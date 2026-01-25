@@ -1,0 +1,3 @@
+# Disable SSL for master realm (run after Keycloak starts)
+# docker exec db90-keycloak /opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:8080 --realm master --user admin --password admin
+# docker exec db90-keycloak /opt/keycloak/bin/kcadm.sh update realms/master -s sslRequired=NONE

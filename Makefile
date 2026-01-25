@@ -53,6 +53,10 @@ setup:
 
 up:
 	docker compose up -d
+	@echo "Waiting for Keycloak to start..."
+	@sleep 15
+	@docker exec db90-keycloak /opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:8080 --realm master --user admin --password admin 2>/dev/null || true
+	@docker exec db90-keycloak /opt/keycloak/bin/kcadm.sh update realms/master -s sslRequired=NONE 2>/dev/null || true
 	@echo ""
 	@echo "Services started:"
 	@echo "  PostgreSQL:  localhost:5432"
