@@ -23,8 +23,8 @@ gem "redis"
 # Authorization
 gem "action_policy"
 
-# Admin interface
-gem "administrate"
+# Admin interface (requires separate configuration for API-only apps)
+# gem "administrate"
 
 # API documentation
 gem "rswag-api"
