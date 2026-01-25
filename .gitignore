@@ -1,0 +1,56 @@
+# Dependencies
+node_modules/
+vendor/bundle/
+
+# Build outputs
+dist/
+build/
+tmp/
+log/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Rails
+/packages/api/log/*
+/packages/api/tmp/*
+/packages/api/storage/*
+/packages/api/public/assets
+/packages/api/public/packs
+/packages/api/.bundle
+!/packages/api/log/.keep
+!/packages/api/tmp/.keep
+
+# Rails credentials
+/packages/api/config/master.key
+/packages/api/config/credentials/*.key
+
+# Node/Vite
+/packages/web/node_modules
+/packages/web/dist
+
+# Temporal
+/temporal/vendor/bundle
+
+# Docker volumes
+postgres-data/
+redis-data/
+minio-data/
+temporal-data/
+
+# Test coverage
+coverage/
+.coverage
+
+# Misc
+*.log
+*.pid
