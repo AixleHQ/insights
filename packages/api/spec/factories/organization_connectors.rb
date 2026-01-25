@@ -1,0 +1,31 @@
+FactoryBot.define do
+  factory :organization_connector do
+    organization
+    connector_type { 'github' }
+    external_org_id { SecureRandom.hex(8) }
+    external_org_name { Faker::Company.name }
+    is_active { true }
+
+    trait :github do
+      connector_type { 'github' }
+    end
+
+    trait :gitlab do
+      connector_type { 'gitlab' }
+    end
+
+    trait :jira do
+      connector_type { 'jira' }
+    end
+
+    trait :inactive do
+      is_active { false }
+    end
+
+    trait :with_tokens do
+      access_token { SecureRandom.hex(32) }
+      refresh_token { SecureRandom.hex(32) }
+      token_expires_at { 1.hour.from_now }
+    end
+  end
+end
