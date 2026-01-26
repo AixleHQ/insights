@@ -9,19 +9,22 @@ import {
 import { useAuth } from './AuthContext';
 import { setCurrentOrganizationId } from '../lib/api';
 
-// Organization type matching the Rails model
+export type MemberRole = 'owner' | 'admin' | 'member' | 'viewer';
+
+// Organization type matching the Rails API response
 export interface Organization {
   id: string;
   name: string;
   slug: string;
   description?: string;
   is_active: boolean;
+  user_role?: MemberRole;
 }
 
-// Organization membership with role
+// Organization membership derived from API response
 export interface OrganizationMembership {
   organization: Organization;
-  role: 'owner' | 'admin' | 'member' | 'viewer';
+  role: MemberRole;
 }
 
 interface OrgState {
@@ -37,6 +40,7 @@ interface OrgContextValue extends OrgState {
   refreshOrganizations: () => Promise<void>;
   hasRole: (role: string | string[]) => boolean;
   currentMembership: OrganizationMembership | null;
+  currentRole: MemberRole | null;
 }
 
 const OrgContext = createContext<OrgContextValue | null>(null);
@@ -87,8 +91,14 @@ export function OrgProvider({ children, apiBaseUrl = '/api/v1' }: OrgProviderPro
       }
 
       const data = await response.json();
-      const memberships: OrganizationMembership[] = data.memberships || [];
-      const organizations = memberships.map((m) => m.organization);
+      // API returns { data: Organization[], meta: {...} }
+      // Each organization includes user_role field
+      const orgsWithRoles: Organization[] = data.data || [];
+      const organizations = orgsWithRoles;
+      const memberships: OrganizationMembership[] = orgsWithRoles.map((org) => ({
+        organization: org,
+        role: org.user_role || 'member',
+      }));
 
       // Restore previously selected org from localStorage
       const storedOrgId = localStorage.getItem(ORG_STORAGE_KEY);
@@ -160,12 +170,16 @@ export function OrgProvider({ children, apiBaseUrl = '/api/v1' }: OrgProviderPro
     [currentMembership]
   );
 
+  // Get current role directly
+  const currentRole = currentMembership?.role || null;
+
   const value: OrgContextValue = {
     ...state,
     setCurrentOrg,
     refreshOrganizations,
     hasRole,
     currentMembership,
+    currentRole,
   };
 
   return <OrgContext.Provider value={value}>{children}</OrgContext.Provider>;

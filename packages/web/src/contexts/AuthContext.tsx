@@ -12,6 +12,7 @@ import {
   logout as authLogout,
   getUser,
   getUserProfile,
+  directLogin as authDirectLogin,
   type User,
   type UserProfile,
 } from '../lib/auth';
@@ -28,6 +29,7 @@ interface AuthContextValue extends AuthState {
   login: () => Promise<void>;
   logout: () => Promise<void>;
   getAccessToken: () => Promise<string | null>;
+  directLogin: (username: string, password: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -166,11 +168,33 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return state.user.access_token;
   }, [state.user]);
 
+  const directLogin = useCallback(async (username: string, password: string) => {
+    setState((prev) => ({ ...prev, isLoading: true, error: null }));
+    try {
+      const user = await authDirectLogin(username, password);
+      setState({
+        isAuthenticated: true,
+        isLoading: false,
+        user,
+        profile: getUserProfile(user),
+        error: null,
+      });
+    } catch (error) {
+      setState((prev) => ({
+        ...prev,
+        isLoading: false,
+        error: error instanceof Error ? error : new Error('Direct login failed'),
+      }));
+      throw error;
+    }
+  }, []);
+
   const value: AuthContextValue = {
     ...state,
     login,
     logout,
     getAccessToken,
+    directLogin,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

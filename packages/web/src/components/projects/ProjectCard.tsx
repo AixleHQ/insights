@@ -35,8 +35,10 @@ interface ProjectCardProps {
   className?: string;
 }
 
-function formatDate(dateStr: string): string {
+function formatDate(dateStr: string | undefined | null): string {
+  if (!dateStr) return '-';
   const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return '-';
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
@@ -111,7 +113,7 @@ export function ProjectCard({ project, onEdit, onDelete, className }: ProjectCar
               Events
             </div>
             <p className="font-mono-display text-sm font-medium">
-              {project.event_count.toLocaleString()}
+              {(project.event_count || 0).toLocaleString()}
             </p>
           </div>
           <div className="space-y-1">
@@ -120,7 +122,7 @@ export function ProjectCard({ project, onEdit, onDelete, className }: ProjectCar
               Cost
             </div>
             <p className="font-mono-display text-sm font-medium">
-              {formatCurrency(project.total_cost_usd)}
+              {formatCurrency(project.total_cost_usd || 0)}
             </p>
           </div>
           <div className="space-y-1">

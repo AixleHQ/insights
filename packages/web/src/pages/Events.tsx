@@ -52,12 +52,12 @@ export function Events() {
   const events: EventRow[] = useMemo(() => {
     return eventsResponse?.data?.map((e) => ({
       id: e.id,
-      tool_name: e.tool_name,
-      event_type: e.event_type,
-      risk_level: e.risk_level,
-      cost_usd: e.cost_usd,
-      token_count: (e.input_tokens || 0) + (e.output_tokens || 0),
-      created_at: e.created_at,
+      tool_name: e.toolName,
+      event_type: e.eventType,
+      risk_level: e.riskLevel,
+      cost_usd: e.costUsd,
+      token_count: (e.inputTokens || 0) + (e.outputTokens || 0),
+      created_at: e.occurredAt || e.createdAt,
       user: e.user ? { email: e.user.email } : undefined,
       project: e.project ? { name: e.project.name } : undefined,
     })) || [];
@@ -81,9 +81,9 @@ export function Events() {
       const search = filters.search.toLowerCase();
       result = result.filter(
         (e) =>
-          e.tool_name.toLowerCase().includes(search) ||
-          e.user?.email.toLowerCase().includes(search) ||
-          e.project?.name.toLowerCase().includes(search)
+          (e.tool_name || '').toLowerCase().includes(search) ||
+          (e.user?.email || '').toLowerCase().includes(search) ||
+          (e.project?.name || '').toLowerCase().includes(search)
       );
     }
 
@@ -92,13 +92,13 @@ export function Events() {
       let comparison = 0;
       switch (sortField) {
         case 'created_at':
-          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          comparison = new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
           break;
         case 'tool_name':
-          comparison = a.tool_name.localeCompare(b.tool_name);
+          comparison = (a.tool_name || '').localeCompare(b.tool_name || '');
           break;
         case 'risk_level':
-          comparison = riskLevelOrder[a.risk_level] - riskLevelOrder[b.risk_level];
+          comparison = (riskLevelOrder[a.risk_level as keyof typeof riskLevelOrder] || 0) - (riskLevelOrder[b.risk_level as keyof typeof riskLevelOrder] || 0);
           break;
         case 'cost_usd':
           comparison = (a.cost_usd || 0) - (b.cost_usd || 0);
@@ -118,7 +118,7 @@ export function Events() {
       e.tool_name,
       e.event_type,
       e.risk_level,
-      e.cost_usd?.toFixed(4) || '0',
+      e.cost_usd != null ? Number(e.cost_usd).toFixed(4) : '0',
       e.token_count || '0',
       e.user?.email || '',
       e.project?.name || '',

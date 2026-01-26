@@ -5,7 +5,18 @@ module Api
     class UsersController < BaseController
       # GET /api/v1/users/me
       def me
-        render_resource(current_user, UserSerializer)
+        response_data = UserSerializer.new(current_user).serialize
+
+        # Include impersonation info if this is an impersonation request
+        if request.env['jwt.impersonation']
+          response_data[:impersonation] = {
+            active: true,
+            impersonator_id: request.env['jwt.impersonator_id'],
+            impersonator_email: request.env['jwt.impersonator_email']
+          }
+        end
+
+        render json: { data: response_data }
       end
 
       # PATCH /api/v1/users/me

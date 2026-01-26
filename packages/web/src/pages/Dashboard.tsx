@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Activity, DollarSign, AlertTriangle, Users } from 'lucide-react';
 import { useOrg } from '@/contexts/OrgContext';
 import { useOverviewStats, useDailyStats, useEvents, useActivityHeatmap } from '@/hooks/useApi';
@@ -56,33 +57,50 @@ export function Dashboard() {
 
   const events: ActivityEvent[] = eventsResponse?.data?.map((e) => ({
     id: e.id,
-    tool_name: e.tool_name,
-    event_type: e.event_type,
-    risk_level: e.risk_level,
-    cost_usd: e.cost_usd,
-    created_at: e.created_at,
+    tool_name: e.toolName,
+    event_type: e.eventType,
+    risk_level: e.riskLevel,
+    cost_usd: e.costUsd,
+    created_at: e.occurredAt || e.createdAt,
     user: e.user ? { email: e.user.email } : undefined,
     project: e.project ? { name: e.project.name } : undefined,
   })) || [];
 
-  // Mock alerts for now since the alerts endpoint might not exist yet
+  // Track dismissed alerts in local storage (per organization)
+  const dismissedAlertsKey = `db90_dismissed_alerts_${currentOrg?.id}`;
+  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem(dismissedAlertsKey);
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  // Sync dismissed alerts to localStorage
+  useEffect(() => {
+    if (currentOrg?.id) {
+      localStorage.setItem(dismissedAlertsKey, JSON.stringify([...dismissedAlerts]));
+    }
+  }, [dismissedAlerts, dismissedAlertsKey, currentOrg?.id]);
+
+  // Derive alerts from stats
   const alerts: Alert[] = stats?.high_risk_events && stats.high_risk_events > 0
     ? [
         {
-          id: '1',
+          id: 'high-risk-events',
           type: 'risk_detected',
           severity: 'warning',
           title: 'High-risk events detected',
           description: `${stats.high_risk_events} high-risk event(s) require attention`,
           created_at: new Date().toISOString(),
-          acknowledged: false,
+          acknowledged: dismissedAlerts.has('high-risk-events'),
         },
       ]
     : [];
 
   const handleDismissAlert = (id: string) => {
-    // TODO: Implement alert dismissal via API
-    console.log('Dismiss alert:', id);
+    setDismissedAlerts((prev) => new Set([...prev, id]));
   };
 
   return (

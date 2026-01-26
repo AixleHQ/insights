@@ -101,18 +101,19 @@ export type EventType = 'completion' | 'prompt' | 'chat' | 'edit' | 'generation'
 
 export interface ToolEvent {
   id: string;
-  tool_name: string;
-  event_type: EventType;
-  risk_level: RiskLevel;
-  cost_usd: number;
-  input_tokens: number | null;
-  output_tokens: number | null;
+  toolName: string;
+  eventType: EventType;
+  riskLevel: RiskLevel;
+  costUsd: number;
+  inputTokens: number | null;
+  outputTokens: number | null;
   model: string | null;
-  sanitized_content: string | null;
-  security_findings: SecurityFinding[];
+  sanitizedContent: string | null;
+  securityFindings: SecurityFinding[];
   user: { id: string; email: string; name: string | null } | null;
   project: { id: string; name: string } | null;
-  created_at: string;
+  createdAt: string;
+  occurredAt: string;
 }
 
 export interface SecurityFinding {

@@ -73,6 +73,7 @@ Rails.application.routes.draw do
         get 'stats/overview', to: 'stats#overview'
         get 'stats/hourly', to: 'stats#hourly'
         get 'stats/daily', to: 'stats#daily'
+        get 'stats/heatmap', to: 'stats#heatmap'
 
         # AI Gateway
         scope 'ai/:provider' do

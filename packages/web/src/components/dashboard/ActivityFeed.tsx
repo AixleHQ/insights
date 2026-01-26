@@ -17,9 +17,9 @@ import {
 
 export interface ActivityEvent {
   id: string;
-  tool_name: string;
-  event_type: string;
-  risk_level: 'critical' | 'high' | 'medium' | 'low' | 'none';
+  tool_name?: string;
+  event_type?: string;
+  risk_level?: 'critical' | 'high' | 'medium' | 'low' | 'none';
   cost_usd?: number;
   created_at: string;
   user?: {
@@ -45,7 +45,8 @@ const toolIcons: Record<string, typeof Code2> = {
   'default': FileSearch,
 };
 
-function getToolIcon(toolName: string) {
+function getToolIcon(toolName: string | undefined | null) {
+  if (!toolName) return toolIcons.default;
   const normalizedName = toolName.toLowerCase().replace(/[\s_-]/g, '-');
   return toolIcons[normalizedName] || toolIcons.default;
 }
@@ -117,18 +118,18 @@ function ActivityItem({ event }: { event: ActivityEvent }) {
       </div>
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-medium">{event.tool_name}</span>
-          <RiskBadge level={event.risk_level} />
+          <span className="truncate text-sm font-medium">{event.tool_name || 'Unknown tool'}</span>
+          <RiskBadge level={event.risk_level || 'none'} />
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span className="truncate">{event.user?.email || 'Unknown user'}</span>
           <span>·</span>
           <span>{timeAgo}</span>
-          {event.cost_usd !== undefined && event.cost_usd > 0 && (
+          {event.cost_usd !== undefined && Number(event.cost_usd) > 0 && (
             <>
               <span>·</span>
               <span className="font-mono-display">
-                ${event.cost_usd.toFixed(3)}
+                ${Number(event.cost_usd).toFixed(3)}
               </span>
             </>
           )}

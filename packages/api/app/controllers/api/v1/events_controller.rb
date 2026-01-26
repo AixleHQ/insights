@@ -10,7 +10,7 @@ module Api
       def index
         events = authorized_scope(current_organization.tool_events)
         events = apply_filters(events)
-        events = events.order(occurred_at: :desc)
+        events = events.includes(:user, :project).order(occurred_at: :desc)
 
         render_collection(events, ToolEventSerializer)
       end
@@ -51,7 +51,7 @@ module Api
 
         events = current_organization.tool_events.where(user_id: nil)
         events = apply_filters(events)
-        events = events.order(occurred_at: :desc)
+        events = events.includes(:project).order(occurred_at: :desc)
 
         render_collection(events, ToolEventSerializer)
       end

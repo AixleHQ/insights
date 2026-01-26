@@ -6,36 +6,48 @@ module Api
       before_action :require_organization!
 
       # GET /api/v1/organizations/:organization_id/stats/overview
+      # Frontend expects: { total_events, total_cost_usd, high_risk_events, active_users, events_change_percent, cost_change_percent }
       def overview
         authorize! current_organization, to: :show?
 
-        time_range = parse_time_range
-        events = current_organization.tool_events
-                                     .where(occurred_at: time_range[:start]..time_range[:end])
+        # Current period (this month)
+        current_start = Time.current.beginning_of_month
+        current_end = Time.current
+        current_events = current_organization.tool_events.where(occurred_at: current_start..current_end)
 
-        data = {
-          timeRange: {
-            start: time_range[:start].iso8601,
-            end: time_range[:end].iso8601
-          },
-          summary: {
-            totalEvents: events.count,
-            totalTokensIn: events.sum(:tokens_in),
-            totalTokensOut: events.sum(:tokens_out),
-            totalTokens: events.sum(:tokens_in) + events.sum(:tokens_out),
-            totalCostUsd: events.sum(:cost_usd).to_f,
-            totalDurationMs: events.sum(:duration_ms),
-            uniqueUsers: events.distinct.count(:user_id),
-            uniqueTools: events.distinct.count(:tool_name)
-          },
-          byTool: aggregate_by_column(events, :tool_name),
-          byEventType: aggregate_by_column(events, :event_type),
-          byModel: aggregate_by_column(events, :model),
-          topUsers: top_users(events, 10),
-          riskSummary: risk_summary(time_range)
+        # Previous period (last month) for comparison
+        prev_start = 1.month.ago.beginning_of_month
+        prev_end = 1.month.ago.end_of_month
+        prev_events = current_organization.tool_events.where(occurred_at: prev_start..prev_end)
+
+        # Last 7 days for active users
+        week_ago = 7.days.ago
+        active_users = current_organization.tool_events.where('occurred_at > ?', week_ago).distinct.count(:user_id)
+
+        # High risk events (from audit logs)
+        high_risk_count = AuditLog
+          .joins(:tool_event)
+          .where(tool_events: { organization_id: current_organization.id })
+          .where(risk_level: %w[high critical])
+          .count
+
+        # Calculate change percentages
+        current_count = current_events.count
+        prev_count = prev_events.count
+        events_change = prev_count > 0 ? ((current_count - prev_count).to_f / prev_count * 100) : 0
+
+        current_cost = current_events.sum(:cost_usd).to_f
+        prev_cost = prev_events.sum(:cost_usd).to_f
+        cost_change = prev_cost > 0 ? ((current_cost - prev_cost) / prev_cost * 100) : 0
+
+        render json: {
+          total_events: current_count,
+          total_cost_usd: current_cost,
+          high_risk_events: high_risk_count,
+          active_users: active_users,
+          events_change_percent: events_change.round(1),
+          cost_change_percent: cost_change.round(1)
         }
-
-        render json: { data: data }
       end
 
       # GET /api/v1/organizations/:organization_id/stats/hourly
@@ -80,10 +92,12 @@ module Api
       end
 
       # GET /api/v1/organizations/:organization_id/stats/daily
+      # Frontend expects: { data: DailyStats[], tool_breakdown: ToolUsageStats[] }
       def daily
         authorize! current_organization, to: :show?
 
-        time_range = parse_time_range(default_days: 30)
+        days = (params[:days] || 30).to_i
+        time_range = parse_time_range(default_days: days)
         events = current_organization.tool_events
                                      .where(occurred_at: time_range[:start]..time_range[:end])
 
@@ -92,34 +106,62 @@ module Api
           .select(
             "DATE_TRUNC('day', occurred_at) as day",
             'COUNT(*) as event_count',
-            'SUM(tokens_in) as tokens_in',
-            'SUM(tokens_out) as tokens_out',
-            'SUM(cost_usd) as cost_usd',
-            'COUNT(DISTINCT user_id) as unique_users',
-            'COUNT(DISTINCT tool_name) as unique_tools'
+            'SUM(cost_usd) as cost_usd'
           )
           .order('day')
           .map do |row|
             {
-              day: row.day&.to_date&.iso8601,
-              eventCount: row.event_count,
-              tokensIn: row.tokens_in || 0,
-              tokensOut: row.tokens_out || 0,
-              costUsd: (row.cost_usd || 0).to_f,
-              uniqueUsers: row.unique_users,
-              uniqueTools: row.unique_tools
+              date: row.day&.to_date&.iso8601,
+              event_count: row.event_count,
+              cost_usd: (row.cost_usd || 0).to_f
+            }
+          end
+
+        tool_breakdown = events
+          .group(:tool_name)
+          .select(
+            'tool_name',
+            'COUNT(*) as event_count',
+            'SUM(cost_usd) as cost_usd'
+          )
+          .order('event_count DESC')
+          .map do |row|
+            {
+              tool_name: row.tool_name,
+              event_count: row.event_count,
+              cost_usd: (row.cost_usd || 0).to_f
             }
           end
 
         render json: {
-          data: {
-            timeRange: {
-              start: time_range[:start].iso8601,
-              end: time_range[:end].iso8601
-            },
-            daily: daily_data
-          }
+          data: daily_data,
+          tool_breakdown: tool_breakdown
         }
+      end
+
+      # GET /api/v1/organizations/:organization_id/stats/heatmap
+      # Returns activity data for the past year for heatmap visualization
+      def heatmap
+        authorize! current_organization, to: :show?
+
+        # Get past year of data
+        start_date = 1.year.ago.beginning_of_day
+        end_date = Time.current
+
+        daily_counts = current_organization.tool_events
+          .where(occurred_at: start_date..end_date)
+          .group("DATE(occurred_at)")
+          .count
+
+        # Convert to array format expected by frontend
+        heatmap_data = daily_counts.map do |date, count|
+          {
+            date: date.to_s,
+            count: count
+          }
+        end
+
+        render json: heatmap_data
       end
 
       private

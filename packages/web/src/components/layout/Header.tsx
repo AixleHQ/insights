@@ -13,7 +13,6 @@ import {
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Separator } from '@/components/ui/separator';
 import { Breadcrumbs } from './Breadcrumbs';
-import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
@@ -30,34 +29,7 @@ import {
   CommandList,
   CommandSeparator,
 } from '@/components/ui/command';
-
-// Mock notifications for UI demonstration
-const mockNotifications = [
-  {
-    id: '1',
-    title: 'Cost threshold exceeded',
-    description: 'API costs exceeded $500 this month',
-    time: '5m ago',
-    read: false,
-    type: 'alert',
-  },
-  {
-    id: '2',
-    title: 'New team member',
-    description: 'John joined your organization',
-    time: '1h ago',
-    read: false,
-    type: 'info',
-  },
-  {
-    id: '3',
-    title: 'Sync completed',
-    description: 'GitHub connector synced 45 repositories',
-    time: '2h ago',
-    read: true,
-    type: 'success',
-  },
-];
+import { useNotifications } from '@/contexts/NotificationsContext';
 
 function CommandPalette({
   open,
@@ -117,7 +89,8 @@ function NotificationBadge({ count }: { count: number }) {
 }
 
 function Notifications() {
-  const unreadCount = mockNotifications.filter((n) => !n.read).length;
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+  const displayNotifications = notifications.slice(0, 5);
 
   return (
     <DropdownMenu>
@@ -132,21 +105,30 @@ function Notifications() {
         <DropdownMenuLabel className="flex items-center justify-between">
           Notifications
           {unreadCount > 0 && (
-            <Badge variant="secondary" className="ml-2 text-xs">
-              {unreadCount} new
-            </Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-auto p-0 text-xs text-primary hover:text-primary/80"
+              onClick={(e) => {
+                e.preventDefault();
+                markAllAsRead();
+              }}
+            >
+              Mark all read
+            </Button>
           )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {mockNotifications.length === 0 ? (
+        {displayNotifications.length === 0 ? (
           <div className="py-6 text-center text-sm text-muted-foreground">
             No notifications
           </div>
         ) : (
-          mockNotifications.map((notification) => (
+          displayNotifications.map((notification) => (
             <DropdownMenuItem
               key={notification.id}
               className="flex cursor-pointer flex-col items-start gap-1 p-3"
+              onClick={() => markAsRead(notification.id)}
             >
               <div className="flex w-full items-start justify-between gap-2">
                 <span

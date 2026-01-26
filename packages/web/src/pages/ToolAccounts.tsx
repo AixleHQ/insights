@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -9,11 +9,13 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { useOrg } from '@/contexts/OrgContext';
-import { useToolAccounts, useDeleteToolAccount } from '@/hooks/useApi';
+import { useToolAccounts, useDeleteToolAccount, useCreateToolAccount } from '@/hooks/useApi';
 import type { ToolAccount } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Card,
   CardContent,
@@ -21,6 +23,14 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -99,10 +109,81 @@ function AccountSkeleton() {
   );
 }
 
+interface ConnectDialogProps {
+  provider: ToolProvider | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (providerId: string, accountId: string, accountName: string) => Promise<void>;
+  isSubmitting: boolean;
+}
+
+function ConnectDialog({ provider, open, onOpenChange, onSubmit, isSubmitting }: ConnectDialogProps) {
+  const [accountId, setAccountId] = useState('');
+  const [accountName, setAccountName] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!provider || !accountId.trim()) return;
+    await onSubmit(provider.id, accountId.trim(), accountName.trim());
+    setAccountId('');
+    setAccountName('');
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Connect {provider?.name}</DialogTitle>
+          <DialogDescription>
+            Enter your {provider?.name} account identifier to enable automatic event attribution.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="account-id">Account ID or Username</Label>
+              <Input
+                id="account-id"
+                value={accountId}
+                onChange={(e) => setAccountId(e.target.value)}
+                placeholder={`Your ${provider?.name} username or ID`}
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                This should match the identifier used in your API requests.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="account-name">Display Name (optional)</Label>
+              <Input
+                id="account-name"
+                value={accountName}
+                onChange={(e) => setAccountName(e.target.value)}
+                placeholder="How you want it displayed"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={!accountId.trim() || isSubmitting}>
+              {isSubmitting ? 'Connecting...' : 'Connect Account'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function ToolAccounts() {
   const { currentOrg } = useOrg();
+  const [connectingProvider, setConnectingProvider] = useState<ToolProvider | null>(null);
 
   const { data: accounts, isLoading } = useToolAccounts(currentOrg?.id || '');
+  const createAccount = useCreateToolAccount();
   const deleteAccount = useDeleteToolAccount();
 
   // Map linked accounts by provider
@@ -114,9 +195,21 @@ export function ToolAccounts() {
     return map;
   }, [accounts]);
 
-  const handleConnect = (providerId: string) => {
-    // In production, this would redirect to OAuth flow
-    console.log('Connecting to:', providerId);
+  const handleConnect = (provider: ToolProvider) => {
+    setConnectingProvider(provider);
+  };
+
+  const handleConnectSubmit = async (providerId: string, accountId: string, _accountName: string) => {
+    if (!currentOrg) return;
+    try {
+      await createAccount.mutateAsync({
+        orgId: currentOrg.id,
+        provider: providerId,
+        code: accountId, // Using code field for account ID
+      });
+    } catch (error) {
+      console.error('Failed to connect account:', error);
+    }
   };
 
   const handleDisconnect = async (accountId: string) => {
@@ -241,7 +334,7 @@ export function ToolAccounts() {
                       </AlertDialogContent>
                     </AlertDialog>
                   ) : (
-                    <Button variant="outline" size="sm" onClick={() => handleConnect(provider.id)}>
+                    <Button variant="outline" size="sm" onClick={() => handleConnect(provider)}>
                       <Plus className="mr-2 size-4" />
                       Connect
                     </Button>
@@ -265,6 +358,14 @@ export function ToolAccounts() {
           </div>
         </CardContent>
       </Card>
+
+      <ConnectDialog
+        provider={connectingProvider}
+        open={!!connectingProvider}
+        onOpenChange={(open) => !open && setConnectingProvider(null)}
+        onSubmit={handleConnectSubmit}
+        isSubmitting={createAccount.isPending}
+      />
     </div>
   );
 }

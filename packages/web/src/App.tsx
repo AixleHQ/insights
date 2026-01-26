@@ -1,15 +1,21 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { OrgProvider } from './contexts/OrgContext';
+import { NotificationsProvider } from './contexts/NotificationsContext';
+import { ImpersonationProvider } from './contexts/ImpersonationContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { ImpersonationBar } from './components/ImpersonationBar';
 import { AppLayout } from './components/layout';
 import { Login } from './pages/Login';
 import { AuthCallback } from './pages/AuthCallback';
+import { AuthIframeCallback } from './pages/AuthIframeCallback';
+import { AuthPopupCallback } from './pages/AuthPopupCallback';
 import { Dashboard } from './pages/Dashboard';
 import { Events } from './pages/Events';
 import { EventDetailPage } from './pages/EventDetailPage';
 import { Projects } from './pages/Projects';
 import { NewProject } from './pages/NewProject';
+import { EditProject } from './pages/EditProject';
 import { ProjectDetail } from './pages/ProjectDetail';
 import { Connectors } from './pages/Connectors';
 import { Team } from './pages/Team';
@@ -18,6 +24,7 @@ import { Settings } from './pages/Settings';
 import { ConnectorSetup } from './pages/ConnectorSetup';
 import { ToolAccounts } from './pages/ToolAccounts';
 import { UnattributedEvents } from './pages/UnattributedEvents';
+import { Notifications } from './pages/Notifications';
 import {
   AdminLayout,
   AdminOverview,
@@ -28,12 +35,17 @@ import {
 function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <OrgProvider apiBaseUrl={import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1'}>
-          <Routes>
+      <ImpersonationProvider>
+        <AuthProvider>
+          <OrgProvider apiBaseUrl={import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1'}>
+            <NotificationsProvider>
+              <ImpersonationBar />
+              <Routes>
             {/* Public routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/auth/iframe-callback" element={<AuthIframeCallback />} />
+            <Route path="/auth/popup-callback" element={<AuthPopupCallback />} />
 
             {/* Protected routes with AppLayout */}
             <Route
@@ -49,6 +61,7 @@ function App() {
               <Route path="/projects" element={<Projects />} />
               <Route path="/projects/new" element={<NewProject />} />
               <Route path="/projects/:id" element={<ProjectDetail />} />
+              <Route path="/projects/:id/edit" element={<EditProject />} />
               <Route path="/connectors" element={<Connectors />} />
               <Route path="/connectors/new/:provider" element={<ConnectorSetup />} />
               <Route path="/team" element={<Team />} />
@@ -56,6 +69,7 @@ function App() {
               <Route path="/settings/*" element={<Settings />} />
               <Route path="/settings/tool-accounts" element={<ToolAccounts />} />
               <Route path="/events/unattributed" element={<UnattributedEvents />} />
+              <Route path="/notifications" element={<Notifications />} />
 
               {/* Admin routes */}
               <Route path="/admin" element={<AdminLayout />}>
@@ -64,9 +78,11 @@ function App() {
                 <Route path="organizations" element={<AdminOrganizations />} />
               </Route>
             </Route>
-          </Routes>
-        </OrgProvider>
-      </AuthProvider>
+              </Routes>
+            </NotificationsProvider>
+          </OrgProvider>
+        </AuthProvider>
+      </ImpersonationProvider>
     </BrowserRouter>
   );
 }

@@ -11,9 +11,9 @@ import { cn } from '@/lib/utils';
 
 export interface EventDetailData {
   id: string;
-  tool_name: string;
-  event_type: string;
-  risk_level: 'critical' | 'high' | 'medium' | 'low' | 'none';
+  tool_name?: string;
+  event_type?: string;
+  risk_level?: 'critical' | 'high' | 'medium' | 'low' | 'none';
   cost_usd?: number;
   token_count?: number;
   created_at: string;
@@ -129,11 +129,11 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-semibold">{event.tool_name}</h1>
-              <RiskBadge level={event.risk_level} />
+              <h1 className="text-xl font-semibold">{event.tool_name || 'Unknown Tool'}</h1>
+              <RiskBadge level={event.risk_level || 'none'} />
             </div>
             <p className="text-sm text-muted-foreground">
-              {event.event_type.replace('_', ' ')} · {formattedDate}
+              {(event.event_type || 'unknown').replace('_', ' ')} · {formattedDate}
             </p>
           </div>
         </div>
@@ -183,7 +183,7 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
               label="Cost"
               value={
                 event.cost_usd !== undefined ? (
-                  <span className="font-mono-display">${event.cost_usd.toFixed(4)}</span>
+                  <span className="font-mono-display">${Number(event.cost_usd).toFixed(4)}</span>
                 ) : (
                   <span className="text-muted-foreground">-</span>
                 )
@@ -205,7 +205,7 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
             <DetailRow
               icon={Shield}
               label="Risk Level"
-              value={<RiskBadge level={event.risk_level} />}
+              value={<RiskBadge level={event.risk_level || 'none'} />}
             />
           </CardContent>
         </Card>

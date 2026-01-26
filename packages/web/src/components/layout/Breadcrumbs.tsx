@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { ChevronRight, Home } from 'lucide-react';
 import {
@@ -79,29 +80,31 @@ export function Breadcrumbs() {
           const isLast = index === crumbs.length - 1;
 
           return (
-            <BreadcrumbItem key={index}>
+            <Fragment key={index}>
               {index > 0 && (
                 <BreadcrumbSeparator>
                   <ChevronRight className="size-3.5" />
                 </BreadcrumbSeparator>
               )}
-              {isLast ? (
-                <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
-              ) : (
-                <BreadcrumbLink asChild>
-                  <Link to={crumb.href || '/'}>
-                    {index === 0 ? (
-                      <span className="flex items-center gap-1.5">
-                        <Home className="size-3.5" />
-                        <span className="sr-only md:not-sr-only">{crumb.label}</span>
-                      </span>
-                    ) : (
-                      crumb.label
-                    )}
-                  </Link>
-                </BreadcrumbLink>
-              )}
-            </BreadcrumbItem>
+              <BreadcrumbItem>
+                {isLast ? (
+                  <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+                ) : (
+                  <BreadcrumbLink asChild>
+                    <Link to={crumb.href || '/'}>
+                      {index === 0 ? (
+                        <span className="flex items-center gap-1.5">
+                          <Home className="size-3.5" />
+                          <span className="sr-only md:not-sr-only">{crumb.label}</span>
+                        </span>
+                      ) : (
+                        crumb.label
+                      )}
+                    </Link>
+                  </BreadcrumbLink>
+                )}
+              </BreadcrumbItem>
+            </Fragment>
           );
         })}
       </BreadcrumbList>

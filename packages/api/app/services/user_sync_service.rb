@@ -9,7 +9,7 @@ class UserSyncService
 
   # Email domains that should be auto-assigned to organizations
   DOMAIN_ORG_MAPPING = {
-    'example.com' => 'dbp',
+    'example.com' => 'dualboot-partners',
     'partner.example.com' => 'fueled'
   }.freeze
 
@@ -18,7 +18,8 @@ class UserSyncService
       keycloak_sub = claims['sub']
       raise ArgumentError, 'Missing sub claim' if keycloak_sub.blank?
 
-      user = find_or_initialize_user(keycloak_sub)
+      email = claims['email']
+      user = find_or_initialize_user_with_email(keycloak_sub, email)
       update_user_attributes(user, claims)
       user.save!
 
@@ -33,8 +34,23 @@ class UserSyncService
 
     private
 
-    def find_or_initialize_user(keycloak_sub)
-      User.find_or_initialize_by(keycloak_sub: keycloak_sub)
+    def find_or_initialize_user_with_email(keycloak_sub, email)
+      # First try to find by keycloak_sub
+      user = User.find_by(keycloak_sub: keycloak_sub)
+      return user if user
+
+      # Check for existing user with this email (may have pending keycloak_sub)
+      if email.present?
+        existing = User.find_by(email: email)
+        if existing && existing.keycloak_sub&.start_with?('pending-')
+          # Update the pending keycloak_sub with the real one
+          existing.update!(keycloak_sub: keycloak_sub)
+          return existing
+        end
+      end
+
+      # Create new user
+      User.new(keycloak_sub: keycloak_sub)
     end
 
     def update_user_attributes(user, claims)

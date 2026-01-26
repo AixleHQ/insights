@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import { UserPlus, Search, Users } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { UserPlus, Search, Users, LogOut, AlertTriangle } from 'lucide-react';
 import { useOrg } from '@/contexts/OrgContext';
-import { useOrganizationMembers, useUpdateMemberRole, useRemoveMember } from '@/hooks/useApi';
+import { useAuth } from '@/contexts/AuthContext';
+import { useOrganizationMembers, useUpdateMemberRole, useRemoveMember, useLeaveOrganization } from '@/hooks/useApi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -12,6 +13,18 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MemberRow, type MemberData, type MemberRole } from '@/components/team';
 
@@ -48,12 +61,15 @@ function MemberSkeleton() {
 }
 
 export function Team() {
-  const { currentOrg, currentMembership } = useOrg();
+  const navigate = useNavigate();
+  const { currentOrg, currentMembership, organizations, setCurrentOrg, refreshOrganizations } = useOrg();
+  const { profile } = useAuth();
   const [search, setSearch] = useState('');
 
   const { data: membersData, isLoading } = useOrganizationMembers(currentOrg?.id || '');
   const updateMemberRole = useUpdateMemberRole();
   const removeMember = useRemoveMember();
+  const leaveOrganization = useLeaveOrganization();
 
   // Transform API response to component format
   const members: MemberData[] = useMemo(() => {
@@ -173,6 +189,120 @@ export function Team() {
             )}
           </TableBody>
         </Table>
+      </div>
+
+      <LeaveOrganizationSection
+        currentOrg={currentOrg}
+        currentMembership={currentMembership}
+        members={members}
+        organizations={organizations}
+        currentUserEmail={profile?.email}
+        onLeave={async (membershipId: string) => {
+          if (!currentOrg) return;
+          await leaveOrganization.mutateAsync({
+            orgId: currentOrg.id,
+            memberId: membershipId,
+          });
+          await refreshOrganizations();
+          // Switch to another org or redirect
+          const remainingOrgs = organizations.filter((o) => o.id !== currentOrg.id);
+          if (remainingOrgs.length > 0) {
+            setCurrentOrg(remainingOrgs[0]);
+          } else {
+            navigate('/');
+          }
+        }}
+        isLeaving={leaveOrganization.isPending}
+      />
+    </div>
+  );
+}
+
+interface LeaveOrganizationSectionProps {
+  currentOrg: { id: string; name: string } | null;
+  currentMembership: { role: MemberRole; organization: { id: string } } | null;
+  members: MemberData[];
+  organizations: { id: string }[];
+  currentUserEmail?: string;
+  onLeave: (membershipId: string) => Promise<void>;
+  isLeaving: boolean;
+}
+
+function LeaveOrganizationSection({
+  currentOrg,
+  currentMembership,
+  members,
+  organizations,
+  currentUserEmail,
+  onLeave,
+  isLeaving,
+}: LeaveOrganizationSectionProps) {
+  if (!currentOrg || !currentMembership) return null;
+
+  // Find current user's membership ID from members list
+  const currentUserMember = members.find((m) => m.email === currentUserEmail);
+
+  // Check if user is the sole owner
+  const owners = members.filter((m) => m.role === 'owner');
+  const isSoleOwner = currentMembership.role === 'owner' && owners.length === 1;
+
+  // Don't show if user is sole owner
+  if (isSoleOwner) {
+    return (
+      <Alert variant="default" className="mt-8">
+        <AlertTriangle className="size-4" />
+        <AlertTitle>You are the sole owner</AlertTitle>
+        <AlertDescription>
+          You cannot leave this organization because you are the only owner.
+          Transfer ownership to another member first, or delete the organization in Settings.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  const handleLeave = async () => {
+    if (!currentUserMember) return;
+    await onLeave(currentUserMember.id);
+  };
+
+  return (
+    <div className="mt-8 rounded-lg border border-destructive/20 bg-destructive/5 p-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h3 className="font-semibold text-destructive">Leave Organization</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Remove yourself from <span className="font-medium">{currentOrg.name}</span>.
+            {organizations.length > 1
+              ? ' You will be switched to another organization.'
+              : ' You will need to create or join another organization.'}
+          </p>
+        </div>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="destructive" size="sm" disabled={isLeaving || !currentUserMember}>
+              <LogOut className="mr-2 size-4" />
+              {isLeaving ? 'Leaving...' : 'Leave'}
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Leave {currentOrg.name}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                You will lose access to all projects, events, and data in this organization.
+                This action cannot be undone. You will need to be invited again to rejoin.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleLeave}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Leave Organization
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );

@@ -15,11 +15,21 @@ module Admin
         user_agent: request.user_agent
       )
 
-      # Store impersonation info in session
-      session[:impersonated_user_id] = user.id
-      session[:admin_user_id] = current_admin_user.id
+      # Generate an impersonation token
+      token = ImpersonationService.generate_token(
+        admin_user: current_admin_user,
+        target_user: user
+      )
 
-      redirect_to admin_root_path, notice: "Now impersonating #{user.display_name}. Refresh the main app to see changes."
+      # Redirect to frontend with impersonation token
+      frontend_url = ENV.fetch('FRONTEND_URL', 'http://localhost:5173')
+      redirect_to "#{frontend_url}/?impersonate=#{token}", allow_other_host: true
+    end
+
+    def stop_impersonation
+      session.delete(:impersonated_user_id)
+      session.delete(:admin_user_id)
+      redirect_to admin_users_path, notice: 'Stopped impersonating user.'
     end
 
     def export

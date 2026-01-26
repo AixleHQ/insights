@@ -16,11 +16,11 @@ import { cn } from '@/lib/utils';
 
 export interface EventRow {
   id: string;
-  tool_name: string;
-  event_type: string;
-  risk_level: 'critical' | 'high' | 'medium' | 'low' | 'none';
+  tool_name?: string;
+  event_type?: string;
+  risk_level?: 'critical' | 'high' | 'medium' | 'low' | 'none';
   cost_usd?: number;
-  created_at: string;
+  created_at?: string;
   user?: { email: string };
   project?: { name: string };
   token_count?: number;
@@ -102,9 +102,11 @@ function EventRowSkeleton() {
   );
 }
 
-function formatCost(cost?: number): string {
+function formatCost(cost: unknown): string {
   if (cost === undefined || cost === null) return '-';
-  return `$${cost.toFixed(3)}`;
+  const numCost = Number(cost);
+  if (isNaN(numCost)) return '-';
+  return `$${numCost.toFixed(3)}`;
 }
 
 export function EventsTable({
@@ -185,16 +187,16 @@ export function EventsTable({
                     to={`/events/${event.id}`}
                     className="font-medium hover:underline"
                   >
-                    {event.tool_name}
+                    {event.tool_name || 'Unknown'}
                   </Link>
                 </TableCell>
                 <TableCell>
                   <span className="text-xs capitalize text-muted-foreground">
-                    {event.event_type.replace('_', ' ')}
+                    {(event.event_type || 'unknown').replace('_', ' ')}
                   </span>
                 </TableCell>
                 <TableCell>
-                  <RiskBadge level={event.risk_level} />
+                  <RiskBadge level={event.risk_level || 'none'} />
                 </TableCell>
                 <TableCell>
                   <span className="text-sm text-muted-foreground">

@@ -25,9 +25,19 @@ module ApplicationCable
         return
       end
 
-      user = User.find_by(keycloak_sub: claims['sub'])
+      # Use sub if available, otherwise fall back to preferred_username or email
+      user_identifier = claims['sub'] || claims['preferred_username'] || claims['email']
+
+      unless user_identifier
+        Rails.logger.warn "[ActionCable] No user identifier in token"
+        reject_unauthorized_connection
+        return
+      end
+
+      user = User.find_by(keycloak_sub: user_identifier)
 
       unless user
+        Rails.logger.warn "[ActionCable] User not found for identifier: #{user_identifier}"
         reject_unauthorized_connection
         return
       end

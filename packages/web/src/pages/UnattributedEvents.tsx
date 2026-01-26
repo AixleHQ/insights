@@ -87,8 +87,8 @@ export function UnattributedEvents() {
     const searchLower = search.toLowerCase();
     return events.filter(
       (e) =>
-        e.tool_name.toLowerCase().includes(searchLower) ||
-        e.model?.toLowerCase().includes(searchLower)
+        (e.toolName || '').toLowerCase().includes(searchLower) ||
+        (e.model || '').toLowerCase().includes(searchLower)
     );
   }, [events, search]);
 
@@ -208,7 +208,7 @@ export function UnattributedEvents() {
                 <TableRow key={event.id}>
                   <TableCell>
                     <div>
-                      <p className="font-medium">{event.tool_name}</p>
+                      <p className="font-medium">{event.toolName || 'Unknown'}</p>
                       {event.model && (
                         <p className="text-xs text-muted-foreground">{event.model}</p>
                       )}
@@ -216,17 +216,17 @@ export function UnattributedEvents() {
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary" className="text-xs">
-                      {event.event_type}
+                      {event.eventType || 'unknown'}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <RiskBadge level={event.risk_level} />
+                    <RiskBadge level={event.riskLevel || 'none'} />
                   </TableCell>
                   <TableCell className="font-mono text-sm">
-                    ${event.cost_usd.toFixed(4)}
+                    ${Number(event.costUsd ?? 0).toFixed(4)}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {formatDistanceToNow(event.created_at)}
+                    {formatDistanceToNow(event.occurredAt || event.createdAt)}
                   </TableCell>
                   <TableCell>
                     <Button

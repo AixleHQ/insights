@@ -81,14 +81,20 @@ export const queryKeys = {
 export function useCurrentUser() {
   return useQuery({
     queryKey: queryKeys.user.current,
-    queryFn: () => api.get<CurrentUser>('/users/me'),
+    queryFn: async () => {
+      const response = await api.get<{ data: CurrentUser }>('/users/me');
+      return response.data;
+    },
   });
 }
 
 export function useUserOrganizations() {
   return useQuery({
     queryKey: queryKeys.user.organizations,
-    queryFn: () => api.get<Organization[]>('/users/me/organizations'),
+    queryFn: async () => {
+      const response = await api.get<{ data: Organization[] }>('/users/me/organizations');
+      return response.data;
+    },
   });
 }
 
@@ -99,8 +105,24 @@ export function useUserOrganizations() {
 export function useOrganization(id: string) {
   return useQuery({
     queryKey: queryKeys.organizations.detail(id),
-    queryFn: () => api.get<Organization>(`/organizations/${id}`),
+    queryFn: async () => {
+      const response = await api.get<{ data: Organization }>(`/organizations/${id}`);
+      return response.data;
+    },
     enabled: !!id,
+  });
+}
+
+export function useCreateOrganization() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: { name: string; description?: string }) =>
+      api.post<Organization>('/organizations', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.organizations });
+      queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all });
+    },
   });
 }
 
@@ -112,6 +134,20 @@ export function useUpdateOrganization() {
       api.patch<Organization>(`/organizations/${id}`, data),
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.organizations.detail(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.organizations });
+    },
+  });
+}
+
+export function useLeaveOrganization() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ orgId, memberId }: { orgId: string; memberId: string }) =>
+      api.delete(`/organizations/${orgId}/members/${memberId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.organizations });
+      queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all });
     },
   });
 }
@@ -136,6 +172,27 @@ export function useUpdateRetentionPolicy() {
   });
 }
 
+// Organization Settings (key-value store)
+export function useOrganizationSettings(orgId: string) {
+  return useQuery({
+    queryKey: ['organizations', orgId, 'settings'],
+    queryFn: () => api.get<Record<string, unknown>>(`/organizations/${orgId}/settings`),
+    enabled: !!orgId,
+  });
+}
+
+export function useUpdateOrganizationSetting() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ orgId, key, value }: { orgId: string; key: string; value: unknown }) =>
+      api.put(`/organizations/${orgId}/settings/${key}`, { value }),
+    onSuccess: (_, { orgId }) => {
+      queryClient.invalidateQueries({ queryKey: ['organizations', orgId, 'settings'] });
+    },
+  });
+}
+
 // ============================================================================
 // Organization Members Hooks
 // ============================================================================
@@ -143,7 +200,10 @@ export function useUpdateRetentionPolicy() {
 export function useOrganizationMembers(orgId: string) {
   return useQuery({
     queryKey: queryKeys.members.all(orgId),
-    queryFn: () => api.get<OrganizationMember[]>(`/organizations/${orgId}/members`),
+    queryFn: async () => {
+      const response = await api.get<{ data: OrganizationMember[] }>(`/organizations/${orgId}/members`);
+      return response.data;
+    },
     enabled: !!orgId,
   });
 }
@@ -191,7 +251,10 @@ export function useRemoveMember() {
 export function useProjects(orgId: string) {
   return useQuery({
     queryKey: queryKeys.projects.all(orgId),
-    queryFn: () => api.get<ProjectWithStats[]>(`/organizations/${orgId}/projects`),
+    queryFn: async () => {
+      const response = await api.get<{ data: ProjectWithStats[] }>(`/organizations/${orgId}/projects`);
+      return response.data;
+    },
     enabled: !!orgId,
   });
 }
@@ -199,7 +262,10 @@ export function useProjects(orgId: string) {
 export function useProject(id: string) {
   return useQuery({
     queryKey: queryKeys.projects.detail(id),
-    queryFn: () => api.get<ProjectWithStats>(`/projects/${id}`),
+    queryFn: async () => {
+      const response = await api.get<{ data: ProjectWithStats }>(`/projects/${id}`);
+      return response.data;
+    },
     enabled: !!id,
   });
 }
@@ -247,7 +313,10 @@ export function useDeleteProject() {
 export function useConnectors(orgId: string) {
   return useQuery({
     queryKey: queryKeys.connectors.all(orgId),
-    queryFn: () => api.get<Connector[]>(`/organizations/${orgId}/connectors`),
+    queryFn: async () => {
+      const response = await api.get<{ data: Connector[] }>(`/organizations/${orgId}/connectors`);
+      return response.data;
+    },
     enabled: !!orgId,
   });
 }
@@ -311,7 +380,10 @@ export function useDeleteConnector() {
 export function useToolAccounts(orgId: string) {
   return useQuery({
     queryKey: queryKeys.toolAccounts.all(orgId),
-    queryFn: () => api.get<ToolAccount[]>(`/organizations/${orgId}/tool_accounts`),
+    queryFn: async () => {
+      const response = await api.get<{ data: ToolAccount[] }>(`/organizations/${orgId}/tool_accounts`);
+      return response.data;
+    },
     enabled: !!orgId,
   });
 }
@@ -388,7 +460,10 @@ export function useEvents(orgId: string, params?: EventsParams) {
 export function useEvent(orgId: string, id: string) {
   return useQuery({
     queryKey: queryKeys.events.detail(orgId, id),
-    queryFn: () => api.get<ToolEvent>(`/organizations/${orgId}/events/${id}`),
+    queryFn: async () => {
+      const response = await api.get<{ data: ToolEvent }>(`/organizations/${orgId}/events/${id}`);
+      return response.data;
+    },
     enabled: !!orgId && !!id,
   });
 }
@@ -404,7 +479,10 @@ export function useEventAuditTrail(orgId: string, id: string) {
 export function useUnattributedEvents(orgId: string) {
   return useQuery({
     queryKey: queryKeys.events.unattributed(orgId),
-    queryFn: () => api.get<ToolEvent[]>(`/organizations/${orgId}/events/unattributed`),
+    queryFn: async () => {
+      const response = await api.get<{ data: ToolEvent[] }>(`/organizations/${orgId}/events/unattributed`);
+      return response.data;
+    },
     enabled: !!orgId,
   });
 }

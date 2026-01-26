@@ -36,173 +36,341 @@ end
 
 # Only seed sample data in development
 if Rails.env.development?
-  puts "Seeding development data..."
+  puts "Seeding development data with realistic usage simulation..."
+  puts "This simulates 100 engineers over 45 days"
 
-  # Create sample users
-  admin_user = User.find_or_create_by!(email: 'admin@db90.dev') do |user|
-    user.keycloak_sub = 'dev-admin-001'
-    user.name = 'Admin User'
-    user.global_admin = true
+  # Configuration for realistic seed
+  NUM_ENGINEERS = 100
+  NUM_DAYS = 45
+  # Keep total events manageable (~50k max) while being realistic
+  EVENTS_PER_ACTIVE_USER_PER_DAY = (5..30) # Range of events per active engineer per day
+  ACTIVE_USER_PERCENTAGE = 0.7 # 70% of users are active on any given day
+  WEEKEND_REDUCTION = 0.3 # 30% of weekday activity on weekends
+
+  # Realistic first and last names for engineers
+  first_names = %w[
+    James John Robert Michael William David Richard Joseph Thomas Charles
+    Christopher Daniel Matthew Anthony Mark Donald Steven Paul Andrew Joshua
+    Mary Patricia Jennifer Linda Barbara Elizabeth Susan Jessica Sarah Karen
+    Nancy Lisa Betty Margaret Sandra Ashley Kimberly Emily Donna Michelle
+    Alex Jordan Taylor Morgan Casey Riley Quinn Blake Jamie Avery
+  ]
+
+  last_names = %w[
+    Smith Johnson Williams Brown Jones Garcia Miller Davis Rodriguez Martinez
+    Hernandez Lopez Gonzalez Wilson Anderson Thomas Taylor Moore Jackson Martin
+    Lee Perez Thompson White Harris Sanchez Clark Ramirez Lewis Robinson
+    Walker Young Allen King Wright Scott Torres Nguyen Hill Flores Green
+    Adams Nelson Baker Hall Rivera Campbell Mitchell Carter Roberts
+  ]
+
+  # Tool configurations with realistic usage patterns
+  # Valid tool_names: claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter, anthropic_api, openai_api, gemini_api, custom
+  # Valid event_types: chat, completion, edit, commit, review, test, debug, refactor, documentation, other
+  TOOL_CONFIGS = {
+    'github_copilot' => {
+      weight: 0.40, # 40% of events
+      event_types: %w[completion edit refactor],
+      models: %w[gpt-4o gpt-4-turbo copilot-codex],
+      avg_tokens_in: 150,
+      avg_tokens_out: 100,
+      avg_cost: 0.003
+    },
+    'cursor' => {
+      weight: 0.30, # 30% of events
+      event_types: %w[completion chat edit refactor debug],
+      models: %w[claude-3-5-sonnet gpt-4o cursor-small],
+      avg_tokens_in: 500,
+      avg_tokens_out: 800,
+      avg_cost: 0.012
+    },
+    'claude_code' => {
+      weight: 0.15, # 15% of events
+      event_types: %w[chat edit completion commit review test debug refactor],
+      models: %w[claude-sonnet-4 claude-opus-4 claude-3-5-sonnet],
+      avg_tokens_in: 2000,
+      avg_tokens_out: 3000,
+      avg_cost: 0.045
+    },
+    'windsurf' => {
+      weight: 0.08, # 8% of events
+      event_types: %w[chat completion edit],
+      models: %w[claude-3-5-sonnet gpt-4o],
+      avg_tokens_in: 600,
+      avg_tokens_out: 900,
+      avg_cost: 0.015
+    },
+    'cody' => {
+      weight: 0.05, # 5% of events
+      event_types: %w[chat completion documentation],
+      models: %w[claude-3-5-sonnet gpt-4o],
+      avg_tokens_in: 400,
+      avg_tokens_out: 600,
+      avg_cost: 0.01
+    },
+    'aider' => {
+      weight: 0.02, # 2% of events
+      event_types: %w[chat edit commit refactor],
+      models: %w[claude-3-5-sonnet gpt-4o claude-opus-4],
+      avg_tokens_in: 1500,
+      avg_tokens_out: 2000,
+      avg_cost: 0.035
+    }
+  }
+
+  # Project templates
+  PROJECT_TEMPLATES = [
+    { name: 'Platform API', desc: 'Core backend API services', weight: 0.25 },
+    { name: 'Web Dashboard', desc: 'React/Next.js frontend application', weight: 0.20 },
+    { name: 'Mobile App', desc: 'React Native mobile application', weight: 0.15 },
+    { name: 'Data Pipeline', desc: 'ETL and data processing services', weight: 0.15 },
+    { name: 'ML Services', desc: 'Machine learning models and inference', weight: 0.10 },
+    { name: 'DevOps', desc: 'Infrastructure and CI/CD automation', weight: 0.10 },
+    { name: 'Documentation', desc: 'Technical docs and guides', weight: 0.05 }
+  ]
+
+  # Duration distribution (in milliseconds)
+  DURATION_RANGES = {
+    'fast' => (100..500),
+    'medium' => (500..2000),
+    'slow' => (2000..10000)
+  }
+
+  # Helper to select weighted random item
+  def weighted_sample(items_with_weights)
+    total = items_with_weights.values.sum
+    r = rand * total
+    items_with_weights.each do |item, weight|
+      r -= weight
+      return item if r <= 0
+    end
+    items_with_weights.keys.first
   end
 
-  dev_user = User.find_or_create_by!(email: 'developer@db90.dev') do |user|
-    user.keycloak_sub = 'dev-user-001'
-    user.name = 'Dev User'
+  # Create organization
+  org = Organization.find_or_create_by!(slug: 'dualboot-partners') do |o|
+    o.name = 'Acme Corp'
   end
+  puts "Organization: #{org.name}"
 
-  viewer_user = User.find_or_create_by!(email: 'viewer@db90.dev') do |user|
-    user.keycloak_sub = 'dev-user-002'
-    user.name = 'Viewer User'
+  # Create 100 engineers
+  puts "Creating #{NUM_ENGINEERS} engineers..."
+  engineers = []
+
+  NUM_ENGINEERS.times do |i|
+    email = "engineer#{i + 1}@example.com"
+    name = "#{first_names.sample} #{last_names.sample}"
+
+    user = User.find_or_create_by!(email: email) do |u|
+      u.keycloak_sub = "seed-user-#{SecureRandom.uuid}"
+      u.name = name
+      u.global_admin = (i == 0) # First user is admin
+    end
+
+    # Assign role based on position
+    role = case i
+           when 0 then 'owner'
+           when 1..4 then 'admin'
+           else 'member'
+           end
+
+    OrganizationMembership.find_or_create_by!(user: user, organization: org) do |m|
+      m.role = role
+    end
+
+    engineers << user
   end
+  puts "Created #{engineers.count} engineers"
 
-  puts "Created #{User.count} users"
-
-  # Create sample organization
-  org = Organization.find_or_create_by!(slug: 'acme-corp') do |o|
-    o.name = 'Acme Corporation'
+  # Create projects
+  puts "Creating projects..."
+  projects = PROJECT_TEMPLATES.map do |template|
+    slug = template[:name].downcase.gsub(/\s+/, '-')
+    Project.find_or_create_by!(organization: org, slug: slug) do |p|
+      p.name = template[:name]
+      p.description = template[:desc]
+    end
   end
+  puts "Created #{projects.count} projects"
 
-  puts "Created organization: #{org.name}"
+  # Assign engineers to projects (each engineer works on 2-4 projects)
+  engineers.each do |engineer|
+    num_projects = rand(2..4)
+    engineer_projects = projects.sample(num_projects)
 
-  # Add users to organization
-  OrganizationMembership.find_or_create_by!(user: admin_user, organization: org) do |m|
-    m.role = 'owner'
+    engineer_projects.each_with_index do |project, idx|
+      ProjectMembership.find_or_create_by!(user: engineer, project: project) do |m|
+        m.role = idx == 0 ? 'member' : 'viewer'
+      end
+    end
   end
+  puts "Assigned engineers to projects"
 
-  OrganizationMembership.find_or_create_by!(user: dev_user, organization: org) do |m|
-    m.role = 'member'
-  end
-
-  OrganizationMembership.find_or_create_by!(user: viewer_user, organization: org) do |m|
-    m.role = 'viewer'
-  end
-
-  puts "Added #{org.members.count} members to #{org.name}"
-
-  # Create sample connectors
+  # Create GitHub connector
   github_connector = OrganizationConnector.find_or_create_by!(
     organization: org,
     connector_type: 'github'
   ) do |c|
-    c.access_token = 'sample_github_token_do_not_use'
+    c.access_token = 'ghp_simulated_token_for_development_only'
     c.is_active = true
+    c.config = { organization: 'dualboot-partners' }
   end
 
-  puts "Created GitHub connector"
-
-  # Create sample projects
-  main_project = Project.find_or_create_by!(organization: org, slug: 'main-api') do |p|
-    p.name = 'Main API'
-    p.description = 'The main backend API service'
-  end
-
-  frontend_project = Project.find_or_create_by!(organization: org, slug: 'web-frontend') do |p|
-    p.name = 'Web Frontend'
-    p.description = 'React web application'
-  end
-
-  puts "Created #{org.projects.count} projects"
-
-  # Add members to projects
-  ProjectMembership.find_or_create_by!(user: admin_user, project: main_project) do |m|
-    m.role = 'owner'
-  end
-
-  ProjectMembership.find_or_create_by!(user: dev_user, project: main_project) do |m|
-    m.role = 'member'
-  end
-
-  ProjectMembership.find_or_create_by!(user: dev_user, project: frontend_project) do |m|
-    m.role = 'owner'
-  end
-
-  # Create sample repositories
-  Repository.find_or_create_by!(
-    project: main_project,
-    organization_connector: github_connector,
-    external_id: 'repo-123456'
-  ) do |r|
-    r.name = 'acme-api'
-    r.full_name = 'acme-corp/acme-api'
-    r.url = 'https://github.com/acme-corp/acme-api'
-    r.default_branch = 'main'
-  end
-
-  Repository.find_or_create_by!(
-    project: frontend_project,
-    organization_connector: github_connector,
-    external_id: 'repo-789012'
-  ) do |r|
-    r.name = 'acme-web'
-    r.full_name = 'acme-corp/acme-web'
-    r.url = 'https://github.com/acme-corp/acme-web'
-    r.default_branch = 'main'
-  end
-
-  puts "Created #{Repository.count} repositories"
-
-  # Create sample tool events for the past 7 days
-  puts "Creating sample tool events..."
-
-  tools = %w[claude_code cursor github_copilot]
-  event_types = %w[chat completion edit]
-  models = ['claude-3-opus', 'claude-3-sonnet', 'gpt-4', 'gpt-4-turbo']
-
-  7.times do |day_offset|
-    date = day_offset.days.ago.beginning_of_day
-
-    # Random number of events per day (10-50)
-    rand(10..50).times do
-      ToolEvent.create!(
-        user: [admin_user, dev_user].sample,
-        organization: org,
-        project: [main_project, frontend_project, nil].sample,
-        tool_name: tools.sample,
-        event_type: event_types.sample,
-        model: models.sample,
-        tokens_in: rand(50..500),
-        tokens_out: rand(100..2000),
-        cost_usd: rand(0.001..0.05).round(6),
-        occurred_at: date + rand(0..86400).seconds
-      )
+  # Create repositories for projects
+  projects.each_with_index do |project, idx|
+    Repository.find_or_create_by!(
+      project: project,
+      organization_connector: github_connector,
+      external_id: "repo-#{100000 + idx}"
+    ) do |r|
+      repo_name = project.slug
+      r.name = repo_name
+      r.full_name = "dualboot-partners/#{repo_name}"
+      r.url = "https://github.com/dualboot-partners/#{repo_name}"
+      r.default_branch = 'main'
     end
   end
+  puts "Created repositories"
 
-  puts "Created #{ToolEvent.count} tool events"
+  # Generate tool events for the past NUM_DAYS days
+  puts "Generating tool events for #{NUM_DAYS} days..."
+  puts "This may take a moment..."
 
-  # Create some organization settings
-  OrganizationSetting.set(org, 'default_retention_days', '90')
-  OrganizationSetting.set(org, 'notification_email', 'alerts@acme.dev')
-  OrganizationSetting.set(org, 'allow_external_tools', 'true')
+  total_events = 0
+  tool_weights = TOOL_CONFIGS.transform_values { |c| c[:weight] }
 
+  NUM_DAYS.times do |day_offset|
+    date = day_offset.days.ago.to_date
+    is_weekend = date.saturday? || date.sunday?
+    activity_modifier = is_weekend ? WEEKEND_REDUCTION : 1.0
+
+    # Determine active users for this day
+    num_active = (NUM_ENGINEERS * ACTIVE_USER_PERCENTAGE * activity_modifier).round
+    active_engineers = engineers.sample(num_active)
+
+    active_engineers.each do |engineer|
+      # Each active engineer generates some events
+      num_events = rand(EVENTS_PER_ACTIVE_USER_PER_DAY) * activity_modifier
+      num_events = num_events.round
+
+      next if num_events == 0
+
+      # Get engineer's projects
+      engineer_projects = engineer.projects.to_a
+      engineer_projects << nil # Allow some events without project
+
+      num_events.times do
+        tool_name = weighted_sample(tool_weights)
+        config = TOOL_CONFIGS[tool_name]
+
+        # Vary tokens with some randomness around the average
+        tokens_in = (config[:avg_tokens_in] * rand(0.3..2.5)).round
+        tokens_out = (config[:avg_tokens_out] * rand(0.3..2.5)).round
+        cost = (config[:avg_cost] * rand(0.5..2.0)).round(6)
+
+        duration_range = DURATION_RANGES.values.sample
+        duration_ms = rand(duration_range)
+
+        ToolEvent.create!(
+          user: engineer,
+          organization: org,
+          project: engineer_projects.sample,
+          tool_name: tool_name,
+          event_type: config[:event_types].sample,
+          model: config[:models].sample,
+          tokens_in: tokens_in,
+          tokens_out: tokens_out,
+          cost_usd: cost,
+          duration_ms: duration_ms,
+          occurred_at: date.to_time + rand(8..20).hours + rand(0..3600).seconds
+        )
+        total_events += 1
+      end
+    end
+
+    # Progress indicator
+    if (day_offset + 1) % 10 == 0
+      puts "  Processed #{day_offset + 1}/#{NUM_DAYS} days (#{total_events} events so far)"
+    end
+  end
+  puts "Created #{total_events} tool events"
+
+  # Create organization settings
+  OrganizationSetting.set(org, 'alert_cost_daily', '500')
+  OrganizationSetting.set(org, 'alert_cost_monthly', '5000')
+  OrganizationSetting.set(org, 'alert_risk_critical', 'true')
+  OrganizationSetting.set(org, 'alert_risk_high', 'true')
+  OrganizationSetting.set(org, 'alert_usage_spike', 'true')
+  OrganizationSetting.set(org, 'alert_email', 'true')
+  OrganizationSetting.set(org, 'sanitize_api_keys', 'true')
+  OrganizationSetting.set(org, 'sanitize_secrets', 'true')
   puts "Created organization settings"
 
-  # Create user settings
-  UserSetting.set(admin_user, 'theme', 'dark')
-  UserSetting.set(admin_user, 'notifications_enabled', 'true')
-  UserSetting.set(dev_user, 'theme', 'light')
-
+  # Create some user settings
+  engineers.first(10).each do |engineer|
+    UserSetting.set(engineer, 'theme', %w[dark light system].sample)
+    UserSetting.set(engineer, 'notifications_enabled', 'true')
+  end
   puts "Created user settings"
 
-  # Create admin audit log entries
-  AdminAuditLog.log_action(
-    admin_user: admin_user,
-    action: 'organizations#update',
-    resource: org,
-    tracked_changes: { name: ['Old Name', 'Acme Corporation'] },
-    metadata: { reason: 'Rebranding' }
-  )
+  # Calculate stats
+  total_cost = ToolEvent.sum(:cost_usd)
+  avg_daily_cost = total_cost / NUM_DAYS
 
-  puts "Created admin audit logs"
-
-  puts "\n=== Seed Data Summary ==="
+  puts "\n" + "=" * 50
+  puts "=== Realistic Seed Data Summary ==="
+  puts "=" * 50
   puts "Users: #{User.count}"
   puts "Organizations: #{Organization.count}"
   puts "Organization Memberships: #{OrganizationMembership.count}"
   puts "Projects: #{Project.count}"
+  puts "Project Memberships: #{ProjectMembership.count}"
   puts "Repositories: #{Repository.count}"
   puts "Tool Events: #{ToolEvent.count}"
-  puts "Sanitization Policies: #{SanitizationPolicy.count}"
+  puts ""
+  puts "=== Usage Statistics ==="
+  puts "Days of data: #{NUM_DAYS}"
+  puts "Total API Cost: $#{total_cost.round(2)}"
+  puts "Avg Daily Cost: $#{avg_daily_cost.round(2)}"
+  puts "Events by tool:"
+  ToolEvent.group(:tool_name).count.each do |tool, count|
+    pct = (count.to_f / ToolEvent.count * 100).round(1)
+    puts "  #{tool}: #{count} (#{pct}%)"
+  end
+  puts ""
+  puts "Model distribution:"
+  ToolEvent.group(:model).count.sort_by { |_, count| -count }.first(10).each do |model, count|
+    pct = (count.to_f / ToolEvent.count * 100).round(1)
+    puts "  #{model}: #{count} (#{pct}%)"
+  end
+  puts "=" * 50
+end
+
+# Assign some events to any real (non-seed) users in the org
+real_users = User.where("email LIKE '%example.com' AND email NOT LIKE 'engineer%@%'")
+                 .joins(:organization_memberships)
+                 .where(organization_memberships: { organization_id: Organization.find_by(slug: 'dualboot-partners')&.id })
+                 .distinct
+
+if real_users.any?
+  puts "\nAssigning events to #{real_users.count} real user(s)..."
+  real_users.each do |user|
+    # Reassign ~500 random events to this user
+    events_to_reassign = ToolEvent.where(organization: user.organizations.first)
+                                   .where("user_id IN (?)", User.where("email LIKE 'engineer%'").pluck(:id))
+                                   .order(Arel.sql("RANDOM()"))
+                                   .limit(500)
+
+    count = events_to_reassign.update_all(user_id: user.id)
+    puts "  #{user.email}: assigned #{count} events"
+
+    # Ensure they're in some projects
+    user.organizations.first&.projects&.limit(3)&.each do |project|
+      ProjectMembership.find_or_create_by!(user: user, project: project) do |m|
+        m.role = 'member'
+      end
+    end
+  end
 end
 
 puts "Seeding complete!"

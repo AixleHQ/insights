@@ -9,7 +9,16 @@ import {
   Save,
 } from 'lucide-react';
 import { useOrg } from '@/contexts/OrgContext';
-import { useOrganization, useUpdateOrganization, useRetentionPolicy, useUpdateRetentionPolicy } from '@/hooks/useApi';
+import {
+  useOrganization,
+  useUpdateOrganization,
+  useRetentionPolicy,
+  useUpdateRetentionPolicy,
+  useOrganizationSettings,
+  useUpdateOrganizationSetting,
+  useOverviewStats,
+  useDailyStats,
+} from '@/hooks/useApi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -173,20 +182,35 @@ function GeneralSettings() {
 
 function PolicySettings() {
   const { currentOrg } = useOrg();
-  const { data: retentionPolicy, isLoading } = useRetentionPolicy(currentOrg?.id || '');
+  const { data: retentionPolicy, isLoading: isLoadingRetention } = useRetentionPolicy(currentOrg?.id || '');
+  const { data: settings, isLoading: isLoadingSettings } = useOrganizationSettings(currentOrg?.id || '');
   const updateRetention = useUpdateRetentionPolicy();
+  const updateSetting = useUpdateOrganizationSetting();
 
-  const [policies, setPolicies] = useState({
-    sanitizeApiKeys: true,
-    sanitizeSecrets: true,
-    sanitizeEmails: false,
-    sanitizeIps: false,
-    blockHighRisk: true,
-    requireReview: false,
-  });
+  // Parse settings from API or use defaults
+  const policies = {
+    sanitizeApiKeys: (settings as Record<string, boolean>)?.sanitize_api_keys ?? true,
+    sanitizeSecrets: (settings as Record<string, boolean>)?.sanitize_secrets ?? true,
+    sanitizeEmails: (settings as Record<string, boolean>)?.sanitize_emails ?? false,
+    sanitizeIps: (settings as Record<string, boolean>)?.sanitize_ips ?? false,
+    blockHighRisk: (settings as Record<string, boolean>)?.block_high_risk ?? true,
+    requireReview: (settings as Record<string, boolean>)?.require_review ?? false,
+  };
 
-  const togglePolicy = (key: keyof typeof policies) => {
-    setPolicies((prev) => ({ ...prev, [key]: !prev[key] }));
+  const isLoading = isLoadingRetention || isLoadingSettings;
+
+  const togglePolicy = async (key: keyof typeof policies) => {
+    if (!currentOrg) return;
+    const settingKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+    try {
+      await updateSetting.mutateAsync({
+        orgId: currentOrg.id,
+        key: settingKey,
+        value: !policies[key],
+      });
+    } catch (error) {
+      console.error('Failed to update setting:', error);
+    }
   };
 
   const handleRetentionChange = async (field: string, value: string) => {
@@ -399,15 +423,42 @@ function PolicySettings() {
 }
 
 function AlertSettings() {
-  const [alerts, setAlerts] = useState({
-    costDaily: 500,
-    costMonthly: 5000,
-    riskCritical: true,
-    riskHigh: true,
-    usageSpike: true,
-    emailNotifications: true,
-    slackNotifications: false,
-  });
+  const { currentOrg } = useOrg();
+  const { data: settings, isLoading } = useOrganizationSettings(currentOrg?.id || '');
+  const updateSetting = useUpdateOrganizationSetting();
+
+  // Parse settings from API or use defaults
+  const alerts = {
+    costDaily: (settings as Record<string, number>)?.alert_cost_daily ?? 500,
+    costMonthly: (settings as Record<string, number>)?.alert_cost_monthly ?? 5000,
+    riskCritical: (settings as Record<string, boolean>)?.alert_risk_critical ?? true,
+    riskHigh: (settings as Record<string, boolean>)?.alert_risk_high ?? true,
+    usageSpike: (settings as Record<string, boolean>)?.alert_usage_spike ?? true,
+    emailNotifications: (settings as Record<string, boolean>)?.alert_email ?? true,
+    slackNotifications: (settings as Record<string, boolean>)?.alert_slack ?? false,
+  };
+
+  const updateAlertSetting = async (key: string, value: unknown) => {
+    if (!currentOrg) return;
+    try {
+      await updateSetting.mutateAsync({
+        orgId: currentOrg.id,
+        key,
+        value,
+      });
+    } catch (error) {
+      console.error('Failed to update setting:', error);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-[300px]" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -429,9 +480,9 @@ function AlertSettings() {
             <Input
               id="costDaily"
               type="number"
-              value={alerts.costDaily}
-              onChange={(e) =>
-                setAlerts({ ...alerts, costDaily: Number(e.target.value) })
+              defaultValue={alerts.costDaily}
+              onBlur={(e) =>
+                updateAlertSetting('alert_cost_daily', Number(e.target.value))
               }
             />
           </div>
@@ -440,9 +491,9 @@ function AlertSettings() {
             <Input
               id="costMonthly"
               type="number"
-              value={alerts.costMonthly}
-              onChange={(e) =>
-                setAlerts({ ...alerts, costMonthly: Number(e.target.value) })
+              defaultValue={alerts.costMonthly}
+              onBlur={(e) =>
+                updateAlertSetting('alert_cost_monthly', Number(e.target.value))
               }
             />
           </div>
@@ -467,7 +518,7 @@ function AlertSettings() {
             <Switch
               checked={alerts.riskCritical}
               onCheckedChange={(checked) =>
-                setAlerts({ ...alerts, riskCritical: checked })
+                updateAlertSetting('alert_risk_critical', checked)
               }
             />
           </div>
@@ -481,7 +532,7 @@ function AlertSettings() {
             <Switch
               checked={alerts.riskHigh}
               onCheckedChange={(checked) =>
-                setAlerts({ ...alerts, riskHigh: checked })
+                updateAlertSetting('alert_risk_high', checked)
               }
             />
           </div>
@@ -495,7 +546,7 @@ function AlertSettings() {
             <Switch
               checked={alerts.usageSpike}
               onCheckedChange={(checked) =>
-                setAlerts({ ...alerts, usageSpike: checked })
+                updateAlertSetting('alert_usage_spike', checked)
               }
             />
           </div>
@@ -518,7 +569,7 @@ function AlertSettings() {
             <Switch
               checked={alerts.emailNotifications}
               onCheckedChange={(checked) =>
-                setAlerts({ ...alerts, emailNotifications: checked })
+                updateAlertSetting('alert_email', checked)
               }
             />
           </div>
@@ -532,7 +583,7 @@ function AlertSettings() {
             <Switch
               checked={alerts.slackNotifications}
               onCheckedChange={(checked) =>
-                setAlerts({ ...alerts, slackNotifications: checked })
+                updateAlertSetting('alert_slack', checked)
               }
             />
           </div>
@@ -543,14 +594,41 @@ function AlertSettings() {
 }
 
 function BillingSettings() {
-  const usage = {
-    currentCost: 847.52,
-    limit: 2000,
-    events: 45623,
-    eventsLimit: 100000,
-    storage: 2.4,
-    storageLimit: 10,
+  const { currentOrg } = useOrg();
+  const { data: stats, isLoading: isLoadingStats } = useOverviewStats(currentOrg?.id || '');
+  const { data: dailyStats, isLoading: isLoadingDaily } = useDailyStats(currentOrg?.id || '', 30);
+
+  // Calculate month-to-date usage from daily stats
+  const monthlyEvents = dailyStats?.data?.reduce((sum, d) => sum + d.event_count, 0) ?? 0;
+  const monthlyTokens = dailyStats?.data?.reduce(
+    (sum, d) => sum + (d.input_tokens || 0) + (d.output_tokens || 0),
+    0
+  ) ?? 0;
+
+  // Estimate storage in GB (rough estimate based on tokens)
+  const estimatedStorageGb = (monthlyTokens / 1000000) * 0.004; // ~4KB per 1M tokens
+
+  // Defaults for plan limits (in practice, these would come from a billing API)
+  const limits = {
+    cost: 2000,
+    events: 100000,
+    storage: 10,
   };
+
+  const isLoading = isLoadingStats || isLoadingDaily;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-[200px]" />
+        <Skeleton className="h-[250px]" />
+      </div>
+    );
+  }
+
+  // Get current month name
+  const currentMonth = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   return (
     <div className="space-y-6">
@@ -577,7 +655,7 @@ function BillingSettings() {
           </div>
           <Separator />
           <div className="text-sm text-muted-foreground">
-            <p>Next billing date: February 1, 2026</p>
+            <p>Current billing period: {currentMonth}</p>
           </div>
           <Button variant="outline">Manage Subscription</Button>
         </CardContent>
@@ -586,37 +664,37 @@ function BillingSettings() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Current Period Usage</CardTitle>
-          <CardDescription>January 1 - January 31, 2026</CardDescription>
+          <CardDescription>{currentMonth}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
               <span>API Costs</span>
               <span className="font-mono-display">
-                ${usage.currentCost.toFixed(2)} / ${usage.limit}
+                ${(stats?.total_cost_usd ?? 0).toFixed(2)} / ${limits.cost}
               </span>
             </div>
-            <Progress value={(usage.currentCost / usage.limit) * 100} />
+            <Progress value={((stats?.total_cost_usd ?? 0) / limits.cost) * 100} />
           </div>
 
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
               <span>Events</span>
               <span className="font-mono-display">
-                {usage.events.toLocaleString()} / {usage.eventsLimit.toLocaleString()}
+                {monthlyEvents.toLocaleString()} / {limits.events.toLocaleString()}
               </span>
             </div>
-            <Progress value={(usage.events / usage.eventsLimit) * 100} />
+            <Progress value={(monthlyEvents / limits.events) * 100} />
           </div>
 
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
-              <span>Storage</span>
+              <span>Storage (estimated)</span>
               <span className="font-mono-display">
-                {usage.storage} GB / {usage.storageLimit} GB
+                {estimatedStorageGb.toFixed(2)} GB / {limits.storage} GB
               </span>
             </div>
-            <Progress value={(usage.storage / usage.storageLimit) * 100} />
+            <Progress value={(estimatedStorageGb / limits.storage) * 100} />
           </div>
         </CardContent>
       </Card>

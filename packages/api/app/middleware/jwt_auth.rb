@@ -40,18 +40,44 @@ class JwtAuth
     end
 
     begin
+      # First, check if it's an impersonation token (silently - don't log failures)
+      impersonation_claims = ImpersonationService.decode_token(token) rescue nil
+      if impersonation_claims
+        env['jwt.claims'] = impersonation_claims
+        env['jwt.token'] = token
+        env['jwt.impersonation'] = true
+        env['jwt.impersonator_id'] = impersonation_claims['impersonator_id']
+        env['jwt.impersonator_email'] = impersonation_claims['impersonator_email']
+        Rails.logger.info("[JwtAuth] Impersonation token validated for #{impersonation_claims['email']}")
+        return @app.call(env)
+      end
+
+      # Otherwise, validate as Keycloak token
+      Rails.logger.debug("[JwtAuth] Validating Keycloak token...")
+      # Debug: log token claims before validation
+      begin
+        unverified = JWT.decode(token, nil, false).first
+        Rails.logger.debug("[JwtAuth] Token claims: #{unverified.keys.join(', ')}")
+      rescue => e
+        Rails.logger.debug("[JwtAuth] Could not decode token for debugging: #{e.message}")
+      end
       claims = validate_token(token)
+      Rails.logger.info("[JwtAuth] Token validated for #{claims['email']}")
       env['jwt.claims'] = claims
       env['jwt.token'] = token
       @app.call(env)
     rescue TokenExpiredError
+      Rails.logger.warn("[JwtAuth] Token expired")
       unauthorized_response('Token has expired')
     rescue InvalidTokenError => e
+      Rails.logger.warn("[JwtAuth] Invalid token: #{e.message}")
       unauthorized_response("Invalid token: #{e.message}")
     rescue JWT::DecodeError => e
+      Rails.logger.warn("[JwtAuth] Token decode error: #{e.message}")
       unauthorized_response("Token decode error: #{e.message}")
     rescue => e
       Rails.logger.error("[JwtAuth] Unexpected error: #{e.class} - #{e.message}")
+      Rails.logger.error(e.backtrace.first(5).join("\n"))
       unauthorized_response('Authentication failed')
     end
   end
@@ -108,10 +134,19 @@ class JwtAuth
   end
 
   def validate_claims!(claims)
-    # Ensure required claims are present
-    required_claims = %w[sub email]
-    missing = required_claims - claims.keys
-    raise InvalidTokenError, "Missing required claims: #{missing.join(', ')}" if missing.any?
+    # Ensure we have an email
+    unless claims['email'].present?
+      raise InvalidTokenError, "Missing required claim: email"
+    end
+
+    # If 'sub' is missing, use a fallback identifier
+    # Keycloak access tokens may not include 'sub' by default
+    unless claims['sub'].present?
+      # Use azp (authorized party / client ID) + email as a stable identifier
+      # Or just use email since it's unique in Keycloak
+      claims['sub'] = claims['preferred_username'] || claims['email']
+      Rails.logger.debug("[JwtAuth] Using fallback sub: #{claims['sub']}")
+    end
 
     # Validate token is not used before its valid time
     if claims['nbf'] && Time.now.to_i < claims['nbf']

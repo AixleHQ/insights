@@ -88,11 +88,11 @@ export function ProjectDetail() {
   const events: EventRow[] = useMemo(() => {
     return eventsResponse?.data?.map((e) => ({
       id: e.id,
-      tool_name: e.tool_name,
-      event_type: e.event_type,
-      risk_level: e.risk_level,
-      cost_usd: e.cost_usd,
-      created_at: e.created_at,
+      tool_name: e.toolName,
+      event_type: e.eventType,
+      risk_level: e.riskLevel,
+      cost_usd: e.costUsd,
+      created_at: e.occurredAt || e.createdAt,
       user: e.user ? { email: e.user.email } : undefined,
       project: e.project ? { name: e.project.name } : undefined,
     })) || [];
@@ -170,7 +170,7 @@ export function ProjectDetail() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate(`/projects/${id}/edit`)}>
               <Settings className="mr-2 size-4" />
               Edit project
             </DropdownMenuItem>
@@ -191,12 +191,12 @@ export function ProjectDetail() {
         <StatCard
           icon={Activity}
           label="Total Events"
-          value={project.event_count.toLocaleString()}
+          value={(project.event_count ?? 0).toLocaleString()}
         />
         <StatCard
           icon={DollarSign}
           label="Total Cost"
-          value={formatCurrency(project.total_cost_usd)}
+          value={formatCurrency(project.total_cost_usd ?? 0)}
         />
         <StatCard
           icon={Calendar}

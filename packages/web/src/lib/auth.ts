@@ -144,5 +144,71 @@ export async function authFetch(
   });
 }
 
+/**
+ * Direct login with username and password (Resource Owner Password Grant)
+ * Note: Requires Keycloak client to have "Direct Access Grants Enabled"
+ */
+export async function directLogin(username: string, password: string): Promise<User> {
+  const tokenUrl = `${keycloakConfig.url}/realms/${keycloakConfig.realm}/protocol/openid-connect/token`;
+
+  const response = await fetch(tokenUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      grant_type: 'password',
+      client_id: keycloakConfig.clientId,
+      username,
+      password,
+      scope: 'openid profile email',
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (errorData.error === 'invalid_grant') {
+      throw new Error('Invalid email or password');
+    }
+    throw new Error(errorData.error_description || 'Authentication failed');
+  }
+
+  const tokenResponse = await response.json();
+
+  // Create a User object compatible with oidc-client-ts
+  const manager = getUserManager();
+
+  // Parse the ID token to get user info
+  const idTokenParts = tokenResponse.id_token.split('.');
+  const idTokenPayload = JSON.parse(atob(idTokenParts[1]));
+
+  const user = new User({
+    access_token: tokenResponse.access_token,
+    token_type: tokenResponse.token_type || 'Bearer',
+    id_token: tokenResponse.id_token,
+    refresh_token: tokenResponse.refresh_token,
+    profile: {
+      sub: idTokenPayload.sub,
+      iss: idTokenPayload.iss,
+      aud: idTokenPayload.aud,
+      exp: idTokenPayload.exp,
+      iat: idTokenPayload.iat,
+      email: idTokenPayload.email,
+      name: idTokenPayload.name,
+      preferred_username: idTokenPayload.preferred_username,
+      email_verified: idTokenPayload.email_verified,
+      picture: idTokenPayload.picture,
+    },
+    expires_at: Math.floor(Date.now() / 1000) + tokenResponse.expires_in,
+    scope: tokenResponse.scope,
+    session_state: tokenResponse.session_state,
+  });
+
+  // Store the user in the UserManager
+  await manager.storeUser(user);
+
+  return user;
+}
+
 // Export types
 export type { User };

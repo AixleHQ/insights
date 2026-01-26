@@ -140,16 +140,13 @@ export function AlertsPanel({ alerts, isLoading, onDismiss, className }: AlertsP
   return (
     <Card className={cn('', className)}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <div className="flex items-center gap-2">
-          <Bell className={cn('size-4', hasAlerts ? 'text-warning' : 'text-muted-foreground')} />
-          <div>
-            <CardTitle className="text-base font-medium">Alerts</CardTitle>
-            <CardDescription className="text-xs">
-              {hasAlerts
-                ? `${activeAlerts.length} active alert${activeAlerts.length > 1 ? 's' : ''}`
-                : 'No active alerts'}
-            </CardDescription>
-          </div>
+        <div>
+          <CardTitle className="text-base font-medium">Alerts</CardTitle>
+          <CardDescription className="text-xs">
+            {hasAlerts
+              ? `${activeAlerts.length} active alert${activeAlerts.length > 1 ? 's' : ''}`
+              : 'No active alerts'}
+          </CardDescription>
         </div>
         {hasAlerts && (
           <Link
