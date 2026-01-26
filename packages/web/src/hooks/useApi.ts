@@ -296,8 +296,57 @@ export interface MemberStats {
   events_this_week: number;
   events_this_month: number;
   most_used_tool: string | null;
-  tool_breakdown: { tool: string; count: number; cost: number }[];
-  daily_activity: { date: string; count: number }[];
+
+  // Token metrics
+  tokens: {
+    total_in: number;
+    total_out: number;
+    total: number;
+  };
+
+  // Breakdowns
+  tool_breakdown: {
+    tool: string;
+    count: number;
+    cost: number;
+    tokens_in: number;
+    tokens_out: number;
+    tokens_total: number;
+    price_per_million_input: number;
+    price_per_million_output: number;
+  }[];
+  model_breakdown: {
+    model: string;
+    count: number;
+    cost: number;
+    tokens_in: number;
+    tokens_out: number;
+    tokens_total: number;
+    price_per_million_input: number;
+    price_per_million_output: number;
+  }[];
+  daily_activity: { date: string; count: number; tokens: number }[];
+
+  // Related entities
+  projects: {
+    id: string;
+    name: string;
+    slug: string;
+    from_events?: boolean;
+  }[];
+  organizations: {
+    id: string;
+    name: string;
+    slug: string;
+    role: string;
+    is_current: boolean;
+  }[];
+  tool_accounts: {
+    id: string;
+    tool_name: string;
+    external_username: string | null;
+    is_active: boolean;
+  }[];
 }
 
 export function useMemberStats(orgId: string, memberId: string) {

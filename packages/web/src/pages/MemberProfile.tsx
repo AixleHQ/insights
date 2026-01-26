@@ -12,6 +12,13 @@ import {
   ShieldCheck,
   User,
   Eye,
+  Folder,
+  Building2,
+  Plug,
+  Coins,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Layers,
 } from 'lucide-react';
 import { useOrg } from '@/contexts/OrgContext';
 import { useMember, useMemberEvents, useMemberStats } from '@/hooks/useApi';
@@ -21,6 +28,14 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { EventsTable, type EventRow } from '@/components/events';
 import { cn } from '@/lib/utils';
 
@@ -45,19 +60,27 @@ function getInitials(name?: string | null, email?: string): string {
   return email?.slice(0, 2).toUpperCase() || 'U';
 }
 
+function formatTokens(tokens: number): string {
+  if (tokens >= 1_000_000) {
+    return `${(tokens / 1_000_000).toFixed(2)}M`;
+  }
+  if (tokens >= 1_000) {
+    return `${(tokens / 1_000).toFixed(1)}K`;
+  }
+  return tokens.toLocaleString();
+}
+
 function StatCard({
   title,
   value,
   subtitle,
   icon: Icon,
-  trend,
   className,
 }: {
   title: string;
   value: string | number;
   subtitle?: string;
   icon: typeof Activity;
-  trend?: { value: number; label: string };
   className?: string;
 }) {
   return (
@@ -71,16 +94,6 @@ function StatCard({
       <CardContent>
         <div className="text-2xl font-bold tracking-tight">{value}</div>
         {subtitle && <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>}
-        {trend && (
-          <div className="mt-2 flex items-center gap-1 text-xs">
-            <TrendingUp className={cn('size-3', trend.value >= 0 ? 'text-emerald-500' : 'text-red-500')} />
-            <span className={trend.value >= 0 ? 'text-emerald-500' : 'text-red-500'}>
-              {trend.value >= 0 ? '+' : ''}
-              {trend.value}%
-            </span>
-            <span className="text-muted-foreground">{trend.label}</span>
-          </div>
-        )}
       </CardContent>
     </Card>
   );
@@ -164,8 +177,13 @@ export function MemberProfile() {
     events_this_week: 0,
     events_this_month: 0,
     most_used_tool: null,
+    tokens: { total_in: 0, total_out: 0, total: 0 },
     tool_breakdown: [],
+    model_breakdown: [],
     daily_activity: [],
+    projects: [],
+    organizations: [],
+    tool_accounts: [],
   };
 
   const formattedJoinDate = member.created_at
@@ -216,7 +234,7 @@ export function MemberProfile() {
         </div>
       </div>
 
-      {/* Stats Grid */}
+      {/* Stats Grid - Row 1 */}
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard
           title="Total Events"
@@ -231,10 +249,10 @@ export function MemberProfile() {
           icon={DollarSign}
         />
         <StatCard
-          title="Today's Activity"
-          value={stats.events_today}
-          subtitle="Events today"
-          icon={TrendingUp}
+          title="Total Tokens"
+          value={formatTokens(stats.tokens?.total || 0)}
+          subtitle={`${formatTokens(stats.tokens?.total_in || 0)} in / ${formatTokens(stats.tokens?.total_out || 0)} out`}
+          icon={Coins}
         />
         <StatCard
           title="Most Used Tool"
@@ -244,40 +262,236 @@ export function MemberProfile() {
         />
       </div>
 
-      {/* Tool Breakdown */}
-      {stats.tool_breakdown && stats.tool_breakdown.length > 0 && (
+      {/* Token Stats Row */}
+      <div className="grid gap-4 md:grid-cols-3">
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Tool Usage</CardTitle>
-            <CardDescription>Breakdown by AI coding tool</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Tokens In</CardTitle>
+            <ArrowDownToLine className="size-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {stats.tool_breakdown.map((tool) => {
-                const percentage = stats.total_events > 0
-                  ? Math.round((tool.count / stats.total_events) * 100)
-                  : 0;
-                return (
-                  <div key={tool.tool} className="space-y-1.5">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">{tool.tool}</span>
-                      <span className="text-muted-foreground">
-                        {tool.count.toLocaleString()} events · ${Number(tool.cost || 0).toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full bg-primary/70 transition-all"
-                        style={{ width: `${percentage}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="text-2xl font-bold tracking-tight font-mono">
+              {formatTokens(stats.tokens?.total_in || 0)}
             </div>
+            <p className="mt-1 text-xs text-muted-foreground">Input tokens (prompts)</p>
           </CardContent>
         </Card>
-      )}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Tokens Out</CardTitle>
+            <ArrowUpFromLine className="size-4 text-emerald-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold tracking-tight font-mono">
+              {formatTokens(stats.tokens?.total_out || 0)}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">Output tokens (completions)</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Today's Activity</CardTitle>
+            <TrendingUp className="size-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold tracking-tight">{stats.events_today}</div>
+            <p className="mt-1 text-xs text-muted-foreground">Events today</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Two Column Layout */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Tool Usage with Token Breakdown */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Layers className="size-4" />
+              Tool Usage
+            </CardTitle>
+            <CardDescription>Events and tokens by AI coding tool</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {stats.tool_breakdown && stats.tool_breakdown.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tool</TableHead>
+                    <TableHead className="text-right">Events</TableHead>
+                    <TableHead className="text-right">Tokens</TableHead>
+                    <TableHead className="text-right">Cost</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {stats.tool_breakdown.map((tool) => (
+                    <TableRow key={tool.tool}>
+                      <TableCell className="font-medium">{tool.tool}</TableCell>
+                      <TableCell className="text-right font-mono text-sm">
+                        {tool.count.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm">
+                        <div>{formatTokens(tool.tokens_total)}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {formatTokens(tool.tokens_in)} / {formatTokens(tool.tokens_out)}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm">
+                        ${Number(tool.cost || 0).toFixed(2)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="py-8 text-center text-sm text-muted-foreground">No tool usage data</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Model Usage with Pricing */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Code2 className="size-4" />
+              Model Usage
+            </CardTitle>
+            <CardDescription>Tokens and pricing by AI model</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {stats.model_breakdown && stats.model_breakdown.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Model</TableHead>
+                    <TableHead className="text-right">Tokens</TableHead>
+                    <TableHead className="text-right">$/M Tokens</TableHead>
+                    <TableHead className="text-right">Cost</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {stats.model_breakdown.map((model) => (
+                    <TableRow key={model.model}>
+                      <TableCell className="font-medium text-sm">{model.model}</TableCell>
+                      <TableCell className="text-right font-mono text-sm">
+                        {formatTokens(model.tokens_total)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                        <div>${model.price_per_million_input} in</div>
+                        <div>${model.price_per_million_output} out</div>
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm">
+                        ${Number(model.cost || 0).toFixed(2)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="py-8 text-center text-sm text-muted-foreground">No model data available</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Three Column Layout for Related Entities */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Projects */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Folder className="size-4" />
+              Projects
+            </CardTitle>
+            <CardDescription>{stats.projects?.length || 0} projects</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {stats.projects && stats.projects.length > 0 ? (
+              <div className="space-y-2">
+                {stats.projects.map((project) => (
+                  <Link
+                    key={project.id}
+                    to={`/projects/${project.id}`}
+                    className="flex items-center justify-between rounded-md border p-2 transition-colors hover:bg-muted/50"
+                  >
+                    <span className="font-medium text-sm">{project.name}</span>
+                    {project.from_events && (
+                      <Badge variant="secondary" className="text-xs">via events</Badge>
+                    )}
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="py-4 text-center text-sm text-muted-foreground">No projects</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Organizations */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Building2 className="size-4" />
+              Organizations
+            </CardTitle>
+            <CardDescription>{stats.organizations?.length || 0} organizations</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {stats.organizations && stats.organizations.length > 0 ? (
+              <div className="space-y-2">
+                {stats.organizations.map((org) => (
+                  <div
+                    key={org.id}
+                    className={cn(
+                      'flex items-center justify-between rounded-md border p-2',
+                      org.is_current && 'border-primary/50 bg-primary/5'
+                    )}
+                  >
+                    <span className="font-medium text-sm">{org.name}</span>
+                    <Badge variant="outline" className="text-xs capitalize">{org.role}</Badge>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="py-4 text-center text-sm text-muted-foreground">No organizations</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Connected Tools */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Plug className="size-4" />
+              Connected Tools
+            </CardTitle>
+            <CardDescription>{stats.tool_accounts?.length || 0} tool accounts</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {stats.tool_accounts && stats.tool_accounts.length > 0 ? (
+              <div className="space-y-2">
+                {stats.tool_accounts.map((account) => (
+                  <div
+                    key={account.id}
+                    className="flex items-center justify-between rounded-md border p-2"
+                  >
+                    <div>
+                      <div className="font-medium text-sm">{account.tool_name}</div>
+                      {account.external_username && (
+                        <div className="text-xs text-muted-foreground">@{account.external_username}</div>
+                      )}
+                    </div>
+                    <Badge variant={account.is_active ? 'default' : 'secondary'} className="text-xs">
+                      {account.is_active ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="py-4 text-center text-sm text-muted-foreground">No connected tools</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Recent Events */}
       <Card>
