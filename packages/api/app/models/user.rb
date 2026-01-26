@@ -31,4 +31,8 @@ class User < ApplicationRecord
     membership = organization_memberships.find_by(organization: organization)
     membership&.role.in?(%w[owner admin])
   end
+
+  def global_admin?
+    global_admin == true
+  end
 end

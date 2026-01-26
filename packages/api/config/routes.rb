@@ -5,6 +5,15 @@ Rails.application.routes.draw do
 
   # API routes
   namespace :api do
+    # Internal API for Temporal workers and other internal services
+    scope :internal, controller: 'internal' do
+      post 'tool_events', action: :create_tool_event
+      post 'audit_logs', action: :create_audit_log
+      post 'alerts', action: :create_alert
+      post 'broadcasts', action: :create_broadcast
+      get 'organizations/:id/sanitization_policy', action: :sanitization_policy
+    end
+
     namespace :v1 do
       # User routes
       get 'users/me', to: 'users#me'
@@ -44,7 +53,37 @@ Rails.application.routes.draw do
 
         # Organization projects
         resources :projects, only: [:index, :create]
+
+        # Events
+        resources :events, only: [:index, :show] do
+          collection do
+            get :summary
+            get :unattributed
+          end
+          member do
+            get :audit_trail
+          end
+        end
+
+        # Telemetry ingestion
+        post 'telemetry/ingest', to: 'telemetry#ingest'
+        post 'telemetry/batch', to: 'telemetry#batch'
+
+        # Stats
+        get 'stats/overview', to: 'stats#overview'
+        get 'stats/hourly', to: 'stats#hourly'
+        get 'stats/daily', to: 'stats#daily'
+
+        # AI Gateway
+        scope 'ai/:provider' do
+          post 'completions', to: 'ai_gateway#completions'
+          post 'chat', to: 'ai_gateway#chat'
+          get 'models', to: 'ai_gateway#models'
+        end
       end
+
+      # Webhooks (outside organization scope, uses connector_id)
+      post 'webhooks/:provider/:connector_id', to: 'webhooks#receive'
 
       # Project routes (can be accessed outside org context for personal projects)
       resources :projects, except: [:index, :create] do
@@ -70,6 +109,9 @@ Rails.application.routes.draw do
       post 'projects', to: 'projects#create'
     end
   end
+
+  # ActionCable WebSocket endpoint
+  mount ActionCable.server => '/cable'
 
   # Draw admin routes from separate file
   draw :admin_routes

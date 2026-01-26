@@ -1,0 +1,19 @@
+---
+:concurrency: 5
+:timeout: 30
+
+# Queue priority (higher priority first)
+:queues:
+  - [critical, 6]
+  - [default, 5]
+  - [alerts, 4]
+  - [ai, 3]
+  - [connectors, 2]
+  - [maintenance, 1]
+
+# Environment-specific settings
+development:
+  :concurrency: 2
+
+production:
+  :concurrency: 10

@@ -11,7 +11,7 @@ class ToolEvent < ApplicationRecord
 
   EVENT_TYPES = %w[chat completion edit commit review test debug refactor documentation other].freeze
 
-  belongs_to :user
+  belongs_to :user, optional: true
   belongs_to :organization
   belongs_to :project, optional: true
   belongs_to :repository, optional: true

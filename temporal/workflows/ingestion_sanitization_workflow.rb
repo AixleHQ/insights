@@ -1,0 +1,128 @@
+require "temporalio/workflow"
+
+module Workflows
+  class IngestionSanitizationWorkflow < Temporalio::Workflow::Definition
+    workflow_query_attr_reader :current_state
+    workflow_query_attr_reader :classification_result
+    workflow_query_attr_reader :sanitization_result
+
+    # Workflow input structure:
+    # {
+    #   "raw_event_key" => "events/2024/01/25/abc123.json",
+    #   "raw_event_bucket" => "db90-raw-events",
+    #   "event" => {
+    #     "organization_id" => "uuid",
+    #     "user_id" => "uuid or nil",
+    #     "project_id" => "uuid or nil",
+    #     "tool_name" => "claude_code",
+    #     "event_type" => "chat",
+    #     "model" => "claude-3-sonnet",
+    #     "tokens_in" => 100,
+    #     "tokens_out" => 500,
+    #     "cost_usd" => 0.10,
+    #     "duration_ms" => 1500,
+    #     "occurred_at" => "2024-01-25T10:00:00Z"
+    #   }
+    # }
+
+    def execute(params)
+      @current_state = "starting"
+      workflow_id = Temporalio::Workflow.info.workflow_id
+
+      # Step 1: Fetch raw event from MinIO
+      @current_state = "fetching_raw_event"
+      raw_event = Temporalio::Workflow.execute_activity(
+        Activities::FetchRawEventActivity,
+        {
+          "bucket" => params["raw_event_bucket"],
+          "key" => params["raw_event_key"]
+        },
+        start_to_close_timeout: 30
+      )
+
+      # Step 2: Get sanitization policy for the organization
+      @current_state = "getting_policy"
+      policy = Temporalio::Workflow.execute_activity(
+        Activities::GetPolicyActivity,
+        { "organization_id" => params["event"]["organization_id"] },
+        start_to_close_timeout: 10
+      )
+
+      # Step 3: Classify the content
+      @current_state = "classifying"
+      @classification_result = Temporalio::Workflow.execute_activity(
+        Activities::ClassificationActivity,
+        {
+          "raw_payload" => raw_event["raw_payload"],
+          "policy" => policy
+        },
+        start_to_close_timeout: 60
+      )
+
+      # Step 4: Sanitize if needed
+      @current_state = "sanitizing"
+      @sanitization_result = Temporalio::Workflow.execute_activity(
+        Activities::SanitizationActivity,
+        {
+          "raw_payload" => raw_event["raw_payload"],
+          "policy" => policy,
+          "classification" => @classification_result
+        },
+        start_to_close_timeout: 60
+      )
+
+      # Step 5: Persist to database
+      @current_state = "persisting"
+      persistence_result = Temporalio::Workflow.execute_activity(
+        Activities::PersistenceActivity,
+        {
+          "event" => params["event"],
+          "raw_event_key" => params["raw_event_key"],
+          "organization_id" => params["event"]["organization_id"],
+          "classification" => @classification_result,
+          "sanitization" => @sanitization_result,
+          "workflow_id" => workflow_id
+        },
+        start_to_close_timeout: 30
+      )
+
+      # Step 6: Broadcast to ActionCable (non-blocking)
+      @current_state = "broadcasting"
+      broadcast_result = Temporalio::Workflow.execute_activity(
+        Activities::BroadcastActivity,
+        {
+          "organization_id" => params["event"]["organization_id"],
+          "tool_event_id" => persistence_result["tool_event_id"],
+          "classification" => @classification_result
+        },
+        start_to_close_timeout: 10
+      )
+
+      # Step 7: Send alert if high risk
+      @current_state = "alerting"
+      alert_result = Temporalio::Workflow.execute_activity(
+        Activities::AlertActivity,
+        {
+          "classification" => @classification_result,
+          "event" => params["event"],
+          "tool_event_id" => persistence_result["tool_event_id"]
+        },
+        start_to_close_timeout: 30
+      )
+
+      @current_state = "completed"
+
+      # Return summary
+      {
+        "workflow_id" => workflow_id,
+        "tool_event_id" => persistence_result["tool_event_id"],
+        "audit_log_id" => persistence_result["audit_log_id"],
+        "risk_level" => @classification_result["risk_level"],
+        "sanitization_applied" => @sanitization_result["change_count"].to_i > 0,
+        "alert_sent" => alert_result["alert_sent"],
+        "broadcasted" => broadcast_result["broadcasted"],
+        "completed_at" => Time.now.utc.iso8601
+      }
+    end
+  end
+end

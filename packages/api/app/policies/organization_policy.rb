@@ -36,6 +36,11 @@ class OrganizationPolicy < ApplicationPolicy
     org_admin?(record) || global_admin?
   end
 
+  # Members can create events (telemetry ingestion)
+  def create_event?
+    org_member?(record) || global_admin?
+  end
+
   relation_scope do |scope|
     if global_admin?
       scope.all

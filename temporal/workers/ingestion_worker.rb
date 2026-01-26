@@ -21,19 +21,25 @@ client = Temporalio::Client.connect(TEMPORAL_HOST, TEMPORAL_NAMESPACE)
 worker = Temporalio::Worker.new(
   client: client,
   task_queue: TASK_QUEUE,
-  workflows: [Workflows::HelloWorkflow],
-  activities: [Activities::GreetingActivity.new]
+  workflows: [
+    Workflows::HelloWorkflow,
+    Workflows::IngestionSanitizationWorkflow
+  ],
+  activities: [
+    Activities::GreetingActivity.new,
+    Activities::FetchRawEventActivity.new,
+    Activities::GetPolicyActivity.new,
+    Activities::ClassificationActivity.new,
+    Activities::SanitizationActivity.new,
+    Activities::PersistenceActivity.new,
+    Activities::AlertActivity.new,
+    Activities::BroadcastActivity.new
+  ]
 )
 
 puts "Worker started. Listening for tasks..."
 
-# Handle graceful shutdown
-shutdown = false
-Signal.trap("INT") { shutdown = true }
-Signal.trap("TERM") { shutdown = true }
-
-worker.run do
-  shutdown
-end
+# Run worker with automatic signal handling
+worker.run(shutdown_signals: %w[INT TERM])
 
 puts "Worker stopped."

@@ -2,7 +2,7 @@ require "temporalio/workflow"
 
 module Workflows
   class HelloWorkflow < Temporalio::Workflow::Definition
-    workflow_query_attr_accessor :current_greeting
+    workflow_query_attr_reader :current_greeting
 
     def execute(name)
       @current_greeting = "Hello, #{name}!"

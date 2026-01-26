@@ -11,7 +11,8 @@ class JwtAuth
     '/health',
     '/api/v1/health',
     '/up',
-    '/admin'
+    '/admin',
+    '/api/internal'
   ].freeze
 
   def initialize(app)

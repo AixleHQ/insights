@@ -4,6 +4,7 @@ ruby "3.4.8"
 
 gem "temporalio"
 gem "concurrent-ruby"
+gem "aws-sdk-s3"
 
 group :development, :test do
   gem "rspec"

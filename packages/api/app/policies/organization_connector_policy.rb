@@ -45,6 +45,11 @@ class OrganizationConnectorPolicy < ApplicationPolicy
     org_admin?(record.organization) || global_admin?
   end
 
+  # Members can use AI connectors (proxy requests)
+  def use?
+    org_member?(record.organization) || global_admin?
+  end
+
   relation_scope do |scope|
     if global_admin?
       scope.all
