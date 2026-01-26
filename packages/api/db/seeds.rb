@@ -34,6 +34,19 @@ if SanitizationPolicy.count == 0
   )
 end
 
+# Create known development users that should persist across reseeds
+# These users authenticate via Keycloak and need to exist with their keycloak_sub
+KNOWN_DEV_USERS = [
+  {
+    email: 'ada.lovelace@example.com',
+    name: 'Ada Lovelace',
+    keycloak_sub: 'ada.lovelace@example.com', # Keycloak uses email as sub
+    global_admin: true,
+    org_role: 'owner'
+  }
+  # Add more known dev users here as needed
+].freeze
+
 # Only seed sample data in development
 if Rails.env.development?
   puts "Seeding development data with realistic usage simulation..."
@@ -152,6 +165,28 @@ if Rails.env.development?
     o.name = 'Acme Corp'
   end
   puts "Organization: #{org.name}"
+
+  # Create known development users first (so they get events)
+  puts "Creating known development users..."
+  known_users = []
+  KNOWN_DEV_USERS.each do |user_data|
+    user = User.find_or_create_by!(email: user_data[:email]) do |u|
+      u.keycloak_sub = user_data[:keycloak_sub]
+      u.name = user_data[:name]
+      u.global_admin = user_data[:global_admin] || false
+    end
+
+    # Update keycloak_sub if it changed (in case user logged in with different sub)
+    user.update!(keycloak_sub: user_data[:keycloak_sub]) if user.keycloak_sub != user_data[:keycloak_sub]
+
+    # Add to organization with specified role
+    OrganizationMembership.find_or_create_by!(user: user, organization: org) do |m|
+      m.role = user_data[:org_role] || 'member'
+    end
+
+    known_users << user
+    puts "  Created/updated: #{user.email} (#{user_data[:org_role]})"
+  end
 
   # Create 100 engineers
   puts "Creating #{NUM_ENGINEERS} engineers..."
@@ -346,17 +381,61 @@ if Rails.env.development?
   puts "=" * 50
 end
 
-# Assign some events to any real (non-seed) users in the org
+# Assign events to known dev users (these should have substantial data)
+org = Organization.find_by(slug: 'dualboot-partners')
+if org && KNOWN_DEV_USERS.any?
+  puts "\nGenerating events for known development users..."
+
+  KNOWN_DEV_USERS.each do |user_data|
+    user = User.find_by(email: user_data[:email])
+    next unless user
+
+    # Assign this user to all projects as a member or admin
+    org.projects.each do |project|
+      ProjectMembership.find_or_create_by!(user: user, project: project) do |m|
+        m.role = user_data[:org_role] == 'owner' ? 'admin' : 'member'
+      end
+    end
+
+    # Reassign 1500 random events to this user (more than default engineers)
+    engineer_ids = User.where("email LIKE 'engineer%'").pluck(:id)
+    events_to_reassign = ToolEvent.where(organization: org)
+                                   .where(user_id: engineer_ids)
+                                   .order(Arel.sql("RANDOM()"))
+                                   .limit(1500)
+
+    count = events_to_reassign.update_all(user_id: user.id)
+    puts "  #{user.email}: assigned #{count} events, added to #{org.projects.count} projects"
+
+    # Create some tool accounts for this user
+    membership = user.organization_memberships.find_by(organization: org)
+    if membership
+      %w[claude_code cursor github_copilot].each do |tool|
+        UserToolAccount.find_or_create_by!(
+          organization_membership: membership,
+          tool_name: tool
+        ) do |ta|
+          ta.external_user_id = "#{user.email.split('@').first}-#{tool}"
+          ta.external_username = user.email.split('@').first
+          ta.is_active = true
+        end
+      end
+      puts "  #{user.email}: created tool accounts"
+    end
+  end
+end
+
+# Also handle any other real users that might exist (logged in before reseed)
 real_users = User.where("email LIKE '%example.com' AND email NOT LIKE 'engineer%@%'")
+                 .where.not(email: KNOWN_DEV_USERS.map { |u| u[:email] })
                  .joins(:organization_memberships)
-                 .where(organization_memberships: { organization_id: Organization.find_by(slug: 'dualboot-partners')&.id })
+                 .where(organization_memberships: { organization_id: org&.id })
                  .distinct
 
 if real_users.any?
-  puts "\nAssigning events to #{real_users.count} real user(s)..."
+  puts "\nAssigning events to #{real_users.count} other real user(s)..."
   real_users.each do |user|
-    # Reassign ~500 random events to this user
-    events_to_reassign = ToolEvent.where(organization: user.organizations.first)
+    events_to_reassign = ToolEvent.where(organization: org)
                                    .where("user_id IN (?)", User.where("email LIKE 'engineer%'").pluck(:id))
                                    .order(Arel.sql("RANDOM()"))
                                    .limit(500)
@@ -364,8 +443,7 @@ if real_users.any?
     count = events_to_reassign.update_all(user_id: user.id)
     puts "  #{user.email}: assigned #{count} events"
 
-    # Ensure they're in some projects
-    user.organizations.first&.projects&.limit(3)&.each do |project|
+    org&.projects&.limit(3)&.each do |project|
       ProjectMembership.find_or_create_by!(user: user, project: project) do |m|
         m.role = 'member'
       end

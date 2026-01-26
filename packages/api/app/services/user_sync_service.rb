@@ -39,11 +39,17 @@ class UserSyncService
       user = User.find_by(keycloak_sub: keycloak_sub)
       return user if user
 
-      # Check for existing user with this email (may have pending keycloak_sub)
+      # Check for existing user with this email
+      # This handles:
+      # - Users created via seeds (keycloak_sub may be email or seed-user-*)
+      # - Users created with pending- prefix
+      # - Users who logged in with a different identity provider
       if email.present?
         existing = User.find_by(email: email)
-        if existing && existing.keycloak_sub&.start_with?('pending-')
-          # Update the pending keycloak_sub with the real one
+        if existing
+          # Update the keycloak_sub to the real OAuth value
+          # This links the seeded/pending user to the actual OAuth identity
+          Rails.logger.info "[UserSyncService] Linking existing user #{email} (old sub: #{existing.keycloak_sub}) to new sub: #{keycloak_sub}"
           existing.update!(keycloak_sub: keycloak_sub)
           return existing
         end
