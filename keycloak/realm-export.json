@@ -117,19 +117,21 @@
   "defaultRoles": ["user"],
   "identityProviders": [
     {
-      "alias": "google",
-      "displayName": "Google",
+      "alias": "google-dbp",
+      "displayName": "Sign in with Google (DBP)",
       "providerId": "google",
-      "enabled": false,
+      "enabled": true,
       "updateProfileFirstLoginMode": "on",
       "trustEmail": true,
       "storeToken": false,
       "addReadTokenRoleOnCreate": false,
       "authenticateByDefault": false,
+      "firstBrokerLoginFlowAlias": "first broker login",
       "linkOnly": false,
       "config": {
-        "clientId": "YOUR_GOOGLE_CLIENT_ID",
-        "clientSecret": "YOUR_GOOGLE_CLIENT_SECRET",
+        "clientId": "${GOOGLE_CLIENT_ID}",
+        "clientSecret": "${GOOGLE_CLIENT_SECRET}",
+        "hostedDomain": "example.com",
         "useJwksUrl": "true",
         "syncMode": "IMPORT",
         "defaultScope": "openid profile email"
@@ -138,13 +140,22 @@
   ],
   "identityProviderMappers": [
     {
-      "name": "google-email-mapper",
-      "identityProviderAlias": "google",
+      "name": "google-dbp-email-verified",
+      "identityProviderAlias": "google-dbp",
       "identityProviderMapper": "hardcoded-attribute-idp-mapper",
       "config": {
         "syncMode": "INHERIT",
         "attribute": "emailVerified",
         "attribute.value": "true"
+      }
+    },
+    {
+      "name": "google-dbp-username-mapper",
+      "identityProviderAlias": "google-dbp",
+      "identityProviderMapper": "oidc-username-idp-mapper",
+      "config": {
+        "syncMode": "INHERIT",
+        "template": "${CLAIM.email}"
       }
     }
   ],
