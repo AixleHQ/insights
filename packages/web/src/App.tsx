@@ -20,6 +20,7 @@ import { ProjectDetail } from './pages/ProjectDetail';
 import { Connectors } from './pages/Connectors';
 import { Team } from './pages/Team';
 import { TeamInvite } from './pages/TeamInvite';
+import { MemberProfile } from './pages/MemberProfile';
 import { Settings } from './pages/Settings';
 import { ConnectorSetup } from './pages/ConnectorSetup';
 import { ToolAccounts } from './pages/ToolAccounts';
@@ -66,6 +67,7 @@ function App() {
               <Route path="/connectors/new/:provider" element={<ConnectorSetup />} />
               <Route path="/team" element={<Team />} />
               <Route path="/team/invite" element={<TeamInvite />} />
+              <Route path="/team/:id" element={<MemberProfile />} />
               <Route path="/settings/*" element={<Settings />} />
               <Route path="/settings/tool-accounts" element={<ToolAccounts />} />
               <Route path="/events/unattributed" element={<UnattributedEvents />} />

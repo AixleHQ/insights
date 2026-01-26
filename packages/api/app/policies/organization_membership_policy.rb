@@ -11,6 +11,16 @@ class OrganizationMembershipPolicy < ApplicationPolicy
     org_member?(record.organization) || global_admin?
   end
 
+  # Members can view stats of other members
+  def stats?
+    org_member?(record.organization) || global_admin?
+  end
+
+  # Members can view events of other members
+  def events?
+    org_member?(record.organization) || global_admin?
+  end
+
   # Only admins can add members
   def create?
     org_admin?(record.organization) || global_admin?

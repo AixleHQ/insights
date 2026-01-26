@@ -72,15 +72,26 @@ export type ConnectorStatus = 'active' | 'inactive' | 'error';
 
 export interface Connector {
   id: string;
-  organization_id: string;
-  provider: ConnectorProvider;
-  name: string;
-  status: ConnectorStatus;
-  external_id: string | null;
-  last_sync_at: string | null;
-  sync_error: string | null;
-  created_at: string;
-  updated_at: string;
+  organizationId?: string;
+  organization_id?: string;
+  connectorType: ConnectorProvider;
+  connector_type?: ConnectorProvider;
+  isActive: boolean;
+  is_active?: boolean;
+  externalAccountId?: string | null;
+  external_account_id?: string | null;
+  externalAccountName?: string | null;
+  external_account_name?: string | null;
+  lastSyncAt?: string | null;
+  last_sync_at?: string | null;
+  lastError?: string | null;
+  last_error?: string | null;
+  tokenExpired?: boolean;
+  token_expired?: boolean;
+  createdAt?: string;
+  created_at?: string;
+  updatedAt?: string;
+  updated_at?: string;
 }
 
 // Tool account types

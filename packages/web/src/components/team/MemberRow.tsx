@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { MoreHorizontal, Shield, ShieldCheck, User, Eye, Trash2 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -91,21 +92,24 @@ export function MemberRow({
   return (
     <TableRow className={cn('group', className)}>
       <TableCell>
-        <div className="flex items-center gap-3">
+        <Link
+          to={`/team/${member.id}`}
+          className="flex items-center gap-3 rounded-md transition-colors hover:bg-muted/50 -m-2 p-2"
+        >
           <Avatar className="size-8">
             <AvatarFallback className="text-xs bg-muted">
               {getInitials(member.name, member.email)}
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0">
-            <p className="truncate font-medium">
+            <p className="truncate font-medium hover:underline">
               {member.name || member.email.split('@')[0]}
             </p>
             <p className="truncate text-xs text-muted-foreground">
               {member.email}
             </p>
           </div>
-        </div>
+        </Link>
       </TableCell>
       <TableCell>
         {canEditRole ? (

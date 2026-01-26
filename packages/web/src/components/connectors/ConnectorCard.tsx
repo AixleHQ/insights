@@ -143,7 +143,7 @@ export function ConnectorCard({
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-lg bg-muted text-lg font-medium capitalize">
-              {connector.provider[0]}
+              {(connector.provider || 'C')[0]}
             </div>
             <div>
               <CardTitle className="text-base">{connector.name}</CardTitle>

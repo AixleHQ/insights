@@ -4,7 +4,7 @@ module Api
   module V1
     class OrganizationMembersController < BaseController
       before_action :require_organization!
-      before_action :set_membership, only: %i[show update destroy]
+      before_action :set_membership, only: %i[show update destroy stats events]
 
       # GET /api/v1/organizations/:organization_id/members
       def index
@@ -58,6 +58,77 @@ module Api
         authorize! @membership
         @membership.destroy!
         render_no_content
+      end
+
+      # GET /api/v1/organizations/:organization_id/members/:id/stats
+      def stats
+        authorize! @membership
+        user = @membership.user
+
+        events = current_organization.tool_events.where(user_id: user.id)
+
+        total_events = events.count
+        total_cost = events.sum(:cost_usd)
+        events_today = events.where('created_at >= ?', Time.current.beginning_of_day).count
+        events_this_week = events.where('created_at >= ?', 1.week.ago).count
+        events_this_month = events.where('created_at >= ?', 1.month.ago).count
+
+        # Tool breakdown
+        tool_breakdown = events
+          .group(:tool_name)
+          .select('tool_name as tool, COUNT(*) as count, SUM(cost_usd) as cost')
+          .order('count DESC')
+          .map { |t| { tool: t.tool, count: t.count, cost: t.cost.to_f } }
+
+        most_used_tool = tool_breakdown.first&.dig(:tool)
+
+        # Daily activity for last 30 days
+        daily_activity = events
+          .where('created_at >= ?', 30.days.ago)
+          .group('DATE(created_at)')
+          .count
+          .map { |date, count| { date: date.to_s, count: count } }
+          .sort_by { |d| d[:date] }
+
+        render json: {
+          total_events: total_events,
+          total_cost: total_cost.to_f,
+          events_today: events_today,
+          events_this_week: events_this_week,
+          events_this_month: events_this_month,
+          most_used_tool: most_used_tool,
+          tool_breakdown: tool_breakdown,
+          daily_activity: daily_activity
+        }
+      end
+
+      # GET /api/v1/organizations/:organization_id/members/:id/events
+      def events
+        authorize! @membership
+        user = @membership.user
+
+        events = current_organization.tool_events
+                                     .where(user_id: user.id)
+                                     .includes(:user, :project)
+                                     .order(created_at: :desc)
+
+        # Pagination
+        page = (params[:page] || 1).to_i
+        per_page = [(params[:per_page] || 25).to_i, 100].min
+
+        total = events.count
+        events = events.offset((page - 1) * per_page).limit(per_page)
+
+        render_collection(
+          events,
+          ToolEventSerializer,
+          meta: {
+            current_page: page,
+            per_page: per_page,
+            total_count: total,
+            total_pages: (total.to_f / per_page).ceil
+          }
+        )
       end
 
       private

@@ -34,7 +34,12 @@ Rails.application.routes.draw do
         end
 
         # Organization members
-        resources :members, controller: 'organization_members'
+        resources :members, controller: 'organization_members' do
+          member do
+            get :stats
+            get :events
+          end
+        end
 
         # Organization connectors
         resources :connectors, controller: 'organization_connectors' do

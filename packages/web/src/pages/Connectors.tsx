@@ -89,18 +89,27 @@ export function Connectors() {
 
   // Transform API response to component format
   const connectors: ConnectorData[] = useMemo(() => {
-    return connectorsData?.map((c) => ({
-      id: c.id,
-      provider: c.provider,
-      name: c.name,
-      status: c.status === 'active' ? 'connected' : c.status === 'error' ? 'error' : 'syncing',
-      last_sync_at: c.last_sync_at || undefined,
-      sync_error: c.sync_error || undefined,
-      metadata: {
-        account_name: c.external_id || '',
-        resources_count: 0, // Would need to be fetched separately
-      },
-    })) || [];
+    if (!connectorsData) return [];
+    return connectorsData.map((c) => {
+      const connectorType = c.connectorType || c.connector_type || 'github';
+      const isActive = c.isActive ?? c.is_active ?? true;
+      const lastError = c.lastError || c.last_error;
+      const externalAccountName = c.externalAccountName || c.external_account_name;
+      const lastSyncAt = c.lastSyncAt || c.last_sync_at;
+
+      return {
+        id: c.id,
+        provider: connectorType as ConnectorData['provider'],
+        name: externalAccountName || connectorType,
+        status: lastError ? 'error' : isActive ? 'connected' : 'disconnected',
+        last_sync_at: lastSyncAt || undefined,
+        sync_error: lastError || undefined,
+        metadata: {
+          account_name: externalAccountName || '',
+          resources_count: 0,
+        },
+      };
+    });
   }, [connectorsData]);
 
   const handleConnect = (providerId: string) => {

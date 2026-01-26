@@ -41,6 +41,8 @@ export const queryKeys = {
   members: {
     all: (orgId: string) => ['organizations', orgId, 'members'] as const,
     detail: (orgId: string, id: string) => ['organizations', orgId, 'members', id] as const,
+    events: (orgId: string, id: string) => ['organizations', orgId, 'members', id, 'events'] as const,
+    stats: (orgId: string, id: string) => ['organizations', orgId, 'members', id, 'stats'] as const,
   },
   projects: {
     all: (orgId: string) => ['organizations', orgId, 'projects'] as const,
@@ -241,6 +243,71 @@ export function useRemoveMember() {
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.members.all(orgId) });
     },
+  });
+}
+
+export interface MemberDetail extends OrganizationMember {
+  stats?: {
+    total_events: number;
+    total_cost: number;
+    events_today: number;
+    events_this_week: number;
+    most_used_tool: string | null;
+  };
+}
+
+export function useMember(orgId: string, memberId: string) {
+  return useQuery({
+    queryKey: queryKeys.members.detail(orgId, memberId),
+    queryFn: async () => {
+      const response = await api.get<{ data: MemberDetail }>(`/organizations/${orgId}/members/${memberId}`);
+      return response.data;
+    },
+    enabled: !!orgId && !!memberId,
+  });
+}
+
+export function useMemberEvents(orgId: string, memberId: string, params?: EventsParams) {
+  return useQuery({
+    queryKey: queryKeys.members.events(orgId, memberId),
+    queryFn: async () => {
+      const searchParams = new URLSearchParams();
+      if (params) {
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            searchParams.append(key, String(value));
+          }
+        });
+      }
+      const query = searchParams.toString();
+      const response = await api.get<PaginatedResponse<ToolEvent>>(
+        `/organizations/${orgId}/members/${memberId}/events${query ? `?${query}` : ''}`
+      );
+      return response;
+    },
+    enabled: !!orgId && !!memberId,
+  });
+}
+
+export interface MemberStats {
+  total_events: number;
+  total_cost: number;
+  events_today: number;
+  events_this_week: number;
+  events_this_month: number;
+  most_used_tool: string | null;
+  tool_breakdown: { tool: string; count: number; cost: number }[];
+  daily_activity: { date: string; count: number }[];
+}
+
+export function useMemberStats(orgId: string, memberId: string) {
+  return useQuery({
+    queryKey: queryKeys.members.stats(orgId, memberId),
+    queryFn: async () => {
+      const response = await api.get<MemberStats>(`/organizations/${orgId}/members/${memberId}/stats`);
+      return response;
+    },
+    enabled: !!orgId && !!memberId,
   });
 }
 
