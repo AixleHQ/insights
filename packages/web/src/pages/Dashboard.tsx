@@ -14,13 +14,6 @@ import {
   type ToolUsageData,
   type Alert,
 } from '@/components/dashboard';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -101,6 +94,35 @@ export function Dashboard() {
         </p>
       </div>
 
+      {isLoadingHeatmap ? (
+        <div className="rounded-xl border bg-card p-6">
+          <div className="flex items-center justify-between mb-6">
+            <Skeleton className="h-6 w-24" />
+            <div className="flex gap-6">
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-4 w-24" />
+            </div>
+          </div>
+          <div className="flex">
+            <div className="w-7 shrink-0" />
+            <div className="flex-1 grid grid-cols-[repeat(53,1fr)] gap-1">
+              {Array.from({ length: 53 }).map((_, i) => (
+                <div key={i} className="flex flex-col gap-1">
+                  {Array.from({ length: 7 }).map((_, j) => (
+                    <Skeleton key={j} className="aspect-square w-full rounded" />
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <TooltipProvider>
+          <ActivityHeatmap data={heatmapData || []} />
+        </TooltipProvider>
+      )}
+
       <MetricGrid>
         <MetricCard
           title="Total Events"
@@ -169,31 +191,6 @@ export function Dashboard() {
           onDismiss={handleDismissAlert}
         />
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Activity Heatmap</CardTitle>
-          <CardDescription>
-            AI tool usage over the past year
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoadingHeatmap ? (
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-full" />
-              <div className="flex gap-1">
-                {Array.from({ length: 52 }).map((_, i) => (
-                  <Skeleton key={i} className="w-[10px] h-[70px]" />
-                ))}
-              </div>
-            </div>
-          ) : (
-            <TooltipProvider>
-              <ActivityHeatmap data={heatmapData || []} />
-            </TooltipProvider>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }

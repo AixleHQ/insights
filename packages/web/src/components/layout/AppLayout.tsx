@@ -7,10 +7,10 @@ export function AppLayout() {
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="flex flex-col h-svh overflow-hidden">
         <Header />
-        <main className="flex-1 overflow-auto">
-          <div className="container mx-auto p-6">
+        <main className="flex-1 overflow-auto pb-[env(safe-area-inset-bottom)]">
+          <div className="container mx-auto px-4 py-6 md:px-6">
             <Outlet />
           </div>
         </main>

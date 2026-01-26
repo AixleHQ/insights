@@ -1,10 +1,26 @@
 import { useMemo } from 'react';
+import { Activity, Calendar, Zap } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+
+interface ToolBreakdown {
+  name: string;
+  events: number;
+  tokens: number;
+  color?: string;
+}
+
+interface ModelBreakdown {
+  name: string;
+  tokens: number;
+}
 
 interface ActivityData {
   date: string;
   count: number;
+  tokens?: number;
+  tools?: ToolBreakdown[];
+  models?: ModelBreakdown[];
 }
 
 interface ActivityHeatmapProps {
@@ -15,16 +31,24 @@ interface ActivityHeatmapProps {
 const DAYS_OF_WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+const TOOL_COLORS: Record<string, string> = {
+  'Claude Code': 'bg-amber-500',
+  'GitHub Copilot': 'bg-blue-500',
+  'Cursor': 'bg-purple-500',
+  'Aider': 'bg-green-500',
+  'default': 'bg-gray-500',
+};
+
 function getIntensityClass(count: number, maxCount: number): string {
-  if (count === 0) return 'bg-muted';
+  if (count === 0) return 'bg-muted/30 border border-muted/50';
   const intensity = count / maxCount;
-  if (intensity < 0.25) return 'bg-emerald-200 dark:bg-emerald-900';
-  if (intensity < 0.5) return 'bg-emerald-400 dark:bg-emerald-700';
-  if (intensity < 0.75) return 'bg-emerald-500 dark:bg-emerald-500';
-  return 'bg-emerald-600 dark:bg-emerald-400';
+  if (intensity < 0.25) return 'bg-emerald-400/40 dark:bg-emerald-500/30';
+  if (intensity < 0.5) return 'bg-emerald-400/60 dark:bg-emerald-500/50';
+  if (intensity < 0.75) return 'bg-emerald-400/80 dark:bg-emerald-500/70';
+  return 'bg-emerald-500 dark:bg-emerald-400';
 }
 
-function formatDate(dateStr: string): string {
+function formatDateLong(dateStr: string): string {
   const date = new Date(dateStr);
   return date.toLocaleDateString('en-US', {
     weekday: 'short',
@@ -34,14 +58,113 @@ function formatDate(dateStr: string): string {
   });
 }
 
+function formatNumber(num: number): string {
+  if (num >= 1000000) {
+    return `${(num / 1000000).toFixed(1)}M`;
+  }
+  if (num >= 1000) {
+    return `${(num / 1000).toFixed(1)}K`;
+  }
+  return num.toLocaleString();
+}
+
+interface DayData {
+  date: string;
+  count: number;
+  tokens?: number;
+  tools?: ToolBreakdown[];
+  models?: ModelBreakdown[];
+  dayOfWeek: number;
+}
+
+function DayTooltip({ day }: { day: DayData }) {
+  const hasActivity = day.count > 0;
+
+  return (
+    <div className="min-w-[200px]">
+      {/* Date header */}
+      <div className="flex items-center gap-2 text-foreground mb-3">
+        <Calendar className="size-4 text-muted-foreground" />
+        <span className="font-medium">{formatDateLong(day.date)}</span>
+      </div>
+
+      {hasActivity ? (
+        <>
+          {/* Stats row */}
+          <div className="flex items-center gap-4 mb-3">
+            <div className="flex items-center gap-1.5">
+              <Activity className="size-4 text-muted-foreground" />
+              <span>{formatNumber(day.count)} events</span>
+            </div>
+            {day.tokens !== undefined && day.tokens > 0 && (
+              <div className="flex items-center gap-1.5">
+                <Zap className="size-4 text-muted-foreground" />
+                <span>{formatNumber(day.tokens)} tokens</span>
+              </div>
+            )}
+          </div>
+
+          {/* Tools breakdown */}
+          {day.tools && day.tools.length > 0 && (
+            <div className="mb-3">
+              <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1.5">
+                Tools
+              </div>
+              <div className="space-y-1">
+                {day.tools.map((tool) => (
+                  <div key={tool.name} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className={cn('size-2 rounded-full', tool.color || TOOL_COLORS[tool.name] || TOOL_COLORS.default)} />
+                      <span>{tool.name}</span>
+                    </div>
+                    <span className="text-muted-foreground">
+                      {formatNumber(tool.events)} / {formatNumber(tool.tokens)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Models breakdown */}
+          {day.models && day.models.length > 0 && (
+            <div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1.5">
+                Models
+              </div>
+              <div className="space-y-1">
+                {day.models.map((model) => (
+                  <div key={model.name} className="flex items-center justify-between text-sm">
+                    <span className="font-mono text-xs truncate max-w-[140px]">{model.name}</span>
+                    <span className="text-muted-foreground">{formatNumber(model.tokens)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <p className="text-sm text-muted-foreground">No activity</p>
+      )}
+    </div>
+  );
+}
+
 export function ActivityHeatmap({ data, className }: ActivityHeatmapProps) {
-  const { weeks, months, maxCount } = useMemo(() => {
-    // Create a map of date -> count
-    const countMap = new Map<string, number>();
+  const { weeks, months, maxCount, totalEvents, totalTokens, activeDays } = useMemo(() => {
+    // Create a map of date -> data
+    const countMap = new Map<string, ActivityData>();
     let max = 0;
-    data.forEach(({ date, count }) => {
-      countMap.set(date, count);
-      if (count > max) max = count;
+    let events = 0;
+    let tokens = 0;
+    let active = 0;
+
+    data.forEach((item) => {
+      countMap.set(item.date, item);
+      if (item.count > max) max = item.count;
+      events += item.count;
+      tokens += item.tokens || 0;
+      if (item.count > 0) active++;
     });
 
     // Generate last 52 weeks of data
@@ -53,17 +176,17 @@ export function ActivityHeatmap({ data, className }: ActivityHeatmapProps) {
     const dayOfWeek = startDate.getDay();
     startDate.setDate(startDate.getDate() - dayOfWeek);
 
-    const weeksData: { date: string; count: number; dayOfWeek: number }[][] = [];
+    const weeksData: DayData[][] = [];
     const monthsData: { label: string; weekIndex: number }[] = [];
 
-    let currentWeek: { date: string; count: number; dayOfWeek: number }[] = [];
+    let currentWeek: DayData[] = [];
     let currentDate = new Date(startDate);
     let lastMonth = -1;
     let weekIndex = 0;
 
     while (currentDate <= today) {
       const dateStr = currentDate.toISOString().split('T')[0];
-      const count = countMap.get(dateStr) || 0;
+      const dayData = countMap.get(dateStr);
       const month = currentDate.getMonth();
 
       // Track month changes for labels
@@ -74,7 +197,10 @@ export function ActivityHeatmap({ data, className }: ActivityHeatmapProps) {
 
       currentWeek.push({
         date: dateStr,
-        count,
+        count: dayData?.count || 0,
+        tokens: dayData?.tokens,
+        tools: dayData?.tools,
+        models: dayData?.models,
         dayOfWeek: currentDate.getDay(),
       });
 
@@ -93,91 +219,115 @@ export function ActivityHeatmap({ data, className }: ActivityHeatmapProps) {
       weeksData.push(currentWeek);
     }
 
-    return { weeks: weeksData, months: monthsData, maxCount: max || 1 };
+    return {
+      weeks: weeksData,
+      months: monthsData,
+      maxCount: max || 1,
+      totalEvents: events,
+      totalTokens: tokens,
+      activeDays: active,
+    };
   }, [data]);
 
   return (
-    <div className={cn('overflow-x-auto', className)}>
-      <div className="min-w-fit">
-        {/* Month labels */}
-        <div className="flex pl-8 mb-1">
-          {months.map((month, i) => (
-            <div
-              key={`${month.label}-${i}`}
-              className="text-xs text-muted-foreground"
-              style={{
-                marginLeft: i === 0 ? `${month.weekIndex * 12}px` : undefined,
-                width: i < months.length - 1
-                  ? `${(months[i + 1].weekIndex - month.weekIndex) * 12}px`
-                  : undefined,
-              }}
-            >
-              {month.label}
+    <div className={cn('rounded-xl border bg-card p-6', className)}>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          <Activity className="size-5 text-emerald-500" />
+          <span className="font-semibold">Activity</span>
+        </div>
+        <div className="flex items-center gap-6 text-sm text-muted-foreground">
+          <span>
+            <span className="text-foreground font-medium">{formatNumber(totalEvents)}</span> events
+          </span>
+          {totalTokens > 0 && (
+            <span>
+              <span className="text-foreground font-medium">{formatNumber(totalTokens)}</span> tokens
+            </span>
+          )}
+          <span>
+            <span className="text-foreground font-medium">{activeDays}</span> active days
+          </span>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <div className="min-w-fit">
+          {/* Month labels */}
+          <div className="flex mb-2" style={{ paddingLeft: '44px' }}>
+            {months.map((month, i) => {
+              const nextMonth = months[i + 1];
+              const colWidth = (weeks.length > 0) ? 100 / weeks.length : 1;
+              const widthPercent = nextMonth
+                ? (nextMonth.weekIndex - month.weekIndex) * colWidth
+                : (weeks.length - month.weekIndex) * colWidth;
+
+              return (
+                <div
+                  key={`${month.label}-${i}`}
+                  className="text-sm text-muted-foreground"
+                  style={{ width: `${widthPercent}%` }}
+                >
+                  {month.label}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex items-stretch">
+            {/* Day of week labels */}
+            <div className="grid grid-rows-7 gap-1 mr-3 text-sm text-muted-foreground shrink-0" style={{ width: '32px' }}>
+              {DAYS_OF_WEEK.map((day) => (
+                <div key={day} className="flex items-center justify-end pr-1">
+                  {day}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        <div className="flex">
-          {/* Day of week labels */}
-          <div className="flex flex-col gap-[2px] mr-2 text-xs text-muted-foreground">
-            {DAYS_OF_WEEK.map((day, i) => (
-              <div
-                key={day}
-                className="h-[10px] flex items-center"
-                style={{ visibility: i % 2 === 1 ? 'visible' : 'hidden' }}
-              >
-                {day}
-              </div>
-            ))}
+            {/* Heatmap grid */}
+            <div className="flex-1 grid gap-1" style={{ gridTemplateColumns: `repeat(${weeks.length}, 1fr)` }}>
+              {weeks.map((week, weekIdx) => (
+                <div key={weekIdx} className="grid grid-rows-7 gap-1">
+                  {DAYS_OF_WEEK.map((_, dayIdx) => {
+                    const day = week.find((d) => d.dayOfWeek === dayIdx);
+                    if (!day) {
+                      return <div key={dayIdx} className="aspect-square w-full" />;
+                    }
+                    return (
+                      <Tooltip key={dayIdx} delayDuration={100}>
+                        <TooltipTrigger asChild>
+                          <div
+                            className={cn(
+                              'aspect-square w-full rounded transition-all cursor-default',
+                              getIntensityClass(day.count, maxCount),
+                              day.count > 0 && 'hover:ring-2 hover:ring-emerald-400/50'
+                            )}
+                          />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="bg-popover text-popover-foreground border shadow-md p-3">
+                          <DayTooltip day={day} />
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
           </div>
 
-          {/* Heatmap grid */}
-          <div className="flex gap-[2px]">
-            {weeks.map((week, weekIdx) => (
-              <div key={weekIdx} className="flex flex-col gap-[2px]">
-                {DAYS_OF_WEEK.map((_, dayIdx) => {
-                  const day = week.find((d) => d.dayOfWeek === dayIdx);
-                  if (!day) {
-                    return <div key={dayIdx} className="w-[10px] h-[10px]" />;
-                  }
-                  return (
-                    <Tooltip key={dayIdx}>
-                      <TooltipTrigger asChild>
-                        <div
-                          className={cn(
-                            'w-[10px] h-[10px] rounded-[2px] transition-colors',
-                            getIntensityClass(day.count, maxCount),
-                            'hover:ring-1 hover:ring-foreground/20'
-                          )}
-                        />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="font-medium">
-                          {day.count} event{day.count !== 1 ? 's' : ''}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDate(day.date)}
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  );
-                })}
-              </div>
-            ))}
+          {/* Legend */}
+          <div className="flex items-center justify-end gap-2 mt-4 text-xs text-muted-foreground">
+            <span>Less</span>
+            <div className="flex gap-1">
+              <div className="w-3 h-3 rounded bg-muted/30 border border-muted/50" />
+              <div className="w-3 h-3 rounded bg-emerald-400/40 dark:bg-emerald-500/30" />
+              <div className="w-3 h-3 rounded bg-emerald-400/60 dark:bg-emerald-500/50" />
+              <div className="w-3 h-3 rounded bg-emerald-400/80 dark:bg-emerald-500/70" />
+              <div className="w-3 h-3 rounded bg-emerald-500 dark:bg-emerald-400" />
+            </div>
+            <span>More</span>
           </div>
-        </div>
-
-        {/* Legend */}
-        <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground">
-          <span>Less</span>
-          <div className="flex gap-[2px]">
-            <div className="w-[10px] h-[10px] rounded-[2px] bg-muted" />
-            <div className="w-[10px] h-[10px] rounded-[2px] bg-emerald-200 dark:bg-emerald-900" />
-            <div className="w-[10px] h-[10px] rounded-[2px] bg-emerald-400 dark:bg-emerald-700" />
-            <div className="w-[10px] h-[10px] rounded-[2px] bg-emerald-500 dark:bg-emerald-500" />
-            <div className="w-[10px] h-[10px] rounded-[2px] bg-emerald-600 dark:bg-emerald-400" />
-          </div>
-          <span>More</span>
         </div>
       </div>
     </div>
