@@ -1,0 +1,26 @@
+<%#
+  Kaminari Paginator - Main pagination wrapper with Tailwind styling
+%>
+<%= paginator.render do %>
+  <nav class="flex items-center justify-between px-4 py-3 border-t border-zinc-100 bg-zinc-50/30" aria-label="Pagination">
+    <div class="hidden sm:block">
+      <p class="text-sm text-zinc-500">
+        Page <span class="font-medium text-zinc-700"><%= current_page %></span>
+        of <span class="font-medium text-zinc-700"><%= total_pages %></span>
+      </p>
+    </div>
+    <div class="flex items-center gap-1">
+      <%= first_page_tag unless current_page.first? %>
+      <%= prev_page_tag unless current_page.first? %>
+      <% each_page do |page| %>
+        <% if page.left_outer? || page.right_outer? || page.inside_window? %>
+          <%= page_tag page %>
+        <% elsif !page.was_truncated? %>
+          <%= gap_tag %>
+        <% end %>
+      <% end %>
+      <%= next_page_tag unless current_page.last? %>
+      <%= last_page_tag unless current_page.last? %>
+    </div>
+  </nav>
+<% end %>

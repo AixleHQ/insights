@@ -1,0 +1,35 @@
+<%#
+  Index page - Main listing view for resources
+%>
+
+<% content_for(:title) { page.resource_name.pluralize.titleize } %>
+
+<!-- Page Header -->
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-semibold text-zinc-900 tracking-tight"><%= page.resource_name.pluralize.titleize %></h1>
+    <p class="mt-1 text-sm text-zinc-500"><%= pluralize(resources.total_count, page.resource_name.titleize.downcase) %> total</p>
+  </div>
+
+  <% if accessible_action?(new_resource, :new) %>
+    <%= link_to "New #{page.resource_name.titleize}",
+        polymorphic_path([:new, namespace, page.resource_name.to_sym]),
+        class: "inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-zinc-900 rounded-md hover:bg-zinc-800 transition-colors" %>
+  <% end %>
+</div>
+
+<!-- Search -->
+<% if show_search_bar %>
+  <%= render "search", search_term: search_term, page: page %>
+<% end %>
+
+<!-- Data Table -->
+<div class="bg-white border border-zinc-200 rounded-lg overflow-hidden shadow-sm">
+  <%= render "collection",
+      collection_presenter: page,
+      page: page,
+      resources: resources %>
+</div>
+
+<!-- Pagination -->
+<%= paginate resources %>

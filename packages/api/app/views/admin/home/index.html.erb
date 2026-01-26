@@ -1,0 +1,161 @@
+<% content_for(:title) { "Dashboard" } %>
+
+<div class="mb-8">
+  <h1 class="text-2xl font-semibold text-zinc-900">Dashboard</h1>
+  <p class="mt-1 text-sm text-zinc-500">System overview and statistics</p>
+</div>
+
+<!-- Stats Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+  <!-- Users -->
+  <div class="bg-white border border-zinc-200 rounded-lg p-5 hover:border-zinc-300 transition-colors">
+    <div class="flex items-center justify-between mb-3">
+      <span class="text-xs font-medium text-zinc-500 uppercase tracking-wide">Users</span>
+      <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+      </svg>
+    </div>
+    <div class="text-3xl font-semibold text-zinc-900 font-mono"><%= @stats[:users][:total] %></div>
+    <div class="mt-2 space-y-1">
+      <div class="flex items-center text-sm text-zinc-500">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 mr-2"></span>
+        <%= @stats[:users][:global_admins] %> global admins
+      </div>
+      <div class="flex items-center text-sm text-zinc-500">
+        <span class="w-2 h-2 rounded-full bg-blue-500 mr-2"></span>
+        <%= @stats[:users][:new_this_week] %> new this week
+      </div>
+    </div>
+    <%= link_to admin_users_path, class: "mt-4 inline-flex items-center text-sm font-medium text-zinc-900 hover:underline" do %>
+      View all <span class="ml-1">&rarr;</span>
+    <% end %>
+  </div>
+
+  <!-- Organizations -->
+  <div class="bg-white border border-zinc-200 rounded-lg p-5 hover:border-zinc-300 transition-colors">
+    <div class="flex items-center justify-between mb-3">
+      <span class="text-xs font-medium text-zinc-500 uppercase tracking-wide">Organizations</span>
+      <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+    </div>
+    <div class="text-3xl font-semibold text-zinc-900 font-mono"><%= @stats[:organizations][:total] %></div>
+    <div class="mt-2 space-y-1">
+      <div class="flex items-center text-sm text-zinc-500">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 mr-2"></span>
+        <%= @stats[:organizations][:active] %> active
+      </div>
+    </div>
+    <%= link_to admin_organizations_path, class: "mt-4 inline-flex items-center text-sm font-medium text-zinc-900 hover:underline" do %>
+      View all <span class="ml-1">&rarr;</span>
+    <% end %>
+  </div>
+
+  <!-- Projects -->
+  <div class="bg-white border border-zinc-200 rounded-lg p-5 hover:border-zinc-300 transition-colors">
+    <div class="flex items-center justify-between mb-3">
+      <span class="text-xs font-medium text-zinc-500 uppercase tracking-wide">Projects</span>
+      <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+      </svg>
+    </div>
+    <div class="text-3xl font-semibold text-zinc-900 font-mono"><%= @stats[:projects][:total] %></div>
+    <div class="mt-2 space-y-1">
+      <div class="flex items-center text-sm text-zinc-500">
+        <span class="w-2 h-2 rounded-full bg-violet-500 mr-2"></span>
+        <%= @stats[:projects][:organization_projects] %> organization
+      </div>
+      <div class="flex items-center text-sm text-zinc-500">
+        <span class="w-2 h-2 rounded-full bg-amber-500 mr-2"></span>
+        <%= @stats[:projects][:personal_projects] %> personal
+      </div>
+    </div>
+    <%= link_to admin_projects_path, class: "mt-4 inline-flex items-center text-sm font-medium text-zinc-900 hover:underline" do %>
+      View all <span class="ml-1">&rarr;</span>
+    <% end %>
+  </div>
+
+  <!-- Connectors -->
+  <div class="bg-white border border-zinc-200 rounded-lg p-5 hover:border-zinc-300 transition-colors">
+    <div class="flex items-center justify-between mb-3">
+      <span class="text-xs font-medium text-zinc-500 uppercase tracking-wide">Connectors</span>
+      <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+      </svg>
+    </div>
+    <div class="text-3xl font-semibold text-zinc-900 font-mono"><%= @stats[:connectors][:total] %></div>
+    <div class="mt-2 space-y-1">
+      <div class="flex items-center text-sm text-zinc-500">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 mr-2"></span>
+        <%= @stats[:connectors][:active] %> active
+      </div>
+    </div>
+    <%= link_to admin_organization_connectors_path, class: "mt-4 inline-flex items-center text-sm font-medium text-zinc-900 hover:underline" do %>
+      View all <span class="ml-1">&rarr;</span>
+    <% end %>
+  </div>
+
+  <!-- Tool Events -->
+  <div class="bg-white border border-zinc-200 rounded-lg p-5 hover:border-zinc-300 transition-colors">
+    <div class="flex items-center justify-between mb-3">
+      <span class="text-xs font-medium text-zinc-500 uppercase tracking-wide">Tool Events</span>
+      <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+    </div>
+    <div class="text-3xl font-semibold text-zinc-900 font-mono"><%= number_with_delimiter(@stats[:tool_events][:total]) %></div>
+    <div class="mt-2 space-y-1">
+      <div class="flex items-center text-sm text-zinc-500">
+        <span class="w-2 h-2 rounded-full bg-blue-500 mr-2"></span>
+        <%= @stats[:tool_events][:today] %> today
+      </div>
+      <div class="flex items-center text-sm text-zinc-500">
+        <span class="w-2 h-2 rounded-full bg-zinc-400 mr-2"></span>
+        <%= number_with_delimiter(@stats[:tool_events][:this_week]) %> this week
+      </div>
+    </div>
+    <%= link_to admin_tool_events_path, class: "mt-4 inline-flex items-center text-sm font-medium text-zinc-900 hover:underline" do %>
+      View all <span class="ml-1">&rarr;</span>
+    <% end %>
+  </div>
+
+  <!-- Audit Logs -->
+  <div class="bg-white border border-zinc-200 rounded-lg p-5 hover:border-zinc-300 transition-colors">
+    <div class="flex items-center justify-between mb-3">
+      <span class="text-xs font-medium text-zinc-500 uppercase tracking-wide">Audit Logs</span>
+      <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+      </svg>
+    </div>
+    <div class="text-3xl font-semibold text-zinc-900 font-mono"><%= number_with_delimiter(@stats[:audit_logs][:total]) %></div>
+    <div class="mt-2 space-y-1">
+      <div class="flex items-center text-sm text-zinc-500">
+        <span class="w-2 h-2 rounded-full bg-blue-500 mr-2"></span>
+        <%= @stats[:audit_logs][:today] %> today
+      </div>
+    </div>
+    <%= link_to admin_audit_logs_path, class: "mt-4 inline-flex items-center text-sm font-medium text-zinc-900 hover:underline" do %>
+      View all <span class="ml-1">&rarr;</span>
+    <% end %>
+  </div>
+</div>
+
+<!-- Connectors by Type -->
+<% if @stats[:connectors][:by_type].any? %>
+<div class="bg-white border border-zinc-200 rounded-lg overflow-hidden max-w-md">
+  <div class="px-5 py-4 border-b border-zinc-100">
+    <h3 class="text-sm font-semibold text-zinc-900">Connectors by Type</h3>
+  </div>
+  <div class="divide-y divide-zinc-100">
+    <% @stats[:connectors][:by_type].each do |type, count| %>
+    <div class="flex items-center justify-between px-5 py-3">
+      <div class="flex items-center gap-3">
+        <span class="w-2 h-2 rounded-full bg-zinc-900"></span>
+        <span class="text-sm text-zinc-700"><%= type.titleize %></span>
+      </div>
+      <span class="text-sm font-mono font-medium text-zinc-900"><%= count %></span>
+    </div>
+    <% end %>
+  </div>
+</div>
+<% end %>

@@ -1,0 +1,2090 @@
+---
+openapi: 3.0.1
+info:
+  title: DB90 API V1
+  version: v1
+  description: API for DB90 - Developer Tooling Platform
+  contact:
+    name: DB90 Team
+servers:
+  - url: http://localhost:3001
+    description: Development server
+  - url: https://api.db90.io
+    description: Production server
+security:
+  - bearer_auth: []
+
+paths:
+  # ============================================
+  # USER ENDPOINTS
+  # ============================================
+  /api/v1/users/me:
+    get:
+      summary: Get current user profile
+      tags:
+        - Users
+      responses:
+        '200':
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      summary: Update current user profile
+      tags:
+        - Users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                avatar_url:
+                  type: string
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/users/me/organizations:
+    get:
+      summary: Get current user's organizations
+      tags:
+        - Users
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+      responses:
+        '200':
+          description: User's organizations with membership info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OrganizationWithMembership'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+  /api/v1/users/me/settings:
+    get:
+      summary: Get current user's settings
+      tags:
+        - Users
+      responses:
+        '200':
+          description: User settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Setting'
+
+  /api/v1/users/me/settings/{key}:
+    put:
+      summary: Create or update a user setting
+      tags:
+        - Users
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                value:
+                  type: object
+              required:
+                - value
+      responses:
+        '200':
+          description: Setting updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Setting'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      summary: Delete a user setting
+      tags:
+        - Users
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Setting deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================
+  # ORGANIZATION ENDPOINTS
+  # ============================================
+  /api/v1/organizations:
+    get:
+      summary: List organizations
+      description: Returns organizations the current user is a member of (or all for global admins)
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+      responses:
+        '200':
+          description: Organizations list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Organization'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+    post:
+      summary: Create organization
+      description: Creates a new organization and makes the current user an owner
+      tags:
+        - Organizations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                slug:
+                  type: string
+                  description: URL-friendly identifier (auto-generated if not provided)
+                description:
+                  type: string
+              required:
+                - name
+      responses:
+        '201':
+          description: Organization created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Organization'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{id}:
+    get:
+      summary: Get organization details
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Organization details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OrganizationFull'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      summary: Update organization
+      description: Requires admin role in the organization
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                slug:
+                  type: string
+                description:
+                  type: string
+                is_active:
+                  type: boolean
+      responses:
+        '200':
+          description: Organization updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Organization'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      summary: Delete organization
+      description: Requires owner role in the organization
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204':
+          description: Organization deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{id}/retention_policy:
+    get:
+      summary: Get organization retention policy
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Retention policy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OrganizationRetentionPolicy'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    patch:
+      summary: Update organization retention policy
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                retention_days:
+                  type: integer
+                  minimum: 1
+                auto_delete_events:
+                  type: boolean
+                anonymize_after_retention:
+                  type: boolean
+      responses:
+        '200':
+          description: Retention policy updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OrganizationRetentionPolicy'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{id}/settings:
+    get:
+      summary: Get organization settings
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Organization settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Setting'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{id}/settings/{key}:
+    put:
+      summary: Create or update organization setting
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                value:
+                  type: object
+              required:
+                - value
+      responses:
+        '200':
+          description: Setting updated
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    delete:
+      summary: Delete organization setting
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Setting deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================
+  # ORGANIZATION MEMBERS ENDPOINTS
+  # ============================================
+  /api/v1/organizations/{organization_id}/members:
+    get:
+      summary: List organization members
+      tags:
+        - Organization Members
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [owner, admin, member, viewer]
+      responses:
+        '200':
+          description: Members list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OrganizationMembership'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+    post:
+      summary: Add organization member
+      description: Requires admin role. Adds a user as a member of the organization.
+      tags:
+        - Organization Members
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: string
+                  format: uuid
+                role:
+                  type: string
+                  enum: [owner, admin, member, viewer]
+              required:
+                - user_id
+                - role
+      responses:
+        '201':
+          description: Member added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OrganizationMembership'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/members/{id}:
+    get:
+      summary: Get organization member
+      tags:
+        - Organization Members
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Member details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OrganizationMembership'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      summary: Update organization member role
+      description: Requires admin role. Cannot demote owners unless you are also an owner.
+      tags:
+        - Organization Members
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role:
+                  type: string
+                  enum: [owner, admin, member, viewer]
+              required:
+                - role
+      responses:
+        '200':
+          description: Member updated
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      summary: Remove organization member
+      description: Requires admin role. Cannot remove owners unless you are also an owner.
+      tags:
+        - Organization Members
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204':
+          description: Member removed
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ============================================
+  # ORGANIZATION CONNECTORS ENDPOINTS
+  # ============================================
+  /api/v1/organizations/{organization_id}/connectors:
+    get:
+      summary: List organization connectors
+      tags:
+        - Organization Connectors
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - name: type
+          in: query
+          description: Filter by connector type
+          schema:
+            type: string
+            enum: [github, gitlab, bitbucket, jira, linear, openrouter, anthropic, openai, gemini]
+        - name: active
+          in: query
+          schema:
+            type: string
+            enum: ['true', 'false']
+      responses:
+        '200':
+          description: Connectors list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OrganizationConnector'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+    post:
+      summary: Create organization connector
+      description: Requires admin role. Creates a new connector for the organization.
+      tags:
+        - Organization Connectors
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                connector_type:
+                  type: string
+                  enum: [github, gitlab, bitbucket, jira, linear, openrouter, anthropic, openai, gemini]
+                access_token:
+                  type: string
+                  description: OAuth access token (sensitive)
+                refresh_token:
+                  type: string
+                  description: OAuth refresh token (sensitive)
+                token_expires_at:
+                  type: string
+                  format: date-time
+                external_account_id:
+                  type: string
+                external_account_name:
+                  type: string
+                webhook_secret:
+                  type: string
+                is_active:
+                  type: boolean
+                  default: true
+              required:
+                - connector_type
+      responses:
+        '201':
+          description: Connector created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OrganizationConnector'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/connectors/{id}:
+    get:
+      summary: Get organization connector
+      tags:
+        - Organization Connectors
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Connector details (tokens never exposed)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OrganizationConnector'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      summary: Update organization connector
+      tags:
+        - Organization Connectors
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                access_token:
+                  type: string
+                refresh_token:
+                  type: string
+                token_expires_at:
+                  type: string
+                  format: date-time
+                external_account_id:
+                  type: string
+                external_account_name:
+                  type: string
+                webhook_secret:
+                  type: string
+                is_active:
+                  type: boolean
+      responses:
+        '200':
+          description: Connector updated
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      summary: Delete organization connector
+      tags:
+        - Organization Connectors
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204':
+          description: Connector deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/connectors/{id}/test:
+    post:
+      summary: Test connector connection
+      description: Tests if the connector can successfully connect to the external service
+      tags:
+        - Organization Connectors
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Test result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      success:
+                        type: boolean
+                      message:
+                        type: string
+                      error:
+                        type: string
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/connectors/{id}/sync:
+    post:
+      summary: Trigger connector sync
+      description: Triggers a sync operation for the connector (e.g., fetch repositories)
+      tags:
+        - Organization Connectors
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Sync triggered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OrganizationConnector'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/connectors/authorize/{type}:
+    get:
+      summary: Get OAuth authorization URL
+      description: Returns the OAuth authorization URL to start the OAuth flow
+      tags:
+        - Organization Connectors
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [github, gitlab, bitbucket, jira, linear]
+      responses:
+        '200':
+          description: Authorization URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      authorize_url:
+                        type: string
+                        format: uri
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/connectors/callback:
+    post:
+      summary: OAuth callback
+      description: Handles the OAuth callback and exchanges the code for tokens
+      tags:
+        - Organization Connectors
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                connector_type:
+                  type: string
+                  enum: [github, gitlab, bitbucket, jira, linear]
+                code:
+                  type: string
+                  description: OAuth authorization code
+              required:
+                - connector_type
+                - code
+      responses:
+        '200':
+          description: Connector created/updated with tokens
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OrganizationConnector'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  # ============================================
+  # USER TOOL ACCOUNTS ENDPOINTS
+  # ============================================
+  /api/v1/organizations/{organization_id}/tool_accounts:
+    get:
+      summary: List user's tool accounts
+      description: Returns the current user's tool accounts for this organization
+      tags:
+        - User Tool Accounts
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: tool
+          in: query
+          description: Filter by tool name
+          schema:
+            type: string
+            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter, anthropic_api, openai_api, gemini_api, custom]
+        - name: active
+          in: query
+          schema:
+            type: string
+            enum: ['true', 'false']
+      responses:
+        '200':
+          description: Tool accounts list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserToolAccount'
+    post:
+      summary: Link tool account
+      description: Links a new tool account to the user's membership in this organization
+      tags:
+        - User Tool Accounts
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tool_name:
+                  type: string
+                  enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter, anthropic_api, openai_api, gemini_api, custom]
+                access_token:
+                  type: string
+                refresh_token:
+                  type: string
+                token_expires_at:
+                  type: string
+                  format: date-time
+                external_account_id:
+                  type: string
+                external_account_name:
+                  type: string
+                is_active:
+                  type: boolean
+                  default: true
+              required:
+                - tool_name
+      responses:
+        '201':
+          description: Tool account created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserToolAccount'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/tool_accounts/{id}:
+    get:
+      summary: Get tool account
+      tags:
+        - User Tool Accounts
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Tool account details (tokens never exposed)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserToolAccount'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      summary: Update tool account
+      tags:
+        - User Tool Accounts
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                access_token:
+                  type: string
+                refresh_token:
+                  type: string
+                token_expires_at:
+                  type: string
+                  format: date-time
+                external_account_id:
+                  type: string
+                external_account_name:
+                  type: string
+                is_active:
+                  type: boolean
+      responses:
+        '200':
+          description: Tool account updated
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      summary: Unlink tool account
+      tags:
+        - User Tool Accounts
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204':
+          description: Tool account deleted
+
+  # ============================================
+  # PROJECT ENDPOINTS
+  # ============================================
+  /api/v1/projects:
+    get:
+      summary: List projects
+      description: Returns all projects the user can access (personal + organization projects)
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - name: personal
+          in: query
+          description: Filter to personal projects only
+          schema:
+            type: string
+            enum: ['true', 'false']
+        - name: active
+          in: query
+          schema:
+            type: string
+            enum: ['true', 'false']
+      responses:
+        '200':
+          description: Projects list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Project'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+    post:
+      summary: Create personal project
+      description: Creates a new personal project owned by the current user
+      tags:
+        - Projects
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                slug:
+                  type: string
+                description:
+                  type: string
+              required:
+                - name
+      responses:
+        '201':
+          description: Project created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Project'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/projects:
+    get:
+      summary: List organization projects
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - name: active
+          in: query
+          schema:
+            type: string
+            enum: ['true', 'false']
+      responses:
+        '200':
+          description: Organization projects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Project'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+    post:
+      summary: Create organization project
+      description: Creates a new project in the organization
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                slug:
+                  type: string
+                description:
+                  type: string
+              required:
+                - name
+      responses:
+        '201':
+          description: Project created
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/projects/{id}:
+    get:
+      summary: Get project details
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Project details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ProjectFull'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      summary: Update project
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                slug:
+                  type: string
+                description:
+                  type: string
+                is_active:
+                  type: boolean
+      responses:
+        '200':
+          description: Project updated
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      summary: Delete project
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204':
+          description: Project deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/projects/{id}/settings:
+    get:
+      summary: Get project settings
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Project settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Setting'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/projects/{id}/settings/{key}:
+    put:
+      summary: Create or update project setting
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                value:
+                  type: object
+              required:
+                - value
+      responses:
+        '200':
+          description: Setting updated
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    delete:
+      summary: Delete project setting
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Setting deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================
+  # PROJECT MEMBERS ENDPOINTS
+  # ============================================
+  /api/v1/projects/{project_id}/members:
+    get:
+      summary: List project members
+      tags:
+        - Project Members
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [owner, admin, member, viewer]
+      responses:
+        '200':
+          description: Project members
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProjectMembership'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+    post:
+      summary: Add project member
+      description: Requires admin role in the project
+      tags:
+        - Project Members
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: string
+                  format: uuid
+                role:
+                  type: string
+                  enum: [owner, admin, member, viewer]
+              required:
+                - user_id
+                - role
+      responses:
+        '201':
+          description: Member added
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/projects/{project_id}/members/{id}:
+    get:
+      summary: Get project member
+      tags:
+        - Project Members
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Member details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ProjectMembership'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      summary: Update project member role
+      tags:
+        - Project Members
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role:
+                  type: string
+                  enum: [owner, admin, member, viewer]
+              required:
+                - role
+      responses:
+        '200':
+          description: Member updated
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      summary: Remove project member
+      tags:
+        - Project Members
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204':
+          description: Member removed
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ============================================
+  # REPOSITORY ENDPOINTS
+  # ============================================
+  /api/v1/projects/{project_id}/repositories:
+    get:
+      summary: List project repositories
+      tags:
+        - Repositories
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - name: private
+          in: query
+          schema:
+            type: string
+            enum: ['true', 'false']
+      responses:
+        '200':
+          description: Repositories list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Repository'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+    post:
+      summary: Add repository to project
+      description: Requires admin role in the project
+      tags:
+        - Repositories
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                organization_connector_id:
+                  type: string
+                  format: uuid
+                external_id:
+                  type: string
+                name:
+                  type: string
+                full_name:
+                  type: string
+                description:
+                  type: string
+                default_branch:
+                  type: string
+                clone_url:
+                  type: string
+                html_url:
+                  type: string
+                is_private:
+                  type: boolean
+              required:
+                - organization_connector_id
+                - external_id
+                - name
+                - full_name
+      responses:
+        '201':
+          description: Repository added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Repository'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/projects/{project_id}/repositories/{id}:
+    get:
+      summary: Get repository details
+      tags:
+        - Repositories
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Repository details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Repository'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      summary: Update repository
+      tags:
+        - Repositories
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                description:
+                  type: string
+                default_branch:
+                  type: string
+      responses:
+        '200':
+          description: Repository updated
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      summary: Remove repository from project
+      tags:
+        - Repositories
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204':
+          description: Repository removed
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/projects/{project_id}/repositories/{id}/sync:
+    post:
+      summary: Trigger repository sync
+      description: Triggers a sync operation for the repository
+      tags:
+        - Repositories
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Sync triggered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Repository'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+# ============================================
+# COMPONENTS
+# ============================================
+components:
+  securitySchemes:
+    bearer_auth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token from Keycloak authentication
+
+  parameters:
+    id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    organization_id:
+      name: organization_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    project_id:
+      name: project_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    X-Organization-ID:
+      name: X-Organization-ID
+      in: header
+      required: true
+      description: Organization context for the request
+      schema:
+        type: string
+        format: uuid
+    page:
+      name: page
+      in: query
+      description: Page number for pagination
+      schema:
+        type: integer
+        default: 1
+        minimum: 1
+    per_page:
+      name: per_page
+      in: query
+      description: Number of items per page (max 100)
+      schema:
+        type: integer
+        default: 25
+        minimum: 1
+        maximum: 100
+
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Access denied
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required:
+        - error
+
+    ValidationError:
+      type: object
+      properties:
+        error:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+      required:
+        - error
+        - errors
+
+    PaginationMeta:
+      type: object
+      properties:
+        currentPage:
+          type: integer
+        totalPages:
+          type: integer
+        totalCount:
+          type: integer
+        perPage:
+          type: integer
+      required:
+        - currentPage
+        - totalPages
+        - totalCount
+        - perPage
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+        globalAdmin:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - email
+        - globalAdmin
+        - createdAt
+        - updatedAt
+
+    UserMinimal:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+      required:
+        - id
+        - email
+
+    Organization:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - slug
+        - isActive
+        - createdAt
+        - updatedAt
+
+    OrganizationFull:
+      allOf:
+        - $ref: '#/components/schemas/Organization'
+        - type: object
+          properties:
+            retentionPolicy:
+              $ref: '#/components/schemas/OrganizationRetentionPolicy'
+            memberCount:
+              type: integer
+            projectCount:
+              type: integer
+
+    OrganizationWithMembership:
+      allOf:
+        - $ref: '#/components/schemas/Organization'
+        - type: object
+          properties:
+            userRole:
+              type: string
+              enum: [owner, admin, member, viewer]
+
+    OrganizationMembership:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [owner, admin, member, viewer]
+        user:
+          $ref: '#/components/schemas/UserMinimal'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - organizationId
+        - role
+        - user
+        - createdAt
+        - updatedAt
+
+    OrganizationConnector:
+      type: object
+      description: Connector credentials (tokens are never exposed in responses)
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        connectorType:
+          type: string
+          enum: [github, gitlab, bitbucket, jira, linear, openrouter, anthropic, openai, gemini]
+        isActive:
+          type: boolean
+        externalAccountId:
+          type: string
+          nullable: true
+        externalAccountName:
+          type: string
+          nullable: true
+        lastSyncAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastError:
+          type: string
+          nullable: true
+        tokenExpiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        tokenExpired:
+          type: boolean
+        sourceControl:
+          type: boolean
+        projectManagement:
+          type: boolean
+        aiProvider:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - organizationId
+        - connectorType
+        - isActive
+        - createdAt
+        - updatedAt
+
+    OrganizationRetentionPolicy:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        retentionDays:
+          type: integer
+        autoDeleteEvents:
+          type: boolean
+        anonymizeAfterRetention:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - organizationId
+        - retentionDays
+        - autoDeleteEvents
+        - anonymizeAfterRetention
+        - createdAt
+        - updatedAt
+
+    UserToolAccount:
+      type: object
+      description: User's tool account (tokens are never exposed in responses)
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationMembershipId:
+          type: string
+          format: uuid
+        toolName:
+          type: string
+          enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter, anthropic_api, openai_api, gemini_api, custom]
+        isActive:
+          type: boolean
+        externalAccountId:
+          type: string
+          nullable: true
+        externalAccountName:
+          type: string
+          nullable: true
+        tokenExpiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        tokenExpired:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - organizationMembershipId
+        - toolName
+        - isActive
+        - createdAt
+        - updatedAt
+
+    Project:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+        organizationId:
+          type: string
+          format: uuid
+          nullable: true
+        ownerId:
+          type: string
+          format: uuid
+          nullable: true
+        isPersonal:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - slug
+        - isActive
+        - isPersonal
+        - createdAt
+        - updatedAt
+
+    ProjectFull:
+      allOf:
+        - $ref: '#/components/schemas/Project'
+        - type: object
+          properties:
+            organization:
+              $ref: '#/components/schemas/OrganizationMinimal'
+            owner:
+              $ref: '#/components/schemas/UserMinimal'
+            memberCount:
+              type: integer
+            repositoryCount:
+              type: integer
+
+    OrganizationMinimal:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+      required:
+        - id
+        - name
+        - slug
+
+    ProjectMembership:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [owner, admin, member, viewer]
+        user:
+          $ref: '#/components/schemas/UserMinimal'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - projectId
+        - role
+        - user
+        - createdAt
+        - updatedAt
+
+    Repository:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        organizationConnectorId:
+          type: string
+          format: uuid
+        externalId:
+          type: string
+        name:
+          type: string
+        fullName:
+          type: string
+        description:
+          type: string
+          nullable: true
+        defaultBranch:
+          type: string
+          nullable: true
+        cloneUrl:
+          type: string
+          nullable: true
+        htmlUrl:
+          type: string
+          nullable: true
+        isPrivate:
+          type: boolean
+        provider:
+          type: string
+        lastSyncAt:
+          type: string
+          format: date-time
+          nullable: true
+        needsSync:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - projectId
+        - organizationConnectorId
+        - externalId
+        - name
+        - fullName
+        - isPrivate
+        - provider
+        - createdAt
+        - updatedAt
+
+    Setting:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          type: string
+        value:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - key
+        - value
+        - createdAt
+        - updatedAt

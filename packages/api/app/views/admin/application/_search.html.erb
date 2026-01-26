@@ -1,0 +1,23 @@
+<%#
+  Search - Search form for filtering resources
+%>
+
+<div class="mb-4">
+  <%= form_tag request.path, method: :get, class: "flex items-center gap-3" do %>
+    <div class="relative flex-1 max-w-sm">
+      <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+        <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+      </div>
+      <%= search_field_tag :search,
+          search_term,
+          placeholder: "Search #{page.resource_name.pluralize}...",
+          class: "w-full pl-10 pr-4 py-2 text-sm border border-zinc-200 rounded-md bg-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-1 focus:border-transparent transition-shadow" %>
+    </div>
+    <%= submit_tag "Search", class: "px-4 py-2 text-sm font-medium text-zinc-700 bg-white border border-zinc-200 rounded-md hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-1 transition-colors cursor-pointer" %>
+    <% if search_term.present? %>
+      <%= link_to "Clear", request.path, class: "px-4 py-2 text-sm font-medium text-zinc-500 hover:text-zinc-700 transition-colors" %>
+    <% end %>
+  <% end %>
+</div>

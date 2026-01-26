@@ -1,0 +1,12 @@
+<%#
+  Page number link
+%>
+<% if page.current? %>
+  <span class="inline-flex items-center justify-center min-w-[2rem] h-8 px-2 text-sm font-medium text-white bg-zinc-900 rounded-md">
+    <%= page %>
+  </span>
+<% else %>
+  <a href="<%= url %>" class="inline-flex items-center justify-center min-w-[2rem] h-8 px-2 text-sm text-zinc-600 bg-white border border-zinc-200 rounded-md hover:bg-zinc-50 hover:text-zinc-900 transition-colors">
+    <%= page %>
+  </a>
+<% end %>

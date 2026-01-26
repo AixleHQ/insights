@@ -1,0 +1,126 @@
+<%#
+  Show page - Display a single user with impersonate action
+%>
+
+<% content_for(:title) { "#{page.resource_name.titleize}: #{page.page_title}" } %>
+
+<!-- Page Header -->
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <div class="flex items-center gap-3 mb-1">
+      <%= link_to polymorphic_path([namespace, page.resource_name.pluralize.to_sym]), class: "text-sm text-zinc-500 hover:text-zinc-700 transition-colors" do %>
+        &larr; Back to <%= page.resource_name.pluralize.titleize %>
+      <% end %>
+    </div>
+    <h1 class="text-2xl font-semibold text-zinc-900 tracking-tight"><%= page.page_title %></h1>
+  </div>
+
+  <div class="flex items-center gap-2">
+    <% unless page.resource == current_admin_user %>
+      <%= button_to "Impersonate",
+          impersonate_admin_user_path(page.resource),
+          method: :post,
+          data: { confirm: "You are about to impersonate #{page.resource.display_name}. This action will be logged. Continue?" },
+          class: "inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-md hover:bg-amber-100 transition-colors" %>
+    <% end %>
+    <% if accessible_action?(page.resource, :edit) %>
+      <%= link_to "Edit",
+          polymorphic_path([:edit, namespace, page.resource]),
+          class: "inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-700 bg-white border border-zinc-200 rounded-md hover:bg-zinc-50 transition-colors" %>
+    <% end %>
+    <% if accessible_action?(page.resource, :destroy) %>
+      <%= link_to "Delete",
+          polymorphic_path([namespace, page.resource]),
+          method: :delete,
+          data: { confirm: "Are you sure you want to delete this #{page.resource_name.titleize}?" },
+          class: "inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 transition-colors" %>
+    <% end %>
+  </div>
+</div>
+
+<!-- Main Attributes -->
+<% page.attributes.each do |title, attributes| %>
+  <div class="bg-white border border-zinc-200 rounded-lg overflow-hidden shadow-sm mb-8">
+    <div class="px-6 py-4 border-b border-zinc-100 bg-zinc-50/50">
+      <h2 class="text-sm font-semibold text-zinc-900"><%= title.present? ? title.titleize : 'Details' %></h2>
+    </div>
+    <dl class="divide-y divide-zinc-100">
+      <% attributes.each do |attr| %>
+        <div class="px-6 py-4 grid grid-cols-3 gap-4">
+          <dt class="text-sm font-medium text-zinc-500"><%= attr.name.to_s.titleize %></dt>
+          <dd class="text-sm text-zinc-900 col-span-2">
+            <% if attr.name.to_s == 'id' %>
+              <code class="font-mono text-xs text-zinc-600 bg-zinc-100 px-2 py-1 rounded"><%= page.resource.id %></code>
+            <% else %>
+              <%= render_field attr, page: page %>
+            <% end %>
+          </dd>
+        </div>
+      <% end %>
+    </dl>
+  </div>
+<% end %>
+
+<!-- Has Many Associations -->
+<% if page.item_associations.any? %>
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-2">
+    <% page.item_associations.each do |assoc_name| %>
+      <% associated_resources = page.resource.send(assoc_name) rescue nil %>
+      <% next unless associated_resources.respond_to?(:any?) %>
+      <% count = associated_resources.count %>
+      <div class="group">
+        <div class="flex items-center gap-2 mb-1.5">
+          <h3 class="text-xs font-semibold text-zinc-500 uppercase tracking-wider"><%= assoc_name.to_s.gsub('_', ' ') %></h3>
+          <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-[10px] font-semibold rounded-full <%= count > 0 ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-400' %>"><%= count %></span>
+        </div>
+        <div class="bg-white border border-zinc-200 rounded-md overflow-hidden shadow-sm">
+          <% if associated_resources.any? %>
+            <div class="divide-y divide-zinc-100/80">
+              <% associated_resources.limit(4).each_with_index do |resource, idx| %>
+                <% if accessible_action?(resource, :show) %>
+                  <%= link_to polymorphic_path([namespace, resource]), class: "group/row flex items-center gap-3 px-3 py-2 hover:bg-zinc-50 transition-all duration-150" do %>
+                    <span class="flex-shrink-0 w-5 h-5 rounded bg-zinc-100 group-hover/row:bg-zinc-200 flex items-center justify-center transition-colors">
+                      <span class="text-[10px] font-mono text-zinc-400 group-hover/row:text-zinc-600"><%= idx + 1 %></span>
+                    </span>
+                    <span class="flex-1 text-sm text-zinc-700 group-hover/row:text-zinc-900 truncate transition-colors">
+                      <%= resource.try(:name) || resource.try(:email) || resource.try(:title) || resource.id %>
+                    </span>
+                    <svg class="w-3.5 h-3.5 text-zinc-300 group-hover/row:text-zinc-500 group-hover/row:translate-x-0.5 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                    </svg>
+                  <% end %>
+                <% else %>
+                  <div class="flex items-center gap-3 px-3 py-2">
+                    <span class="flex-shrink-0 w-5 h-5 rounded bg-zinc-100 flex items-center justify-center">
+                      <span class="text-[10px] font-mono text-zinc-400"><%= idx + 1 %></span>
+                    </span>
+                    <span class="flex-1 text-sm text-zinc-700 truncate">
+                      <%= resource.try(:name) || resource.try(:email) || resource.try(:title) || resource.id %>
+                    </span>
+                  </div>
+                <% end %>
+              <% end %>
+            </div>
+            <% if count > 4 %>
+              <%= link_to polymorphic_path([namespace, assoc_name]), class: "flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-50 border-t border-zinc-100 text-xs font-medium text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 transition-colors" do %>
+                <span>View all <%= count %></span>
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                </svg>
+              <% end %>
+            <% end %>
+          <% else %>
+            <div class="flex flex-col items-center justify-center py-6 px-3">
+              <div class="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center mb-2">
+                <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+                </svg>
+              </div>
+              <span class="text-xs text-zinc-400">No <%= assoc_name.to_s.gsub('_', ' ') %></span>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% end %>

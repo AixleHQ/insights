@@ -23,8 +23,15 @@ gem "redis"
 # Authorization
 gem "action_policy"
 
-# Admin interface (requires separate configuration for API-only apps)
-# gem "administrate"
+# Pagination
+gem "kaminari"
+
+# Serialization
+gem "alba"
+
+# Admin interface
+gem "administrate"
+gem "sprockets-rails"
 
 # API documentation
 gem "rswag-api"
@@ -56,3 +63,4 @@ group :test do
   gem "vcr"
   gem "simplecov", require: false
 end
+gem "csv"

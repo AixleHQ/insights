@@ -1,0 +1,63 @@
+<%#
+  New page - Form for creating a new resource
+%>
+
+<% content_for(:title) { "New #{page.resource_name.titleize}" } %>
+
+<!-- Page Header -->
+<div class="mb-6">
+  <div class="flex items-center gap-3 mb-1">
+    <%= link_to polymorphic_path([namespace, page.resource_name.pluralize.to_sym]), class: "text-sm text-zinc-500 hover:text-zinc-700 transition-colors" do %>
+      &larr; Back to <%= page.resource_name.pluralize.titleize %>
+    <% end %>
+  </div>
+  <h1 class="text-2xl font-semibold text-zinc-900 tracking-tight">New <%= page.resource_name.titleize %></h1>
+  <p class="mt-1 text-sm text-zinc-500">Create a new <%= page.resource_name.downcase %> record</p>
+</div>
+
+<!-- Form -->
+<div class="bg-white border border-zinc-200 rounded-lg shadow-sm">
+  <%= form_with(model: page.resource, url: [namespace, page.resource], scope: page.resource_name, local: true, class: "divide-y divide-zinc-100") do |f| %>
+    <% if page.resource.errors.any? %>
+      <div class="p-6 bg-red-50 border-b border-red-200">
+        <h3 class="text-sm font-medium text-red-800 mb-2">
+          <%= pluralize(page.resource.errors.count, "error") %> prevented this <%= page.resource_name %> from being saved:
+        </h3>
+        <ul class="list-disc list-inside text-sm text-red-700">
+          <% page.resource.errors.full_messages.each do |message| %>
+            <li><%= message %></li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+
+    <% page.attributes(controller.action_name).each do |title, attributes| %>
+      <div class="p-6">
+        <% if title.present? %>
+          <h3 class="text-sm font-semibold text-zinc-900 mb-4"><%= title.titleize %></h3>
+        <% end %>
+        <div class="space-y-6">
+          <% attributes.each do |attribute| %>
+            <div class="grid grid-cols-3 gap-4 items-start">
+              <label class="text-sm font-medium text-zinc-700 pt-2" for="<%= "#{page.resource_name}_#{attribute.name}" %>">
+                <%= attribute.name.to_s.titleize %>
+              </label>
+              <div class="col-span-2">
+                <%= render_field attribute, f: f %>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+
+    <!-- Form Actions -->
+    <div class="px-6 py-4 bg-zinc-50/50 flex items-center justify-end gap-3">
+      <%= link_to "Cancel",
+          polymorphic_path([namespace, page.resource_name.pluralize.to_sym]),
+          class: "px-4 py-2 text-sm font-medium text-zinc-700 bg-white border border-zinc-200 rounded-md hover:bg-zinc-50 transition-colors" %>
+      <%= f.submit "Create #{page.resource_name.titleize}",
+          class: "px-4 py-2 text-sm font-medium text-white bg-zinc-900 rounded-md hover:bg-zinc-800 transition-colors cursor-pointer" %>
+    </div>
+  <% end %>
+</div>

@@ -29,6 +29,11 @@ module Api
     # Skip views, helpers and assets when generating a new resource.
     config.api_only = true
 
+    # Add session/flash middleware for admin panel (Administrate requires these)
+    config.middleware.use ActionDispatch::Cookies
+    config.middleware.use ActionDispatch::Session::CookieStore, key: '_db90_admin_session'
+    config.middleware.use ActionDispatch::Flash
+
     # Use SQL format for schema to preserve raw SQL (TimescaleDB, custom types, etc.)
     config.active_record.schema_format = :sql
   end

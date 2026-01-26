@@ -1,0 +1,95 @@
+<%#
+  Users Index page - Main listing view with impersonate action
+%>
+
+<% content_for(:title) { "Users" } %>
+
+<!-- Page Header -->
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-semibold text-zinc-900 tracking-tight">Users</h1>
+    <p class="mt-1 text-sm text-zinc-500"><%= pluralize(resources.total_count, 'user') %> total</p>
+  </div>
+
+  <% if accessible_action?(new_resource, :new) %>
+    <%= link_to "New User",
+        new_admin_user_path,
+        class: "inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-zinc-900 rounded-md hover:bg-zinc-800 transition-colors" %>
+  <% end %>
+</div>
+
+<!-- Search -->
+<% if show_search_bar %>
+  <%= render "search", search_term: search_term, page: page %>
+<% end %>
+
+<!-- Data Table -->
+<div class="bg-white border border-zinc-200 rounded-lg overflow-hidden shadow-sm">
+  <table class="w-full">
+    <thead>
+      <tr class="border-b border-zinc-200 bg-zinc-50/50">
+        <% page.attribute_types.each do |attr_name, attr_type| %>
+          <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+            <%= attr_name.to_s.titleize %>
+          </th>
+        <% end %>
+        <th class="px-4 py-3 text-right text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+          Actions
+        </th>
+      </tr>
+    </thead>
+
+    <tbody class="divide-y divide-zinc-100">
+      <% resources.each do |user| %>
+        <tr class="hover:bg-zinc-50/50 transition-colors">
+          <% page.attributes_for(user).each do |attr| %>
+            <td class="px-4 py-3 text-sm text-zinc-700">
+              <% if attr.name.to_s == 'id' %>
+                <code class="font-mono text-xs text-zinc-500 bg-zinc-100 px-2 py-1 rounded"><%= user.id %></code>
+              <% else %>
+                <%= render_field attr %>
+              <% end %>
+            </td>
+          <% end %>
+          <td class="px-4 py-3 text-sm text-right">
+            <div class="flex items-center justify-end gap-2">
+              <% if accessible_action?(user, :show) %>
+                <%= link_to "View",
+                    admin_user_path(user),
+                    class: "px-3 py-1.5 text-xs font-medium text-zinc-600 bg-zinc-100 rounded hover:bg-zinc-200 transition-colors" %>
+              <% end %>
+              <% if accessible_action?(user, :edit) %>
+                <%= link_to "Edit",
+                    edit_admin_user_path(user),
+                    class: "px-3 py-1.5 text-xs font-medium text-zinc-600 bg-zinc-100 rounded hover:bg-zinc-200 transition-colors" %>
+              <% end %>
+              <% if user != current_admin_user %>
+                <%= button_to "Impersonate",
+                    impersonate_admin_user_path(user),
+                    method: :post,
+                    data: { confirm: "Impersonate #{user.name || user.email}?" },
+                    class: "px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 rounded hover:bg-amber-100 transition-colors" %>
+              <% end %>
+            </div>
+          </td>
+        </tr>
+      <% end %>
+
+      <% if resources.empty? %>
+        <tr>
+          <td colspan="<%= page.attribute_types.count + 1 %>" class="px-4 py-12 text-center">
+            <div class="flex flex-col items-center">
+              <svg class="w-12 h-12 text-zinc-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+              </svg>
+              <p class="text-sm text-zinc-500">No users found</p>
+            </div>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+
+<!-- Pagination -->
+<%= paginate resources %>

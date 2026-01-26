@@ -10,7 +10,8 @@ class JwtAuth
   EXCLUDED_PATHS = [
     '/health',
     '/api/v1/health',
-    '/up'
+    '/up',
+    '/admin'
   ].freeze
 
   def initialize(app)
@@ -22,6 +23,11 @@ class JwtAuth
 
     # Skip auth for excluded paths
     if excluded_path?(request.path)
+      return @app.call(env)
+    end
+
+    # Skip if claims already set (e.g., by test middleware)
+    if env['jwt.claims']
       return @app.call(env)
     end
 

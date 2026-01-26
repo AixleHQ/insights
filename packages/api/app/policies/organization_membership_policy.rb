@@ -1,0 +1,54 @@
+# frozen_string_literal: true
+
+class OrganizationMembershipPolicy < ApplicationPolicy
+  # Members can view membership list of their org
+  def index?
+    org_member?(record.organization) || global_admin?
+  end
+
+  # Members can view individual memberships
+  def show?
+    org_member?(record.organization) || global_admin?
+  end
+
+  # Only admins can add members
+  def create?
+    org_admin?(record.organization) || global_admin?
+  end
+
+  # Admins can update memberships, but can't demote owners unless they're also an owner
+  def update?
+    return true if global_admin?
+    return false unless org_admin?(record.organization)
+
+    # Can't demote an owner unless you're also an owner
+    if record.owner?
+      org_owner?(record.organization)
+    else
+      true
+    end
+  end
+
+  # Only admins can remove members, but can't remove owners unless they're also an owner
+  def destroy?
+    return true if global_admin?
+    return false unless org_admin?(record.organization)
+
+    # Can't remove an owner unless you're also an owner
+    if record.owner?
+      org_owner?(record.organization)
+    else
+      true
+    end
+  end
+
+  relation_scope do |scope|
+    if global_admin?
+      scope.all
+    elsif organization
+      scope.where(organization: organization)
+    else
+      scope.none
+    end
+  end
+end
