@@ -1,0 +1,198 @@
+/**
+ * API Response Types
+ *
+ * These types match the Rails API responses.
+ */
+
+// User types
+export interface User {
+  id: string;
+  email: string;
+  name: string | null;
+  avatar_url: string | null;
+  role: 'admin' | 'member' | 'viewer';
+  super_admin: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CurrentUser extends User {
+  organizations: Organization[];
+}
+
+// Organization types
+export interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+  logo_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OrganizationWithStats extends Organization {
+  member_count: number;
+  project_count: number;
+  connector_count: number;
+}
+
+// Organization member types
+export interface OrganizationMember {
+  id: string;
+  user_id: string;
+  organization_id: string;
+  role: 'admin' | 'member' | 'viewer';
+  user: User;
+  created_at: string;
+  updated_at: string;
+}
+
+// Project types
+export interface Project {
+  id: string;
+  name: string;
+  description: string | null;
+  organization_id: string | null;
+  repository_url: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectWithStats extends Project {
+  event_count: number;
+  total_cost_usd: number;
+  last_event_at: string | null;
+  connectors: { id: string; provider: string }[];
+}
+
+// Connector types
+export type ConnectorProvider = 'github' | 'gitlab' | 'bitbucket' | 'jira' | 'linear';
+export type ConnectorStatus = 'active' | 'inactive' | 'error';
+
+export interface Connector {
+  id: string;
+  organization_id: string;
+  provider: ConnectorProvider;
+  name: string;
+  status: ConnectorStatus;
+  external_id: string | null;
+  last_sync_at: string | null;
+  sync_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Tool account types
+export interface ToolAccount {
+  id: string;
+  user_id: string;
+  provider: string;
+  external_id: string;
+  external_username: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Event types
+export type RiskLevel = 'none' | 'low' | 'medium' | 'high' | 'critical';
+export type EventType = 'completion' | 'prompt' | 'chat' | 'edit' | 'generation';
+
+export interface ToolEvent {
+  id: string;
+  tool_name: string;
+  event_type: EventType;
+  risk_level: RiskLevel;
+  cost_usd: number;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  model: string | null;
+  sanitized_content: string | null;
+  security_findings: SecurityFinding[];
+  user: { id: string; email: string; name: string | null } | null;
+  project: { id: string; name: string } | null;
+  created_at: string;
+}
+
+export interface SecurityFinding {
+  type: string;
+  severity: RiskLevel;
+  description: string;
+  location: { start: number; end: number } | null;
+}
+
+export interface EventAuditEntry {
+  id: string;
+  action: string;
+  actor: { id: string; email: string; name: string | null } | null;
+  changes: Record<string, unknown>;
+  created_at: string;
+}
+
+// Stats types
+export interface OverviewStats {
+  total_events: number;
+  total_cost_usd: number;
+  events_today: number;
+  cost_today_usd: number;
+  active_users: number;
+  high_risk_events: number;
+  events_change_percent: number;
+  cost_change_percent: number;
+}
+
+export interface DailyStats {
+  date: string;
+  event_count: number;
+  cost_usd: number;
+  input_tokens: number;
+  output_tokens: number;
+}
+
+export interface HourlyStats {
+  hour: string;
+  event_count: number;
+  cost_usd: number;
+}
+
+export interface ToolUsageStats {
+  tool_name: string;
+  event_count: number;
+  cost_usd: number;
+  percentage: number;
+}
+
+// Alert types
+export type AlertSeverity = 'info' | 'warning' | 'error' | 'critical';
+
+export interface Alert {
+  id: string;
+  organization_id: string;
+  severity: AlertSeverity;
+  title: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+// Pagination types
+export interface PaginatedResponse<T> {
+  data: T[];
+  meta: {
+    current_page: number;
+    total_pages: number;
+    total_count: number;
+    per_page: number;
+  };
+}
+
+// Retention policy types
+export type RetentionPeriod = '7_days' | '30_days' | '90_days' | '1_year' | 'forever';
+
+export interface RetentionPolicy {
+  raw_content_retention: RetentionPeriod;
+  sanitized_content_retention: RetentionPeriod;
+  metadata_retention: RetentionPeriod;
+  audit_log_retention: RetentionPeriod;
+}
