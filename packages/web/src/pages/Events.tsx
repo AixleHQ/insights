@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Download, RefreshCw } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useOrg } from '@/contexts/OrgContext';
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import {
   EventFilters,
   EventsTable,
+  EventDrawer,
   type EventFiltersState,
   type EventRow,
 } from '@/components/events';
@@ -31,6 +32,8 @@ export function Events() {
   const [sortField, setSortField] = useState<SortField>('created_at');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [page, setPage] = useState(1);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Build API params from filters
   const apiParams = useMemo(() => ({
@@ -139,6 +142,26 @@ export function Events() {
     queryClient.invalidateQueries({ queryKey: queryKeys.events.all(currentOrg?.id || '', apiParams) });
   };
 
+  const handleEventClick = useCallback((eventId: string) => {
+    setSelectedEventId(eventId);
+    setDrawerOpen(true);
+  }, []);
+
+  const handleNavigate = useCallback((direction: 'prev' | 'next') => {
+    if (!selectedEventId) return;
+    const currentIndex = filteredAndSortedEvents.findIndex((e) => e.id === selectedEventId);
+    if (currentIndex === -1) return;
+
+    const newIndex = direction === 'prev' ? currentIndex - 1 : currentIndex + 1;
+    if (newIndex >= 0 && newIndex < filteredAndSortedEvents.length) {
+      setSelectedEventId(filteredAndSortedEvents[newIndex].id);
+    }
+  }, [selectedEventId, filteredAndSortedEvents]);
+
+  const selectedEventIndex = selectedEventId
+    ? filteredAndSortedEvents.findIndex((e) => e.id === selectedEventId)
+    : -1;
+
   const totalPages = eventsResponse?.meta?.total_pages || 1;
   const totalCount = eventsResponse?.meta?.total_count || 0;
 
@@ -178,6 +201,17 @@ export function Events() {
         sortField={sortField}
         sortDirection={sortDirection}
         onSort={handleSort}
+        onEventClick={handleEventClick}
+        selectedEventId={selectedEventId}
+      />
+
+      <EventDrawer
+        eventId={selectedEventId}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        onNavigate={handleNavigate}
+        hasPrev={selectedEventIndex > 0}
+        hasNext={selectedEventIndex < filteredAndSortedEvents.length - 1}
       />
 
       <div className="flex items-center justify-between text-sm text-muted-foreground">

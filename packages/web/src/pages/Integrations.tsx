@@ -1,0 +1,386 @@
+import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useOrg } from '@/contexts/OrgContext';
+import { useConnectors, useSyncConnector, useDeleteConnector } from '@/hooks/useApi';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  IntegrationCard,
+  type IntegrationData,
+  type IntegrationProvider,
+  type ProviderInfo,
+} from '@/components/integrations';
+
+const availableProviders: ProviderInfo[] = [
+  // Code Hosting / Version Control
+  {
+    id: 'github',
+    name: 'GitHub',
+    description: 'Connect repositories, pull requests, and commits',
+    category: 'code',
+    features: [
+      'Repository tracking',
+      'Pull request events',
+      'Commit monitoring',
+      'Copilot usage analytics',
+    ],
+    available: true,
+  },
+  {
+    id: 'gitlab',
+    name: 'GitLab',
+    description: 'Connect projects, merge requests, and pipelines',
+    category: 'code',
+    features: [
+      'Project tracking',
+      'Merge request events',
+      'Pipeline monitoring',
+      'CI/CD analytics',
+    ],
+    available: true,
+  },
+  {
+    id: 'bitbucket',
+    name: 'Bitbucket',
+    description: 'Connect repositories and pull requests',
+    category: 'code',
+    features: [
+      'Repository tracking',
+      'Pull request events',
+      'Pipeline monitoring',
+    ],
+    available: true,
+  },
+
+  // Project Management
+  {
+    id: 'jira',
+    name: 'Jira',
+    description: 'Connect issues and projects for context',
+    category: 'project',
+    features: [
+      'Issue tracking',
+      'Project context',
+      'Sprint monitoring',
+    ],
+    available: true,
+  },
+  {
+    id: 'linear',
+    name: 'Linear',
+    description: 'Connect issues and teams',
+    category: 'project',
+    features: [
+      'Issue tracking',
+      'Team context',
+      'Cycle monitoring',
+    ],
+    available: true,
+  },
+
+  // AI / LLM Providers
+  {
+    id: 'claude',
+    name: 'Claude',
+    description: 'Track Claude API usage and conversations',
+    category: 'ai',
+    features: [
+      'API usage tracking',
+      'Token consumption',
+      'Cost analytics',
+      'Model usage breakdown',
+    ],
+    available: false,
+    comingSoon: true,
+  },
+  {
+    id: 'claude-code',
+    name: 'Claude Code',
+    description: 'Monitor Claude Code CLI usage',
+    category: 'ai',
+    features: [
+      'Session tracking',
+      'Code generation analytics',
+      'Token consumption',
+      'Project-level insights',
+    ],
+    available: true,
+  },
+  {
+    id: 'anthropic',
+    name: 'Anthropic API',
+    description: 'Direct Anthropic API integration',
+    category: 'ai',
+    features: [
+      'API key management',
+      'Usage monitoring',
+      'Cost tracking',
+      'Rate limit visibility',
+    ],
+    available: false,
+    comingSoon: true,
+  },
+  {
+    id: 'openai',
+    name: 'OpenAI',
+    description: 'Track OpenAI API usage and costs',
+    category: 'ai',
+    features: [
+      'API usage tracking',
+      'GPT model analytics',
+      'Token consumption',
+      'Cost breakdown',
+    ],
+    available: false,
+    comingSoon: true,
+  },
+  {
+    id: 'openrouter',
+    name: 'OpenRouter',
+    description: 'Multi-model AI gateway tracking',
+    category: 'ai',
+    features: [
+      'Multi-provider analytics',
+      'Model comparison',
+      'Cost optimization',
+      'Usage patterns',
+    ],
+    available: false,
+    comingSoon: true,
+  },
+  {
+    id: 'copilot',
+    name: 'GitHub Copilot',
+    description: 'Track Copilot suggestions and usage',
+    category: 'ai',
+    features: [
+      'Suggestion tracking',
+      'Acceptance rates',
+      'Language breakdown',
+      'Developer productivity',
+    ],
+    available: false,
+    comingSoon: true,
+  },
+  {
+    id: 'cursor',
+    name: 'Cursor',
+    description: 'Monitor Cursor IDE AI usage',
+    category: 'ai',
+    features: [
+      'AI completions tracking',
+      'Chat usage analytics',
+      'Token consumption',
+      'Session insights',
+    ],
+    available: false,
+    comingSoon: true,
+  },
+
+  // Design
+  {
+    id: 'figma',
+    name: 'Figma',
+    description: 'Track AI features in Figma',
+    category: 'design',
+    features: [
+      'AI plugin usage',
+      'Design generation',
+      'Collaboration insights',
+    ],
+    available: false,
+    comingSoon: true,
+  },
+
+  // Communication
+  {
+    id: 'slack',
+    name: 'Slack',
+    description: 'Receive alerts and notifications',
+    category: 'communication',
+    features: [
+      'Alert notifications',
+      'Usage summaries',
+      'Bot commands',
+    ],
+    available: false,
+    comingSoon: true,
+  },
+];
+
+const categoryLabels: Record<ProviderInfo['category'], string> = {
+  code: 'Code Hosting',
+  project: 'Project Management',
+  ai: 'AI Tools',
+  design: 'Design',
+  communication: 'Communication',
+};
+
+function IntegrationSkeleton() {
+  return (
+    <div className="rounded-lg border p-4 space-y-4">
+      <div className="flex items-center gap-3">
+        <Skeleton className="size-10 rounded-lg" />
+        <div className="space-y-2">
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="h-4 w-24" />
+        </div>
+      </div>
+      <Skeleton className="h-6 w-24" />
+      <Skeleton className="h-4 w-40" />
+    </div>
+  );
+}
+
+export function Integrations() {
+  const { currentOrg } = useOrg();
+  const navigate = useNavigate();
+
+  const { data: connectorsData, isLoading } = useConnectors(currentOrg?.id || '');
+  const syncConnector = useSyncConnector();
+  const deleteConnector = useDeleteConnector();
+
+  // Transform API response to component format
+  const integrations: IntegrationData[] = useMemo(() => {
+    if (!connectorsData) return [];
+    return connectorsData.map((c) => {
+      const connectorType = c.connectorType || c.connector_type || 'github';
+      const isActive = c.isActive ?? c.is_active ?? true;
+      const lastError = c.lastError || c.last_error;
+      const externalAccountName = c.externalAccountName || c.external_account_name;
+      const lastSyncAt = c.lastSyncAt || c.last_sync_at;
+
+      return {
+        id: c.id,
+        provider: connectorType as IntegrationProvider,
+        name: externalAccountName || connectorType,
+        status: lastError ? 'error' : isActive ? 'connected' : 'disconnected',
+        last_sync_at: lastSyncAt || undefined,
+        sync_error: lastError || undefined,
+        metadata: {
+          account_name: externalAccountName || '',
+          resources_count: 0,
+        },
+      };
+    });
+  }, [connectorsData]);
+
+  const handleConnect = (providerId: string) => {
+    navigate(`/integrations/new/${providerId}`);
+  };
+
+  const handleSync = async (id: string) => {
+    if (!currentOrg) return;
+    try {
+      await syncConnector.mutateAsync({ orgId: currentOrg.id, connectorId: id });
+    } catch (error) {
+      console.error('Failed to sync integration:', error);
+    }
+  };
+
+  const handleDisconnect = async (id: string) => {
+    if (!currentOrg) return;
+    if (window.confirm('Are you sure you want to disconnect this integration?')) {
+      try {
+        await deleteConnector.mutateAsync({ orgId: currentOrg.id, connectorId: id });
+      } catch (error) {
+        console.error('Failed to disconnect integration:', error);
+      }
+    }
+  };
+
+  // Get providers that are already connected
+  const connectedProviders = new Set(integrations.map((c) => c.provider));
+
+  // Filter available providers to show only those not connected
+  const unconnectedProviders = availableProviders.filter(
+    (p) => !connectedProviders.has(p.id)
+  );
+
+  // Group unconnected providers by category
+  const providersByCategory = useMemo(() => {
+    const grouped: Record<ProviderInfo['category'], ProviderInfo[]> = {
+      code: [],
+      project: [],
+      ai: [],
+      design: [],
+      communication: [],
+    };
+    unconnectedProviders.forEach((p) => {
+      grouped[p.category].push(p);
+    });
+    return grouped;
+  }, [unconnectedProviders]);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Integrations</h1>
+        <p className="text-sm text-muted-foreground">
+          Connect external services to sync repositories, track AI usage, and more
+        </p>
+      </div>
+
+      <Tabs defaultValue="connected" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="connected">
+            Connected ({integrations.length})
+          </TabsTrigger>
+          <TabsTrigger value="available">
+            Available ({unconnectedProviders.length})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="connected" className="space-y-4">
+          {isLoading ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <IntegrationSkeleton key={i} />
+              ))}
+            </div>
+          ) : integrations.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12">
+              <p className="text-muted-foreground">No integrations configured</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Connect a service to get started
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {integrations.map((integration) => (
+                <IntegrationCard
+                  key={integration.id}
+                  integration={integration}
+                  onSync={handleSync}
+                  onDisconnect={handleDisconnect}
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="available" className="space-y-8">
+          {Object.entries(providersByCategory).map(([category, providers]) => {
+            if (providers.length === 0) return null;
+            return (
+              <div key={category} className="space-y-4">
+                <h2 className="text-lg font-medium">
+                  {categoryLabels[category as ProviderInfo['category']]}
+                </h2>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {providers.map((provider) => (
+                    <IntegrationCard
+                      key={provider.id}
+                      provider={provider}
+                      onConnect={handleConnect}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}

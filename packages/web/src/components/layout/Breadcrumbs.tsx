@@ -18,7 +18,7 @@ interface BreadcrumbConfig {
 const routeLabels: Record<string, string> = {
   events: 'Events',
   projects: 'Projects',
-  connectors: 'Connectors',
+  integrations: 'Integrations',
   team: 'Team',
   settings: 'Settings',
   new: 'New',

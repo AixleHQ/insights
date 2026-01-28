@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Activity, DollarSign, AlertTriangle, Users } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Activity, DollarSign, AlertTriangle, Users, Coins } from 'lucide-react';
 import { useOrg } from '@/contexts/OrgContext';
 import { useOverviewStats, useDailyStats, useEvents, useActivityHeatmap } from '@/hooks/useApi';
 import {
@@ -15,6 +15,7 @@ import {
   type ToolUsageData,
   type Alert,
 } from '@/components/dashboard';
+import { EventDrawer } from '@/components/events';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -102,6 +103,30 @@ export function Dashboard() {
   const handleDismissAlert = (id: string) => {
     setDismissedAlerts((prev) => new Set([...prev, id]));
   };
+
+  // Event drawer state
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const handleEventClick = useCallback((eventId: string) => {
+    setSelectedEventId(eventId);
+    setDrawerOpen(true);
+  }, []);
+
+  const handleNavigate = useCallback((direction: 'prev' | 'next') => {
+    if (!selectedEventId) return;
+    const currentIndex = events.findIndex((e) => e.id === selectedEventId);
+    if (currentIndex === -1) return;
+
+    const newIndex = direction === 'prev' ? currentIndex - 1 : currentIndex + 1;
+    if (newIndex >= 0 && newIndex < events.length) {
+      setSelectedEventId(events[newIndex].id);
+    }
+  }, [selectedEventId, events]);
+
+  const selectedEventIndex = selectedEventId
+    ? events.findIndex((e) => e.id === selectedEventId)
+    : -1;
 
   return (
     <div className="space-y-6">
@@ -194,11 +219,23 @@ export function Dashboard() {
           icon={<Users className="size-5" />}
           description="Last 7 days"
         />
+        <MetricCard
+          title="Total Tokens"
+          value={stats?.total_tokens ?? 0}
+          format="compact"
+          icon={<Coins className="size-5" />}
+          description={`${((stats?.total_tokens_in ?? 0) / 1000).toFixed(0)}K in / ${((stats?.total_tokens_out ?? 0) / 1000).toFixed(0)}K out`}
+        />
       </MetricGrid>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <CostTrendChart data={chartData} isLoading={isLoadingDaily} />
-        <ActivityFeed events={events} isLoading={isLoadingEvents} />
+        <ActivityFeed
+          events={events}
+          isLoading={isLoadingEvents}
+          onEventClick={handleEventClick}
+          selectedEventId={selectedEventId}
+        />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -209,6 +246,15 @@ export function Dashboard() {
           onDismiss={handleDismissAlert}
         />
       </div>
+
+      <EventDrawer
+        eventId={selectedEventId}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        onNavigate={handleNavigate}
+        hasPrev={selectedEventIndex > 0}
+        hasNext={selectedEventIndex < events.length - 1}
+      />
     </div>
   );
 }

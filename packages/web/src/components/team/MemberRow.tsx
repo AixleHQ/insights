@@ -32,6 +32,7 @@ export interface MemberData {
   joined_at?: string;
   last_active_at?: string;
   event_count?: number;
+  token_count?: number;
 }
 
 interface MemberRowProps {
@@ -62,6 +63,16 @@ function getInitials(name?: string, email?: string): string {
       .slice(0, 2);
   }
   return email?.slice(0, 2).toUpperCase() || 'U';
+}
+
+function formatTokens(tokens: number): string {
+  if (tokens >= 1_000_000) {
+    return `${(tokens / 1_000_000).toFixed(1)}M`;
+  }
+  if (tokens >= 1_000) {
+    return `${(tokens / 1_000).toFixed(1)}K`;
+  }
+  return tokens.toLocaleString();
 }
 
 export function MemberRow({
@@ -151,7 +162,12 @@ export function MemberRow({
           : '-'}
       </TableCell>
       <TableCell className="font-mono-display text-sm">
-        {member.event_count?.toLocaleString() ?? '-'}
+        <div>{member.event_count?.toLocaleString() ?? '-'}</div>
+        {member.token_count !== undefined && member.token_count > 0 && (
+          <div className="text-xs text-muted-foreground">
+            {formatTokens(member.token_count)} tokens
+          </div>
+        )}
       </TableCell>
       <TableCell>
         {canRemove && (

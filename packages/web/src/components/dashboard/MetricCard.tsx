@@ -7,7 +7,7 @@ interface MetricCardProps {
   title: string;
   value: string | number;
   previousValue?: number;
-  format?: 'number' | 'currency' | 'percentage';
+  format?: 'number' | 'currency' | 'percentage' | 'compact';
   icon?: ReactNode;
   trend?: 'up' | 'down' | 'neutral';
   trendValue?: string;
@@ -28,6 +28,16 @@ function formatValue(value: string | number, format?: string): string {
       }).format(value);
     case 'percentage':
       return `${value.toFixed(1)}%`;
+    case 'compact':
+      // Format large numbers with K, M, B suffixes
+      if (value >= 1_000_000_000) {
+        return `${(value / 1_000_000_000).toFixed(1)}B`;
+      } else if (value >= 1_000_000) {
+        return `${(value / 1_000_000).toFixed(1)}M`;
+      } else if (value >= 1_000) {
+        return `${(value / 1_000).toFixed(1)}K`;
+      }
+      return new Intl.NumberFormat('en-US').format(value);
     case 'number':
     default:
       return new Intl.NumberFormat('en-US').format(value);
@@ -118,7 +128,7 @@ interface MetricGridProps {
 
 export function MetricGrid({ children, className }: MetricGridProps) {
   return (
-    <div className={cn('grid gap-4 md:grid-cols-2 lg:grid-cols-4', className)}>
+    <div className={cn('grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5', className)}>
       {children}
     </div>
   );

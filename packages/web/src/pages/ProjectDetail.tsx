@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -31,7 +31,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { EventsTable, type EventRow } from '@/components/events';
+import { EventsTable, EventDrawer, type EventRow } from '@/components/events';
 import { formatDistanceToNow } from '@/lib/utils';
 
 function formatCurrency(value: number): string {
@@ -76,6 +76,8 @@ export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const { currentOrg } = useOrg();
   const navigate = useNavigate();
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const { data: project, isLoading: isLoadingProject } = useProject(id || '');
   const { data: eventsResponse, isLoading: isLoadingEvents } = useEvents(
@@ -92,11 +94,32 @@ export function ProjectDetail() {
       event_type: e.eventType,
       risk_level: e.riskLevel,
       cost_usd: e.costUsd,
+      token_count: (e.inputTokens || 0) + (e.outputTokens || 0),
       created_at: e.occurredAt || e.createdAt,
       user: e.user ? { email: e.user.email } : undefined,
       project: e.project ? { name: e.project.name } : undefined,
     })) || [];
   }, [eventsResponse]);
+
+  const handleEventClick = useCallback((eventId: string) => {
+    setSelectedEventId(eventId);
+    setDrawerOpen(true);
+  }, []);
+
+  const handleNavigate = useCallback((direction: 'prev' | 'next') => {
+    if (!selectedEventId) return;
+    const currentIndex = events.findIndex((e) => e.id === selectedEventId);
+    if (currentIndex === -1) return;
+
+    const newIndex = direction === 'prev' ? currentIndex - 1 : currentIndex + 1;
+    if (newIndex >= 0 && newIndex < events.length) {
+      setSelectedEventId(events[newIndex].id);
+    }
+  }, [selectedEventId, events]);
+
+  const selectedEventIndex = selectedEventId
+    ? events.findIndex((e) => e.id === selectedEventId)
+    : -1;
 
   const handleDelete = async () => {
     if (!id) return;
@@ -229,7 +252,7 @@ export function ProjectDetail() {
       <Tabs defaultValue="activity">
         <TabsList>
           <TabsTrigger value="activity">Recent Activity</TabsTrigger>
-          <TabsTrigger value="connectors">Connectors</TabsTrigger>
+          <TabsTrigger value="integrations">Integrations</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
         <TabsContent value="activity" className="mt-4">
@@ -241,11 +264,16 @@ export function ProjectDetail() {
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
-              <EventsTable events={events} isLoading={isLoadingEvents} />
+              <EventsTable
+                events={events}
+                isLoading={isLoadingEvents}
+                onEventClick={handleEventClick}
+                selectedEventId={selectedEventId}
+              />
             </CardContent>
           </Card>
         </TabsContent>
-        <TabsContent value="connectors" className="mt-4">
+        <TabsContent value="integrations" className="mt-4">
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Connected Services</CardTitle>
@@ -299,6 +327,15 @@ export function ProjectDetail() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <EventDrawer
+        eventId={selectedEventId}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        onNavigate={handleNavigate}
+        hasPrev={selectedEventIndex > 0}
+        hasNext={selectedEventIndex < events.length - 1}
+      />
     </div>
   );
 }

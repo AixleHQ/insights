@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom';
 import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import {
   Table,
@@ -35,6 +34,8 @@ interface EventsTableProps {
   sortField?: SortField;
   sortDirection?: SortDirection;
   onSort?: (field: SortField) => void;
+  onEventClick?: (eventId: string) => void;
+  selectedEventId?: string | null;
   className?: string;
 }
 
@@ -96,6 +97,9 @@ function EventRowSkeleton() {
         <Skeleton className="h-4 w-16" />
       </TableCell>
       <TableCell>
+        <Skeleton className="h-4 w-14" />
+      </TableCell>
+      <TableCell>
         <Skeleton className="h-4 w-20" />
       </TableCell>
     </TableRow>
@@ -109,12 +113,25 @@ function formatCost(cost: unknown): string {
   return `$${numCost.toFixed(3)}`;
 }
 
+function formatTokens(tokens: number | undefined): string {
+  if (tokens === undefined || tokens === null) return '-';
+  if (tokens >= 1_000_000) {
+    return `${(tokens / 1_000_000).toFixed(1)}M`;
+  }
+  if (tokens >= 1_000) {
+    return `${(tokens / 1_000).toFixed(1)}K`;
+  }
+  return tokens.toLocaleString();
+}
+
 export function EventsTable({
   events,
   isLoading,
   sortField,
   sortDirection,
   onSort,
+  onEventClick,
+  selectedEventId,
   className,
 }: EventsTableProps) {
   return (
@@ -155,6 +172,7 @@ export function EventsTable({
                 Cost
               </SortButton>
             </TableHead>
+            <TableHead className="w-[80px]">Tokens</TableHead>
             <TableHead className="w-[120px]">
               <SortButton
                 field="created_at"
@@ -172,7 +190,7 @@ export function EventsTable({
             Array.from({ length: 10 }).map((_, i) => <EventRowSkeleton key={i} />)
           ) : events.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="h-24 text-center">
+              <TableCell colSpan={8} className="h-24 text-center">
                 <p className="text-muted-foreground">No events found</p>
               </TableCell>
             </TableRow>
@@ -180,15 +198,16 @@ export function EventsTable({
             events.map((event) => (
               <TableRow
                 key={event.id}
-                className="group cursor-pointer hover:bg-muted/50"
+                className={cn(
+                  'group cursor-pointer hover:bg-muted/50 transition-colors',
+                  selectedEventId === event.id && 'bg-muted'
+                )}
+                onClick={() => onEventClick?.(event.id)}
               >
                 <TableCell>
-                  <Link
-                    to={`/events/${event.id}`}
-                    className="font-medium hover:underline"
-                  >
+                  <span className="font-medium">
                     {event.tool_name || 'Unknown'}
-                  </Link>
+                  </span>
                 </TableCell>
                 <TableCell>
                   <span className="text-xs capitalize text-muted-foreground">
@@ -204,20 +223,18 @@ export function EventsTable({
                   </span>
                 </TableCell>
                 <TableCell>
-                  {event.project ? (
-                    <Link
-                      to={`/projects/${event.project.name}`}
-                      className="text-sm text-muted-foreground hover:text-foreground hover:underline"
-                    >
-                      {event.project.name}
-                    </Link>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">-</span>
-                  )}
+                  <span className="text-sm text-muted-foreground">
+                    {event.project?.name || '-'}
+                  </span>
                 </TableCell>
                 <TableCell>
                   <span className="font-mono-display text-sm">
                     {formatCost(event.cost_usd)}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <span className="font-mono-display text-sm text-muted-foreground">
+                    {formatTokens(event.token_count)}
                   </span>
                 </TableCell>
                 <TableCell>

@@ -65,6 +65,10 @@ module Api
         authorize! @membership
         user = @membership.user
 
+        Rails.logger.info "[MemberStats] User: #{user.id}/#{user.email}, Org: #{current_organization.id}/#{current_organization.slug}"
+        Rails.logger.info "[MemberStats] All events for user: #{ToolEvent.where(user_id: user.id).count}"
+        Rails.logger.info "[MemberStats] Events in org: #{current_organization.tool_events.where(user_id: user.id).count}"
+
         events = current_organization.tool_events.where(user_id: user.id)
 
         # Basic counts

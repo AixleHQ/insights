@@ -19,9 +19,14 @@ class UserSyncService
       raise ArgumentError, 'Missing sub claim' if keycloak_sub.blank?
 
       email = claims['email']
+      Rails.logger.info "[UserSyncService] sync_from_claims: sub=#{keycloak_sub}, email=#{email}"
+
       user = find_or_initialize_user_with_email(keycloak_sub, email)
       update_user_attributes(user, claims)
       user.save!
+
+      Rails.logger.info "[UserSyncService] User synced: id=#{user.id}, email=#{user.email}, keycloak_sub=#{user.keycloak_sub}"
+      Rails.logger.info "[UserSyncService] User orgs: #{user.organization_memberships.count}, events: #{ToolEvent.where(user_id: user.id).count}"
 
       auto_assign_organization(user, claims) if user.organization_memberships.empty?
 

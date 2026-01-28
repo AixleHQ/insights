@@ -147,7 +147,9 @@ module Api
       end
 
       def oauth_callback_url
-        "#{request.base_url}/api/v1/organizations/#{current_organization.id}/connectors/callback"
+        # Redirect to frontend callback page which handles the OAuth popup flow
+        frontend_url = ENV.fetch('FRONTEND_URL', 'http://localhost:5173')
+        "#{frontend_url}/integrations/callback"
       end
     end
   end

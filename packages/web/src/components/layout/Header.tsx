@@ -60,7 +60,7 @@ function CommandPalette({
               </CommandItem>
               <CommandItem>
                 <span className="mr-2">+</span>
-                <span>Add connector</span>
+                <span>Add integration</span>
               </CommandItem>
             </CommandGroup>
             <CommandSeparator />
@@ -68,7 +68,7 @@ function CommandPalette({
               <CommandItem>Dashboard</CommandItem>
               <CommandItem>Events</CommandItem>
               <CommandItem>Projects</CommandItem>
-              <CommandItem>Connectors</CommandItem>
+              <CommandItem>Integrations</CommandItem>
               <CommandItem>Team</CommandItem>
               <CommandItem>Settings</CommandItem>
             </CommandGroup>

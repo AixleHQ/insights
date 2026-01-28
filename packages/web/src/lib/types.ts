@@ -152,6 +152,11 @@ export interface OverviewStats {
   high_risk_events: number;
   events_change_percent: number;
   cost_change_percent: number;
+  // Token metrics
+  total_tokens_in?: number;
+  total_tokens_out?: number;
+  total_tokens?: number;
+  tokens_today?: number;
 }
 
 export interface DailyStats {

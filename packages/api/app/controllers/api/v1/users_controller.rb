@@ -16,6 +16,18 @@ module Api
           }
         end
 
+        # Add debug info for development
+        if Rails.env.development?
+          response_data[:_debug] = {
+            user_id: current_user.id,
+            keycloak_sub: current_user.keycloak_sub,
+            email: current_user.email,
+            total_events: ToolEvent.where(user_id: current_user.id).count,
+            jwt_sub: request.env['jwt.claims']&.dig('sub'),
+            jwt_email: request.env['jwt.claims']&.dig('email')
+          }
+        end
+
         render json: { data: response_data }
       end
 

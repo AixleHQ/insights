@@ -107,6 +107,11 @@ export function OrgProvider({ children, apiBaseUrl = '/api/v1' }: OrgProviderPro
       // If no stored org or stored org not found, use first org
       if (!currentOrg && organizations.length > 0) {
         currentOrg = organizations[0];
+        // Clear invalid stored org ID (e.g., after DB reseed)
+        if (storedOrgId) {
+          console.warn(`[OrgContext] Stored org ${storedOrgId} not found, switching to ${currentOrg.slug}`);
+          localStorage.setItem(ORG_STORAGE_KEY, currentOrg.id);
+        }
       }
 
       // Update the global API client state for X-Organization-ID header

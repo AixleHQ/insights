@@ -59,7 +59,7 @@ const navItems = [
   { title: 'Dashboard', icon: LayoutDashboard, href: '/' },
   { title: 'Events', icon: Activity, href: '/events' },
   { title: 'Projects', icon: FolderKanban, href: '/projects' },
-  { title: 'Connectors', icon: Plug, href: '/connectors' },
+  { title: 'Integrations', icon: Plug, href: '/integrations' },
   { title: 'Team', icon: Users, href: '/team' },
   { title: 'Settings', icon: Settings, href: '/settings' },
 ];

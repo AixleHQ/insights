@@ -1,11 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft,
   ArrowRight,
   Check,
   ExternalLink,
-  Github,
   Loader2,
   Shield,
   Zap,
@@ -30,24 +29,28 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
+import { useOrg } from '@/contexts/OrgContext';
+import { useProjects } from '@/hooks/useApi';
+import { api } from '@/lib/api';
+import { ProviderLogo } from '@/components/icons';
+import type { IntegrationProvider } from '@/components/integrations';
 
 interface ProviderConfig {
+  id: IntegrationProvider;
   name: string;
   displayName: string;
-  icon: React.ReactNode;
-  color: string;
   description: string;
   features: string[];
   scopes: { name: string; description: string }[];
   requiresWebhook: boolean;
+  requiresOAuth: boolean;
 }
 
 const providers: Record<string, ProviderConfig> = {
   github: {
+    id: 'github',
     name: 'github',
     displayName: 'GitHub',
-    icon: <Github className="size-6" />,
-    color: 'bg-[#24292f]',
     description: 'Connect your GitHub organization to track AI tool usage across repositories.',
     features: [
       'Repository activity monitoring',
@@ -61,16 +64,12 @@ const providers: Record<string, ProviderConfig> = {
       { name: 'admin:repo_hook', description: 'Manage repository webhooks' },
     ],
     requiresWebhook: true,
+    requiresOAuth: true,
   },
   gitlab: {
+    id: 'gitlab',
     name: 'gitlab',
     displayName: 'GitLab',
-    icon: (
-      <svg className="size-6" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M22.65 14.39L12 22.13 1.35 14.39a.84.84 0 0 1-.3-.94l1.22-3.78 2.44-7.51A.42.42 0 0 1 4.82 2a.43.43 0 0 1 .58 0 .42.42 0 0 1 .11.18l2.44 7.49h8.1l2.44-7.51A.42.42 0 0 1 18.6 2a.43.43 0 0 1 .58 0 .42.42 0 0 1 .11.18l2.44 7.51L23 13.45a.84.84 0 0 1-.35.94z" />
-      </svg>
-    ),
-    color: 'bg-[#fc6d26]',
     description: 'Connect your GitLab instance to monitor AI-assisted development.',
     features: [
       'Merge request tracking',
@@ -83,16 +82,12 @@ const providers: Record<string, ProviderConfig> = {
       { name: 'read_repository', description: 'Read repository content' },
     ],
     requiresWebhook: true,
+    requiresOAuth: true,
   },
   bitbucket: {
+    id: 'bitbucket',
     name: 'bitbucket',
     displayName: 'Bitbucket',
-    icon: (
-      <svg className="size-6" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M.778 1.213a.768.768 0 0 0-.768.892l3.263 19.81c.084.5.515.868 1.022.873H19.95a.772.772 0 0 0 .77-.646l3.27-20.03a.768.768 0 0 0-.768-.891zM14.52 15.53H9.522L8.17 8.466h7.561z" />
-      </svg>
-    ),
-    color: 'bg-[#0052cc]',
     description: 'Connect Bitbucket Cloud or Server for complete visibility.',
     features: [
       'Pull request monitoring',
@@ -105,16 +100,12 @@ const providers: Record<string, ProviderConfig> = {
       { name: 'pullrequest', description: 'Access pull requests' },
     ],
     requiresWebhook: true,
+    requiresOAuth: true,
   },
   jira: {
+    id: 'jira',
     name: 'jira',
     displayName: 'Jira',
-    icon: (
-      <svg className="size-6" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.001 1.001 0 0 0 23.013 0z" />
-      </svg>
-    ),
-    color: 'bg-[#0052cc]',
     description: 'Link Jira projects to correlate AI tool usage with issues.',
     features: [
       'Issue tracking integration',
@@ -127,16 +118,12 @@ const providers: Record<string, ProviderConfig> = {
       { name: 'write:jira-work', description: 'Update issues with AI metadata' },
     ],
     requiresWebhook: false,
+    requiresOAuth: true,
   },
   linear: {
+    id: 'linear',
     name: 'linear',
     displayName: 'Linear',
-    icon: (
-      <svg className="size-6" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M3.025 9.213A9.028 9.028 0 0 1 9.213 3.025l-1.186-1.186A11.035 11.035 0 0 0 1.839 8.027l1.186 1.186zm-.997 3.349a9.027 9.027 0 0 0 2.456 5.961l8.466-8.466A9.023 9.023 0 0 0 7.013 7.61l-4.985 4.952zM5.898 20a9.025 9.025 0 0 0 5.89 2.028l-1.186-1.186A7.033 7.033 0 0 1 7.085 18.8L5.898 20zm8.39 1.972A11.033 11.033 0 0 0 22.16 15.16l-1.186-1.186a9.024 9.024 0 0 1-5.5 5.813l-.186.185z" />
-      </svg>
-    ),
-    color: 'bg-[#5e6ad2]',
     description: 'Connect Linear to track AI-assisted issue resolution.',
     features: [
       'Issue lifecycle tracking',
@@ -149,35 +136,90 @@ const providers: Record<string, ProviderConfig> = {
       { name: 'issues:create', description: 'Create issues for alerts' },
     ],
     requiresWebhook: true,
+    requiresOAuth: true,
+  },
+  'claude-code': {
+    id: 'claude-code',
+    name: 'claude-code',
+    displayName: 'Claude Code',
+    description: 'Monitor Claude Code CLI sessions and AI usage.',
+    features: [
+      'Session tracking',
+      'Token consumption analytics',
+      'Code generation insights',
+      'Project attribution',
+    ],
+    scopes: [
+      { name: 'telemetry', description: 'Receive usage telemetry' },
+    ],
+    requiresWebhook: false,
+    requiresOAuth: false,
   },
 };
 
 type SetupStep = 'overview' | 'authorize' | 'configure' | 'complete';
 
-export function ConnectorSetup() {
+export function IntegrationSetup() {
   const { provider: providerKey } = useParams<{ provider: string }>();
   const navigate = useNavigate();
+  const { currentOrg } = useOrg();
+  const { data: projects } = useProjects(currentOrg?.id || '');
+
   const [step, setStep] = useState<SetupStep>('overview');
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [config, setConfig] = useState({
     name: '',
     syncRepos: true,
     syncPRs: true,
     webhookEnabled: true,
-    selectedProjects: [] as string[],
+    selectedProject: '',
   });
 
   const provider = providerKey ? providers[providerKey] : null;
 
+  // Listen for OAuth callback messages
+  useEffect(() => {
+    const handleMessage = async (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type !== 'integration_oauth_callback') return;
+
+      const { code, error: oauthError } = event.data;
+
+      if (oauthError) {
+        setError(`Authorization failed: ${oauthError}`);
+        setIsAuthorizing(false);
+        return;
+      }
+
+      if (code && currentOrg && provider) {
+        try {
+          await api.post(`/organizations/${currentOrg.id}/connectors/callback`, {
+            code,
+            connector_type: provider.name,
+          });
+          setIsAuthorizing(false);
+          setStep('configure');
+        } catch (err) {
+          setError('Failed to complete authorization. Please try again.');
+          setIsAuthorizing(false);
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [currentOrg, provider]);
+
   if (!provider) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <p className="text-muted-foreground">Unknown provider</p>
+        <p className="text-muted-foreground">Unknown integration</p>
         <Button asChild variant="link" className="mt-2">
-          <Link to="/connectors">
+          <Link to="/integrations">
             <ArrowLeft className="mr-2 size-4" />
-            Back to connectors
+            Back to integrations
           </Link>
         </Button>
       </div>
@@ -185,23 +227,61 @@ export function ConnectorSetup() {
   }
 
   const handleAuthorize = async () => {
+    if (!currentOrg) return;
     setIsAuthorizing(true);
-    // Simulate OAuth redirect
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    setIsAuthorizing(false);
+    setError(null);
+
+    try {
+      // Get authorization URL from API
+      const response = await api.get<{ data: { authorize_url: string } }>(
+        `/organizations/${currentOrg.id}/connectors/authorize/${provider.name}`
+      );
+      const authUrl = response.data.authorize_url;
+
+      // Open popup for OAuth
+      const width = 600;
+      const height = 700;
+      const left = window.screenX + (window.innerWidth - width) / 2;
+      const top = window.screenY + (window.innerHeight - height) / 2;
+
+      window.open(
+        authUrl,
+        'oauth_popup',
+        `width=${width},height=${height},left=${left},top=${top}`
+      );
+
+      // The popup will post a message back when authorization is complete
+      // We listen for this in the useEffect above
+    } catch (err) {
+      setError('Failed to start authorization. Please try again.');
+      setIsAuthorizing(false);
+    }
+  };
+
+  const handleSkipOAuth = () => {
+    // For providers that don't require OAuth (like claude-code)
     setStep('configure');
   };
 
   const handleConnect = async () => {
     setIsConnecting(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setIsConnecting(false);
-    setStep('complete');
+    setError(null);
+
+    try {
+      // The connector was already created during OAuth callback
+      // Here we just finalize the configuration
+      // In a real implementation, you might update the connector with additional config
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      setIsConnecting(false);
+      setStep('complete');
+    } catch (err) {
+      setError('Failed to complete setup. Please try again.');
+      setIsConnecting(false);
+    }
   };
 
   const handleFinish = () => {
-    navigate('/connectors');
+    navigate('/integrations');
   };
 
   return (
@@ -209,14 +289,12 @@ export function ConnectorSetup() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <Button asChild variant="ghost" size="icon">
-          <Link to="/connectors">
+          <Link to="/integrations">
             <ArrowLeft className="size-4" />
           </Link>
         </Button>
         <div className="flex items-center gap-3">
-          <div className={`flex size-10 items-center justify-center rounded-lg text-white ${provider.color}`}>
-            {provider.icon}
-          </div>
+          <ProviderLogo provider={provider.id} size="lg" showBackground />
           <div>
             <h1 className="text-xl font-semibold">Connect {provider.displayName}</h1>
             <p className="text-sm text-muted-foreground">Step-by-step setup wizard</p>
@@ -256,6 +334,13 @@ export function ConnectorSetup() {
         ))}
       </div>
 
+      {/* Error Banner */}
+      {error && (
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+          {error}
+        </div>
+      )}
+
       {/* Step Content */}
       {step === 'overview' && (
         <Card>
@@ -276,26 +361,29 @@ export function ConnectorSetup() {
               </div>
             </div>
 
-            <Separator />
-
-            <div>
-              <h3 className="mb-3 flex items-center gap-2 text-sm font-medium">
-                <Shield className="size-4" />
-                Required Permissions
-              </h3>
-              <div className="space-y-2">
-                {provider.scopes.map((scope) => (
-                  <div key={scope.name} className="rounded-lg border p-3">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="font-mono text-xs">
-                        {scope.name}
-                      </Badge>
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">{scope.description}</p>
+            {provider.requiresOAuth && (
+              <>
+                <Separator />
+                <div>
+                  <h3 className="mb-3 flex items-center gap-2 text-sm font-medium">
+                    <Shield className="size-4" />
+                    Required Permissions
+                  </h3>
+                  <div className="space-y-2">
+                    {provider.scopes.map((scope) => (
+                      <div key={scope.name} className="rounded-lg border p-3">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="font-mono text-xs">
+                            {scope.name}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-sm text-muted-foreground">{scope.description}</p>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
+              </>
+            )}
 
             <div className="flex justify-end">
               <Button onClick={() => setStep('authorize')}>
@@ -310,52 +398,74 @@ export function ConnectorSetup() {
       {step === 'authorize' && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Authorize Access</CardTitle>
+            <CardTitle className="text-lg">
+              {provider.requiresOAuth ? 'Authorize Access' : 'Configuration'}
+            </CardTitle>
             <CardDescription>
-              You'll be redirected to {provider.displayName} to grant access to your account.
+              {provider.requiresOAuth
+                ? `You'll be redirected to ${provider.displayName} to grant access to your account.`
+                : `Configure ${provider.displayName} integration settings.`}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="rounded-lg border border-dashed p-6 text-center">
-              <div className={`mx-auto mb-4 flex size-16 items-center justify-center rounded-xl text-white ${provider.color}`}>
-                {provider.icon}
-              </div>
-              <p className="text-sm text-muted-foreground">
-                DB90 will request read-only access to monitor AI tool activity.
-                <br />
-                We never store your credentials.
-              </p>
-            </div>
+            {provider.requiresOAuth ? (
+              <>
+                <div className="rounded-lg border border-dashed p-6 text-center">
+                  <div className="mx-auto mb-4">
+                    <ProviderLogo provider={provider.id} size="lg" showBackground />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    DB90 will request read-only access to monitor AI tool activity.
+                    <br />
+                    We never store your credentials.
+                  </p>
+                </div>
 
-            <div className="flex items-center justify-between rounded-lg bg-muted/50 p-4">
-              <div className="flex items-center gap-2">
-                <Shield className="size-4 text-primary" />
-                <span className="text-sm">Secure OAuth 2.0 authorization</span>
+                <div className="flex items-center justify-between rounded-lg bg-muted/50 p-4">
+                  <div className="flex items-center gap-2">
+                    <Shield className="size-4 text-primary" />
+                    <span className="text-sm">Secure OAuth 2.0 authorization</span>
+                  </div>
+                  <a
+                    href="#"
+                    className="flex items-center gap-1 text-sm text-primary hover:underline"
+                  >
+                    Learn more
+                    <ExternalLink className="size-3" />
+                  </a>
+                </div>
+              </>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  This integration doesn't require OAuth. You can proceed to configure it.
+                </p>
               </div>
-              <a
-                href="#"
-                className="flex items-center gap-1 text-sm text-primary hover:underline"
-              >
-                Learn more
-                <ExternalLink className="size-3" />
-              </a>
-            </div>
+            )}
 
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => setStep('overview')}>
                 <ArrowLeft className="mr-2 size-4" />
                 Back
               </Button>
-              <Button onClick={handleAuthorize} disabled={isAuthorizing}>
+              <Button
+                onClick={provider.requiresOAuth ? handleAuthorize : handleSkipOAuth}
+                disabled={isAuthorizing}
+              >
                 {isAuthorizing ? (
                   <>
                     <Loader2 className="mr-2 size-4 animate-spin" />
                     Authorizing...
                   </>
-                ) : (
+                ) : provider.requiresOAuth ? (
                   <>
                     Authorize with {provider.displayName}
                     <ExternalLink className="ml-2 size-4" />
+                  </>
+                ) : (
+                  <>
+                    Continue
+                    <ArrowRight className="ml-2 size-4" />
                   </>
                 )}
               </Button>
@@ -443,18 +553,23 @@ export function ConnectorSetup() {
 
             <div className="space-y-2">
               <Label>Link to Project</Label>
-              <Select>
+              <Select
+                value={config.selectedProject}
+                onValueChange={(value) => setConfig({ ...config, selectedProject: value })}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select a project (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="api-gateway">api-gateway</SelectItem>
-                  <SelectItem value="web-dashboard">web-dashboard</SelectItem>
-                  <SelectItem value="mobile-app">mobile-app</SelectItem>
+                  {projects?.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Optionally link this connector to a specific project
+                Optionally link this integration to a specific project
               </p>
             </div>
 
@@ -499,7 +614,7 @@ export function ConnectorSetup() {
             </div>
             <div className="mt-8 flex justify-center gap-4">
               <Button variant="outline" asChild>
-                <Link to={`/connectors`}>View All Connectors</Link>
+                <Link to="/integrations">View All Integrations</Link>
               </Button>
               <Button onClick={handleFinish}>
                 Go to Dashboard

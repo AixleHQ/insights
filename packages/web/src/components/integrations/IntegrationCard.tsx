@@ -16,12 +16,29 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { cn } from '@/lib/utils';
-import { formatDistanceToNow } from '@/lib/utils';
+import { cn, formatDistanceToNow } from '@/lib/utils';
+import { ProviderLogo } from '@/components/icons';
 
-export interface ConnectorData {
+export type IntegrationProvider =
+  | 'github'
+  | 'gitlab'
+  | 'bitbucket'
+  | 'jira'
+  | 'linear'
+  | 'slack'
+  | 'figma'
+  | 'claude'
+  | 'claude-code'
+  | 'anthropic'
+  | 'openai'
+  | 'openrouter'
+  | 'cursor'
+  | 'copilot'
+  | 'google';
+
+export interface IntegrationData {
   id: string;
-  provider: 'github' | 'gitlab' | 'bitbucket' | 'jira' | 'linear';
+  provider: IntegrationProvider;
   name: string;
   status: 'connected' | 'error' | 'syncing' | 'disconnected';
   last_sync_at?: string;
@@ -33,16 +50,17 @@ export interface ConnectorData {
 }
 
 export interface ProviderInfo {
-  id: string;
+  id: IntegrationProvider;
   name: string;
   description: string;
-  icon: React.ReactNode;
+  category: 'code' | 'project' | 'ai' | 'design' | 'communication';
   features: string[];
   available: boolean;
+  comingSoon?: boolean;
 }
 
-interface ConnectorCardProps {
-  connector?: ConnectorData;
+interface IntegrationCardProps {
+  integration?: IntegrationData;
   provider?: ProviderInfo;
   onSync?: (id: string) => void;
   onDisconnect?: (id: string) => void;
@@ -77,16 +95,16 @@ const statusConfig = {
   },
 };
 
-export function ConnectorCard({
-  connector,
+export function IntegrationCard({
+  integration,
   provider,
   onSync,
   onDisconnect,
   onConnect,
   className,
-}: ConnectorCardProps) {
+}: IntegrationCardProps) {
   // Display as available provider to connect
-  if (provider && !connector) {
+  if (provider && !integration) {
     return (
       <Card
         className={cn(
@@ -98,9 +116,7 @@ export function ConnectorCard({
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
-                {provider.icon}
-              </div>
+              <ProviderLogo provider={provider.id} size="md" showBackground />
               <div>
                 <CardTitle className="text-base">{provider.name}</CardTitle>
                 <CardDescription className="text-xs">
@@ -131,10 +147,10 @@ export function ConnectorCard({
     );
   }
 
-  // Display as connected connector
-  if (!connector) return null;
+  // Display as connected integration
+  if (!integration) return null;
 
-  const status = statusConfig[connector.status];
+  const status = statusConfig[integration.status];
   const StatusIcon = status.icon;
 
   return (
@@ -142,15 +158,13 @@ export function ConnectorCard({
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-lg bg-muted text-lg font-medium capitalize">
-              {(connector.provider || 'C')[0]}
-            </div>
+            <ProviderLogo provider={integration.provider} size="md" showBackground />
             <div>
-              <CardTitle className="text-base">{connector.name}</CardTitle>
+              <CardTitle className="text-base">{integration.name}</CardTitle>
               <CardDescription className="text-xs capitalize">
-                {connector.provider}
-                {connector.metadata?.account_name &&
-                  ` · ${connector.metadata.account_name}`}
+                {integration.provider.replace('-', ' ')}
+                {integration.metadata?.account_name &&
+                  ` · ${integration.metadata.account_name}`}
               </CardDescription>
             </div>
           </div>
@@ -166,14 +180,14 @@ export function ConnectorCard({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onSync?.(connector.id)}>
+              <DropdownMenuItem onClick={() => onSync?.(integration.id)}>
                 <RefreshCw className="mr-2 size-4" />
                 Sync now
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="text-destructive"
-                onClick={() => onDisconnect?.(connector.id)}
+                onClick={() => onDisconnect?.(integration.id)}
               >
                 <Unplug className="mr-2 size-4" />
                 Disconnect
@@ -190,29 +204,29 @@ export function ConnectorCard({
                 className={cn(
                   'size-3',
                   status.color,
-                  connector.status === 'syncing' && 'animate-spin'
+                  integration.status === 'syncing' && 'animate-spin'
                 )}
               />
               <span className={status.color}>{status.label}</span>
             </Badge>
           </div>
-          {connector.metadata?.resources_count !== undefined && (
+          {integration.metadata?.resources_count !== undefined && (
             <span className="text-xs text-muted-foreground">
-              {connector.metadata.resources_count} resources
+              {integration.metadata.resources_count} resources
             </span>
           )}
         </div>
 
-        {connector.last_sync_at && (
+        {integration.last_sync_at && (
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <Clock className="size-3" />
-            Last synced {formatDistanceToNow(connector.last_sync_at)}
+            Last synced {formatDistanceToNow(integration.last_sync_at)}
           </div>
         )}
 
-        {connector.sync_error && (
+        {integration.sync_error && (
           <div className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
-            {connector.sync_error}
+            {integration.sync_error}
           </div>
         )}
       </CardContent>

@@ -34,6 +34,8 @@ interface ActivityFeedProps {
   events: ActivityEvent[];
   isLoading?: boolean;
   className?: string;
+  onEventClick?: (eventId: string) => void;
+  selectedEventId?: string | null;
 }
 
 const toolIcons: Record<string, typeof Code2> = {
@@ -104,15 +106,20 @@ export function RiskBadge({
   );
 }
 
-function ActivityItem({ event }: { event: ActivityEvent }) {
+function ActivityItem({
+  event,
+  onClick,
+  isSelected,
+}: {
+  event: ActivityEvent;
+  onClick?: () => void;
+  isSelected?: boolean;
+}) {
   const ToolIcon = getToolIcon(event.tool_name);
   const timeAgo = formatDistanceToNow(event.created_at);
 
-  return (
-    <Link
-      to={`/events/${event.id}`}
-      className="group flex items-start gap-3 rounded-lg p-3 transition-colors hover:bg-muted/50"
-    >
+  const content = (
+    <>
       <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
         <ToolIcon className="size-4" />
       </div>
@@ -141,6 +148,25 @@ function ActivityItem({ event }: { event: ActivityEvent }) {
         )}
       </div>
       <ArrowRight className="size-4 shrink-0 text-muted-foreground/50 opacity-0 transition-opacity group-hover:opacity-100" />
+    </>
+  );
+
+  const className = cn(
+    'group flex items-start gap-3 rounded-lg p-3 transition-colors hover:bg-muted/50 cursor-pointer',
+    isSelected && 'bg-muted'
+  );
+
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={cn(className, 'w-full text-left')}>
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <Link to={`/events/${event.id}`} className={className}>
+      {content}
     </Link>
   );
 }
@@ -160,7 +186,13 @@ function ActivitySkeleton() {
   );
 }
 
-export function ActivityFeed({ events, isLoading, className }: ActivityFeedProps) {
+export function ActivityFeed({
+  events,
+  isLoading,
+  className,
+  onEventClick,
+  selectedEventId,
+}: ActivityFeedProps) {
   return (
     <Card className={cn('col-span-full lg:col-span-2', className)}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -192,7 +224,12 @@ export function ActivityFeed({ events, isLoading, className }: ActivityFeedProps
           ) : (
             <div className="space-y-1">
               {events.map((event) => (
-                <ActivityItem key={event.id} event={event} />
+                <ActivityItem
+                  key={event.id}
+                  event={event}
+                  onClick={onEventClick ? () => onEventClick(event.id) : undefined}
+                  isSelected={selectedEventId === event.id}
+                />
               ))}
             </div>
           )}
