@@ -1,4 +1,3 @@
-import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -7,8 +6,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SortButton, type SortDirection } from '@/components/ui/sort-button';
 import { RiskBadge } from '@/components/dashboard/ActivityFeed';
 import { formatDistanceToNow } from '@/lib/utils';
 import { cn } from '@/lib/utils';
@@ -26,7 +25,6 @@ export interface EventRow {
 }
 
 type SortField = 'created_at' | 'tool_name' | 'risk_level' | 'cost_usd';
-type SortDirection = 'asc' | 'desc';
 
 interface EventsTableProps {
   events: EventRow[];
@@ -37,42 +35,6 @@ interface EventsTableProps {
   onEventClick?: (eventId: string) => void;
   selectedEventId?: string | null;
   className?: string;
-}
-
-function SortButton({
-  field,
-  currentField,
-  currentDirection,
-  onSort,
-  children,
-}: {
-  field: SortField;
-  currentField?: SortField;
-  currentDirection?: SortDirection;
-  onSort?: (field: SortField) => void;
-  children: React.ReactNode;
-}) {
-  const isActive = currentField === field;
-
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      className="-ml-3 h-8 data-[state=open]:bg-accent"
-      onClick={() => onSort?.(field)}
-    >
-      {children}
-      {isActive ? (
-        currentDirection === 'asc' ? (
-          <ArrowUp className="ml-2 size-3" />
-        ) : (
-          <ArrowDown className="ml-2 size-3" />
-        )
-      ) : (
-        <ArrowUpDown className="ml-2 size-3 opacity-50" />
-      )}
-    </Button>
-  );
 }
 
 function EventRowSkeleton() {

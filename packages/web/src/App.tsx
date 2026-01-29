@@ -23,6 +23,7 @@ import { IntegrationOAuthCallback } from './pages/IntegrationOAuthCallback';
 import { Team } from './pages/Team';
 import { TeamInvite } from './pages/TeamInvite';
 import { MemberProfile } from './pages/MemberProfile';
+import { MyProfile } from './pages/MyProfile';
 import { Settings } from './pages/Settings';
 import { ToolAccounts } from './pages/ToolAccounts';
 import { UnattributedEvents } from './pages/UnattributedEvents';
@@ -39,7 +40,7 @@ function App() {
     <BrowserRouter>
       <ImpersonationProvider>
         <AuthProvider>
-          <OrgProvider apiBaseUrl={import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1'}>
+          <OrgProvider apiBaseUrl={import.meta.env.VITE_API_URL || '/api/v1'}>
             <NotificationsProvider>
               <ImpersonationBar />
               <Routes>
@@ -61,6 +62,7 @@ function App() {
                   }
                 >
                   <Route path="/" element={<Dashboard />} />
+                  <Route path="/profile" element={<MyProfile />} />
                   <Route path="/events" element={<Events />} />
                   <Route path="/events/:id" element={<EventDetailPage />} />
                   <Route path="/projects" element={<Projects />} />

@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Users, Shield, ShieldCheck, Mail, MoreVertical } from 'lucide-react';
+import { Search, Users, Shield, ShieldCheck, Mail, MoreVertical, X } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,14 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { SortButton, type SortDirection } from '@/components/ui/sort-button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -24,6 +32,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { formatDistanceToNow } from '@/lib/utils';
+
+type UserSortField = 'name' | 'organizations_count' | 'events_count' | 'created_at' | 'last_active_at';
 
 interface AdminUser {
   id: string;
@@ -73,23 +83,82 @@ function UserSkeleton() {
 
 export function AdminUsers() {
   const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [sortField, setSortField] = useState<UserSortField>('created_at');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   const { data: users, isLoading } = useQuery({
     queryKey: ['admin', 'users'],
     queryFn: () => api.get<AdminUser[]>('/admin/users'),
   });
 
+  const handleSort = (field: UserSortField) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+
+  const clearFilters = () => {
+    setSearch('');
+    setRoleFilter('all');
+  };
+
+  const hasActiveFilters = search || roleFilter !== 'all';
+
   const filteredUsers = useMemo(() => {
     if (!users) return [];
-    if (!search) return users;
 
-    const searchLower = search.toLowerCase();
-    return users.filter(
-      (user) =>
-        user.email.toLowerCase().includes(searchLower) ||
-        user.name?.toLowerCase().includes(searchLower)
-    );
-  }, [users, search]);
+    let result = [...users];
+
+    // Apply search filter
+    if (search) {
+      const searchLower = search.toLowerCase();
+      result = result.filter(
+        (user) =>
+          user.email.toLowerCase().includes(searchLower) ||
+          user.name?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Apply role filter
+    if (roleFilter !== 'all') {
+      if (roleFilter === 'super_admin') {
+        result = result.filter((user) => user.super_admin);
+      } else if (roleFilter === 'user') {
+        result = result.filter((user) => !user.super_admin);
+      }
+    }
+
+    // Apply sorting
+    result.sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'name':
+          comparison = (a.name || a.email).localeCompare(b.name || b.email);
+          break;
+        case 'organizations_count':
+          comparison = a.organizations_count - b.organizations_count;
+          break;
+        case 'events_count':
+          comparison = a.events_count - b.events_count;
+          break;
+        case 'created_at':
+          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          break;
+        case 'last_active_at':
+          const aTime = a.last_active_at ? new Date(a.last_active_at).getTime() : 0;
+          const bTime = b.last_active_at ? new Date(b.last_active_at).getTime() : 0;
+          comparison = aTime - bTime;
+          break;
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+
+    return result;
+  }, [users, search, roleFilter, sortField, sortDirection]);
 
   const getInitials = (name: string | null, email: string) => {
     if (name) {
@@ -118,26 +187,91 @@ export function AdminUsers() {
         </Badge>
       </div>
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Search users..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
-        />
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative w-64">
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search users..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
+        <Select value={roleFilter} onValueChange={setRoleFilter}>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue placeholder="Role" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Roles</SelectItem>
+            <SelectItem value="super_admin">Super Admins</SelectItem>
+            <SelectItem value="user">Users</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" onClick={clearFilters}>
+            <X className="mr-2 size-4" />
+            Clear filters
+          </Button>
+        )}
       </div>
 
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[280px]">User</TableHead>
+              <TableHead className="w-[280px]">
+                <SortButton
+                  field="name"
+                  currentField={sortField}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                >
+                  User
+                </SortButton>
+              </TableHead>
               <TableHead className="w-[100px]">Role</TableHead>
-              <TableHead className="w-[80px]">Orgs</TableHead>
-              <TableHead className="w-[80px]">Events</TableHead>
-              <TableHead className="w-[120px]">Joined</TableHead>
-              <TableHead className="w-[120px]">Last Active</TableHead>
+              <TableHead className="w-[80px]">
+                <SortButton
+                  field="organizations_count"
+                  currentField={sortField}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                >
+                  Orgs
+                </SortButton>
+              </TableHead>
+              <TableHead className="w-[80px]">
+                <SortButton
+                  field="events_count"
+                  currentField={sortField}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                >
+                  Events
+                </SortButton>
+              </TableHead>
+              <TableHead className="w-[120px]">
+                <SortButton
+                  field="created_at"
+                  currentField={sortField}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                >
+                  Joined
+                </SortButton>
+              </TableHead>
+              <TableHead className="w-[120px]">
+                <SortButton
+                  field="last_active_at"
+                  currentField={sortField}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                >
+                  Last Active
+                </SortButton>
+              </TableHead>
               <TableHead className="w-[50px]" />
             </TableRow>
           </TableHeader>

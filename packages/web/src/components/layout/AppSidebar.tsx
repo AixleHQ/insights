@@ -299,6 +299,12 @@ function UserMenu() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
+          <Link to="/profile">
+            <User className="mr-2 size-4" />
+            My Profile
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
           <Link to="/settings">
             <Settings className="mr-2 size-4" />
             Settings

@@ -1,8 +1,6 @@
-import { useState } from 'react';
-import { X, Filter } from 'lucide-react';
+import { Search, X, Calendar, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -15,8 +13,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 
 export interface EventFiltersState {
@@ -35,8 +31,134 @@ interface EventFiltersProps {
   className?: string;
 }
 
-const riskLevels = ['critical', 'high', 'medium', 'low', 'none'];
-const eventTypes = ['prompt', 'completion', 'function_call', 'file_operation'];
+const riskLevels = [
+  { value: 'critical', label: 'Critical', color: 'bg-risk-critical' },
+  { value: 'high', label: 'High', color: 'bg-risk-high' },
+  { value: 'medium', label: 'Medium', color: 'bg-risk-medium' },
+  { value: 'low', label: 'Low', color: 'bg-risk-low' },
+  { value: 'none', label: 'None', color: 'bg-muted-foreground' },
+];
+
+const eventTypes = [
+  { value: 'prompt', label: 'Prompt' },
+  { value: 'completion', label: 'Completion' },
+  { value: 'function_call', label: 'Function Call' },
+  { value: 'file_operation', label: 'File Operation' },
+];
+
+function FilterChip({
+  label,
+  value,
+  onRemove,
+  colorDot,
+}: {
+  label: string;
+  value: string;
+  onRemove: () => void;
+  colorDot?: string;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/15">
+      {colorDot && (
+        <span className={cn('size-2 rounded-full', colorDot)} />
+      )}
+      <span className="text-muted-foreground">{label}:</span>
+      <span>{value}</span>
+      <button
+        onClick={onRemove}
+        className="ml-0.5 rounded-full p-0.5 hover:bg-primary/20 transition-colors"
+      >
+        <X className="size-3" />
+      </button>
+    </span>
+  );
+}
+
+function DateRangePicker({
+  dateFrom,
+  dateTo,
+  onDateFromChange,
+  onDateToChange,
+}: {
+  dateFrom?: string;
+  dateTo?: string;
+  onDateFromChange: (value: string | undefined) => void;
+  onDateToChange: (value: string | undefined) => void;
+}) {
+  const hasDateFilter = dateFrom || dateTo;
+
+  const formatDateDisplay = () => {
+    if (dateFrom && dateTo) {
+      return `${new Date(dateFrom).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${new Date(dateTo).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+    }
+    if (dateFrom) {
+      return `From ${new Date(dateFrom).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+    }
+    if (dateTo) {
+      return `Until ${new Date(dateTo).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+    }
+    return 'Date range';
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className={cn(
+            'h-8 gap-2 border-dashed font-normal',
+            hasDateFilter && 'border-solid border-primary/50 bg-primary/5'
+          )}
+        >
+          <Calendar className="size-3.5 text-muted-foreground" />
+          <span className={hasDateFilter ? 'text-foreground' : 'text-muted-foreground'}>
+            {formatDateDisplay()}
+          </span>
+          <ChevronDown className="size-3 text-muted-foreground" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-4" align="start">
+        <div className="space-y-3">
+          <div className="text-sm font-medium">Date Range</div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground">From</label>
+              <Input
+                type="date"
+                value={dateFrom || ''}
+                onChange={(e) => onDateFromChange(e.target.value || undefined)}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground">To</label>
+              <Input
+                type="date"
+                value={dateTo || ''}
+                onChange={(e) => onDateToChange(e.target.value || undefined)}
+                className="h-8 text-sm"
+              />
+            </div>
+          </div>
+          {hasDateFilter && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-full text-xs"
+              onClick={() => {
+                onDateFromChange(undefined);
+                onDateToChange(undefined);
+              }}
+            >
+              Clear dates
+            </Button>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 export function EventFilters({
   filters,
@@ -44,16 +166,10 @@ export function EventFilters({
   tools,
   className,
 }: EventFiltersProps) {
-  const [isOpen, setIsOpen] = useState(false);
-
-  const activeFilterCount = Object.values(filters).filter(
-    (v) => v !== undefined && v !== ''
-  ).length;
-
   const updateFilter = (key: keyof EventFiltersState, value: string | undefined) => {
     onFiltersChange({
       ...filters,
-      [key]: value === '' ? undefined : value,
+      [key]: value === '' || value === 'all' ? undefined : value,
     });
   };
 
@@ -61,140 +177,173 @@ export function EventFilters({
     onFiltersChange({});
   };
 
+  // Collect active filter chips
+  const activeFilters: { key: keyof EventFiltersState; label: string; value: string; colorDot?: string }[] = [];
+
+  if (filters.tool) {
+    activeFilters.push({ key: 'tool', label: 'Tool', value: filters.tool });
+  }
+  if (filters.riskLevel) {
+    const risk = riskLevels.find(r => r.value === filters.riskLevel);
+    activeFilters.push({
+      key: 'riskLevel',
+      label: 'Risk',
+      value: risk?.label || filters.riskLevel,
+      colorDot: risk?.color
+    });
+  }
+  if (filters.eventType) {
+    const type = eventTypes.find(t => t.value === filters.eventType);
+    activeFilters.push({ key: 'eventType', label: 'Type', value: type?.label || filters.eventType });
+  }
+  if (filters.dateFrom) {
+    activeFilters.push({
+      key: 'dateFrom',
+      label: 'From',
+      value: new Date(filters.dateFrom).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    });
+  }
+  if (filters.dateTo) {
+    activeFilters.push({
+      key: 'dateTo',
+      label: 'To',
+      value: new Date(filters.dateTo).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    });
+  }
+
+  const hasActiveFilters = activeFilters.length > 0 || filters.search;
+
   return (
-    <div className={cn('flex items-center gap-2', className)}>
-      <div className="relative flex-1 max-w-sm">
-        <Input
-          placeholder="Search events..."
-          value={filters.search || ''}
-          onChange={(e) => updateFilter('search', e.target.value)}
-          className="pr-8"
+    <div className={cn('space-y-3', className)}>
+      {/* Main filter bar */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Search input */}
+        <div className="relative w-64">
+          <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search events..."
+            value={filters.search || ''}
+            onChange={(e) => updateFilter('search', e.target.value)}
+            className="h-8 pl-8 pr-8 text-sm"
+          />
+          {filters.search && (
+            <button
+              onClick={() => updateFilter('search', undefined)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground hover:bg-muted"
+            >
+              <X className="size-3.5" />
+            </button>
+          )}
+        </div>
+
+        <div className="h-5 w-px bg-border" />
+
+        {/* Tool filter */}
+        <Select
+          value={filters.tool || 'all'}
+          onValueChange={(value) => updateFilter('tool', value)}
+        >
+          <SelectTrigger className={cn(
+            'h-8 w-[140px] gap-1 border-dashed text-sm font-normal',
+            filters.tool && 'border-solid border-primary/50 bg-primary/5'
+          )}>
+            <SelectValue placeholder="Tool" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All tools</SelectItem>
+            {tools.map((tool) => (
+              <SelectItem key={tool} value={tool}>
+                {tool}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Risk level filter */}
+        <Select
+          value={filters.riskLevel || 'all'}
+          onValueChange={(value) => updateFilter('riskLevel', value)}
+        >
+          <SelectTrigger className={cn(
+            'h-8 w-[130px] gap-1 border-dashed text-sm font-normal',
+            filters.riskLevel && 'border-solid border-primary/50 bg-primary/5'
+          )}>
+            <SelectValue placeholder="Risk level" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All risks</SelectItem>
+            {riskLevels.map((level) => (
+              <SelectItem key={level.value} value={level.value}>
+                <span className="flex items-center gap-2">
+                  <span className={cn('size-2 rounded-full', level.color)} />
+                  {level.label}
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Event type filter */}
+        <Select
+          value={filters.eventType || 'all'}
+          onValueChange={(value) => updateFilter('eventType', value)}
+        >
+          <SelectTrigger className={cn(
+            'h-8 w-[140px] gap-1 border-dashed text-sm font-normal',
+            filters.eventType && 'border-solid border-primary/50 bg-primary/5'
+          )}>
+            <SelectValue placeholder="Event type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All types</SelectItem>
+            {eventTypes.map((type) => (
+              <SelectItem key={type.value} value={type.value}>
+                {type.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Date range picker */}
+        <DateRangePicker
+          dateFrom={filters.dateFrom}
+          dateTo={filters.dateTo}
+          onDateFromChange={(value) => updateFilter('dateFrom', value)}
+          onDateToChange={(value) => updateFilter('dateTo', value)}
         />
-        {filters.search && (
-          <button
-            onClick={() => updateFilter('search', undefined)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-          >
-            <X className="size-4" />
-          </button>
+
+        {/* Clear all button */}
+        {hasActiveFilters && (
+          <>
+            <div className="h-5 w-px bg-border" />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearFilters}
+              className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <X className="mr-1 size-3" />
+              Clear all
+            </Button>
+          </>
         )}
       </div>
 
-      <Popover open={isOpen} onOpenChange={setIsOpen}>
-        <PopoverTrigger asChild>
-          <Button variant="outline" className="gap-2">
-            <Filter className="size-4" />
-            Filters
-            {activeFilterCount > 0 && (
-              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
-                {activeFilterCount}
-              </Badge>
-            )}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-80" align="end">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h4 className="font-medium">Filters</h4>
-              {activeFilterCount > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearFilters}
-                  className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  Clear all
-                </Button>
-              )}
-            </div>
-
-            <Separator />
-
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Tool</Label>
-                <Select
-                  value={filters.tool || ''}
-                  onValueChange={(value) => updateFilter('tool', value)}
-                >
-                  <SelectTrigger className="h-8">
-                    <SelectValue placeholder="All tools" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">All tools</SelectItem>
-                    {tools.map((tool) => (
-                      <SelectItem key={tool} value={tool}>
-                        {tool}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs">Risk Level</Label>
-                <Select
-                  value={filters.riskLevel || ''}
-                  onValueChange={(value) => updateFilter('riskLevel', value)}
-                >
-                  <SelectTrigger className="h-8">
-                    <SelectValue placeholder="All levels" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">All levels</SelectItem>
-                    {riskLevels.map((level) => (
-                      <SelectItem key={level} value={level} className="capitalize">
-                        {level}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs">Event Type</Label>
-                <Select
-                  value={filters.eventType || ''}
-                  onValueChange={(value) => updateFilter('eventType', value)}
-                >
-                  <SelectTrigger className="h-8">
-                    <SelectValue placeholder="All types" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">All types</SelectItem>
-                    {eventTypes.map((type) => (
-                      <SelectItem key={type} value={type} className="capitalize">
-                        {type.replace('_', ' ')}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">From</Label>
-                  <Input
-                    type="date"
-                    value={filters.dateFrom || ''}
-                    onChange={(e) => updateFilter('dateFrom', e.target.value)}
-                    className="h-8"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">To</Label>
-                  <Input
-                    type="date"
-                    value={filters.dateTo || ''}
-                    onChange={(e) => updateFilter('dateTo', e.target.value)}
-                    className="h-8"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </PopoverContent>
-      </Popover>
+      {/* Active filter chips */}
+      {activeFilters.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">Active filters:</span>
+          {activeFilters.map((filter) => (
+            <FilterChip
+              key={filter.key}
+              label={filter.label}
+              value={filter.value}
+              colorDot={filter.colorDot}
+              onRemove={() => updateFilter(filter.key, undefined)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

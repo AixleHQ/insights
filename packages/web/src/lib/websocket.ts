@@ -242,7 +242,7 @@ let client: ActionCableClient | null = null;
 
 export function getWebSocketClient(): ActionCableClient {
   if (!client) {
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
     client = new ActionCableClient(baseUrl);
   }
   return client;

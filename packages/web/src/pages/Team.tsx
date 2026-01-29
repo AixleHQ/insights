@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganizationMembers, useUpdateMemberRole, useRemoveMember, useLeaveOrganization } from '@/hooks/useApi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SortButton, type SortDirection } from '@/components/ui/sort-button';
 import {
   Table,
   TableBody,
@@ -60,11 +61,22 @@ function MemberSkeleton() {
   );
 }
 
+type MemberSortField = 'name' | 'role' | 'status' | 'joined_at' | 'event_count';
+
+const roleOrder: Record<MemberRole, number> = {
+  owner: 4,
+  admin: 3,
+  member: 2,
+  viewer: 1,
+};
+
 export function Team() {
   const navigate = useNavigate();
   const { currentOrg, currentMembership, organizations, setCurrentOrg, refreshOrganizations } = useOrg();
   const { profile } = useAuth();
   const [search, setSearch] = useState('');
+  const [sortField, setSortField] = useState<MemberSortField>('name');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   const { data: membersData, isLoading } = useOrganizationMembers(currentOrg?.id || '');
   const updateMemberRole = useUpdateMemberRole();
@@ -110,13 +122,47 @@ export function Team() {
     }
   };
 
+  const handleSort = (field: MemberSortField) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
   const filteredMembers = useMemo(() => {
-    return members.filter(
+    let result = members.filter(
       (member) =>
         member.email.toLowerCase().includes(search.toLowerCase()) ||
         member.name?.toLowerCase().includes(search.toLowerCase())
     );
-  }, [members, search]);
+
+    // Apply sorting
+    result.sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'name':
+          comparison = (a.name || a.email).localeCompare(b.name || b.email);
+          break;
+        case 'role':
+          comparison = (roleOrder[a.role] || 0) - (roleOrder[b.role] || 0);
+          break;
+        case 'status':
+          comparison = a.status.localeCompare(b.status);
+          break;
+        case 'joined_at':
+          comparison = new Date(a.joined_at || 0).getTime() - new Date(b.joined_at || 0).getTime();
+          break;
+        case 'event_count':
+          comparison = (a.event_count || 0) - (b.event_count || 0);
+          break;
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+
+    return result;
+  }, [members, search, sortField, sortDirection]);
 
   const activeCount = members.filter((m) => m.status === 'active').length;
   const pendingCount = members.filter((m) => m.status === 'pending').length;
@@ -153,12 +199,57 @@ export function Team() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[250px]">Member</TableHead>
-              <TableHead className="w-[120px]">Role</TableHead>
-              <TableHead className="w-[100px]">Status</TableHead>
-              <TableHead className="w-[120px]">Joined</TableHead>
+              <TableHead className="w-[250px]">
+                <SortButton
+                  field="name"
+                  currentField={sortField}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                >
+                  Member
+                </SortButton>
+              </TableHead>
+              <TableHead className="w-[120px]">
+                <SortButton
+                  field="role"
+                  currentField={sortField}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                >
+                  Role
+                </SortButton>
+              </TableHead>
+              <TableHead className="w-[100px]">
+                <SortButton
+                  field="status"
+                  currentField={sortField}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                >
+                  Status
+                </SortButton>
+              </TableHead>
+              <TableHead className="w-[120px]">
+                <SortButton
+                  field="joined_at"
+                  currentField={sortField}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                >
+                  Joined
+                </SortButton>
+              </TableHead>
               <TableHead className="w-[120px]">Last Active</TableHead>
-              <TableHead className="w-[100px]">Events</TableHead>
+              <TableHead className="w-[100px]">
+                <SortButton
+                  field="event_count"
+                  currentField={sortField}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                >
+                  Events
+                </SortButton>
+              </TableHead>
               <TableHead className="w-[50px]" />
             </TableRow>
           </TableHeader>

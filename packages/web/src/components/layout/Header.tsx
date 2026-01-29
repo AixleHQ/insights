@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Bell, Search, Command, Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -34,10 +34,17 @@ import { useNotifications } from '@/contexts/NotificationsContext';
 function CommandPalette({
   open,
   onOpenChange,
+  onNavigate,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onNavigate: (path: string) => void;
 }) {
+  const runCommand = (callback: () => void) => {
+    onOpenChange(false);
+    callback();
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="overflow-hidden p-0 shadow-lg">
@@ -50,27 +57,39 @@ function CommandPalette({
           <CommandList>
             <CommandEmpty>No results found.</CommandEmpty>
             <CommandGroup heading="Quick Actions">
-              <CommandItem>
+              <CommandItem onSelect={() => runCommand(() => onNavigate('/events'))}>
                 <Search className="mr-2 size-4" />
                 <span>Search events...</span>
               </CommandItem>
-              <CommandItem>
+              <CommandItem onSelect={() => runCommand(() => onNavigate('/projects/new'))}>
                 <span className="mr-2">+</span>
                 <span>New project</span>
               </CommandItem>
-              <CommandItem>
+              <CommandItem onSelect={() => runCommand(() => onNavigate('/integrations'))}>
                 <span className="mr-2">+</span>
                 <span>Add integration</span>
               </CommandItem>
             </CommandGroup>
             <CommandSeparator />
             <CommandGroup heading="Navigation">
-              <CommandItem>Dashboard</CommandItem>
-              <CommandItem>Events</CommandItem>
-              <CommandItem>Projects</CommandItem>
-              <CommandItem>Integrations</CommandItem>
-              <CommandItem>Team</CommandItem>
-              <CommandItem>Settings</CommandItem>
+              <CommandItem onSelect={() => runCommand(() => onNavigate('/'))}>
+                Dashboard
+              </CommandItem>
+              <CommandItem onSelect={() => runCommand(() => onNavigate('/events'))}>
+                Events
+              </CommandItem>
+              <CommandItem onSelect={() => runCommand(() => onNavigate('/projects'))}>
+                Projects
+              </CommandItem>
+              <CommandItem onSelect={() => runCommand(() => onNavigate('/integrations'))}>
+                Integrations
+              </CommandItem>
+              <CommandItem onSelect={() => runCommand(() => onNavigate('/team'))}>
+                Team
+              </CommandItem>
+              <CommandItem onSelect={() => runCommand(() => onNavigate('/settings'))}>
+                Settings
+              </CommandItem>
             </CommandGroup>
           </CommandList>
         </CommandPrimitive>
@@ -184,10 +203,11 @@ function ThemeToggle() {
 }
 
 export function Header() {
+  const navigate = useNavigate();
   const [commandOpen, setCommandOpen] = useState(false);
 
   // Keyboard shortcut for command palette
-  useState(() => {
+  useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
@@ -197,7 +217,7 @@ export function Header() {
 
     document.addEventListener('keydown', down);
     return () => document.removeEventListener('keydown', down);
-  });
+  }, []);
 
   return (
     <>
@@ -230,7 +250,7 @@ export function Header() {
         </div>
       </header>
 
-      <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
+      <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} onNavigate={navigate} />
     </>
   );
 }

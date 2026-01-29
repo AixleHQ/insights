@@ -8,6 +8,7 @@ import {
   DollarSign,
   MoreVertical,
   ExternalLink,
+  X,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -15,6 +16,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SortButton, type SortDirection } from '@/components/ui/sort-button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -31,6 +40,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { formatDistanceToNow, formatCurrency } from '@/lib/utils';
+
+type OrgSortField = 'name' | 'members_count' | 'events_count' | 'total_cost_usd' | 'created_at';
 
 interface AdminOrganization {
   id: string;
@@ -112,23 +123,83 @@ function PlanBadge({ plan }: { plan: string }) {
 
 export function AdminOrganizations() {
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [planFilter, setPlanFilter] = useState<string>('all');
+  const [sortField, setSortField] = useState<OrgSortField>('created_at');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   const { data: organizations, isLoading } = useQuery({
     queryKey: ['admin', 'organizations'],
     queryFn: () => api.get<AdminOrganization[]>('/admin/organizations'),
   });
 
+  const handleSort = (field: OrgSortField) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+
+  const clearFilters = () => {
+    setSearch('');
+    setStatusFilter('all');
+    setPlanFilter('all');
+  };
+
+  const hasActiveFilters = search || statusFilter !== 'all' || planFilter !== 'all';
+
   const filteredOrgs = useMemo(() => {
     if (!organizations) return [];
-    if (!search) return organizations;
 
-    const searchLower = search.toLowerCase();
-    return organizations.filter(
-      (org) =>
-        org.name.toLowerCase().includes(searchLower) ||
-        org.slug.toLowerCase().includes(searchLower)
-    );
-  }, [organizations, search]);
+    let result = [...organizations];
+
+    // Apply search filter
+    if (search) {
+      const searchLower = search.toLowerCase();
+      result = result.filter(
+        (org) =>
+          org.name.toLowerCase().includes(searchLower) ||
+          org.slug.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      result = result.filter((org) => org.status === statusFilter);
+    }
+
+    // Apply plan filter
+    if (planFilter !== 'all') {
+      result = result.filter((org) => org.plan === planFilter);
+    }
+
+    // Apply sorting
+    result.sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case 'members_count':
+          comparison = a.members_count - b.members_count;
+          break;
+        case 'events_count':
+          comparison = a.events_count - b.events_count;
+          break;
+        case 'total_cost_usd':
+          comparison = a.total_cost_usd - b.total_cost_usd;
+          break;
+        case 'created_at':
+          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          break;
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+
+    return result;
+  }, [organizations, search, statusFilter, planFilter, sortField, sortDirection]);
 
   const totalCost = useMemo(() => {
     return organizations?.reduce((sum, org) => sum + org.total_cost_usd, 0) || 0;
@@ -163,27 +234,105 @@ export function AdminOrganizations() {
         </div>
       </div>
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Search organizations..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
-        />
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative w-64">
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search organizations..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[130px]">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="trial">Trial</SelectItem>
+            <SelectItem value="suspended">Suspended</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={planFilter} onValueChange={setPlanFilter}>
+          <SelectTrigger className="w-[130px]">
+            <SelectValue placeholder="Plan" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Plans</SelectItem>
+            <SelectItem value="enterprise">Enterprise</SelectItem>
+            <SelectItem value="team">Team</SelectItem>
+            <SelectItem value="free">Free</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" onClick={clearFilters}>
+            <X className="mr-2 size-4" />
+            Clear filters
+          </Button>
+        )}
       </div>
 
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[250px]">Organization</TableHead>
+              <TableHead className="w-[250px]">
+                <SortButton
+                  field="name"
+                  currentField={sortField}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                >
+                  Organization
+                </SortButton>
+              </TableHead>
               <TableHead className="w-[100px]">Status</TableHead>
               <TableHead className="w-[90px]">Plan</TableHead>
-              <TableHead className="w-[80px]">Members</TableHead>
-              <TableHead className="w-[100px]">Events</TableHead>
-              <TableHead className="w-[100px]">Cost</TableHead>
-              <TableHead className="w-[120px]">Created</TableHead>
+              <TableHead className="w-[80px]">
+                <SortButton
+                  field="members_count"
+                  currentField={sortField}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                >
+                  Members
+                </SortButton>
+              </TableHead>
+              <TableHead className="w-[100px]">
+                <SortButton
+                  field="events_count"
+                  currentField={sortField}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                >
+                  Events
+                </SortButton>
+              </TableHead>
+              <TableHead className="w-[100px]">
+                <SortButton
+                  field="total_cost_usd"
+                  currentField={sortField}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                >
+                  Cost
+                </SortButton>
+              </TableHead>
+              <TableHead className="w-[120px]">
+                <SortButton
+                  field="created_at"
+                  currentField={sortField}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                >
+                  Created
+                </SortButton>
+              </TableHead>
               <TableHead className="w-[50px]" />
             </TableRow>
           </TableHeader>

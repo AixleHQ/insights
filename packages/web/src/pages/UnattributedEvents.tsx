@@ -15,6 +15,7 @@ import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { SortButton, type SortDirection } from '@/components/ui/sort-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -42,6 +43,16 @@ import {
 } from '@/components/ui/dialog';
 import { RiskBadge } from '@/components/dashboard';
 import { formatDistanceToNow } from '@/lib/utils';
+
+type UnattributedSortField = 'tool_name' | 'risk_level' | 'cost_usd' | 'created_at';
+
+const riskLevelOrder: Record<string, number> = {
+  critical: 4,
+  high: 3,
+  medium: 2,
+  low: 1,
+  none: 0,
+};
 
 function EventSkeleton() {
   return (
@@ -72,6 +83,8 @@ export function UnattributedEvents() {
   const { currentOrg } = useOrg();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
+  const [sortField, setSortField] = useState<UnattributedSortField>('created_at');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<string>('');
@@ -80,17 +93,52 @@ export function UnattributedEvents() {
   const { data: events, isLoading, isFetching } = useUnattributedEvents(currentOrg?.id || '');
   const { data: members } = useOrganizationMembers(currentOrg?.id || '');
 
+  const handleSort = (field: UnattributedSortField) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+
   const filteredEvents = useMemo(() => {
     if (!events) return [];
-    if (!search) return events;
 
-    const searchLower = search.toLowerCase();
-    return events.filter(
-      (e) =>
-        (e.toolName || '').toLowerCase().includes(searchLower) ||
-        (e.model || '').toLowerCase().includes(searchLower)
-    );
-  }, [events, search]);
+    let result = [...events];
+
+    // Apply search filter
+    if (search) {
+      const searchLower = search.toLowerCase();
+      result = result.filter(
+        (e) =>
+          (e.toolName || '').toLowerCase().includes(searchLower) ||
+          (e.model || '').toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Apply sorting
+    result.sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'tool_name':
+          comparison = (a.toolName || '').localeCompare(b.toolName || '');
+          break;
+        case 'risk_level':
+          comparison = (riskLevelOrder[a.riskLevel || 'none'] || 0) - (riskLevelOrder[b.riskLevel || 'none'] || 0);
+          break;
+        case 'cost_usd':
+          comparison = (Number(a.costUsd) || 0) - (Number(b.costUsd) || 0);
+          break;
+        case 'created_at':
+          comparison = new Date(a.occurredAt || a.createdAt || 0).getTime() - new Date(b.occurredAt || b.createdAt || 0).getTime();
+          break;
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+
+    return result;
+  }, [events, search, sortField, sortDirection]);
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({
@@ -181,11 +229,47 @@ export function UnattributedEvents() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Tool</TableHead>
+              <TableHead>
+                <SortButton
+                  field="tool_name"
+                  currentField={sortField}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                >
+                  Tool
+                </SortButton>
+              </TableHead>
               <TableHead>Event Type</TableHead>
-              <TableHead>Risk</TableHead>
-              <TableHead>Cost</TableHead>
-              <TableHead>Time</TableHead>
+              <TableHead>
+                <SortButton
+                  field="risk_level"
+                  currentField={sortField}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                >
+                  Risk
+                </SortButton>
+              </TableHead>
+              <TableHead>
+                <SortButton
+                  field="cost_usd"
+                  currentField={sortField}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                >
+                  Cost
+                </SortButton>
+              </TableHead>
+              <TableHead>
+                <SortButton
+                  field="created_at"
+                  currentField={sortField}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                >
+                  Time
+                </SortButton>
+              </TableHead>
               <TableHead className="w-[140px]">Actions</TableHead>
             </TableRow>
           </TableHeader>

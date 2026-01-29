@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -37,6 +37,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { EventsTable, type EventRow } from '@/components/events';
+import { SortButton, type SortDirection } from '@/components/ui/sort-button';
 import { cn } from '@/lib/utils';
 
 type MemberRole = 'owner' | 'admin' | 'member' | 'viewer';
@@ -122,9 +123,20 @@ function ProfileSkeleton() {
   );
 }
 
+type ToolSortField = 'tool' | 'count' | 'tokens' | 'cost';
+type ModelSortField = 'model' | 'tokens' | 'cost';
+
 export function MemberProfile() {
   const { id } = useParams<{ id: string }>();
   const { currentOrg } = useOrg();
+
+  // Tool usage sorting state
+  const [toolSortField, setToolSortField] = useState<ToolSortField>('count');
+  const [toolSortDirection, setToolSortDirection] = useState<SortDirection>('desc');
+
+  // Model usage sorting state
+  const [modelSortField, setModelSortField] = useState<ModelSortField>('tokens');
+  const [modelSortDirection, setModelSortDirection] = useState<SortDirection>('desc');
 
   const { data: member, isLoading: memberLoading } = useMember(currentOrg?.id || '', id || '');
   const { data: statsData } = useMemberStats(currentOrg?.id || '', id || '');
@@ -150,6 +162,85 @@ export function MemberProfile() {
     }));
   }, [eventsResponse]);
 
+  const handleToolSort = (field: ToolSortField) => {
+    if (toolSortField === field) {
+      setToolSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setToolSortField(field);
+      setToolSortDirection('desc');
+    }
+  };
+
+  const handleModelSort = (field: ModelSortField) => {
+    if (modelSortField === field) {
+      setModelSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setModelSortField(field);
+      setModelSortDirection('desc');
+    }
+  };
+
+  // Create stats with defaults - must be before useMemo hooks that depend on it
+  const stats = statsData || {
+    total_events: 0,
+    total_cost: 0,
+    events_today: 0,
+    events_this_week: 0,
+    events_this_month: 0,
+    most_used_tool: null,
+    tokens: { total_in: 0, total_out: 0, total: 0 },
+    tool_breakdown: [],
+    model_breakdown: [],
+    daily_activity: [],
+    projects: [],
+    organizations: [],
+    tool_accounts: [],
+  };
+
+  // Sorted tool breakdown - must be called before early returns (hooks rules)
+  const sortedToolBreakdown = useMemo(() => {
+    if (!stats.tool_breakdown) return [];
+    return [...stats.tool_breakdown].sort((a, b) => {
+      let comparison = 0;
+      switch (toolSortField) {
+        case 'tool':
+          comparison = (a.tool || '').localeCompare(b.tool || '');
+          break;
+        case 'count':
+          comparison = (a.count || 0) - (b.count || 0);
+          break;
+        case 'tokens':
+          comparison = (a.tokens_total || 0) - (b.tokens_total || 0);
+          break;
+        case 'cost':
+          comparison = (Number(a.cost) || 0) - (Number(b.cost) || 0);
+          break;
+      }
+      return toolSortDirection === 'asc' ? comparison : -comparison;
+    });
+  }, [stats.tool_breakdown, toolSortField, toolSortDirection]);
+
+  // Sorted model breakdown - must be called before early returns (hooks rules)
+  const sortedModelBreakdown = useMemo(() => {
+    if (!stats.model_breakdown) return [];
+    return [...stats.model_breakdown].sort((a, b) => {
+      let comparison = 0;
+      switch (modelSortField) {
+        case 'model':
+          comparison = (a.model || '').localeCompare(b.model || '');
+          break;
+        case 'tokens':
+          comparison = (a.tokens_total || 0) - (b.tokens_total || 0);
+          break;
+        case 'cost':
+          comparison = (Number(a.cost) || 0) - (Number(b.cost) || 0);
+          break;
+      }
+      return modelSortDirection === 'asc' ? comparison : -comparison;
+    });
+  }, [stats.model_breakdown, modelSortField, modelSortDirection]);
+
+  // Early returns must come AFTER all hooks
   if (memberLoading) {
     return <ProfileSkeleton />;
   }
@@ -170,21 +261,6 @@ export function MemberProfile() {
 
   const role = roleConfig[(member.role as MemberRole) || 'member'];
   const RoleIcon = role.icon;
-  const stats = statsData || {
-    total_events: 0,
-    total_cost: 0,
-    events_today: 0,
-    events_this_week: 0,
-    events_this_month: 0,
-    most_used_tool: null,
-    tokens: { total_in: 0, total_out: 0, total: 0 },
-    tool_breakdown: [],
-    model_breakdown: [],
-    daily_activity: [],
-    projects: [],
-    organizations: [],
-    tool_accounts: [],
-  };
 
   const formattedJoinDate = member.created_at
     ? new Date(member.created_at).toLocaleDateString('en-US', {
@@ -312,18 +388,54 @@ export function MemberProfile() {
             <CardDescription>Events and tokens by AI coding tool</CardDescription>
           </CardHeader>
           <CardContent>
-            {stats.tool_breakdown && stats.tool_breakdown.length > 0 ? (
+            {sortedToolBreakdown.length > 0 ? (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Tool</TableHead>
-                    <TableHead className="text-right">Events</TableHead>
-                    <TableHead className="text-right">Tokens</TableHead>
-                    <TableHead className="text-right">Cost</TableHead>
+                    <TableHead>
+                      <SortButton
+                        field="tool"
+                        currentField={toolSortField}
+                        currentDirection={toolSortDirection}
+                        onSort={handleToolSort}
+                      >
+                        Tool
+                      </SortButton>
+                    </TableHead>
+                    <TableHead className="text-right">
+                      <SortButton
+                        field="count"
+                        currentField={toolSortField}
+                        currentDirection={toolSortDirection}
+                        onSort={handleToolSort}
+                      >
+                        Events
+                      </SortButton>
+                    </TableHead>
+                    <TableHead className="text-right">
+                      <SortButton
+                        field="tokens"
+                        currentField={toolSortField}
+                        currentDirection={toolSortDirection}
+                        onSort={handleToolSort}
+                      >
+                        Tokens
+                      </SortButton>
+                    </TableHead>
+                    <TableHead className="text-right">
+                      <SortButton
+                        field="cost"
+                        currentField={toolSortField}
+                        currentDirection={toolSortDirection}
+                        onSort={handleToolSort}
+                      >
+                        Cost
+                      </SortButton>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {stats.tool_breakdown.map((tool) => (
+                  {sortedToolBreakdown.map((tool) => (
                     <TableRow key={tool.tool}>
                       <TableCell className="font-medium">{tool.tool}</TableCell>
                       <TableCell className="text-right font-mono text-sm">
@@ -358,18 +470,45 @@ export function MemberProfile() {
             <CardDescription>Tokens and pricing by AI model</CardDescription>
           </CardHeader>
           <CardContent>
-            {stats.model_breakdown && stats.model_breakdown.length > 0 ? (
+            {sortedModelBreakdown.length > 0 ? (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Model</TableHead>
-                    <TableHead className="text-right">Tokens</TableHead>
+                    <TableHead>
+                      <SortButton
+                        field="model"
+                        currentField={modelSortField}
+                        currentDirection={modelSortDirection}
+                        onSort={handleModelSort}
+                      >
+                        Model
+                      </SortButton>
+                    </TableHead>
+                    <TableHead className="text-right">
+                      <SortButton
+                        field="tokens"
+                        currentField={modelSortField}
+                        currentDirection={modelSortDirection}
+                        onSort={handleModelSort}
+                      >
+                        Tokens
+                      </SortButton>
+                    </TableHead>
                     <TableHead className="text-right">$/M Tokens</TableHead>
-                    <TableHead className="text-right">Cost</TableHead>
+                    <TableHead className="text-right">
+                      <SortButton
+                        field="cost"
+                        currentField={modelSortField}
+                        currentDirection={modelSortDirection}
+                        onSort={handleModelSort}
+                      >
+                        Cost
+                      </SortButton>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {stats.model_breakdown.map((model) => (
+                  {sortedModelBreakdown.map((model) => (
                     <TableRow key={model.model}>
                       <TableCell className="font-medium text-sm">{model.model}</TableCell>
                       <TableCell className="text-right font-mono text-sm">

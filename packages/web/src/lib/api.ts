@@ -19,7 +19,7 @@ export interface RequestOptions extends RequestInit {
   skipOrgHeader?: boolean;
 }
 
-const DEFAULT_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
+const DEFAULT_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 const IMPERSONATION_STORAGE_KEY = 'impersonation_token';
 
 // Global state for current organization ID
