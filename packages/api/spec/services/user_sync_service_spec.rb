@@ -85,7 +85,8 @@ RSpec.describe UserSyncService do
         }
       end
 
-      let!(:dbp_org) { create(:organization, slug: 'dbp', name: 'Acme Corp') }
+      # Must match DOMAIN_ORG_MAPPING: 'example.com' => 'dualboot-partners'
+      let!(:dbp_org) { create(:organization, slug: 'dualboot-partners', name: 'Acme Corp') }
 
       it 'auto-assigns user to organization based on email domain' do
         user = described_class.sync_from_claims(claims_dbp)

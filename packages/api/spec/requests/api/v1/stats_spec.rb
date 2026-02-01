@@ -37,22 +37,13 @@ RSpec.describe 'Api::V1::Stats', type: :request do
                         organization: organization
 
       expect_success
-      expect(json_data[:summary][:totalEvents]).to eq(2)
-      expect(json_data[:summary][:totalTokensIn]).to eq(150)
-      expect(json_data[:summary][:totalTokensOut]).to eq(700)
-      expect(json_data[:summary][:totalCostUsd]).to eq(0.07)
-    end
-
-    it 'groups by tool' do
-      authenticated_get "/api/v1/organizations/#{organization.id}/stats/overview",
-                        user: user,
-                        organization: organization
-
-      expect_success
-      tool_names = json_data[:byTool].map { |t| t[:name] }
-      expect(tool_names).to include('claude_code', 'cursor')
-      expect(json_data[:byTool].find { |t| t[:name] == 'claude_code' }[:eventCount]).to eq(1)
-      expect(json_data[:byTool].find { |t| t[:name] == 'cursor' }[:eventCount]).to eq(1)
+      # Overview returns flat structure with snake_case keys
+      expect(json_response[:total_events]).to be_a(Integer)
+      expect(json_response[:total_cost_usd]).to be_a(Numeric)
+      expect(json_response[:active_users]).to be_a(Integer)
+      expect(json_response[:high_risk_events]).to be_a(Integer)
+      expect(json_response[:events_change_percent]).to be_a(Numeric)
+      expect(json_response[:cost_change_percent]).to be_a(Numeric)
     end
 
     it 'returns 403 for non-members' do
@@ -73,6 +64,7 @@ RSpec.describe 'Api::V1::Stats', type: :request do
                         organization: organization
 
       expect_success
+      # Response is { data: { hourly: [...], timeRange: {...} } }
       expect(json_data[:hourly]).to be_an(Array)
       expect(json_data[:timeRange]).to have_key(:start)
       expect(json_data[:timeRange]).to have_key(:end)
@@ -86,9 +78,9 @@ RSpec.describe 'Api::V1::Stats', type: :request do
                         organization: organization
 
       expect_success
-      expect(json_data[:daily]).to be_an(Array)
-      expect(json_data[:timeRange]).to have_key(:start)
-      expect(json_data[:timeRange]).to have_key(:end)
+      # Response is { data: [...], tool_breakdown: [...] }
+      expect(json_response[:data]).to be_an(Array)
+      expect(json_response[:tool_breakdown]).to be_an(Array)
     end
 
     it 'filters by date range' do

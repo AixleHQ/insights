@@ -40,13 +40,14 @@ RSpec.describe 'Admin Users', type: :request do
   end
 
   describe 'POST /admin/users/:id/impersonate' do
-    it 'sets impersonation session and creates audit log' do
+    it 'creates audit log and redirects to frontend with impersonation token' do
       expect {
         post impersonate_admin_user_path(user)
       }.to change(AdminAuditLog, :count).by(1)
 
-      expect(response).to redirect_to(admin_root_path)
-      expect(session[:impersonated_user_id]).to eq(user.id)
+      expect(response).to have_http_status(:redirect)
+      expect(response.location).to start_with(ENV.fetch('FRONTEND_URL', 'http://localhost:5173'))
+      expect(response.location).to include('impersonate=')
 
       audit_log = AdminAuditLog.last
       expect(audit_log.action).to eq('impersonate')
