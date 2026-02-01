@@ -24,6 +24,9 @@ import type {
   Alert,
   PaginatedResponse,
   RetentionPolicy,
+  Invitation,
+  InvitationPublic,
+  MemberRole,
 } from '@/lib/types';
 
 // Query keys factory
@@ -73,6 +76,12 @@ export const queryKeys = {
   },
   alerts: {
     all: (orgId: string) => ['organizations', orgId, 'alerts'] as const,
+  },
+  invitations: {
+    all: (orgId: string) => ['organizations', orgId, 'invitations'] as const,
+    detail: (orgId: string, id: string) => ['organizations', orgId, 'invitations', id] as const,
+    byToken: (token: string) => ['invitations', token] as const,
+    check: ['invitations', 'check'] as const,
   },
 };
 
@@ -648,6 +657,24 @@ export function useActivityHeatmap(orgId: string) {
   });
 }
 
+export interface DailyToolData {
+  date: string;
+  [toolName: string]: string | number; // date is string, tool counts are numbers
+}
+
+export interface DailyByToolResponse {
+  data: DailyToolData[];
+  tools: string[];
+}
+
+export function useDailyByTool(orgId: string, days = 30) {
+  return useQuery({
+    queryKey: ['organizations', orgId, 'stats', 'daily_by_tool', days],
+    queryFn: () => api.get<DailyByToolResponse>(`/organizations/${orgId}/stats/daily_by_tool?days=${days}`),
+    enabled: !!orgId,
+  });
+}
+
 // ============================================================================
 // Alerts Hooks (if implemented)
 // ============================================================================
@@ -657,5 +684,94 @@ export function useAlerts(orgId: string) {
     queryKey: queryKeys.alerts.all(orgId),
     queryFn: () => api.get<Alert[]>(`/organizations/${orgId}/alerts`),
     enabled: !!orgId,
+  });
+}
+
+// ============================================================================
+// Invitation Hooks
+// ============================================================================
+
+export function useInvitations(orgId: string, status?: string) {
+  return useQuery({
+    queryKey: queryKeys.invitations.all(orgId),
+    queryFn: async () => {
+      const params = status ? `?status=${status}` : '';
+      const response = await api.get<{ data: Invitation[] }>(`/organizations/${orgId}/invitations${params}`);
+      return response.data;
+    },
+    enabled: !!orgId,
+  });
+}
+
+export function useCreateInvitation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ orgId, email, role }: { orgId: string; email: string; role: MemberRole }) =>
+      api.post<{ data: Invitation }>(`/organizations/${orgId}/invitations`, { email, role }),
+    onSuccess: (_, { orgId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.invitations.all(orgId) });
+    },
+  });
+}
+
+export function useRevokeInvitation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ orgId, invitationId }: { orgId: string; invitationId: string }) =>
+      api.delete(`/organizations/${orgId}/invitations/${invitationId}`),
+    onSuccess: (_, { orgId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.invitations.all(orgId) });
+    },
+  });
+}
+
+export function useResendInvitation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ orgId, invitationId }: { orgId: string; invitationId: string }) =>
+      api.post<{ data: Invitation }>(`/organizations/${orgId}/invitations/${invitationId}/resend`),
+    onSuccess: (_, { orgId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.invitations.all(orgId) });
+    },
+  });
+}
+
+// Public invitation endpoints (for viewing and accepting invitations)
+export function useInvitationByToken(token: string) {
+  return useQuery({
+    queryKey: queryKeys.invitations.byToken(token),
+    queryFn: async () => {
+      const response = await api.get<{ data: InvitationPublic }>(`/invitations/${token}`, { skipAuth: true });
+      return response.data;
+    },
+    enabled: !!token,
+    retry: false, // Don't retry on 404
+  });
+}
+
+export function useAcceptInvitation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (token: string) =>
+      api.post<{ message: string; data: { organization: { id: string; name: string; slug: string }; role: string } }>(
+        `/invitations/${token}/accept`
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.organizations });
+    },
+  });
+}
+
+export function useCheckPendingInvitations() {
+  return useQuery({
+    queryKey: queryKeys.invitations.check,
+    queryFn: async () => {
+      const response = await api.get<{ data: InvitationPublic[] }>('/invitations/check');
+      return response.data;
+    },
   });
 }

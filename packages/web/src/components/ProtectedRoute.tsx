@@ -8,6 +8,8 @@ interface ProtectedRouteProps {
   requireOrg?: boolean;
   requireRoles?: string[];
   fallback?: ReactNode;
+  /** If true, skip the org check and onboarding redirect */
+  allowNoOrg?: boolean;
 }
 
 export function ProtectedRoute({
@@ -15,10 +17,11 @@ export function ProtectedRoute({
   requireOrg = false,
   requireRoles,
   fallback,
+  allowNoOrg = false,
 }: ProtectedRouteProps) {
   const location = useLocation();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { currentOrg, hasRole, isLoading: orgLoading } = useOrg();
+  const { currentOrg, organizations, hasRole, isLoading: orgLoading } = useOrg();
 
   // Show loading state
   if (authLoading || (isAuthenticated && orgLoading)) {
@@ -37,9 +40,15 @@ export function ProtectedRoute({
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // Redirect to onboarding if user has no organizations (unless allowNoOrg is set)
+  // Don't redirect if we're already on the onboarding page
+  if (!allowNoOrg && organizations.length === 0 && location.pathname !== '/onboarding') {
+    return <Navigate to="/onboarding" state={{ from: location }} replace />;
+  }
+
   // Check if organization is required
   if (requireOrg && !currentOrg) {
-    return <Navigate to="/select-org" state={{ from: location }} replace />;
+    return <Navigate to="/onboarding" state={{ from: location }} replace />;
   }
 
   // Check role requirements

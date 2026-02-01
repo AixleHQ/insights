@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>You're invited to <%= @organization.name %></title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #1a1a1a;
+      background-color: #f5f5f5;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+    .card {
+      background-color: #ffffff;
+      border-radius: 12px;
+      padding: 40px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+    .logo {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .logo-text {
+      font-size: 24px;
+      font-weight: 700;
+      color: #18181b;
+      letter-spacing: -0.5px;
+    }
+    h1 {
+      font-size: 24px;
+      font-weight: 600;
+      margin: 0 0 16px 0;
+      color: #18181b;
+    }
+    p {
+      margin: 0 0 16px 0;
+      color: #52525b;
+    }
+    .org-name {
+      font-weight: 600;
+      color: #18181b;
+    }
+    .inviter {
+      color: #71717a;
+    }
+    .role-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      background-color: #f4f4f5;
+      border-radius: 9999px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #52525b;
+      text-transform: capitalize;
+    }
+    .button {
+      display: inline-block;
+      padding: 14px 28px;
+      background-color: #18181b;
+      color: #ffffff !important;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 16px;
+      margin: 24px 0;
+    }
+    .button:hover {
+      background-color: #27272a;
+    }
+    .expires {
+      font-size: 14px;
+      color: #a1a1aa;
+      margin-top: 24px;
+    }
+    .footer {
+      text-align: center;
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid #e4e4e7;
+    }
+    .footer p {
+      font-size: 12px;
+      color: #a1a1aa;
+    }
+    .link {
+      color: #3b82f6;
+      text-decoration: none;
+    }
+    .link:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="logo">
+        <span class="logo-text">DB90</span>
+      </div>
+
+      <h1>You've been invited!</h1>
+
+      <p>
+        <span class="inviter"><%= @inviter.display_name %></span> has invited you to join
+        <span class="org-name"><%= @organization.name %></span> on DB90.
+      </p>
+
+      <p>
+        You've been invited as a <span class="role-badge"><%= @invitation.role %></span>
+      </p>
+
+      <div style="text-align: center;">
+        <a href="<%= @accept_url %>" class="button">Accept Invitation</a>
+      </div>
+
+      <p>
+        Or copy and paste this link into your browser:<br>
+        <a href="<%= @accept_url %>" class="link"><%= @accept_url %></a>
+      </p>
+
+      <p class="expires">
+        This invitation expires on <%= @expires_at.strftime('%B %d, %Y at %I:%M %p %Z') %>
+      </p>
+
+      <div class="footer">
+        <p>
+          If you didn't expect this invitation, you can safely ignore this email.
+        </p>
+        <p>
+          &copy; <%= Time.current.year %> DB90. All rights reserved.
+        </p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

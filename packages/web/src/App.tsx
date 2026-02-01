@@ -28,6 +28,9 @@ import { Settings } from './pages/Settings';
 import { ToolAccounts } from './pages/ToolAccounts';
 import { UnattributedEvents } from './pages/UnattributedEvents';
 import { Notifications } from './pages/Notifications';
+import { Onboarding } from './pages/Onboarding';
+import { InvitationAccept } from './pages/InvitationAccept';
+import { InvitationsManagement } from './pages/InvitationsManagement';
 import {
   AdminLayout,
   AdminOverview,
@@ -53,6 +56,26 @@ function App() {
                 {/* OAuth callback for integrations (outside protected routes for popup) */}
                 <Route path="/integrations/callback" element={<IntegrationOAuthCallback />} />
 
+                {/* Invitation accept page - requires auth but not org */}
+                <Route
+                  path="/invitations/:token"
+                  element={
+                    <ProtectedRoute allowNoOrg>
+                      <InvitationAccept />
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* Onboarding page - for users without organizations */}
+                <Route
+                  path="/onboarding"
+                  element={
+                    <ProtectedRoute allowNoOrg>
+                      <Onboarding />
+                    </ProtectedRoute>
+                  }
+                />
+
                 {/* Protected routes with AppLayout */}
                 <Route
                   element={
@@ -73,6 +96,7 @@ function App() {
                   <Route path="/integrations/new/:provider" element={<IntegrationSetup />} />
                   <Route path="/team" element={<Team />} />
                   <Route path="/team/invite" element={<TeamInvite />} />
+                  <Route path="/team/invitations" element={<InvitationsManagement />} />
                   <Route path="/team/:id" element={<MemberProfile />} />
                   <Route path="/settings/*" element={<Settings />} />
                   <Route path="/settings/tool-accounts" element={<ToolAccounts />} />

@@ -2,6 +2,7 @@ class Organization < ApplicationRecord
   has_many :organization_memberships, dependent: :destroy
   has_many :members, through: :organization_memberships, source: :user
   has_many :organization_settings, dependent: :destroy
+  has_many :invitations, dependent: :destroy
   has_one :retention_policy, class_name: 'OrganizationRetentionPolicy', dependent: :destroy
   has_many :organization_connectors, dependent: :destroy
   has_many :projects, dependent: :destroy

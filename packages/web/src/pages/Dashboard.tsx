@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Activity, DollarSign, AlertTriangle, Users, Coins } from 'lucide-react';
 import { useOrg } from '@/contexts/OrgContext';
-import { useOverviewStats, useDailyStats, useEvents, useActivityHeatmap } from '@/hooks/useApi';
+import { useOverviewStats, useDailyStats, useEvents, useDailyByTool } from '@/hooks/useApi';
 import {
   MetricCard,
   MetricGrid,
@@ -9,18 +10,25 @@ import {
   ActivityFeed,
   TopToolsChart,
   AlertsPanel,
-  ActivityHeatmap,
+  ToolUsageByDayChart,
   type DailyCostData,
   type ActivityEvent,
   type ToolUsageData,
   type Alert,
 } from '@/components/dashboard';
 import { EventDrawer } from '@/components/events';
-import { TooltipProvider } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export function Dashboard() {
-  const { currentOrg } = useOrg();
+  const navigate = useNavigate();
+  const { currentOrg, currentRole } = useOrg();
+
+  // Role-based redirect: members and viewers go to profile
+  useEffect(() => {
+    if (currentRole && (currentRole === 'member' || currentRole === 'viewer')) {
+      navigate('/profile', { replace: true });
+    }
+  }, [currentRole, navigate]);
 
   // Fetch data using TanStack Query
   const {
@@ -39,9 +47,9 @@ export function Dashboard() {
   } = useEvents(currentOrg?.id || '', { per_page: 10 });
 
   const {
-    data: heatmapData,
-    isLoading: isLoadingHeatmap,
-  } = useActivityHeatmap(currentOrg?.id || '');
+    data: toolByDayData,
+    isLoading: isLoadingToolByDay,
+  } = useDailyByTool(currentOrg?.id || '', 30);
 
   // Transform API responses to component formats
   const chartData: DailyCostData[] = dailyData?.data?.map((d) => ({
@@ -137,34 +145,11 @@ export function Dashboard() {
         </p>
       </div>
 
-      {isLoadingHeatmap ? (
-        <div className="rounded-xl border bg-card p-6">
-          <div className="flex items-center justify-between mb-6">
-            <Skeleton className="h-6 w-24" />
-            <div className="flex gap-6">
-              <Skeleton className="h-4 w-20" />
-              <Skeleton className="h-4 w-20" />
-              <Skeleton className="h-4 w-24" />
-            </div>
-          </div>
-          <div className="flex">
-            <div className="w-7 shrink-0" />
-            <div className="flex-1 grid grid-cols-[repeat(53,1fr)] gap-1">
-              {Array.from({ length: 53 }).map((_, i) => (
-                <div key={i} className="flex flex-col gap-1">
-                  {Array.from({ length: 7 }).map((_, j) => (
-                    <Skeleton key={j} className="aspect-square w-full rounded" />
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      ) : (
-        <TooltipProvider>
-          <ActivityHeatmap data={heatmapData || []} />
-        </TooltipProvider>
-      )}
+      <ToolUsageByDayChart
+        data={toolByDayData?.data || []}
+        tools={toolByDayData?.tools || []}
+        isLoading={isLoadingToolByDay}
+      />
 
       <MetricGrid>
         <MetricCard

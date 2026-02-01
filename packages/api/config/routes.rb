@@ -41,6 +41,13 @@ Rails.application.routes.draw do
           end
         end
 
+        # Organization invitations
+        resources :invitations do
+          member do
+            post :resend
+          end
+        end
+
         # Organization connectors
         resources :connectors, controller: 'organization_connectors' do
           member do
@@ -78,6 +85,7 @@ Rails.application.routes.draw do
         get 'stats/overview', to: 'stats#overview'
         get 'stats/hourly', to: 'stats#hourly'
         get 'stats/daily', to: 'stats#daily'
+        get 'stats/daily_by_tool', to: 'stats#daily_by_tool'
         get 'stats/heatmap', to: 'stats#heatmap'
 
         # AI Gateway
@@ -113,6 +121,11 @@ Rails.application.routes.draw do
       # Personal projects index
       get 'projects', to: 'projects#index'
       post 'projects', to: 'projects#create'
+
+      # Public invitation routes (outside organization scope)
+      get 'invitations/check', to: 'public_invitations#check'
+      get 'invitations/:token', to: 'public_invitations#show'
+      post 'invitations/:token/accept', to: 'public_invitations#accept'
     end
   end
 

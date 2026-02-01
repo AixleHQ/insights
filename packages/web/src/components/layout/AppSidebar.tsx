@@ -56,6 +56,7 @@ import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 const navItems = [
+  { title: 'Profile', icon: User, href: '/profile' },
   { title: 'Dashboard', icon: LayoutDashboard, href: '/' },
   { title: 'Events', icon: Activity, href: '/events' },
   { title: 'Projects', icon: FolderKanban, href: '/projects' },
@@ -170,37 +171,68 @@ function OrgSwitcher() {
   const currentMembership = memberships.find((m) => m.organization.id === currentOrg.id);
   const currentRole = currentMembership?.role || 'member';
   const RoleIcon = roleIcons[currentRole];
+  const isCollapsed = state === 'collapsed';
 
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <SidebarMenuButton
-            size="lg"
-            className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+          <button
+            className={`
+              group relative flex w-full items-center gap-3 rounded-lg border border-sidebar-border
+              bg-sidebar-accent/50 p-2 text-left transition-all duration-200
+              hover:bg-sidebar-accent hover:border-sidebar-primary/50
+              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring
+              data-[state=open]:bg-sidebar-accent data-[state=open]:border-sidebar-primary/50
+              ${isCollapsed ? 'justify-center' : ''}
+            `}
           >
-            <div className="flex size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-              <Building2 className="size-4" />
-            </div>
-            <div className="grid flex-1 text-left text-sm leading-tight">
-              <span className="truncate font-semibold">{currentOrg.name}</span>
-              <span className="flex items-center gap-1 text-xs text-sidebar-foreground/60">
-                <RoleIcon className={`size-3 ${roleColors[currentRole]}`} />
-                <span className="capitalize">{currentRole}</span>
+            {/* Org Avatar/Icon */}
+            <div className="relative flex size-9 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-sidebar-primary to-sidebar-primary/70 text-sidebar-primary-foreground shadow-sm">
+              <span className="font-mono-display text-xs font-bold tracking-tight">
+                {getOrgInitials(currentOrg.name)}
               </span>
+              {/* Active indicator dot */}
+              <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-emerald-500 ring-2 ring-sidebar" />
             </div>
-            <ChevronsUpDown className="ml-auto size-4" />
-          </SidebarMenuButton>
+
+            {/* Org Details - hidden when collapsed */}
+            {!isCollapsed && (
+              <div className="grid flex-1 gap-0.5 overflow-hidden">
+                <span className="text-[10px] font-medium uppercase tracking-wider text-sidebar-foreground/50">
+                  Organization
+                </span>
+                <span className="truncate text-sm font-semibold text-sidebar-foreground">
+                  {currentOrg.name}
+                </span>
+                <span className="flex items-center gap-1 text-xs text-sidebar-foreground/60">
+                  <RoleIcon className={`size-3 ${roleColors[currentRole]}`} />
+                  <span className="capitalize">{currentRole}</span>
+                </span>
+              </div>
+            )}
+
+            {/* Switch indicator */}
+            {!isCollapsed && (
+              <div className="flex flex-col items-center justify-center rounded bg-sidebar-accent px-1.5 py-1 transition-colors group-hover:bg-sidebar-primary/20">
+                <ChevronsUpDown className="size-4 text-sidebar-foreground/60 transition-colors group-hover:text-sidebar-foreground" />
+              </div>
+            )}
+          </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
-          className="w-[--radix-dropdown-menu-trigger-width] min-w-64"
+          className="w-[--radix-dropdown-menu-trigger-width] min-w-72"
           align="start"
-          side={state === 'collapsed' ? 'right' : 'bottom'}
+          side={isCollapsed ? 'right' : 'bottom'}
           sideOffset={4}
         >
-          <DropdownMenuLabel className="text-xs text-muted-foreground">
-            Your Organizations ({memberships.length})
+          <DropdownMenuLabel className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Switch Organization</span>
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+              {memberships.length} total
+            </span>
           </DropdownMenuLabel>
+          <DropdownMenuSeparator />
           {memberships.map((membership) => {
             const org = membership.organization;
             const RoleIconItem = roleIcons[membership.role];
@@ -210,28 +242,44 @@ function OrgSwitcher() {
               <DropdownMenuItem
                 key={org.id}
                 onClick={() => setCurrentOrg(org)}
-                className="gap-2 p-2"
+                className={`gap-3 p-2.5 ${isSelected ? 'bg-accent' : ''}`}
               >
-                <div className="flex size-7 items-center justify-center rounded-md border bg-background text-xs font-medium">
+                <div className={`
+                  flex size-9 shrink-0 items-center justify-center rounded-md text-xs font-bold
+                  ${isSelected
+                    ? 'bg-gradient-to-br from-primary to-primary/70 text-primary-foreground'
+                    : 'border border-border bg-muted text-muted-foreground'
+                  }
+                `}>
                   {getOrgInitials(org.name)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="truncate font-medium">{org.name}</div>
+                  <div className="flex items-center gap-2">
+                    <span className="truncate font-medium">{org.name}</span>
+                    {isSelected && (
+                      <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                        Current
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
                     <RoleIconItem className={`size-3 ${roleColors[membership.role]}`} />
                     <span className="capitalize">{membership.role}</span>
                   </div>
                 </div>
-                {isSelected && <Check className="size-4 text-primary" />}
+                {isSelected && <Check className="size-4 shrink-0 text-primary" />}
               </DropdownMenuItem>
             );
           })}
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setCreateDialogOpen(true)} className="gap-2">
-            <div className="flex size-7 items-center justify-center rounded-md border border-dashed">
-              <Plus className="size-4" />
+          <DropdownMenuItem onClick={() => setCreateDialogOpen(true)} className="gap-3 p-2.5">
+            <div className="flex size-9 items-center justify-center rounded-md border-2 border-dashed border-muted-foreground/30">
+              <Plus className="size-4 text-muted-foreground" />
             </div>
-            <span>Create Organization</span>
+            <div className="flex-1">
+              <span className="font-medium">Create Organization</span>
+              <p className="text-xs text-muted-foreground">Start a new workspace</p>
+            </div>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -322,6 +370,16 @@ function UserMenu() {
 
 export function AppSidebar() {
   const location = useLocation();
+  const { currentRole } = useOrg();
+
+  // Filter nav items based on role - hide Dashboard for members/viewers
+  const visibleNavItems = navItems.filter((item) => {
+    // Dashboard (href: '/') is only visible to owners and admins
+    if (item.href === '/') {
+      return currentRole === 'owner' || currentRole === 'admin';
+    }
+    return true;
+  });
 
   const isActive = (href: string) => {
     if (href === '/') {
@@ -330,13 +388,16 @@ export function AppSidebar() {
     return location.pathname.startsWith(href);
   };
 
+  // Determine home link based on role
+  const homeLink = currentRole === 'owner' || currentRole === 'admin' ? '/' : '/profile';
+
   return (
     <Sidebar collapsible="icon" variant="sidebar">
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link to="/" className="flex items-center gap-2">
+              <Link to={homeLink} className="flex items-center gap-2">
                 <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70">
                   <span className="font-mono-display text-sm font-bold text-primary-foreground">
                     90
@@ -358,7 +419,17 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
+              <SidebarMenuItem>
+                <OrgSwitcher />
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarSeparator />
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {visibleNavItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     asChild
@@ -378,12 +449,6 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <OrgSwitcher />
-          </SidebarMenuItem>
-        </SidebarMenu>
-        <SidebarSeparator />
         <SidebarMenu>
           <SidebarMenuItem>
             <UserMenu />

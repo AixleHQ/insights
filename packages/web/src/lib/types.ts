@@ -213,3 +213,42 @@ export interface RetentionPolicy {
   metadata_retention: RetentionPeriod;
   audit_log_retention: RetentionPeriod;
 }
+
+// Invitation types
+export type InvitationStatus = 'pending' | 'accepted' | 'revoked' | 'expired';
+export type MemberRole = 'owner' | 'admin' | 'member' | 'viewer';
+
+export interface Invitation {
+  id: string;
+  email: string;
+  role: MemberRole;
+  status: InvitationStatus;
+  organization: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  invitedBy: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  expiresAt: string;
+  acceptedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InvitationPublic {
+  id: string;
+  role: MemberRole;
+  status: InvitationStatus;
+  organization: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  invitedByName: string;
+  expired: boolean;
+  expiresAt: string;
+}

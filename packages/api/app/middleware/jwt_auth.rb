@@ -15,6 +15,12 @@ class JwtAuth
     '/api/internal'
   ].freeze
 
+  # Patterns for public endpoints that don't require authentication
+  # GET /api/v1/invitations/:token (viewing invitation)
+  EXCLUDED_PATTERNS = [
+    /\A\/api\/v1\/invitations\/[^\/]+\z/  # Matches /api/v1/invitations/{token} but not /api/v1/invitations/{token}/accept
+  ].freeze
+
   def initialize(app)
     @app = app
   end
@@ -85,7 +91,9 @@ class JwtAuth
   private
 
   def excluded_path?(path)
-    EXCLUDED_PATHS.any? { |excluded| path == excluded || path.start_with?("#{excluded}/") }
+    return true if EXCLUDED_PATHS.any? { |excluded| path == excluded || path.start_with?("#{excluded}/") }
+    return true if EXCLUDED_PATTERNS.any? { |pattern| path.match?(pattern) }
+    false
   end
 
   def extract_token(request)

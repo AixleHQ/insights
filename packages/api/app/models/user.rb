@@ -2,6 +2,7 @@ class User < ApplicationRecord
   has_many :organization_memberships, dependent: :destroy
   has_many :organizations, through: :organization_memberships
   has_many :project_memberships, dependent: :destroy
+  has_many :sent_invitations, class_name: 'Invitation', foreign_key: :invited_by_id, dependent: :destroy
   has_many :projects, through: :project_memberships
   has_many :owned_projects, class_name: 'Project', foreign_key: :owner_id, dependent: :nullify
   has_many :user_settings, dependent: :destroy
