@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { UserPlus, Search, Users, LogOut, AlertTriangle } from 'lucide-react';
+import { UserPlus, Search, Users, LogOut, AlertTriangle, Mail, Clock, X, MoreHorizontal } from 'lucide-react';
 import { useOrg } from '@/contexts/OrgContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { useOrganizationMembers, useUpdateMemberRole, useRemoveMember, useLeaveOrganization } from '@/hooks/useApi';
+import { useOrganizationMembers, useUpdateMemberRole, useRemoveMember, useLeaveOrganization, useInvitations, useRevokeInvitation } from '@/hooks/useApi';
+import type { Invitation } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SortButton, type SortDirection } from '@/components/ui/sort-button';
@@ -61,7 +62,7 @@ function MemberSkeleton() {
   );
 }
 
-type MemberSortField = 'name' | 'role' | 'status' | 'joined_at' | 'event_count';
+type MemberSortField = 'name' | 'role' | 'status' | 'joined_at' | 'total_tokens';
 
 const roleOrder: Record<MemberRole, number> = {
   owner: 4,
@@ -79,9 +80,11 @@ export function Team() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   const { data: membersData, isLoading } = useOrganizationMembers(currentOrg?.id || '');
+  const { data: invitationsData, isLoading: isLoadingInvitations } = useInvitations(currentOrg?.id || '', 'pending');
   const updateMemberRole = useUpdateMemberRole();
   const removeMember = useRemoveMember();
   const leaveOrganization = useLeaveOrganization();
+  const revokeInvitation = useRevokeInvitation();
 
   // Transform API response to component format
   const members: MemberData[] = useMemo(() => {
@@ -89,12 +92,11 @@ export function Team() {
       id: m.id,
       email: m.user.email,
       name: m.user.name || undefined,
-      avatar_url: m.user.avatar_url || undefined,
       role: m.role as MemberRole,
-      status: 'active' as const, // API doesn't have pending status
+      status: 'active' as const,
       joined_at: m.created_at,
-      last_active_at: undefined, // Would need separate query
-      event_count: undefined, // Would need separate query
+      last_active_at: m.last_active_at || undefined,
+      total_tokens: m.total_tokens,
     })) || [];
   }, [membersData]);
 
@@ -154,8 +156,8 @@ export function Team() {
         case 'joined_at':
           comparison = new Date(a.joined_at || 0).getTime() - new Date(b.joined_at || 0).getTime();
           break;
-        case 'event_count':
-          comparison = (a.event_count || 0) - (b.event_count || 0);
+        case 'total_tokens':
+          comparison = (a.total_tokens || 0) - (b.total_tokens || 0);
           break;
       }
       return sortDirection === 'asc' ? comparison : -comparison;
@@ -165,7 +167,19 @@ export function Team() {
   }, [members, search, sortField, sortDirection]);
 
   const activeCount = members.filter((m) => m.status === 'active').length;
-  const pendingCount = members.filter((m) => m.status === 'pending').length;
+  const pendingInvitations = invitationsData || [];
+  const pendingCount = pendingInvitations.length;
+
+  const handleRevokeInvitation = async (invitationId: string) => {
+    if (!currentOrg) return;
+    try {
+      await revokeInvitation.mutateAsync({ orgId: currentOrg.id, invitationId });
+    } catch (error) {
+      console.error('Failed to revoke invitation:', error);
+    }
+  };
+
+  const canManageInvitations = currentMembership?.role === 'owner' || currentMembership?.role === 'admin';
 
   return (
     <div className="space-y-6">
@@ -194,6 +208,29 @@ export function Team() {
           className="pl-9"
         />
       </div>
+
+      {/* Pending Invitations Section */}
+      {pendingCount > 0 && (
+        <div className="rounded-lg border border-dashed border-warning/50 bg-warning/5 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Mail className="size-4 text-warning" />
+            <h3 className="font-medium text-sm">
+              Pending Invitations ({pendingCount})
+            </h3>
+          </div>
+          <div className="grid gap-2">
+            {pendingInvitations.map((invitation) => (
+              <PendingInvitationRow
+                key={invitation.id}
+                invitation={invitation}
+                canRevoke={canManageInvitations}
+                onRevoke={handleRevokeInvitation}
+                isRevoking={revokeInvitation.isPending}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="rounded-md border">
         <Table>
@@ -242,12 +279,12 @@ export function Team() {
               <TableHead className="w-[120px]">Last Active</TableHead>
               <TableHead className="w-[100px]">
                 <SortButton
-                  field="event_count"
+                  field="total_tokens"
                   currentField={sortField}
                   currentDirection={sortDirection}
                   onSort={handleSort}
                 >
-                  Events
+                  Tokens
                 </SortButton>
               </TableHead>
               <TableHead className="w-[50px]" />
@@ -395,6 +432,56 @@ function LeaveOrganizationSection({
           </AlertDialogContent>
         </AlertDialog>
       </div>
+    </div>
+  );
+}
+
+interface PendingInvitationRowProps {
+  invitation: Invitation;
+  canRevoke: boolean;
+  onRevoke: (id: string) => void;
+  isRevoking: boolean;
+}
+
+function PendingInvitationRow({ invitation, canRevoke, onRevoke, isRevoking }: PendingInvitationRowProps) {
+  const expiresAt = new Date(invitation.expiresAt);
+  const isExpired = expiresAt < new Date();
+  const daysUntilExpiry = Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-md bg-background p-3 border">
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="flex size-8 items-center justify-center rounded-full bg-muted">
+          <Mail className="size-4 text-muted-foreground" />
+        </div>
+        <div className="min-w-0">
+          <p className="truncate font-medium text-sm">{invitation.email}</p>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="capitalize">{invitation.role}</span>
+            <span>•</span>
+            <span className="flex items-center gap-1">
+              <Clock className="size-3" />
+              {isExpired ? (
+                <span className="text-destructive">Expired</span>
+              ) : (
+                <span>Expires in {daysUntilExpiry} day{daysUntilExpiry !== 1 ? 's' : ''}</span>
+              )}
+            </span>
+          </div>
+        </div>
+      </div>
+      {canRevoke && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onRevoke(invitation.id)}
+          disabled={isRevoking}
+          className="text-muted-foreground hover:text-destructive"
+        >
+          <X className="size-4" />
+          <span className="sr-only">Revoke invitation</span>
+        </Button>
+      )}
     </div>
   );
 }

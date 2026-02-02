@@ -31,8 +31,7 @@ export interface MemberData {
   status: 'active' | 'pending' | 'inactive';
   joined_at?: string;
   last_active_at?: string;
-  event_count?: number;
-  token_count?: number;
+  total_tokens?: number;
 }
 
 interface MemberRowProps {
@@ -162,12 +161,9 @@ export function MemberRow({
           : '-'}
       </TableCell>
       <TableCell className="font-mono-display text-sm">
-        <div>{member.event_count?.toLocaleString() ?? '-'}</div>
-        {member.token_count !== undefined && member.token_count > 0 && (
-          <div className="text-xs text-muted-foreground">
-            {formatTokens(member.token_count)} tokens
-          </div>
-        )}
+        {member.total_tokens !== undefined && member.total_tokens > 0
+          ? formatTokens(member.total_tokens)
+          : '-'}
       </TableCell>
       <TableCell>
         {canRemove && (

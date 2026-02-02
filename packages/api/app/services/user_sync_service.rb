@@ -70,8 +70,16 @@ class UserSyncService
         user.send("#{attribute}=", value) if value.present?
       end
 
-      # Update last sign in time
-      user.last_sign_in_at = Time.current
+      # Update last login time when:
+      # 1. Never logged in before, OR
+      # 2. Token was just issued (fresh login - iat within last 2 minutes), OR
+      # 3. It's been more than 1 hour (throttled activity tracking)
+      token_issued_at = claims['iat'] ? Time.at(claims['iat']) : nil
+      is_fresh_login = token_issued_at && token_issued_at > 2.minutes.ago
+
+      if user.last_login_at.nil? || is_fresh_login || user.last_login_at < 1.hour.ago
+        user.last_login_at = Time.current
+      end
     end
 
     def auto_assign_organization(user, claims)

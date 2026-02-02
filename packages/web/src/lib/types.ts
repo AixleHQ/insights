@@ -41,10 +41,12 @@ export interface OrganizationMember {
   id: string;
   user_id: string;
   organization_id: string;
-  role: 'admin' | 'member' | 'viewer';
+  role: 'owner' | 'admin' | 'member' | 'viewer';
   user: User;
   created_at: string;
   updated_at: string;
+  total_tokens?: number;
+  last_active_at?: string | null;
 }
 
 // Project types
