@@ -37,7 +37,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { EventsTable, type EventRow } from '@/components/events';
+import { ActivityHeatmap } from '@/components/dashboard';
 import { SortButton, type SortDirection } from '@/components/ui/sort-button';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 type MemberRole = 'owner' | 'admin' | 'member' | 'viewer';
@@ -309,6 +311,13 @@ export function MemberProfile() {
           </div>
         </div>
       </div>
+
+      {/* Activity Heatmap */}
+      {stats.daily_activity && stats.daily_activity.length > 0 && (
+        <TooltipProvider>
+          <ActivityHeatmap data={stats.daily_activity} />
+        </TooltipProvider>
+      )}
 
       {/* Stats Grid - Row 1 */}
       <div className="grid gap-4 md:grid-cols-4">

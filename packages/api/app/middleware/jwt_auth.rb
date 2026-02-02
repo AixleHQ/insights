@@ -17,8 +17,9 @@ class JwtAuth
 
   # Patterns for public endpoints that don't require authentication
   # GET /api/v1/invitations/:token (viewing invitation)
+  # Uses negative lookahead to exclude "check" route which requires auth
   EXCLUDED_PATTERNS = [
-    /\A\/api\/v1\/invitations\/[^\/]+\z/  # Matches /api/v1/invitations/{token} but not /api/v1/invitations/{token}/accept
+    /\A\/api\/v1\/invitations\/(?!check\z)[^\/]+\z/  # Matches /api/v1/invitations/{token} but NOT /api/v1/invitations/check
   ].freeze
 
   def initialize(app)

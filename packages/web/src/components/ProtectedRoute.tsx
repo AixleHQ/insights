@@ -21,10 +21,10 @@ export function ProtectedRoute({
 }: ProtectedRouteProps) {
   const location = useLocation();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { currentOrg, organizations, hasRole, isLoading: orgLoading } = useOrg();
+  const { currentOrg, organizations, hasRole, isLoading: orgLoading, isInitialized: orgInitialized } = useOrg();
 
-  // Show loading state
-  if (authLoading || (isAuthenticated && orgLoading)) {
+  // Show loading state - wait for auth AND org context to be initialized
+  if (authLoading || (isAuthenticated && (!orgInitialized || orgLoading))) {
     if (fallback) {
       return <>{fallback}</>;
     }

@@ -79,7 +79,8 @@ const roleColors: Record<MemberRole, string> = {
   viewer: 'text-muted-foreground',
 };
 
-function getOrgInitials(name: string) {
+function getOrgInitials(name: string | undefined | null) {
+  if (!name) return '??';
   return name
     .split(' ')
     .map((word) => word[0])

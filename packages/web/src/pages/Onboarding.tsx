@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Building2,
@@ -122,7 +122,23 @@ function formatDate(dateString: string): string {
 export function Onboarding() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { refreshOrganizations, setCurrentOrg } = useOrg();
+  const { organizations, isInitialized, refreshOrganizations, setCurrentOrg } = useOrg();
+
+  // Redirect to dashboard if user already has organizations
+  useEffect(() => {
+    if (isInitialized && organizations.length > 0) {
+      navigate('/', { replace: true });
+    }
+  }, [isInitialized, organizations, navigate]);
+
+  // Show loading while checking if user has organizations
+  if (!isInitialized) {
+    return (
+      <div className="flex min-h-svh items-center justify-center bg-background">
+        <Loader2 className="size-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   // Fetch pending invitations
   const {

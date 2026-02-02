@@ -32,6 +32,7 @@ interface OrgState {
   organizations: Organization[];
   memberships: OrganizationMembership[];
   isLoading: boolean;
+  isInitialized: boolean;
   error: Error | null;
 }
 
@@ -53,13 +54,14 @@ interface OrgProviderProps {
 }
 
 export function OrgProvider({ children, apiBaseUrl = '/api/v1' }: OrgProviderProps) {
-  const { isAuthenticated, getAccessToken } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, getAccessToken } = useAuth();
 
   const [state, setState] = useState<OrgState>({
     currentOrg: null,
     organizations: [],
     memberships: [],
     isLoading: false,
+    isInitialized: false,
     error: null,
   });
 
@@ -75,7 +77,7 @@ export function OrgProvider({ children, apiBaseUrl = '/api/v1' }: OrgProviderPro
       return;
     }
 
-    setState((prev) => ({ ...prev, isLoading: true, error: null }));
+    setState((prev) => ({ ...prev, isLoading: true, isInitialized: false, error: null }));
 
     try {
       const token = await getAccessToken();
@@ -92,10 +94,17 @@ export function OrgProvider({ children, apiBaseUrl = '/api/v1' }: OrgProviderPro
 
       const data = await response.json();
       // API returns { data: Organization[], meta: {...} }
-      // Each organization includes user_role field
-      const orgsWithRoles: Organization[] = data.data || [];
-      const organizations = orgsWithRoles;
-      const memberships: OrganizationMembership[] = orgsWithRoles.map((org) => ({
+      // Each organization includes userRole field (camelCase from API)
+      const orgsWithRoles = data.data || [];
+      const organizations: Organization[] = orgsWithRoles.map((org: Record<string, unknown>) => ({
+        id: org.id as string,
+        name: org.name as string,
+        slug: org.slug as string,
+        description: org.description as string | undefined,
+        is_active: org.isActive as boolean,
+        user_role: (org.userRole as MemberRole) || 'member',
+      }));
+      const memberships: OrganizationMembership[] = organizations.map((org) => ({
         organization: org,
         role: org.user_role || 'member',
       }));
@@ -122,12 +131,14 @@ export function OrgProvider({ children, apiBaseUrl = '/api/v1' }: OrgProviderPro
         organizations,
         memberships,
         isLoading: false,
+        isInitialized: true,
         error: null,
       });
     } catch (error) {
       setState((prev) => ({
         ...prev,
         isLoading: false,
+        isInitialized: true,
         error: error instanceof Error ? error : new Error('Failed to fetch organizations'),
       }));
     }
@@ -135,18 +146,25 @@ export function OrgProvider({ children, apiBaseUrl = '/api/v1' }: OrgProviderPro
 
   // Fetch organizations when auth state changes
   useEffect(() => {
+    if (authLoading) {
+      // Auth is still loading, don't do anything yet
+      return;
+    }
+
     if (isAuthenticated) {
       refreshOrganizations();
     } else {
+      // Only set initialized when auth is done AND user is not authenticated
       setState({
         currentOrg: null,
         organizations: [],
         memberships: [],
         isLoading: false,
+        isInitialized: true,
         error: null,
       });
     }
-  }, [isAuthenticated, refreshOrganizations]);
+  }, [authLoading, isAuthenticated, refreshOrganizations]);
 
   // Set current organization
   const setCurrentOrg = useCallback((org: Organization | null) => {

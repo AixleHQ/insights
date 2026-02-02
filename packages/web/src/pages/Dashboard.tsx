@@ -49,7 +49,7 @@ export function Dashboard() {
   const {
     data: toolByDayData,
     isLoading: isLoadingToolByDay,
-  } = useDailyByTool(currentOrg?.id || '', 30);
+  } = useDailyByTool(currentOrg?.id || '', 365);
 
   // Transform API responses to component formats
   const chartData: DailyCostData[] = dailyData?.data?.map((d) => ({
