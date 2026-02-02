@@ -1,6 +1,7 @@
 {
   "realm": "db90",
   "enabled": true,
+  "loginTheme": "db90",
   "sslRequired": "none",
   "registrationAllowed": false,
   "loginWithEmailAllowed": true,
@@ -148,7 +149,8 @@
         "hostedDomain": "example.com",
         "useJwksUrl": "true",
         "syncMode": "IMPORT",
-        "defaultScope": "openid profile email"
+        "defaultScope": "openid profile email",
+        "prompt": "select_account"
       }
     }
   ],

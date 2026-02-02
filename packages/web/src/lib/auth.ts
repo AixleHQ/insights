@@ -88,7 +88,27 @@ export async function getUser(): Promise<User | null> {
 }
 
 export async function getAccessToken(): Promise<string | null> {
-  const user = await getUser();
+  const manager = getUserManager();
+  let user = await manager.getUser();
+
+  // If no user or token is expired/expiring soon, try silent renew
+  if (user) {
+    // Check if token expires within 30 seconds
+    const expiresAt = user.expires_at ?? 0;
+    const now = Math.floor(Date.now() / 1000);
+    const expiresIn = expiresAt - now;
+
+    if (user.expired || expiresIn < 30) {
+      console.log('[Auth] Token expired or expiring soon, attempting silent renew...');
+      try {
+        user = await manager.signinSilent();
+      } catch (error) {
+        console.error('[Auth] Silent renew failed in getAccessToken:', error);
+        // Return the existing token anyway - it might still work
+      }
+    }
+  }
+
   return user?.access_token ?? null;
 }
 

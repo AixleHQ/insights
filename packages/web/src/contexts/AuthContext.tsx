@@ -11,6 +11,7 @@ import {
   login as authLogin,
   logout as authLogout,
   getUser,
+  getAccessToken as getAuthAccessToken,
   getUserProfile,
   directLogin as authDirectLogin,
   type User,
@@ -165,7 +166,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const getAccessToken = useCallback(async (): Promise<string | null> => {
     if (!state.user) return null;
-    return state.user.access_token;
+    // Use the auth library's getAccessToken which handles token refresh
+    return getAuthAccessToken();
   }, [state.user]);
 
   const directLogin = useCallback(async (username: string, password: string) => {

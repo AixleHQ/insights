@@ -77,7 +77,20 @@ export function InviteForm({ onSubmit, className }: InviteFormProps) {
       navigate('/team');
     } catch (error) {
       console.error('Failed to send invites:', error);
-      setError('Failed to send invites. Please try again.');
+      // Extract specific validation error message if available
+      let errorMessage = 'Failed to send invites. Please try again.';
+      if (error && typeof error === 'object' && 'data' in error) {
+        const apiError = error as { data?: { errors?: Record<string, string[]> } };
+        if (apiError.data?.errors) {
+          const messages = Object.entries(apiError.data.errors)
+            .map(([field, msgs]) => `${field} ${(msgs as string[]).join(', ')}`)
+            .join('. ');
+          if (messages) {
+            errorMessage = messages;
+          }
+        }
+      }
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

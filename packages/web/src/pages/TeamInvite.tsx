@@ -1,12 +1,10 @@
-import { useNavigate } from 'react-router-dom';
 import { useOrg } from '@/contexts/OrgContext';
-import { useInviteMember } from '@/hooks/useApi';
+import { useCreateInvitation } from '@/hooks/useApi';
 import { InviteForm, type MemberRole } from '@/components/team';
 
 export function TeamInvite() {
-  const navigate = useNavigate();
   const { currentOrg } = useOrg();
-  const inviteMember = useInviteMember();
+  const createInvitation = useCreateInvitation();
 
   const handleSubmit = async (
     invites: Array<{ email: string; role: MemberRole }>
@@ -15,15 +13,12 @@ export function TeamInvite() {
 
     // Send each invite to the API
     for (const invite of invites) {
-      await inviteMember.mutateAsync({
+      await createInvitation.mutateAsync({
         orgId: currentOrg.id,
         email: invite.email,
         role: invite.role,
       });
     }
-
-    // Navigate back to team page on success
-    navigate('/team');
   };
 
   return <InviteForm onSubmit={handleSubmit} />;
