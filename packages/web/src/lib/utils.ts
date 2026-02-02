@@ -49,3 +49,50 @@ export function formatCurrency(value: number): string {
 export function formatNumber(value: number): string {
   return new Intl.NumberFormat('en-US').format(value);
 }
+
+/**
+ * Known tool name mappings for proper display
+ */
+const TOOL_NAME_MAP: Record<string, string> = {
+  'claude_code': 'Claude Code',
+  'claude-code': 'Claude Code',
+  'github_copilot': 'GitHub Copilot',
+  'github-copilot': 'GitHub Copilot',
+  'cursor': 'Cursor',
+  'aider': 'Aider',
+  'codeium': 'Codeium',
+  'windsurf': 'Windsurf',
+  'continue': 'Continue',
+  'copilot': 'Copilot',
+  'tabnine': 'Tabnine',
+  'cody': 'Cody',
+  'supermaven': 'Supermaven',
+  'sourcegraph': 'Sourcegraph',
+  'replit': 'Replit',
+  'amazon_q': 'Amazon Q',
+  'amazon-q': 'Amazon Q',
+  'gemini': 'Gemini',
+  'chatgpt': 'ChatGPT',
+  'openai': 'OpenAI',
+  'anthropic': 'Anthropic',
+};
+
+/**
+ * Humanize a tool name for display
+ * Converts snake_case/kebab-case to Title Case with proper casing for known tools
+ */
+export function humanizeToolName(toolName: string | undefined | null): string {
+  if (!toolName) return 'Unknown Tool';
+
+  const normalized = toolName.toLowerCase().trim();
+
+  // Check for known tool names first
+  if (TOOL_NAME_MAP[normalized]) {
+    return TOOL_NAME_MAP[normalized];
+  }
+
+  // Fallback: convert snake_case/kebab-case to Title Case
+  return toolName
+    .replace(/[_-]/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}

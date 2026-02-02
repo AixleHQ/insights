@@ -6,7 +6,7 @@ import {
   ChartTooltipContent,
 } from '@/components/ui/chart';
 import type { ChartConfig } from '@/components/ui/chart';
-import { cn } from '@/lib/utils';
+import { cn, humanizeToolName } from '@/lib/utils';
 
 export interface ToolUsageData {
   tool_name: string;
@@ -32,7 +32,10 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function TopToolsChart({ data, isLoading, className }: TopToolsChartProps) {
-  const sortedData = [...data].sort((a, b) => b.event_count - a.event_count).slice(0, 5);
+  const sortedData = [...data]
+    .sort((a, b) => b.event_count - a.event_count)
+    .slice(0, 5)
+    .map((d) => ({ ...d, tool_name: humanizeToolName(d.tool_name) }));
 
   return (
     <Card className={cn('', className)}>

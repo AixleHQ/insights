@@ -40,7 +40,7 @@ import { EventsTable, type EventRow } from '@/components/events';
 import { ActivityHeatmap } from '@/components/dashboard';
 import { SortButton, type SortDirection } from '@/components/ui/sort-button';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
+import { cn, humanizeToolName } from '@/lib/utils';
 
 type MemberRole = 'owner' | 'admin' | 'member' | 'viewer';
 
@@ -341,7 +341,7 @@ export function MemberProfile() {
         />
         <StatCard
           title="Most Used Tool"
-          value={stats.most_used_tool || 'None'}
+          value={stats.most_used_tool ? humanizeToolName(stats.most_used_tool) : 'None'}
           subtitle="Primary tool"
           icon={Code2}
         />
@@ -446,7 +446,7 @@ export function MemberProfile() {
                 <TableBody>
                   {sortedToolBreakdown.map((tool) => (
                     <TableRow key={tool.tool}>
-                      <TableCell className="font-medium">{tool.tool}</TableCell>
+                      <TableCell className="font-medium">{humanizeToolName(tool.tool)}</TableCell>
                       <TableCell className="text-right font-mono text-sm">
                         {tool.count.toLocaleString()}
                       </TableCell>
@@ -623,7 +623,7 @@ export function MemberProfile() {
                     className="flex items-center justify-between rounded-md border p-2"
                   >
                     <div>
-                      <div className="font-medium text-sm">{account.tool_name}</div>
+                      <div className="font-medium text-sm">{humanizeToolName(account.tool_name)}</div>
                       {account.external_username && (
                         <div className="text-xs text-muted-foreground">@{account.external_username}</div>
                       )}

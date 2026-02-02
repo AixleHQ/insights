@@ -7,7 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RiskBadge } from '@/components/dashboard/ActivityFeed';
-import { cn } from '@/lib/utils';
+import { cn, humanizeToolName } from '@/lib/utils';
 
 export interface EventDetailData {
   id: string;
@@ -129,7 +129,7 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-semibold">{event.tool_name || 'Unknown Tool'}</h1>
+              <h1 className="text-xl font-semibold">{humanizeToolName(event.tool_name)}</h1>
               <RiskBadge level={event.risk_level || 'none'} />
             </div>
             <p className="text-sm text-muted-foreground">

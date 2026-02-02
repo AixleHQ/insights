@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { formatDistanceToNow } from '@/lib/utils';
+import { formatDistanceToNow, humanizeToolName } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -125,7 +125,7 @@ function ActivityItem({
       </div>
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-medium">{event.tool_name || 'Unknown tool'}</span>
+          <span className="truncate text-sm font-medium">{humanizeToolName(event.tool_name)}</span>
           <RiskBadge level={event.risk_level || 'none'} />
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">

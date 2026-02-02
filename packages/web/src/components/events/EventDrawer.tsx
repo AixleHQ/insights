@@ -26,7 +26,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { RiskBadge } from '@/components/dashboard/ActivityFeed';
 import { useOrg } from '@/contexts/OrgContext';
 import { useEvent } from '@/hooks/useApi';
-import { cn } from '@/lib/utils';
+import { cn, humanizeToolName } from '@/lib/utils';
 
 interface EventDrawerProps {
   eventId: string | null;
@@ -132,7 +132,7 @@ export function EventDrawer({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-3">
                     <SheetTitle className="truncate text-lg">
-                      {event.toolName || 'Unknown Tool'}
+                      {humanizeToolName(event.toolName)}
                     </SheetTitle>
                     <RiskBadge level={event.riskLevel || 'none'} />
                   </div>

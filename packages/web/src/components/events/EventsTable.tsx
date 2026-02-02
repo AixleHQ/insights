@@ -9,8 +9,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { SortButton, type SortDirection } from '@/components/ui/sort-button';
 import { RiskBadge } from '@/components/dashboard/ActivityFeed';
-import { formatDistanceToNow } from '@/lib/utils';
-import { cn } from '@/lib/utils';
+import { formatDistanceToNow, humanizeToolName, cn } from '@/lib/utils';
 
 export interface EventRow {
   id: string;
@@ -168,7 +167,7 @@ export function EventsTable({
               >
                 <TableCell>
                   <span className="font-medium">
-                    {event.tool_name || 'Unknown'}
+                    {humanizeToolName(event.tool_name)}
                   </span>
                 </TableCell>
                 <TableCell>

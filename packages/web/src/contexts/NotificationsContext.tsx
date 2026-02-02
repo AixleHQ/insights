@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import type { ReactNode } from 'react';
 import { useOrg } from './OrgContext';
 import { useWebSocket } from '@/hooks/useWebSocket';
-import { formatDistanceToNow } from '@/lib/utils';
+import { formatDistanceToNow, humanizeToolName } from '@/lib/utils';
 
 export interface Notification {
   id: string;
@@ -100,7 +100,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     const event = data as { tool_name?: string; event_type?: string };
     addNotification({
       title: 'New Event',
-      description: `${event.tool_name || 'Unknown tool'}: ${event.event_type || 'event'}`,
+      description: `${humanizeToolName(event.tool_name)}: ${event.event_type || 'event'}`,
       type: 'event',
     });
   }, [addNotification]);

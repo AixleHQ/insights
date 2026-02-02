@@ -22,7 +22,7 @@ import {
   ChartTooltipContent,
 } from '@/components/ui/chart';
 import type { ChartConfig } from '@/components/ui/chart';
-import { cn } from '@/lib/utils';
+import { cn, humanizeToolName } from '@/lib/utils';
 import type { DailyToolData } from '@/hooks/useApi';
 
 interface ToolUsageByDayChartProps {
@@ -53,23 +53,12 @@ const TOOL_COLORS: Record<string, string> = {
   Other: 'hsl(220 9% 46%)',             // gray
 };
 
-// Display names for tools
-const TOOL_DISPLAY_NAMES: Record<string, string> = {
-  claude_code: 'Claude Code',
-  github_copilot: 'GitHub Copilot',
-  cursor: 'Cursor',
-  aider: 'Aider',
-  windsurf: 'Windsurf',
-  cody: 'Cody',
-  Other: 'Other',
-};
-
 function getToolColor(tool: string): string {
   return TOOL_COLORS[tool] || TOOL_COLORS['Other'];
 }
 
 function getToolDisplayName(tool: string): string {
-  return TOOL_DISPLAY_NAMES[tool] || tool;
+  return humanizeToolName(tool);
 }
 
 function formatDate(dateStr: string, range: TimeRange): string {
