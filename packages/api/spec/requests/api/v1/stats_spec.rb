@@ -95,4 +95,85 @@ RSpec.describe 'Api::V1::Stats', type: :request do
       expect_success
     end
   end
+
+  describe 'GET /api/v1/organizations/:organization_id/stats/daily_by_tool' do
+    before do
+      # Create events for multiple tools over multiple days
+      create(:tool_event, organization: organization, user: user, tool_name: 'claude_code', occurred_at: Time.current)
+      create(:tool_event, organization: organization, user: user, tool_name: 'claude_code', occurred_at: Time.current)
+      create(:tool_event, organization: organization, user: user, tool_name: 'cursor', occurred_at: Time.current)
+      create(:tool_event, organization: organization, user: user, tool_name: 'github_copilot', occurred_at: 1.day.ago)
+      create(:tool_event, organization: organization, user: user, tool_name: 'aider', occurred_at: 1.day.ago)
+    end
+
+    it 'returns daily data grouped by tool' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/daily_by_tool",
+                        user: user,
+                        organization: organization
+
+      expect_success
+      expect(json_response[:data]).to be_an(Array)
+      expect(json_response[:tools]).to be_an(Array)
+    end
+
+    it 'includes top 3 tools plus Other' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/daily_by_tool",
+                        user: user,
+                        organization: organization
+
+      expect_success
+      # Should have top 3 tools + 'Other'
+      expect(json_response[:tools].length).to be <= 4
+      expect(json_response[:tools]).to include('Other')
+    end
+
+    it 'returns data with tool counts per day' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/daily_by_tool",
+                        user: user,
+                        organization: organization
+
+      expect_success
+      # Each day should have a date and counts for each tool
+      day_data = json_response[:data].first
+      expect(day_data).to have_key(:date)
+    end
+
+    it 'accepts days parameter' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/daily_by_tool",
+                        user: user,
+                        organization: organization,
+                        params: { days: 7 }
+
+      expect_success
+    end
+  end
+
+  describe 'GET /api/v1/organizations/:organization_id/stats/heatmap' do
+    before do
+      # Create events across different days
+      create(:tool_event, organization: organization, user: user, occurred_at: Time.current)
+      create(:tool_event, organization: organization, user: user, occurred_at: 1.day.ago)
+      create(:tool_event, organization: organization, user: user, occurred_at: 1.day.ago)
+      create(:tool_event, organization: organization, user: user, occurred_at: 1.week.ago)
+    end
+
+    it 'returns heatmap data for the past year' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/heatmap",
+                        user: user,
+                        organization: organization
+
+      expect_success
+      expect(json_response).to be_an(Array)
+    end
+
+    it 'returns data with date and count' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/heatmap",
+                        user: user,
+                        organization: organization
+
+      expect_success
+      expect(json_response.first).to have_key(:date)
+      expect(json_response.first).to have_key(:count)
+    end
+  end
 end

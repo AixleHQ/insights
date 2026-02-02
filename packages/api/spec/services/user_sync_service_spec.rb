@@ -7,7 +7,8 @@ RSpec.describe UserSyncService do
         'sub' => 'keycloak-user-123',
         'email' => 'test@example.com',
         'name' => 'Test User',
-        'picture' => 'https://example.com/avatar.png'
+        'picture' => 'https://example.com/avatar.png',
+        'iat' => Time.current.to_i  # Token issued at (for fresh login detection)
       }
     end
 
@@ -27,10 +28,18 @@ RSpec.describe UserSyncService do
         expect(user.avatar_url).to eq('https://example.com/avatar.png')
       end
 
-      it 'sets last_sign_in_at' do
+      it 'sets last_login_at for fresh login' do
         freeze_time do
           user = described_class.sync_from_claims(claims)
-          expect(user.last_sign_in_at).to eq(Time.current)
+          expect(user.last_login_at).to eq(Time.current)
+        end
+      end
+
+      it 'sets last_login_at when iat is within 2 minutes' do
+        claims_with_recent_iat = claims.merge('iat' => 1.minute.ago.to_i)
+        freeze_time do
+          user = described_class.sync_from_claims(claims_with_recent_iat)
+          expect(user.last_login_at).to eq(Time.current)
         end
       end
     end
@@ -58,10 +67,30 @@ RSpec.describe UserSyncService do
         expect(user.name).to eq('Test User')
       end
 
-      it 'updates last_sign_in_at' do
+      it 'updates last_login_at for fresh login' do
         freeze_time do
           user = described_class.sync_from_claims(claims)
-          expect(user.last_sign_in_at).to eq(Time.current)
+          expect(user.last_login_at).to eq(Time.current)
+        end
+      end
+
+      it 'does not update last_login_at for old token if recently logged in' do
+        existing_user.update!(last_login_at: 30.minutes.ago)
+        old_token_claims = claims.merge('iat' => 1.hour.ago.to_i)
+
+        user = described_class.sync_from_claims(old_token_claims)
+        # Should not update since iat is old and last_login was within 1 hour
+        expect(user.last_login_at).to be_within(1.second).of(30.minutes.ago)
+      end
+
+      it 'updates last_login_at for old token if last login was over 1 hour ago' do
+        existing_user.update!(last_login_at: 2.hours.ago)
+        old_token_claims = claims.merge('iat' => 1.hour.ago.to_i)
+
+        freeze_time do
+          user = described_class.sync_from_claims(old_token_claims)
+          # Should update since last_login was over 1 hour ago
+          expect(user.last_login_at).to eq(Time.current)
         end
       end
     end
