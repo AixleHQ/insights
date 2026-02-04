@@ -89,7 +89,7 @@ export function ToolUsageByDayChart({ data, tools, isLoading, className }: ToolU
     return sliced.map((item) => ({
       ...item,
       dateLabel: formatDate(item.date, timeRange),
-    }));
+    })) as (DailyToolData & { dateLabel: string })[];
   }, [data, timeRange]);
 
   const chartConfig = useMemo(() => {

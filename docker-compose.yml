@@ -85,8 +85,11 @@ services:
       KC_HOSTNAME_STRICT: "false"
       KC_HOSTNAME_STRICT_HTTPS: "false"
       KC_HTTP_ENABLED: "true"
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID}"
+      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET}"
     volumes:
       - ./keycloak:/opt/keycloak/data/import
+      - ./keycloak/themes:/opt/keycloak/themes
     command: start-dev --import-realm
     healthcheck:
       test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080;echo -e 'GET /health/ready HTTP/1.1\r\nhost: localhost\r\nConnection: close\r\n\r\n' >&3;if [ $? -eq 0 ]; then echo 'Healthcheck Successful';exit 0;else echo 'Healthcheck Failed';exit 1;fi;"]
@@ -94,6 +97,18 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
+
+  keycloak-init:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: db90-keycloak-init
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    volumes:
+      - ./keycloak/disable-ssl.sh:/opt/keycloak/disable-ssl.sh
+    entrypoint: ["/bin/bash", "/opt/keycloak/disable-ssl.sh"]
+    network_mode: "service:keycloak"
+    restart: "no"
 
 volumes:
   postgres-data:

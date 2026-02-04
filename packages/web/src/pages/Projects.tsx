@@ -78,14 +78,14 @@ export function Projects() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
           <p className="text-sm text-muted-foreground">
             Manage your projects and track AI tool usage
           </p>
         </div>
-        <Button asChild>
+        <Button asChild className="w-full sm:w-auto">
           <Link to="/projects/new">
             <Plus className="mr-2 size-4" />
             New Project
@@ -93,8 +93,8 @@ export function Projects() {
         </Button>
       </div>
 
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative flex-1 sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search projects..."
@@ -103,7 +103,7 @@ export function Projects() {
             className="pl-9"
           />
         </div>
-        <div className="flex items-center rounded-md border">
+        <div className="flex items-center rounded-md border self-start">
           <Button
             variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
             size="icon"

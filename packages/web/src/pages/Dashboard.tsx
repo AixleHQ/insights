@@ -17,7 +17,6 @@ import {
   type Alert,
 } from '@/components/dashboard';
 import { EventDrawer } from '@/components/events';
-import { Skeleton } from '@/components/ui/skeleton';
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -213,7 +212,7 @@ export function Dashboard() {
         />
       </MetricGrid>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         <CostTrendChart data={chartData} isLoading={isLoadingDaily} />
         <ActivityFeed
           events={events}
@@ -223,7 +222,7 @@ export function Dashboard() {
         />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
         <TopToolsChart data={toolUsage} isLoading={isLoadingDaily} />
         <AlertsPanel
           alerts={alerts}

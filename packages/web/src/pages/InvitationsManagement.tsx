@@ -184,7 +184,7 @@ function InvitationRow({
           {invitation.status}
         </Badge>
       </TableCell>
-      <TableCell className="text-muted-foreground">
+      <TableCell className="hidden sm:table-cell text-muted-foreground">
         {isPending ? (
           <span
             className={`${
@@ -201,7 +201,7 @@ function InvitationRow({
           <span className="text-muted-foreground/50">—</span>
         )}
       </TableCell>
-      <TableCell className="text-muted-foreground">
+      <TableCell className="hidden md:table-cell text-muted-foreground">
         {invitation.invitedBy.name || invitation.invitedBy.email}
       </TableCell>
       <TableCell>
@@ -511,7 +511,7 @@ export function InvitationsManagement() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-bold tracking-tight">Team Invitations</h1>
           <p className="text-muted-foreground">
@@ -549,7 +549,7 @@ export function InvitationsManagement() {
             value={statusFilter}
             onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}
           >
-            <TabsList className="mb-4">
+            <TabsList className="mb-4 w-full flex-wrap sm:w-auto sm:flex-nowrap">
               <TabsTrigger value="all" className="gap-1.5">
                 All
                 <Badge variant="secondary" className="ml-1 size-5 rounded-full p-0 text-xs">
@@ -575,17 +575,17 @@ export function InvitationsManagement() {
                   <Loader2 className="size-8 animate-spin text-muted-foreground" />
                 </div>
               ) : filteredInvitations && filteredInvitations.length > 0 ? (
-                <div className="rounded-lg border">
-                  <Table>
+                <div className="rounded-lg border overflow-x-auto">
+                  <Table className="min-w-[600px]">
                     <TableHeader>
                       <TableRow>
                         <TableHead>Email</TableHead>
                         <TableHead>Role</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>
+                        <TableHead className="hidden sm:table-cell">
                           {statusFilter === 'accepted' ? 'Accepted' : 'Expires'}
                         </TableHead>
-                        <TableHead>Invited By</TableHead>
+                        <TableHead className="hidden md:table-cell">Invited By</TableHead>
                         <TableHead className="w-[100px]"></TableHead>
                       </TableRow>
                     </TableHeader>

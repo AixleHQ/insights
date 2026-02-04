@@ -167,7 +167,7 @@ export function Events() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Events</h1>
           <p className="text-sm text-muted-foreground">
@@ -177,11 +177,11 @@ export function Events() {
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isFetching}>
             <RefreshCw className={`mr-2 size-4 ${isFetching ? 'animate-spin' : ''}`} />
-            Refresh
+            <span className="hidden sm:inline">Refresh</span>
           </Button>
           <Button variant="outline" size="sm" onClick={handleExport}>
             <Download className="mr-2 size-4" />
-            Export
+            <span className="hidden sm:inline">Export</span>
           </Button>
         </div>
       </div>
@@ -214,12 +214,12 @@ export function Events() {
         hasNext={selectedEventIndex < filteredAndSortedEvents.length - 1}
       />
 
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm text-muted-foreground">
         <p>
           Showing {filteredAndSortedEvents.length} of {totalCount} events
         </p>
         {totalPages > 1 && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between sm:justify-end gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -228,7 +228,7 @@ export function Events() {
             >
               Previous
             </Button>
-            <span>
+            <span className="text-xs sm:text-sm">
               Page {page} of {totalPages}
             </span>
             <Button

@@ -216,15 +216,15 @@ export function EventFilters({
   return (
     <div className={cn('space-y-3', className)}>
       {/* Main filter bar */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
         {/* Search input */}
-        <div className="relative w-64">
+        <div className="relative w-full sm:w-64">
           <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search events..."
             value={filters.search || ''}
             onChange={(e) => updateFilter('search', e.target.value)}
-            className="h-8 pl-8 pr-8 text-sm"
+            className="h-9 sm:h-8 pl-8 pr-8 text-sm"
           />
           {filters.search && (
             <button
@@ -236,96 +236,99 @@ export function EventFilters({
           )}
         </div>
 
-        <div className="h-5 w-px bg-border" />
+        <div className="hidden sm:block h-5 w-px bg-border" />
 
-        {/* Tool filter */}
-        <Select
-          value={filters.tool || 'all'}
-          onValueChange={(value) => updateFilter('tool', value)}
-        >
-          <SelectTrigger className={cn(
-            'h-8 w-[140px] gap-1 border-dashed text-sm font-normal',
-            filters.tool && 'border-solid border-primary/50 bg-primary/5'
-          )}>
-            <SelectValue placeholder="Tool" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All tools</SelectItem>
-            {tools.map((tool) => (
-              <SelectItem key={tool} value={tool}>
-                {tool}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* Filter selects - grid on mobile, inline on desktop */}
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-2">
+          {/* Tool filter */}
+          <Select
+            value={filters.tool || 'all'}
+            onValueChange={(value) => updateFilter('tool', value)}
+          >
+            <SelectTrigger className={cn(
+              'h-9 sm:h-8 w-full sm:w-[140px] gap-1 border-dashed text-sm font-normal',
+              filters.tool && 'border-solid border-primary/50 bg-primary/5'
+            )}>
+              <SelectValue placeholder="Tool" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All tools</SelectItem>
+              {tools.map((tool) => (
+                <SelectItem key={tool} value={tool}>
+                  {tool}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        {/* Risk level filter */}
-        <Select
-          value={filters.riskLevel || 'all'}
-          onValueChange={(value) => updateFilter('riskLevel', value)}
-        >
-          <SelectTrigger className={cn(
-            'h-8 w-[130px] gap-1 border-dashed text-sm font-normal',
-            filters.riskLevel && 'border-solid border-primary/50 bg-primary/5'
-          )}>
-            <SelectValue placeholder="Risk level" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All risks</SelectItem>
-            {riskLevels.map((level) => (
-              <SelectItem key={level.value} value={level.value}>
-                <span className="flex items-center gap-2">
-                  <span className={cn('size-2 rounded-full', level.color)} />
-                  {level.label}
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          {/* Risk level filter */}
+          <Select
+            value={filters.riskLevel || 'all'}
+            onValueChange={(value) => updateFilter('riskLevel', value)}
+          >
+            <SelectTrigger className={cn(
+              'h-9 sm:h-8 w-full sm:w-[130px] gap-1 border-dashed text-sm font-normal',
+              filters.riskLevel && 'border-solid border-primary/50 bg-primary/5'
+            )}>
+              <SelectValue placeholder="Risk level" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All risks</SelectItem>
+              {riskLevels.map((level) => (
+                <SelectItem key={level.value} value={level.value}>
+                  <span className="flex items-center gap-2">
+                    <span className={cn('size-2 rounded-full', level.color)} />
+                    {level.label}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        {/* Event type filter */}
-        <Select
-          value={filters.eventType || 'all'}
-          onValueChange={(value) => updateFilter('eventType', value)}
-        >
-          <SelectTrigger className={cn(
-            'h-8 w-[140px] gap-1 border-dashed text-sm font-normal',
-            filters.eventType && 'border-solid border-primary/50 bg-primary/5'
-          )}>
-            <SelectValue placeholder="Event type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All types</SelectItem>
-            {eventTypes.map((type) => (
-              <SelectItem key={type.value} value={type.value}>
-                {type.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          {/* Event type filter */}
+          <Select
+            value={filters.eventType || 'all'}
+            onValueChange={(value) => updateFilter('eventType', value)}
+          >
+            <SelectTrigger className={cn(
+              'h-9 sm:h-8 w-full sm:w-[140px] gap-1 border-dashed text-sm font-normal',
+              filters.eventType && 'border-solid border-primary/50 bg-primary/5'
+            )}>
+              <SelectValue placeholder="Event type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All types</SelectItem>
+              {eventTypes.map((type) => (
+                <SelectItem key={type.value} value={type.value}>
+                  {type.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        {/* Date range picker */}
-        <DateRangePicker
-          dateFrom={filters.dateFrom}
-          dateTo={filters.dateTo}
-          onDateFromChange={(value) => updateFilter('dateFrom', value)}
-          onDateToChange={(value) => updateFilter('dateTo', value)}
-        />
+          {/* Date range picker */}
+          <DateRangePicker
+            dateFrom={filters.dateFrom}
+            dateTo={filters.dateTo}
+            onDateFromChange={(value) => updateFilter('dateFrom', value)}
+            onDateToChange={(value) => updateFilter('dateTo', value)}
+          />
+        </div>
 
         {/* Clear all button */}
         {hasActiveFilters && (
-          <>
-            <div className="h-5 w-px bg-border" />
+          <div className="flex items-center gap-2 sm:contents">
+            <div className="hidden sm:block h-5 w-px bg-border" />
             <Button
               variant="ghost"
               size="sm"
               onClick={clearFilters}
-              className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
+              className="h-9 sm:h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
             >
               <X className="mr-1 size-3" />
               Clear all
             </Button>
-          </>
+          </div>
         )}
       </div>
 

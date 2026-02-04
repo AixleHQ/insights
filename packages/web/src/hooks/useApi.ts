@@ -431,6 +431,80 @@ export function useDeleteProject() {
   });
 }
 
+// Project stats for activity charts
+export interface ProjectStatsData {
+  date: string;
+  eventCount: number;
+  costUsd: number;
+}
+
+export interface ProjectStatsResponse {
+  daily: ProjectStatsData[];
+  totalEvents: number;
+  totalCost: number;
+}
+
+export function useProjectStats(projectId: string, days = 30) {
+  return useQuery({
+    queryKey: ['projects', projectId, 'stats', days],
+    queryFn: () => api.get<ProjectStatsResponse>(`/projects/${projectId}/stats?days=${days}`),
+    enabled: !!projectId,
+  });
+}
+
+// Project daily by tool for stacked bar chart
+export function useProjectDailyByTool(projectId: string, days = 30) {
+  return useQuery({
+    queryKey: ['projects', projectId, 'stats', 'daily_by_tool', days],
+    queryFn: () => api.get<DailyByToolResponse>(`/projects/${projectId}/stats/daily_by_tool?days=${days}`),
+    enabled: !!projectId,
+  });
+}
+
+// Project members
+export interface ProjectMember {
+  id: string;
+  userId: string;
+  email: string;
+  name: string | null;
+  avatarUrl: string | null;
+  role: string;
+  joinedAt: string;
+}
+
+export function useProjectMembers(projectId: string) {
+  return useQuery({
+    queryKey: ['projects', projectId, 'members'],
+    queryFn: async () => {
+      const response = await api.get<{ data: ProjectMember[] }>(`/projects/${projectId}/members`);
+      return response.data;
+    },
+    enabled: !!projectId,
+  });
+}
+
+// Project repositories
+export interface ProjectRepository {
+  id: string;
+  name: string;
+  fullName: string;
+  provider: string;
+  url: string;
+  lastSyncAt: string | null;
+  isActive: boolean;
+}
+
+export function useProjectRepositories(projectId: string) {
+  return useQuery({
+    queryKey: ['projects', projectId, 'repositories'],
+    queryFn: async () => {
+      const response = await api.get<{ data: ProjectRepository[] }>(`/projects/${projectId}/repositories`);
+      return response.data;
+    },
+    enabled: !!projectId,
+  });
+}
+
 // ============================================================================
 // Connectors Hooks
 // ============================================================================

@@ -175,19 +175,21 @@ export function UnattributedEvents() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button asChild variant="ghost" size="icon">
-          <Link to="/events">
-            <ArrowLeft className="size-4" />
-          </Link>
-        </Button>
-        <div className="flex-1">
-          <h1 className="text-xl font-semibold">Unattributed Events</h1>
-          <p className="text-sm text-muted-foreground">
-            Events that couldn't be automatically attributed to a user
-          </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <div className="flex items-center gap-4 flex-1">
+          <Button asChild variant="ghost" size="icon">
+            <Link to="/events">
+              <ArrowLeft className="size-4" />
+            </Link>
+          </Button>
+          <div className="flex-1">
+            <h1 className="text-xl font-semibold">Unattributed Events</h1>
+            <p className="text-sm text-muted-foreground">
+              Events that couldn't be automatically attributed to a user
+            </p>
+          </div>
         </div>
-        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isFetching}>
+        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isFetching} className="self-start sm:self-auto">
           <RefreshCw className={`mr-2 size-4 ${isFetching ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
@@ -209,8 +211,8 @@ export function UnattributedEvents() {
         </CardContent>
       </Card>
 
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1 sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search by tool or model..."
@@ -219,14 +221,14 @@ export function UnattributedEvents() {
             className="pl-9"
           />
         </div>
-        <Badge variant="outline" className="gap-1">
+        <Badge variant="outline" className="gap-1 self-start sm:self-auto">
           <UserX className="size-3" />
           {events?.length || 0} unattributed
         </Badge>
       </div>
 
-      <div className="rounded-md border">
-        <Table>
+      <div className="rounded-md border overflow-x-auto">
+        <Table className="min-w-[600px]">
           <TableHeader>
             <TableRow>
               <TableHead>
@@ -239,7 +241,7 @@ export function UnattributedEvents() {
                   Tool
                 </SortButton>
               </TableHead>
-              <TableHead>Event Type</TableHead>
+              <TableHead className="hidden sm:table-cell">Event Type</TableHead>
               <TableHead>
                 <SortButton
                   field="risk_level"
@@ -250,7 +252,7 @@ export function UnattributedEvents() {
                   Risk
                 </SortButton>
               </TableHead>
-              <TableHead>
+              <TableHead className="hidden sm:table-cell">
                 <SortButton
                   field="cost_usd"
                   currentField={sortField}
@@ -270,7 +272,7 @@ export function UnattributedEvents() {
                   Time
                 </SortButton>
               </TableHead>
-              <TableHead className="w-[140px]">Actions</TableHead>
+              <TableHead className="w-[100px] sm:w-[140px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -298,7 +300,7 @@ export function UnattributedEvents() {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden sm:table-cell">
                     <Badge variant="secondary" className="text-xs">
                       {event.eventType || 'unknown'}
                     </Badge>
@@ -306,7 +308,7 @@ export function UnattributedEvents() {
                   <TableCell>
                     <RiskBadge level={event.riskLevel || 'none'} />
                   </TableCell>
-                  <TableCell className="font-mono text-sm">
+                  <TableCell className="hidden sm:table-cell font-mono text-sm">
                     ${Number(event.costUsd ?? 0).toFixed(4)}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">

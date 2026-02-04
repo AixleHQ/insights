@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { UserPlus, Search, Users, LogOut, AlertTriangle, Mail, Clock, X, MoreHorizontal } from 'lucide-react';
+import { UserPlus, Search, Users, LogOut, AlertTriangle, Mail, Clock, X } from 'lucide-react';
 import { useOrg } from '@/contexts/OrgContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganizationMembers, useUpdateMemberRole, useRemoveMember, useLeaveOrganization, useInvitations, useRevokeInvitation } from '@/hooks/useApi';
@@ -37,24 +37,24 @@ function MemberSkeleton() {
         <div className="flex items-center gap-3">
           <Skeleton className="size-8 rounded-full" />
           <div className="space-y-2">
-            <Skeleton className="h-4 w-32" />
-            <Skeleton className="h-3 w-48" />
+            <Skeleton className="h-4 w-24 sm:w-32" />
+            <Skeleton className="h-3 w-32 sm:w-48" />
           </div>
         </div>
       </td>
       <td className="p-4">
-        <Skeleton className="h-8 w-24" />
+        <Skeleton className="h-8 w-20 sm:w-24" />
       </td>
-      <td className="p-4">
+      <td className="hidden sm:table-cell p-4">
         <Skeleton className="h-5 w-16" />
       </td>
-      <td className="p-4">
+      <td className="hidden md:table-cell p-4">
         <Skeleton className="h-4 w-20" />
       </td>
-      <td className="p-4">
+      <td className="hidden lg:table-cell p-4">
         <Skeleton className="h-4 w-20" />
       </td>
-      <td className="p-4">
+      <td className="hidden sm:table-cell p-4">
         <Skeleton className="h-4 w-16" />
       </td>
       <td className="p-4" />
@@ -80,7 +80,7 @@ export function Team() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   const { data: membersData, isLoading } = useOrganizationMembers(currentOrg?.id || '');
-  const { data: invitationsData, isLoading: isLoadingInvitations } = useInvitations(currentOrg?.id || '', 'pending');
+  const { data: invitationsData } = useInvitations(currentOrg?.id || '', 'pending');
   const updateMemberRole = useUpdateMemberRole();
   const removeMember = useRemoveMember();
   const leaveOrganization = useLeaveOrganization();
@@ -183,7 +183,7 @@ export function Team() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Team</h1>
           <p className="text-sm text-muted-foreground">
@@ -199,7 +199,7 @@ export function Team() {
         </Button>
       </div>
 
-      <div className="relative max-w-sm">
+      <div className="relative w-full sm:max-w-sm">
         <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           placeholder="Search members..."
@@ -232,11 +232,11 @@ export function Team() {
         </div>
       )}
 
-      <div className="rounded-md border">
-        <Table>
+      <div className="rounded-md border overflow-x-auto">
+        <Table className="min-w-[600px]">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[250px]">
+              <TableHead className="w-[180px] sm:w-[250px]">
                 <SortButton
                   field="name"
                   currentField={sortField}
@@ -246,7 +246,7 @@ export function Team() {
                   Member
                 </SortButton>
               </TableHead>
-              <TableHead className="w-[120px]">
+              <TableHead className="w-[100px] sm:w-[120px]">
                 <SortButton
                   field="role"
                   currentField={sortField}
@@ -256,7 +256,7 @@ export function Team() {
                   Role
                 </SortButton>
               </TableHead>
-              <TableHead className="w-[100px]">
+              <TableHead className="hidden sm:table-cell w-[100px]">
                 <SortButton
                   field="status"
                   currentField={sortField}
@@ -266,7 +266,7 @@ export function Team() {
                   Status
                 </SortButton>
               </TableHead>
-              <TableHead className="w-[120px]">
+              <TableHead className="hidden md:table-cell w-[120px]">
                 <SortButton
                   field="joined_at"
                   currentField={sortField}
@@ -276,8 +276,8 @@ export function Team() {
                   Joined
                 </SortButton>
               </TableHead>
-              <TableHead className="w-[120px]">Last Active</TableHead>
-              <TableHead className="w-[100px]">
+              <TableHead className="hidden lg:table-cell w-[120px]">Last Active</TableHead>
+              <TableHead className="hidden sm:table-cell w-[100px]">
                 <SortButton
                   field="total_tokens"
                   currentField={sortField}

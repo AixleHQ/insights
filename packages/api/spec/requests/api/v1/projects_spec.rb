@@ -121,4 +121,132 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       expect(json_data.first[:key]).to eq('feature_flag')
     end
   end
+
+  describe 'GET /api/v1/projects/:id/stats' do
+    let!(:project) { create(:project, organization: organization, owner: nil) }
+
+    context 'with events' do
+      before do
+        # Create tool events for this project
+        create(:tool_event, project: project, organization: organization, occurred_at: 1.day.ago, cost_usd: 0.10)
+        create(:tool_event, project: project, organization: organization, occurred_at: 2.days.ago, cost_usd: 0.20)
+        create(:tool_event, project: project, organization: organization, occurred_at: 3.days.ago, cost_usd: 0.15)
+      end
+
+      it 'returns daily event statistics' do
+        authenticated_get "/api/v1/projects/#{project.id}/stats", user: user
+
+        expect_success
+        expect(json_response[:daily]).to be_an(Array)
+        expect(json_response[:totalEvents]).to eq(3)
+        expect(json_response[:totalCost]).to be_within(0.01).of(0.45)
+      end
+
+      it 'respects the days parameter' do
+        authenticated_get "/api/v1/projects/#{project.id}/stats", user: user, params: { days: 1 }
+
+        expect_success
+        expect(json_response[:totalEvents]).to eq(1)
+      end
+    end
+
+    context 'without events' do
+      it 'returns empty stats' do
+        authenticated_get "/api/v1/projects/#{project.id}/stats", user: user
+
+        expect_success
+        expect(json_response[:daily]).to eq([])
+        expect(json_response[:totalEvents]).to eq(0)
+        expect(json_response[:totalCost]).to eq(0.0)
+      end
+    end
+
+    it 'returns 403 for unauthorized users' do
+      authenticated_get "/api/v1/projects/#{project.id}/stats", user: other_user
+
+      expect_forbidden
+    end
+  end
+
+  describe 'GET /api/v1/projects/:id/stats/daily_by_tool' do
+    let!(:project) { create(:project, organization: organization, owner: nil) }
+
+    context 'with events from multiple tools' do
+      before do
+        create(:tool_event, project: project, organization: organization, tool_name: 'claude_code', occurred_at: 1.day.ago)
+        create(:tool_event, project: project, organization: organization, tool_name: 'claude_code', occurred_at: 1.day.ago)
+        create(:tool_event, project: project, organization: organization, tool_name: 'cursor', occurred_at: 1.day.ago)
+        create(:tool_event, project: project, organization: organization, tool_name: 'github_copilot', occurred_at: 2.days.ago)
+      end
+
+      it 'returns daily data grouped by tool' do
+        authenticated_get "/api/v1/projects/#{project.id}/stats/daily_by_tool", user: user
+
+        expect_success
+        expect(json_response[:data]).to be_an(Array)
+        expect(json_response[:tools]).to include('claude_code')
+      end
+
+      it 'includes top tools and Other category' do
+        authenticated_get "/api/v1/projects/#{project.id}/stats/daily_by_tool", user: user
+
+        expect_success
+        expect(json_response[:tools]).to include('Other')
+      end
+    end
+
+    context 'without events' do
+      it 'returns empty data' do
+        authenticated_get "/api/v1/projects/#{project.id}/stats/daily_by_tool", user: user
+
+        expect_success
+        expect(json_response[:data]).to eq([])
+        expect(json_response[:tools]).to eq(['Other'])
+      end
+    end
+  end
+
+  describe 'GET /api/v1/projects/:id/members' do
+    let!(:project) { create(:project, organization: organization, owner: nil) }
+
+    context 'with project members' do
+      let!(:project_membership) { create(:project_membership, project: project, user: user, role: 'owner') }
+
+      it 'returns project members' do
+        authenticated_get "/api/v1/projects/#{project.id}/members", user: user
+
+        expect_success
+        expect(json_response[:data]).to be_an(Array)
+        expect(json_response[:data].length).to eq(1)
+        expect(json_response[:data].first[:userId]).to eq(user.id)
+        expect(json_response[:data].first[:role]).to eq('owner')
+      end
+
+      it 'includes member details' do
+        authenticated_get "/api/v1/projects/#{project.id}/members", user: user
+
+        expect_success
+        member_data = json_response[:data].first
+        expect(member_data).to have_key(:email)
+        expect(member_data).to have_key(:name)
+        expect(member_data).to have_key(:avatarUrl)
+        expect(member_data).to have_key(:joinedAt)
+      end
+    end
+
+    context 'without project members' do
+      it 'returns empty array' do
+        authenticated_get "/api/v1/projects/#{project.id}/members", user: user
+
+        expect_success
+        expect(json_response[:data]).to eq([])
+      end
+    end
+
+    it 'returns 403 for unauthorized users' do
+      authenticated_get "/api/v1/projects/#{project.id}/members", user: other_user
+
+      expect_forbidden
+    end
+  end
 end

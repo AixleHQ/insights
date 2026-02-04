@@ -55,16 +55,24 @@ export interface Project {
   name: string;
   description: string | null;
   organization_id: string | null;
+  organizationId?: string | null;
   repository_url: string | null;
+  repositoryUrl?: string | null;
   is_active: boolean;
+  isActive?: boolean;
   created_at: string;
+  createdAt?: string;
   updated_at: string;
+  updatedAt?: string;
 }
 
 export interface ProjectWithStats extends Project {
   event_count: number;
+  eventCount?: number;
   total_cost_usd: number;
+  totalCostUsd?: number;
   last_event_at: string | null;
+  lastEventAt?: string | null;
   connectors: { id: string; provider: string }[];
 }
 

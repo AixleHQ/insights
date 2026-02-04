@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { Activity, Calendar, Zap } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -28,7 +28,8 @@ interface ActivityHeatmapProps {
   className?: string;
 }
 
-const DAYS_OF_WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAYS_OF_WEEK_FULL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAYS_OF_WEEK_SHORT = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 const TOOL_COLORS: Record<string, string> = {
@@ -40,7 +41,7 @@ const TOOL_COLORS: Record<string, string> = {
 };
 
 function getIntensityClass(count: number, maxCount: number): string {
-  if (count === 0) return 'bg-muted/30 border border-muted/50';
+  if (count === 0) return 'bg-muted/30 dark:bg-muted/20';
   const intensity = count / maxCount;
   if (intensity < 0.25) return 'bg-emerald-400/40 dark:bg-emerald-500/30';
   if (intensity < 0.5) return 'bg-emerald-400/60 dark:bg-emerald-500/50';
@@ -150,7 +151,41 @@ function DayTooltip({ day }: { day: DayData }) {
   );
 }
 
+// Calculate optimal weeks to display based on container width
+function calculateWeeksToShow(containerWidth: number): number {
+  // Each cell needs minimum ~8px + 2px gap = 10px, plus day labels ~24px
+  // So available width for cells = containerWidth - 24
+  const availableWidth = containerWidth - 24;
+  const cellSize = 10; // minimum cell width + gap
+  const maxWeeks = Math.floor(availableWidth / cellSize);
+
+  // Clamp between 12 (3 months) and 53 (full year)
+  return Math.max(12, Math.min(53, maxWeeks));
+}
+
 export function ActivityHeatmap({ data, className }: ActivityHeatmapProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [weeksToShow, setWeeksToShow] = useState(53);
+  const [isCompact, setIsCompact] = useState(false);
+
+  // Observe container width changes
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) {
+        const width = entry.contentRect.width;
+        setWeeksToShow(calculateWeeksToShow(width));
+        setIsCompact(width < 500);
+      }
+    });
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
   const { weeks, months, maxCount, totalEvents, totalTokens, activeDays } = useMemo(() => {
     // Create a map of date -> data
     const countMap = new Map<string, ActivityData>();
@@ -167,10 +202,11 @@ export function ActivityHeatmap({ data, className }: ActivityHeatmapProps) {
       if (item.count > 0) active++;
     });
 
-    // Generate last 52 weeks of data
+    // Generate weeks of data based on weeksToShow
     const today = new Date();
+    const daysToGoBack = (weeksToShow - 1) * 7;
     const startDate = new Date(today);
-    startDate.setDate(startDate.getDate() - 364); // Go back ~52 weeks
+    startDate.setDate(startDate.getDate() - daysToGoBack);
 
     // Adjust to start on Sunday
     const dayOfWeek = startDate.getDay();
@@ -227,17 +263,20 @@ export function ActivityHeatmap({ data, className }: ActivityHeatmapProps) {
       totalTokens: tokens,
       activeDays: active,
     };
-  }, [data]);
+  }, [data, weeksToShow]);
+
+  const dayLabels = isCompact ? DAYS_OF_WEEK_SHORT : DAYS_OF_WEEK_FULL;
+  const labelWidth = isCompact ? 16 : 28;
 
   return (
-    <div className={cn('rounded-xl border bg-card p-6', className)}>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+    <div ref={containerRef} className={cn('rounded-xl border bg-card p-4 sm:p-6', className)}>
+      {/* Header - stacks on mobile */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 mb-4 sm:mb-6">
         <div className="flex items-center gap-2">
-          <Activity className="size-5 text-emerald-500" />
-          <span className="font-semibold">Activity</span>
+          <Activity className="size-4 sm:size-5 text-emerald-500" />
+          <span className="font-semibold text-sm sm:text-base">Activity</span>
         </div>
-        <div className="flex items-center gap-6 text-sm text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-3 sm:gap-6 text-xs sm:text-sm text-muted-foreground">
           <span>
             <span className="text-foreground font-medium">{formatNumber(totalEvents)}</span> events
           </span>
@@ -252,82 +291,102 @@ export function ActivityHeatmap({ data, className }: ActivityHeatmapProps) {
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <div className="min-w-fit">
-          {/* Month labels */}
-          <div className="flex mb-2" style={{ paddingLeft: '44px' }}>
-            {months.map((month, i) => {
-              const nextMonth = months[i + 1];
-              const colWidth = (weeks.length > 0) ? 100 / weeks.length : 1;
-              const widthPercent = nextMonth
-                ? (nextMonth.weekIndex - month.weekIndex) * colWidth
-                : (weeks.length - month.weekIndex) * colWidth;
+      {/* Heatmap container */}
+      <div className="w-full">
+        {/* Month labels */}
+        <div
+          className="flex mb-1 sm:mb-2 text-[10px] sm:text-xs text-muted-foreground"
+          style={{ paddingLeft: `${labelWidth + 4}px` }}
+        >
+          {months.map((month, i) => {
+            const nextMonth = months[i + 1];
+            const colWidth = (weeks.length > 0) ? 100 / weeks.length : 1;
+            const widthPercent = nextMonth
+              ? (nextMonth.weekIndex - month.weekIndex) * colWidth
+              : (weeks.length - month.weekIndex) * colWidth;
 
-              return (
-                <div
-                  key={`${month.label}-${i}`}
-                  className="text-sm text-muted-foreground"
-                  style={{ width: `${widthPercent}%` }}
-                >
-                  {month.label}
-                </div>
-              );
-            })}
+            // Skip month label if it would be too cramped
+            if (widthPercent < 5) return null;
+
+            return (
+              <div
+                key={`${month.label}-${i}`}
+                style={{ width: `${widthPercent}%` }}
+              >
+                {month.label}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="flex items-stretch">
+          {/* Day of week labels */}
+          <div
+            className="grid grid-rows-7 gap-[1px] sm:gap-[2px] mr-1 text-[10px] sm:text-xs text-muted-foreground shrink-0"
+            style={{ width: `${labelWidth}px` }}
+          >
+            {dayLabels.map((day, idx) => (
+              <div
+                key={`${day}-${idx}`}
+                className="flex items-center justify-end h-full"
+              >
+                {/* Only show every other day label on very compact views */}
+                {isCompact ? (idx % 2 === 1 ? day : '') : day}
+              </div>
+            ))}
           </div>
 
-          <div className="flex items-stretch">
-            {/* Day of week labels */}
-            <div className="grid grid-rows-7 gap-1 mr-3 text-sm text-muted-foreground shrink-0" style={{ width: '32px' }}>
-              {DAYS_OF_WEEK.map((day) => (
-                <div key={day} className="flex items-center justify-end pr-1">
-                  {day}
-                </div>
-              ))}
-            </div>
-
-            {/* Heatmap grid */}
-            <div className="flex-1 grid gap-1" style={{ gridTemplateColumns: `repeat(${weeks.length}, 1fr)` }}>
-              {weeks.map((week, weekIdx) => (
-                <div key={weekIdx} className="grid grid-rows-7 gap-1">
-                  {DAYS_OF_WEEK.map((_, dayIdx) => {
-                    const day = week.find((d) => d.dayOfWeek === dayIdx);
-                    if (!day) {
-                      return <div key={dayIdx} className="aspect-square w-full" />;
-                    }
-                    return (
-                      <Tooltip key={dayIdx} delayDuration={100}>
-                        <TooltipTrigger asChild>
-                          <div
-                            className={cn(
-                              'aspect-square w-full rounded transition-all cursor-default',
-                              getIntensityClass(day.count, maxCount),
-                              day.count > 0 && 'hover:ring-2 hover:ring-emerald-400/50'
-                            )}
-                          />
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="bg-popover text-popover-foreground border shadow-md p-3">
-                          <DayTooltip day={day} />
-                        </TooltipContent>
-                      </Tooltip>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
+          {/* Heatmap grid */}
+          <div
+            className="flex-1 grid gap-[1px] sm:gap-[2px]"
+            style={{
+              gridTemplateColumns: `repeat(${weeks.length}, minmax(0, 1fr))`,
+            }}
+          >
+            {weeks.map((week, weekIdx) => (
+              <div key={weekIdx} className="grid grid-rows-7 gap-[1px] sm:gap-[2px]">
+                {[0, 1, 2, 3, 4, 5, 6].map((dayIdx) => {
+                  const day = week.find((d) => d.dayOfWeek === dayIdx);
+                  if (!day) {
+                    return <div key={dayIdx} className="aspect-square w-full" />;
+                  }
+                  return (
+                    <Tooltip key={dayIdx} delayDuration={100}>
+                      <TooltipTrigger asChild>
+                        <div
+                          className={cn(
+                            'aspect-square w-full rounded-[2px] sm:rounded-sm transition-colors cursor-default',
+                            getIntensityClass(day.count, maxCount),
+                            day.count > 0 && 'hover:ring-1 hover:ring-emerald-400/50 hover:ring-offset-1 hover:ring-offset-background'
+                          )}
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent
+                        side="top"
+                        className="bg-popover text-popover-foreground border shadow-lg p-3 z-50"
+                        sideOffset={5}
+                      >
+                        <DayTooltip day={day} />
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </div>
+            ))}
           </div>
+        </div>
 
-          {/* Legend */}
-          <div className="flex items-center justify-end gap-2 mt-4 text-xs text-muted-foreground">
-            <span>Less</span>
-            <div className="flex gap-1">
-              <div className="w-3 h-3 rounded bg-muted/30 border border-muted/50" />
-              <div className="w-3 h-3 rounded bg-emerald-400/40 dark:bg-emerald-500/30" />
-              <div className="w-3 h-3 rounded bg-emerald-400/60 dark:bg-emerald-500/50" />
-              <div className="w-3 h-3 rounded bg-emerald-400/80 dark:bg-emerald-500/70" />
-              <div className="w-3 h-3 rounded bg-emerald-500 dark:bg-emerald-400" />
-            </div>
-            <span>More</span>
+        {/* Legend */}
+        <div className="flex items-center justify-end gap-1.5 sm:gap-2 mt-3 sm:mt-4 text-[10px] sm:text-xs text-muted-foreground">
+          <span>Less</span>
+          <div className="flex gap-[2px] sm:gap-1">
+            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded bg-muted/30 dark:bg-muted/20" />
+            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded bg-emerald-400/40 dark:bg-emerald-500/30" />
+            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded bg-emerald-400/60 dark:bg-emerald-500/50" />
+            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded bg-emerald-400/80 dark:bg-emerald-500/70" />
+            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded bg-emerald-500 dark:bg-emerald-400" />
           </div>
+          <span>More</span>
         </div>
       </div>
     </div>

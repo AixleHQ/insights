@@ -1,0 +1,10 @@
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="db90-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B5FFF"/>
+      <stop offset="100%" style="stop-color:#6B3FDF"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="12" fill="url(#db90-gradient)"/>
+  <text x="24" y="32" font-family="ui-monospace, SFMono-Regular, SF Mono, Menlo, monospace" font-size="20" font-weight="bold" fill="#0F0F1E" text-anchor="middle">90</text>
+</svg>

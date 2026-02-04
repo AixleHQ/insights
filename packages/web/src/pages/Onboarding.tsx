@@ -121,7 +121,7 @@ function formatDate(dateString: string): string {
 
 export function Onboarding() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { profile } = useAuth();
   const { organizations, isInitialized, refreshOrganizations, setCurrentOrg } = useOrg();
 
   // Redirect to dashboard if user already has organizations
@@ -206,7 +206,12 @@ export function Onboarding() {
 
       // Set the new org as current if we have it
       if (result) {
-        setCurrentOrg(result);
+        setCurrentOrg({
+          id: result.id,
+          name: result.name,
+          slug: result.slug,
+          is_active: true,
+        });
       }
 
       setCreateDialogOpen(false);
@@ -240,9 +245,9 @@ export function Onboarding() {
             </div>
             <span className="text-lg font-semibold tracking-tight">DB90</span>
           </div>
-          {user && (
+          {profile && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span>{user.email}</span>
+              <span>{profile.email}</span>
             </div>
           )}
         </div>

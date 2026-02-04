@@ -12,7 +12,14 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useOrg } from '@/contexts/OrgContext';
-import { useProject, useEvents, useDeleteProject } from '@/hooks/useApi';
+import {
+  useProject,
+  useEvents,
+  useDeleteProject,
+  useProjectDailyByTool,
+  useProjectMembers,
+  useProjectRepositories,
+} from '@/hooks/useApi';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -32,6 +39,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { EventsTable, EventDrawer, type EventRow } from '@/components/events';
+import { ToolUsageByDayChart } from '@/components/dashboard';
+import { ProjectTeamSection, ProjectReposSection } from '@/components/project';
 import { formatDistanceToNow } from '@/lib/utils';
 
 function formatCurrency(value: number): string {
@@ -84,6 +93,9 @@ export function ProjectDetail() {
     currentOrg?.id || '',
     { project_id: id, per_page: 10 }
   );
+  const { data: dailyByToolData, isLoading: isLoadingDailyByTool } = useProjectDailyByTool(id || '');
+  const { data: projectMembers, isLoading: isLoadingMembers } = useProjectMembers(id || '');
+  const { data: projectRepositories, isLoading: isLoadingRepositories } = useProjectRepositories(id || '');
   const deleteProject = useDeleteProject();
 
   // Transform events for the table
@@ -143,7 +155,7 @@ export function ProjectDetail() {
             <Skeleton className="h-4 w-64" />
           </div>
         </div>
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-24" />
           ))}
@@ -179,8 +191,8 @@ export function ProjectDetail() {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-xl font-semibold">{project.name}</h1>
-              <Badge variant={project.is_active ? 'default' : 'secondary'}>
-                {project.is_active ? 'Active' : 'Inactive'}
+              <Badge variant={(project.is_active ?? project.isActive) ? 'default' : 'secondary'}>
+                {(project.is_active ?? project.isActive) ? 'Active' : 'Inactive'}
               </Badge>
             </div>
             <p className="text-sm text-muted-foreground">{project.description}</p>
@@ -210,26 +222,47 @@ export function ProjectDetail() {
         </DropdownMenu>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      {/* Tool Usage Chart */}
+      {dailyByToolData && dailyByToolData.data && dailyByToolData.data.length > 0 && (
+        <ToolUsageByDayChart
+          data={dailyByToolData.data}
+          tools={dailyByToolData.tools}
+          isLoading={isLoadingDailyByTool}
+        />
+      )}
+
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
         <StatCard
           icon={Activity}
           label="Total Events"
-          value={(project.event_count ?? 0).toLocaleString()}
+          value={(project.event_count ?? project.eventCount ?? 0).toLocaleString()}
         />
         <StatCard
           icon={DollarSign}
           label="Total Cost"
-          value={formatCurrency(project.total_cost_usd ?? 0)}
+          value={formatCurrency(project.total_cost_usd ?? project.totalCostUsd ?? 0)}
         />
         <StatCard
           icon={Calendar}
           label="Created"
-          value={new Date(project.created_at).toLocaleDateString()}
+          value={new Date(project.createdAt || project.created_at).toLocaleDateString()}
         />
         <StatCard
           icon={GitBranch}
           label="Last Activity"
-          value={project.last_event_at ? formatDistanceToNow(project.last_event_at) : 'Never'}
+          value={project.last_event_at || project.lastEventAt ? formatDistanceToNow(project.last_event_at || project.lastEventAt!) : 'Never'}
+        />
+      </div>
+
+      {/* Team and Repositories */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <ProjectTeamSection
+          members={projectMembers}
+          isLoading={isLoadingMembers}
+        />
+        <ProjectReposSection
+          repositories={projectRepositories}
+          isLoading={isLoadingRepositories}
         />
       </div>
 

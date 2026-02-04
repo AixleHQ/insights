@@ -3,7 +3,7 @@
 module Api
   module V1
     class ProjectsController < BaseController
-      before_action :set_project, only: %i[show update destroy settings update_setting destroy_setting]
+      before_action :set_project, only: %i[show update destroy settings update_setting destroy_setting stats daily_by_tool members]
 
       # GET /api/v1/projects
       # GET /api/v1/organizations/:organization_id/projects
@@ -115,6 +115,106 @@ module Api
         setting = @project.project_settings.find_by!(key: params[:key])
         setting.destroy!
         render_no_content
+      end
+
+      # GET /api/v1/projects/:id/stats
+      def stats
+        authorize! @project, to: :show?
+
+        days = (params[:days] || 30).to_i
+        time_range_start = days.days.ago.beginning_of_day
+        time_range_end = Time.current
+
+        events = @project.tool_events.where(occurred_at: time_range_start..time_range_end)
+
+        daily_data = events
+          .group("DATE_TRUNC('day', occurred_at)")
+          .select(
+            "DATE_TRUNC('day', occurred_at) as day",
+            'COUNT(*) as event_count',
+            'SUM(cost_usd) as cost_usd'
+          )
+          .order('day')
+          .map do |row|
+            {
+              date: row.day&.to_date&.iso8601,
+              eventCount: row.event_count,
+              costUsd: (row.cost_usd || 0).to_f
+            }
+          end
+
+        render json: {
+          daily: daily_data,
+          totalEvents: events.count,
+          totalCost: events.sum(:cost_usd).to_f
+        }
+      end
+
+      # GET /api/v1/projects/:id/stats/daily_by_tool
+      def daily_by_tool
+        authorize! @project, to: :show?
+
+        days = (params[:days] || 30).to_i
+        time_range_start = days.days.ago.beginning_of_day
+        time_range_end = Time.current
+
+        events = @project.tool_events.where(occurred_at: time_range_start..time_range_end)
+
+        # Get top tools by total event count
+        top_tools = events
+          .group(:tool_name)
+          .order(Arel.sql('COUNT(*) DESC'))
+          .limit(3)
+          .pluck(:tool_name)
+
+        # Get daily data grouped by date and tool
+        daily_tool_data = events
+          .group("DATE_TRUNC('day', occurred_at)", :tool_name)
+          .select(
+            "DATE_TRUNC('day', occurred_at) as day",
+            'tool_name',
+            'COUNT(*) as event_count'
+          )
+          .order('day')
+
+        # Transform into chart-friendly format
+        date_map = {}
+        daily_tool_data.each do |row|
+          date = row.day&.to_date&.iso8601
+          next unless date
+
+          date_map[date] ||= { date: date }
+          tool_key = top_tools.include?(row.tool_name) ? row.tool_name : 'Other'
+          date_map[date][tool_key] ||= 0
+          date_map[date][tool_key] += row.event_count
+        end
+
+        render json: {
+          data: date_map.values.sort_by { |d| d[:date] },
+          tools: top_tools + ['Other']
+        }
+      end
+
+      # GET /api/v1/projects/:id/members
+      def members
+        authorize! @project, to: :show?
+
+        project_members = @project.project_memberships.includes(:user)
+
+        members_data = project_members.map do |pm|
+          user = pm.user
+          {
+            id: pm.id,
+            userId: user.id,
+            email: user.email,
+            name: user.name,
+            avatarUrl: user.avatar_url,
+            role: pm.role,
+            joinedAt: pm.created_at.iso8601
+          }
+        end
+
+        render json: { data: members_data }
       end
 
       private

@@ -70,7 +70,7 @@ function getRoleDescription(role: string): string {
 export function InvitationAccept() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, profile } = useAuth();
   const { refreshOrganizations, setCurrentOrg } = useOrg();
 
   const [isAccepting, setIsAccepting] = useState(false);
@@ -107,9 +107,7 @@ export function InvitationAccept() {
             id: result.data.organization.id,
             name: result.data.organization.name,
             slug: result.data.organization.slug,
-            logo_url: null,
-            created_at: '',
-            updated_at: '',
+            is_active: true,
           });
         }
         navigate('/profile');
@@ -148,9 +146,9 @@ export function InvitationAccept() {
             </div>
             <span className="text-lg font-semibold tracking-tight">DB90</span>
           </Link>
-          {user && (
+          {profile && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span>{user.email}</span>
+              <span>{profile.email}</span>
             </div>
           )}
         </div>

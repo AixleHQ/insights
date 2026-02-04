@@ -96,11 +96,11 @@ export function EventsTable({
   className,
 }: EventsTableProps) {
   return (
-    <div className={cn('rounded-md border', className)}>
-      <Table>
+    <div className={cn('rounded-md border overflow-x-auto', className)}>
+      <Table className="min-w-[700px]">
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[140px]">
+            <TableHead className="w-[120px] sm:w-[140px]">
               <SortButton
                 field="tool_name"
                 currentField={sortField}
@@ -110,8 +110,8 @@ export function EventsTable({
                 Tool
               </SortButton>
             </TableHead>
-            <TableHead className="w-[120px]">Type</TableHead>
-            <TableHead className="w-[100px]">
+            <TableHead className="hidden sm:table-cell w-[100px]">Type</TableHead>
+            <TableHead className="w-[80px] sm:w-[100px]">
               <SortButton
                 field="risk_level"
                 currentField={sortField}
@@ -121,9 +121,9 @@ export function EventsTable({
                 Risk
               </SortButton>
             </TableHead>
-            <TableHead>User</TableHead>
-            <TableHead>Project</TableHead>
-            <TableHead className="w-[100px]">
+            <TableHead className="hidden md:table-cell">User</TableHead>
+            <TableHead className="hidden lg:table-cell">Project</TableHead>
+            <TableHead className="w-[80px] sm:w-[100px]">
               <SortButton
                 field="cost_usd"
                 currentField={sortField}
@@ -133,8 +133,8 @@ export function EventsTable({
                 Cost
               </SortButton>
             </TableHead>
-            <TableHead className="w-[80px]">Tokens</TableHead>
-            <TableHead className="w-[120px]">
+            <TableHead className="hidden sm:table-cell w-[80px]">Tokens</TableHead>
+            <TableHead className="w-[100px] sm:w-[120px]">
               <SortButton
                 field="created_at"
                 currentField={sortField}
@@ -166,11 +166,11 @@ export function EventsTable({
                 onClick={() => onEventClick?.(event.id)}
               >
                 <TableCell>
-                  <span className="font-medium">
+                  <span className="font-medium text-sm">
                     {humanizeToolName(event.tool_name)}
                   </span>
                 </TableCell>
-                <TableCell>
+                <TableCell className="hidden sm:table-cell">
                   <span className="text-xs capitalize text-muted-foreground">
                     {(event.event_type || 'unknown').replace('_', ' ')}
                   </span>
@@ -178,13 +178,13 @@ export function EventsTable({
                 <TableCell>
                   <RiskBadge level={event.risk_level || 'none'} />
                 </TableCell>
-                <TableCell>
-                  <span className="text-sm text-muted-foreground">
+                <TableCell className="hidden md:table-cell">
+                  <span className="text-sm text-muted-foreground truncate max-w-[150px] block">
                     {event.user?.email || '-'}
                   </span>
                 </TableCell>
-                <TableCell>
-                  <span className="text-sm text-muted-foreground">
+                <TableCell className="hidden lg:table-cell">
+                  <span className="text-sm text-muted-foreground truncate max-w-[120px] block">
                     {event.project?.name || '-'}
                   </span>
                 </TableCell>
@@ -193,13 +193,13 @@ export function EventsTable({
                     {formatCost(event.cost_usd)}
                   </span>
                 </TableCell>
-                <TableCell>
+                <TableCell className="hidden sm:table-cell">
                   <span className="font-mono-display text-sm text-muted-foreground">
                     {formatTokens(event.token_count)}
                   </span>
                 </TableCell>
                 <TableCell>
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-xs sm:text-sm text-muted-foreground">
                     {formatDistanceToNow(event.created_at)}
                   </span>
                 </TableCell>

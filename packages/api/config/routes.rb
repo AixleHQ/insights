@@ -105,6 +105,9 @@ Rails.application.routes.draw do
           get :settings
           put 'settings/:key', action: :update_setting
           delete 'settings/:key', action: :destroy_setting
+          get :stats
+          get 'stats/daily_by_tool', action: :daily_by_tool
+          get :members
         end
 
         # Project members

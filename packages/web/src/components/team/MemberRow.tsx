@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MoreHorizontal, Shield, ShieldCheck, User, Eye, Trash2 } from 'lucide-react';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,6 +27,7 @@ export interface MemberData {
   id: string;
   email: string;
   name?: string;
+  avatar_url?: string | null;
   role: MemberRole;
   status: 'active' | 'pending' | 'inactive';
   joined_at?: string;
@@ -107,6 +108,7 @@ export function MemberRow({
           className="flex items-center gap-3 rounded-md transition-colors hover:bg-muted/50 -m-2 p-2"
         >
           <Avatar className="size-8">
+            {member.avatar_url && <AvatarImage src={member.avatar_url} alt={member.name || member.email} />}
             <AvatarFallback className="text-xs bg-muted">
               {getInitials(member.name, member.email)}
             </AvatarFallback>
@@ -144,7 +146,7 @@ export function MemberRow({
           </div>
         )}
       </TableCell>
-      <TableCell>
+      <TableCell className="hidden sm:table-cell">
         <Badge
           variant={member.status === 'active' ? 'default' : 'secondary'}
           className="text-xs"
@@ -152,15 +154,15 @@ export function MemberRow({
           {member.status === 'pending' ? 'Pending' : member.status}
         </Badge>
       </TableCell>
-      <TableCell className="text-sm text-muted-foreground">
+      <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
         {member.joined_at ? formatDistanceToNow(member.joined_at) : '-'}
       </TableCell>
-      <TableCell className="text-sm text-muted-foreground">
+      <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
         {member.last_active_at
           ? formatDistanceToNow(member.last_active_at)
           : '-'}
       </TableCell>
-      <TableCell className="font-mono-display text-sm">
+      <TableCell className="hidden sm:table-cell font-mono-display text-sm">
         {member.total_tokens !== undefined && member.total_tokens > 0
           ? formatTokens(member.total_tokens)
           : '-'}

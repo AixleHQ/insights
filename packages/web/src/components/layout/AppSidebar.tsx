@@ -8,7 +8,6 @@ import {
   Users,
   Settings,
   ChevronDown,
-  Building2,
   LogOut,
   ChevronsUpDown,
   Plus,
