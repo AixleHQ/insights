@@ -34,7 +34,7 @@ module Api
     # (api_only mode strips it out by default, breaking PATCH/DELETE form submissions)
     config.middleware.use Rack::MethodOverride
     config.middleware.use ActionDispatch::Cookies
-    config.middleware.use ActionDispatch::Session::CookieStore, key: '_db90_admin_session'
+    config.middleware.use ActionDispatch::Session::CookieStore, key: "_db90_admin_session"
     config.middleware.use ActionDispatch::Flash
 
     # Use SQL format for schema to preserve raw SQL (TimescaleDB, custom types, etc.)

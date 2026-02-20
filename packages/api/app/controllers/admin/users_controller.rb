@@ -11,7 +11,7 @@ module Admin
 
       if resource.save
         redirect_to(
-          [namespace, resource],
+          [ namespace, resource ],
           notice: translate_with_resource("create.success")
         )
       else
@@ -25,8 +25,8 @@ module Admin
 
       AdminAuditLog.create!(
         admin_user: current_admin_user,
-        action: 'impersonate',
-        resource_type: 'User',
+        action: "impersonate",
+        resource_type: "User",
         resource_id: user.id,
         metadata: { impersonated_user_email: user.email },
         ip_address: request.remote_ip,
@@ -40,14 +40,14 @@ module Admin
       )
 
       # Redirect to frontend with impersonation token
-      frontend_url = ENV.fetch('FRONTEND_URL', 'http://localhost:5173')
+      frontend_url = ENV.fetch("FRONTEND_URL", "http://localhost:5173")
       redirect_to "#{frontend_url}/?impersonate=#{token}", allow_other_host: true
     end
 
     def stop_impersonation
       session.delete(:impersonated_user_id)
       session.delete(:admin_user_id)
-      redirect_to admin_users_path, notice: 'Stopped impersonating user.'
+      redirect_to admin_users_path, notice: "Stopped impersonating user."
     end
 
     def export
@@ -62,11 +62,11 @@ module Admin
     private
 
     def generate_csv(users)
-      require 'csv'
+      require "csv"
       CSV.generate(headers: true) do |csv|
         csv << %w[id email name global_admin created_at]
         users.find_each do |user|
-          csv << [user.id, user.email, user.name, user.global_admin, user.created_at]
+          csv << [ user.id, user.email, user.name, user.global_admin, user.created_at ]
         end
       end
     end

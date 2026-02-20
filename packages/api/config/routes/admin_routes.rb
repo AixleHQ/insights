@@ -4,23 +4,23 @@
 # In API-only mode, we must manually define all routes including :new and :edit
 namespace :admin do
   # Session routes
-  get 'login', to: 'sessions#new'
-  post 'login', to: 'sessions#create'
-  delete 'logout', to: 'sessions#destroy'
-  get 'logout', to: 'sessions#destroy'
+  get "login", to: "sessions#new"
+  post "login", to: "sessions#create"
+  delete "logout", to: "sessions#destroy"
+  get "logout", to: "sessions#destroy"
 
   # Read-only resources with export
-  resources :admin_audit_logs, only: [:index, :show] do
+  resources :admin_audit_logs, only: [ :index, :show ] do
     collection do
       get :export
     end
   end
-  resources :audit_logs, only: [:index, :show] do
+  resources :audit_logs, only: [ :index, :show ] do
     collection do
       get :export
     end
   end
-  resources :tool_events, only: [:index, :show] do
+  resources :tool_events, only: [ :index, :show ] do
     collection do
       get :export
     end
@@ -46,23 +46,23 @@ namespace :admin do
   end
 
   # Special user actions
-  post 'users/:id/impersonate', to: 'users#impersonate'
+  post "users/:id/impersonate", to: "users#impersonate"
 
   # Special connector actions
-  post 'organization_connectors/:id/force_sync', to: 'organization_connectors#force_sync', as: :force_sync_organization_connector
-  post 'organization_connectors/:id/revoke', to: 'organization_connectors#revoke', as: :revoke_organization_connector
+  post "organization_connectors/:id/force_sync", to: "organization_connectors#force_sync", as: :force_sync_organization_connector
+  post "organization_connectors/:id/revoke", to: "organization_connectors#revoke", as: :revoke_organization_connector
 
   # Special sanitization policy actions
-  post 'sanitization_policies/:id/activate', to: 'sanitization_policies#activate', as: :activate_sanitization_policy
-  post 'sanitization_policies/:id/deactivate', to: 'sanitization_policies#deactivate', as: :deactivate_sanitization_policy
+  post "sanitization_policies/:id/activate", to: "sanitization_policies#activate", as: :activate_sanitization_policy
+  post "sanitization_policies/:id/deactivate", to: "sanitization_policies#deactivate", as: :deactivate_sanitization_policy
 
-  root to: 'home#index'
+  root to: "home#index"
 end
 
 # Named route helpers defined outside the namespace so the `as:` values are not
 # auto-prefixed with "admin_". This gives us new_admin_user_path, edit_admin_user_path,
 # etc. — the conventions expected by Administrate views and polymorphic_path helpers.
-scope path: '/admin', module: 'admin' do
+scope path: "/admin", module: "admin" do
   %w[organizations organization_connectors organization_memberships
      organization_retention_policies projects project_memberships
      repositories sanitization_policies users user_tool_accounts].each do |res|
@@ -71,5 +71,5 @@ scope path: '/admin', module: 'admin' do
     get "#{res}/:id/edit", to: "#{res}#edit", as: :"edit_admin_#{singular}"
   end
 
-  post 'users/:id/impersonate', to: 'users#impersonate', as: :impersonate_admin_user
+  post "users/:id/impersonate", to: "users#impersonate", as: :impersonate_admin_user
 end
