@@ -2,6 +2,24 @@
 
 module Admin
   class UsersController < Admin::ApplicationController
+    # Administrate's default create doesn't set keycloak_sub, which is required.
+    # Generate a placeholder so admins can create users; UserSyncService will
+    # replace it with the real Keycloak sub when the user first logs in (email match).
+    def create
+      resource = resource_class.new(resource_params)
+      resource.keycloak_sub ||= "pending-#{SecureRandom.uuid}"
+
+      if resource.save
+        redirect_to(
+          [namespace, resource],
+          notice: translate_with_resource("create.success")
+        )
+      else
+        render :new, locals: { page: Administrate::Page::Form.new(dashboard, resource) },
+               status: :unprocessable_entity
+      end
+    end
+
     def impersonate
       user = User.find(params[:id])
 
