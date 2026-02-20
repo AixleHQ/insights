@@ -29,9 +29,12 @@ module Api
     # Skip views, helpers and assets when generating a new resource.
     config.api_only = true
 
-    # Add session/flash middleware for admin panel (Administrate requires these)
+    # Add session/flash/method-override middleware for admin panel (Administrate requires these)
+    # Rack::MethodOverride is needed so form_with's hidden _method field is respected
+    # (api_only mode strips it out by default, breaking PATCH/DELETE form submissions)
+    config.middleware.use Rack::MethodOverride
     config.middleware.use ActionDispatch::Cookies
-    config.middleware.use ActionDispatch::Session::CookieStore, key: '_db90_admin_session'
+    config.middleware.use ActionDispatch::Session::CookieStore, key: "_db90_admin_session"
     config.middleware.use ActionDispatch::Flash
 
     # Use SQL format for schema to preserve raw SQL (TimescaleDB, custom types, etc.)
