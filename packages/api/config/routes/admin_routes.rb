@@ -27,18 +27,19 @@ namespace :admin do
   end
 
   # Full CRUD - manually define to include new/edit in API-only mode
-  # Use standard Rails route naming: new_admin_resource, edit_admin_resource
+  # Named routes follow Rails conventions: admin_users, admin_user,
+  # new_admin_user, edit_admin_user — required for polymorphic_path and form_with.
   %w[organizations organization_connectors organization_memberships
      organization_retention_policies projects project_memberships
      repositories sanitization_policies users user_tool_accounts].each do |res|
     singular = res.singularize
     get res, to: "#{res}#index", as: res.to_sym
-    get "#{res}/export", to: "#{res}#export"
-    post "#{res}/batch_delete", to: "#{res}#batch_delete"
-    get "#{res}/new", to: "#{res}#new"
+    get "#{res}/export", to: "#{res}#export", as: :"export_admin_#{res}"
+    post "#{res}/batch_delete", to: "#{res}#batch_delete", as: :"batch_delete_admin_#{res}"
+    get "#{res}/new", to: "#{res}#new", as: :"new_admin_#{singular}"
     post res, to: "#{res}#create"
     get "#{res}/:id", to: "#{res}#show", as: singular.to_sym
-    get "#{res}/:id/edit", to: "#{res}#edit"
+    get "#{res}/:id/edit", to: "#{res}#edit", as: :"edit_admin_#{singular}"
     patch "#{res}/:id", to: "#{res}#update"
     put "#{res}/:id", to: "#{res}#update"
     delete "#{res}/:id", to: "#{res}#destroy"
@@ -58,18 +59,7 @@ namespace :admin do
   root to: 'home#index'
 end
 
-# Add the new/edit route names outside the namespace with proper naming
+# Named route helpers for special user actions (outside namespace to set custom as: name)
 scope path: '/admin', module: 'admin' do
-  %w[organizations organization_connectors organization_memberships
-     organization_retention_policies projects project_memberships
-     repositories sanitization_policies users user_tool_accounts].each do |res|
-    singular = res.singularize
-    get "#{res}/new", to: "#{res}#new", as: :"new_admin_#{singular}"
-    get "#{res}/:id/edit", to: "#{res}#edit", as: :"edit_admin_#{singular}"
-    get "#{res}/export", to: "#{res}#export", as: :"export_admin_#{res}"
-    post "#{res}/batch_delete", to: "#{res}#batch_delete", as: :"batch_delete_admin_#{res}"
-  end
-
-  # Special user actions
   post 'users/:id/impersonate', to: 'users#impersonate', as: :impersonate_admin_user
 end
