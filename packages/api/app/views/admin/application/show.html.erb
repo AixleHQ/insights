@@ -22,10 +22,10 @@
           class: "inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-700 bg-white border border-zinc-200 rounded-md hover:bg-zinc-50 transition-colors" %>
     <% end %>
     <% if accessible_action?(page.resource, :destroy) %>
-      <%= link_to "Delete",
+      <%= button_to "Delete",
           polymorphic_path([namespace, page.resource]),
           method: :delete,
-          data: { confirm: "Are you sure you want to delete this #{page.resource_name.titleize}?" },
+          form: { data: { turbo_confirm: "Are you sure you want to delete this #{page.resource_name.titleize}?" } },
           class: "inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 transition-colors" %>
     <% end %>
   </div>
