@@ -27,8 +27,8 @@ namespace :admin do
   end
 
   # Full CRUD - manually define to include new/edit in API-only mode
-  # Named routes follow Rails conventions: admin_users, admin_user,
-  # new_admin_user, edit_admin_user — required for polymorphic_path and form_with.
+  # new/edit routes have no `as:` here — named helpers are registered below
+  # outside the namespace block to get the correct new_admin_*/edit_admin_* names.
   %w[organizations organization_connectors organization_memberships
      organization_retention_policies projects project_memberships
      repositories sanitization_policies users user_tool_accounts].each do |res|
@@ -36,10 +36,10 @@ namespace :admin do
     get res, to: "#{res}#index", as: res.to_sym
     get "#{res}/export", to: "#{res}#export", as: :"export_admin_#{res}"
     post "#{res}/batch_delete", to: "#{res}#batch_delete", as: :"batch_delete_admin_#{res}"
-    get "#{res}/new", to: "#{res}#new", as: :"new_admin_#{singular}"
+    get "#{res}/new", to: "#{res}#new"
     post res, to: "#{res}#create"
     get "#{res}/:id", to: "#{res}#show", as: singular.to_sym
-    get "#{res}/:id/edit", to: "#{res}#edit", as: :"edit_admin_#{singular}"
+    get "#{res}/:id/edit", to: "#{res}#edit"
     patch "#{res}/:id", to: "#{res}#update"
     put "#{res}/:id", to: "#{res}#update"
     delete "#{res}/:id", to: "#{res}#destroy"
@@ -59,7 +59,17 @@ namespace :admin do
   root to: 'home#index'
 end
 
-# Named route helpers for special user actions (outside namespace to set custom as: name)
+# Named route helpers defined outside the namespace so the `as:` values are not
+# auto-prefixed with "admin_". This gives us new_admin_user_path, edit_admin_user_path,
+# etc. — the conventions expected by Administrate views and polymorphic_path helpers.
 scope path: '/admin', module: 'admin' do
+  %w[organizations organization_connectors organization_memberships
+     organization_retention_policies projects project_memberships
+     repositories sanitization_policies users user_tool_accounts].each do |res|
+    singular = res.singularize
+    get "#{res}/new", to: "#{res}#new", as: :"new_admin_#{singular}"
+    get "#{res}/:id/edit", to: "#{res}#edit", as: :"edit_admin_#{singular}"
+  end
+
   post 'users/:id/impersonate', to: 'users#impersonate', as: :impersonate_admin_user
 end
