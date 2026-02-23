@@ -11,13 +11,14 @@ class ToolEventDashboard < Administrate::BaseDashboard
     repository: Field::BelongsTo,
     event_type: Field::String,
     tool_name: Field::String,
-    session_id: Field::String,
-    input_tokens: Field::Number,
-    output_tokens: Field::Number,
-    total_tokens: Field::Number,
-    model_name: Field::String,
+    tokens_in: Field::Number,
+    tokens_out: Field::Number,
+    tokens_total: Field::Number,
+    model: Field::String,
     duration_ms: Field::Number,
+    cost_usd: Field::Number,
     metadata: Field::Text,
+    occurred_at: Field::DateTime,
     created_at: Field::DateTime
   }.freeze
 
@@ -27,8 +28,8 @@ class ToolEventDashboard < Administrate::BaseDashboard
     organization
     event_type
     tool_name
-    total_tokens
-    created_at
+    tokens_total
+    occurred_at
   ].freeze
 
   SHOW_PAGE_ATTRIBUTES = %i[
@@ -39,13 +40,14 @@ class ToolEventDashboard < Administrate::BaseDashboard
     repository
     event_type
     tool_name
-    session_id
-    input_tokens
-    output_tokens
-    total_tokens
-    model_name
+    tokens_in
+    tokens_out
+    tokens_total
+    model
     duration_ms
+    cost_usd
     metadata
+    occurred_at
     created_at
   ].freeze
 
@@ -55,6 +57,6 @@ class ToolEventDashboard < Administrate::BaseDashboard
   COLLECTION_FILTERS = {}.freeze
 
   def display_resource(event)
-    "#{event.event_type} - #{event.created_at&.strftime('%Y-%m-%d %H:%M')}"
+    "#{event.event_type} - #{event.occurred_at&.strftime('%Y-%m-%d %H:%M')}"
   end
 end
