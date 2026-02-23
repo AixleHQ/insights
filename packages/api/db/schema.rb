@@ -208,6 +208,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_25_224627) do
   create_table "user_tool_accounts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.text "access_token"
     t.datetime "created_at", null: false
+    t.string "external_account_id"
+    t.string "external_account_name"
     t.string "external_email"
     t.string "external_user_id"
     t.string "external_username"
