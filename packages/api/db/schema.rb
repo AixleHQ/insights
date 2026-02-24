@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_01_25_224627) do
+ActiveRecord::Schema[8.1].define(version: 2026_02_24_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -22,6 +22,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_25_224627) do
   create_enum "daily_aggregate_retention", ["365_days", "730_days", "1095_days", "forever"]
   create_enum "event_type", ["chat", "completion", "edit", "commit", "review", "test", "debug", "refactor", "documentation", "other"]
   create_enum "hourly_aggregate_retention", ["90_days", "180_days", "365_days", "730_days"]
+  create_enum "invitation_status", ["pending", "accepted", "revoked", "expired"]
   create_enum "member_role", ["owner", "admin", "member", "viewer"]
   create_enum "raw_event_ttl", ["6_hours", "12_hours", "24_hours", "48_hours", "72_hours"]
   create_enum "risk_level", ["low", "medium", "high", "critical"]
@@ -60,6 +61,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_25_224627) do
     t.index ["raw_event_key"], name: "index_audit_logs_on_raw_event_key"
     t.index ["temporal_workflow_id"], name: "index_audit_logs_on_temporal_workflow_id"
     t.index ["tool_event_id"], name: "index_audit_logs_on_tool_event_id"
+  end
+
+  create_table "invitations", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "accepted_at"
+    t.datetime "created_at", null: false
+    t.string "email", null: false
+    t.datetime "expires_at"
+    t.uuid "invited_by_id", null: false
+    t.uuid "organization_id", null: false
+    t.enum "role", default: "member", null: false, enum_type: "member_role"
+    t.enum "status", default: "pending", null: false, enum_type: "invitation_status"
+    t.string "token", null: false
+    t.datetime "updated_at", null: false
+    t.index ["invited_by_id"], name: "index_invitations_on_invited_by_id"
+    t.index ["organization_id", "email"], name: "index_invitations_on_organization_id_and_email", unique: true, where: "(status = 'pending'::invitation_status)"
+    t.index ["organization_id"], name: "index_invitations_on_organization_id"
+    t.index ["token"], name: "index_invitations_on_token", unique: true
   end
 
   create_table "organization_connectors", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -166,10 +184,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_25_224627) do
   end
 
   create_table "repositories", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "clone_url"
     t.datetime "created_at", null: false
     t.string "default_branch"
+    t.text "description"
     t.string "external_id", null: false
     t.string "full_name", null: false
+    t.string "html_url"
     t.boolean "is_private", default: false
     t.datetime "last_sync_at"
     t.string "name", null: false
@@ -185,9 +206,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_25_224627) do
   create_table "sanitization_policies", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.jsonb "classification_rules", default: {}
     t.datetime "created_at", null: false
+    t.text "description"
     t.datetime "effective_at"
     t.boolean "is_active", default: false, null: false
+    t.boolean "is_global", default: false, null: false
     t.string "name", null: false
+    t.string "pattern"
+    t.integer "priority", default: 0, null: false
+    t.string "replacement"
     t.jsonb "sanitization_rules", default: {}
     t.datetime "updated_at", null: false
     t.integer "version", null: false
@@ -229,6 +255,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_25_224627) do
     t.string "email", null: false
     t.boolean "global_admin", default: false, null: false
     t.string "keycloak_sub", null: false
+    t.datetime "last_login_at"
+    t.datetime "last_sign_in_at"
     t.string "name"
     t.datetime "updated_at", null: false
     t.index ["email"], name: "index_users_on_email", unique: true
@@ -238,6 +266,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_25_224627) do
   add_foreign_key "admin_audit_logs", "users", column: "admin_user_id"
   add_foreign_key "audit_logs", "organizations"
   add_foreign_key "audit_logs", "sanitization_policies", column: "policy_version_id"
+  add_foreign_key "invitations", "organizations"
+  add_foreign_key "invitations", "users", column: "invited_by_id"
   add_foreign_key "organization_connectors", "organizations"
   add_foreign_key "organization_memberships", "organizations"
   add_foreign_key "organization_memberships", "users"
