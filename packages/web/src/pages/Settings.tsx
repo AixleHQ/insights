@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import {
   Building2,
@@ -90,15 +90,15 @@ function GeneralSettings() {
   const [hasChanges, setHasChanges] = useState(false);
 
   // Update form when org data loads
-  useState(() => {
+  useEffect(() => {
     if (org) {
       setFormData({
         name: org.name || '',
         slug: org.slug || '',
-        description: '',
+        description: org.description || '',
       });
     }
-  });
+  }, [org]);
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
