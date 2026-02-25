@@ -224,11 +224,11 @@ module Api
       end
 
       def project_params
-        params.permit(:name, :slug, :description, :is_active)
+        params.permit(:name, :slug, :description, :repository_url, :is_active)
       end
 
       def project_update_params
-        params.permit(:name, :slug, :description, :is_active)
+        params.permit(:name, :slug, :description, :repository_url, :is_active)
       end
     end
   end

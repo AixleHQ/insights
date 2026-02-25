@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Grid, List, Search } from 'lucide-react';
 import { useOrg } from '@/contexts/OrgContext';
 import { useProjects, useDeleteProject } from '@/hooks/useApi';
@@ -32,6 +32,7 @@ function ProjectSkeleton() {
 
 export function Projects() {
   const { currentOrg } = useOrg();
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
 
@@ -44,7 +45,7 @@ export function Projects() {
       id: p.id,
       name: p.name,
       description: p.description || undefined,
-      repository_url: p.repository_url || undefined,
+      repository_url: p.repositoryUrl || undefined,
       is_active: p.is_active,
       event_count: p.event_count,
       total_cost_usd: p.total_cost_usd,
@@ -62,8 +63,7 @@ export function Projects() {
   }, [projects, search]);
 
   const handleEdit = (id: string) => {
-    // Navigate to project detail or open edit modal
-    console.log('Edit project:', id);
+    navigate(`/projects/${id}/edit`);
   };
 
   const handleDelete = async (id: string) => {

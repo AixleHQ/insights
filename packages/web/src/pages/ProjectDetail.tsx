@@ -266,17 +266,17 @@ export function ProjectDetail() {
         />
       </div>
 
-      {project.repository_url && (
+      {project.repositoryUrl && (
         <Card>
           <CardContent className="flex items-center gap-3 p-4">
             <GitBranch className="size-4 text-muted-foreground" />
             <a
-              href={project.repository_url}
+              href={project.repositoryUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="text-sm text-primary hover:underline"
             >
-              {project.repository_url}
+              {project.repositoryUrl}
             </a>
           </CardContent>
         </Card>
