@@ -54,8 +54,8 @@ export function EditProject() {
       initialData={{
         name: project.name,
         description: project.description || '',
-        repository_url: project.repository_url || '',
-        is_active: project.is_active,
+        repository_url: project.repositoryUrl || '',
+        is_active: project.isActive ?? true,
       }}
       onSubmit={handleSubmit}
     />

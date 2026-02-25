@@ -45,7 +45,7 @@ export function Projects() {
       id: p.id,
       name: p.name,
       description: p.description || undefined,
-      repository_url: p.repository_url || undefined,
+      repository_url: p.repositoryUrl || undefined,
       is_active: p.is_active,
       event_count: p.event_count,
       total_cost_usd: p.total_cost_usd,
