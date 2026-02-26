@@ -415,6 +415,7 @@ export function useUpdateProject() {
       api.patch<Project>(`/projects/${id}`, data),
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projects.detail(id) });
+      queryClient.invalidateQueries({ queryKey: ['organizations'] });
     },
   });
 }
