@@ -97,6 +97,8 @@ erDiagram
         string connector_type "ConnectorType enum"
         string external_org_id
         string external_org_name
+        string external_account_id
+        string external_account_name
         string access_token
         string refresh_token
         datetime token_expires_at
@@ -117,6 +119,8 @@ erDiagram
         string external_user_id
         string external_username
         string external_email
+        string external_account_id
+        string external_account_name
         string access_token
         string refresh_token
         datetime token_expires_at
@@ -132,6 +136,7 @@ erDiagram
         string name
         string slug
         string description
+        string repository_url
         boolean is_active
         datetime created_at
         datetime updated_at
@@ -172,7 +177,10 @@ erDiagram
         string name
         string full_name
         string url
+        string clone_url
+        string html_url
         string default_branch
+        text description
         boolean is_private
         datetime last_sync_at
         datetime created_at
@@ -255,6 +263,11 @@ erDiagram
         uuid id PK
         integer version
         string name
+        text description
+        string pattern
+        string replacement
+        boolean is_global "default: false"
+        integer priority "default: 0"
         jsonb classification_rules
         jsonb sanitization_rules
         boolean is_active
