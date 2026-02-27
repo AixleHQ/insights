@@ -4,8 +4,7 @@ module Admin
   class SessionsController < ActionController::Base
     include ActionController::Cookies
 
-    # Skip CSRF for dev login (API-only app)
-    skip_forgery_protection if: -> { Rails.env.development? || Rails.env.test? }
+    protect_from_forgery with: :exception
 
     def new
       @error = params[:error]
@@ -64,6 +63,7 @@ module Admin
             <h1>Admin Login</h1>
             #{messages.join}
             <form action="/admin/login" method="post">
+              <input type="hidden" name="authenticity_token" value="#{form_authenticity_token}">
               <label for="email">Email</label>
               <input type="email" name="email" id="email" placeholder="admin@db90.io" required autofocus>
               <button type="submit">Sign In</button>

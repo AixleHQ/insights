@@ -1,17 +1,16 @@
 import { UserManager, User, Log } from 'oidc-client-ts';
 import type { UserManagerSettings } from 'oidc-client-ts';
+import { config } from './config';
 
-// Enable logging in development
 if (import.meta.env.DEV) {
   Log.setLogger(console);
   Log.setLevel(Log.INFO);
 }
 
-// Keycloak configuration
 const keycloakConfig = {
-  url: import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost:8080',
-  realm: import.meta.env.VITE_KEYCLOAK_REALM || 'db90',
-  clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'db90-web',
+  url: config.keycloakUrl,
+  realm: config.keycloakRealm,
+  clientId: config.keycloakClientId,
 };
 
 // OIDC User Manager settings

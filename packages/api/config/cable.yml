@@ -8,6 +8,10 @@ development:
 test:
   adapter: test
 
+staging:
+  adapter: redis
+  url: <%= ENV.fetch("REDIS_URL") { "redis://localhost:6379/1" } %>
+
 production:
   adapter: solid_cable
   connects_to:

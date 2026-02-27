@@ -110,30 +110,104 @@ Keycloak manages authentication via OpenID Connect. The frontend uses `oidc-clie
 ## Makefile Reference
 
 ```
-make help             Show all commands
+make help                          Show all commands
 
-make up / down        Start / stop Docker services
-make logs             Tail Docker logs
+Docker:
+  make up / down                   Start / stop Docker services
+  make build                       Build/rebuild app containers
+  make logs                        Tail all logs
+  make logs-api                    Tail Rails API logs
+  make logs-web                    Tail Vite dev server logs
+  make logs-sidekiq                Tail Sidekiq logs
 
-make api              Start Rails server
-make web              Start Vite dev server
-make worker           Start Temporal worker
+Development:
+  make console                     Rails console inside API container
+  make worker                      Start Temporal worker
+  make sidekiq                     View Sidekiq status
 
-make db-create        Create databases
-make db-migrate       Run migrations
-make db-seed          Seed sample data
-make db-reset         Drop and recreate everything
+Database:
+  make db-create                   Create databases
+  make db-migrate                  Run migrations
+  make db-seed                     Seed sample data
+  make db-reset                    Drop and recreate everything
 
-make test             Run all tests
-make test-api         RSpec (Rails)
-make test-web         Vitest (frontend)
+Testing:
+  make test                        Run all tests
+  make test-api                    RSpec (Rails)
+  make test-web                    Vitest (frontend)
 
-make lint             Run all linters
-make lint-api         Rubocop
-make lint-web         ESLint
+Code Quality:
+  make lint                        Run all linters
+  make lint-api                    Rubocop
+  make lint-web                    ESLint
 
-make generate-types   Generate TypeScript types from OpenAPI
-make clean            Remove build artifacts
+Code Generation:
+  make generate-types              Generate TypeScript types from OpenAPI
+
+Setup & Cleanup:
+  make setup                       Full setup (build, up, db-create, migrate, seed)
+  make clean                       Remove build artifacts
+
+Remote (ECS operations):
+  make remote-build                Build remote container
+  make remote-shell                Shell into remote container
+  make toolbox-shell               Shell into toolbox container
+
+Staging — Exec:
+  make staging-exec-api            Exec into staging API container
+  make staging-exec-web            Exec into staging web container
+  make staging-exec-sidekiq        Exec into staging Sidekiq container
+  make staging-exec-keycloak       Exec into staging Keycloak container
+  make staging-exec-temporal       Exec into staging Temporal container
+
+Staging — Logs:
+  make staging-logs-api            View staging API logs
+  make staging-logs-web            View staging web logs
+  make staging-logs-keycloak       View staging Keycloak logs
+  make staging-logs-temporal       View staging Temporal logs
+  make staging-logs-sidekiq        View staging Sidekiq logs
+  make watch-staging-logs-api      Follow staging API logs
+  make watch-staging-logs-web      Follow staging web logs
+  make watch-staging-logs-keycloak Follow staging Keycloak logs
+  make watch-staging-logs-temporal Follow staging Temporal logs
+  make watch-staging-logs-sidekiq  Follow staging Sidekiq logs
+
+Staging — Build & Deploy:
+  make staging-build               Build & push all staging images
+  make staging-build-api           Build & push staging API image
+  make staging-build-keycloak      Build & push staging Keycloak image
+  make staging-deploy              Deploy all staging services
+  make staging-deploy-api          Deploy staging API
+  make staging-deploy-web          Deploy staging web
+  make staging-deploy-sidekiq      Deploy staging Sidekiq
+  make staging-deploy-keycloak     Deploy staging Keycloak
+  make staging-deploy-temporal-worker  Deploy staging Temporal worker
+
+Production — Exec:
+  make prod-exec-api               Exec into prod API container
+  make prod-exec-web               Exec into prod web container
+  make prod-exec-keycloak          Exec into prod Keycloak container
+
+Production — Logs:
+  make prod-logs-api               View prod API logs
+  make prod-logs-web               View prod web logs
+  make prod-logs-keycloak          View prod Keycloak logs
+  make prod-logs-temporal          View prod Temporal logs
+  make prod-logs-sidekiq           View prod Sidekiq logs
+  make watch-prod-logs-api         Follow prod API logs
+  make watch-prod-logs-web         Follow prod web logs
+  make watch-prod-logs-keycloak    Follow prod Keycloak logs
+  make watch-prod-logs-temporal    Follow prod Temporal logs
+  make watch-prod-logs-sidekiq     Follow prod Sidekiq logs
+
+Production — Build & Deploy:
+  make prod-build                  Build & push all prod images
+  make prod-deploy                 Deploy all prod services
+  make prod-deploy-api             Deploy prod API
+  make prod-deploy-web             Deploy prod web
+  make prod-deploy-sidekiq         Deploy prod Sidekiq
+  make prod-deploy-keycloak        Deploy prod Keycloak
+  make prod-deploy-temporal-worker Deploy prod Temporal worker
 ```
 
 ## Testing

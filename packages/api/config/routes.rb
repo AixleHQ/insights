@@ -1,3 +1,6 @@
+require 'sidekiq/web'
+require_relative '../lib/admin_constraint'
+
 Rails.application.routes.draw do
   # Health check endpoint
   get "health", to: "health#show"
@@ -134,6 +137,9 @@ Rails.application.routes.draw do
 
   # ActionCable WebSocket endpoint
   mount ActionCable.server => '/cable'
+
+  # Sidekiq Web UI (protected by admin auth)
+  mount Sidekiq::Web => '/admin/sidekiq', constraints: AdminConstraint.new
 
   # Draw admin routes from separate file
   draw :admin_routes

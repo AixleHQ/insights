@@ -98,13 +98,16 @@ export default defineConfig({
     },
   },
   server: {
+    host: '0.0.0.0',
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: process.env.API_PROXY_TARGET || 'http://localhost:3000',
         changeOrigin: true,
-        // Don't rewrite - Rails expects /api/v1 path
       },
+    },
+    watch: {
+      usePolling: !!process.env.DOCKER,
     },
   },
 })

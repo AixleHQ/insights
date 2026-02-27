@@ -2,7 +2,7 @@
   "realm": "db90",
   "enabled": true,
   "loginTheme": "db90",
-  "sslRequired": "none",
+  "sslRequired": "${KC_SSL_REQUIRED:-none}",
   "registrationAllowed": false,
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
@@ -43,19 +43,17 @@
       "serviceAccountsEnabled": false,
       "authorizationServicesEnabled": false,
       "fullScopeAllowed": true,
-      "rootUrl": "http://localhost:5173",
-      "baseUrl": "http://localhost:5173",
+      "rootUrl": "${APP_URL:-http://localhost:5173}",
+      "baseUrl": "${APP_URL:-http://localhost:5173}",
       "redirectUris": [
-        "http://localhost:5173/*",
-        "http://localhost:3000/*"
+        "${APP_URL:-http://localhost:5173}/*"
       ],
       "webOrigins": [
-        "http://localhost:5173",
-        "http://localhost:3000"
+        "${APP_URL:-http://localhost:5173}"
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "http://localhost:5173/*"
+        "post.logout.redirect.uris": "${APP_URL:-http://localhost:5173}/*"
       },
       "defaultClientScopes": [
         "web-origins",

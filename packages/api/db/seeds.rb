@@ -40,15 +40,21 @@ KNOWN_DEV_USERS = [
   {
     email: 'ada.lovelace@example.com',
     name: 'Ada Lovelace',
-    keycloak_sub: 'ada.lovelace@example.com', # Keycloak uses email as sub
+    keycloak_sub: 'ada.lovelace@example.com',
     global_admin: true,
     org_role: 'owner'
+  },
+  {
+    email: 'alan.turing@example.com',
+    name: 'Alan Turing',
+    keycloak_sub: 'alan.turing@example.com',
+    global_admin: true,
+    org_role: 'admin'
   }
-  # Add more known dev users here as needed
 ].freeze
 
 # Only seed sample data in development
-if Rails.env.development?
+if Rails.env.development? || Rails.env.staging?
   puts "Seeding development data with realistic usage simulation..."
   puts "This simulates 100 engineers over 45 days"
 
