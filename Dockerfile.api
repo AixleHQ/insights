@@ -4,8 +4,7 @@ FROM ruby:${RUBY_VERSION}-slim AS base
 
 WORKDIR /app
 
-ENV RAILS_ENV="production" \
-    BUNDLE_DEPLOYMENT="1" \
+ENV BUNDLE_DEPLOYMENT="1" \
     BUNDLE_PATH="/usr/local/bundle" \
     BUNDLE_WITHOUT="development:test"
 
@@ -17,31 +16,51 @@ RUN apt-get update -qq && \
     build-essential \
     git \
     libpq-dev \
+    libyaml-dev \
     pkg-config && \
     rm -rf /var/lib/apt/lists/*
 
 COPY packages/api/Gemfile packages/api/Gemfile.lock ./
+
+# CI stage: includes test/dev gems for running specs and linters
+FROM build AS ci
+ENV BUNDLE_WITHOUT=""
+RUN apt-get update -qq && \
+    apt-get install --no-install-recommends -y postgresql-client && \
+    rm -rf /var/lib/apt/lists/*
+RUN bundle install
+COPY packages/api/ .
+ENV RAILS_ENV="test"
+CMD ["bundle", "exec", "rspec"]
+
+# Production build: exclude test/dev gems
+FROM build AS production-build
+ENV BUNDLE_WITHOUT="development:test"
 RUN bundle install && \
     rm -rf ~/.bundle/ "${BUNDLE_PATH}"/ruby/*/cache "${BUNDLE_PATH}"/ruby/*/bundler/gems/*/.git
-
 COPY packages/api/ .
 
 RUN bundle exec bootsnap precompile app/ lib/
 
-# Production stage
+# Production stage (default)
 FROM base
 
 RUN apt-get update -qq && \
     apt-get install --no-install-recommends -y \
     curl \
-    libpq-dev && \
+    libpq-dev \
+    libyaml-0-2 \
+    postgresql-client && \
     rm -rf /var/lib/apt/lists/*
 
-COPY --from=build "${BUNDLE_PATH}" "${BUNDLE_PATH}"
-COPY --from=build /app /app
+ENV RAILS_ENV="production"
+
+COPY --from=production-build "${BUNDLE_PATH}" "${BUNDLE_PATH}"
+COPY --from=production-build /app /app
 
 RUN groupadd --system --gid 1000 rails && \
     useradd rails --uid 1000 --gid 1000 --create-home --shell /bin/bash && \
+    mkdir -p db log storage tmp && \
     chown -R rails:rails db log storage tmp
 
 USER 1000:1000

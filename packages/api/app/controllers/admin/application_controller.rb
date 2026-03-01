@@ -32,13 +32,7 @@ module Admin
     def authenticate_admin!
       unless current_admin_user&.global_admin?
         respond_to do |format|
-          format.html do
-            if Rails.env.development? || Rails.env.test?
-              redirect_to '/admin/login'
-            else
-              render plain: 'Forbidden: Global admin access required', status: :forbidden
-            end
-          end
+          format.html { redirect_to '/admin/login' }
           format.json { render json: { error: 'Forbidden' }, status: :forbidden }
         end
       end

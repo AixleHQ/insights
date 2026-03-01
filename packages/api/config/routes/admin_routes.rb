@@ -3,9 +3,9 @@
 # Admin routes (Administrate)
 # In API-only mode, we must manually define all routes including :new and :edit
 namespace :admin do
-  # Session routes
+  # Session routes (OIDC flow via Keycloak)
   get "login", to: "sessions#new"
-  post "login", to: "sessions#create"
+  get "callback", to: "sessions#callback"
   delete "logout", to: "sessions#destroy"
   get "logout", to: "sessions#destroy"
 

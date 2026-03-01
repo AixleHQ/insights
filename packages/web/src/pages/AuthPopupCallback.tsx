@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react';
 import { Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { User } from 'oidc-client-ts';
 import { getUserManager } from '../lib/auth';
+import { config } from '../lib/config';
 
-// Keycloak configuration - must match auth.ts
 const keycloakConfig = {
-  url: import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost:8080',
-  realm: import.meta.env.VITE_KEYCLOAK_REALM || 'db90',
-  clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'db90-web',
+  url: config.keycloakUrl,
+  realm: config.keycloakRealm,
+  clientId: config.keycloakClientId,
 };
 
 // Storage key for PKCE verifier - must match Login.tsx

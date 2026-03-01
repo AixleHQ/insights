@@ -42,6 +42,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+        navigateFallbackDenylist: [/^\/admin/, /^\/cable/],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -98,13 +99,24 @@ export default defineConfig({
     },
   },
   server: {
+    host: '0.0.0.0',
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: process.env.API_PROXY_TARGET || 'http://localhost:3000',
         changeOrigin: true,
-        // Don't rewrite - Rails expects /api/v1 path
       },
+      '/admin': {
+        target: process.env.API_PROXY_TARGET || 'http://localhost:3000',
+      },
+      '/cable': {
+        target: process.env.API_PROXY_TARGET || 'http://localhost:3000',
+        changeOrigin: true,
+        ws: true,
+      },
+    },
+    watch: {
+      usePolling: !!process.env.DOCKER,
     },
   },
 })
