@@ -152,6 +152,16 @@
             <% end %>
           </div>
         </div>
+
+        <div>
+          <p class="px-3 mb-2 text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">System</p>
+          <div class="space-y-1">
+            <%= link_to '/admin/sidekiq', class: "flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors #{request.path.start_with?('/admin/sidekiq') ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:text-white hover:bg-zinc-900'}" do %>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              Sidekiq
+            <% end %>
+          </div>
+        </div>
       </nav>
 
       <!-- User -->

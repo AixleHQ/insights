@@ -37,6 +37,11 @@ server {
 
     resolver 169.254.169.253 valid=10s ipv6=off;
 
+    set $forwarded_proto $http_x_forwarded_proto;
+    if ($forwarded_proto = '') {
+        set $forwarded_proto $scheme;
+    }
+
     location / {
         try_files $uri $uri/ /index.html;
     }
@@ -50,7 +55,7 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto $forwarded_proto;
         proxy_cache_bypass $http_upgrade;
     }
 
@@ -61,7 +66,7 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto $forwarded_proto;
     }
 
     location /cable {
@@ -73,7 +78,7 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto $forwarded_proto;
     }
 
     location /up {
