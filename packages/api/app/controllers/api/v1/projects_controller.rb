@@ -200,6 +200,7 @@ module Api
         authorize! @project, to: :show?
 
         project_members = @project.project_memberships.includes(:user)
+        project_members = project_members.where(role: params[:role]) if params[:role].present?
 
         members_data = project_members.map do |pm|
           user = pm.user
