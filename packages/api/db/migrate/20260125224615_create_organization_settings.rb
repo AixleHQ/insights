@@ -8,6 +8,6 @@ class CreateOrganizationSettings < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :organization_settings, [:organization_id, :key], unique: true
+    add_index :organization_settings, [ :organization_id, :key ], unique: true
   end
 end

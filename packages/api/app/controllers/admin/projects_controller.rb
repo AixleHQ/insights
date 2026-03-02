@@ -20,12 +20,12 @@ module Admin
     private
 
     def generate_csv(projects)
-      require 'csv'
+      require "csv"
       CSV.generate(headers: true) do |csv|
         csv << %w[id name slug organization_id owner_id is_active created_at]
         projects.find_each do |project|
-          csv << [project.id, project.name, project.slug, project.organization_id,
-                  project.owner_id, project.is_active, project.created_at]
+          csv << [ project.id, project.name, project.slug, project.organization_id,
+                  project.owner_id, project.is_active, project.created_at ]
         end
       end
     end

@@ -1,24 +1,24 @@
 class UserSyncService
   # Maps Keycloak JWT claims to User attributes
   CLAIM_MAPPING = {
-    'sub' => :keycloak_sub,
-    'email' => :email,
-    'name' => :name,
-    'picture' => :avatar_url
+    "sub" => :keycloak_sub,
+    "email" => :email,
+    "name" => :name,
+    "picture" => :avatar_url
   }.freeze
 
   # Email domains that should be auto-assigned to organizations
   DOMAIN_ORG_MAPPING = {
-    'example.com' => 'dualboot-partners',
-    'partner.example.com' => 'fueled'
+    "example.com" => "dualboot-partners",
+    "partner.example.com" => "fueled"
   }.freeze
 
   class << self
     def sync_from_claims(claims)
-      keycloak_sub = claims['sub']
-      raise ArgumentError, 'Missing sub claim' if keycloak_sub.blank?
+      keycloak_sub = claims["sub"]
+      raise ArgumentError, "Missing sub claim" if keycloak_sub.blank?
 
-      email = claims['email']
+      email = claims["email"]
       Rails.logger.info "[UserSyncService] sync_from_claims: sub=#{keycloak_sub}, email=#{email}"
 
       user = find_or_initialize_user_with_email(keycloak_sub, email)
@@ -74,7 +74,7 @@ class UserSyncService
       # 1. Never logged in before, OR
       # 2. Token was just issued (fresh login - iat within last 2 minutes), OR
       # 3. It's been more than 1 hour (throttled activity tracking)
-      token_issued_at = claims['iat'] ? Time.at(claims['iat']) : nil
+      token_issued_at = claims["iat"] ? Time.at(claims["iat"]) : nil
       is_fresh_login = token_issued_at && token_issued_at > 2.minutes.ago
 
       if user.last_login_at.nil? || is_fresh_login || user.last_login_at < 1.hour.ago
@@ -83,10 +83,10 @@ class UserSyncService
     end
 
     def auto_assign_organization(user, claims)
-      email = claims['email']
+      email = claims["email"]
       return unless email.present?
 
-      domain = email.split('@').last&.downcase
+      domain = email.split("@").last&.downcase
       org_slug = DOMAIN_ORG_MAPPING[domain]
       return unless org_slug
 
@@ -98,7 +98,7 @@ class UserSyncService
         user: user,
         organization: organization
       ) do |membership|
-        membership.role = 'member'
+        membership.role = "member"
       end
 
       Rails.logger.info "[UserSyncService] Auto-assigned user #{user.email} to org #{org_slug}"

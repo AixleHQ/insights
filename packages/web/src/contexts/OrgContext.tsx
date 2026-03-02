@@ -208,6 +208,7 @@ export function OrgProvider({ children, apiBaseUrl = '/api/v1' }: OrgProviderPro
   return <OrgContext.Provider value={value}>{children}</OrgContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useOrg(): OrgContextValue {
   const context = useContext(OrgContext);
   if (!context) {
@@ -217,6 +218,7 @@ export function useOrg(): OrgContextValue {
 }
 
 // Hook for requiring an organization to be selected
+// eslint-disable-next-line react-refresh/only-export-components
 export function useRequireOrg(): OrgContextValue & { isReady: boolean } {
   const org = useOrg();
   return {
@@ -226,6 +228,7 @@ export function useRequireOrg(): OrgContextValue & { isReady: boolean } {
 }
 
 // Hook for requiring specific roles
+// eslint-disable-next-line react-refresh/only-export-components
 export function useRequireRole(
   requiredRoles: string | string[]
 ): OrgContextValue & { hasAccess: boolean } {

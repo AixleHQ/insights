@@ -45,7 +45,7 @@ Rails.application.configure do
   # Use letter_opener to preview emails in browser during development
   config.action_mailer.delivery_method = :letter_opener
   LetterOpener.configure do |c|
-    c.location = Rails.root.join('tmp', 'letter_opener')
+    c.location = Rails.root.join("tmp", "letter_opener")
   end
 
   # Print deprecation notices to the Rails logger.
@@ -82,7 +82,7 @@ Rails.application.configure do
   # config.generators.apply_rubocop_autocorrect_after_generate!
 
   # Configure Active Record encryption for development
-  config.active_record.encryption.primary_key = 'dev_primary_key_32_characters_xx'
-  config.active_record.encryption.deterministic_key = 'dev_deterministic_key_32_chars__'
-  config.active_record.encryption.key_derivation_salt = 'dev_key_derivation_salt_value___'
+  config.active_record.encryption.primary_key = "dev_primary_key_32_characters_xx"
+  config.active_record.encryption.deterministic_key = "dev_deterministic_key_32_chars__"
+  config.active_record.encryption.key_derivation_salt = "dev_key_derivation_salt_value___"
 end

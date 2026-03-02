@@ -9,27 +9,27 @@
 #   KEYCLOAK_JWKS_URI     - JWKS endpoint URL (auto-generated from issuer)
 
 # Explicitly require JwtAuth middleware before Rails autoloading
-require_relative '../../app/middleware/jwt_auth'
+require_relative "../../app/middleware/jwt_auth"
 
 module Keycloak
   class Configuration
     attr_accessor :url, :realm, :audience, :issuer, :jwks_uri
 
     def initialize
-      @url = ENV.fetch('KEYCLOAK_URL', 'http://localhost:8080')
-      @realm = ENV.fetch('KEYCLOAK_REALM', 'db90')
-      @audience = ENV.fetch('KEYCLOAK_AUDIENCE', 'db90-web')
-      @issuer = ENV.fetch('KEYCLOAK_ISSUER') { "#{@url}/realms/#{@realm}" }
-      @jwks_uri = ENV.fetch('KEYCLOAK_JWKS_URI') { "#{@issuer}/protocol/openid-connect/certs" }
+      @url = ENV.fetch("KEYCLOAK_URL", "http://localhost:8080")
+      @realm = ENV.fetch("KEYCLOAK_REALM", "db90")
+      @audience = ENV.fetch("KEYCLOAK_AUDIENCE", "db90-web")
+      @issuer = ENV.fetch("KEYCLOAK_ISSUER") { "#{@url}/realms/#{@realm}" }
+      @jwks_uri = ENV.fetch("KEYCLOAK_JWKS_URI") { "#{@issuer}/protocol/openid-connect/certs" }
     end
 
     # Browser-facing URL (for OIDC redirects).
     # In Docker/ECS the internal hostname differs from the public one.
     def external_url
-      @external_url ||= if ENV['KEYCLOAK_EXTERNAL_URL'].present?
-        ENV['KEYCLOAK_EXTERNAL_URL']
-      elsif ENV['KEYCLOAK_ISSUER'].present?
-        ENV['KEYCLOAK_ISSUER'].sub(%r{/realms/.*}, '')
+      @external_url ||= if ENV["KEYCLOAK_EXTERNAL_URL"].present?
+        ENV["KEYCLOAK_EXTERNAL_URL"]
+      elsif ENV["KEYCLOAK_ISSUER"].present?
+        ENV["KEYCLOAK_ISSUER"].sub(%r{/realms/.*}, "")
       else
         url
       end
@@ -37,8 +37,8 @@ module Keycloak
 
     # Server-to-server URL (for token exchange, JWKS fetch).
     def internal_url
-      @internal_url ||= if ENV['KEYCLOAK_JWKS_URI'].present?
-        URI(ENV['KEYCLOAK_JWKS_URI']).then { |u| "#{u.scheme}://#{u.host}:#{u.port}" }
+      @internal_url ||= if ENV["KEYCLOAK_JWKS_URI"].present?
+        URI(ENV["KEYCLOAK_JWKS_URI"]).then { |u| "#{u.scheme}://#{u.host}:#{u.port}" }
       else
         url
       end

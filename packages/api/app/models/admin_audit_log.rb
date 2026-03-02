@@ -1,5 +1,5 @@
 class AdminAuditLog < ApplicationRecord
-  belongs_to :admin_user, class_name: 'User'
+  belongs_to :admin_user, class_name: "User"
 
   validates :action, presence: true
   validates :resource_type, presence: true

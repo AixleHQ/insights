@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require 'jwt'
-require 'net/http'
+require "jwt"
+require "net/http"
 
 module Keycloak
   module JwtVerifier
@@ -13,13 +13,13 @@ module Keycloak
     # Returns nil on failure (logs warning).
     def verify(token)
       header = JWT.decode(token, nil, false).last
-      kid = header['kid']
+      kid = header["kid"]
 
       public_key = resolve_key(kid)
       return nil unless public_key
 
       decoded = JWT.decode(token, public_key, true, {
-        algorithm: 'RS256',
+        algorithm: "RS256",
         verify_expiration: true
       })
 
@@ -31,11 +31,11 @@ module Keycloak
 
     # Same as verify but raises VerificationError on failure.
     def verify!(token)
-      verify(token) || raise(VerificationError, 'Token verification failed')
+      verify(token) || raise(VerificationError, "Token verification failed")
     end
 
     def fetch_jwks
-      Rails.cache.fetch('keycloak_jwks', expires_in: 1.hour) do
+      Rails.cache.fetch("keycloak_jwks", expires_in: 1.hour) do
         uri = URI(Keycloak.configuration.jwks_uri)
         response = Net::HTTP.get_response(uri)
 
@@ -47,12 +47,12 @@ module Keycloak
       end
     rescue Errno::ECONNREFUSED, SocketError => e
       Rails.logger.error("[Keycloak::JwtVerifier] Cannot connect to Keycloak: #{e.message}")
-      raise VerificationError, 'Cannot connect to identity provider'
+      raise VerificationError, "Cannot connect to identity provider"
     end
 
     def resolve_key(kid)
       jwks = fetch_jwks
-      key_data = jwks['keys']&.find { |k| k['kid'] == kid }
+      key_data = jwks["keys"]&.find { |k| k["kid"] == kid }
 
       unless key_data
         Rails.logger.warn("[Keycloak::JwtVerifier] Key not found: #{kid}")
@@ -63,8 +63,8 @@ module Keycloak
     end
 
     def build_rsa_key(key_data)
-      n = Base64.urlsafe_decode64(key_data['n'])
-      e = Base64.urlsafe_decode64(key_data['e'])
+      n = Base64.urlsafe_decode64(key_data["n"])
+      e = Base64.urlsafe_decode64(key_data["e"])
 
       data_sequence = OpenSSL::ASN1::Sequence([
         OpenSSL::ASN1::Integer(OpenSSL::BN.new(n, 2)),

@@ -20,11 +20,11 @@ module Admin
     private
 
     def generate_csv(organizations)
-      require 'csv'
+      require "csv"
       CSV.generate(headers: true) do |csv|
         csv << %w[id name slug is_active member_count created_at]
         organizations.find_each do |org|
-          csv << [org.id, org.name, org.slug, org.is_active, org.members.count, org.created_at]
+          csv << [ org.id, org.name, org.slug, org.is_active, org.members.count, org.created_at ]
         end
       end
     end

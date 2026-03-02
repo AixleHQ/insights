@@ -14,11 +14,11 @@ module Api
         if params[:organization_id].present?
           require_organization!
           projects = projects.where(organization_id: current_organization.id)
-        elsif params[:personal] == 'true'
+        elsif params[:personal] == "true"
           projects = projects.where(owner_id: current_user.id)
         end
 
-        projects = projects.active if params[:active] == 'true'
+        projects = projects.active if params[:active] == "true"
         projects = projects.order(:name)
 
         render_collection(projects, ProjectSerializer)
@@ -49,14 +49,14 @@ module Api
           @project.save!
           # Add creator as project owner (for org projects)
           if @project.organization_project?
-            @project.project_memberships.create!(user: current_user, role: 'owner')
+            @project.project_memberships.create!(user: current_user, role: "owner")
           end
         end
 
         render_created(@project, ProjectSerializer)
       rescue ActiveRecord::RecordInvalid => e
         render json: {
-          error: 'Unprocessable Entity',
+          error: "Unprocessable Entity",
           errors: format_validation_errors(e.record.errors)
         }, status: :unprocessable_entity
       end
@@ -69,7 +69,7 @@ module Api
           render_resource(@project, ProjectSerializer)
         else
           render json: {
-            error: 'Unprocessable Entity',
+            error: "Unprocessable Entity",
             errors: format_validation_errors(@project.errors)
           }, status: :unprocessable_entity
         end
@@ -102,7 +102,7 @@ module Api
           render_resource(setting, ProjectSettingSerializer)
         else
           render json: {
-            error: 'Unprocessable Entity',
+            error: "Unprocessable Entity",
             errors: format_validation_errors(setting.errors)
           }, status: :unprocessable_entity
         end
@@ -131,10 +131,10 @@ module Api
           .group("DATE_TRUNC('day', occurred_at)")
           .select(
             "DATE_TRUNC('day', occurred_at) as day",
-            'COUNT(*) as event_count',
-            'SUM(cost_usd) as cost_usd'
+            "COUNT(*) as event_count",
+            "SUM(cost_usd) as cost_usd"
           )
-          .order('day')
+          .order("day")
           .map do |row|
             {
               date: row.day&.to_date&.iso8601,
@@ -163,7 +163,7 @@ module Api
         # Get top tools by total event count
         top_tools = events
           .group(:tool_name)
-          .order(Arel.sql('COUNT(*) DESC'))
+          .order(Arel.sql("COUNT(*) DESC"))
           .limit(3)
           .pluck(:tool_name)
 
@@ -172,10 +172,10 @@ module Api
           .group("DATE_TRUNC('day', occurred_at)", :tool_name)
           .select(
             "DATE_TRUNC('day', occurred_at) as day",
-            'tool_name',
-            'COUNT(*) as event_count'
+            "tool_name",
+            "COUNT(*) as event_count"
           )
-          .order('day')
+          .order("day")
 
         # Transform into chart-friendly format
         date_map = {}
@@ -184,14 +184,14 @@ module Api
           next unless date
 
           date_map[date] ||= { date: date }
-          tool_key = top_tools.include?(row.tool_name) ? row.tool_name : 'Other'
+          tool_key = top_tools.include?(row.tool_name) ? row.tool_name : "Other"
           date_map[date][tool_key] ||= 0
           date_map[date][tool_key] += row.event_count
         end
 
         render json: {
           data: date_map.values.sort_by { |d| d[:date] },
-          tools: top_tools + ['Other']
+          tools: top_tools + [ "Other" ]
         }
       end
 
@@ -200,6 +200,7 @@ module Api
         authorize! @project, to: :show?
 
         project_members = @project.project_memberships.includes(:user)
+        project_members = project_members.where(role: params[:role]) if params[:role].present?
 
         members_data = project_members.map do |pm|
           user = pm.user

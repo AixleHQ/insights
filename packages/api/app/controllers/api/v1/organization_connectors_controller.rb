@@ -12,7 +12,7 @@ module Api
 
         # Allow filtering by type
         connectors = connectors.by_type(params[:type]) if params[:type].present?
-        connectors = connectors.active if params[:active] == 'true'
+        connectors = connectors.active if params[:active] == "true"
 
         render_collection(connectors, OrganizationConnectorSerializer)
       end
@@ -32,7 +32,7 @@ module Api
           render_created(@connector, OrganizationConnectorSerializer)
         else
           render json: {
-            error: 'Unprocessable Entity',
+            error: "Unprocessable Entity",
             errors: format_validation_errors(@connector.errors)
           }, status: :unprocessable_entity
         end
@@ -46,7 +46,7 @@ module Api
           render_resource(@connector, OrganizationConnectorSerializer)
         else
           render json: {
-            error: 'Unprocessable Entity',
+            error: "Unprocessable Entity",
             errors: format_validation_errors(@connector.errors)
           }, status: :unprocessable_entity
         end
@@ -67,7 +67,7 @@ module Api
         result = provider.test_connection
 
         if result[:success]
-          render json: { data: { success: true, message: 'Connection successful' } }
+          render json: { data: { success: true, message: "Connection successful" } }
         else
           render json: { data: { success: false, error: result[:error] } }, status: :ok
         end
@@ -124,7 +124,7 @@ module Api
           render_resource(connector, OrganizationConnectorSerializer)
         else
           render json: {
-            error: 'Unprocessable Entity',
+            error: "Unprocessable Entity",
             errors: format_validation_errors(connector.errors)
           }, status: :unprocessable_entity
         end
@@ -148,7 +148,7 @@ module Api
 
       def oauth_callback_url
         # Redirect to frontend callback page which handles the OAuth popup flow
-        frontend_url = ENV.fetch('FRONTEND_URL', 'http://localhost:5173')
+        frontend_url = ENV.fetch("FRONTEND_URL", "http://localhost:5173")
         "#{frontend_url}/integrations/callback"
       end
     end

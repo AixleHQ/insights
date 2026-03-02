@@ -3,15 +3,15 @@ class Organization < ApplicationRecord
   has_many :members, through: :organization_memberships, source: :user
   has_many :organization_settings, dependent: :destroy
   has_many :invitations, dependent: :destroy
-  has_one :retention_policy, class_name: 'OrganizationRetentionPolicy', dependent: :destroy
+  has_one :retention_policy, class_name: "OrganizationRetentionPolicy", dependent: :destroy
   has_many :organization_connectors, dependent: :destroy
   has_many :projects, dependent: :destroy
-  has_many :tool_events, class_name: 'ToolEvent', dependent: :restrict_with_error
+  has_many :tool_events, class_name: "ToolEvent", dependent: :restrict_with_error
   has_many :audit_logs, dependent: :restrict_with_error
 
   validates :name, presence: true
-  validates :slug, presence: true, uniqueness: true, format: { with: /\A[a-z0-9]+(?:-[a-z0-9]+)*\z/, message: 'must be lowercase alphanumeric with hyphens' }
-  validates :is_active, inclusion: { in: [true, false] }
+  validates :slug, presence: true, uniqueness: true, format: { with: /\A[a-z0-9]+(?:-[a-z0-9]+)*\z/, message: "must be lowercase alphanumeric with hyphens" }
+  validates :is_active, inclusion: { in: [ true, false ] }
 
   before_validation :generate_slug, on: :create
   after_create :create_default_retention_policy
@@ -19,7 +19,7 @@ class Organization < ApplicationRecord
   scope :active, -> { where(is_active: true) }
 
   def owners
-    members.joins(:organization_memberships).where(organization_memberships: { role: 'owner' })
+    members.joins(:organization_memberships).where(organization_memberships: { role: "owner" })
   end
 
   def admins

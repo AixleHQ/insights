@@ -3,7 +3,7 @@ class SanitizationPolicy < ApplicationRecord
 
   validates :version, presence: true, uniqueness: true, numericality: { only_integer: true, greater_than: 0 }
   validates :name, presence: true
-  validates :is_active, inclusion: { in: [true, false] }
+  validates :is_active, inclusion: { in: [ true, false ] }
 
   before_validation :assign_version, on: :create
   before_save :set_effective_at, if: -> { is_active_changed? && is_active? }

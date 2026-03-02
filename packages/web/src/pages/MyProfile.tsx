@@ -20,7 +20,7 @@ export function MyProfile() {
   const currentUserMembership = useMemo(() => {
     if (!members || !profile?.email) return null;
     return members.find((member) => member.user?.email === profile.email);
-  }, [members, profile?.email]);
+  }, [members, profile]);
 
   // If we found the membership, redirect to the member profile page
   if (currentUserMembership) {

@@ -3,24 +3,24 @@
 class AttributionJob
   include Sidekiq::Job
 
-  sidekiq_options queue: 'ai', retry: 3
+  sidekiq_options queue: "ai", retry: 3
 
   DEFAULT_BATCH_SIZE = 1000
   MIN_CONFIDENCE = 0.7
 
   def perform(organization_id = nil, options = {})
-    Rails.logger.info('[AttributionJob] Starting event attribution...')
+    Rails.logger.info("[AttributionJob] Starting event attribution...")
 
-    batch_size = options['batch_size'] || DEFAULT_BATCH_SIZE
-    min_confidence = options['min_confidence'] || MIN_CONFIDENCE
+    batch_size = options["batch_size"] || DEFAULT_BATCH_SIZE
+    min_confidence = options["min_confidence"] || MIN_CONFIDENCE
 
     stats = { organizations_processed: 0, events_attributed: 0, errors: [] }
 
     organizations = if organization_id
                       Organization.where(id: organization_id)
-                    else
+    else
                       Organization.all
-                    end
+    end
 
     organizations.find_each do |org|
       begin

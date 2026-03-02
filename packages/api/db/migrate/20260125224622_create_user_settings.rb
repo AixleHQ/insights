@@ -8,6 +8,6 @@ class CreateUserSettings < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :user_settings, [:user_id, :key], unique: true
+    add_index :user_settings, [ :user_id, :key ], unique: true
   end
 end

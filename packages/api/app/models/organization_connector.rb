@@ -5,8 +5,8 @@ class OrganizationConnector < ApplicationRecord
   has_many :repositories, dependent: :destroy
 
   validates :connector_type, presence: true, inclusion: { in: CONNECTOR_TYPES }
-  validates :connector_type, uniqueness: { scope: :organization_id, message: 'already exists for this organization' }
-  validates :is_active, inclusion: { in: [true, false] }
+  validates :connector_type, uniqueness: { scope: :organization_id, message: "already exists for this organization" }
+  validates :is_active, inclusion: { in: [ true, false ] }
 
   encrypts :access_token
   encrypts :refresh_token

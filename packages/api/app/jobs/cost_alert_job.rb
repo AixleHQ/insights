@@ -3,7 +3,7 @@
 class CostAlertJob
   include Sidekiq::Job
 
-  sidekiq_options queue: 'alerts', retry: 3
+  sidekiq_options queue: "alerts", retry: 3
 
   # Default thresholds in USD
   DEFAULT_THRESHOLDS = {
@@ -13,15 +13,15 @@ class CostAlertJob
   }.freeze
 
   def perform(organization_id = nil)
-    Rails.logger.info('[CostAlertJob] Checking cost thresholds...')
+    Rails.logger.info("[CostAlertJob] Checking cost thresholds...")
 
     stats = { organizations_checked: 0, alerts_sent: 0, errors: [] }
 
     organizations = if organization_id
                       Organization.where(id: organization_id)
-                    else
+    else
                       Organization.all
-                    end
+    end
 
     organizations.find_each do |org|
       begin
@@ -74,28 +74,28 @@ class CostAlertJob
                   .to_h
 
     {
-      daily: settings['cost_threshold_daily']&.to_f || DEFAULT_THRESHOLDS[:daily],
-      weekly: settings['cost_threshold_weekly']&.to_f || DEFAULT_THRESHOLDS[:weekly],
-      monthly: settings['cost_threshold_monthly']&.to_f || DEFAULT_THRESHOLDS[:monthly],
-      per_user: settings['cost_threshold_per_user']&.to_f
+      daily: settings["cost_threshold_daily"]&.to_f || DEFAULT_THRESHOLDS[:daily],
+      weekly: settings["cost_threshold_weekly"]&.to_f || DEFAULT_THRESHOLDS[:weekly],
+      monthly: settings["cost_threshold_monthly"]&.to_f || DEFAULT_THRESHOLDS[:monthly],
+      per_user: settings["cost_threshold_per_user"]&.to_f
     }
   end
 
   def daily_cost(org)
     (org.tool_events
-       .where('occurred_at >= ?', Time.current.beginning_of_day)
+       .where("occurred_at >= ?", Time.current.beginning_of_day)
        .sum(:cost_usd) || 0).to_f
   end
 
   def weekly_cost(org)
     (org.tool_events
-       .where('occurred_at >= ?', Time.current.beginning_of_week)
+       .where("occurred_at >= ?", Time.current.beginning_of_week)
        .sum(:cost_usd) || 0).to_f
   end
 
   def monthly_cost(org)
     (org.tool_events
-       .where('occurred_at >= ?', Time.current.beginning_of_month)
+       .where("occurred_at >= ?", Time.current.beginning_of_month)
        .sum(:cost_usd) || 0).to_f
   end
 
@@ -105,7 +105,7 @@ class CostAlertJob
     alerts_sent = 0
 
     user_costs = org.tool_events
-                    .where('occurred_at >= ?', Time.current.beginning_of_day)
+                    .where("occurred_at >= ?", Time.current.beginning_of_day)
                     .where.not(user_id: nil)
                     .group(:user_id)
                     .sum(:cost_usd)
@@ -126,7 +126,7 @@ class CostAlertJob
     return if Rails.cache.read(cache_key)
 
     alert_data = {
-      type: 'cost_threshold',
+      type: "cost_threshold",
       period: period.to_s,
       current_cost_usd: current_cost.round(2),
       threshold_usd: threshold.round(2),
@@ -150,7 +150,7 @@ class CostAlertJob
     return unless user
 
     alert_data = {
-      type: 'user_cost_threshold',
+      type: "user_cost_threshold",
       user_id: user_id,
       user_email: user.email,
       current_cost_usd: current_cost.round(2),

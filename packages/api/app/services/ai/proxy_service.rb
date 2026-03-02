@@ -3,10 +3,10 @@
 module Ai
   class ProxyService
     ADAPTER_MAP = {
-      'openrouter' => Ai::OpenrouterAdapter,
-      'anthropic' => Ai::AnthropicAdapter,
-      'openai' => Ai::OpenaiAdapter,
-      'gemini' => Ai::GeminiAdapter
+      "openrouter" => Ai::OpenrouterAdapter,
+      "anthropic" => Ai::AnthropicAdapter,
+      "openai" => Ai::OpenaiAdapter,
+      "gemini" => Ai::GeminiAdapter
     }.freeze
 
     class << self
@@ -32,7 +32,7 @@ module Ai
         track_usage(
           connector: connector,
           provider: provider,
-          operation: 'chat',
+          operation: "chat",
           model: response[:model],
           tokens_in: response[:usage][:prompt_tokens],
           tokens_out: response[:usage][:completion_tokens],
@@ -58,7 +58,7 @@ module Ai
         track_usage(
           connector: connector,
           provider: provider,
-          operation: 'completion',
+          operation: "completion",
           model: response[:model],
           tokens_in: response[:usage][:prompt_tokens],
           tokens_out: response[:usage][:completion_tokens],

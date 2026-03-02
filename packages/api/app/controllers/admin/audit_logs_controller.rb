@@ -17,11 +17,11 @@ module Admin
     private
 
     def generate_csv(audit_logs)
-      require 'csv'
+      require "csv"
       CSV.generate(headers: true) do |csv|
         csv << %w[id user_id action resource_type resource_id created_at]
         audit_logs.find_each do |log|
-          csv << [log.id, log.user_id, log.action, log.resource_type, log.resource_id, log.created_at]
+          csv << [ log.id, log.user_id, log.action, log.resource_type, log.resource_id, log.created_at ]
         end
       end
     end
@@ -35,7 +35,7 @@ module Admin
     end
 
     def resource_name
-      'audit_log'
+      "audit_log"
     end
 
     def scoped_resource

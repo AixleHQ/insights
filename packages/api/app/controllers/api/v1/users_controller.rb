@@ -8,11 +8,11 @@ module Api
         response_data = UserSerializer.new(current_user).serialize
 
         # Include impersonation info if this is an impersonation request
-        if request.env['jwt.impersonation']
+        if request.env["jwt.impersonation"]
           response_data[:impersonation] = {
             active: true,
-            impersonator_id: request.env['jwt.impersonator_id'],
-            impersonator_email: request.env['jwt.impersonator_email']
+            impersonator_id: request.env["jwt.impersonator_id"],
+            impersonator_email: request.env["jwt.impersonator_email"]
           }
         end
 
@@ -23,8 +23,8 @@ module Api
             keycloak_sub: current_user.keycloak_sub,
             email: current_user.email,
             total_events: ToolEvent.where(user_id: current_user.id).count,
-            jwt_sub: request.env['jwt.claims']&.dig('sub'),
-            jwt_email: request.env['jwt.claims']&.dig('email')
+            jwt_sub: request.env["jwt.claims"]&.dig("sub"),
+            jwt_email: request.env["jwt.claims"]&.dig("email")
           }
         end
 
@@ -39,7 +39,7 @@ module Api
           render_resource(current_user, UserSerializer)
         else
           render json: {
-            error: 'Unprocessable Entity',
+            error: "Unprocessable Entity",
             errors: format_validation_errors(current_user.errors)
           }, status: :unprocessable_entity
         end
@@ -77,7 +77,7 @@ module Api
           render_resource(setting, UserSettingSerializer)
         else
           render json: {
-            error: 'Unprocessable Entity',
+            error: "Unprocessable Entity",
             errors: format_validation_errors(setting.errors)
           }, status: :unprocessable_entity
         end

@@ -11,8 +11,8 @@ class UserToolAccount < ApplicationRecord
   has_one :organization, through: :organization_membership
 
   validates :tool_name, presence: true, inclusion: { in: TOOL_NAMES }
-  validates :tool_name, uniqueness: { scope: :organization_membership_id, message: 'account already exists for this membership' }
-  validates :is_active, inclusion: { in: [true, false] }
+  validates :tool_name, uniqueness: { scope: :organization_membership_id, message: "account already exists for this membership" }
+  validates :is_active, inclusion: { in: [ true, false ] }
 
   encrypts :access_token
   encrypts :refresh_token

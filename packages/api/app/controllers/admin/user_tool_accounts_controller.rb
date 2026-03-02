@@ -13,7 +13,7 @@ module Admin
     end
 
     def resource_name
-      'user_tool_account'
+      "user_tool_account"
     end
 
     def scoped_resource

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require 'net/http'
-require 'digest'
+require "net/http"
+require "digest"
 
 module Admin
   class KeycloakAuthService
@@ -11,26 +11,26 @@ module Admin
       params = {
         client_id: config.audience,
         redirect_uri: redirect_uri,
-        response_type: 'code',
-        scope: 'openid profile email',
+        response_type: "code",
+        scope: "openid profile email",
         code_challenge: pkce_challenge(code_verifier),
-        code_challenge_method: 'S256'
+        code_challenge_method: "S256"
       }
       "#{config.authorize_url}?#{params.to_query}"
     end
 
     def authenticate(code, code_verifier, redirect_uri)
-      return failure('No authorization code received') unless code.present?
-      return failure('Session expired. Please try again.') unless code_verifier.present?
+      return failure("No authorization code received") unless code.present?
+      return failure("Session expired. Please try again.") unless code_verifier.present?
 
       token_response = exchange_code(code, code_verifier, redirect_uri)
-      return failure('Failed to obtain access token') unless token_response&.dig('access_token')
+      return failure("Failed to obtain access token") unless token_response&.dig("access_token")
 
-      claims = Keycloak::JwtVerifier.verify(token_response['access_token'])
-      return failure('Invalid token') unless claims
+      claims = Keycloak::JwtVerifier.verify(token_response["access_token"])
+      return failure("Invalid token") unless claims
 
       user = find_admin_user(claims)
-      return failure('Access denied. Global admin role required.') unless user
+      return failure("Access denied. Global admin role required.") unless user
 
       Result.new(success?: true, user: user)
     end
@@ -52,7 +52,7 @@ module Admin
     def exchange_code(code, verifier, redirect_uri)
       uri = URI(config.internal_token_url)
       response = Net::HTTP.post_form(uri, {
-        grant_type: 'authorization_code',
+        grant_type: "authorization_code",
         client_id: config.audience,
         code: code,
         redirect_uri: redirect_uri,
@@ -71,7 +71,7 @@ module Admin
     end
 
     def find_admin_user(claims)
-      user = User.find_by(keycloak_sub: claims['sub']) || User.find_by(email: claims['email'])
+      user = User.find_by(keycloak_sub: claims["sub"]) || User.find_by(email: claims["email"])
       user if user&.global_admin?
     end
   end

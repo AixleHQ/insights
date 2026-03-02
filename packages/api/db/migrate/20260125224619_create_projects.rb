@@ -11,7 +11,7 @@ class CreateProjects < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :projects, [:organization_id, :slug], unique: true, where: 'organization_id IS NOT NULL'
-    add_index :projects, [:owner_id, :slug], unique: true, where: 'owner_id IS NOT NULL'
+    add_index :projects, [ :organization_id, :slug ], unique: true, where: 'organization_id IS NOT NULL'
+    add_index :projects, [ :owner_id, :slug ], unique: true, where: 'owner_id IS NOT NULL'
   end
 end

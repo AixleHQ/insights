@@ -1,5 +1,5 @@
 class HourlyTokenUsage < ApplicationRecord
-  self.table_name = 'timeseries.hourly_token_usage'
+  self.table_name = "timeseries.hourly_token_usage"
   self.primary_key = nil
 
   belongs_to :organization

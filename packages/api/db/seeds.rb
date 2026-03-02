@@ -210,10 +210,10 @@ if Rails.env.development? || Rails.env.staging?
 
     # Assign role based on position
     role = case i
-           when 0 then 'owner'
-           when 1..4 then 'admin'
-           else 'member'
-           end
+    when 0 then 'owner'
+    when 1..4 then 'admin'
+    else 'member'
+    end
 
     OrganizationMembership.find_or_create_by!(user: user, organization: org) do |m|
       m.role = role

@@ -201,7 +201,7 @@ RSpec.describe 'Api::V1::Projects', type: :request do
 
         expect_success
         expect(json_response[:data]).to eq([])
-        expect(json_response[:tools]).to eq(['Other'])
+        expect(json_response[:tools]).to eq([ 'Other' ])
       end
     end
   end

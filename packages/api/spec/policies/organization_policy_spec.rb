@@ -81,5 +81,4 @@ RSpec.describe OrganizationPolicy, type: :policy do
       expect(policy(organization, current_user: member).apply(:retention_policy?)).to be false
     end
   end
-
 end

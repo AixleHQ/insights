@@ -3,20 +3,20 @@
 class GithubSyncJob
   include Sidekiq::Job
 
-  sidekiq_options queue: 'connectors', retry: 3
+  sidekiq_options queue: "connectors", retry: 3
 
-  def perform(connector_id, action = 'sync', options = {})
+  def perform(connector_id, action = "sync", options = {})
     @connector = OrganizationConnector.find(connector_id)
     @options = options.symbolize_keys
 
     Rails.logger.info("[GithubSyncJob] Starting #{action} for connector #{connector_id}")
 
     case action
-    when 'sync'
+    when "sync"
       sync_repositories
-    when 'refresh_token'
+    when "refresh_token"
       refresh_token
-    when 'webhook'
+    when "webhook"
       process_webhook
     else
       Rails.logger.warn("[GithubSyncJob] Unknown action: #{action}")
@@ -77,11 +77,11 @@ class GithubSyncJob
     payload = @options[:payload]
 
     case event_type
-    when 'push'
+    when "push"
       process_push_event(payload)
-    when 'pull_request'
+    when "pull_request"
       process_pull_request_event(payload)
-    when 'installation', 'installation_repositories'
+    when "installation", "installation_repositories"
       sync_repositories
     else
       Rails.logger.info("[GithubSyncJob] Ignoring webhook event: #{event_type}")
@@ -89,34 +89,34 @@ class GithubSyncJob
   end
 
   def process_push_event(payload)
-    repository = find_repository(payload.dig('repository', 'id'))
+    repository = find_repository(payload.dig("repository", "id"))
     return unless repository
 
-    commits = payload['commits'] || []
+    commits = payload["commits"] || []
     commits.each do |commit|
       create_commit_event(repository, commit)
     end
   end
 
   def process_pull_request_event(payload)
-    repository = find_repository(payload.dig('repository', 'id'))
+    repository = find_repository(payload.dig("repository", "id"))
     return unless repository
 
-    pr = payload['pull_request']
-    action = payload['action']
+    pr = payload["pull_request"]
+    action = payload["action"]
 
     ToolEvent.create!(
       organization_id: @connector.organization_id,
-      tool_name: 'github',
-      event_type: 'pull_request',
-      occurred_at: Time.parse(pr['updated_at']),
+      tool_name: "github",
+      event_type: "pull_request",
+      occurred_at: Time.parse(pr["updated_at"]),
       metadata: {
         action: action,
-        pr_number: pr['number'],
-        pr_title: pr['title'],
-        pr_state: pr['state'],
+        pr_number: pr["number"],
+        pr_title: pr["title"],
+        pr_state: pr["state"],
         repository_id: repository.id,
-        author: pr.dig('user', 'login')
+        author: pr.dig("user", "login")
       }
     )
   end
@@ -128,16 +128,16 @@ class GithubSyncJob
   def create_commit_event(repository, commit)
     ToolEvent.create!(
       organization_id: @connector.organization_id,
-      tool_name: 'github',
-      event_type: 'commit',
-      occurred_at: Time.parse(commit['timestamp']),
+      tool_name: "github",
+      event_type: "commit",
+      occurred_at: Time.parse(commit["timestamp"]),
       metadata: {
-        sha: commit['id'],
-        message: commit['message'],
-        author_name: commit.dig('author', 'name'),
-        author_email: commit.dig('author', 'email'),
+        sha: commit["id"],
+        message: commit["message"],
+        author_name: commit.dig("author", "name"),
+        author_email: commit.dig("author", "email"),
         repository_id: repository.id,
-        url: commit['url']
+        url: commit["url"]
       }
     )
   end

@@ -11,7 +11,7 @@ module Api
       event = ToolEvent.create!(tool_event_params)
       render json: { data: { id: event.id } }, status: :created
     rescue ActiveRecord::RecordInvalid => e
-      render json: { error: 'Validation failed', errors: e.record.errors.to_hash }, status: :unprocessable_entity
+      render json: { error: "Validation failed", errors: e.record.errors.to_hash }, status: :unprocessable_entity
     end
 
     # POST /api/internal/audit_logs
@@ -19,7 +19,7 @@ module Api
       audit_log = AuditLog.create!(audit_log_params)
       render json: { data: { id: audit_log.id } }, status: :created
     rescue ActiveRecord::RecordInvalid => e
-      render json: { error: 'Validation failed', errors: e.record.errors.to_hash }, status: :unprocessable_entity
+      render json: { error: "Validation failed", errors: e.record.errors.to_hash }, status: :unprocessable_entity
     end
 
     # POST /api/internal/alerts
@@ -34,7 +34,7 @@ module Api
         EventsChannel.broadcast_alert(alert_data[:organization_id], alert_data)
       end
 
-      render json: { data: { id: SecureRandom.uuid, status: 'sent' } }, status: :created
+      render json: { data: { id: SecureRandom.uuid, status: "sent" } }, status: :created
     end
 
     # POST /api/internal/broadcasts
@@ -47,7 +47,7 @@ module Api
         ActionCable.server.broadcast(channel, { type: event, **data.to_unsafe_h })
         render json: { success: true }, status: :ok
       else
-        render json: { error: 'Missing required parameters' }, status: :bad_request
+        render json: { error: "Missing required parameters" }, status: :bad_request
       end
     end
 
@@ -71,27 +71,27 @@ module Api
         render json: { data: nil }
       end
     rescue ActiveRecord::RecordNotFound
-      render json: { error: 'Organization not found' }, status: :not_found
+      render json: { error: "Organization not found" }, status: :not_found
     end
 
     private
 
     def verify_internal_api_key!
-      api_key = ENV['INTERNAL_API_KEY']
+      api_key = ENV["INTERNAL_API_KEY"]
       return if api_key.blank? # Skip verification if no key configured
 
       provided_key = extract_bearer_token
 
       unless provided_key && ActiveSupport::SecurityUtils.secure_compare(provided_key, api_key)
-        render json: { error: 'Unauthorized' }, status: :unauthorized
+        render json: { error: "Unauthorized" }, status: :unauthorized
       end
     end
 
     def extract_bearer_token
-      auth_header = request.headers['Authorization']
-      return nil unless auth_header&.start_with?('Bearer ')
+      auth_header = request.headers["Authorization"]
+      return nil unless auth_header&.start_with?("Bearer ")
 
-      auth_header.split(' ').last
+      auth_header.split(" ").last
     end
 
     def tool_event_params

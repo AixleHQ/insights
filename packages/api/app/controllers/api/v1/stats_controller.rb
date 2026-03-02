@@ -22,7 +22,7 @@ module Api
 
         # Last 7 days for active users
         week_ago = 7.days.ago
-        active_users = current_organization.tool_events.where('occurred_at > ?', week_ago).distinct.count(:user_id)
+        active_users = current_organization.tool_events.where("occurred_at > ?", week_ago).distinct.count(:user_id)
 
         # High risk events (from audit logs)
         high_risk_count = AuditLog
@@ -62,13 +62,13 @@ module Api
           .group("DATE_TRUNC('hour', occurred_at)")
           .select(
             "DATE_TRUNC('hour', occurred_at) as hour",
-            'COUNT(*) as event_count',
-            'SUM(tokens_in) as tokens_in',
-            'SUM(tokens_out) as tokens_out',
-            'SUM(cost_usd) as cost_usd',
-            'COUNT(DISTINCT user_id) as unique_users'
+            "COUNT(*) as event_count",
+            "SUM(tokens_in) as tokens_in",
+            "SUM(tokens_out) as tokens_out",
+            "SUM(cost_usd) as cost_usd",
+            "COUNT(DISTINCT user_id) as unique_users"
           )
-          .order('hour')
+          .order("hour")
           .map do |row|
             {
               hour: row.hour&.iso8601,
@@ -105,10 +105,10 @@ module Api
           .group("DATE_TRUNC('day', occurred_at)")
           .select(
             "DATE_TRUNC('day', occurred_at) as day",
-            'COUNT(*) as event_count',
-            'SUM(cost_usd) as cost_usd'
+            "COUNT(*) as event_count",
+            "SUM(cost_usd) as cost_usd"
           )
-          .order('day')
+          .order("day")
           .map do |row|
             {
               date: row.day&.to_date&.iso8601,
@@ -120,11 +120,11 @@ module Api
         tool_breakdown = events
           .group(:tool_name)
           .select(
-            'tool_name',
-            'COUNT(*) as event_count',
-            'SUM(cost_usd) as cost_usd'
+            "tool_name",
+            "COUNT(*) as event_count",
+            "SUM(cost_usd) as cost_usd"
           )
-          .order(Arel.sql('event_count DESC'))
+          .order(Arel.sql("event_count DESC"))
           .map do |row|
             {
               tool_name: row.tool_name,
@@ -152,7 +152,7 @@ module Api
         # Get top tools by total event count
         top_tools = events
           .group(:tool_name)
-          .order(Arel.sql('COUNT(*) DESC'))
+          .order(Arel.sql("COUNT(*) DESC"))
           .limit(3)
           .pluck(:tool_name)
 
@@ -161,10 +161,10 @@ module Api
           .group("DATE_TRUNC('day', occurred_at)", :tool_name)
           .select(
             "DATE_TRUNC('day', occurred_at) as day",
-            'tool_name',
-            'COUNT(*) as event_count'
+            "tool_name",
+            "COUNT(*) as event_count"
           )
-          .order('day')
+          .order("day")
 
         # Transform into chart-friendly format
         # Group by date, with each date having counts for top tools + "Other"
@@ -174,14 +174,14 @@ module Api
           next unless date
 
           date_map[date] ||= { date: date }
-          tool_key = top_tools.include?(row.tool_name) ? row.tool_name : 'Other'
+          tool_key = top_tools.include?(row.tool_name) ? row.tool_name : "Other"
           date_map[date][tool_key] ||= 0
           date_map[date][tool_key] += row.event_count
         end
 
         render json: {
           data: date_map.values.sort_by { |d| d[:date] },
-          tools: top_tools + ['Other']
+          tools: top_tools + [ "Other" ]
         }
       end
 
@@ -237,12 +237,12 @@ module Api
           .group(column)
           .select(
             "#{column}",
-            'COUNT(*) as event_count',
-            'SUM(tokens_in) as tokens_in',
-            'SUM(tokens_out) as tokens_out',
-            'SUM(cost_usd) as cost_usd'
+            "COUNT(*) as event_count",
+            "SUM(tokens_in) as tokens_in",
+            "SUM(tokens_out) as tokens_out",
+            "SUM(cost_usd) as cost_usd"
           )
-          .order(Arel.sql('event_count DESC'))
+          .order(Arel.sql("event_count DESC"))
           .limit(20)
           .map do |row|
             {
@@ -260,18 +260,18 @@ module Api
           .where.not(user_id: nil)
           .group(:user_id)
           .select(
-            'user_id',
-            'COUNT(*) as event_count',
-            'SUM(tokens_in + tokens_out) as total_tokens',
-            'SUM(cost_usd) as cost_usd'
+            "user_id",
+            "COUNT(*) as event_count",
+            "SUM(tokens_in + tokens_out) as total_tokens",
+            "SUM(cost_usd) as cost_usd"
           )
-          .order(Arel.sql('total_tokens DESC'))
+          .order(Arel.sql("total_tokens DESC"))
           .limit(limit)
           .map do |row|
             user = User.find_by(id: row.user_id)
             {
               userId: row.user_id,
-              name: user&.name || 'Unknown',
+              name: user&.name || "Unknown",
               email: user&.email,
               eventCount: row.event_count,
               totalTokens: row.total_tokens || 0,

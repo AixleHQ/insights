@@ -13,7 +13,7 @@ module Admin
     end
 
     def resource_name
-      'organization_retention_policy'
+      "organization_retention_policy"
     end
 
     def scoped_resource

@@ -13,7 +13,7 @@ module Admin
     end
 
     def resource_name
-      'organization_membership'
+      "organization_membership"
     end
 
     def scoped_resource

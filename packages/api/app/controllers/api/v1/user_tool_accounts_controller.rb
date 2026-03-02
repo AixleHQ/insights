@@ -13,7 +13,7 @@ module Api
 
         # Allow filtering by tool
         accounts = accounts.by_tool(params[:tool]) if params[:tool].present?
-        accounts = accounts.active if params[:active] == 'true'
+        accounts = accounts.active if params[:active] == "true"
 
         render json: {
           data: UserToolAccountSerializer.new(accounts).serialize
@@ -35,7 +35,7 @@ module Api
           render_created(@tool_account, UserToolAccountSerializer)
         else
           render json: {
-            error: 'Unprocessable Entity',
+            error: "Unprocessable Entity",
             errors: format_validation_errors(@tool_account.errors)
           }, status: :unprocessable_entity
         end
@@ -49,7 +49,7 @@ module Api
           render_resource(@tool_account, UserToolAccountSerializer)
         else
           render json: {
-            error: 'Unprocessable Entity',
+            error: "Unprocessable Entity",
             errors: format_validation_errors(@tool_account.errors)
           }, status: :unprocessable_entity
         end

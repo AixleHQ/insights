@@ -20,23 +20,23 @@ module Admin
     def activate
       policy = SanitizationPolicy.find(params[:id])
       policy.update!(is_active: true)
-      redirect_to admin_sanitization_policy_path(policy), notice: 'Policy activated.'
+      redirect_to admin_sanitization_policy_path(policy), notice: "Policy activated."
     end
 
     def deactivate
       policy = SanitizationPolicy.find(params[:id])
       policy.update!(is_active: false)
-      redirect_to admin_sanitization_policy_path(policy), notice: 'Policy deactivated.'
+      redirect_to admin_sanitization_policy_path(policy), notice: "Policy deactivated."
     end
 
     private
 
     def generate_csv(policies)
-      require 'csv'
+      require "csv"
       CSV.generate(headers: true) do |csv|
         csv << %w[id name is_active version created_at]
         policies.find_each do |policy|
-          csv << [policy.id, policy.name, policy.is_active, policy.version, policy.created_at]
+          csv << [ policy.id, policy.name, policy.is_active, policy.version, policy.created_at ]
         end
       end
     end
@@ -50,7 +50,7 @@ module Admin
     end
 
     def resource_name
-      'sanitization_policy'
+      "sanitization_policy"
     end
 
     def scoped_resource

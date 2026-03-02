@@ -28,10 +28,10 @@ module Admin
         cookies.signed[:admin_user_id] = {
           value: result.user.id,
           httponly: true,
-          secure: request.ssl? || request.headers['X-Forwarded-Proto'] == 'https',
+          secure: request.ssl? || request.headers["X-Forwarded-Proto"] == "https",
           expires: 1.day.from_now
         }
-        redirect_to '/admin'
+        redirect_to "/admin"
       else
         redirect_to "/admin/login?error=#{ERB::Util.url_encode(result.error)}"
       end
@@ -40,7 +40,7 @@ module Admin
     # DELETE /admin/logout
     def destroy
       cookies.delete(:admin_user_id)
-      redirect_to '/admin/login?notice=Logged+out+successfully'
+      redirect_to "/admin/login?notice=Logged+out+successfully"
     end
 
     private

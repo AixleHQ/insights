@@ -8,7 +8,14 @@ RSpec.describe SanitizationPolicy, type: :model do
   describe 'validations' do
     subject { build(:sanitization_policy) }
 
-    it { should validate_presence_of(:version) }
+    it 'validates presence of version' do
+      policy = build(:sanitization_policy)
+      allow(policy).to receive(:assign_version) # stub auto-assignment callback
+      policy.version = nil
+      policy.valid?
+      expect(policy.errors[:version]).to include("can't be blank")
+    end
+
     it { should validate_uniqueness_of(:version) }
     it { should validate_numericality_of(:version).only_integer.is_greater_than(0) }
     it { should validate_presence_of(:name) }
@@ -68,7 +75,7 @@ RSpec.describe SanitizationPolicy, type: :model do
         policy3 = create(:sanitization_policy, version: 3)
         policy2 = create(:sanitization_policy, version: 2)
 
-        expect(SanitizationPolicy.by_version.to_a).to eq([policy3, policy2, policy1])
+        expect(SanitizationPolicy.by_version.to_a).to eq([ policy3, policy2, policy1 ])
       end
     end
   end

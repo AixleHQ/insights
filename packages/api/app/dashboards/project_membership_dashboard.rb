@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'administrate/base_dashboard'
+require "administrate/base_dashboard"
 
 class ProjectMembershipDashboard < Administrate::BaseDashboard
   ATTRIBUTE_TYPES = {
@@ -36,7 +36,7 @@ class ProjectMembershipDashboard < Administrate::BaseDashboard
   ].freeze
 
   COLLECTION_FILTERS = {
-    owners: ->(resources) { resources.where(role: 'owner') },
+    owners: ->(resources) { resources.where(role: "owner") },
     admins: ->(resources) { resources.where(role: %w[owner admin]) }
   }.freeze
 

@@ -1,7 +1,7 @@
-require 'jwt'
-require 'net/http'
-require 'json'
-require_relative '../../lib/keycloak/jwt_verifier'
+require "jwt"
+require "net/http"
+require "json"
+require_relative "../../lib/keycloak/jwt_verifier"
 
 class JwtAuth
   class AuthError < StandardError; end
@@ -9,11 +9,11 @@ class JwtAuth
   class InvalidTokenError < AuthError; end
 
   EXCLUDED_PATHS = [
-    '/health',
-    '/api/v1/health',
-    '/up',
-    '/admin',
-    '/api/internal'
+    "/health",
+    "/api/v1/health",
+    "/up",
+    "/admin",
+    "/api/internal"
   ].freeze
 
   EXCLUDED_PATTERNS = [
@@ -31,24 +31,24 @@ class JwtAuth
       return @app.call(env)
     end
 
-    if env['jwt.claims']
+    if env["jwt.claims"]
       return @app.call(env)
     end
 
     token = extract_token(request)
 
     if token.nil?
-      return unauthorized_response('Missing authorization token')
+      return unauthorized_response("Missing authorization token")
     end
 
     begin
       impersonation_claims = ImpersonationService.decode_token(token) rescue nil
       if impersonation_claims
-        env['jwt.claims'] = impersonation_claims
-        env['jwt.token'] = token
-        env['jwt.impersonation'] = true
-        env['jwt.impersonator_id'] = impersonation_claims['impersonator_id']
-        env['jwt.impersonator_email'] = impersonation_claims['impersonator_email']
+        env["jwt.claims"] = impersonation_claims
+        env["jwt.token"] = token
+        env["jwt.impersonation"] = true
+        env["jwt.impersonator_id"] = impersonation_claims["impersonator_id"]
+        env["jwt.impersonator_email"] = impersonation_claims["impersonator_email"]
         Rails.logger.info("[JwtAuth] Impersonation token validated for #{impersonation_claims['email']}")
         return @app.call(env)
       end
@@ -63,12 +63,12 @@ class JwtAuth
 
       claims = validate_token(token)
       Rails.logger.info("[JwtAuth] Token validated for #{claims['email']}")
-      env['jwt.claims'] = claims
-      env['jwt.token'] = token
+      env["jwt.claims"] = claims
+      env["jwt.token"] = token
       @app.call(env)
     rescue TokenExpiredError
       Rails.logger.warn("[JwtAuth] Token expired")
-      unauthorized_response('Token has expired')
+      unauthorized_response("Token has expired")
     rescue InvalidTokenError => e
       Rails.logger.warn("[JwtAuth] Invalid token: #{e.message}")
       unauthorized_response("Invalid token: #{e.message}")
@@ -78,7 +78,7 @@ class JwtAuth
     rescue => e
       Rails.logger.error("[JwtAuth] Unexpected error: #{e.class} - #{e.message}")
       Rails.logger.error(e.backtrace.first(5).join("\n"))
-      unauthorized_response('Authentication failed')
+      unauthorized_response("Authentication failed")
     end
   end
 
@@ -91,24 +91,24 @@ class JwtAuth
   end
 
   def extract_token(request)
-    auth_header = request.env['HTTP_AUTHORIZATION']
+    auth_header = request.env["HTTP_AUTHORIZATION"]
     return nil unless auth_header
 
-    scheme, token = auth_header.split(' ', 2)
-    return nil unless scheme&.downcase == 'bearer' && token.present?
+    scheme, token = auth_header.split(" ", 2)
+    return nil unless scheme&.downcase == "bearer" && token.present?
 
     token
   end
 
   def validate_token(token)
     header = JWT.decode(token, nil, false).last
-    kid = header['kid']
+    kid = header["kid"]
 
     public_key = Keycloak::JwtVerifier.resolve_key(kid)
     raise InvalidTokenError, "Key not found: #{kid}" unless public_key
 
     options = {
-      algorithm: 'RS256',
+      algorithm: "RS256",
       verify_iss: true,
       iss: Keycloak.configuration.issuer,
       verify_aud: true,
@@ -122,11 +122,11 @@ class JwtAuth
     validate_claims!(claims)
     claims
   rescue JWT::ExpiredSignature
-    raise TokenExpiredError, 'Token has expired'
+    raise TokenExpiredError, "Token has expired"
   rescue JWT::InvalidIssuerError
-    raise InvalidTokenError, 'Invalid issuer'
+    raise InvalidTokenError, "Invalid issuer"
   rescue JWT::InvalidAudError
-    raise InvalidTokenError, 'Invalid audience'
+    raise InvalidTokenError, "Invalid audience"
   rescue Keycloak::JwtVerifier::VerificationError => e
     raise InvalidTokenError, e.message
   rescue JWT::DecodeError => e
@@ -134,26 +134,26 @@ class JwtAuth
   end
 
   def validate_claims!(claims)
-    unless claims['email'].present?
+    unless claims["email"].present?
       raise InvalidTokenError, "Missing required claim: email"
     end
 
-    unless claims['sub'].present?
-      claims['sub'] = claims['preferred_username'] || claims['email']
+    unless claims["sub"].present?
+      claims["sub"] = claims["preferred_username"] || claims["email"]
       Rails.logger.debug("[JwtAuth] Using fallback sub: #{claims['sub']}")
     end
 
-    if claims['nbf'] && Time.now.to_i < claims['nbf']
-      raise InvalidTokenError, 'Token not yet valid'
+    if claims["nbf"] && Time.now.to_i < claims["nbf"]
+      raise InvalidTokenError, "Token not yet valid"
     end
   end
 
   def unauthorized_response(message)
-    body = { error: 'Unauthorized', message: message }.to_json
+    body = { error: "Unauthorized", message: message }.to_json
     [
       401,
-      { 'Content-Type' => 'application/json', 'WWW-Authenticate' => 'Bearer' },
-      [body]
+      { "Content-Type" => "application/json", "WWW-Authenticate" => "Bearer" },
+      [ body ]
     ]
   end
 end

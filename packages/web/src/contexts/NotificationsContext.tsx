@@ -24,6 +24,7 @@ interface NotificationsContextType {
 
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useNotifications() {
   const context = useContext(NotificationsContext);
   if (!context) {
@@ -55,6 +56,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   }, [notifications, storageKey, currentOrg?.id]);
 
   // Clear notifications when org changes
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (currentOrg?.id) {
       try {
@@ -65,6 +67,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       }
     }
   }, [currentOrg?.id, storageKey]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const addNotification = useCallback((notification: Omit<Notification, 'id' | 'time' | 'read' | 'timestamp'>) => {
     const newNotification: Notification = {

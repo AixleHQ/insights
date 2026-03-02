@@ -134,7 +134,7 @@ export function Team() {
   };
 
   const filteredMembers = useMemo(() => {
-    let result = members.filter(
+    const result = members.filter(
       (member) =>
         member.email.toLowerCase().includes(search.toLowerCase()) ||
         member.name?.toLowerCase().includes(search.toLowerCase())
@@ -444,9 +444,10 @@ interface PendingInvitationRowProps {
 }
 
 function PendingInvitationRow({ invitation, canRevoke, onRevoke, isRevoking }: PendingInvitationRowProps) {
+  const now = new Date();
   const expiresAt = new Date(invitation.expiresAt);
-  const isExpired = expiresAt < new Date();
-  const daysUntilExpiry = Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  const isExpired = expiresAt < now;
+  const daysUntilExpiry = Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
   return (
     <div className="flex items-center justify-between gap-4 rounded-md bg-background p-3 border">

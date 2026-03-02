@@ -34,7 +34,7 @@ RSpec.describe Ai::ProxyService do
   describe '.chat' do
     let(:organization) { create(:organization) }
     let(:connector) { create(:organization_connector, organization: organization, connector_type: 'anthropic') }
-    let(:messages) { [{ role: 'user', content: 'Hello' }] }
+    let(:messages) { [ { role: 'user', content: 'Hello' } ] }
 
     before do
       allow(Ai::AnthropicAdapter).to receive(:chat).and_return({

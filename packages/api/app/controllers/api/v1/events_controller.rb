@@ -65,7 +65,7 @@ module Api
         if audit_log
           render_resource(audit_log, AuditLogSerializer)
         else
-          render json: { data: nil, message: 'No audit trail available for this event' }
+          render json: { data: nil, message: "No audit trail available for this event" }
         end
       end
 
@@ -87,10 +87,10 @@ module Api
 
       def apply_time_filter(scope)
         if params[:start_date].present?
-          scope = scope.where('occurred_at >= ?', Time.zone.parse(params[:start_date]))
+          scope = scope.where("occurred_at >= ?", Time.zone.parse(params[:start_date]))
         end
         if params[:end_date].present?
-          scope = scope.where('occurred_at <= ?', Time.zone.parse(params[:end_date]))
+          scope = scope.where("occurred_at <= ?", Time.zone.parse(params[:end_date]))
         end
         scope
       end

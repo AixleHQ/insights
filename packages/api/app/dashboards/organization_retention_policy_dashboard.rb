@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 
-require 'administrate/base_dashboard'
+require "administrate/base_dashboard"
 
 class OrganizationRetentionPolicyDashboard < Administrate::BaseDashboard
   ATTRIBUTE_TYPES = {
     id: Field::String,
     organization: Field::BelongsTo,
-    updated_by: Field::BelongsTo.with_options(class_name: 'User'),
+    updated_by: Field::BelongsTo.with_options(class_name: "User"),
     raw_event_ttl: Field::String,
     tool_events_retention: Field::String,
     hourly_aggregate_retention: Field::String,
