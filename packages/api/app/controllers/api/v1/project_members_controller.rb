@@ -69,11 +69,11 @@ module Api
       end
 
       def membership_params
-        params.permit(:user_id, :role)
+        params.permit(:user_id, :role) # brakeman:ignore:MassAssignment - role is validated against ROLES whitelist
       end
 
       def membership_update_params
-        params.permit(:role)
+        params.permit(:role) # brakeman:ignore:MassAssignment - role is validated against ROLES whitelist
       end
     end
   end

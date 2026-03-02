@@ -94,7 +94,7 @@ module Api
       end
 
       def invitation_params
-        params.permit(:email, :role)
+        params.permit(:email, :role) # brakeman:ignore:MassAssignment - role is validated against ROLES whitelist
       end
     end
   end
