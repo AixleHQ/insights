@@ -14,9 +14,7 @@ import * as ReactNamespace from 'react'
 
 // Declare global types
 declare global {
-  // eslint-disable-next-line no-var
   var React: typeof ReactNamespace & { act: typeof act }
-  // eslint-disable-next-line no-var
   var IS_REACT_ACT_ENVIRONMENT: boolean
 }
 
@@ -39,7 +37,7 @@ try {
     writable: false,
     configurable: true,
   })
-} catch (e) {
+} catch {
   // Ignore if we can't modify the module
 }
 
