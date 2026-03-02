@@ -34,8 +34,8 @@ namespace :admin do
      repositories sanitization_policies users user_tool_accounts].each do |res|
     singular = res.singularize
     get res, to: "#{res}#index", as: res.to_sym
-    get "#{res}/export", to: "#{res}#export", as: :"export_admin_#{res}"
-    post "#{res}/batch_delete", to: "#{res}#batch_delete", as: :"batch_delete_admin_#{res}"
+    get "#{res}/export", to: "#{res}#export"
+    post "#{res}/batch_delete", to: "#{res}#batch_delete"
     get "#{res}/new", to: "#{res}#new"
     post res, to: "#{res}#create"
     get "#{res}/:id", to: "#{res}#show", as: singular.to_sym
@@ -69,6 +69,8 @@ scope path: "/admin", module: "admin" do
     singular = res.singularize
     get "#{res}/new", to: "#{res}#new", as: :"new_admin_#{singular}"
     get "#{res}/:id/edit", to: "#{res}#edit", as: :"edit_admin_#{singular}"
+    get "#{res}/export", to: "#{res}#export", as: :"export_admin_#{res}"
+    post "#{res}/batch_delete", to: "#{res}#batch_delete", as: :"batch_delete_admin_#{res}"
   end
 
   post "users/:id/impersonate", to: "users#impersonate", as: :impersonate_admin_user
