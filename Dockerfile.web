@@ -18,6 +18,7 @@ RUN npm run build
 
 # CI stage: full Node environment with dev dependencies for tests and linters
 FROM base AS ci
+ENV NODE_ENV="test"
 COPY packages/web/package.json packages/web/package-lock.json ./
 RUN npm ci --include=dev
 COPY packages/web/ .
