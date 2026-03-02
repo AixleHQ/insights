@@ -133,13 +133,13 @@ setup('authenticate', async ({ page, request }) => {
   // Find or create the origin entry for localhost:5173
   const originIndex = storageState.origins.findIndex(o => o.origin === 'http://localhost:5173');
   if (originIndex >= 0) {
-    // @ts-ignore - adding sessionStorage which isn't in the type but we'll handle it
+    // @ts-expect-error - adding sessionStorage which isn't in the type but we'll handle it
     storageState.origins[originIndex].sessionStorage = sessionStorageData;
   } else {
     storageState.origins.push({
       origin: 'http://localhost:5173',
       localStorage: [],
-      // @ts-ignore
+      // @ts-expect-error - adding sessionStorage which isn't in the type but we'll handle it
       sessionStorage: sessionStorageData,
     });
   }

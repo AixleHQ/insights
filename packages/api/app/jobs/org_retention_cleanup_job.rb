@@ -1,10 +1,10 @@
 class OrgRetentionCleanupJob
   include Sidekiq::Job
 
-  sidekiq_options queue: 'maintenance', retry: 3
+  sidekiq_options queue: "maintenance", retry: 3
 
   def perform
-    Rails.logger.info('[OrgRetentionCleanupJob] Starting retention cleanup...')
+    Rails.logger.info("[OrgRetentionCleanupJob] Starting retention cleanup...")
 
     stats = { organizations_processed: 0, total_deleted: 0, errors: [] }
 
@@ -43,7 +43,7 @@ class OrgRetentionCleanupJob
 
     deleted = ToolEvent
       .where(organization_id: org.id)
-      .where('occurred_at < ?', cutoff)
+      .where("occurred_at < ?", cutoff)
       .delete_all
 
     if deleted > 0

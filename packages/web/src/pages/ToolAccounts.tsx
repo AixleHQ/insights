@@ -199,7 +199,7 @@ export function ToolAccounts() {
     setConnectingProvider(provider);
   };
 
-  const handleConnectSubmit = async (providerId: string, accountId: string, _accountName: string) => {
+  const handleConnectSubmit = async (providerId: string, accountId: string) => {
     if (!currentOrg) return;
     try {
       await createAccount.mutateAsync({

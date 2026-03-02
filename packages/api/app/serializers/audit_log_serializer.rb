@@ -13,15 +13,15 @@ class AuditLogSerializer < BaseSerializer
   end
 
   attribute :detection_summary do |audit_log|
-    audit_log.metadata&.dig('detection_summary')
+    audit_log.metadata&.dig("detection_summary")
   end
 
   attribute :sanitization_changes do |audit_log|
-    audit_log.metadata&.dig('sanitization_changes')
+    audit_log.metadata&.dig("sanitization_changes")
   end
 
   attribute :risk_score do |audit_log|
-    audit_log.metadata&.dig('risk_score')
+    audit_log.metadata&.dig("risk_score")
   end
 
   attribute :policy_version do |audit_log|

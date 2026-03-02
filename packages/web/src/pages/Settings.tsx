@@ -92,10 +92,18 @@ function GeneralSettings() {
   // Update form when org data loads
   useEffect(() => {
     if (org) {
-      setFormData({
-        name: org.name || '',
-        slug: org.slug || '',
-        description: org.description || '',
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFormData((prev) => {
+        const newData = {
+          name: org.name || '',
+          slug: org.slug || '',
+          description: org.description || '',
+        };
+        // Only update if data actually changed
+        if (prev.name !== newData.name || prev.slug !== newData.slug || prev.description !== newData.description) {
+          return newData;
+        }
+        return prev;
       });
     }
   }, [org]);

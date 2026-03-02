@@ -2,7 +2,7 @@
 
 namespace :seed do
   desc "Assign some tool events to a specific user by email"
-  task :assign_to_user, [:email] => :environment do |_t, args|
+  task :assign_to_user, [ :email ] => :environment do |_t, args|
     email = args[:email]
 
     if email.blank?
@@ -24,9 +24,9 @@ namespace :seed do
     org = user.organizations.first
     unless org
       puts "User has no organizations. Creating membership..."
-      org = Organization.find_by(slug: 'dualboot-partners')
+      org = Organization.find_by(slug: "dualboot-partners")
       if org
-        OrganizationMembership.create!(user: user, organization: org, role: 'member')
+        OrganizationMembership.create!(user: user, organization: org, role: "member")
         puts "Added user to organization: #{org.name}"
       else
         puts "No organization found. Run rails db:seed first."
@@ -60,7 +60,7 @@ namespace :seed do
     projects = org.projects.limit(3)
     projects.each do |project|
       ProjectMembership.find_or_create_by!(user: user, project: project) do |m|
-        m.role = 'member'
+        m.role = "member"
       end
     end
 
@@ -70,7 +70,7 @@ namespace :seed do
   end
 
   desc "Show user's event summary"
-  task :user_summary, [:email] => :environment do |_t, args|
+  task :user_summary, [ :email ] => :environment do |_t, args|
     email = args[:email]
 
     if email.blank?

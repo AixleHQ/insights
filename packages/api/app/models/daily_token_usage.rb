@@ -1,5 +1,5 @@
 class DailyTokenUsage < ApplicationRecord
-  self.table_name = 'timeseries.daily_token_usage'
+  self.table_name = "timeseries.daily_token_usage"
   self.primary_key = nil
 
   belongs_to :organization
@@ -24,13 +24,13 @@ class DailyTokenUsage < ApplicationRecord
     for_organization(org)
       .in_range(start_time, end_time)
       .group(:tool_name)
-      .select('tool_name, SUM(total_tokens) as total_tokens, SUM(total_cost) as total_cost, SUM(event_count) as event_count')
+      .select("tool_name, SUM(total_tokens) as total_tokens, SUM(total_cost) as total_cost, SUM(event_count) as event_count")
   end
 
   def self.usage_by_user(org, start_time, end_time)
     for_organization(org)
       .in_range(start_time, end_time)
       .group(:user_id)
-      .select('user_id, SUM(total_tokens) as total_tokens, SUM(total_cost) as total_cost, SUM(event_count) as event_count')
+      .select("user_id, SUM(total_tokens) as total_tokens, SUM(total_cost) as total_cost, SUM(event_count) as event_count")
   end
 end

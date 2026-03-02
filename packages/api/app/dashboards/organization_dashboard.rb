@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'administrate/base_dashboard'
+require "administrate/base_dashboard"
 
 class OrganizationDashboard < Administrate::BaseDashboard
   ATTRIBUTE_TYPES = {
@@ -10,9 +10,9 @@ class OrganizationDashboard < Administrate::BaseDashboard
     description: Field::Text,
     is_active: Field::Boolean,
     organization_memberships: Field::HasMany,
-    members: Field::HasMany.with_options(class_name: 'User'),
+    members: Field::HasMany.with_options(class_name: "User"),
     organization_settings: Field::HasMany,
-    retention_policy: Field::HasOne.with_options(class_name: 'OrganizationRetentionPolicy'),
+    retention_policy: Field::HasOne.with_options(class_name: "OrganizationRetentionPolicy"),
     organization_connectors: Field::HasMany,
     projects: Field::HasMany,
     created_at: Field::DateTime,

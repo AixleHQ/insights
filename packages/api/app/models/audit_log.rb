@@ -2,8 +2,8 @@ class AuditLog < ApplicationRecord
   RISK_LEVELS = %w[low medium high critical].freeze
 
   belongs_to :organization
-  belongs_to :policy_version, class_name: 'SanitizationPolicy', optional: true
-  belongs_to :tool_event, class_name: 'ToolEvent', optional: true
+  belongs_to :policy_version, class_name: "SanitizationPolicy", optional: true
+  belongs_to :tool_event, class_name: "ToolEvent", optional: true
 
   validates :raw_event_key, presence: true
   validates :risk_level, presence: true, inclusion: { in: RISK_LEVELS }

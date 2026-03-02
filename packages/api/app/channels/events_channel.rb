@@ -18,7 +18,7 @@ class EventsChannel < ApplicationCable::Channel
     stream_from "events:#{organization.id}"
 
     transmit(
-      type: 'subscription_confirmed',
+      type: "subscription_confirmed",
       organization_id: organization.id,
       subscribed_at: Time.current.iso8601
     )
@@ -34,14 +34,14 @@ class EventsChannel < ApplicationCable::Channel
 
     return unless organization && authorized?(organization)
 
-    limit = [data['limit']&.to_i || 10, 50].min
+    limit = [ data["limit"]&.to_i || 10, 50 ].min
     events = organization.tool_events
                          .order(occurred_at: :desc)
                          .limit(limit)
                          .map { |e| serialize_event(e) }
 
     transmit(
-      type: 'recent_events',
+      type: "recent_events",
       events: events,
       count: events.length
     )
@@ -53,7 +53,7 @@ class EventsChannel < ApplicationCable::Channel
       ActionCable.server.broadcast(
         "events:#{organization_id}",
         {
-          type: 'new_event',
+          type: "new_event",
           event: {
             id: tool_event.id,
             tool_name: tool_event.tool_name,
@@ -74,7 +74,7 @@ class EventsChannel < ApplicationCable::Channel
       ActionCable.server.broadcast(
         "events:#{organization_id}",
         {
-          type: 'alert',
+          type: "alert",
           alert: alert_data,
           timestamp: Time.current.iso8601
         }
@@ -86,7 +86,7 @@ class EventsChannel < ApplicationCable::Channel
       ActionCable.server.broadcast(
         "events:#{organization_id}",
         {
-          type: 'event_updated',
+          type: "event_updated",
           event_id: tool_event_id,
           updates: updates,
           timestamp: Time.current.iso8601

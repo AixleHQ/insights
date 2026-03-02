@@ -3,37 +3,37 @@ class Invitation < ApplicationRecord
   ROLES = OrganizationMembership::ROLES
 
   belongs_to :organization
-  belongs_to :invited_by, class_name: 'User'
+  belongs_to :invited_by, class_name: "User"
 
   validates :email, presence: true, format: { with: URI::MailTo::EMAIL_REGEXP }
   validates :token, presence: true, uniqueness: true
   validates :role, presence: true, inclusion: { in: ROLES }
   validates :status, presence: true, inclusion: { in: STATUSES }
-  validates :email, uniqueness: { scope: :organization_id, message: 'has already been invited to this organization', conditions: -> { pending } }
+  validates :email, uniqueness: { scope: :organization_id, message: "has already been invited to this organization", conditions: -> { pending } }
 
-  scope :pending, -> { where(status: 'pending') }
-  scope :accepted, -> { where(status: 'accepted') }
-  scope :revoked, -> { where(status: 'revoked') }
-  scope :expired, -> { where(status: 'expired') }
-  scope :active, -> { pending.where('expires_at > ?', Time.current) }
+  scope :pending, -> { where(status: "pending") }
+  scope :accepted, -> { where(status: "accepted") }
+  scope :revoked, -> { where(status: "revoked") }
+  scope :expired, -> { where(status: "expired") }
+  scope :active, -> { pending.where("expires_at > ?", Time.current) }
 
   before_validation :generate_token, on: :create
   before_validation :set_expiration, on: :create
 
   def pending?
-    status == 'pending'
+    status == "pending"
   end
 
   def accepted?
-    status == 'accepted'
+    status == "accepted"
   end
 
   def revoked?
-    status == 'revoked'
+    status == "revoked"
   end
 
   def expired?
-    return true if status == 'expired'
+    return true if status == "expired"
 
     pending? && expires_at.present? && expires_at < Time.current
   end
@@ -53,7 +53,7 @@ class Invitation < ApplicationRecord
       )
 
       update!(
-        status: 'accepted',
+        status: "accepted",
         accepted_at: Time.current
       )
 
@@ -64,13 +64,13 @@ class Invitation < ApplicationRecord
   def revoke!
     return false unless pending?
 
-    update!(status: 'revoked')
+    update!(status: "revoked")
   end
 
   def mark_expired!
     return false unless pending?
 
-    update!(status: 'expired')
+    update!(status: "expired")
   end
 
   def accept_url

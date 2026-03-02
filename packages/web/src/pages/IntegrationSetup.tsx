@@ -201,7 +201,7 @@ export function IntegrationSetup() {
           });
           setIsAuthorizing(false);
           setStep('configure');
-        } catch (err) {
+        } catch {
           setError('Failed to complete authorization. Please try again.');
           setIsAuthorizing(false);
         }
@@ -252,7 +252,7 @@ export function IntegrationSetup() {
 
       // The popup will post a message back when authorization is complete
       // We listen for this in the useEffect above
-    } catch (err) {
+    } catch {
       setError('Failed to start authorization. Please try again.');
       setIsAuthorizing(false);
     }
@@ -274,7 +274,7 @@ export function IntegrationSetup() {
       await new Promise((resolve) => setTimeout(resolve, 500));
       setIsConnecting(false);
       setStep('complete');
-    } catch (err) {
+    } catch {
       setError('Failed to complete setup. Please try again.');
       setIsConnecting(false);
     }

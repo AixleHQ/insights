@@ -8,6 +8,6 @@ class CreateOrganizationMemberships < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :organization_memberships, [:user_id, :organization_id], unique: true
+    add_index :organization_memberships, [ :user_id, :organization_id ], unique: true
   end
 end

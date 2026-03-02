@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
-require 'administrate/base_dashboard'
+require "administrate/base_dashboard"
 
 class AdminAuditLogDashboard < Administrate::BaseDashboard
   ATTRIBUTE_TYPES = {
     id: Field::String,
-    admin_user: Field::BelongsTo.with_options(class_name: 'User'),
+    admin_user: Field::BelongsTo.with_options(class_name: "User"),
     action: Field::String,
     resource_type: Field::String,
     resource_id: Field::String,

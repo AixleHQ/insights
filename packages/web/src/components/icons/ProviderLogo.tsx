@@ -122,4 +122,5 @@ export function ProviderLogo({
   return logoElement;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export { logoMap, providerColors };

@@ -6,15 +6,15 @@ class OrganizationMembership < ApplicationRecord
   has_many :user_tool_accounts, dependent: :destroy
 
   validates :role, presence: true, inclusion: { in: ROLES }
-  validates :user_id, uniqueness: { scope: :organization_id, message: 'is already a member of this organization' }
+  validates :user_id, uniqueness: { scope: :organization_id, message: "is already a member of this organization" }
 
-  scope :owners, -> { where(role: 'owner') }
+  scope :owners, -> { where(role: "owner") }
   scope :admins, -> { where(role: %w[owner admin]) }
-  scope :members, -> { where(role: 'member') }
-  scope :viewers, -> { where(role: 'viewer') }
+  scope :members, -> { where(role: "member") }
+  scope :viewers, -> { where(role: "viewer") }
 
   def owner?
-    role == 'owner'
+    role == "owner"
   end
 
   def admin?

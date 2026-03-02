@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Activity, DollarSign, AlertTriangle, Users, Coins } from 'lucide-react';
 import { useOrg } from '@/contexts/OrgContext';
@@ -63,7 +63,7 @@ export function Dashboard() {
     total_cost: t.cost_usd,
   })) || [];
 
-  const events: ActivityEvent[] = eventsResponse?.data?.map((e) => ({
+  const events: ActivityEvent[] = useMemo(() => eventsResponse?.data?.map((e) => ({
     id: e.id,
     tool_name: e.toolName,
     event_type: e.eventType,
@@ -72,7 +72,7 @@ export function Dashboard() {
     created_at: e.occurredAt || e.createdAt,
     user: e.user ? { email: e.user.email } : undefined,
     project: e.project ? { name: e.project.name } : undefined,
-  })) || [];
+  })) || [], [eventsResponse?.data]);
 
   // Track dismissed alerts in local storage (per organization)
   const dismissedAlertsKey = `db90_dismissed_alerts_${currentOrg?.id}`;

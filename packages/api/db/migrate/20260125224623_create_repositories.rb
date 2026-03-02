@@ -14,6 +14,6 @@ class CreateRepositories < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :repositories, [:organization_connector_id, :external_id], unique: true, name: 'idx_repositories_connector_external'
+    add_index :repositories, [ :organization_connector_id, :external_id ], unique: true, name: 'idx_repositories_connector_external'
   end
 end

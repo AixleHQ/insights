@@ -11,8 +11,8 @@ module Api
         repositories = @project.repositories.includes(:organization_connector).order(:name)
 
         # Allow filtering
-        repositories = repositories.private_repos if params[:private] == 'true'
-        repositories = repositories.public_repos if params[:private] == 'false'
+        repositories = repositories.private_repos if params[:private] == "true"
+        repositories = repositories.public_repos if params[:private] == "false"
 
         render_collection(repositories, RepositorySerializer)
       end
@@ -32,7 +32,7 @@ module Api
           render_created(@repository, RepositorySerializer)
         else
           render json: {
-            error: 'Unprocessable Entity',
+            error: "Unprocessable Entity",
             errors: format_validation_errors(@repository.errors)
           }, status: :unprocessable_entity
         end
@@ -46,7 +46,7 @@ module Api
           render_resource(@repository, RepositorySerializer)
         else
           render json: {
-            error: 'Unprocessable Entity',
+            error: "Unprocessable Entity",
             errors: format_validation_errors(@repository.errors)
           }, status: :unprocessable_entity
         end

@@ -9,10 +9,10 @@ class ApplicationController < ActionController::API
   protected
 
   def authenticate_user!
-    claims = request.env['jwt.claims']
+    claims = request.env["jwt.claims"]
 
     unless claims
-      render_unauthorized('Authentication required')
+      render_unauthorized("Authentication required")
       return
     end
 
@@ -20,26 +20,26 @@ class ApplicationController < ActionController::API
     @jwt_claims = claims
   rescue ActiveRecord::RecordInvalid => e
     Rails.logger.error "[Auth] User sync failed: #{e.message}"
-    render_unauthorized('User sync failed')
+    render_unauthorized("User sync failed")
   end
 
   def set_current_organization
     return unless current_user
 
-    org_id = request.headers['X-Organization-ID']
+    org_id = request.headers["X-Organization-ID"]
     return unless org_id.present?
 
     @current_organization = current_user.organizations.find_by(id: org_id)
 
     unless @current_organization
-      render json: { error: 'Organization not found or access denied' }, status: :forbidden
+      render json: { error: "Organization not found or access denied" }, status: :forbidden
     end
   end
 
   def require_organization!
     return if current_organization
 
-    render json: { error: 'Organization context required', message: 'Please provide X-Organization-ID header' }, status: :bad_request
+    render json: { error: "Organization context required", message: "Please provide X-Organization-ID header" }, status: :bad_request
   end
 
   def require_organization_role!(*roles)
@@ -48,13 +48,13 @@ class ApplicationController < ActionController::API
 
     membership = current_user.organization_memberships.find_by(organization: current_organization)
     unless membership && roles.map(&:to_s).include?(membership.role)
-      render json: { error: 'Insufficient permissions' }, status: :forbidden
+      render json: { error: "Insufficient permissions" }, status: :forbidden
     end
   end
 
   def require_global_admin!
     unless current_user&.global_admin?
-      render json: { error: 'Global admin access required' }, status: :forbidden
+      render json: { error: "Global admin access required" }, status: :forbidden
     end
   end
 
@@ -65,7 +65,7 @@ class ApplicationController < ActionController::API
 
   private
 
-  def render_unauthorized(message = 'Unauthorized')
-    render json: { error: 'Unauthorized', message: message }, status: :unauthorized
+  def render_unauthorized(message = "Unauthorized")
+    render json: { error: "Unauthorized", message: message }, status: :unauthorized
   end
 end

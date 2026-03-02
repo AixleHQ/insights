@@ -4,24 +4,24 @@ module Webhooks
   class JiraVerifier
     # Jira Cloud uses asymmetric keys for webhooks; Jira Server/DC can use shared secrets
     # For simplicity, we'll support the shared secret approach (HMAC-SHA256)
-    SIGNATURE_HEADER = 'X-Hub-Signature'
+    SIGNATURE_HEADER = "X-Hub-Signature"
 
     class << self
       def verify!(payload:, signature:, secret:)
-        raise SignatureMissingError, 'Missing webhook signature' if signature.blank?
-        raise SignatureMissingError, 'Missing webhook secret' if secret.blank?
+        raise SignatureMissingError, "Missing webhook signature" if signature.blank?
+        raise SignatureMissingError, "Missing webhook secret" if secret.blank?
 
         expected = compute_signature(payload, secret)
 
         unless secure_compare(signature, expected)
-          raise SignatureInvalidError, 'Invalid Jira webhook signature'
+          raise SignatureInvalidError, "Invalid Jira webhook signature"
         end
 
         true
       end
 
       def compute_signature(payload, secret)
-        digest = OpenSSL::HMAC.hexdigest('SHA256', secret, payload)
+        digest = OpenSSL::HMAC.hexdigest("SHA256", secret, payload)
         "sha256=#{digest}"
       end
 

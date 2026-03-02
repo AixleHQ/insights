@@ -148,11 +148,12 @@ export function AdminUsers() {
         case 'created_at':
           comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
           break;
-        case 'last_active_at':
+        case 'last_active_at': {
           const aTime = a.last_active_at ? new Date(a.last_active_at).getTime() : 0;
           const bTime = b.last_active_at ? new Date(b.last_active_at).getTime() : 0;
           comparison = aTime - bTime;
           break;
+        }
       }
       return sortDirection === 'asc' ? comparison : -comparison;
     });

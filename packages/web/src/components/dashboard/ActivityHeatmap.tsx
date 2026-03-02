@@ -216,7 +216,7 @@ export function ActivityHeatmap({ data, className }: ActivityHeatmapProps) {
     const monthsData: { label: string; weekIndex: number }[] = [];
 
     let currentWeek: DayData[] = [];
-    let currentDate = new Date(startDate);
+    const currentDate = new Date(startDate);
     let lastMonth = -1;
     let weekIndex = 0;
 

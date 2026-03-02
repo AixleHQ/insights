@@ -3,20 +3,20 @@
 class JiraSyncJob
   include Sidekiq::Job
 
-  sidekiq_options queue: 'connectors', retry: 3
+  sidekiq_options queue: "connectors", retry: 3
 
-  def perform(connector_id, action = 'sync', options = {})
+  def perform(connector_id, action = "sync", options = {})
     @connector = OrganizationConnector.find(connector_id)
     @options = options.symbolize_keys
 
     Rails.logger.info("[JiraSyncJob] Starting #{action} for connector #{connector_id}")
 
     case action
-    when 'sync'
+    when "sync"
       sync_projects
-    when 'refresh_token'
+    when "refresh_token"
       refresh_token
-    when 'webhook'
+    when "webhook"
       process_webhook
     else
       Rails.logger.warn("[JiraSyncJob] Unknown action: #{action}")
@@ -45,8 +45,8 @@ class JiraSyncJob
   def sync_project(project_data)
     # Store project info in connector metadata
     @connector.metadata ||= {}
-    @connector.metadata['projects'] ||= {}
-    @connector.metadata['projects'][project_data[:key]] = {
+    @connector.metadata["projects"] ||= {}
+    @connector.metadata["projects"][project_data[:key]] = {
       id: project_data[:id],
       name: project_data[:name],
       key: project_data[:key],
@@ -71,11 +71,11 @@ class JiraSyncJob
     payload = @options[:payload]
 
     case event_type
-    when 'jira:issue_created', 'jira:issue_updated'
+    when "jira:issue_created", "jira:issue_updated"
       process_issue_event(payload, event_type)
-    when 'comment_created', 'comment_updated'
+    when "comment_created", "comment_updated"
       process_comment_event(payload, event_type)
-    when 'sprint_started', 'sprint_closed'
+    when "sprint_started", "sprint_closed"
       process_sprint_event(payload, event_type)
     else
       Rails.logger.info("[JiraSyncJob] Ignoring webhook event: #{event_type}")
@@ -83,83 +83,83 @@ class JiraSyncJob
   end
 
   def process_issue_event(payload, event_type)
-    issue = payload['issue']
+    issue = payload["issue"]
     return unless issue
 
-    action = event_type.split(':').last.gsub('issue_', '')
+    action = event_type.split(":").last.gsub("issue_", "")
 
     ToolEvent.create!(
       organization_id: @connector.organization_id,
-      tool_name: 'jira',
-      event_type: 'issue',
+      tool_name: "jira",
+      event_type: "issue",
       occurred_at: Time.current,
       metadata: {
         action: action,
-        issue_key: issue['key'],
-        issue_id: issue['id'],
-        summary: issue.dig('fields', 'summary'),
-        status: issue.dig('fields', 'status', 'name'),
-        issue_type: issue.dig('fields', 'issuetype', 'name'),
-        project_key: issue.dig('fields', 'project', 'key'),
-        assignee: issue.dig('fields', 'assignee', 'displayName'),
-        reporter: issue.dig('fields', 'reporter', 'displayName'),
+        issue_key: issue["key"],
+        issue_id: issue["id"],
+        summary: issue.dig("fields", "summary"),
+        status: issue.dig("fields", "status", "name"),
+        issue_type: issue.dig("fields", "issuetype", "name"),
+        project_key: issue.dig("fields", "project", "key"),
+        assignee: issue.dig("fields", "assignee", "displayName"),
+        reporter: issue.dig("fields", "reporter", "displayName"),
         changelog: extract_changelog(payload)
       }
     )
   end
 
   def process_comment_event(payload, event_type)
-    comment = payload['comment']
-    issue = payload['issue']
+    comment = payload["comment"]
+    issue = payload["issue"]
     return unless comment && issue
 
-    action = event_type.gsub('comment_', '')
+    action = event_type.gsub("comment_", "")
 
     ToolEvent.create!(
       organization_id: @connector.organization_id,
-      tool_name: 'jira',
-      event_type: 'comment',
-      occurred_at: Time.parse(comment['created']),
+      tool_name: "jira",
+      event_type: "comment",
+      occurred_at: Time.parse(comment["created"]),
       metadata: {
         action: action,
-        comment_id: comment['id'],
-        issue_key: issue['key'],
-        author: comment.dig('author', 'displayName')
+        comment_id: comment["id"],
+        issue_key: issue["key"],
+        author: comment.dig("author", "displayName")
       }
     )
   end
 
   def process_sprint_event(payload, event_type)
-    sprint = payload['sprint']
+    sprint = payload["sprint"]
     return unless sprint
 
-    action = event_type.gsub('sprint_', '')
+    action = event_type.gsub("sprint_", "")
 
     ToolEvent.create!(
       organization_id: @connector.organization_id,
-      tool_name: 'jira',
-      event_type: 'sprint',
+      tool_name: "jira",
+      event_type: "sprint",
       occurred_at: Time.current,
       metadata: {
         action: action,
-        sprint_id: sprint['id'],
-        sprint_name: sprint['name'],
-        sprint_state: sprint['state'],
-        board_id: sprint['originBoardId']
+        sprint_id: sprint["id"],
+        sprint_name: sprint["name"],
+        sprint_state: sprint["state"],
+        board_id: sprint["originBoardId"]
       }
     )
   end
 
   def extract_changelog(payload)
-    changelog = payload['changelog']
+    changelog = payload["changelog"]
     return nil unless changelog
 
-    items = changelog['items'] || []
+    items = changelog["items"] || []
     items.map do |item|
       {
-        field: item['field'],
-        from: item['fromString'],
-        to: item['toString']
+        field: item["field"],
+        from: item["fromString"],
+        to: item["toString"]
       }
     end
   end

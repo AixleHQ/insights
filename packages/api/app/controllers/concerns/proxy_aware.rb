@@ -8,8 +8,8 @@ module ProxyAware
   private
 
   def external_origin
-    scheme = request.headers['X-Forwarded-Proto'] || request.scheme
-    host = request.headers['X-Forwarded-Host'] || request.host_with_port
+    scheme = request.headers["X-Forwarded-Proto"] || request.scheme
+    host = request.headers["X-Forwarded-Host"] || request.host_with_port
     "#{scheme}://#{host}"
   end
 end

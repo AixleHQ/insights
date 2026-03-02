@@ -1,7 +1,7 @@
 require 'rails_helper'
 
 RSpec.describe JwtAuth do
-  let(:app) { ->(env) { [200, { 'Content-Type' => 'application/json' }, ['OK']] } }
+  let(:app) { ->(env) { [ 200, { 'Content-Type' => 'application/json' }, [ 'OK' ] ] } }
   let(:middleware) { described_class.new(app) }
 
   describe '#call' do

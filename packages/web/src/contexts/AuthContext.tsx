@@ -202,6 +202,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth(): AuthContextValue {
   const context = useContext(AuthContext);
   if (!context) {
@@ -211,6 +212,7 @@ export function useAuth(): AuthContextValue {
 }
 
 // Hook for checking if user has required roles
+// eslint-disable-next-line react-refresh/only-export-components
 export function useRequireAuth(): AuthContextValue & { isReady: boolean } {
   const auth = useAuth();
   return {

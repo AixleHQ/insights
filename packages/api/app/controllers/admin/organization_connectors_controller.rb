@@ -22,23 +22,23 @@ module Admin
       # Queue sync job (implementation depends on connector type)
       # SyncConnectorJob.perform_later(connector.id)
       connector.update!(last_sync_at: nil) # Reset to trigger re-sync
-      redirect_to admin_organization_connector_path(connector), notice: 'Sync initiated.'
+      redirect_to admin_organization_connector_path(connector), notice: "Sync initiated."
     end
 
     def revoke
       connector = OrganizationConnector.find(params[:id])
       connector.update!(is_active: false, access_token: nil, refresh_token: nil)
-      redirect_to admin_organization_connector_path(connector), notice: 'Connector access revoked.'
+      redirect_to admin_organization_connector_path(connector), notice: "Connector access revoked."
     end
 
     private
 
     def generate_csv(connectors)
-      require 'csv'
+      require "csv"
       CSV.generate(headers: true) do |csv|
         csv << %w[id organization_name connector_type is_active last_sync_at created_at]
         connectors.find_each do |connector|
-          csv << [connector.id, connector.organization&.name, connector.connector_type, connector.is_active, connector.last_sync_at, connector.created_at]
+          csv << [ connector.id, connector.organization&.name, connector.connector_type, connector.is_active, connector.last_sync_at, connector.created_at ]
         end
       end
     end
@@ -52,7 +52,7 @@ module Admin
     end
 
     def resource_name
-      'organization_connector'
+      "organization_connector"
     end
 
     def scoped_resource

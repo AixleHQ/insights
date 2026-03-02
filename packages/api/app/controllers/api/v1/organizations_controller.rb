@@ -25,13 +25,13 @@ module Api
         Organization.transaction do
           @organization.save!
           # Make the creator an owner
-          @organization.organization_memberships.create!(user: current_user, role: 'owner')
+          @organization.organization_memberships.create!(user: current_user, role: "owner")
         end
 
         render_created(@organization, OrganizationSerializer)
       rescue ActiveRecord::RecordInvalid => e
         render json: {
-          error: 'Unprocessable Entity',
+          error: "Unprocessable Entity",
           errors: format_validation_errors(e.record.errors)
         }, status: :unprocessable_entity
       end
@@ -44,7 +44,7 @@ module Api
           render_resource(@organization, OrganizationSerializer)
         else
           render json: {
-            error: 'Unprocessable Entity',
+            error: "Unprocessable Entity",
             errors: format_validation_errors(@organization.errors)
           }, status: :unprocessable_entity
         end
@@ -72,7 +72,7 @@ module Api
           render_resource(policy, OrganizationRetentionPolicySerializer)
         else
           render json: {
-            error: 'Unprocessable Entity',
+            error: "Unprocessable Entity",
             errors: format_validation_errors(policy.errors)
           }, status: :unprocessable_entity
         end
@@ -98,7 +98,7 @@ module Api
           render_resource(setting, OrganizationSettingSerializer)
         else
           render json: {
-            error: 'Unprocessable Entity',
+            error: "Unprocessable Entity",
             errors: format_validation_errors(setting.errors)
           }, status: :unprocessable_entity
         end

@@ -101,7 +101,7 @@ module Ai
         account = UserToolAccount
           .joins(:user)
           .where(tool_name: %w[github gitlab bitbucket])
-          .where('metadata @> ?', { git_emails: [git_email.downcase] }.to_json)
+          .where("metadata @> ?", { git_emails: [ git_email.downcase ] }.to_json)
           .where(users: { id: organization.member_ids })
           .first
 
@@ -132,7 +132,7 @@ module Ai
           organization_id: organization.id
         ).where.not(user_id: nil)
           .where("metadata->>'ip_address' = ?", ip_address)
-          .where('occurred_at > ?', 24.hours.ago)
+          .where("occurred_at > ?", 24.hours.ago)
           .order(occurred_at: :desc)
           .first
 
@@ -161,17 +161,17 @@ module Ai
 
       def correlation_method(user, event_data)
         if event_data[:user_id].present? && user.id.to_s == event_data[:user_id].to_s
-          'direct_user_id'
+          "direct_user_id"
         elsif event_data[:email].present? && user.email.downcase == event_data[:email].to_s.downcase
-          'email'
+          "email"
         elsif event_data[:external_user_id].present?
-          'tool_account'
+          "tool_account"
         elsif event_data[:git_author_email].present?
-          'git_email'
+          "git_email"
         elsif event_data[:machine_id].present?
-          'machine_id'
+          "machine_id"
         elsif event_data[:ip_address].present?
-          'ip_address'
+          "ip_address"
         end
       end
 
@@ -179,12 +179,12 @@ module Ai
         metadata = event.metadata || {}
         {
           user_id: event.user_id,
-          email: metadata['email'],
+          email: metadata["email"],
           tool_name: event.tool_name,
-          external_user_id: metadata['external_user_id'],
-          git_author_email: metadata['git_author_email'],
-          machine_id: metadata['machine_id'],
-          ip_address: metadata['ip_address']
+          external_user_id: metadata["external_user_id"],
+          git_author_email: metadata["git_author_email"],
+          machine_id: metadata["machine_id"],
+          ip_address: metadata["ip_address"]
         }
       end
     end

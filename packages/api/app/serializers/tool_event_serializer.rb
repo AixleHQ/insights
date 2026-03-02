@@ -22,13 +22,13 @@ class ToolEventSerializer < BaseSerializer
     # Simple heuristic: high cost = higher risk
     cost = event.cost_usd.to_f
     if cost > 1.0
-      'high'
+      "high"
     elsif cost > 0.1
-      'medium'
+      "medium"
     elsif cost > 0.01
-      'low'
+      "low"
     else
-      'none'
+      "none"
     end
   end
 

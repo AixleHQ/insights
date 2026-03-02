@@ -95,5 +95,4 @@ RSpec.describe ProjectPolicy, type: :policy do
       expect(policy(project, current_user: user).apply(:create?)).to be true
     end
   end
-
 end

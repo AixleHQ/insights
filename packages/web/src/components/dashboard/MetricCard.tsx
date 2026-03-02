@@ -47,7 +47,6 @@ function formatValue(value: string | number, format?: string): string {
 export function MetricCard({
   title,
   value,
-  previousValue: _previousValue,
   format = 'number',
   icon,
   trend,
@@ -61,6 +60,7 @@ export function MetricCard({
   // Detect value changes and trigger animation
   useEffect(() => {
     if (prevValueRef.current !== value) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsAnimating(true);
       const timer = setTimeout(() => setIsAnimating(false), 600);
       prevValueRef.current = value;

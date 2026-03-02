@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class ImpersonationService
-  ALGORITHM = 'HS256'
+  ALGORITHM = "HS256"
   TOKEN_EXPIRY = 1.hour
 
   class << self
@@ -15,7 +15,7 @@ class ImpersonationService
         impersonator_email: admin_user.email,
         iat: Time.current.to_i,
         exp: TOKEN_EXPIRY.from_now.to_i,
-        iss: 'db90-impersonation'
+        iss: "db90-impersonation"
       }
 
       JWT.encode(payload, secret_key, ALGORITHM)
@@ -26,7 +26,7 @@ class ImpersonationService
       payload = decoded.first
 
       # Verify it's an impersonation token
-      raise JWT::InvalidIssuerError, 'Not an impersonation token' unless payload['iss'] == 'db90-impersonation'
+      raise JWT::InvalidIssuerError, "Not an impersonation token" unless payload["iss"] == "db90-impersonation"
 
       payload
     rescue JWT::ExpiredSignature
@@ -44,7 +44,7 @@ class ImpersonationService
 
     def secret_key
       Rails.application.credentials.secret_key_base ||
-        ENV.fetch('SECRET_KEY_BASE', 'development_secret_key_for_impersonation')
+        ENV.fetch("SECRET_KEY_BASE", "development_secret_key_for_impersonation")
     end
   end
 end

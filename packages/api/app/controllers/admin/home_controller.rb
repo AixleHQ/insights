@@ -7,7 +7,7 @@ module Admin
         users: {
           total: User.count,
           global_admins: User.global_admins.count,
-          new_this_week: User.where('created_at > ?', 1.week.ago).count
+          new_this_week: User.where("created_at > ?", 1.week.ago).count
         },
         organizations: {
           total: Organization.count,
@@ -25,12 +25,12 @@ module Admin
         },
         tool_events: {
           total: ToolEvent.count,
-          today: ToolEvent.where('created_at > ?', Time.current.beginning_of_day).count,
-          this_week: ToolEvent.where('created_at > ?', 1.week.ago).count
+          today: ToolEvent.where("created_at > ?", Time.current.beginning_of_day).count,
+          this_week: ToolEvent.where("created_at > ?", 1.week.ago).count
         },
         audit_logs: {
           total: AuditLog.count,
-          today: AuditLog.where('created_at > ?', Time.current.beginning_of_day).count
+          today: AuditLog.where("created_at > ?", Time.current.beginning_of_day).count
         }
       }
     end

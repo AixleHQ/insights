@@ -1,6 +1,6 @@
 class ToolEvent < ApplicationRecord
-  self.table_name = 'timeseries.tool_events'
-  self.primary_key = 'id'
+  self.table_name = "timeseries.tool_events"
+  self.primary_key = "id"
 
   TOOL_NAMES = %w[
     claude_code cursor windsurf github_copilot

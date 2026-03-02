@@ -3,20 +3,20 @@
 class BitbucketSyncJob
   include Sidekiq::Job
 
-  sidekiq_options queue: 'connectors', retry: 3
+  sidekiq_options queue: "connectors", retry: 3
 
-  def perform(connector_id, action = 'sync', options = {})
+  def perform(connector_id, action = "sync", options = {})
     @connector = OrganizationConnector.find(connector_id)
     @options = options.symbolize_keys
 
     Rails.logger.info("[BitbucketSyncJob] Starting #{action} for connector #{connector_id}")
 
     case action
-    when 'sync'
+    when "sync"
       sync_repositories
-    when 'refresh_token'
+    when "refresh_token"
       refresh_token
-    when 'webhook'
+    when "webhook"
       process_webhook
     else
       Rails.logger.warn("[BitbucketSyncJob] Unknown action: #{action}")
@@ -51,7 +51,7 @@ class BitbucketSyncJob
       name: repo_data[:name],
       full_name: repo_data[:full_name],
       url: repo_data.dig(:links, :html, :href),
-      default_branch: repo_data.dig(:mainbranch, :name) || 'main',
+      default_branch: repo_data.dig(:mainbranch, :name) || "main",
       is_private: repo_data[:is_private],
       metadata: {
         description: repo_data[:description],
@@ -77,9 +77,9 @@ class BitbucketSyncJob
     payload = @options[:payload]
 
     case event_type
-    when 'repo:push'
+    when "repo:push"
       process_push_event(payload)
-    when 'pullrequest:created', 'pullrequest:updated', 'pullrequest:fulfilled', 'pullrequest:rejected'
+    when "pullrequest:created", "pullrequest:updated", "pullrequest:fulfilled", "pullrequest:rejected"
       process_pull_request_event(payload, event_type)
     else
       Rails.logger.info("[BitbucketSyncJob] Ignoring webhook event: #{event_type}")
@@ -87,14 +87,14 @@ class BitbucketSyncJob
   end
 
   def process_push_event(payload)
-    repository = find_repository(payload.dig('repository', 'uuid'))
+    repository = find_repository(payload.dig("repository", "uuid"))
     return unless repository
 
-    push = payload['push']
-    changes = push['changes'] || []
+    push = payload["push"]
+    changes = push["changes"] || []
 
     changes.each do |change|
-      commits = change['commits'] || []
+      commits = change["commits"] || []
       commits.each do |commit|
         create_commit_event(repository, commit)
       end
@@ -102,24 +102,24 @@ class BitbucketSyncJob
   end
 
   def process_pull_request_event(payload, event_type)
-    repository = find_repository(payload.dig('repository', 'uuid'))
+    repository = find_repository(payload.dig("repository", "uuid"))
     return unless repository
 
-    pr = payload['pullrequest']
-    action = event_type.split(':').last
+    pr = payload["pullrequest"]
+    action = event_type.split(":").last
 
     ToolEvent.create!(
       organization_id: @connector.organization_id,
-      tool_name: 'bitbucket',
-      event_type: 'pull_request',
-      occurred_at: Time.parse(pr['updated_on']),
+      tool_name: "bitbucket",
+      event_type: "pull_request",
+      occurred_at: Time.parse(pr["updated_on"]),
       metadata: {
         action: action,
-        pr_id: pr['id'],
-        pr_title: pr['title'],
-        pr_state: pr['state'],
+        pr_id: pr["id"],
+        pr_title: pr["title"],
+        pr_state: pr["state"],
         repository_id: repository.id,
-        author: pr.dig('author', 'display_name')
+        author: pr.dig("author", "display_name")
       }
     )
   end
@@ -131,13 +131,13 @@ class BitbucketSyncJob
   def create_commit_event(repository, commit)
     ToolEvent.create!(
       organization_id: @connector.organization_id,
-      tool_name: 'bitbucket',
-      event_type: 'commit',
-      occurred_at: Time.parse(commit['date']),
+      tool_name: "bitbucket",
+      event_type: "commit",
+      occurred_at: Time.parse(commit["date"]),
       metadata: {
-        sha: commit['hash'],
-        message: commit['message'],
-        author_name: commit.dig('author', 'user', 'display_name'),
+        sha: commit["hash"],
+        message: commit["message"],
+        author_name: commit.dig("author", "user", "display_name"),
         repository_id: repository.id
       }
     )

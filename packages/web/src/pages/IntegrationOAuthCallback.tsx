@@ -23,6 +23,7 @@ export function IntegrationOAuthCallback() {
         window.location.origin
       );
 
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStatus(error ? 'error' : 'success');
 
       // Close the popup after a short delay
