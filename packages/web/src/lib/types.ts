@@ -80,7 +80,7 @@ export interface ProjectWithStats extends Project {
 }
 
 // Connector types
-export type ConnectorProvider = 'github' | 'gitlab' | 'bitbucket' | 'jira' | 'linear';
+export type ConnectorProvider = 'github' | 'gitlab' | 'bitbucket' | 'jira' | 'linear' | 'anthropic' | 'openai' | 'openrouter' | 'gemini';
 export type ConnectorStatus = 'active' | 'inactive' | 'error';
 
 export interface Connector {

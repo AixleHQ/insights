@@ -32,6 +32,7 @@ export type IntegrationProvider =
   | 'anthropic'
   | 'openai'
   | 'openrouter'
+  | 'gemini'
   | 'cursor'
   | 'copilot'
   | 'google';

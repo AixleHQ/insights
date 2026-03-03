@@ -549,6 +549,29 @@ export function useCreateConnector() {
   });
 }
 
+export function useConnectWithApiKey() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      orgId,
+      connectorType,
+      apiKey,
+    }: {
+      orgId: string;
+      connectorType: string;
+      apiKey: string;
+    }) =>
+      api.post<Connector>(`/organizations/${orgId}/connectors`, {
+        connector_type: connectorType,
+        access_token: apiKey,
+      }),
+    onSuccess: (_, { orgId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
+    },
+  });
+}
+
 export function useSyncConnector() {
   const queryClient = useQueryClient();
 

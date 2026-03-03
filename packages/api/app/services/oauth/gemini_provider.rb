@@ -1,0 +1,24 @@
+# frozen_string_literal: true
+
+module Oauth
+  class GeminiProvider < BaseProvider
+    API_URL = "https://generativelanguage.googleapis.com"
+
+    def test_connection
+      response = Faraday.get("#{API_URL}/v1beta/models") do |req|
+        req.params["key"] = connector.access_token
+        req.headers["Accept"] = "application/json"
+      end
+
+      if response.success?
+        { success: true }
+      elsif response.status == 401 || response.status == 403
+        { success: false, error: "Invalid API key" }
+      else
+        { success: false, error: "Gemini API error: #{response.status}" }
+      end
+    rescue Faraday::Error => e
+      { success: false, error: "Connection error: #{e.message}" }
+    end
+  end
+end
