@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOrg } from '@/contexts/OrgContext';
 import { useConnectors, useSyncConnector, useDeleteConnector } from '@/hooks/useApi';
@@ -10,6 +10,9 @@ import {
   type IntegrationProvider,
   type ProviderInfo,
 } from '@/components/integrations';
+import { ApiKeyConnectSheet } from '@/components/integrations/ApiKeyConnectSheet';
+
+const AI_PROVIDERS = new Set(['anthropic', 'openai', 'openrouter', 'gemini']);
 
 const availableProviders: ProviderInfo[] = [
   // Code Hosting / Version Control
@@ -117,8 +120,7 @@ const availableProviders: ProviderInfo[] = [
       'Cost tracking',
       'Rate limit visibility',
     ],
-    available: false,
-    comingSoon: true,
+    available: true,
   },
   {
     id: 'openai',
@@ -131,8 +133,7 @@ const availableProviders: ProviderInfo[] = [
       'Token consumption',
       'Cost breakdown',
     ],
-    available: false,
-    comingSoon: true,
+    available: true,
   },
   {
     id: 'openrouter',
@@ -145,8 +146,20 @@ const availableProviders: ProviderInfo[] = [
       'Cost optimization',
       'Usage patterns',
     ],
-    available: false,
-    comingSoon: true,
+    available: true,
+  },
+  {
+    id: 'gemini',
+    name: 'Gemini',
+    description: 'Track Google Gemini API usage and costs',
+    category: 'ai',
+    features: [
+      'API usage tracking',
+      'Model analytics',
+      'Token consumption',
+      'Cost breakdown',
+    ],
+    available: true,
   },
   {
     id: 'copilot',
@@ -240,6 +253,9 @@ export function Integrations() {
   const syncConnector = useSyncConnector();
   const deleteConnector = useDeleteConnector();
 
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [connectingProvider, setConnectingProvider] = useState<ProviderInfo | null>(null);
+
   // Transform API response to component format
   const integrations: IntegrationData[] = useMemo(() => {
     if (!connectorsData) return [];
@@ -266,7 +282,13 @@ export function Integrations() {
   }, [connectorsData]);
 
   const handleConnect = (providerId: string) => {
-    navigate(`/integrations/new/${providerId}`);
+    if (AI_PROVIDERS.has(providerId)) {
+      const provider = availableProviders.find((p) => p.id === providerId) ?? null;
+      setConnectingProvider(provider);
+      setSheetOpen(true);
+    } else {
+      navigate(`/integrations/new/${providerId}`);
+    }
   };
 
   const handleSync = async (id: string) => {
@@ -381,6 +403,13 @@ export function Integrations() {
           })}
         </TabsContent>
       </Tabs>
+
+      <ApiKeyConnectSheet
+        provider={connectingProvider}
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        onSuccess={() => {}}
+      />
     </div>
   );
 }

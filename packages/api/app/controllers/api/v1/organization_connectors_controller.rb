@@ -28,6 +28,17 @@ module Api
         @connector = current_organization.organization_connectors.new(connector_params)
         authorize! @connector
 
+        if @connector.ai_provider?
+          provider = Oauth::BaseProvider.for(@connector)
+          result = provider.test_connection
+          unless result[:success]
+            return render json: {
+              error: "Unprocessable Entity",
+              errors: { access_token: [ result[:error] || "Invalid API key" ] }
+            }, status: :unprocessable_entity
+          end
+        end
+
         if @connector.save
           render_created(@connector, OrganizationConnectorSerializer)
         else

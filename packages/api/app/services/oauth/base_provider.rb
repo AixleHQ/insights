@@ -9,7 +9,11 @@ module Oauth
       "gitlab" => "Oauth::GitlabProvider",
       "bitbucket" => "Oauth::BitbucketProvider",
       "jira" => "Oauth::JiraProvider",
-      "linear" => "Oauth::LinearProvider"
+      "linear" => "Oauth::LinearProvider",
+      "anthropic" => "Oauth::AnthropicProvider",
+      "openai" => "Oauth::OpenaiProvider",
+      "openrouter" => "Oauth::OpenrouterProvider",
+      "gemini" => "Oauth::GeminiProvider"
     }.freeze
 
     def self.for(connector)

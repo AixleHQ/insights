@@ -107,6 +107,153 @@ Keycloak manages authentication via OpenID Connect. The frontend uses `oidc-clie
 - **Admin console**: [localhost:8080](http://localhost:8080) — username `admin`, password `admin`
 - **Google login**: Optional — set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env`
 
+### Setting up Google login locally
+
+Google OAuth goes through Keycloak as an identity broker — Google never redirects back to your frontend or Rails API directly.
+
+1. Go to [Google Cloud Console → APIs & Credentials](https://console.cloud.google.com/apis/credentials)
+2. Create or edit an **OAuth 2.0 Client ID**
+3. Under **Authorized redirect URIs**, add **only** this URL:
+   ```
+   http://localhost:8080/realms/db90/broker/google-dbp/endpoint
+   ```
+4. Copy the **Client ID** and **Client Secret** into your `.env`:
+   ```env
+   GOOGLE_CLIENT_ID=your-client-id
+   GOOGLE_CLIENT_SECRET=your-client-secret
+   ```
+5. Restart the containers: `docker compose up -d`
+
+## Integration Auth
+
+Each integration uses either an OAuth app (code hosting / project management) or a plain API key (AI providers). Credentials are passed to the Rails API via environment variables — add them to your `.env` file and `docker-compose.yml` under the `api` service's `environment:` block, then restart the container.
+
+```bash
+docker compose up -d api
+```
+
+---
+
+### GitHub
+
+1. Go to **Settings → Developer settings → OAuth Apps → New OAuth App**
+2. Set **Authorization callback URL** to `http://localhost:5173/integrations/callback`
+3. Copy the **Client ID** and generate a **Client Secret**
+
+```env
+GITHUB_CLIENT_ID=your-client-id
+GITHUB_CLIENT_SECRET=your-client-secret
+```
+
+`docker-compose.yml` → `api.environment`:
+```yaml
+GITHUB_CLIENT_ID: "${GITHUB_CLIENT_ID}"
+GITHUB_CLIENT_SECRET: "${GITHUB_CLIENT_SECRET}"
+```
+
+---
+
+### GitLab
+
+1. Go to **Preferences → Applications → Add new application** (or use a [Group](https://gitlab.com/groups) application for shared access)
+2. Set **Redirect URI** to `http://localhost:5173/integrations/callback`
+3. Enable scopes: `read_user`, `read_api`, `read_repository`
+4. Copy the **Application ID** and **Secret**
+
+```env
+GITLAB_CLIENT_ID=your-application-id
+GITLAB_CLIENT_SECRET=your-secret
+```
+
+`docker-compose.yml` → `api.environment`:
+```yaml
+GITLAB_CLIENT_ID: "${GITLAB_CLIENT_ID}"
+GITLAB_CLIENT_SECRET: "${GITLAB_CLIENT_SECRET}"
+```
+
+---
+
+### Bitbucket
+
+1. Go to **Personal settings → OAuth → Add consumer**
+2. Set **Callback URL** to `http://localhost:5173/integrations/callback`
+3. Enable permissions: `Account: Read`, `Repositories: Read`
+4. Copy the **Key** (client ID) and **Secret**
+
+```env
+BITBUCKET_CLIENT_ID=your-key
+BITBUCKET_CLIENT_SECRET=your-secret
+```
+
+`docker-compose.yml` → `api.environment`:
+```yaml
+BITBUCKET_CLIENT_ID: "${BITBUCKET_CLIENT_ID}"
+BITBUCKET_CLIENT_SECRET: "${BITBUCKET_CLIENT_SECRET}"
+```
+
+---
+
+### Jira
+
+1. Go to [developer.atlassian.com](https://developer.atlassian.com/console/myapps/) → **Create → OAuth 2.0 integration**
+2. Add callback URL `http://localhost:5173/integrations/callback`
+3. Add scopes: `read:jira-user`, `read:jira-work`
+4. Copy the **Client ID** and **Secret** from the **Authorization** tab
+
+```env
+JIRA_CLIENT_ID=your-client-id
+JIRA_CLIENT_SECRET=your-client-secret
+```
+
+`docker-compose.yml` → `api.environment`:
+```yaml
+JIRA_CLIENT_ID: "${JIRA_CLIENT_ID}"
+JIRA_CLIENT_SECRET: "${JIRA_CLIENT_SECRET}"
+```
+
+---
+
+### Linear
+
+1. Go to **Settings → API → OAuth applications → Create new**
+2. Set **Callback URL** to `http://localhost:5173/integrations/callback`
+3. Copy the **Client ID** and **Client Secret**
+
+```env
+LINEAR_CLIENT_ID=your-client-id
+LINEAR_CLIENT_SECRET=your-client-secret
+```
+
+`docker-compose.yml` → `api.environment`:
+```yaml
+LINEAR_CLIENT_ID: "${LINEAR_CLIENT_ID}"
+LINEAR_CLIENT_SECRET: "${LINEAR_CLIENT_SECRET}"
+```
+
+---
+
+### Anthropic API
+
+No OAuth app needed — generate an API key from the [Anthropic Console](https://console.anthropic.com/settings/keys). The key is entered directly in the Connect sheet in the UI and validated against `https://api.anthropic.com/v1/models` before being saved.
+
+---
+
+### OpenAI
+
+No OAuth app needed — generate an API key from [platform.openai.com/api-keys](https://platform.openai.com/api-keys). The key is entered directly in the Connect sheet in the UI and validated against `https://api.openai.com/v1/models` before being saved.
+
+---
+
+### OpenRouter
+
+No OAuth app needed — generate an API key from [openrouter.ai/settings/keys](https://openrouter.ai/settings/keys). The key is entered directly in the Connect sheet in the UI and validated against `https://openrouter.ai/api/v1/models` before being saved.
+
+---
+
+### Gemini
+
+No OAuth app needed — generate an API key from [Google AI Studio](https://aistudio.google.com/app/apikey). The key is entered directly in the Connect sheet in the UI and validated against `https://generativelanguage.googleapis.com/v1beta/models` before being saved.
+
 ## Makefile Reference
 
 ```

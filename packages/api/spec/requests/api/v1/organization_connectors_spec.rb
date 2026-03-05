@@ -89,6 +89,52 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
 
       expect_forbidden
     end
+
+    context 'with AI provider connectors' do
+      %w[anthropic openai openrouter gemini].each do |provider|
+        describe "#{provider} connector" do
+          let(:api_key) { 'valid-api-key-123' }
+
+          it "creates a #{provider} connector when API key is valid" do
+            allow_any_instance_of("Oauth::#{provider.capitalize}Provider".constantize)
+              .to receive(:test_connection).and_return({ success: true })
+
+            authenticated_post "/api/v1/organizations/#{organization.id}/connectors",
+                               user: admin,
+                               organization: organization,
+                               params: { connector_type: provider, access_token: api_key }
+
+            expect_created
+            expect(json_data[:connectorType]).to eq(provider)
+          end
+
+          it "returns 422 when #{provider} API key is invalid" do
+            allow_any_instance_of("Oauth::#{provider.capitalize}Provider".constantize)
+              .to receive(:test_connection).and_return({ success: false, error: 'Invalid API key' })
+
+            authenticated_post "/api/v1/organizations/#{organization.id}/connectors",
+                               user: admin,
+                               organization: organization,
+                               params: { connector_type: provider, access_token: 'bad-key' }
+
+            expect_unprocessable
+            expect(json_response[:errors][:access_token]).to include('Invalid API key')
+          end
+
+          it "does not create a #{provider} connector when API key is invalid" do
+            allow_any_instance_of("Oauth::#{provider.capitalize}Provider".constantize)
+              .to receive(:test_connection).and_return({ success: false, error: 'Invalid API key' })
+
+            expect {
+              authenticated_post "/api/v1/organizations/#{organization.id}/connectors",
+                                 user: admin,
+                                 organization: organization,
+                                 params: { connector_type: provider, access_token: 'bad-key' }
+            }.not_to change(OrganizationConnector, :count)
+          end
+        end
+      end
+    end
   end
 
   describe 'PATCH /api/v1/organizations/:organization_id/connectors/:id' do
