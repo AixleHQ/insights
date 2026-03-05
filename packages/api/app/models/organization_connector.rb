@@ -1,5 +1,5 @@
 class OrganizationConnector < ApplicationRecord
-  CONNECTOR_TYPES = %w[github gitlab bitbucket jira linear openrouter anthropic openai gemini].freeze
+  CONNECTOR_TYPES = %w[github gitlab bitbucket jira linear openrouter anthropic openai gemini slack].freeze
 
   belongs_to :organization
   has_many :repositories, dependent: :destroy
@@ -30,6 +30,10 @@ class OrganizationConnector < ApplicationRecord
 
   def ai_provider?
     connector_type.in?(%w[openrouter anthropic openai gemini])
+  end
+
+  def slack_webhook?
+    connector_type == "slack"
   end
 
   def mark_synced!

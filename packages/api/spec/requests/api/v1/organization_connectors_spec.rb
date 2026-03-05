@@ -90,6 +90,49 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
       expect_forbidden
     end
 
+    context 'with slack webhook connector' do
+      let(:valid_webhook_url) { 'https://hooks.slack.com/services/T12345678/B12345678/EXAMPLE-WEBHOOK-SECRET' }
+
+      it 'creates a slack connector with a valid webhook URL' do
+        authenticated_post "/api/v1/organizations/#{organization.id}/connectors",
+                           user: admin,
+                           organization: organization,
+                           params: { connector_type: 'slack', access_token: valid_webhook_url, external_account_name: '#general' }
+
+        expect_created
+        expect(json_data[:connectorType]).to eq('slack')
+      end
+
+      it 'returns 422 when the webhook URL format is invalid' do
+        authenticated_post "/api/v1/organizations/#{organization.id}/connectors",
+                           user: admin,
+                           organization: organization,
+                           params: { connector_type: 'slack', access_token: 'https://example.com/not-a-slack-webhook' }
+
+        expect_unprocessable
+        expect(json_response[:errors][:access_token]).to include('Invalid Slack webhook URL format')
+      end
+
+      it 'returns 422 when the webhook URL is blank' do
+        authenticated_post "/api/v1/organizations/#{organization.id}/connectors",
+                           user: admin,
+                           organization: organization,
+                           params: { connector_type: 'slack', access_token: '' }
+
+        expect_unprocessable
+        expect(json_response[:errors][:access_token]).to include('Webhook URL is required')
+      end
+
+      it 'does not create a slack connector when the webhook URL is invalid' do
+        expect {
+          authenticated_post "/api/v1/organizations/#{organization.id}/connectors",
+                             user: admin,
+                             organization: organization,
+                             params: { connector_type: 'slack', access_token: 'not-a-url' }
+        }.not_to change(OrganizationConnector, :count)
+      end
+    end
+
     context 'with AI provider connectors' do
       %w[anthropic openai openrouter gemini].each do |provider|
         describe "#{provider} connector" do
