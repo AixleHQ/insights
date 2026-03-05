@@ -107,6 +107,23 @@ Keycloak manages authentication via OpenID Connect. The frontend uses `oidc-clie
 - **Admin console**: [localhost:8080](http://localhost:8080) — username `admin`, password `admin`
 - **Google login**: Optional — set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env`
 
+### Setting up Google login locally
+
+Google OAuth goes through Keycloak as an identity broker — Google never redirects back to your frontend or Rails API directly.
+
+1. Go to [Google Cloud Console → APIs & Credentials](https://console.cloud.google.com/apis/credentials)
+2. Create or edit an **OAuth 2.0 Client ID**
+3. Under **Authorized redirect URIs**, add **only** this URL:
+   ```
+   http://localhost:8080/realms/db90/broker/google-dbp/endpoint
+   ```
+4. Copy the **Client ID** and **Client Secret** into your `.env`:
+   ```env
+   GOOGLE_CLIENT_ID=your-client-id
+   GOOGLE_CLIENT_SECRET=your-client-secret
+   ```
+5. Restart the containers: `docker compose up -d`
+
 ## Integration Auth
 
 Each integration uses either an OAuth app (code hosting / project management) or a plain API key (AI providers). Credentials are passed to the Rails API via environment variables — add them to your `.env` file and `docker-compose.yml` under the `api` service's `environment:` block, then restart the container.
