@@ -47,6 +47,9 @@ gem "faraday"
 # CORS
 gem "rack-cors"
 
+# Error tracking
+gem "rollbar"
+
 group :development, :test do
   gem "debug", platforms: %i[ mri windows ], require: "debug/prelude"
   gem "bundler-audit", require: false

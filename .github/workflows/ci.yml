@@ -104,7 +104,7 @@ jobs:
     name: Run DB Migrations
     runs-on: ubuntu-latest
     container: ghcr.io/artempartos/ecs_toolbox:latest
-    needs: [build]
+    needs: [build, api_test, api_lint, api_security, web_test, web_lint, web_typecheck]
     if: github.ref_name == 'staging' || github.ref_name == 'main'
     env:
       ENVIRONMENT: ${{ github.ref_name == 'main' && 'prod' || 'staging' }}
@@ -146,3 +146,28 @@ jobs:
 
       - name: Deploy ${{ matrix.service }}
         run: APPLICATION=${{ matrix.service }} ecs_helper deploy --timeout 3600
+
+  post_deploy:
+    name: Post Deploy (Rollbar)
+    runs-on: ubuntu-latest
+    container: ghcr.io/artempartos/ecs_toolbox:latest
+    if: github.ref_name == 'staging' || github.ref_name == 'main'
+    env:
+      ENVIRONMENT: ${{ github.ref_name == 'main' && 'prod' || 'staging' }}
+      APPLICATION: api
+    needs: [deploy]
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Notify Rollbar of deploy
+        run: |
+          COMMIT_SHA="${{ github.sha }}"
+          ACTOR="${{ github.actor }}"
+          ACTOR_ID="${{ github.actor_id }}"
+          DEPLOY_USER="${ACTOR} ${ACTOR_ID}+${ACTOR}@users.noreply.github.com"
+          ecs_helper run_command \
+            --command "bash -c 'export DEPLOY_REVISION=${COMMIT_SHA} && export DEPLOY_USER=\"${DEPLOY_USER}\" && bundle exec rake rollbar:deploy'" \
+            --name 'rollbar-deploy'

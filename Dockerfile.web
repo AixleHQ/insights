@@ -96,6 +96,7 @@ ENV API_UPSTREAM="api:3000"
 ENV KEYCLOAK_URL=""
 ENV KEYCLOAK_REALM="db90"
 ENV KEYCLOAK_CLIENT_ID="db90-web"
+ENV ROLLBAR_CLIENT_TOKEN=""
 
 COPY <<'ENTRYPOINT' /docker-entrypoint.d/90-runtime-config.sh
 #!/bin/sh
@@ -103,7 +104,8 @@ cat > /usr/share/nginx/html/config.js << EOF
 window.__APP_CONFIG__ = {
   keycloakUrl: "${KEYCLOAK_URL}",
   keycloakRealm: "${KEYCLOAK_REALM}",
-  keycloakClientId: "${KEYCLOAK_CLIENT_ID}"
+  keycloakClientId: "${KEYCLOAK_CLIENT_ID}",
+  rollbarClientToken: "${ROLLBAR_CLIENT_TOKEN}"
 };
 EOF
 ENTRYPOINT

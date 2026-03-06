@@ -432,6 +432,18 @@ resource "aws_ssm_parameter" "ar_encryption_key_derivation_salt" {
   value = random_password.ar_encryption_key_derivation_salt.result
 }
 
+resource "aws_ssm_parameter" "rollbar_access_token" {
+  name  = "/${local.ssm_prefix}/ROLLBAR_ACCESS_TOKEN"
+  type  = "SecureString"
+  value = var.rollbar_access_token
+}
+
+resource "aws_ssm_parameter" "rollbar_client_token" {
+  name  = "/${local.ssm_prefix}/ROLLBAR_CLIENT_TOKEN"
+  type  = "SecureString"
+  value = var.rollbar_client_token
+}
+
 # =============================================================================
 # Locals for ECS environment variables & secrets
 # =============================================================================
@@ -468,6 +480,7 @@ locals {
     { name = "ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY", valueFrom = aws_ssm_parameter.ar_encryption_primary_key.arn },
     { name = "ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY", valueFrom = aws_ssm_parameter.ar_encryption_deterministic_key.arn },
     { name = "ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT", valueFrom = aws_ssm_parameter.ar_encryption_key_derivation_salt.arn },
+    { name = "ROLLBAR_ACCESS_TOKEN", valueFrom = aws_ssm_parameter.rollbar_access_token.arn },
   ]
 }
 
@@ -550,7 +563,9 @@ module "app_web" {
     KEYCLOAK_URL   = local.keycloak_public
     KEYCLOAK_REALM = "db90"
   }
-  secrets = []
+  secrets = [
+    { name = "ROLLBAR_CLIENT_TOKEN", valueFrom = aws_ssm_parameter.rollbar_client_token.arn },
+  ]
 
   containers = {
     web = {
