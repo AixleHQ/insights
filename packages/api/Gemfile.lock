@@ -342,6 +342,7 @@ GEM
     reline (0.6.3)
       io-console (~> 0.5)
     rexml (3.4.4)
+    rollbar (3.7.0)
     rspec-core (3.13.6)
       rspec-support (~> 3.13.0)
     rspec-expectations (3.13.5)
@@ -508,6 +509,7 @@ DEPENDENCIES
   rack-cors
   rails (~> 8.1.2)
   redis
+  rollbar
   rspec-rails
   rswag-api
   rswag-specs

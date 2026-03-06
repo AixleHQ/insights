@@ -153,6 +153,18 @@ variable "ssm_key_prefix" {
   type = string
 }
 
+# --- Rollbar ---
+
+variable "rollbar_access_token" {
+  type      = string
+  sensitive = true
+}
+
+variable "rollbar_client_token" {
+  type      = string
+  sensitive = true
+}
+
 variable "alb_oidc_client_id" {
   type        = string
   description = "Keycloak OIDC client ID for ALB authentication (protects Temporal UI)"
