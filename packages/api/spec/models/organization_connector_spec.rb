@@ -3,7 +3,7 @@ require 'rails_helper'
 RSpec.describe OrganizationConnector, type: :model do
   describe 'constants' do
     it 'defines valid connector types' do
-      expect(OrganizationConnector::CONNECTOR_TYPES).to eq(%w[github gitlab bitbucket jira linear openrouter anthropic openai gemini])
+      expect(OrganizationConnector::CONNECTOR_TYPES).to eq(%w[github gitlab bitbucket jira linear openrouter anthropic openai gemini slack])
     end
   end
 
