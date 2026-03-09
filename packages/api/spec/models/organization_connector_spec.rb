@@ -45,8 +45,8 @@ RSpec.describe OrganizationConnector, type: :model do
   describe 'scopes' do
     describe '.active' do
       it 'returns only active connectors' do
-        active = create(:organization_connector, is_active: true)
-        inactive = create(:organization_connector, is_active: false)
+        active = create(:organization_connector, is_active: true, status: 'connected')
+        inactive = create(:organization_connector, is_active: false, status: 'disconnected')
 
         expect(OrganizationConnector.active).to include(active)
         expect(OrganizationConnector.active).not_to include(inactive)

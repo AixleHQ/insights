@@ -265,16 +265,18 @@ export function Integrations() {
     if (!connectorsData) return [];
     return connectorsData.map((c) => {
       const connectorType = c.connectorType || c.connector_type || 'github';
-      const isActive = c.isActive ?? c.is_active ?? true;
       const lastError = c.lastError || c.last_error;
       const externalAccountName = c.externalAccountName || c.external_account_name;
       const lastSyncAt = c.lastSyncAt || c.last_sync_at;
+
+      // Use backend status field as the single source of truth
+      const status = (c.status as IntegrationData['status']) || (lastError ? 'error' : (c.isActive ?? c.is_active ?? true) ? 'connected' : 'disconnected');
 
       return {
         id: c.id,
         provider: connectorType as IntegrationProvider,
         name: externalAccountName || connectorType,
-        status: lastError ? 'error' : isActive ? 'connected' : 'disconnected',
+        status,
         last_sync_at: lastSyncAt || undefined,
         sync_error: lastError || undefined,
         metadata: {

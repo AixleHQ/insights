@@ -42,7 +42,7 @@ export interface IntegrationData {
   id: string;
   provider: IntegrationProvider;
   name: string;
-  status: 'connected' | 'error' | 'syncing' | 'disconnected';
+  status: 'connected' | 'error' | 'testing' | 'disconnected';
   last_sync_at?: string;
   sync_error?: string;
   metadata?: {
@@ -85,8 +85,8 @@ const statusConfig = {
     color: 'text-destructive',
     bg: 'bg-destructive/10',
   },
-  syncing: {
-    label: 'Syncing',
+  testing: {
+    label: 'Testing',
     icon: RefreshCw,
     color: 'text-primary',
     bg: 'bg-primary/10',
@@ -227,7 +227,7 @@ export function IntegrationCard({
                   className={cn(
                     'size-3',
                     status.color,
-                    integration.status === 'syncing' && 'animate-spin'
+                    integration.status === 'testing' && 'animate-spin'
                   )}
                 />
                 <span className={status.color}>{status.label}</span>
