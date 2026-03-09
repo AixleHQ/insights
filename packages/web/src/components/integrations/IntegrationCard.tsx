@@ -68,6 +68,7 @@ interface IntegrationCardProps {
   onTest?: (id: string) => void;
   onDisconnect?: (id: string) => void;
   onConnect?: (providerId: string) => void;
+  isTesting?: boolean;
   className?: string;
 }
 
@@ -105,6 +106,7 @@ export function IntegrationCard({
   onTest,
   onDisconnect,
   onConnect,
+  isTesting = false,
   className,
 }: IntegrationCardProps) {
   // Display as available provider to connect
@@ -191,9 +193,12 @@ export function IntegrationCard({
                 </DropdownMenuItem>
               )}
               {onTest && (
-                <DropdownMenuItem onClick={() => onTest(integration.id)}>
+                <DropdownMenuItem
+                  onClick={() => onTest(integration.id)}
+                  disabled={isTesting}
+                >
                   <FlaskConical className="mr-2 size-4" />
-                  Send test message
+                  Test connection
                 </DropdownMenuItem>
               )}
               {(onSync || onTest) && <DropdownMenuSeparator />}
@@ -211,16 +216,23 @@ export function IntegrationCard({
       <CardContent className="space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className={cn('gap-1', status.bg)}>
-              <StatusIcon
-                className={cn(
-                  'size-3',
-                  status.color,
-                  integration.status === 'syncing' && 'animate-spin'
-                )}
-              />
-              <span className={status.color}>{status.label}</span>
-            </Badge>
+            {isTesting ? (
+              <Badge variant="outline" className="gap-1 bg-primary/10">
+                <RefreshCw className="size-3 animate-spin text-primary" />
+                <span className="text-primary">Testing…</span>
+              </Badge>
+            ) : (
+              <Badge variant="outline" className={cn('gap-1', status.bg)}>
+                <StatusIcon
+                  className={cn(
+                    'size-3',
+                    status.color,
+                    integration.status === 'syncing' && 'animate-spin'
+                  )}
+                />
+                <span className={status.color}>{status.label}</span>
+              </Badge>
+            )}
           </div>
           {integration.metadata?.resources_count !== undefined && (
             <span className="text-xs text-muted-foreground">
@@ -237,9 +249,10 @@ export function IntegrationCard({
         )}
 
         {integration.sync_error && (
-          <div className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
-            {integration.sync_error}
-          </div>
+          <Badge variant="outline" className="w-full justify-start gap-1 bg-destructive/10 font-normal">
+            <AlertCircle className="size-3 shrink-0 text-destructive" />
+            <span className="truncate text-destructive">{integration.sync_error}</span>
+          </Badge>
         )}
       </CardContent>
     </Card>
