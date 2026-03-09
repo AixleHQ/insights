@@ -51,6 +51,14 @@ module Api
         authorize! @membership
 
         if @membership.save
+          OrganizationAuditLog.log(
+            organization: current_organization,
+            actor: current_user,
+            action: "member.invited",
+            resource: @membership,
+            tracked_changes: { user_id: @membership.user_id, role: @membership.role },
+            request: request
+          )
           render_created(@membership, OrganizationMembershipSerializer)
         else
           render json: {
@@ -64,7 +72,17 @@ module Api
       def update
         authorize! @membership
 
+        old_role = @membership.role
+
         if @membership.update(membership_update_params)
+          OrganizationAuditLog.log(
+            organization: current_organization,
+            actor: current_user,
+            action: "member.role_changed",
+            resource: @membership,
+            tracked_changes: { user_id: @membership.user_id, before: old_role, after: @membership.role },
+            request: request
+          )
           render_resource(@membership, OrganizationMembershipSerializer)
         else
           render json: {
@@ -77,7 +95,19 @@ module Api
       # DELETE /api/v1/organizations/:organization_id/members/:id
       def destroy
         authorize! @membership
+
+        user_id = @membership.user_id
+        role = @membership.role
         @membership.destroy!
+
+        OrganizationAuditLog.log(
+          organization: current_organization,
+          actor: current_user,
+          action: "member.removed",
+          tracked_changes: { user_id: user_id, role: role },
+          request: request
+        )
+
         render_no_content
       end
 

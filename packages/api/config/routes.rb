@@ -51,6 +51,9 @@ Rails.application.routes.draw do
           end
         end
 
+        # Organization audit logs
+        resources :audit_logs, controller: "organization_audit_logs", only: [ :index ]
+
         # Organization connectors
         resources :connectors, controller: "organization_connectors" do
           member do

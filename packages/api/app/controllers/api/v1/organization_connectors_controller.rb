@@ -40,6 +40,14 @@ module Api
         end
 
         if @connector.save
+          OrganizationAuditLog.log(
+            organization: current_organization,
+            actor: current_user,
+            action: "connector.create",
+            resource: @connector,
+            tracked_changes: { connector_type: @connector.connector_type },
+            request: request
+          )
           render_created(@connector, OrganizationConnectorSerializer)
         else
           render json: {
@@ -53,7 +61,17 @@ module Api
       def update
         authorize! @connector
 
+        changes_before = @connector.slice(:is_active, :status, :external_account_name)
+
         if @connector.update(connector_update_params)
+          OrganizationAuditLog.log(
+            organization: current_organization,
+            actor: current_user,
+            action: "connector.update",
+            resource: @connector,
+            tracked_changes: { before: changes_before, after: @connector.slice(:is_active, :status, :external_account_name) },
+            request: request
+          )
           render_resource(@connector, OrganizationConnectorSerializer)
         else
           render json: {
@@ -66,7 +84,18 @@ module Api
       # DELETE /api/v1/organizations/:organization_id/connectors/:id
       def destroy
         authorize! @connector
+
+        connector_type = @connector.connector_type
         @connector.destroy!
+
+        OrganizationAuditLog.log(
+          organization: current_organization,
+          actor: current_user,
+          action: "connector.delete",
+          tracked_changes: { connector_type: connector_type },
+          request: request
+        )
+
         render_no_content
       end
 
