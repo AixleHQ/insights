@@ -38,10 +38,10 @@ module Slack
       timestamp  = Time.current.iso8601
 
       severity_emoji = case severity.to_s
-                       when "critical" then ":red_circle:"
-                       when "warning"  then ":large_yellow_circle:"
-                       else                 ":large_blue_circle:"
-                       end
+      when "critical" then ":red_circle:"
+      when "warning"  then ":large_yellow_circle:"
+      else ":large_blue_circle:"
+      end
 
       lines = [
         "#{severity_emoji} *#{@org.name}* — #{alert_type.to_s.tr('_', ' ').capitalize}",
