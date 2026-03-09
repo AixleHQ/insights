@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOrg } from '@/contexts/OrgContext';
-import { useConnectors, useSyncConnector, useDeleteConnector } from '@/hooks/useApi';
+import { useConnectors, useSyncConnector, useDeleteConnector, useTestConnector } from '@/hooks/useApi';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -11,8 +11,10 @@ import {
   type ProviderInfo,
 } from '@/components/integrations';
 import { ApiKeyConnectSheet } from '@/components/integrations/ApiKeyConnectSheet';
+import { SlackConnectSheet } from '@/components/integrations/SlackConnectSheet';
 
 const AI_PROVIDERS = new Set(['anthropic', 'openai', 'openrouter', 'gemini']);
+const SLACK_PROVIDERS = new Set(['slack']);
 
 const availableProviders: ProviderInfo[] = [
   // Code Hosting / Version Control
@@ -216,8 +218,7 @@ const availableProviders: ProviderInfo[] = [
       'Usage summaries',
       'Bot commands',
     ],
-    available: false,
-    comingSoon: true,
+    available: true,
   },
 ];
 
@@ -252,9 +253,11 @@ export function Integrations() {
   const { data: connectorsData, isLoading } = useConnectors(currentOrg?.id || '');
   const syncConnector = useSyncConnector();
   const deleteConnector = useDeleteConnector();
+  const testConnector = useTestConnector();
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [connectingProvider, setConnectingProvider] = useState<ProviderInfo | null>(null);
+  const [slackSheetOpen, setSlackSheetOpen] = useState(false);
 
   // Transform API response to component format
   const integrations: IntegrationData[] = useMemo(() => {
@@ -286,6 +289,8 @@ export function Integrations() {
       const provider = availableProviders.find((p) => p.id === providerId) ?? null;
       setConnectingProvider(provider);
       setSheetOpen(true);
+    } else if (SLACK_PROVIDERS.has(providerId)) {
+      setSlackSheetOpen(true);
     } else {
       navigate(`/integrations/new/${providerId}`);
     }
@@ -308,6 +313,15 @@ export function Integrations() {
       } catch (error) {
         console.error('Failed to disconnect integration:', error);
       }
+    }
+  };
+
+  const handleTest = async (id: string) => {
+    if (!currentOrg) return;
+    try {
+      await testConnector.mutateAsync({ orgId: currentOrg.id, connectorId: id });
+    } catch (error) {
+      console.error('Failed to test connector:', error);
     }
   };
 
@@ -373,7 +387,8 @@ export function Integrations() {
                 <IntegrationCard
                   key={integration.id}
                   integration={integration}
-                  onSync={handleSync}
+                  onSync={integration.provider === 'slack' ? undefined : handleSync}
+                  onTest={integration.provider === 'slack' ? handleTest : undefined}
                   onDisconnect={handleDisconnect}
                 />
               ))}
@@ -408,6 +423,12 @@ export function Integrations() {
         provider={connectingProvider}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
+        onSuccess={() => {}}
+      />
+
+      <SlackConnectSheet
+        open={slackSheetOpen}
+        onOpenChange={setSlackSheetOpen}
         onSuccess={() => {}}
       />
     </div>
