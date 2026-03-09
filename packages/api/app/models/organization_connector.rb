@@ -1,5 +1,6 @@
 class OrganizationConnector < ApplicationRecord
   CONNECTOR_TYPES = %w[github gitlab bitbucket jira linear openrouter anthropic openai gemini slack].freeze
+  STATUSES = %w[connected error disconnected].freeze
 
   belongs_to :organization
   has_many :repositories, dependent: :destroy
@@ -7,12 +8,13 @@ class OrganizationConnector < ApplicationRecord
   validates :connector_type, presence: true, inclusion: { in: CONNECTOR_TYPES }
   validates :connector_type, uniqueness: { scope: :organization_id, message: "already exists for this organization" }
   validates :is_active, inclusion: { in: [ true, false ] }
+  validates :status, inclusion: { in: STATUSES }
 
   encrypts :access_token
   encrypts :refresh_token
   encrypts :webhook_secret
 
-  scope :active, -> { where(is_active: true) }
+  scope :active, -> { where.not(status: "disconnected") }
   scope :by_type, ->(type) { where(connector_type: type) }
 
   def token_expired?
@@ -36,11 +38,19 @@ class OrganizationConnector < ApplicationRecord
     connector_type == "slack"
   end
 
+  def mark_connected!
+    update!(status: "connected", last_error: nil, last_sync_at: Time.current, is_active: true)
+  end
+
   def mark_synced!
-    update!(last_sync_at: Time.current, last_error: nil)
+    update!(status: "connected", last_sync_at: Time.current, last_error: nil, is_active: true)
   end
 
   def mark_error!(error_message)
-    update!(last_error: error_message)
+    update!(status: "error", last_error: error_message)
+  end
+
+  def mark_disconnected!
+    update!(status: "disconnected", is_active: false)
   end
 end

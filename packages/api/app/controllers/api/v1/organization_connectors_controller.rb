@@ -78,6 +78,7 @@ module Api
         result = provider.test_connection
 
         if result[:success]
+          @connector.mark_connected!
           render json: { data: { success: true, message: "Connection successful" } }
         else
           @connector.mark_error!(result[:error])
@@ -130,7 +131,9 @@ module Api
           token_expires_at: token_data[:expires_at],
           external_account_id: token_data[:account_id],
           external_account_name: token_data[:account_name],
-          is_active: true
+          is_active: true,
+          status: "connected",
+          last_error: nil
         )
 
         if connector.save

@@ -35,7 +35,7 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
     end
 
     it 'filters by active status' do
-      inactive = create(:organization_connector, organization: organization, connector_type: 'gitlab', is_active: false)
+      inactive = create(:organization_connector, organization: organization, connector_type: 'gitlab', is_active: false, status: 'disconnected')
 
       authenticated_get "/api/v1/organizations/#{organization.id}/connectors",
                         user: member,
