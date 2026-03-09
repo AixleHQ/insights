@@ -258,6 +258,7 @@ export function Integrations() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [connectingProvider, setConnectingProvider] = useState<ProviderInfo | null>(null);
   const [slackSheetOpen, setSlackSheetOpen] = useState(false);
+  const [testingConnectorId, setTestingConnectorId] = useState<string | null>(null);
 
   // Transform API response to component format
   const integrations: IntegrationData[] = useMemo(() => {
@@ -318,10 +319,13 @@ export function Integrations() {
 
   const handleTest = async (id: string) => {
     if (!currentOrg) return;
+    setTestingConnectorId(id);
     try {
       await testConnector.mutateAsync({ orgId: currentOrg.id, connectorId: id });
     } catch (error) {
       console.error('Failed to test connector:', error);
+    } finally {
+      setTestingConnectorId(null);
     }
   };
 
@@ -388,8 +392,9 @@ export function Integrations() {
                   key={integration.id}
                   integration={integration}
                   onSync={integration.provider === 'slack' ? undefined : handleSync}
-                  onTest={integration.provider === 'slack' ? handleTest : undefined}
+                  onTest={handleTest}
                   onDisconnect={handleDisconnect}
+                  isTesting={testingConnectorId === integration.id}
                 />
               ))}
             </div>
