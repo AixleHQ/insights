@@ -94,6 +94,8 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
       let(:valid_webhook_url) { 'https://hooks.slack.com/services/T12345678/B12345678/EXAMPLE-WEBHOOK-SECRET' }
 
       it 'creates a slack connector with a valid webhook URL' do
+        allow_any_instance_of(Oauth::SlackProvider).to receive(:test_connection).and_return({ success: true })
+
         authenticated_post "/api/v1/organizations/#{organization.id}/connectors",
                            user: admin,
                            organization: organization,
