@@ -28,7 +28,7 @@ module Api
         @connector = current_organization.organization_connectors.new(connector_params)
         authorize! @connector
 
-        if @connector.ai_provider?
+        if @connector.ai_provider? || @connector.slack_webhook?
           provider = Oauth::BaseProvider.for(@connector)
           result = provider.test_connection
           unless result[:success]

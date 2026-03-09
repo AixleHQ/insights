@@ -13,7 +13,8 @@ module Oauth
       "anthropic" => "Oauth::AnthropicProvider",
       "openai" => "Oauth::OpenaiProvider",
       "openrouter" => "Oauth::OpenrouterProvider",
-      "gemini" => "Oauth::GeminiProvider"
+      "gemini" => "Oauth::GeminiProvider",
+      "slack" => "Oauth::SlackProvider"
     }.freeze
 
     def self.for(connector)

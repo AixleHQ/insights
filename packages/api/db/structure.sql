@@ -28,7 +28,7 @@ COMMENT ON EXTENSION timescaledb IS 'Enables scalable inserts and complex querie
 -- Name: timeseries; Type: SCHEMA; Schema: -; Owner: -
 --
 
-CREATE SCHEMA IF NOT EXISTS timeseries;
+CREATE SCHEMA timeseries;
 
 
 --
@@ -58,7 +58,8 @@ CREATE TYPE public.connector_type AS ENUM (
     'openrouter',
     'anthropic',
     'openai',
-    'gemini'
+    'gemini',
+    'slack'
 );
 
 
@@ -3139,6 +3140,494 @@ ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_86_chunk ALTER COLUMN _t
 ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_86_chunk ALTER COLUMN occurred_at SET STATISTICS 0;
 ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_86_chunk ALTER COLUMN created_at SET STATISTICS 0;
 ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_86_chunk ALTER COLUMN duration_ms SET STATISTICS 0;
+
+
+--
+-- Name: compress_hyper_2_87_chunk; Type: TABLE; Schema: _timescaledb_internal; Owner: -
+--
+
+CREATE TABLE _timescaledb_internal.compress_hyper_2_87_chunk (
+    _ts_meta_count integer,
+    user_id uuid,
+    organization_id uuid,
+    _ts_meta_v2_bloomh_id _timescaledb_internal.bloom1,
+    id _timescaledb_internal.compressed_data,
+    _ts_meta_v2_bloomh_project_id _timescaledb_internal.bloom1,
+    project_id _timescaledb_internal.compressed_data,
+    repository_id _timescaledb_internal.compressed_data,
+    _ts_meta_v2_bloomh_tool_name _timescaledb_internal.bloom1,
+    tool_name _timescaledb_internal.compressed_data,
+    event_type _timescaledb_internal.compressed_data,
+    model _timescaledb_internal.compressed_data,
+    tokens_in _timescaledb_internal.compressed_data,
+    tokens_out _timescaledb_internal.compressed_data,
+    tokens_total _timescaledb_internal.compressed_data,
+    cost_usd _timescaledb_internal.compressed_data,
+    metadata _timescaledb_internal.compressed_data,
+    _ts_meta_min_1 timestamp with time zone,
+    _ts_meta_max_1 timestamp with time zone,
+    occurred_at _timescaledb_internal.compressed_data,
+    created_at _timescaledb_internal.compressed_data,
+    duration_ms _timescaledb_internal.compressed_data
+)
+WITH (toast_tuple_target='128');
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN _ts_meta_count SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN user_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN organization_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN _ts_meta_v2_bloomh_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN _ts_meta_v2_bloomh_id SET STORAGE EXTERNAL;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN id SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN _ts_meta_v2_bloomh_project_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN _ts_meta_v2_bloomh_project_id SET STORAGE EXTERNAL;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN project_id SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN repository_id SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN _ts_meta_v2_bloomh_tool_name SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN _ts_meta_v2_bloomh_tool_name SET STORAGE EXTERNAL;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN tool_name SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN tool_name SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN event_type SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN event_type SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN model SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN model SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN tokens_in SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN tokens_out SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN tokens_total SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN cost_usd SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN cost_usd SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN metadata SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN metadata SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN _ts_meta_min_1 SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN _ts_meta_max_1 SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN occurred_at SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN created_at SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_87_chunk ALTER COLUMN duration_ms SET STATISTICS 0;
+
+
+--
+-- Name: compress_hyper_2_88_chunk; Type: TABLE; Schema: _timescaledb_internal; Owner: -
+--
+
+CREATE TABLE _timescaledb_internal.compress_hyper_2_88_chunk (
+    _ts_meta_count integer,
+    user_id uuid,
+    organization_id uuid,
+    _ts_meta_v2_bloomh_id _timescaledb_internal.bloom1,
+    id _timescaledb_internal.compressed_data,
+    _ts_meta_v2_bloomh_project_id _timescaledb_internal.bloom1,
+    project_id _timescaledb_internal.compressed_data,
+    repository_id _timescaledb_internal.compressed_data,
+    _ts_meta_v2_bloomh_tool_name _timescaledb_internal.bloom1,
+    tool_name _timescaledb_internal.compressed_data,
+    event_type _timescaledb_internal.compressed_data,
+    model _timescaledb_internal.compressed_data,
+    tokens_in _timescaledb_internal.compressed_data,
+    tokens_out _timescaledb_internal.compressed_data,
+    tokens_total _timescaledb_internal.compressed_data,
+    cost_usd _timescaledb_internal.compressed_data,
+    metadata _timescaledb_internal.compressed_data,
+    _ts_meta_min_1 timestamp with time zone,
+    _ts_meta_max_1 timestamp with time zone,
+    occurred_at _timescaledb_internal.compressed_data,
+    created_at _timescaledb_internal.compressed_data,
+    duration_ms _timescaledb_internal.compressed_data
+)
+WITH (toast_tuple_target='128');
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN _ts_meta_count SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN user_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN organization_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN _ts_meta_v2_bloomh_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN _ts_meta_v2_bloomh_id SET STORAGE EXTERNAL;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN id SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN _ts_meta_v2_bloomh_project_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN _ts_meta_v2_bloomh_project_id SET STORAGE EXTERNAL;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN project_id SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN repository_id SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN _ts_meta_v2_bloomh_tool_name SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN _ts_meta_v2_bloomh_tool_name SET STORAGE EXTERNAL;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN tool_name SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN tool_name SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN event_type SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN event_type SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN model SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN model SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN tokens_in SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN tokens_out SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN tokens_total SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN cost_usd SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN cost_usd SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN metadata SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN metadata SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN _ts_meta_min_1 SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN _ts_meta_max_1 SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN occurred_at SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN created_at SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_88_chunk ALTER COLUMN duration_ms SET STATISTICS 0;
+
+
+--
+-- Name: compress_hyper_2_89_chunk; Type: TABLE; Schema: _timescaledb_internal; Owner: -
+--
+
+CREATE TABLE _timescaledb_internal.compress_hyper_2_89_chunk (
+    _ts_meta_count integer,
+    user_id uuid,
+    organization_id uuid,
+    _ts_meta_v2_bloomh_id _timescaledb_internal.bloom1,
+    id _timescaledb_internal.compressed_data,
+    _ts_meta_v2_bloomh_project_id _timescaledb_internal.bloom1,
+    project_id _timescaledb_internal.compressed_data,
+    repository_id _timescaledb_internal.compressed_data,
+    _ts_meta_v2_bloomh_tool_name _timescaledb_internal.bloom1,
+    tool_name _timescaledb_internal.compressed_data,
+    event_type _timescaledb_internal.compressed_data,
+    model _timescaledb_internal.compressed_data,
+    tokens_in _timescaledb_internal.compressed_data,
+    tokens_out _timescaledb_internal.compressed_data,
+    tokens_total _timescaledb_internal.compressed_data,
+    cost_usd _timescaledb_internal.compressed_data,
+    metadata _timescaledb_internal.compressed_data,
+    _ts_meta_min_1 timestamp with time zone,
+    _ts_meta_max_1 timestamp with time zone,
+    occurred_at _timescaledb_internal.compressed_data,
+    created_at _timescaledb_internal.compressed_data,
+    duration_ms _timescaledb_internal.compressed_data
+)
+WITH (toast_tuple_target='128');
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN _ts_meta_count SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN user_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN organization_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN _ts_meta_v2_bloomh_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN _ts_meta_v2_bloomh_id SET STORAGE EXTERNAL;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN id SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN _ts_meta_v2_bloomh_project_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN _ts_meta_v2_bloomh_project_id SET STORAGE EXTERNAL;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN project_id SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN repository_id SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN _ts_meta_v2_bloomh_tool_name SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN _ts_meta_v2_bloomh_tool_name SET STORAGE EXTERNAL;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN tool_name SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN tool_name SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN event_type SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN event_type SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN model SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN model SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN tokens_in SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN tokens_out SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN tokens_total SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN cost_usd SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN cost_usd SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN metadata SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN metadata SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN _ts_meta_min_1 SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN _ts_meta_max_1 SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN occurred_at SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN created_at SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_89_chunk ALTER COLUMN duration_ms SET STATISTICS 0;
+
+
+--
+-- Name: compress_hyper_2_90_chunk; Type: TABLE; Schema: _timescaledb_internal; Owner: -
+--
+
+CREATE TABLE _timescaledb_internal.compress_hyper_2_90_chunk (
+    _ts_meta_count integer,
+    user_id uuid,
+    organization_id uuid,
+    _ts_meta_v2_bloomh_id _timescaledb_internal.bloom1,
+    id _timescaledb_internal.compressed_data,
+    _ts_meta_v2_bloomh_project_id _timescaledb_internal.bloom1,
+    project_id _timescaledb_internal.compressed_data,
+    repository_id _timescaledb_internal.compressed_data,
+    _ts_meta_v2_bloomh_tool_name _timescaledb_internal.bloom1,
+    tool_name _timescaledb_internal.compressed_data,
+    event_type _timescaledb_internal.compressed_data,
+    model _timescaledb_internal.compressed_data,
+    tokens_in _timescaledb_internal.compressed_data,
+    tokens_out _timescaledb_internal.compressed_data,
+    tokens_total _timescaledb_internal.compressed_data,
+    cost_usd _timescaledb_internal.compressed_data,
+    metadata _timescaledb_internal.compressed_data,
+    _ts_meta_min_1 timestamp with time zone,
+    _ts_meta_max_1 timestamp with time zone,
+    occurred_at _timescaledb_internal.compressed_data,
+    created_at _timescaledb_internal.compressed_data,
+    duration_ms _timescaledb_internal.compressed_data
+)
+WITH (toast_tuple_target='128');
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN _ts_meta_count SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN user_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN organization_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN _ts_meta_v2_bloomh_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN _ts_meta_v2_bloomh_id SET STORAGE EXTERNAL;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN id SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN _ts_meta_v2_bloomh_project_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN _ts_meta_v2_bloomh_project_id SET STORAGE EXTERNAL;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN project_id SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN repository_id SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN _ts_meta_v2_bloomh_tool_name SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN _ts_meta_v2_bloomh_tool_name SET STORAGE EXTERNAL;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN tool_name SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN tool_name SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN event_type SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN event_type SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN model SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN model SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN tokens_in SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN tokens_out SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN tokens_total SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN cost_usd SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN cost_usd SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN metadata SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN metadata SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN _ts_meta_min_1 SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN _ts_meta_max_1 SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN occurred_at SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN created_at SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_90_chunk ALTER COLUMN duration_ms SET STATISTICS 0;
+
+
+--
+-- Name: compress_hyper_2_91_chunk; Type: TABLE; Schema: _timescaledb_internal; Owner: -
+--
+
+CREATE TABLE _timescaledb_internal.compress_hyper_2_91_chunk (
+    _ts_meta_count integer,
+    user_id uuid,
+    organization_id uuid,
+    _ts_meta_v2_bloomh_id _timescaledb_internal.bloom1,
+    id _timescaledb_internal.compressed_data,
+    _ts_meta_v2_bloomh_project_id _timescaledb_internal.bloom1,
+    project_id _timescaledb_internal.compressed_data,
+    repository_id _timescaledb_internal.compressed_data,
+    _ts_meta_v2_bloomh_tool_name _timescaledb_internal.bloom1,
+    tool_name _timescaledb_internal.compressed_data,
+    event_type _timescaledb_internal.compressed_data,
+    model _timescaledb_internal.compressed_data,
+    tokens_in _timescaledb_internal.compressed_data,
+    tokens_out _timescaledb_internal.compressed_data,
+    tokens_total _timescaledb_internal.compressed_data,
+    cost_usd _timescaledb_internal.compressed_data,
+    metadata _timescaledb_internal.compressed_data,
+    _ts_meta_min_1 timestamp with time zone,
+    _ts_meta_max_1 timestamp with time zone,
+    occurred_at _timescaledb_internal.compressed_data,
+    created_at _timescaledb_internal.compressed_data,
+    duration_ms _timescaledb_internal.compressed_data
+)
+WITH (toast_tuple_target='128');
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN _ts_meta_count SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN user_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN organization_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN _ts_meta_v2_bloomh_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN _ts_meta_v2_bloomh_id SET STORAGE EXTERNAL;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN id SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN _ts_meta_v2_bloomh_project_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN _ts_meta_v2_bloomh_project_id SET STORAGE EXTERNAL;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN project_id SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN repository_id SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN _ts_meta_v2_bloomh_tool_name SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN _ts_meta_v2_bloomh_tool_name SET STORAGE EXTERNAL;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN tool_name SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN tool_name SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN event_type SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN event_type SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN model SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN model SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN tokens_in SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN tokens_out SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN tokens_total SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN cost_usd SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN cost_usd SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN metadata SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN metadata SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN _ts_meta_min_1 SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN _ts_meta_max_1 SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN occurred_at SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN created_at SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_91_chunk ALTER COLUMN duration_ms SET STATISTICS 0;
+
+
+--
+-- Name: compress_hyper_2_92_chunk; Type: TABLE; Schema: _timescaledb_internal; Owner: -
+--
+
+CREATE TABLE _timescaledb_internal.compress_hyper_2_92_chunk (
+    _ts_meta_count integer,
+    user_id uuid,
+    organization_id uuid,
+    _ts_meta_v2_bloomh_id _timescaledb_internal.bloom1,
+    id _timescaledb_internal.compressed_data,
+    _ts_meta_v2_bloomh_project_id _timescaledb_internal.bloom1,
+    project_id _timescaledb_internal.compressed_data,
+    repository_id _timescaledb_internal.compressed_data,
+    _ts_meta_v2_bloomh_tool_name _timescaledb_internal.bloom1,
+    tool_name _timescaledb_internal.compressed_data,
+    event_type _timescaledb_internal.compressed_data,
+    model _timescaledb_internal.compressed_data,
+    tokens_in _timescaledb_internal.compressed_data,
+    tokens_out _timescaledb_internal.compressed_data,
+    tokens_total _timescaledb_internal.compressed_data,
+    cost_usd _timescaledb_internal.compressed_data,
+    metadata _timescaledb_internal.compressed_data,
+    _ts_meta_min_1 timestamp with time zone,
+    _ts_meta_max_1 timestamp with time zone,
+    occurred_at _timescaledb_internal.compressed_data,
+    created_at _timescaledb_internal.compressed_data,
+    duration_ms _timescaledb_internal.compressed_data
+)
+WITH (toast_tuple_target='128');
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN _ts_meta_count SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN user_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN organization_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN _ts_meta_v2_bloomh_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN _ts_meta_v2_bloomh_id SET STORAGE EXTERNAL;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN id SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN _ts_meta_v2_bloomh_project_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN _ts_meta_v2_bloomh_project_id SET STORAGE EXTERNAL;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN project_id SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN repository_id SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN _ts_meta_v2_bloomh_tool_name SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN _ts_meta_v2_bloomh_tool_name SET STORAGE EXTERNAL;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN tool_name SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN tool_name SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN event_type SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN event_type SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN model SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN model SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN tokens_in SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN tokens_out SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN tokens_total SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN cost_usd SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN cost_usd SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN metadata SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN metadata SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN _ts_meta_min_1 SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN _ts_meta_max_1 SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN occurred_at SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN created_at SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_92_chunk ALTER COLUMN duration_ms SET STATISTICS 0;
+
+
+--
+-- Name: compress_hyper_2_93_chunk; Type: TABLE; Schema: _timescaledb_internal; Owner: -
+--
+
+CREATE TABLE _timescaledb_internal.compress_hyper_2_93_chunk (
+    _ts_meta_count integer,
+    user_id uuid,
+    organization_id uuid,
+    _ts_meta_v2_bloomh_id _timescaledb_internal.bloom1,
+    id _timescaledb_internal.compressed_data,
+    _ts_meta_v2_bloomh_project_id _timescaledb_internal.bloom1,
+    project_id _timescaledb_internal.compressed_data,
+    repository_id _timescaledb_internal.compressed_data,
+    _ts_meta_v2_bloomh_tool_name _timescaledb_internal.bloom1,
+    tool_name _timescaledb_internal.compressed_data,
+    event_type _timescaledb_internal.compressed_data,
+    model _timescaledb_internal.compressed_data,
+    tokens_in _timescaledb_internal.compressed_data,
+    tokens_out _timescaledb_internal.compressed_data,
+    tokens_total _timescaledb_internal.compressed_data,
+    cost_usd _timescaledb_internal.compressed_data,
+    metadata _timescaledb_internal.compressed_data,
+    _ts_meta_min_1 timestamp with time zone,
+    _ts_meta_max_1 timestamp with time zone,
+    occurred_at _timescaledb_internal.compressed_data,
+    created_at _timescaledb_internal.compressed_data,
+    duration_ms _timescaledb_internal.compressed_data
+)
+WITH (toast_tuple_target='128');
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN _ts_meta_count SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN user_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN organization_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN _ts_meta_v2_bloomh_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN _ts_meta_v2_bloomh_id SET STORAGE EXTERNAL;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN id SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN _ts_meta_v2_bloomh_project_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN _ts_meta_v2_bloomh_project_id SET STORAGE EXTERNAL;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN project_id SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN repository_id SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN _ts_meta_v2_bloomh_tool_name SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN _ts_meta_v2_bloomh_tool_name SET STORAGE EXTERNAL;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN tool_name SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN tool_name SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN event_type SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN event_type SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN model SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN model SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN tokens_in SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN tokens_out SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN tokens_total SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN cost_usd SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN cost_usd SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN metadata SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN metadata SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN _ts_meta_min_1 SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN _ts_meta_max_1 SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN occurred_at SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN created_at SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_93_chunk ALTER COLUMN duration_ms SET STATISTICS 0;
+
+
+--
+-- Name: compress_hyper_2_94_chunk; Type: TABLE; Schema: _timescaledb_internal; Owner: -
+--
+
+CREATE TABLE _timescaledb_internal.compress_hyper_2_94_chunk (
+    _ts_meta_count integer,
+    user_id uuid,
+    organization_id uuid,
+    _ts_meta_v2_bloomh_id _timescaledb_internal.bloom1,
+    id _timescaledb_internal.compressed_data,
+    _ts_meta_v2_bloomh_project_id _timescaledb_internal.bloom1,
+    project_id _timescaledb_internal.compressed_data,
+    repository_id _timescaledb_internal.compressed_data,
+    _ts_meta_v2_bloomh_tool_name _timescaledb_internal.bloom1,
+    tool_name _timescaledb_internal.compressed_data,
+    event_type _timescaledb_internal.compressed_data,
+    model _timescaledb_internal.compressed_data,
+    tokens_in _timescaledb_internal.compressed_data,
+    tokens_out _timescaledb_internal.compressed_data,
+    tokens_total _timescaledb_internal.compressed_data,
+    cost_usd _timescaledb_internal.compressed_data,
+    metadata _timescaledb_internal.compressed_data,
+    _ts_meta_min_1 timestamp with time zone,
+    _ts_meta_max_1 timestamp with time zone,
+    occurred_at _timescaledb_internal.compressed_data,
+    created_at _timescaledb_internal.compressed_data,
+    duration_ms _timescaledb_internal.compressed_data
+)
+WITH (toast_tuple_target='128');
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN _ts_meta_count SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN user_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN organization_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN _ts_meta_v2_bloomh_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN _ts_meta_v2_bloomh_id SET STORAGE EXTERNAL;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN id SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN _ts_meta_v2_bloomh_project_id SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN _ts_meta_v2_bloomh_project_id SET STORAGE EXTERNAL;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN project_id SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN repository_id SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN _ts_meta_v2_bloomh_tool_name SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN _ts_meta_v2_bloomh_tool_name SET STORAGE EXTERNAL;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN tool_name SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN tool_name SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN event_type SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN event_type SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN model SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN model SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN tokens_in SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN tokens_out SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN tokens_total SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN cost_usd SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN cost_usd SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN metadata SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN metadata SET STORAGE EXTENDED;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN _ts_meta_min_1 SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN _ts_meta_max_1 SET STATISTICS 1000;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN occurred_at SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN created_at SET STATISTICS 0;
+ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_94_chunk ALTER COLUMN duration_ms SET STATISTICS 0;
 
 
 --
@@ -8308,6 +8797,62 @@ CREATE INDEX compress_hyper_2_86_chunk_organization_id_user_id__ts_meta__idx ON 
 
 
 --
+-- Name: compress_hyper_2_87_chunk_organization_id_user_id__ts_meta__idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
+--
+
+CREATE INDEX compress_hyper_2_87_chunk_organization_id_user_id__ts_meta__idx ON _timescaledb_internal.compress_hyper_2_87_chunk USING btree (organization_id, user_id, _ts_meta_min_1 DESC, _ts_meta_max_1 DESC);
+
+
+--
+-- Name: compress_hyper_2_88_chunk_organization_id_user_id__ts_meta__idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
+--
+
+CREATE INDEX compress_hyper_2_88_chunk_organization_id_user_id__ts_meta__idx ON _timescaledb_internal.compress_hyper_2_88_chunk USING btree (organization_id, user_id, _ts_meta_min_1 DESC, _ts_meta_max_1 DESC);
+
+
+--
+-- Name: compress_hyper_2_89_chunk_organization_id_user_id__ts_meta__idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
+--
+
+CREATE INDEX compress_hyper_2_89_chunk_organization_id_user_id__ts_meta__idx ON _timescaledb_internal.compress_hyper_2_89_chunk USING btree (organization_id, user_id, _ts_meta_min_1 DESC, _ts_meta_max_1 DESC);
+
+
+--
+-- Name: compress_hyper_2_90_chunk_organization_id_user_id__ts_meta__idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
+--
+
+CREATE INDEX compress_hyper_2_90_chunk_organization_id_user_id__ts_meta__idx ON _timescaledb_internal.compress_hyper_2_90_chunk USING btree (organization_id, user_id, _ts_meta_min_1 DESC, _ts_meta_max_1 DESC);
+
+
+--
+-- Name: compress_hyper_2_91_chunk_organization_id_user_id__ts_meta__idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
+--
+
+CREATE INDEX compress_hyper_2_91_chunk_organization_id_user_id__ts_meta__idx ON _timescaledb_internal.compress_hyper_2_91_chunk USING btree (organization_id, user_id, _ts_meta_min_1 DESC, _ts_meta_max_1 DESC);
+
+
+--
+-- Name: compress_hyper_2_92_chunk_organization_id_user_id__ts_meta__idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
+--
+
+CREATE INDEX compress_hyper_2_92_chunk_organization_id_user_id__ts_meta__idx ON _timescaledb_internal.compress_hyper_2_92_chunk USING btree (organization_id, user_id, _ts_meta_min_1 DESC, _ts_meta_max_1 DESC);
+
+
+--
+-- Name: compress_hyper_2_93_chunk_organization_id_user_id__ts_meta__idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
+--
+
+CREATE INDEX compress_hyper_2_93_chunk_organization_id_user_id__ts_meta__idx ON _timescaledb_internal.compress_hyper_2_93_chunk USING btree (organization_id, user_id, _ts_meta_min_1 DESC, _ts_meta_max_1 DESC);
+
+
+--
+-- Name: compress_hyper_2_94_chunk_organization_id_user_id__ts_meta__idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
+--
+
+CREATE INDEX compress_hyper_2_94_chunk_organization_id_user_id__ts_meta__idx ON _timescaledb_internal.compress_hyper_2_94_chunk USING btree (organization_id, user_id, _ts_meta_min_1 DESC, _ts_meta_max_1 DESC);
+
+
+--
 -- Name: idx_on_organization_id_connector_type_ebd5fb8c77; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -10307,6 +10852,7 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260305123754'),
 ('20260225233834'),
 ('20260224000000'),
 ('20260223000002'),
