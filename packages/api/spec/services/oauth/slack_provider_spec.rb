@@ -67,11 +67,11 @@ RSpec.describe Oauth::SlackProvider, type: :service do
       let(:faraday_response) { instance_double(Faraday::Response, success?: true) }
 
       before do
-        allow(Faraday).to receive(:post).with(webhook_url).and_yield(double(headers: {}, body: nil)).and_return(faraday_response)
+        allow(Faraday).to receive(:post).with(webhook_url).and_return(faraday_response)
       end
 
       it "POSTs a test message to the webhook URL" do
-        expect(Faraday).to receive(:post).with(webhook_url)
+        expect(Faraday).to receive(:post).with(webhook_url).and_return(faraday_response)
 
         provider.test_connection
       end
@@ -87,7 +87,7 @@ RSpec.describe Oauth::SlackProvider, type: :service do
       let(:faraday_response) { instance_double(Faraday::Response, success?: false, status: 403) }
 
       before do
-        allow(Faraday).to receive(:post).with(webhook_url).and_yield(double(headers: {}, body: nil)).and_return(faraday_response)
+        allow(Faraday).to receive(:post).with(webhook_url).and_return(faraday_response)
       end
 
       it "returns failure with the HTTP status" do
