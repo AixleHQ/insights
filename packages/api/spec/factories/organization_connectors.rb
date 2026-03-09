@@ -18,6 +18,11 @@ FactoryBot.define do
       connector_type { 'jira' }
     end
 
+    trait :slack do
+      connector_type { 'slack' }
+      access_token { 'https://hooks.slack.com/services/T12345678/B12345678/EXAMPLE-WEBHOOK-SECRET' }
+    end
+
     trait :inactive do
       is_active { false }
     end

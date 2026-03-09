@@ -80,9 +80,11 @@ module Api
         if result[:success]
           render json: { data: { success: true, message: "Connection successful" } }
         else
+          @connector.mark_error!(result[:error])
           render json: { data: { success: false, error: result[:error] } }, status: :ok
         end
       rescue StandardError => e
+        @connector.mark_error!(e.message)
         render json: { data: { success: false, error: e.message } }, status: :ok
       end
 
