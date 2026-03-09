@@ -3721,7 +3721,8 @@ CREATE TABLE public.organization_connectors (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     external_account_id character varying,
-    external_account_name character varying
+    external_account_name character varying,
+    status character varying DEFAULT 'connected'::character varying NOT NULL
 );
 
 
@@ -8965,6 +8966,13 @@ CREATE INDEX index_organization_connectors_on_organization_id ON public.organiza
 
 
 --
+-- Name: index_organization_connectors_on_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_organization_connectors_on_status ON public.organization_connectors USING btree (status);
+
+
+--
 -- Name: index_organization_memberships_on_organization_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -10852,6 +10860,7 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260309000001'),
 ('20260305123754'),
 ('20260225233834'),
 ('20260224000000'),
