@@ -5,6 +5,7 @@ import {
   AlertCircle,
   Clock,
   Unplug,
+  FlaskConical,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -64,6 +65,7 @@ interface IntegrationCardProps {
   integration?: IntegrationData;
   provider?: ProviderInfo;
   onSync?: (id: string) => void;
+  onTest?: (id: string) => void;
   onDisconnect?: (id: string) => void;
   onConnect?: (providerId: string) => void;
   className?: string;
@@ -100,6 +102,7 @@ export function IntegrationCard({
   integration,
   provider,
   onSync,
+  onTest,
   onDisconnect,
   onConnect,
   className,
@@ -181,11 +184,19 @@ export function IntegrationCard({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onSync?.(integration.id)}>
-                <RefreshCw className="mr-2 size-4" />
-                Sync now
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
+              {onSync && (
+                <DropdownMenuItem onClick={() => onSync(integration.id)}>
+                  <RefreshCw className="mr-2 size-4" />
+                  Sync now
+                </DropdownMenuItem>
+              )}
+              {onTest && (
+                <DropdownMenuItem onClick={() => onTest(integration.id)}>
+                  <FlaskConical className="mr-2 size-4" />
+                  Send test message
+                </DropdownMenuItem>
+              )}
+              {(onSync || onTest) && <DropdownMenuSeparator />}
               <DropdownMenuItem
                 className="text-destructive"
                 onClick={() => onDisconnect?.(integration.id)}

@@ -596,6 +596,44 @@ export function useDeleteConnector() {
   });
 }
 
+export function useConnectWithWebhook() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      orgId,
+      webhookUrl,
+      channelLabel,
+    }: {
+      orgId: string;
+      webhookUrl: string;
+      channelLabel?: string;
+    }) =>
+      api.post<Connector>(`/organizations/${orgId}/connectors`, {
+        connector_type: 'slack',
+        access_token: webhookUrl,
+        ...(channelLabel ? { external_account_name: channelLabel } : {}),
+      }),
+    onSuccess: (_, { orgId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
+    },
+  });
+}
+
+export function useTestConnector() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ orgId, connectorId }: { orgId: string; connectorId: string }) =>
+      api.post<{ data: { success: boolean; message?: string; error?: string } }>(
+        `/organizations/${orgId}/connectors/${connectorId}/test`
+      ),
+    onSettled: (_, __, { orgId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
+    },
+  });
+}
+
 // ============================================================================
 // Tool Accounts Hooks
 // ============================================================================
