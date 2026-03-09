@@ -223,6 +223,51 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
       expect_success
       expect(json_data[:success]).to be true
     end
+
+    context 'with a slack connector' do
+      let!(:slack_connector) { create(:organization_connector, :slack, organization: organization) }
+
+      context 'when Slack accepts the test message' do
+        before do
+          allow_any_instance_of(Oauth::SlackProvider).to receive(:test_connection)
+            .and_return({ success: true })
+        end
+
+        it 'returns success' do
+          authenticated_post "/api/v1/organizations/#{organization.id}/connectors/#{slack_connector.id}/test",
+                             user: admin,
+                             organization: organization
+
+          expect_success
+          expect(json_data[:success]).to be true
+        end
+      end
+
+      context 'when Slack rejects the test message' do
+        before do
+          allow_any_instance_of(Oauth::SlackProvider).to receive(:test_connection)
+            .and_return({ success: false, error: 'Slack webhook error (HTTP 403)' })
+        end
+
+        it 'returns a structured error' do
+          authenticated_post "/api/v1/organizations/#{organization.id}/connectors/#{slack_connector.id}/test",
+                             user: admin,
+                             organization: organization
+
+          expect_success
+          expect(json_data[:success]).to be false
+          expect(json_data[:error]).to eq('Slack webhook error (HTTP 403)')
+        end
+
+        it 'persists the error in last_error' do
+          authenticated_post "/api/v1/organizations/#{organization.id}/connectors/#{slack_connector.id}/test",
+                             user: admin,
+                             organization: organization
+
+          expect(slack_connector.reload.last_error).to eq('Slack webhook error (HTTP 403)')
+        end
+      end
+    end
   end
 
   describe 'POST /api/v1/organizations/:organization_id/connectors/:id/sync' do
