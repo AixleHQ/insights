@@ -24,7 +24,6 @@ module Api
 
     # POST /api/internal/alerts
     def create_alert
-      # For now, just log the alert - can be extended to email/Slack
       alert_data = alert_params
 
       Rails.logger.info("[InternalAPI] Alert created: #{alert_data[:alert_type]} for org #{alert_data[:organization_id]}")
@@ -33,6 +32,9 @@ module Api
       if alert_data[:organization_id]
         EventsChannel.broadcast_alert(alert_data[:organization_id], alert_data)
       end
+
+      # Deliver to Slack if enabled for this organization
+      deliver_slack_alert(alert_data)
 
       render json: { data: { id: SecureRandom.uuid, status: "sent" } }, status: :created
     end
@@ -121,6 +123,18 @@ module Api
         :organization_id, :alert_type, :severity,
         :title, :message, metadata: {}
       ).to_h.symbolize_keys
+    end
+
+    def deliver_slack_alert(alert_data)
+      return unless alert_data[:organization_id]
+
+      org = Organization.find_by(id: alert_data[:organization_id])
+      return unless org
+
+      alert_slack = org.organization_settings.find_by(key: "alert_slack")&.value == "true"
+      return unless alert_slack
+
+      Slack::NotificationService.deliver_alert(org, alert_data)
     end
   end
 end
