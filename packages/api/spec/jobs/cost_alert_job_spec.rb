@@ -11,6 +11,7 @@ RSpec.describe CostAlertJob, type: :job do
     allow(EventsChannel).to receive(:broadcast_alert)
     allow(Rails.cache).to receive(:read).and_return(nil)
     allow(Rails.cache).to receive(:write)
+    allow(Slack::NotificationService).to receive(:deliver_alert)
   end
 
   describe '#perform' do
@@ -70,6 +71,45 @@ RSpec.describe CostAlertJob, type: :job do
       expect(stats).to have_key(:organizations_checked)
       expect(stats).to have_key(:alerts_sent)
       expect(stats).to have_key(:errors)
+    end
+
+    context 'when alert_slack is enabled' do
+      before do
+        create(:organization_setting, organization: organization, key: 'alert_slack', value: 'true')
+        create(:tool_event, organization: organization, user: user, cost_usd: 150.0, occurred_at: Time.current)
+      end
+
+      it 'delivers the cost alert to Slack' do
+        expect(Slack::NotificationService).to receive(:deliver_alert)
+          .with(organization, hash_including(alert_type: 'cost_threshold'))
+
+        described_class.new.perform(organization.id)
+      end
+    end
+
+    context 'when alert_slack is disabled' do
+      before do
+        create(:tool_event, organization: organization, user: user, cost_usd: 150.0, occurred_at: Time.current)
+      end
+
+      it 'does not deliver to Slack' do
+        expect(Slack::NotificationService).not_to receive(:deliver_alert)
+
+        described_class.new.perform(organization.id)
+      end
+    end
+
+    context 'when alert_slack is enabled but no Slack connector exists' do
+      before do
+        create(:organization_setting, organization: organization, key: 'alert_slack', value: 'true')
+        create(:tool_event, organization: organization, user: user, cost_usd: 150.0, occurred_at: Time.current)
+        allow(Slack::NotificationService).to receive(:deliver_alert).and_call_original
+        allow(Rails.logger).to receive(:warn)
+      end
+
+      it 'does not raise an error' do
+        expect { described_class.new.perform(organization.id) }.not_to raise_error
+      end
     end
   end
 end
