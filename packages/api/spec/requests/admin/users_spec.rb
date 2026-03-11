@@ -54,6 +54,55 @@ RSpec.describe 'Admin Users', type: :request do
       expect(audit_log.resource_type).to eq('User')
       expect(audit_log.resource_id).to eq(user.id.to_s)
     end
+
+    context 'when the impersonated user belongs to organizations' do
+      let(:organization) { create(:organization) }
+
+      before do
+        create(:organization_membership, user: user, organization: organization)
+      end
+
+      it 'logs impersonation.started to each organization audit log' do
+        expect {
+          post impersonate_admin_user_path(user)
+        }.to change(OrganizationAuditLog, :count).by(1)
+
+        org_log = OrganizationAuditLog.last
+        expect(org_log.action).to eq('impersonation.started')
+        expect(org_log.organization).to eq(organization)
+        expect(org_log.actor).to eq(global_admin)
+        expect(org_log.resource_type).to eq('User')
+        expect(org_log.resource_id).to eq(user.id.to_s)
+        expect(org_log.metadata['impersonator_email']).to eq(global_admin.email)
+      end
+    end
+
+    context 'when the impersonated user belongs to multiple organizations' do
+      let(:org1) { create(:organization) }
+      let(:org2) { create(:organization) }
+
+      before do
+        create(:organization_membership, user: user, organization: org1)
+        create(:organization_membership, user: user, organization: org2)
+      end
+
+      it 'logs impersonation.started to every organization' do
+        expect {
+          post impersonate_admin_user_path(user)
+        }.to change(OrganizationAuditLog, :count).by(2)
+
+        actions = OrganizationAuditLog.last(2).map(&:action)
+        expect(actions).to all(eq('impersonation.started'))
+      end
+    end
+
+    context 'when the impersonated user belongs to no organizations' do
+      it 'does not create any organization audit log' do
+        expect {
+          post impersonate_admin_user_path(user)
+        }.not_to change(OrganizationAuditLog, :count)
+      end
+    end
   end
 
   describe 'GET /admin/users/export' do

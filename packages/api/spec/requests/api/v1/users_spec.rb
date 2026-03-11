@@ -101,4 +101,50 @@ RSpec.describe 'Api::V1::Users', type: :request do
       expect_not_found
     end
   end
+
+  describe 'POST /api/v1/users/me/stop_impersonation' do
+    let(:admin) { create(:user, global_admin: true) }
+    let!(:organization) { create(:organization) }
+    let!(:membership) { create(:organization_membership, user: user, organization: organization) }
+
+    context 'when in impersonation mode' do
+      it 'logs impersonation.ended and returns success' do
+        expect {
+          impersonated_post '/api/v1/users/me/stop_impersonation',
+                           user: user,
+                           impersonator: admin
+        }.to change(OrganizationAuditLog, :count).by(1)
+
+        expect_success
+        expect(json_data[:success]).to be true
+
+        log = OrganizationAuditLog.last
+        expect(log.action).to eq('impersonation.ended')
+        expect(log.actor_id).to eq(admin.id)
+        expect(log.organization_id).to eq(organization.id)
+        expect(log.resource_type).to eq('User')
+        expect(log.resource_id).to eq(user.id)
+      end
+
+      it 'logs to all organizations the user belongs to' do
+        other_org = create(:organization)
+        create(:organization_membership, user: user, organization: other_org)
+
+        expect {
+          impersonated_post '/api/v1/users/me/stop_impersonation',
+                           user: user,
+                           impersonator: admin
+        }.to change(OrganizationAuditLog, :count).by(2)
+      end
+    end
+
+    context 'when not in impersonation mode' do
+      it 'returns bad request' do
+        authenticated_post '/api/v1/users/me/stop_impersonation', user: user
+
+        expect_bad_request
+        expect(json_response[:error]).to eq('Not in impersonation mode')
+      end
+    end
+  end
 end

@@ -25,6 +25,7 @@ Rails.application.routes.draw do
       get "users/me/settings", to: "users#settings"
       put "users/me/settings/:key", to: "users#update_setting"
       delete "users/me/settings/:key", to: "users#destroy_setting"
+      post "users/me/stop_impersonation", to: "users#stop_impersonation"
 
       # Organization routes
       resources :organizations do
