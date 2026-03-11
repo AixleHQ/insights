@@ -17,6 +17,7 @@ import type {
   ToolAccount,
   ToolEvent,
   EventAuditEntry,
+  OrganizationAuditLog,
   OverviewStats,
   DailyStats,
   HourlyStats,
@@ -82,6 +83,10 @@ export const queryKeys = {
     detail: (orgId: string, id: string) => ['organizations', orgId, 'invitations', id] as const,
     byToken: (token: string) => ['invitations', token] as const,
     check: ['invitations', 'check'] as const,
+  },
+  auditLogs: {
+    all: (orgId: string, params?: Record<string, unknown>) =>
+      ['organizations', orgId, 'audit_logs', params] as const,
   },
 };
 
@@ -909,5 +914,40 @@ export function useCheckPendingInvitations() {
       const response = await api.get<{ data: InvitationPublic[] }>('/invitations/check');
       return response.data;
     },
+  });
+}
+
+// ============================================================================
+// Audit Log Hooks
+// ============================================================================
+
+export interface AuditLogFilters {
+  page?: number;
+  per_page?: number;
+  actor_id?: string;
+  log_action?: string;
+  resource_type?: string;
+  from_date?: string;
+  to_date?: string;
+}
+
+export function useOrganizationAuditLogs(orgId: string, filters: AuditLogFilters = {}) {
+  return useQuery({
+    queryKey: queryKeys.auditLogs.all(orgId, filters as Record<string, unknown>),
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (filters.page) params.set('page', String(filters.page));
+      if (filters.per_page) params.set('per_page', String(filters.per_page));
+      if (filters.actor_id) params.set('actor_id', filters.actor_id);
+      if (filters.log_action) params.set('log_action', filters.log_action);
+      if (filters.resource_type) params.set('resource_type', filters.resource_type);
+      if (filters.from_date) params.set('from_date', filters.from_date);
+      if (filters.to_date) params.set('to_date', filters.to_date);
+      const query = params.toString();
+      return api.get<PaginatedResponse<OrganizationAuditLog>>(
+        `/organizations/${orgId}/audit_logs${query ? `?${query}` : ''}`
+      );
+    },
+    enabled: !!orgId,
   });
 }

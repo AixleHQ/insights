@@ -40,7 +40,20 @@ module Api
       def update
         authorize! @organization
 
+        tracked_changes = organization_params.to_h.each_with_object({}) do |(key, value), changes|
+          old = @organization.public_send(key)
+          changes[key] = { before: old, after: value } if old != value
+        end
+
         if @organization.update(organization_params)
+          OrganizationAuditLog.log(
+            organization: @organization,
+            actor: current_user,
+            action: "settings.update",
+            resource: @organization,
+            tracked_changes: tracked_changes,
+            request: request
+          )
           render_resource(@organization, OrganizationSerializer)
         else
           render json: {
@@ -68,7 +81,17 @@ module Api
         authorize! @organization, to: :retention_policy?
 
         policy = @organization.retention_policy || @organization.build_retention_policy
+        changes_before = policy.attributes.slice(*retention_policy_params.keys)
+
         if policy.update(retention_policy_params)
+          OrganizationAuditLog.log(
+            organization: @organization,
+            actor: current_user,
+            action: "settings.update",
+            resource: policy,
+            tracked_changes: { before: changes_before, after: policy.attributes.slice(*retention_policy_params.keys) },
+            request: request
+          )
           render_resource(policy, OrganizationRetentionPolicySerializer)
         else
           render json: {
@@ -126,6 +149,7 @@ module Api
           organization: @organization,
           actor: current_user,
           action: "settings.delete",
+          resource: setting,
           tracked_changes: { key: params[:key], before: setting.value },
           request: request
         )
