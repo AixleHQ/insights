@@ -8,6 +8,7 @@ class Organization < ApplicationRecord
   has_many :projects, dependent: :destroy
   has_many :tool_events, class_name: "ToolEvent", dependent: :restrict_with_error
   has_many :audit_logs, dependent: :restrict_with_error
+  has_many :organization_audit_logs, dependent: :destroy
 
   validates :name, presence: true
   validates :slug, presence: true, uniqueness: true, format: { with: /\A[a-z0-9]+(?:-[a-z0-9]+)*\z/, message: "must be lowercase alphanumeric with hyphens" }

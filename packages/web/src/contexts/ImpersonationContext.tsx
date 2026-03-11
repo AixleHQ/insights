@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { api } from '@/lib/api';
 
 interface ImpersonationState {
   isImpersonating: boolean;
@@ -8,7 +9,7 @@ interface ImpersonationState {
 
 interface ImpersonationContextValue extends ImpersonationState {
   startImpersonation: (token: string) => void;
-  stopImpersonation: () => void;
+  stopImpersonation: () => Promise<void>;
 }
 
 const STORAGE_KEY = 'impersonation_token';
@@ -74,7 +75,12 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
     decodeAndSetToken(token);
   }, []);
 
-  const stopImpersonation = useCallback(() => {
+  const stopImpersonation = useCallback(async () => {
+    try {
+      await api.post('/users/me/stop_impersonation');
+    } catch (error) {
+      console.error('Failed to log impersonation end:', error);
+    }
     localStorage.removeItem(STORAGE_KEY);
     setState({
       isImpersonating: false,

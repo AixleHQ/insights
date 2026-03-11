@@ -3700,6 +3700,24 @@ CREATE TABLE public.invitations (
 
 
 --
+-- Name: organization_audit_logs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_audit_logs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    actor_id uuid,
+    action character varying NOT NULL,
+    resource_type character varying,
+    resource_id uuid,
+    tracked_changes jsonb DEFAULT '{}'::jsonb NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    ip_address character varying,
+    created_at timestamp(6) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
 -- Name: organization_connectors; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -6634,6 +6652,14 @@ ALTER TABLE ONLY public.invitations
 
 
 --
+-- Name: organization_audit_logs organization_audit_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_audit_logs
+    ADD CONSTRAINT organization_audit_logs_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: organization_connectors organization_connectors_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -8959,6 +8985,48 @@ CREATE UNIQUE INDEX index_invitations_on_token ON public.invitations USING btree
 
 
 --
+-- Name: index_organization_audit_logs_on_action; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_organization_audit_logs_on_action ON public.organization_audit_logs USING btree (action);
+
+
+--
+-- Name: index_organization_audit_logs_on_actor_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_organization_audit_logs_on_actor_id ON public.organization_audit_logs USING btree (actor_id);
+
+
+--
+-- Name: index_organization_audit_logs_on_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_organization_audit_logs_on_created_at ON public.organization_audit_logs USING btree (created_at);
+
+
+--
+-- Name: index_organization_audit_logs_on_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_organization_audit_logs_on_organization_id ON public.organization_audit_logs USING btree (organization_id);
+
+
+--
+-- Name: index_organization_audit_logs_on_resource_type; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_organization_audit_logs_on_resource_type ON public.organization_audit_logs USING btree (resource_type);
+
+
+--
+-- Name: index_organization_audit_logs_on_resource_type_and_resource_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_organization_audit_logs_on_resource_type_and_resource_id ON public.organization_audit_logs USING btree (resource_type, resource_id);
+
+
+--
 -- Name: index_organization_connectors_on_organization_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -10718,6 +10786,14 @@ ALTER TABLE ONLY public.organization_memberships
 
 
 --
+-- Name: organization_audit_logs fk_rails_6b6833732b; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_audit_logs
+    ADD CONSTRAINT fk_rails_6b6833732b FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+
+
+--
 -- Name: audit_logs fk_rails_7145b2958f; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -10755,6 +10831,14 @@ ALTER TABLE ONLY public.project_memberships
 
 ALTER TABLE ONLY public.user_tool_accounts
     ADD CONSTRAINT fk_rails_8ccfbe393d FOREIGN KEY (organization_membership_id) REFERENCES public.organization_memberships(id);
+
+
+--
+-- Name: organization_audit_logs fk_rails_8d2e99ef05; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_audit_logs
+    ADD CONSTRAINT fk_rails_8d2e99ef05 FOREIGN KEY (actor_id) REFERENCES public.users(id);
 
 
 --
@@ -10860,6 +10944,7 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260309000002'),
 ('20260309000001'),
 ('20260305123754'),
 ('20260225233834'),

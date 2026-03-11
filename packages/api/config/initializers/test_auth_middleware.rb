@@ -20,7 +20,27 @@ if Rails.env.test?
 
       auth_header = env["HTTP_AUTHORIZATION"]
 
-      if auth_header&.start_with?("Bearer test-token-for-")
+      if auth_header&.start_with?("Bearer test-impersonation-")
+        # Format: test-impersonation-<user_id>-by-<impersonator_id>
+        match = auth_header.match(/Bearer test-impersonation-(.+)-by-([a-f0-9-]+)\z/)
+        if match
+          user = User.find_by(id: match[1])
+          impersonator = User.find_by(id: match[2])
+
+          if user && impersonator
+            env["jwt.claims"] = {
+              "sub" => user.keycloak_sub,
+              "email" => user.email,
+              "name" => user.name,
+              "iat" => Time.current.to_i,
+              "exp" => 1.hour.from_now.to_i
+            }
+            env["jwt.impersonation"] = true
+            env["jwt.impersonator_id"] = impersonator.id
+            env["jwt.impersonator_email"] = impersonator.email
+          end
+        end
+      elsif auth_header&.start_with?("Bearer test-token-for-")
         user_id = auth_header.sub("Bearer test-token-for-", "")
         user = User.find_by(id: user_id)
 

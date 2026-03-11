@@ -92,6 +92,28 @@ module Api
         render_no_content
       end
 
+      # POST /api/v1/users/me/stop_impersonation
+      def stop_impersonation
+        unless request.env["jwt.impersonation"]
+          return render json: { error: "Not in impersonation mode" }, status: :bad_request
+        end
+
+        impersonator = User.find_by(id: request.env["jwt.impersonator_id"])
+
+        current_user.organizations.each do |organization|
+          OrganizationAuditLog.log(
+            organization: organization,
+            actor: impersonator,
+            action: "impersonation.ended",
+            resource: current_user,
+            metadata: { impersonator_email: request.env["jwt.impersonator_email"] },
+            request: request
+          )
+        end
+
+        render json: { data: { success: true } }
+      end
+
       private
 
       def user_params

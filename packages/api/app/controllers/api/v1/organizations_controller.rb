@@ -92,9 +92,20 @@ module Api
         authorize! @organization, to: :settings?
 
         setting = @organization.organization_settings.find_or_initialize_by(key: params[:key])
+        action = setting.new_record? ? "settings.create" : "settings.update"
+        old_value = setting.value
+
         setting.value = params[:value]
 
         if setting.save
+          OrganizationAuditLog.log(
+            organization: @organization,
+            actor: current_user,
+            action: action,
+            resource: setting,
+            tracked_changes: { key: params[:key], before: old_value, after: setting.value },
+            request: request
+          )
           render_resource(setting, OrganizationSettingSerializer)
         else
           render json: {
@@ -110,6 +121,15 @@ module Api
 
         setting = @organization.organization_settings.find_by!(key: params[:key])
         setting.destroy!
+
+        OrganizationAuditLog.log(
+          organization: @organization,
+          actor: current_user,
+          action: "settings.delete",
+          tracked_changes: { key: params[:key], before: setting.value },
+          request: request
+        )
+
         render_no_content
       end
 

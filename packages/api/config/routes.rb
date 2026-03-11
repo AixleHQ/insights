@@ -25,6 +25,7 @@ Rails.application.routes.draw do
       get "users/me/settings", to: "users#settings"
       put "users/me/settings/:key", to: "users#update_setting"
       delete "users/me/settings/:key", to: "users#destroy_setting"
+      post "users/me/stop_impersonation", to: "users#stop_impersonation"
 
       # Organization routes
       resources :organizations do
@@ -50,6 +51,9 @@ Rails.application.routes.draw do
             post :resend
           end
         end
+
+        # Organization audit logs
+        resources :audit_logs, controller: "organization_audit_logs", only: [ :index ]
 
         # Organization connectors
         resources :connectors, controller: "organization_connectors" do
