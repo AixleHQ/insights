@@ -21,6 +21,7 @@ import {
   useUpdateRetentionPolicy,
   useOrganizationSettings,
   useUpdateOrganizationSetting,
+  useDeleteOrganizationSetting,
   useOverviewStats,
   useDailyStats,
   useOrganizationAuditLogs,
@@ -96,7 +97,10 @@ function SettingsNav() {
 function GeneralSettings() {
   const { currentOrg } = useOrg();
   const { data: org, isLoading } = useOrganization(currentOrg?.id || '');
+  const { data: settings, isLoading: isLoadingSettings } = useOrganizationSettings(currentOrg?.id || '');
   const updateOrg = useUpdateOrganization();
+  const updateSetting = useUpdateOrganizationSetting();
+  const deleteSetting = useDeleteOrganizationSetting();
 
   const [formData, setFormData] = useState({
     name: '',
@@ -104,6 +108,9 @@ function GeneralSettings() {
     description: '',
   });
   const [hasChanges, setHasChanges] = useState(false);
+  const [emailDomain, setEmailDomain] = useState('');
+
+  const savedEmailDomain = (settings as Record<string, string>)?.allowed_email_domain ?? '';
 
   // Update form when org data loads
   useEffect(() => {
@@ -124,6 +131,11 @@ function GeneralSettings() {
     }
   }, [org]);
 
+  useEffect(() => {
+    setEmailDomain(savedEmailDomain);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedEmailDomain]);
+
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     setHasChanges(true);
@@ -139,7 +151,25 @@ function GeneralSettings() {
     }
   };
 
-  if (isLoading) {
+  const handleSaveEmailDomain = async () => {
+    if (!currentOrg) return;
+    try {
+      const trimmed = emailDomain.trim().toLowerCase();
+      if (!trimmed && savedEmailDomain) {
+        await deleteSetting.mutateAsync({ orgId: currentOrg.id, key: 'allowed_email_domain' });
+      } else if (trimmed) {
+        await updateSetting.mutateAsync({
+          orgId: currentOrg.id,
+          key: 'allowed_email_domain',
+          value: trimmed,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to save email domain:', error);
+    }
+  };
+
+  if (isLoading || isLoadingSettings) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-8 w-48" />
@@ -200,6 +230,43 @@ function GeneralSettings() {
           Save Changes
         </Button>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Email Domain Auto-Join</CardTitle>
+          <CardDescription>
+            Users who register with this email domain will automatically join your organization
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="emailDomain">Allowed Email Domain</Label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">@</span>
+                <Input
+                  id="emailDomain"
+                  className="pl-7"
+                  value={emailDomain}
+                  onChange={(e) => setEmailDomain(e.target.value)}
+                  placeholder="example.com"
+                />
+              </div>
+              <Button
+                onClick={handleSaveEmailDomain}
+                disabled={updateSetting.isPending || deleteSetting.isPending || emailDomain.trim().toLowerCase() === savedEmailDomain}
+              >
+                {updateSetting.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
+                <Save className="mr-2 size-4" />
+                Save
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Leave empty to disable auto-join. Only one domain is supported per organization.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
