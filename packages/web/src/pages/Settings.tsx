@@ -888,7 +888,7 @@ function SecuritySettings() {
                 {logs.map((log) => (
                   <TableRow key={log.id}>
                     <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                      {new Date(log.created_at).toLocaleString()}
+                      {new Date(log.createdAt).toLocaleString()}
                     </TableCell>
                     <TableCell>
                       {log.actor ? (
@@ -913,12 +913,12 @@ function SecuritySettings() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm">
-                      {log.resource_type ? (
+                      {log.resourceType ? (
                         <span className="text-muted-foreground">
-                          {log.resource_type}
-                          {log.resource_id && (
+                          {log.resourceType}
+                          {log.resourceId && (
                             <span className="ml-1 font-mono text-xs opacity-60">
-                              #{log.resource_id.slice(0, 8)}
+                              #{log.resourceId.slice(0, 8)}
                             </span>
                           )}
                         </span>
@@ -927,7 +927,7 @@ function SecuritySettings() {
                       )}
                     </TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">
-                      {log.ip_address ?? '—'}
+                      {log.ipAddress ?? '—'}
                     </TableCell>
                   </TableRow>
                 ))}

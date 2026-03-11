@@ -211,12 +211,12 @@ export interface Alert {
 export interface OrganizationAuditLog {
   id: string;
   action: string;
-  resource_type: string | null;
-  resource_id: string | null;
-  tracked_changes: Record<string, unknown>;
+  resourceType: string | null;
+  resourceId: string | null;
+  trackedChanges: Record<string, unknown>;
   metadata: Record<string, unknown>;
-  ip_address: string | null;
-  created_at: string;
+  ipAddress: string | null;
+  createdAt: string;
   actor: { id: string; email: string; name: string | null } | null;
 }
 
