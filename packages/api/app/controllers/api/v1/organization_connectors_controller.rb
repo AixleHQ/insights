@@ -108,9 +108,25 @@ module Api
 
         if result[:success]
           @connector.mark_connected!
+          OrganizationAuditLog.log(
+            organization: current_organization,
+            actor: current_user,
+            action: "connector.test",
+            resource: @connector,
+            tracked_changes: { connector_type: @connector.connector_type, success: true },
+            request: request
+          )
           render json: { data: { success: true, message: "Connection successful" } }
         else
           @connector.mark_error!(result[:error])
+          OrganizationAuditLog.log(
+            organization: current_organization,
+            actor: current_user,
+            action: "connector.test",
+            resource: @connector,
+            tracked_changes: { connector_type: @connector.connector_type, success: false, error: result[:error] },
+            request: request
+          )
           render json: { data: { success: false, error: result[:error] } }, status: :ok
         end
       rescue StandardError => e
@@ -126,6 +142,14 @@ module Api
         # ConnectorSyncJob.perform_later(@connector.id)
 
         @connector.mark_synced!
+        OrganizationAuditLog.log(
+          organization: current_organization,
+          actor: current_user,
+          action: "connector.sync",
+          resource: @connector,
+          tracked_changes: { connector_type: @connector.connector_type },
+          request: request
+        )
         render_resource(@connector, OrganizationConnectorSerializer)
       end
 

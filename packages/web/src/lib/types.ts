@@ -207,6 +207,19 @@ export interface Alert {
   created_at: string;
 }
 
+// Organization audit log types
+export interface OrganizationAuditLog {
+  id: string;
+  action: string;
+  resource_type: string | null;
+  resource_id: string | null;
+  tracked_changes: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  ip_address: string | null;
+  created_at: string;
+  actor: { id: string; email: string; name: string | null } | null;
+}
+
 // Pagination types
 export interface PaginatedResponse<T> {
   data: T[];
