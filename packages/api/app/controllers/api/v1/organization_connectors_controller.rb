@@ -92,6 +92,7 @@ module Api
           organization: current_organization,
           actor: current_user,
           action: "connector.delete",
+          resource: @connector,
           tracked_changes: { connector_type: connector_type },
           request: request
         )

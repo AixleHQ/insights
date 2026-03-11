@@ -104,6 +104,7 @@ module Api
           organization: current_organization,
           actor: current_user,
           action: "member.removed",
+          resource: @membership,
           tracked_changes: { user_id: user_id, role: role },
           request: request
         )

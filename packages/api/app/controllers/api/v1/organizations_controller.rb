@@ -149,6 +149,7 @@ module Api
           organization: @organization,
           actor: current_user,
           action: "settings.delete",
+          resource: setting,
           tracked_changes: { key: params[:key], before: setting.value },
           request: request
         )
