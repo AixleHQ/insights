@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { OrgProvider } from './contexts/OrgContext';
 import { NotificationsProvider } from './contexts/NotificationsContext';
@@ -37,6 +37,11 @@ import {
   AdminUsers,
   AdminOrganizations,
 } from './pages/admin';
+
+function TeamIdRedirect() {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={`/settings/members/${id}`} replace />;
+}
 
 function App() {
   return (
@@ -94,12 +99,16 @@ function App() {
                   <Route path="/projects/:id/edit" element={<EditProject />} />
                   <Route path="/integrations" element={<Integrations />} />
                   <Route path="/integrations/new/:provider" element={<IntegrationSetup />} />
-                  <Route path="/team" element={<Team />} />
-                  <Route path="/team/invite" element={<TeamInvite />} />
-                  <Route path="/team/invitations" element={<InvitationsManagement />} />
-                  <Route path="/team/:id" element={<MemberProfile />} />
+                  {/* /team/* redirects to /settings/members/* for backwards compatibility */}
+                  <Route path="/team" element={<Navigate to="/settings/members" replace />} />
+                  <Route path="/team/invite" element={<Navigate to="/settings/members/invite" replace />} />
+                  <Route path="/team/invitations" element={<Navigate to="/settings/members/invitations" replace />} />
+                  <Route path="/team/:id" element={<TeamIdRedirect />} />
                   <Route path="/settings/*" element={<Settings />} />
                   <Route path="/settings/tool-accounts" element={<ToolAccounts />} />
+                  <Route path="/settings/members/invite" element={<TeamInvite />} />
+                  <Route path="/settings/members/invitations" element={<InvitationsManagement />} />
+                  <Route path="/settings/members/:id" element={<MemberProfile />} />
                   <Route path="/events/unattributed" element={<UnattributedEvents />} />
                   <Route path="/notifications" element={<Notifications />} />
 

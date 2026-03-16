@@ -192,7 +192,7 @@ export function Team() {
           </p>
         </div>
         <Button asChild>
-          <Link to="/team/invite">
+          <Link to="/settings/members/invite">
             <UserPlus className="mr-2 size-4" />
             Invite
           </Link>
