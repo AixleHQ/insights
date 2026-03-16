@@ -231,14 +231,17 @@ export interface PaginatedResponse<T> {
   };
 }
 
-// Retention policy types
-export type RetentionPeriod = '7_days' | '30_days' | '90_days' | '1_year' | 'forever';
+// Retention policy types — values match backend model constants
+export type RawEventTtl = '6_hours' | '12_hours' | '24_hours' | '48_hours' | '72_hours';
+export type ToolEventsRetention = '30_days' | '60_days' | '90_days' | '180_days' | '365_days' | '730_days';
+export type HourlyAggregateRetention = '90_days' | '180_days' | '365_days' | '730_days';
+export type DailyAggregateRetention = '365_days' | '730_days' | '1095_days' | 'forever';
 
 export interface RetentionPolicy {
-  raw_content_retention: RetentionPeriod;
-  sanitized_content_retention: RetentionPeriod;
-  metadata_retention: RetentionPeriod;
-  audit_log_retention: RetentionPeriod;
+  rawEventTtl: RawEventTtl;
+  toolEventsRetention: ToolEventsRetention;
+  hourlyAggregateRetention: HourlyAggregateRetention;
+  dailyAggregateRetention: DailyAggregateRetention;
 }
 
 // Invitation types
