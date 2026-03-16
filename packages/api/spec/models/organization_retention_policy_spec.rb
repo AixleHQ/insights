@@ -41,6 +41,37 @@ RSpec.describe OrganizationRetentionPolicy, type: :model do
     it { should validate_inclusion_of(:tool_events_retention).in_array(OrganizationRetentionPolicy::TOOL_EVENTS_RETENTIONS) }
     it { should validate_inclusion_of(:hourly_aggregate_retention).in_array(OrganizationRetentionPolicy::HOURLY_AGGREGATE_RETENTIONS) }
     it { should validate_inclusion_of(:daily_aggregate_retention).in_array(OrganizationRetentionPolicy::DAILY_AGGREGATE_RETENTIONS) }
+
+    describe 'invalid enum values are rejected' do
+      it 'rejects an invalid raw_event_ttl' do
+        policy = build(:organization_retention_policy, raw_event_ttl: '1_year')
+        expect(policy).not_to be_valid
+        expect(policy.errors[:raw_event_ttl]).to be_present
+      end
+
+      it 'rejects an invalid tool_events_retention' do
+        policy = build(:organization_retention_policy, tool_events_retention: '7_days')
+        expect(policy).not_to be_valid
+        expect(policy.errors[:tool_events_retention]).to be_present
+      end
+
+      it 'rejects an invalid hourly_aggregate_retention' do
+        policy = build(:organization_retention_policy, hourly_aggregate_retention: '30_days')
+        expect(policy).not_to be_valid
+        expect(policy.errors[:hourly_aggregate_retention]).to be_present
+      end
+
+      it 'rejects an invalid daily_aggregate_retention' do
+        policy = build(:organization_retention_policy, daily_aggregate_retention: '90_days')
+        expect(policy).not_to be_valid
+        expect(policy.errors[:daily_aggregate_retention]).to be_present
+      end
+
+      it 'rejects blank values' do
+        policy = build(:organization_retention_policy, raw_event_ttl: '')
+        expect(policy).not_to be_valid
+      end
+    end
   end
 
   describe '#raw_event_ttl_duration' do
