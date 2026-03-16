@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   MoreHorizontal,
   RefreshCw,
@@ -6,6 +7,7 @@ import {
   Clock,
   Unplug,
   FlaskConical,
+  ChevronDown,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -98,6 +100,32 @@ const statusConfig = {
     bg: 'bg-muted',
   },
 };
+
+function ErrorPanel({ error }: { error: string }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="rounded-md border border-destructive/20 bg-destructive/5 text-xs">
+      <button
+        type="button"
+        className="flex w-full items-center gap-2 px-3 py-2 text-destructive"
+        onClick={() => setExpanded((prev) => !prev)}
+        aria-expanded={expanded}
+      >
+        <AlertCircle className="size-3 shrink-0" />
+        <span className="flex-1 truncate text-left font-medium">Last error</span>
+        <ChevronDown
+          className={cn('size-3 shrink-0 transition-transform duration-150', expanded && 'rotate-180')}
+        />
+      </button>
+      {expanded && (
+        <div className="border-t border-destructive/20 px-3 py-2">
+          <p className="break-all font-mono text-destructive/80">{error}</p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function IntegrationCard({
   integration,
@@ -249,10 +277,7 @@ export function IntegrationCard({
         )}
 
         {integration.sync_error && (
-          <Badge variant="outline" className="w-full justify-start gap-1 bg-destructive/10 font-normal">
-            <AlertCircle className="size-3 shrink-0 text-destructive" />
-            <span className="truncate text-destructive">{integration.sync_error}</span>
-          </Badge>
+          <ErrorPanel error={integration.sync_error} />
         )}
       </CardContent>
     </Card>
