@@ -28,7 +28,7 @@ class UserSyncService
       Rails.logger.info "[UserSyncService] User synced: id=#{user.id}, email=#{user.email}, keycloak_sub=#{user.keycloak_sub}"
       Rails.logger.info "[UserSyncService] User orgs: #{user.organization_memberships.count}, events: #{ToolEvent.where(user_id: user.id).count}"
 
-      auto_assign_organization(user, claims) if user.organization_memberships.empty?
+      auto_assign_organization(user, claims)
 
       user
     end
@@ -87,21 +87,30 @@ class UserSyncService
       return unless email.present?
 
       domain = email.split("@").last&.downcase
+      return unless domain.present?
+
+      # Hardcoded legacy domain mapping
       org_slug = DOMAIN_ORG_MAPPING[domain]
-      return unless org_slug
-
-      organization = Organization.find_by(slug: org_slug)
-      return unless organization
-
-      # Create membership with default role
-      OrganizationMembership.find_or_create_by!(
-        user: user,
-        organization: organization
-      ) do |membership|
-        membership.role = "member"
+      if org_slug
+        organization = Organization.find_by(slug: org_slug)
+        if organization
+          OrganizationMembership.find_or_create_by!(user: user, organization: organization) do |m|
+            m.role = "member"
+          end
+          Rails.logger.info "[UserSyncService] Auto-assigned #{user.email} to org #{org_slug} (legacy mapping)"
+        end
       end
 
-      Rails.logger.info "[UserSyncService] Auto-assigned user #{user.email} to org #{org_slug}"
+      # Dynamic domain matching via OrganizationSetting allowed_email_domain
+      OrganizationSetting
+        .where(key: "allowed_email_domain", value: domain)
+        .includes(:organization)
+        .each do |setting|
+          OrganizationMembership.find_or_create_by!(user: user, organization: setting.organization) do |m|
+            m.role = "member"
+          end
+          Rails.logger.info "[UserSyncService] Auto-assigned #{user.email} to org #{setting.organization.slug} (domain setting)"
+        end
     end
   end
 end

@@ -209,6 +209,18 @@ export function useUpdateOrganizationSetting() {
   });
 }
 
+export function useDeleteOrganizationSetting() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ orgId, key }: { orgId: string; key: string }) =>
+      api.delete(`/organizations/${orgId}/settings/${key}`),
+    onSuccess: (_, { orgId }) => {
+      queryClient.invalidateQueries({ queryKey: ['organizations', orgId, 'settings'] });
+    },
+  });
+}
+
 // ============================================================================
 // Organization Members Hooks
 // ============================================================================
