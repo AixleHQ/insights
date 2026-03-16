@@ -8,6 +8,8 @@ module Api
 
       # GET /api/v1/organizations/:organization_id/members
       def index
+        authorize! current_organization, to: :show?
+
         memberships = current_organization.organization_memberships
                                           .includes(:user)
                                           .order("users.name")
@@ -98,18 +100,23 @@ module Api
 
         user_id = @membership.user_id
         role = @membership.role
-        @membership.destroy!
 
-        OrganizationAuditLog.log(
-          organization: current_organization,
-          actor: current_user,
-          action: "member.removed",
-          resource: @membership,
-          tracked_changes: { user_id: user_id, role: role },
-          request: request
-        )
-
-        render_no_content
+        if @membership.destroy
+          OrganizationAuditLog.log(
+            organization: current_organization,
+            actor: current_user,
+            action: "member.removed",
+            resource: @membership,
+            tracked_changes: { user_id: user_id, role: role },
+            request: request
+          )
+          render_no_content
+        else
+          render json: {
+            error: "Unprocessable Entity",
+            errors: format_validation_errors(@membership.errors)
+          }, status: :unprocessable_entity
+        end
       end
 
       # GET /api/v1/organizations/:organization_id/members/:id/stats
