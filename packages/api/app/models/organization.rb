@@ -15,7 +15,10 @@ class Organization < ApplicationRecord
   validates :is_active, inclusion: { in: [ true, false ] }
 
   before_validation :generate_slug, on: :create
+  before_destroy :flag_as_being_destroyed, prepend: true
   after_create :create_default_retention_policy
+
+  attr_reader :being_destroyed
 
   scope :active, -> { where(is_active: true) }
 
@@ -28,6 +31,10 @@ class Organization < ApplicationRecord
   end
 
   private
+
+  def flag_as_being_destroyed
+    @being_destroyed = true
+  end
 
   def generate_slug
     return if slug.present?

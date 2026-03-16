@@ -149,6 +149,15 @@ RSpec.describe 'Api::V1::OrganizationMembers', type: :request do
       expect_success
       expect(json_data[:role]).to eq('admin')
     end
+
+    it 'returns 422 when attempting to downgrade the last owner' do
+      authenticated_patch "/api/v1/organizations/#{organization.id}/members/#{owner_membership.id}",
+                          user: owner,
+                          organization: organization,
+                          params: { role: 'admin' }
+
+      expect_unprocessable
+    end
   end
 
   describe 'DELETE /api/v1/organizations/:organization_id/members/:id' do
@@ -167,6 +176,15 @@ RSpec.describe 'Api::V1::OrganizationMembers', type: :request do
                            organization: organization
 
       expect_forbidden
+    end
+
+    it 'returns 422 when attempting to remove the last owner' do
+      authenticated_delete "/api/v1/organizations/#{organization.id}/members/#{owner_membership.id}",
+                           user: owner,
+                           organization: organization
+
+      expect_unprocessable
+      expect(OrganizationMembership.exists?(owner_membership.id)).to be true
     end
   end
 
