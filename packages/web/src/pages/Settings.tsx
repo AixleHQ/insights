@@ -52,6 +52,16 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Table,
   TableBody,
   TableCell,
@@ -275,12 +285,47 @@ function GeneralSettings() {
   );
 }
 
+// Returns a numeric value for ordering retention durations (higher = longer retention)
+function retentionOrder(value: string): number {
+  if (value === 'forever') return Infinity;
+  const parts = value.split('_');
+  const unit = parts[parts.length - 1];
+  const amount = parseInt(parts[0]);
+  if (unit === 'hours') return amount;
+  if (unit === 'days') return amount * 24;
+  return 0;
+}
+
+function formatRetentionLabel(value: string): string {
+  if (value === 'forever') return 'Forever';
+  const parts = value.split('_');
+  const unit = parts[parts.length - 1];
+  const amount = parseInt(parts[0]);
+  if (unit === 'hours') return `${amount} hours`;
+  if (unit === 'days') {
+    if (amount % 365 === 0) {
+      const years = amount / 365;
+      return `${years} year${years > 1 ? 's' : ''}`;
+    }
+    if (amount === 180) return '6 months';
+    return `${amount} days`;
+  }
+  return value;
+}
+
 function PolicySettings() {
   const { currentOrg } = useOrg();
   const { data: retentionPolicy, isLoading: isLoadingRetention } = useRetentionPolicy(currentOrg?.id || '');
   const { data: settings, isLoading: isLoadingSettings } = useOrganizationSettings(currentOrg?.id || '');
   const updateRetention = useUpdateRetentionPolicy();
   const updateSetting = useUpdateOrganizationSetting();
+
+  const [pendingChange, setPendingChange] = useState<{
+    field: string;
+    value: string;
+    currentLabel: string;
+    newLabel: string;
+  } | null>(null);
 
   // Parse settings from API or use defaults
   const policies = {
@@ -308,15 +353,25 @@ function PolicySettings() {
     }
   };
 
-  const handleRetentionChange = async (field: string, value: string) => {
+  const applyRetentionChange = async (field: string, value: string) => {
     if (!currentOrg) return;
     try {
-      await updateRetention.mutateAsync({
-        orgId: currentOrg.id,
-        data: { [field]: value },
-      });
+      await updateRetention.mutateAsync({ orgId: currentOrg.id, data: { [field]: value } });
     } catch (error) {
       console.error('Failed to update retention:', error);
+    }
+  };
+
+  const handleRetentionChange = (field: string, currentValue: string, newValue: string) => {
+    if (retentionOrder(newValue) < retentionOrder(currentValue)) {
+      setPendingChange({
+        field,
+        value: newValue,
+        currentLabel: formatRetentionLabel(currentValue),
+        newLabel: formatRetentionLabel(newValue),
+      });
+    } else {
+      applyRetentionChange(field, newValue);
     }
   };
 
@@ -407,70 +462,80 @@ function PolicySettings() {
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label>Raw Content</Label>
+              <Label>Raw Event TTL</Label>
               <Select
-                value={retentionPolicy?.raw_content_retention || '30_days'}
-                onValueChange={(value) => handleRetentionChange('raw_content_retention', value)}
+                value={retentionPolicy?.rawEventTtl || '24_hours'}
+                onValueChange={(value) =>
+                  handleRetentionChange('raw_event_ttl', retentionPolicy?.rawEventTtl || '24_hours', value)
+                }
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="7_days">7 days</SelectItem>
-                  <SelectItem value="30_days">30 days</SelectItem>
-                  <SelectItem value="90_days">90 days</SelectItem>
-                  <SelectItem value="1_year">1 year</SelectItem>
-                  <SelectItem value="forever">Forever</SelectItem>
+                  <SelectItem value="6_hours">6 hours</SelectItem>
+                  <SelectItem value="12_hours">12 hours</SelectItem>
+                  <SelectItem value="24_hours">24 hours</SelectItem>
+                  <SelectItem value="48_hours">48 hours</SelectItem>
+                  <SelectItem value="72_hours">72 hours</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Sanitized Content</Label>
+              <Label>Tool Events</Label>
               <Select
-                value={retentionPolicy?.sanitized_content_retention || '90_days'}
-                onValueChange={(value) => handleRetentionChange('sanitized_content_retention', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="7_days">7 days</SelectItem>
-                  <SelectItem value="30_days">30 days</SelectItem>
-                  <SelectItem value="90_days">90 days</SelectItem>
-                  <SelectItem value="1_year">1 year</SelectItem>
-                  <SelectItem value="forever">Forever</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Metadata</Label>
-              <Select
-                value={retentionPolicy?.metadata_retention || '1_year'}
-                onValueChange={(value) => handleRetentionChange('metadata_retention', value)}
+                value={retentionPolicy?.toolEventsRetention || '90_days'}
+                onValueChange={(value) =>
+                  handleRetentionChange('tool_events_retention', retentionPolicy?.toolEventsRetention || '90_days', value)
+                }
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="30_days">30 days</SelectItem>
+                  <SelectItem value="60_days">60 days</SelectItem>
                   <SelectItem value="90_days">90 days</SelectItem>
-                  <SelectItem value="1_year">1 year</SelectItem>
-                  <SelectItem value="forever">Forever</SelectItem>
+                  <SelectItem value="180_days">6 months</SelectItem>
+                  <SelectItem value="365_days">1 year</SelectItem>
+                  <SelectItem value="730_days">2 years</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Audit Logs</Label>
+              <Label>Hourly Aggregates</Label>
               <Select
-                value={retentionPolicy?.audit_log_retention || '1_year'}
-                onValueChange={(value) => handleRetentionChange('audit_log_retention', value)}
+                value={retentionPolicy?.hourlyAggregateRetention || '365_days'}
+                onValueChange={(value) =>
+                  handleRetentionChange('hourly_aggregate_retention', retentionPolicy?.hourlyAggregateRetention || '365_days', value)
+                }
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="90_days">90 days</SelectItem>
-                  <SelectItem value="1_year">1 year</SelectItem>
+                  <SelectItem value="180_days">6 months</SelectItem>
+                  <SelectItem value="365_days">1 year</SelectItem>
+                  <SelectItem value="730_days">2 years</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Daily Aggregates</Label>
+              <Select
+                value={retentionPolicy?.dailyAggregateRetention || 'forever'}
+                onValueChange={(value) =>
+                  handleRetentionChange('daily_aggregate_retention', retentionPolicy?.dailyAggregateRetention || 'forever', value)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="365_days">1 year</SelectItem>
+                  <SelectItem value="730_days">2 years</SelectItem>
+                  <SelectItem value="1095_days">3 years</SelectItem>
                   <SelectItem value="forever">Forever</SelectItem>
                 </SelectContent>
               </Select>
@@ -478,6 +543,34 @@ function PolicySettings() {
           </div>
         </CardContent>
       </Card>
+
+      <AlertDialog open={!!pendingChange} onOpenChange={(open) => !open && setPendingChange(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reduce retention period?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You are reducing the retention from{' '}
+              <strong>{pendingChange?.currentLabel}</strong> to{' '}
+              <strong>{pendingChange?.newLabel}</strong>. Data older than the
+              new limit may be permanently deleted. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (pendingChange) {
+                  applyRetentionChange(pendingChange.field, pendingChange.value);
+                  setPendingChange(null);
+                }
+              }}
+            >
+              Reduce retention
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Card>
         <CardHeader>

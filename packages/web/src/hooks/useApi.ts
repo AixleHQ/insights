@@ -171,7 +171,10 @@ export function useLeaveOrganization() {
 export function useRetentionPolicy(orgId: string) {
   return useQuery({
     queryKey: ['organizations', orgId, 'retention_policy'],
-    queryFn: () => api.get<RetentionPolicy>(`/organizations/${orgId}/retention_policy`),
+    queryFn: async () => {
+      const response = await api.get<{ data: RetentionPolicy }>(`/organizations/${orgId}/retention_policy`);
+      return response.data;
+    },
     enabled: !!orgId,
   });
 }
@@ -180,8 +183,8 @@ export function useUpdateRetentionPolicy() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ orgId, data }: { orgId: string; data: Partial<RetentionPolicy> }) =>
-      api.patch<RetentionPolicy>(`/organizations/${orgId}/retention_policy`, data),
+    mutationFn: ({ orgId, data }: { orgId: string; data: Record<string, string> }) =>
+      api.patch<{ data: RetentionPolicy }>(`/organizations/${orgId}/retention_policy`, data),
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: ['organizations', orgId, 'retention_policy'] });
     },
