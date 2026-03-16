@@ -5,7 +5,6 @@ import {
   Activity,
   FolderKanban,
   Plug,
-  Users,
   Settings,
   ChevronDown,
   LogOut,
@@ -60,7 +59,6 @@ const navItems = [
   { title: 'Events', icon: Activity, href: '/events' },
   { title: 'Projects', icon: FolderKanban, href: '/projects' },
   { title: 'Integrations', icon: Plug, href: '/integrations' },
-  { title: 'Team', icon: Users, href: '/team' },
   { title: 'Settings', icon: Settings, href: '/settings' },
 ];
 

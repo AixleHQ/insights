@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
+import { Team } from './Team';
 import {
   Building2,
   Shield,
@@ -12,6 +13,7 @@ import {
   Search,
   X,
   FileSearch,
+  Users,
 } from 'lucide-react';
 import { useOrg } from '@/contexts/OrgContext';
 import {
@@ -61,6 +63,7 @@ import { cn } from '@/lib/utils';
 
 const navItems = [
   { title: 'General', href: '/settings', icon: Building2 },
+  { title: 'Members', href: '/settings/members', icon: Users },
   { title: 'Policies', href: '/settings/policies', icon: Shield },
   { title: 'Alerts', href: '/settings/alerts', icon: Bell },
   { title: 'Billing', href: '/settings/billing', icon: CreditCard },
@@ -118,7 +121,6 @@ function GeneralSettings() {
   // Update form when org data loads
   useEffect(() => {
     if (org) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormData((prev) => {
         const newData = {
           name: org.name || '',
@@ -136,7 +138,6 @@ function GeneralSettings() {
 
   useEffect(() => {
     setEmailDomain(savedEmailDomain);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedEmailDomain]);
 
   const handleChange = (field: string, value: string) => {
@@ -1055,6 +1056,7 @@ export function Settings() {
         <div className="flex-1">
           <Routes>
             <Route index element={<GeneralSettings />} />
+            <Route path="members" element={<Team />} />
             <Route path="policies" element={<PolicySettings />} />
             <Route path="alerts" element={<AlertSettings />} />
             <Route path="billing" element={<BillingSettings />} />
