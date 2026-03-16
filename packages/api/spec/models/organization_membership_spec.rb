@@ -25,6 +25,48 @@ RSpec.describe OrganizationMembership, type: :model do
       expect(duplicate).not_to be_valid
       expect(duplicate.errors[:user_id]).to include('is already a member of this organization')
     end
+
+    describe 'last owner protection on role downgrade' do
+      let(:organization) { create(:organization) }
+
+      it 'prevents downgrading the last owner' do
+        owner_membership = create(:organization_membership, organization: organization, role: 'owner')
+        owner_membership.role = 'admin'
+        expect(owner_membership).not_to be_valid
+        expect(owner_membership.errors[:role]).to include('Cannot downgrade the last owner of an organization')
+      end
+
+      it 'allows downgrading an owner when another owner exists' do
+        owner_membership = create(:organization_membership, organization: organization, role: 'owner')
+        create(:organization_membership, organization: organization, role: 'owner')
+        owner_membership.role = 'admin'
+        expect(owner_membership).to be_valid
+      end
+    end
+  end
+
+  describe 'last owner protection on destroy' do
+    let(:organization) { create(:organization) }
+
+    it 'prevents destroying the last owner membership' do
+      owner_membership = create(:organization_membership, organization: organization, role: 'owner')
+      expect(owner_membership.destroy).to be_falsey
+      expect(owner_membership.errors[:base]).to include('Cannot remove the last owner of an organization')
+      expect(OrganizationMembership.exists?(owner_membership.id)).to be true
+    end
+
+    it 'allows destroying an owner membership when another owner exists' do
+      owner_membership = create(:organization_membership, organization: organization, role: 'owner')
+      create(:organization_membership, organization: organization, role: 'owner')
+      expect(owner_membership.destroy).to be_truthy
+      expect(OrganizationMembership.exists?(owner_membership.id)).to be false
+    end
+
+    it 'allows destroying a non-owner membership regardless' do
+      create(:organization_membership, organization: organization, role: 'owner')
+      member_membership = create(:organization_membership, organization: organization, role: 'member')
+      expect(member_membership.destroy).to be_truthy
+    end
   end
 
   describe 'scopes' do
