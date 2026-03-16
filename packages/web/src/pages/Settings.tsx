@@ -121,7 +121,6 @@ function GeneralSettings() {
   // Update form when org data loads
   useEffect(() => {
     if (org) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormData((prev) => {
         const newData = {
           name: org.name || '',
@@ -139,7 +138,6 @@ function GeneralSettings() {
 
   useEffect(() => {
     setEmailDomain(savedEmailDomain);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedEmailDomain]);
 
   const handleChange = (field: string, value: string) => {

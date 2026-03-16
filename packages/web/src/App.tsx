@@ -20,7 +20,6 @@ import { ProjectDetail } from './pages/ProjectDetail';
 import { Integrations } from './pages/Integrations';
 import { IntegrationSetup } from './pages/IntegrationSetup';
 import { IntegrationOAuthCallback } from './pages/IntegrationOAuthCallback';
-import { Team } from './pages/Team';
 import { TeamInvite } from './pages/TeamInvite';
 import { MemberProfile } from './pages/MemberProfile';
 import { MyProfile } from './pages/MyProfile';
