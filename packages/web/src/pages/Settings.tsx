@@ -110,7 +110,10 @@ function GeneralSettings() {
   const [hasChanges, setHasChanges] = useState(false);
   const [emailDomain, setEmailDomain] = useState('');
 
-  const savedEmailDomain = (settings as Record<string, string>)?.allowed_email_domain ?? '';
+  const savedEmailDomain =
+    (settings as { data: Array<{ key: string; value: string }> })?.data?.find(
+      (s) => s.key === 'allowed_email_domain'
+    )?.value ?? '';
 
   // Update form when org data loads
   useEffect(() => {
