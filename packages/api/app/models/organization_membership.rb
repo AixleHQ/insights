@@ -35,6 +35,8 @@ class OrganizationMembership < ApplicationRecord
   private
 
   def ensure_not_last_owner
+    return if organization.being_destroyed
+
     if owner? && organization.organization_memberships.owners.count == 1
       errors.add(:base, "Cannot remove the last owner of an organization")
       throw :abort
