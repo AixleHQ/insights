@@ -9,6 +9,7 @@ import type { ProjectConnector } from '@/lib/types';
 
 const mockProjectConnectors = vi.fn();
 const mockConnectWithApiKey = vi.fn();
+const mockConnectWithSlack = vi.fn();
 const mockDeleteConnector = vi.fn();
 const mockTestConnector = vi.fn();
 
@@ -22,6 +23,7 @@ vi.mock('@/contexts/OrgContext', () => ({
 vi.mock('@/hooks/useApi', () => ({
   useProjectConnectors: () => mockProjectConnectors(),
   useProjectConnectWithApiKey: () => ({ mutateAsync: mockConnectWithApiKey }),
+  useProjectConnectWithSlack: () => ({ mutateAsync: mockConnectWithSlack }),
   useProjectDeleteConnector: () => ({ mutateAsync: mockDeleteConnector }),
   useProjectTestConnector: () => ({ mutateAsync: mockTestConnector }),
   useConnectWithApiKey: () => ({ mutateAsync: vi.fn() }),
@@ -55,6 +57,7 @@ describe('ProjectConnectorsTab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockConnectWithApiKey.mockResolvedValue({});
+    mockConnectWithSlack.mockResolvedValue({});
     mockDeleteConnector.mockResolvedValue({});
     mockTestConnector.mockResolvedValue({ data: { success: true } });
   });
@@ -188,7 +191,7 @@ describe('ProjectConnectorsTab', () => {
       });
     });
 
-    it('shows Webhook URL label when connecting Slack', async () => {
+    it('opens SlackConnectSheet with Webhook URL and Channel label when connecting Slack', async () => {
       mockProjectConnectors.mockReturnValue({ data: [], isLoading: false });
       const user = userEvent.setup();
       renderComponent();
@@ -197,7 +200,73 @@ describe('ProjectConnectorsTab', () => {
       const slackCard = screen.getByTestId('provider-card-slack');
       await user.click(within(slackCard).getByRole('button', { name: /^connect$/i }));
 
-      expect(screen.getByLabelText('Webhook URL')).toBeInTheDocument();
+      expect(screen.getByLabelText(/webhook url/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/channel label/i)).toBeInTheDocument();
+    });
+
+    it('calls useProjectConnectWithSlack with projectId, webhookUrl, and channelLabel on submit', async () => {
+      mockProjectConnectors.mockReturnValue({ data: [], isLoading: false });
+      const user = userEvent.setup();
+      renderComponent();
+
+      await user.click(screen.getByRole('tab', { name: /available/i }));
+      const slackCard = screen.getByTestId('provider-card-slack');
+      await user.click(within(slackCard).getByRole('button', { name: /^connect$/i }));
+
+      await user.type(screen.getByLabelText(/webhook url/i), 'https://hooks.slack.com/services/T00/B00/xxx');
+      await user.type(screen.getByLabelText(/channel label/i), '#alerts');
+      await user.click(screen.getByRole('button', { name: /^connect$/i }));
+
+      await waitFor(() => {
+        expect(mockConnectWithSlack).toHaveBeenCalledWith({
+          projectId: PROJECT_ID,
+          webhookUrl: 'https://hooks.slack.com/services/T00/B00/xxx',
+          channelLabel: '#alerts',
+        });
+      });
+    });
+
+    it('calls useProjectConnectWithSlack without channelLabel when channel is empty', async () => {
+      mockProjectConnectors.mockReturnValue({ data: [], isLoading: false });
+      const user = userEvent.setup();
+      renderComponent();
+
+      await user.click(screen.getByRole('tab', { name: /available/i }));
+      const slackCard = screen.getByTestId('provider-card-slack');
+      await user.click(within(slackCard).getByRole('button', { name: /^connect$/i }));
+
+      await user.type(screen.getByLabelText(/webhook url/i), 'https://hooks.slack.com/services/T00/B00/xxx');
+      await user.click(screen.getByRole('button', { name: /^connect$/i }));
+
+      await waitFor(() => {
+        expect(mockConnectWithSlack).toHaveBeenCalledWith({
+          projectId: PROJECT_ID,
+          webhookUrl: 'https://hooks.slack.com/services/T00/B00/xxx',
+          channelLabel: undefined,
+        });
+      });
+    });
+
+    it('shows inline error when Slack webhook URL is invalid', async () => {
+      mockConnectWithSlack.mockRejectedValue(
+        new ApiError('Validation error', 422, {
+          errors: { access_token: ['Invalid Slack webhook URL format'] },
+        })
+      );
+      mockProjectConnectors.mockReturnValue({ data: [], isLoading: false });
+      const user = userEvent.setup();
+      renderComponent();
+
+      await user.click(screen.getByRole('tab', { name: /available/i }));
+      const slackCard = screen.getByTestId('provider-card-slack');
+      await user.click(within(slackCard).getByRole('button', { name: /^connect$/i }));
+
+      await user.type(screen.getByLabelText(/webhook url/i), 'not-a-valid-url');
+      await user.click(screen.getByRole('button', { name: /^connect$/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Invalid Slack webhook URL format')).toBeInTheDocument();
+      });
     });
 
     it('shows inline error when API key is invalid', async () => {

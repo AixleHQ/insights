@@ -9,6 +9,7 @@ import {
   type ProviderInfo,
 } from '@/components/integrations';
 import { ApiKeyConnectSheet } from '@/components/integrations/ApiKeyConnectSheet';
+import { SlackConnectSheet } from '@/components/integrations/SlackConnectSheet';
 
 const PROVIDERS: ProviderInfo[] = [
   {
@@ -107,6 +108,7 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
   const testConnector = useProjectTestConnector();
 
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [slackSheetOpen, setSlackSheetOpen] = useState(false);
   const [connectingProvider, setConnectingProvider] = useState<ProviderInfo | null>(null);
   const [testingConnectorId, setTestingConnectorId] = useState<string | null>(null);
 
@@ -138,6 +140,10 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
   const availableProviders = PROVIDERS.filter((p) => !connectedProviderIds.has(p.id));
 
   const handleConnect = (providerId: string) => {
+    if (providerId === 'slack') {
+      setSlackSheetOpen(true);
+      return;
+    }
     const provider = PROVIDERS.find((p) => p.id === providerId) ?? null;
     setConnectingProvider(provider);
     setSheetOpen(true);
@@ -239,6 +245,13 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
         onOpenChange={setSheetOpen}
         onSuccess={() => {}}
         onConnect={handleConnectWithApiKey}
+      />
+
+      <SlackConnectSheet
+        projectId={projectId}
+        open={slackSheetOpen}
+        onOpenChange={setSlackSheetOpen}
+        onSuccess={() => {}}
       />
     </>
   );

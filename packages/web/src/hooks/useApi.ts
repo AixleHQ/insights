@@ -697,6 +697,30 @@ export function useProjectConnectWithApiKey() {
   });
 }
 
+export function useProjectConnectWithSlack() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      projectId,
+      webhookUrl,
+      channelLabel,
+    }: {
+      projectId: string;
+      webhookUrl: string;
+      channelLabel?: string;
+    }) =>
+      api.post<ProjectConnector>(`/projects/${projectId}/connectors`, {
+        connector_type: 'slack',
+        access_token: webhookUrl,
+        ...(channelLabel ? { external_org_name: channelLabel } : {}),
+      }),
+    onSuccess: (_, { projectId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.projectConnectors.all(projectId) });
+    },
+  });
+}
+
 export function useProjectDeleteConnector() {
   const queryClient = useQueryClient();
 
