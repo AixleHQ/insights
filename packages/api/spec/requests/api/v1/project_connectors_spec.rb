@@ -100,6 +100,12 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
   end
 
   describe 'POST /api/v1/projects/:project_id/connectors' do
+    # Use a fresh project with no existing connectors to avoid uniqueness conflicts
+    let(:fresh_project) { create(:project, organization: organization) }
+    before do
+      create(:project_membership, user: org_admin, project: fresh_project, role: 'admin')
+    end
+
     context 'with AI provider connectors' do
       %w[anthropic openai openrouter gemini].each do |provider|
         describe "#{provider} connector" do
@@ -110,7 +116,7 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
             allow_any_instance_of(provider_class)
               .to receive(:test_connection).and_return({ success: true })
 
-            authenticated_post "/api/v1/projects/#{project.id}/connectors",
+            authenticated_post "/api/v1/projects/#{fresh_project.id}/connectors",
                                user: org_admin,
                                organization: organization,
                                params: { connector_type: provider, access_token: api_key }
@@ -123,7 +129,7 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
             allow_any_instance_of(provider_class)
               .to receive(:test_connection).and_return({ success: false, error: 'Invalid API key' })
 
-            authenticated_post "/api/v1/projects/#{project.id}/connectors",
+            authenticated_post "/api/v1/projects/#{fresh_project.id}/connectors",
                                user: org_admin,
                                organization: organization,
                                params: { connector_type: provider, access_token: 'bad-key' }
@@ -137,7 +143,7 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
               .to receive(:test_connection).and_return({ success: false, error: 'Invalid API key' })
 
             expect {
-              authenticated_post "/api/v1/projects/#{project.id}/connectors",
+              authenticated_post "/api/v1/projects/#{fresh_project.id}/connectors",
                                  user: org_admin,
                                  organization: organization,
                                  params: { connector_type: provider, access_token: 'bad-key' }
@@ -148,7 +154,7 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
     end
 
     it 'returns 403 for regular project members' do
-      authenticated_post "/api/v1/projects/#{project.id}/connectors",
+      authenticated_post "/api/v1/projects/#{fresh_project.id}/connectors",
                          user: project_member,
                          organization: organization,
                          params: { connector_type: 'openai', access_token: 'key' }
@@ -157,7 +163,7 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
     end
 
     it 'returns 403 for non-members' do
-      authenticated_post "/api/v1/projects/#{project.id}/connectors",
+      authenticated_post "/api/v1/projects/#{fresh_project.id}/connectors",
                          user: non_member,
                          params: { connector_type: 'openai', access_token: 'key' }
 
@@ -168,7 +174,10 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
       allow_any_instance_of(Oauth::AnthropicProvider)
         .to receive(:test_connection).and_return({ success: true })
 
-      authenticated_post "/api/v1/projects/#{project.id}/connectors",
+      # Create a pre-existing anthropic connector on fresh_project
+      create(:project_connector, project: fresh_project, connector_type: 'anthropic')
+
+      authenticated_post "/api/v1/projects/#{fresh_project.id}/connectors",
                          user: org_admin,
                          organization: organization,
                          params: { connector_type: 'anthropic', access_token: 'key' }

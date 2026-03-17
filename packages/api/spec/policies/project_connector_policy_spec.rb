@@ -133,7 +133,7 @@ RSpec.describe ProjectConnectorPolicy, type: :policy do
     let(:personal_connector) { create(:project_connector, project: personal_project) }
 
     def personal_policy(record, current_user:)
-      described_class.new(record, user: current_user)
+      described_class.new(record, user: current_user, organization: nil)
     end
 
     it 'allows the owner to view' do

@@ -50,7 +50,7 @@ class ProjectConnectorPolicy < ApplicationPolicy
     return true if global_admin?
     project = record.project
     return true if project.personal? && project.owner_id == user&.id
-    return project_member?(project) if project.organization_project?
+    return project_member?(project) || org_admin?(project.organization) if project.organization_project?
     false
   end
 
