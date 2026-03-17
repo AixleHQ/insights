@@ -85,6 +85,8 @@ module Api
       end
 
       # POST /api/v1/projects/:project_id/connectors/:id/test
+      # Supports all connector types via Oauth::BaseProvider.for dispatch,
+      # including AI providers (Anthropic, OpenAI, etc.) and Slack webhooks.
       def test
         authorize! @connector, to: :test?
 

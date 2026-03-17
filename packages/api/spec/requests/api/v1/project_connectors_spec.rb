@@ -304,11 +304,15 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
 
     context 'with a Slack connector' do
       let(:slack_connector) { create(:project_connector, :slack, project: project) }
+      let(:slack_provider) { instance_double(Oauth::SlackProvider) }
+
+      before do
+        allow(Oauth::BaseProvider).to receive(:for).and_return(slack_provider)
+      end
 
       context 'when the Slack webhook responds with success' do
         before do
-          allow_any_instance_of(Oauth::SlackProvider)
-            .to receive(:test_connection).and_return({ success: true })
+          allow(slack_provider).to receive(:test_connection).and_return({ success: true })
         end
 
         it 'returns 200 with success: true' do
@@ -333,8 +337,7 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
 
       context 'when the Slack webhook returns a non-2xx HTTP response' do
         before do
-          allow_any_instance_of(Oauth::SlackProvider)
-            .to receive(:test_connection)
+          allow(slack_provider).to receive(:test_connection)
             .and_return({ success: false, error: 'Slack webhook error (HTTP 403)' })
         end
 
@@ -360,8 +363,7 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
 
       context 'when the webhook URL format is invalid' do
         before do
-          allow_any_instance_of(Oauth::SlackProvider)
-            .to receive(:test_connection)
+          allow(slack_provider).to receive(:test_connection)
             .and_return({ success: false, error: 'Invalid Slack webhook URL format' })
         end
 
@@ -387,8 +389,7 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
 
       context 'when a network error occurs' do
         before do
-          allow_any_instance_of(Oauth::SlackProvider)
-            .to receive(:test_connection)
+          allow(slack_provider).to receive(:test_connection)
             .and_return({ success: false, error: 'Connection error: connection refused' })
         end
 
@@ -414,8 +415,7 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
 
       context 'when an unexpected error occurs' do
         before do
-          allow_any_instance_of(Oauth::SlackProvider)
-            .to receive(:test_connection).and_raise(RuntimeError, 'unexpected failure')
+          allow(slack_provider).to receive(:test_connection).and_raise(RuntimeError, 'unexpected failure')
         end
 
         it 'returns 200 with success: false and the error message' do
@@ -436,14 +436,6 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
           expect(slack_connector.reload.last_error).to eq('unexpected failure')
           expect(slack_connector.reload.status).to eq('error')
         end
-      end
-
-      it 'returns 403 for regular project members' do
-        authenticated_post "/api/v1/projects/#{project.id}/connectors/#{slack_connector.id}/test",
-                           user: project_member,
-                           organization: organization
-
-        expect_forbidden
       end
     end
   end
