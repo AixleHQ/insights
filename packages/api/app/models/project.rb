@@ -4,6 +4,7 @@ class Project < ApplicationRecord
   has_many :project_memberships, dependent: :destroy
   has_many :members, through: :project_memberships, source: :user
   has_many :project_settings, dependent: :destroy
+  has_many :project_connectors, dependent: :destroy
   has_many :repositories, dependent: :destroy
   has_many :tool_events, class_name: "ToolEvent", dependent: :restrict_with_error
 

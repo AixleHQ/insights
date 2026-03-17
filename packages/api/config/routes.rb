@@ -126,6 +126,14 @@ Rails.application.routes.draw do
             post :sync
           end
         end
+
+        # Project AI provider connectors
+        resources :connectors, controller: "project_connectors" do
+          member do
+            post :test
+            post :sync
+          end
+        end
       end
 
       # Personal projects index

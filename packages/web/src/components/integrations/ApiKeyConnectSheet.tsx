@@ -21,6 +21,8 @@ interface ApiKeyConnectSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  /** Optional override for the connect action. When provided, org context is not used. */
+  onConnect?: (apiKey: string) => Promise<void>;
 }
 
 export function ApiKeyConnectSheet({
@@ -28,6 +30,7 @@ export function ApiKeyConnectSheet({
   open,
   onOpenChange,
   onSuccess,
+  onConnect,
 }: ApiKeyConnectSheetProps) {
   const { currentOrg } = useOrg();
   const connectWithApiKey = useConnectWithApiKey();
@@ -46,17 +49,22 @@ export function ApiKeyConnectSheet({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!provider || !currentOrg) return;
+    if (!provider) return;
 
     setError(null);
     setIsSubmitting(true);
 
     try {
-      await connectWithApiKey.mutateAsync({
-        orgId: currentOrg.id,
-        connectorType: provider.id,
-        apiKey,
-      });
+      if (onConnect) {
+        await onConnect(apiKey);
+      } else {
+        if (!currentOrg) return;
+        await connectWithApiKey.mutateAsync({
+          orgId: currentOrg.id,
+          connectorType: provider.id,
+          apiKey,
+        });
+      }
       setApiKey('');
       onOpenChange(false);
       onSuccess();

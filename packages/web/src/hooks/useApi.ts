@@ -14,6 +14,7 @@ import type {
   Project,
   ProjectWithStats,
   Connector,
+  ProjectConnector,
   ToolAccount,
   ToolEvent,
   EventAuditEntry,
@@ -55,6 +56,10 @@ export const queryKeys = {
   connectors: {
     all: (orgId: string) => ['organizations', orgId, 'connectors'] as const,
     detail: (orgId: string, id: string) => ['organizations', orgId, 'connectors', id] as const,
+  },
+  projectConnectors: {
+    all: (projectId: string) => ['projects', projectId, 'connectors'] as const,
+    detail: (projectId: string, id: string) => ['projects', projectId, 'connectors', id] as const,
   },
   toolAccounts: {
     all: (orgId: string) => ['organizations', orgId, 'tool_accounts'] as const,
@@ -650,6 +655,70 @@ export function useTestConnector() {
       ),
     onSettled: (_, __, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
+    },
+  });
+}
+
+// ============================================================================
+// Project Connectors Hooks
+// ============================================================================
+
+export function useProjectConnectors(projectId: string) {
+  return useQuery({
+    queryKey: queryKeys.projectConnectors.all(projectId),
+    queryFn: async () => {
+      const response = await api.get<{ data: ProjectConnector[] }>(`/projects/${projectId}/connectors`);
+      return response.data;
+    },
+    enabled: !!projectId,
+  });
+}
+
+export function useProjectConnectWithApiKey() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      projectId,
+      connectorType,
+      apiKey,
+    }: {
+      projectId: string;
+      connectorType: string;
+      apiKey: string;
+    }) =>
+      api.post<ProjectConnector>(`/projects/${projectId}/connectors`, {
+        connector_type: connectorType,
+        access_token: apiKey,
+      }),
+    onSuccess: (_, { projectId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.projectConnectors.all(projectId) });
+    },
+  });
+}
+
+export function useProjectDeleteConnector() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ projectId, connectorId }: { projectId: string; connectorId: string }) =>
+      api.delete(`/projects/${projectId}/connectors/${connectorId}`),
+    onSuccess: (_, { projectId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.projectConnectors.all(projectId) });
+    },
+  });
+}
+
+export function useProjectTestConnector() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ projectId, connectorId }: { projectId: string; connectorId: string }) =>
+      api.post<{ data: { success: boolean; message?: string; error?: string } }>(
+        `/projects/${projectId}/connectors/${connectorId}/test`
+      ),
+    onSettled: (_, __, { projectId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.projectConnectors.all(projectId) });
     },
   });
 }

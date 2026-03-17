@@ -108,6 +108,34 @@ export interface Connector {
   updated_at?: string;
 }
 
+// Project connector types
+export type ProjectConnectorProvider = 'anthropic' | 'openai' | 'openrouter' | 'gemini';
+
+export interface ProjectConnector {
+  id: string;
+  projectId?: string;
+  project_id?: string;
+  connectorType: ProjectConnectorProvider;
+  connector_type?: ProjectConnectorProvider;
+  isActive: boolean;
+  is_active?: boolean;
+  status?: ConnectorStatus;
+  externalAccountId?: string | null;
+  external_account_id?: string | null;
+  externalAccountName?: string | null;
+  external_account_name?: string | null;
+  lastSyncAt?: string | null;
+  last_sync_at?: string | null;
+  lastError?: string | null;
+  last_error?: string | null;
+  tokenExpired?: boolean;
+  token_expired?: boolean;
+  createdAt?: string;
+  created_at?: string;
+  updatedAt?: string;
+  updated_at?: string;
+}
+
 // Tool account types
 export interface ToolAccount {
   id: string;
