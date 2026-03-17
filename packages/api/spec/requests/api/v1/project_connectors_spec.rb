@@ -301,6 +301,151 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
 
       expect_forbidden
     end
+
+    context 'with a Slack connector' do
+      let(:slack_connector) { create(:project_connector, :slack, project: project) }
+
+      context 'when the Slack webhook responds with success' do
+        before do
+          allow_any_instance_of(Oauth::SlackProvider)
+            .to receive(:test_connection).and_return({ success: true })
+        end
+
+        it 'returns 200 with success: true' do
+          authenticated_post "/api/v1/projects/#{project.id}/connectors/#{slack_connector.id}/test",
+                             user: org_admin,
+                             organization: organization
+
+          expect_success
+          expect(json_data[:success]).to be true
+          expect(json_data[:message]).to eq('Connection successful')
+        end
+
+        it 'marks the connector as connected' do
+          authenticated_post "/api/v1/projects/#{project.id}/connectors/#{slack_connector.id}/test",
+                             user: org_admin,
+                             organization: organization
+
+          expect(slack_connector.reload.status).to eq('connected')
+          expect(slack_connector.reload.last_error).to be_nil
+        end
+      end
+
+      context 'when the Slack webhook returns a non-2xx HTTP response' do
+        before do
+          allow_any_instance_of(Oauth::SlackProvider)
+            .to receive(:test_connection)
+            .and_return({ success: false, error: 'Slack webhook error (HTTP 403)' })
+        end
+
+        it 'returns 200 with success: false and the error message' do
+          authenticated_post "/api/v1/projects/#{project.id}/connectors/#{slack_connector.id}/test",
+                             user: org_admin,
+                             organization: organization
+
+          expect_success
+          expect(json_data[:success]).to be false
+          expect(json_data[:error]).to eq('Slack webhook error (HTTP 403)')
+        end
+
+        it 'sets last_error and status to error on the connector' do
+          authenticated_post "/api/v1/projects/#{project.id}/connectors/#{slack_connector.id}/test",
+                             user: org_admin,
+                             organization: organization
+
+          expect(slack_connector.reload.last_error).to eq('Slack webhook error (HTTP 403)')
+          expect(slack_connector.reload.status).to eq('error')
+        end
+      end
+
+      context 'when the webhook URL format is invalid' do
+        before do
+          allow_any_instance_of(Oauth::SlackProvider)
+            .to receive(:test_connection)
+            .and_return({ success: false, error: 'Invalid Slack webhook URL format' })
+        end
+
+        it 'returns 200 with success: false and the format error' do
+          authenticated_post "/api/v1/projects/#{project.id}/connectors/#{slack_connector.id}/test",
+                             user: org_admin,
+                             organization: organization
+
+          expect_success
+          expect(json_data[:success]).to be false
+          expect(json_data[:error]).to eq('Invalid Slack webhook URL format')
+        end
+
+        it 'persists the format error in last_error' do
+          authenticated_post "/api/v1/projects/#{project.id}/connectors/#{slack_connector.id}/test",
+                             user: org_admin,
+                             organization: organization
+
+          expect(slack_connector.reload.last_error).to eq('Invalid Slack webhook URL format')
+          expect(slack_connector.reload.status).to eq('error')
+        end
+      end
+
+      context 'when a network error occurs' do
+        before do
+          allow_any_instance_of(Oauth::SlackProvider)
+            .to receive(:test_connection)
+            .and_return({ success: false, error: 'Connection error: connection refused' })
+        end
+
+        it 'returns 200 with success: false and a connection error message' do
+          authenticated_post "/api/v1/projects/#{project.id}/connectors/#{slack_connector.id}/test",
+                             user: org_admin,
+                             organization: organization
+
+          expect_success
+          expect(json_data[:success]).to be false
+          expect(json_data[:error]).to include('Connection error')
+        end
+
+        it 'persists the network error in last_error' do
+          authenticated_post "/api/v1/projects/#{project.id}/connectors/#{slack_connector.id}/test",
+                             user: org_admin,
+                             organization: organization
+
+          expect(slack_connector.reload.last_error).to include('Connection error')
+          expect(slack_connector.reload.status).to eq('error')
+        end
+      end
+
+      context 'when an unexpected error occurs' do
+        before do
+          allow_any_instance_of(Oauth::SlackProvider)
+            .to receive(:test_connection).and_raise(RuntimeError, 'unexpected failure')
+        end
+
+        it 'returns 200 with success: false and the error message' do
+          authenticated_post "/api/v1/projects/#{project.id}/connectors/#{slack_connector.id}/test",
+                             user: org_admin,
+                             organization: organization
+
+          expect_success
+          expect(json_data[:success]).to be false
+          expect(json_data[:error]).to eq('unexpected failure')
+        end
+
+        it 'persists the error in last_error' do
+          authenticated_post "/api/v1/projects/#{project.id}/connectors/#{slack_connector.id}/test",
+                             user: org_admin,
+                             organization: organization
+
+          expect(slack_connector.reload.last_error).to eq('unexpected failure')
+          expect(slack_connector.reload.status).to eq('error')
+        end
+      end
+
+      it 'returns 403 for regular project members' do
+        authenticated_post "/api/v1/projects/#{project.id}/connectors/#{slack_connector.id}/test",
+                           user: project_member,
+                           organization: organization
+
+        expect_forbidden
+      end
+    end
   end
 
   describe 'POST /api/v1/projects/:project_id/connectors/:id/sync' do
