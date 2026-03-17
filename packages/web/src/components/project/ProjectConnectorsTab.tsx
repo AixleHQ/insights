@@ -9,6 +9,7 @@ import {
   type ProviderInfo,
 } from '@/components/integrations';
 import { ApiKeyConnectSheet } from '@/components/integrations/ApiKeyConnectSheet';
+import { SlackConnectSheet } from '@/components/integrations/SlackConnectSheet';
 
 const PROVIDERS: ProviderInfo[] = [
   {
@@ -75,8 +76,7 @@ const PROVIDERS: ProviderInfo[] = [
       'Webhook-based delivery',
     ],
     available: true,
-    inputLabel: 'Webhook URL',
-    inputPlaceholder: 'https://hooks.slack.com/services/...',
+    connectSheet: 'webhook',
   },
 ];
 
@@ -106,7 +106,9 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
   const deleteConnector = useProjectDeleteConnector();
   const testConnector = useProjectTestConnector();
 
+  const [activeTab, setActiveTab] = useState('connected');
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [slackSheetOpen, setSlackSheetOpen] = useState(false);
   const [connectingProvider, setConnectingProvider] = useState<ProviderInfo | null>(null);
   const [testingConnectorId, setTestingConnectorId] = useState<string | null>(null);
 
@@ -139,6 +141,10 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
 
   const handleConnect = (providerId: string) => {
     const provider = PROVIDERS.find((p) => p.id === providerId) ?? null;
+    if (provider?.connectSheet === 'webhook') {
+      setSlackSheetOpen(true);
+      return;
+    }
     setConnectingProvider(provider);
     setSheetOpen(true);
   };
@@ -175,7 +181,7 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
 
   return (
     <>
-      <Tabs defaultValue="connected" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="connected">
             Connected ({integrations.length})
@@ -237,8 +243,15 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
         provider={connectingProvider}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
-        onSuccess={() => {}}
+        onSuccess={() => setActiveTab('connected')}
         onConnect={handleConnectWithApiKey}
+      />
+
+      <SlackConnectSheet
+        projectId={projectId}
+        open={slackSheetOpen}
+        onOpenChange={setSlackSheetOpen}
+        onSuccess={() => setActiveTab('connected')}
       />
     </>
   );

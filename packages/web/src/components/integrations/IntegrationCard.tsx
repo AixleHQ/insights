@@ -63,6 +63,7 @@ export interface ProviderInfo {
   comingSoon?: boolean;
   inputLabel?: string;
   inputPlaceholder?: string;
+  connectSheet?: 'webhook';
 }
 
 interface IntegrationCardProps {
