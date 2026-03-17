@@ -40,7 +40,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { EventsTable, EventDrawer, type EventRow } from '@/components/events';
 import { ToolUsageByDayChart } from '@/components/dashboard';
-import { ProjectTeamSection, ProjectReposSection } from '@/components/project';
+import { ProjectTeamSection, ProjectReposSection, ProjectConnectorsTab } from '@/components/project';
 import { formatDistanceToNow } from '@/lib/utils';
 
 function formatCurrency(value: number): string {
@@ -309,38 +309,13 @@ export function ProjectDetail() {
         <TabsContent value="integrations" className="mt-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Connected Services</CardTitle>
+              <CardTitle className="text-base">AI Provider Connectors</CardTitle>
               <CardDescription>
-                Integrations linked to this project
+                Connect AI providers to track usage and costs for this project
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {project.connectors && project.connectors.length > 0 ? (
-                <div className="space-y-2">
-                  {project.connectors.map((connector) => (
-                    <div
-                      key={connector.id}
-                      className="flex items-center justify-between rounded-lg border p-3"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="flex size-8 items-center justify-center rounded bg-muted text-sm font-medium capitalize">
-                          {connector.provider[0]}
-                        </div>
-                        <span className="font-medium capitalize">
-                          {connector.provider}
-                        </span>
-                      </div>
-                      <Badge variant="outline" className="text-success">
-                        Connected
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  No connectors linked to this project
-                </p>
-              )}
+              <ProjectConnectorsTab projectId={id!} />
             </CardContent>
           </Card>
         </TabsContent>
