@@ -611,7 +611,7 @@ function PolicySettings() {
   );
 }
 
-function AlertSettings() {
+export function AlertSettings() {
   const { currentOrg } = useOrg();
   const { data: settings, isLoading } = useOrganizationSettings(currentOrg?.id || '');
   const { data: connectors } = useConnectors(currentOrg?.id || '');
@@ -769,6 +769,7 @@ function AlertSettings() {
               </p>
             </div>
             <Switch
+              aria-label="Critical Risk Events"
               checked={riskCritical}
               onCheckedChange={(checked) =>
                 updateAlertSetting('alert_risk_critical', checked)
@@ -783,6 +784,7 @@ function AlertSettings() {
               </p>
             </div>
             <Switch
+              aria-label="High Risk Events"
               checked={riskHigh}
               onCheckedChange={(checked) =>
                 updateAlertSetting('alert_risk_high', checked)
@@ -797,6 +799,7 @@ function AlertSettings() {
               </p>
             </div>
             <Switch
+              aria-label="Usage Spikes"
               checked={usageSpike}
               onCheckedChange={(checked) =>
                 updateAlertSetting('alert_usage_spike', checked)
@@ -820,6 +823,7 @@ function AlertSettings() {
               </p>
             </div>
             <Switch
+              aria-label="Email Notifications"
               checked={emailNotifications}
               onCheckedChange={(checked) =>
                 updateAlertSetting('alert_email', checked)
@@ -836,6 +840,7 @@ function AlertSettings() {
               </p>
             </div>
             <Switch
+              aria-label="Slack Notifications"
               checked={slackNotifications}
               disabled={!hasSlackConnector}
               onCheckedChange={(checked) =>
