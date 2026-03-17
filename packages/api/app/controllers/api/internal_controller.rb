@@ -36,6 +36,9 @@ module Api
       # Deliver to Slack if enabled for this organization
       deliver_slack_alert(alert_data)
 
+      # Deliver to project Slack webhooks where individually enabled
+      deliver_project_slack_alerts(alert_data)
+
       render json: { data: { id: SecureRandom.uuid, status: "sent" } }, status: :created
     end
 
@@ -120,7 +123,7 @@ module Api
 
     def alert_params
       params.require(:alert).permit(
-        :organization_id, :alert_type, :severity,
+        :organization_id, :project_id, :alert_type, :severity,
         :title, :message, metadata: {}
       ).to_h.symbolize_keys
     end
@@ -135,6 +138,27 @@ module Api
       return unless alert_slack
 
       Slack::NotificationService.deliver_alert(org, alert_data)
+    end
+
+    def deliver_project_slack_alerts(alert_data)
+      return unless alert_data[:organization_id]
+
+      org = Organization.find_by(id: alert_data[:organization_id])
+      return unless org
+
+      if alert_data[:project_id]
+        project = org.projects.find_by(id: alert_data[:project_id])
+        return unless project
+        return unless ProjectSetting.get(project, "alert_slack") == "true"
+
+        Slack::ProjectNotificationService.deliver_alert(project, alert_data)
+      else
+        org.projects.find_each do |project|
+          next unless ProjectSetting.get(project, "alert_slack") == "true"
+
+          Slack::ProjectNotificationService.deliver_alert(project, alert_data)
+        end
+      end
     end
   end
 end
