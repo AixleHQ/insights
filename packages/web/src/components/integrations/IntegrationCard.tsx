@@ -143,6 +143,7 @@ export function IntegrationCard({
   if (provider && !integration) {
     return (
       <Card
+        data-testid={`provider-card-${provider.id}`}
         className={cn(
           'group relative transition-all hover:shadow-md',
           !provider.available && 'opacity-60',

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -194,9 +194,8 @@ describe('ProjectConnectorsTab', () => {
       renderComponent();
 
       await user.click(screen.getByRole('tab', { name: /available/i }));
-      // Slack is the 5th provider — find its Connect button
-      const connectButtons = screen.getAllByRole('button', { name: /^connect$/i });
-      await user.click(connectButtons[4]);
+      const slackCard = screen.getByTestId('provider-card-slack');
+      await user.click(within(slackCard).getByRole('button', { name: /^connect$/i }));
 
       expect(screen.getByLabelText('Webhook URL')).toBeInTheDocument();
     });

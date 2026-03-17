@@ -39,13 +39,17 @@ module Api
         @connector.assign_attributes(connector_params)
         authorize! @connector
 
-        provider = Oauth::BaseProvider.for(@connector)
-        result = provider.test_connection
+        # Validate API key / webhook URL for AI providers and Slack webhooks
+        provider = Oauth::BaseProvider.for(@connector) if @connector.ai_provider? || @connector.slack_webhook?
+        result = provider&.test_connection || { success: true }
 
         unless result[:success]
           error_msg = result[:error] || "Invalid API key"
           @connector.assign_attributes(is_active: false, status: "error", last_error: error_msg)
-          @connector.save
+          unless @connector.save
+            Rails.logger.warn("[ProjectConnector] Failed to persist error state for " \
+                              "#{@connector.connector_type}: #{@connector.errors.full_messages}")
+          end
           return render json: {
             error: "Unprocessable Entity",
             errors: { access_token: [ error_msg ] }
