@@ -23,18 +23,36 @@ module Api
 
       # POST /api/v1/projects/:project_id/connectors
       def create
-        @connector = @project.project_connectors.new(connector_params)
+        # Support retrying a failed connector of the same type
+        @connector = @project.project_connectors.find_or_initialize_by(
+          connector_type: params[:connector_type]
+        )
+
+        # Reject if an active connector of this type already exists
+        if @connector.persisted? && @connector.is_active?
+          return render json: {
+            error: "Unprocessable Entity",
+            errors: { connector_type: [ "already exists for this project" ] }
+          }, status: :unprocessable_entity
+        end
+
+        @connector.assign_attributes(connector_params)
         authorize! @connector
 
         provider = Oauth::BaseProvider.for(@connector)
         result = provider.test_connection
+
         unless result[:success]
+          error_msg = result[:error] || "Invalid API key"
+          @connector.assign_attributes(is_active: false, status: "error", last_error: error_msg)
+          @connector.save
           return render json: {
             error: "Unprocessable Entity",
-            errors: { access_token: [ result[:error] || "Invalid API key" ] }
+            errors: { access_token: [ error_msg ] }
           }, status: :unprocessable_entity
         end
 
+        @connector.assign_attributes(is_active: true, status: "connected", last_error: nil, last_sync_at: Time.current)
         if @connector.save
           render_created(@connector, ProjectConnectorSerializer)
         else

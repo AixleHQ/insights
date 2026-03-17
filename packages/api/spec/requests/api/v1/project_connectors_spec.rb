@@ -112,7 +112,7 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
           let(:api_key) { 'valid-api-key-123' }
           let(:provider_class) { "Oauth::#{provider.capitalize}Provider".constantize }
 
-          it "creates a #{provider} connector when API key is valid" do
+          it "creates a #{provider} connector with is_active: true when API key is valid" do
             allow_any_instance_of(provider_class)
               .to receive(:test_connection).and_return({ success: true })
 
@@ -123,6 +123,7 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
 
             expect_created
             expect(json_data[:connectorType]).to eq(provider)
+            expect(json_data[:isActive]).to be true
           end
 
           it "returns 422 when #{provider} API key is invalid" do
@@ -138,7 +139,7 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
             expect(json_response[:errors][:access_token]).to include('Invalid API key')
           end
 
-          it "does not create a #{provider} connector when API key is invalid" do
+          it "saves #{provider} connector in error state when API key is invalid" do
             allow_any_instance_of(provider_class)
               .to receive(:test_connection).and_return({ success: false, error: 'Invalid API key' })
 
@@ -147,7 +148,12 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
                                  user: org_admin,
                                  organization: organization,
                                  params: { connector_type: provider, access_token: 'bad-key' }
-            }.not_to change(ProjectConnector, :count)
+            }.to change(ProjectConnector, :count).by(1)
+
+            saved = ProjectConnector.find_by!(project_id: fresh_project.id, connector_type: provider)
+            expect(saved.is_active).to be false
+            expect(saved.status).to eq('error')
+            expect(saved.last_error).to eq('Invalid API key')
           end
         end
       end
@@ -170,11 +176,8 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
       expect_forbidden
     end
 
-    it 'returns 422 when a connector of the same type already exists' do
-      allow_any_instance_of(Oauth::AnthropicProvider)
-        .to receive(:test_connection).and_return({ success: true })
-
-      # Create a pre-existing anthropic connector on fresh_project
+    it 'returns 422 when a connector of the same type already exists and is active' do
+      # Create a pre-existing active connector on fresh_project
       create(:project_connector, project: fresh_project, connector_type: 'anthropic')
 
       authenticated_post "/api/v1/projects/#{fresh_project.id}/connectors",
@@ -183,6 +186,27 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
                          params: { connector_type: 'anthropic', access_token: 'key' }
 
       expect_unprocessable
+    end
+
+    it 'activates an existing error-state connector when retried with a valid key' do
+      allow_any_instance_of(Oauth::AnthropicProvider)
+        .to receive(:test_connection).and_return({ success: true })
+
+      error_connector = create(:project_connector, :with_error, project: fresh_project,
+                                                                connector_type: 'anthropic',
+                                                                is_active: false)
+
+      expect {
+        authenticated_post "/api/v1/projects/#{fresh_project.id}/connectors",
+                           user: org_admin,
+                           organization: organization,
+                           params: { connector_type: 'anthropic', access_token: 'valid-key' }
+      }.not_to change(ProjectConnector, :count)
+
+      expect_created
+      expect(error_connector.reload.is_active).to be true
+      expect(error_connector.reload.status).to eq('connected')
+      expect(error_connector.reload.last_error).to be_nil
     end
   end
 
