@@ -374,5 +374,105 @@ describe('ProjectConnectorsTab', () => {
         });
       });
     });
+
+    it('shows Testing… badge during active test', async () => {
+      // testConnector never resolves during this test so isTesting stays true
+      mockTestConnector.mockReturnValue(new Promise(() => {}));
+      mockProjectConnectors.mockReturnValue({ data: [connectedAnthropicConnector], isLoading: false });
+      const user = userEvent.setup();
+      renderComponent();
+
+      await user.click(screen.getByRole('button', { name: /actions/i }));
+      await user.click(screen.getByRole('menuitem', { name: /test connection/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Testing…')).toBeInTheDocument();
+      });
+    });
+
+    it('shows updated status badge after test completes and query refreshes', async () => {
+      const errorConnector: ProjectConnector = {
+        ...connectedAnthropicConnector,
+        status: 'error',
+        lastError: 'Invalid API key',
+      };
+
+      // First render: connector is in error state
+      mockProjectConnectors.mockReturnValue({ data: [errorConnector], isLoading: false });
+      const user = userEvent.setup();
+      renderComponent();
+
+      expect(screen.getByText('Error')).toBeInTheDocument();
+
+      // Simulate test fixing the connector: query returns connected state after test
+      mockTestConnector.mockImplementation(async () => {
+        mockProjectConnectors.mockReturnValue({
+          data: [{ ...connectedAnthropicConnector, status: 'connected', lastError: null }],
+          isLoading: false,
+        });
+        return { data: { success: true } };
+      });
+
+      await user.click(screen.getByRole('button', { name: /actions/i }));
+      await user.click(screen.getByRole('menuitem', { name: /test connection/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Connected')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Connector health display', () => {
+    it('shows last sync time when connector has lastSyncAt', () => {
+      const syncedConnector: ProjectConnector = {
+        ...connectedAnthropicConnector,
+        lastSyncAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+      };
+      mockProjectConnectors.mockReturnValue({ data: [syncedConnector], isLoading: false });
+      renderComponent();
+
+      expect(screen.getByText(/last synced/i)).toBeInTheDocument();
+    });
+
+    it('does not show last sync row when lastSyncAt is null', () => {
+      mockProjectConnectors.mockReturnValue({ data: [connectedAnthropicConnector], isLoading: false });
+      renderComponent();
+
+      expect(screen.queryByText(/last synced/i)).not.toBeInTheDocument();
+    });
+
+    it('shows error panel when connector has lastError', () => {
+      const errorConnector: ProjectConnector = {
+        ...connectedAnthropicConnector,
+        status: 'error',
+        lastError: 'Unauthorized: invalid API key',
+      };
+      mockProjectConnectors.mockReturnValue({ data: [errorConnector], isLoading: false });
+      renderComponent();
+
+      expect(screen.getByRole('button', { name: /last error/i })).toBeInTheDocument();
+    });
+
+    it('does not show error panel when connector has no lastError', () => {
+      mockProjectConnectors.mockReturnValue({ data: [connectedAnthropicConnector], isLoading: false });
+      renderComponent();
+
+      expect(screen.queryByRole('button', { name: /last error/i })).not.toBeInTheDocument();
+    });
+
+    it('expands error panel to show error message detail', async () => {
+      const user = userEvent.setup();
+      const errorConnector: ProjectConnector = {
+        ...connectedAnthropicConnector,
+        status: 'error',
+        lastError: 'Connection timeout after 30s',
+      };
+      mockProjectConnectors.mockReturnValue({ data: [errorConnector], isLoading: false });
+      renderComponent();
+
+      await user.click(screen.getByRole('button', { name: /last error/i }));
+
+      expect(screen.getByText('Connection timeout after 30s')).toBeInTheDocument();
+    });
   });
 });
