@@ -61,6 +61,8 @@ export interface ProviderInfo {
   features: string[];
   available: boolean;
   comingSoon?: boolean;
+  inputLabel?: string;
+  inputPlaceholder?: string;
 }
 
 interface IntegrationCardProps {

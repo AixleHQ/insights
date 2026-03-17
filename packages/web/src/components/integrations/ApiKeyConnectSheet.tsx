@@ -99,11 +99,11 @@ export function ApiKeyConnectSheet({
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 px-4">
           <div className="space-y-2">
-            <Label htmlFor="api-key">API Key</Label>
+            <Label htmlFor="api-key">{provider?.inputLabel ?? 'API Key'}</Label>
             <Input
               id="api-key"
               type="password"
-              placeholder="Enter your API key"
+              placeholder={provider?.inputPlaceholder ?? 'Enter your API key'}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               autoComplete="off"

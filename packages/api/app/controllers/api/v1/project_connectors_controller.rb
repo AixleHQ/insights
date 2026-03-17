@@ -124,12 +124,12 @@ module Api
 
       def connector_params
         params.permit(:connector_type, :access_token, :refresh_token, :token_expires_at,
-                      :external_account_id, :external_account_name, :is_active)
+                      :external_org_id, :external_org_name, :is_active)
       end
 
       def connector_update_params
         params.permit(:access_token, :refresh_token, :token_expires_at,
-                      :external_account_id, :external_account_name, :is_active)
+                      :external_org_id, :external_org_name, :is_active)
       end
     end
   end

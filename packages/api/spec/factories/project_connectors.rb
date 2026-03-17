@@ -23,6 +23,12 @@ FactoryBot.define do
       connector_type { 'gemini' }
     end
 
+    trait :slack do
+      connector_type { 'slack' }
+      access_token { 'https://hooks.slack.com/services/T00000000/B00000000/EXAMPLE-WEBHOOK-SECRET' }
+      external_org_name { '#general' }
+    end
+
     trait :inactive do
       is_active { false }
       status { 'disconnected' }

@@ -10,7 +10,7 @@ import {
 } from '@/components/integrations';
 import { ApiKeyConnectSheet } from '@/components/integrations/ApiKeyConnectSheet';
 
-const AI_PROVIDERS: ProviderInfo[] = [
+const PROVIDERS: ProviderInfo[] = [
   {
     id: 'anthropic',
     name: 'Anthropic API',
@@ -62,6 +62,21 @@ const AI_PROVIDERS: ProviderInfo[] = [
       'Cost breakdown',
     ],
     available: true,
+  },
+  {
+    id: 'slack',
+    name: 'Slack',
+    description: 'Send project alerts and notifications to Slack',
+    category: 'communication',
+    features: [
+      'Cost alerts',
+      'Usage notifications',
+      'Custom channel routing',
+      'Webhook-based delivery',
+    ],
+    available: true,
+    inputLabel: 'Webhook URL',
+    inputPlaceholder: 'https://hooks.slack.com/services/...',
   },
 ];
 
@@ -120,10 +135,10 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
   }, [connectorsData]);
 
   const connectedProviderIds = new Set(integrations.map((c) => c.provider));
-  const availableProviders = AI_PROVIDERS.filter((p) => !connectedProviderIds.has(p.id));
+  const availableProviders = PROVIDERS.filter((p) => !connectedProviderIds.has(p.id));
 
   const handleConnect = (providerId: string) => {
-    const provider = AI_PROVIDERS.find((p) => p.id === providerId) ?? null;
+    const provider = PROVIDERS.find((p) => p.id === providerId) ?? null;
     setConnectingProvider(provider);
     setSheetOpen(true);
   };
@@ -179,9 +194,9 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
             </div>
           ) : integrations.length === 0 ? (
             <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-8">
-              <p className="text-muted-foreground text-sm">No AI providers connected</p>
+              <p className="text-muted-foreground text-sm">No providers connected</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Switch to the Available tab to connect an AI provider
+                Switch to the Available tab to connect a provider
               </p>
             </div>
           ) : (
@@ -202,7 +217,7 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
         <TabsContent value="available" className="space-y-4">
           {availableProviders.length === 0 ? (
             <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-8">
-              <p className="text-muted-foreground text-sm">All AI providers are connected</p>
+              <p className="text-muted-foreground text-sm">All providers are connected</p>
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
