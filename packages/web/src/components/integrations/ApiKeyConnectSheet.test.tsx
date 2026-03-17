@@ -231,4 +231,66 @@ describe('ApiKeyConnectSheet', () => {
       expect(mockMutateAsync).not.toHaveBeenCalled();
     });
   });
+
+  describe('onConnect override prop', () => {
+    it('calls onConnect instead of mutateAsync when provided', async () => {
+      const onConnect = vi.fn().mockResolvedValue(undefined);
+      const user = userEvent.setup();
+      renderSheet({ onConnect });
+
+      await user.type(screen.getByLabelText('API Key'), 'sk-project-key');
+      await user.click(screen.getByRole('button', { name: 'Connect' }));
+
+      await waitFor(() => {
+        expect(onConnect).toHaveBeenCalledWith('sk-project-key');
+        expect(mockMutateAsync).not.toHaveBeenCalled();
+      });
+    });
+
+    it('does not call mutateAsync when onConnect is provided', async () => {
+      const onConnect = vi.fn().mockResolvedValue(undefined);
+      const user = userEvent.setup();
+      renderSheet({ onConnect });
+
+      await user.type(screen.getByLabelText('API Key'), 'sk-project-key');
+      await user.click(screen.getByRole('button', { name: 'Connect' }));
+
+      await waitFor(() => {
+        expect(mockMutateAsync).not.toHaveBeenCalled();
+      });
+    });
+
+    it('closes the sheet and calls onSuccess after onConnect resolves', async () => {
+      const onConnect = vi.fn().mockResolvedValue(undefined);
+      const onOpenChange = vi.fn();
+      const onSuccess = vi.fn();
+      const user = userEvent.setup();
+      renderSheet({ onConnect, onOpenChange, onSuccess });
+
+      await user.type(screen.getByLabelText('API Key'), 'sk-project-key');
+      await user.click(screen.getByRole('button', { name: 'Connect' }));
+
+      await waitFor(() => {
+        expect(onOpenChange).toHaveBeenCalledWith(false);
+        expect(onSuccess).toHaveBeenCalled();
+      });
+    });
+
+    it('shows inline error when onConnect throws a 422 ApiError', async () => {
+      const onConnect = vi.fn().mockRejectedValue(
+        new ApiError('Validation error', 422, {
+          errors: { access_token: ['Invalid project API key'] },
+        })
+      );
+      const user = userEvent.setup();
+      renderSheet({ onConnect });
+
+      await user.type(screen.getByLabelText('API Key'), 'bad-key');
+      await user.click(screen.getByRole('button', { name: 'Connect' }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Invalid project API key')).toBeInTheDocument();
+      });
+    });
+  });
 });
