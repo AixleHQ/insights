@@ -141,8 +141,11 @@ class CostAlertJob
     # Broadcast via ActionCable
     EventsChannel.broadcast_alert(org.id, alert_data)
 
-    # Deliver to Slack if enabled
+    # Deliver to Slack if enabled (org-level)
     Slack::NotificationService.deliver_alert(org, alert_data) if slack_enabled
+
+    # Deliver to project Slack webhooks where individually enabled
+    deliver_to_project_slack_webhooks(org, alert_data)
 
     Rails.logger.info("[CostAlertJob] Alert sent for org #{org.slug}: #{period} cost $#{current_cost.round(2)} exceeds threshold $#{threshold.round(2)}")
 
@@ -172,8 +175,19 @@ class CostAlertJob
 
     Slack::NotificationService.deliver_alert(org, alert_data) if slack_enabled
 
+    # Deliver to project Slack webhooks where individually enabled
+    deliver_to_project_slack_webhooks(org, alert_data)
+
     Rails.logger.info("[CostAlertJob] User alert sent for #{user.email} in org #{org.slug}: cost $#{current_cost.round(2)} exceeds threshold $#{threshold.round(2)}")
 
     Rails.cache.write(cache_key, true, expires_in: 24.hours)
+  end
+
+  def deliver_to_project_slack_webhooks(org, alert_data)
+    org.projects.find_each do |project|
+      next unless ProjectSetting.get(project, "alert_slack") == "true"
+
+      Slack::ProjectNotificationService.deliver_alert(project, alert_data)
+    end
   end
 end
