@@ -247,6 +247,40 @@ describe('ProjectConnectorsTab', () => {
       });
     });
 
+    it('switches to Connected tab and shows Slack connector after connecting', async () => {
+      const connectedSlack: ProjectConnector = {
+        id: 'slack-1',
+        project_id: PROJECT_ID,
+        connectorType: 'slack',
+        isActive: true,
+        status: 'connected',
+        externalAccountName: null,
+        lastSyncAt: null,
+        lastError: null,
+      };
+
+      mockProjectConnectors.mockReturnValue({ data: [], isLoading: false });
+      const user = userEvent.setup();
+      renderComponent();
+
+      await user.click(screen.getByRole('tab', { name: /available/i }));
+      const slackCard = screen.getByTestId('provider-card-slack');
+      await user.click(within(slackCard).getByRole('button', { name: /^connect$/i }));
+
+      // Update mock before submit so re-render after onSuccess sees the new connector
+      mockProjectConnectors.mockReturnValue({ data: [connectedSlack], isLoading: false });
+
+      await user.type(screen.getByLabelText(/webhook url/i), 'https://hooks.slack.com/services/T00/B00/xxx');
+      await user.click(screen.getByRole('button', { name: /^connect$/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('tab', { name: /connected \(1\)/i })).toBeInTheDocument();
+      });
+
+      // Slack no longer in Available
+      expect(screen.getByRole('tab', { name: /available \(4\)/i })).toBeInTheDocument();
+    });
+
     it('shows inline error when Slack webhook URL is invalid', async () => {
       mockConnectWithSlack.mockRejectedValue(
         new ApiError('Validation error', 422, {

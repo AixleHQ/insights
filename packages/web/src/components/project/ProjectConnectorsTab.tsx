@@ -76,8 +76,7 @@ const PROVIDERS: ProviderInfo[] = [
       'Webhook-based delivery',
     ],
     available: true,
-    inputLabel: 'Webhook URL',
-    inputPlaceholder: 'https://hooks.slack.com/services/...',
+    connectSheet: 'webhook',
   },
 ];
 
@@ -107,6 +106,7 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
   const deleteConnector = useProjectDeleteConnector();
   const testConnector = useProjectTestConnector();
 
+  const [activeTab, setActiveTab] = useState('connected');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [slackSheetOpen, setSlackSheetOpen] = useState(false);
   const [connectingProvider, setConnectingProvider] = useState<ProviderInfo | null>(null);
@@ -140,11 +140,11 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
   const availableProviders = PROVIDERS.filter((p) => !connectedProviderIds.has(p.id));
 
   const handleConnect = (providerId: string) => {
-    if (providerId === 'slack') {
+    const provider = PROVIDERS.find((p) => p.id === providerId) ?? null;
+    if (provider?.connectSheet === 'webhook') {
       setSlackSheetOpen(true);
       return;
     }
-    const provider = PROVIDERS.find((p) => p.id === providerId) ?? null;
     setConnectingProvider(provider);
     setSheetOpen(true);
   };
@@ -181,7 +181,7 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
 
   return (
     <>
-      <Tabs defaultValue="connected" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="connected">
             Connected ({integrations.length})
@@ -243,7 +243,7 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
         provider={connectingProvider}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
-        onSuccess={() => {}}
+        onSuccess={() => setActiveTab('connected')}
         onConnect={handleConnectWithApiKey}
       />
 
@@ -251,7 +251,7 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
         projectId={projectId}
         open={slackSheetOpen}
         onOpenChange={setSlackSheetOpen}
-        onSuccess={() => {}}
+        onSuccess={() => setActiveTab('connected')}
       />
     </>
   );
