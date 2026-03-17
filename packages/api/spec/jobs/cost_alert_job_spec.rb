@@ -172,6 +172,22 @@ RSpec.describe CostAlertJob, type: :job do
           described_class.new.perform(organization.id)
         end
       end
+
+      context 'when a per-user alert is triggered' do
+        before do
+          create(:organization_setting, organization: organization, key: 'cost_threshold_per_user', value: '50')
+          create(:tool_event, organization: organization, user: user, cost_usd: 75.0, occurred_at: Time.current)
+          create(:project_setting, project: project, key: 'alert_slack', value: 'true')
+          create(:project_connector, :slack, project: project)
+        end
+
+        it 'delivers the user cost alert to the project Slack webhook' do
+          expect(Slack::ProjectNotificationService).to receive(:deliver_alert)
+            .with(project, hash_including(alert_type: 'user_cost_threshold'))
+
+          described_class.new.perform(organization.id)
+        end
+      end
     end
   end
 end

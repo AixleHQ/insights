@@ -1,63 +1,23 @@
 # frozen_string_literal: true
 
 module Slack
-  class ProjectNotificationService
-    def self.deliver_alert(project, alert_data)
-      new(project).deliver_alert(alert_data)
-    end
-
+  class ProjectNotificationService < BaseNotificationService
     def initialize(project)
       @project = project
     end
 
-    def deliver_alert(alert_data)
-      connector = @project.project_connectors.by_type("slack").active.first
-
-      unless connector
-        Rails.logger.warn("[Slack::ProjectNotificationService] No active Slack connector for project #{@project.slug}")
-        return
-      end
-
-      response = Faraday.post(connector.access_token) do |req|
-        req.headers["Content-Type"] = "application/json"
-        req.body = format_message(alert_data).to_json
-      end
-
-      unless response.success?
-        Rails.logger.error("[Slack::ProjectNotificationService] Failed to deliver alert to Slack for project #{@project.slug}: HTTP #{response.status}")
-      end
-    rescue Faraday::Error => e
-      Rails.logger.error("[Slack::ProjectNotificationService] Connection error delivering Slack alert for project #{@project.slug}: #{e.message}")
-    end
-
     private
 
-    def format_message(alert_data)
-      org_name   = @project.organization&.name || "Unknown"
-      alert_type = alert_data[:alert_type] || alert_data[:type] || "alert"
-      severity   = alert_data[:severity] || "warning"
-      timestamp  = Time.current.iso8601
+    def find_connector
+      @project.project_connectors.by_type("slack").active.first
+    end
 
-      severity_emoji = case severity.to_s
-      when "critical" then ":red_circle:"
-      when "warning"  then ":large_yellow_circle:"
-      else ":large_blue_circle:"
-      end
+    def display_name
+      @project.organization&.name || "Unknown"
+    end
 
-      lines = [
-        "#{severity_emoji} *#{org_name}* — #{alert_type.to_s.tr('_', ' ').capitalize}",
-        "*Type:* #{alert_type}",
-        "*Severity:* #{severity}",
-        "*Time:* #{timestamp}"
-      ]
-
-      lines.insert(1, "*Details:* #{alert_data[:title]}") if alert_data[:title].present?
-
-      if alert_data[:current_cost_usd].present?
-        lines.insert(-2, "*Cost:* $#{alert_data[:current_cost_usd]} / $#{alert_data[:threshold_usd]} threshold (#{alert_data[:percentage]}%)")
-      end
-
-      { text: lines.join("\n") }
+    def resource_identifier
+      "project #{@project.slug}"
     end
   end
 end
