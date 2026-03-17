@@ -106,6 +106,64 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
       create(:project_membership, user: org_admin, project: fresh_project, role: 'admin')
     end
 
+    context 'with Slack connector' do
+      let(:valid_webhook_url) { 'https://hooks.slack.com/services/T00000000/B00000000/EXAMPLE-WEBHOOK-SECRET' }
+
+      it 'creates a slack connector when webhook URL is valid' do
+        allow_any_instance_of(Oauth::SlackProvider)
+          .to receive(:test_connection).and_return({ success: true })
+
+        authenticated_post "/api/v1/projects/#{fresh_project.id}/connectors",
+                           user: org_admin,
+                           organization: organization,
+                           params: { connector_type: 'slack', access_token: valid_webhook_url,
+                                     external_org_name: '#general' }
+
+        expect_created
+        expect(json_data[:connectorType]).to eq('slack')
+        expect(json_data[:isActive]).to be true
+        expect(json_data[:externalAccountName]).to eq('#general')
+      end
+
+      it 'returns 422 when webhook URL format is invalid' do
+        authenticated_post "/api/v1/projects/#{fresh_project.id}/connectors",
+                           user: org_admin,
+                           organization: organization,
+                           params: { connector_type: 'slack', access_token: 'not-a-valid-url' }
+
+        expect_unprocessable
+        expect(json_response[:errors][:access_token]).to include('Invalid Slack webhook URL format')
+      end
+
+      it 'saves slack connector in error state when URL is invalid' do
+        expect {
+          authenticated_post "/api/v1/projects/#{fresh_project.id}/connectors",
+                             user: org_admin,
+                             organization: organization,
+                             params: { connector_type: 'slack', access_token: 'bad-url' }
+        }.to change(ProjectConnector, :count).by(1)
+
+        saved = ProjectConnector.find_by!(project_id: fresh_project.id, connector_type: 'slack')
+        expect(saved.is_active).to be false
+        expect(saved.status).to eq('error')
+        expect(saved.last_error).to eq('Invalid Slack webhook URL format')
+      end
+
+      it 'stores the channel name in external_org_name' do
+        allow_any_instance_of(Oauth::SlackProvider)
+          .to receive(:test_connection).and_return({ success: true })
+
+        authenticated_post "/api/v1/projects/#{fresh_project.id}/connectors",
+                           user: org_admin,
+                           organization: organization,
+                           params: { connector_type: 'slack', access_token: valid_webhook_url,
+                                     external_org_name: '#alerts' }
+
+        saved = ProjectConnector.find_by!(project_id: fresh_project.id, connector_type: 'slack')
+        expect(saved.external_org_name).to eq('#alerts')
+      end
+    end
+
     context 'with AI provider connectors' do
       %w[anthropic openai openrouter gemini].each do |provider|
         describe "#{provider} connector" do

@@ -109,7 +109,7 @@ export interface Connector {
 }
 
 // Project connector types
-export type ProjectConnectorProvider = 'anthropic' | 'openai' | 'openrouter' | 'gemini';
+export type ProjectConnectorProvider = 'anthropic' | 'openai' | 'openrouter' | 'gemini' | 'slack';
 
 export interface ProjectConnector {
   id: string;

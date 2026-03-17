@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -73,7 +73,7 @@ describe('ProjectConnectorsTab', () => {
     it('shows empty state when no connectors are connected', () => {
       mockProjectConnectors.mockReturnValue({ data: [], isLoading: false });
       renderComponent();
-      expect(screen.getByText('No AI providers connected')).toBeInTheDocument();
+      expect(screen.getByText('No providers connected')).toBeInTheDocument();
     });
 
     it('displays connected connector count in tab label', () => {
@@ -109,19 +109,19 @@ describe('ProjectConnectorsTab', () => {
   });
 
   describe('Available tab', () => {
-    it('shows all 4 AI providers when none are connected', () => {
+    it('shows all 5 providers when none are connected', () => {
       mockProjectConnectors.mockReturnValue({ data: [], isLoading: false });
       renderComponent();
-      expect(screen.getByRole('tab', { name: /available \(4\)/i })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: /available \(5\)/i })).toBeInTheDocument();
     });
 
     it('excludes already-connected providers from the Available tab count', () => {
       mockProjectConnectors.mockReturnValue({ data: [connectedAnthropicConnector], isLoading: false });
       renderComponent();
-      expect(screen.getByRole('tab', { name: /available \(3\)/i })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: /available \(4\)/i })).toBeInTheDocument();
     });
 
-    it('shows the 4 AI provider names in the Available tab', async () => {
+    it('shows all provider names in the Available tab', async () => {
       mockProjectConnectors.mockReturnValue({ data: [], isLoading: false });
       const user = userEvent.setup();
       renderComponent();
@@ -132,6 +132,7 @@ describe('ProjectConnectorsTab', () => {
       expect(screen.getByText('OpenAI')).toBeInTheDocument();
       expect(screen.getByText('OpenRouter')).toBeInTheDocument();
       expect(screen.getByText('Gemini')).toBeInTheDocument();
+      expect(screen.getByText('Slack')).toBeInTheDocument();
     });
 
     it('shows empty state when all providers are connected', async () => {
@@ -140,6 +141,7 @@ describe('ProjectConnectorsTab', () => {
         { ...connectedAnthropicConnector, id: '2', connectorType: 'openai' },
         { ...connectedAnthropicConnector, id: '3', connectorType: 'openrouter' },
         { ...connectedAnthropicConnector, id: '4', connectorType: 'gemini' },
+        { ...connectedAnthropicConnector, id: '5', connectorType: 'slack' },
       ];
       mockProjectConnectors.mockReturnValue({ data: allConnected, isLoading: false });
       const user = userEvent.setup();
@@ -147,7 +149,7 @@ describe('ProjectConnectorsTab', () => {
 
       await user.click(screen.getByRole('tab', { name: /available \(0\)/i }));
 
-      expect(screen.getByText('All AI providers are connected')).toBeInTheDocument();
+      expect(screen.getByText('All providers are connected')).toBeInTheDocument();
     });
   });
 
@@ -184,6 +186,18 @@ describe('ProjectConnectorsTab', () => {
           })
         );
       });
+    });
+
+    it('shows Webhook URL label when connecting Slack', async () => {
+      mockProjectConnectors.mockReturnValue({ data: [], isLoading: false });
+      const user = userEvent.setup();
+      renderComponent();
+
+      await user.click(screen.getByRole('tab', { name: /available/i }));
+      const slackCard = screen.getByTestId('provider-card-slack');
+      await user.click(within(slackCard).getByRole('button', { name: /^connect$/i }));
+
+      expect(screen.getByLabelText('Webhook URL')).toBeInTheDocument();
     });
 
     it('shows inline error when API key is invalid', async () => {

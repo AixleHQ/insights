@@ -2,8 +2,12 @@ require 'rails_helper'
 
 RSpec.describe ProjectConnector, type: :model do
   describe 'constants' do
-    it 'defines only AI provider connector types' do
-      expect(ProjectConnector::CONNECTOR_TYPES).to eq(%w[openrouter anthropic openai gemini])
+    it 'defines AI provider and Slack connector types' do
+      expect(ProjectConnector::CONNECTOR_TYPES).to include('anthropic', 'openai', 'openrouter', 'gemini', 'slack')
+    end
+
+    it 'defines AI_PROVIDER_TYPES without slack' do
+      expect(ProjectConnector::AI_PROVIDER_TYPES).not_to include('slack')
     end
 
     it 'defines valid statuses' do
@@ -33,9 +37,14 @@ RSpec.describe ProjectConnector, type: :model do
       expect(other).to be_valid
     end
 
-    it 'rejects non-AI connector types' do
+    it 'rejects unsupported connector types' do
       connector = build(:project_connector, connector_type: 'github')
       expect(connector).not_to be_valid
+    end
+
+    it 'allows slack connector type' do
+      connector = build(:project_connector, :slack)
+      expect(connector).to be_valid
     end
 
     it { should allow_value(true).for(:is_active) }
@@ -93,6 +102,20 @@ RSpec.describe ProjectConnector, type: :model do
       it "returns true for #{provider}" do
         expect(build(:project_connector, connector_type: provider).ai_provider?).to be true
       end
+    end
+
+    it 'returns false for slack' do
+      expect(build(:project_connector, :slack).ai_provider?).to be false
+    end
+  end
+
+  describe '#slack_webhook?' do
+    it 'returns true for slack' do
+      expect(build(:project_connector, :slack).slack_webhook?).to be true
+    end
+
+    it 'returns false for AI providers' do
+      expect(build(:project_connector, connector_type: 'anthropic').slack_webhook?).to be false
     end
   end
 
