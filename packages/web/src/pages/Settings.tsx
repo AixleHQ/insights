@@ -27,6 +27,7 @@ import {
   useOverviewStats,
   useDailyStats,
   useOrganizationAuditLogs,
+  useConnectors,
   type AuditLogFilters,
 } from '@/hooks/useApi';
 import { Button } from '@/components/ui/button';
@@ -610,30 +611,86 @@ function PolicySettings() {
   );
 }
 
-function AlertSettings() {
+export function AlertSettings() {
   const { currentOrg } = useOrg();
   const { data: settings, isLoading } = useOrganizationSettings(currentOrg?.id || '');
+  const { data: connectors } = useConnectors(currentOrg?.id || '');
   const updateSetting = useUpdateOrganizationSetting();
 
-  // Parse settings from API or use defaults
-  const alerts = {
-    costDaily: (settings as Record<string, number>)?.alert_cost_daily ?? 500,
-    costMonthly: (settings as Record<string, number>)?.alert_cost_monthly ?? 5000,
-    riskCritical: (settings as Record<string, boolean>)?.alert_risk_critical ?? true,
-    riskHigh: (settings as Record<string, boolean>)?.alert_risk_high ?? true,
-    usageSpike: (settings as Record<string, boolean>)?.alert_usage_spike ?? true,
-    emailNotifications: (settings as Record<string, boolean>)?.alert_email ?? true,
-    slackNotifications: (settings as Record<string, boolean>)?.alert_slack ?? false,
+  const getSetting = (key: string) =>
+    (settings as { data: Array<{ key: string; value: string }> })?.data?.find(
+      (s) => s.key === key
+    )?.value;
+
+  const hasSlackConnector = connectors?.some(
+    (c) => (c.connectorType === 'slack' || c.connector_type === 'slack') && (c.isActive || c.is_active)
+  ) ?? false;
+
+  // Parse boolean/numeric settings
+  const riskCritical = getSetting('alert_risk_critical') !== 'false' && getSetting('alert_risk_critical') !== undefined ? getSetting('alert_risk_critical') !== 'false' : true;
+  const riskHigh = getSetting('alert_risk_high') !== 'false' && getSetting('alert_risk_high') !== undefined ? getSetting('alert_risk_high') !== 'false' : true;
+  const usageSpike = getSetting('alert_usage_spike') !== 'false' && getSetting('alert_usage_spike') !== undefined ? getSetting('alert_usage_spike') !== 'false' : true;
+  const emailNotifications = getSetting('alert_email') !== 'false' && getSetting('alert_email') !== undefined ? getSetting('alert_email') !== 'false' : true;
+  const slackNotifications = getSetting('alert_slack') === 'true';
+
+  // Controlled state for cost threshold inputs
+  const [costDaily, setCostDaily] = useState('');
+  const [costMonthly, setCostMonthly] = useState('');
+  const [costDailyError, setCostDailyError] = useState('');
+  const [costMonthlyError, setCostMonthlyError] = useState('');
+
+  // Sync controlled inputs when settings load
+  useEffect(() => {
+    const daily = getSetting('alert_cost_daily');
+    if (daily !== undefined) setCostDaily(daily);
+    else setCostDaily('500');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings]);
+
+  useEffect(() => {
+    const monthly = getSetting('alert_cost_monthly');
+    if (monthly !== undefined) setCostMonthly(monthly);
+    else setCostMonthly('5000');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings]);
+
+  const validateCostInput = (value: string): string => {
+    if (value === '' || value === null) return 'Value is required';
+    if (!/^\d+(\.\d+)?$/.test(value.trim())) return 'Must be a positive number';
+    if (Number(value) < 0) return 'Must be non-negative';
+    return '';
+  };
+
+  const handleCostDailyChange = (value: string) => {
+    setCostDaily(value);
+    setCostDailyError(validateCostInput(value));
+  };
+
+  const handleCostMonthlyChange = (value: string) => {
+    setCostMonthly(value);
+    setCostMonthlyError(validateCostInput(value));
+  };
+
+  const handleCostDailyBlur = () => {
+    const error = validateCostInput(costDaily);
+    setCostDailyError(error);
+    if (!error && currentOrg) {
+      updateSetting.mutate({ orgId: currentOrg.id, key: 'alert_cost_daily', value: costDaily });
+    }
+  };
+
+  const handleCostMonthlyBlur = () => {
+    const error = validateCostInput(costMonthly);
+    setCostMonthlyError(error);
+    if (!error && currentOrg) {
+      updateSetting.mutate({ orgId: currentOrg.id, key: 'alert_cost_monthly', value: costMonthly });
+    }
   };
 
   const updateAlertSetting = async (key: string, value: unknown) => {
     if (!currentOrg) return;
     try {
-      await updateSetting.mutateAsync({
-        orgId: currentOrg.id,
-        key,
-        value,
-      });
+      await updateSetting.mutateAsync({ orgId: currentOrg.id, key, value });
     } catch (error) {
       console.error('Failed to update setting:', error);
     }
@@ -668,22 +725,30 @@ function AlertSettings() {
             <Input
               id="costDaily"
               type="number"
-              defaultValue={alerts.costDaily}
-              onBlur={(e) =>
-                updateAlertSetting('alert_cost_daily', Number(e.target.value))
-              }
+              min={0}
+              value={costDaily}
+              onChange={(e) => handleCostDailyChange(e.target.value)}
+              onBlur={handleCostDailyBlur}
+              className={cn(costDailyError && 'border-destructive focus-visible:ring-destructive')}
             />
+            {costDailyError && (
+              <p className="text-xs text-destructive">{costDailyError}</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="costMonthly">Monthly Cost Limit (USD)</Label>
             <Input
               id="costMonthly"
               type="number"
-              defaultValue={alerts.costMonthly}
-              onBlur={(e) =>
-                updateAlertSetting('alert_cost_monthly', Number(e.target.value))
-              }
+              min={0}
+              value={costMonthly}
+              onChange={(e) => handleCostMonthlyChange(e.target.value)}
+              onBlur={handleCostMonthlyBlur}
+              className={cn(costMonthlyError && 'border-destructive focus-visible:ring-destructive')}
             />
+            {costMonthlyError && (
+              <p className="text-xs text-destructive">{costMonthlyError}</p>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -704,7 +769,8 @@ function AlertSettings() {
               </p>
             </div>
             <Switch
-              checked={alerts.riskCritical}
+              aria-label="Critical Risk Events"
+              checked={riskCritical}
               onCheckedChange={(checked) =>
                 updateAlertSetting('alert_risk_critical', checked)
               }
@@ -718,7 +784,8 @@ function AlertSettings() {
               </p>
             </div>
             <Switch
-              checked={alerts.riskHigh}
+              aria-label="High Risk Events"
+              checked={riskHigh}
               onCheckedChange={(checked) =>
                 updateAlertSetting('alert_risk_high', checked)
               }
@@ -732,7 +799,8 @@ function AlertSettings() {
               </p>
             </div>
             <Switch
-              checked={alerts.usageSpike}
+              aria-label="Usage Spikes"
+              checked={usageSpike}
               onCheckedChange={(checked) =>
                 updateAlertSetting('alert_usage_spike', checked)
               }
@@ -755,21 +823,26 @@ function AlertSettings() {
               </p>
             </div>
             <Switch
-              checked={alerts.emailNotifications}
+              aria-label="Email Notifications"
+              checked={emailNotifications}
               onCheckedChange={(checked) =>
                 updateAlertSetting('alert_email', checked)
               }
             />
           </div>
-          <div className="flex items-center justify-between rounded-lg border p-3">
+          <div className={cn('flex items-center justify-between rounded-lg border p-3', !hasSlackConnector && 'opacity-60')}>
             <div>
               <Label>Slack Notifications</Label>
               <p className="text-xs text-muted-foreground">
-                Post alerts to a Slack channel
+                {hasSlackConnector
+                  ? 'Post alerts to a Slack channel'
+                  : 'Connect a Slack integration to enable this'}
               </p>
             </div>
             <Switch
-              checked={alerts.slackNotifications}
+              aria-label="Slack Notifications"
+              checked={slackNotifications}
+              disabled={!hasSlackConnector}
               onCheckedChange={(checked) =>
                 updateAlertSetting('alert_slack', checked)
               }
