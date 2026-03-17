@@ -3806,6 +3806,31 @@ CREATE TABLE public.organizations (
 
 
 --
+-- Name: project_connectors; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.project_connectors (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    project_id uuid NOT NULL,
+    connector_type public.connector_type NOT NULL,
+    access_token text,
+    refresh_token text,
+    token_expires_at timestamp(6) without time zone,
+    scopes text[] DEFAULT '{}'::text[],
+    webhook_secret text,
+    config jsonb DEFAULT '{}'::jsonb,
+    is_active boolean DEFAULT true NOT NULL,
+    external_org_id character varying,
+    external_org_name character varying,
+    status character varying DEFAULT 'connected'::character varying NOT NULL,
+    last_sync_at timestamp(6) without time zone,
+    last_error character varying,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
 -- Name: project_memberships; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -6700,6 +6725,14 @@ ALTER TABLE ONLY public.organizations
 
 
 --
+-- Name: project_connectors project_connectors_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.project_connectors
+    ADD CONSTRAINT project_connectors_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: project_memberships project_memberships_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -9097,6 +9130,20 @@ CREATE UNIQUE INDEX index_organizations_on_slug ON public.organizations USING bt
 
 
 --
+-- Name: index_project_connectors_on_project_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_project_connectors_on_project_id ON public.project_connectors USING btree (project_id);
+
+
+--
+-- Name: index_project_connectors_on_project_id_and_connector_type; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_project_connectors_on_project_id_and_connector_type ON public.project_connectors USING btree (project_id, connector_type);
+
+
+--
 -- Name: index_project_memberships_on_project_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -10826,6 +10873,14 @@ ALTER TABLE ONLY public.project_memberships
 
 
 --
+-- Name: project_connectors fk_rails_8c7a35259d; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.project_connectors
+    ADD CONSTRAINT fk_rails_8c7a35259d FOREIGN KEY (project_id) REFERENCES public.projects(id);
+
+
+--
 -- Name: user_tool_accounts fk_rails_8ccfbe393d; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -10944,6 +10999,7 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260317000001'),
 ('20260309000002'),
 ('20260309000001'),
 ('20260305123754'),
