@@ -8,6 +8,7 @@ import {
   type IntegrationProvider,
   type ProviderInfo,
 } from '@/components/integrations';
+import type { ConnectorStatus } from '@/lib/types';
 import { ApiKeyConnectSheet } from '@/components/integrations/ApiKeyConnectSheet';
 import { SlackConnectSheet } from '@/components/integrations/SlackConnectSheet';
 
@@ -119,7 +120,7 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
       const lastError = c.lastError || c.last_error;
       const externalAccountName = c.externalAccountName || c.external_account_name;
       const lastSyncAt = c.lastSyncAt || c.last_sync_at;
-      const status = (c.status as IntegrationData['status']) || (lastError ? 'error' : (c.isActive ?? c.is_active ?? true) ? 'connected' : 'disconnected');
+      const status: ConnectorStatus = c.status ?? 'connected';
 
       return {
         id: c.id,

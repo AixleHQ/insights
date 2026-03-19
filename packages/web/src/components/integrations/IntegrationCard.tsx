@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn, formatDistanceToNow } from '@/lib/utils';
 import { ProviderLogo } from '@/components/icons';
+import type { ConnectorStatus } from '@/lib/types';
 
 export type IntegrationProvider =
   | 'github'
@@ -44,7 +45,7 @@ export interface IntegrationData {
   id: string;
   provider: IntegrationProvider;
   name: string;
-  status: 'connected' | 'error' | 'testing' | 'disconnected';
+  status: ConnectorStatus;
   last_sync_at?: string;
   sync_error?: string;
   metadata?: {
@@ -89,12 +90,6 @@ const statusConfig = {
     icon: AlertCircle,
     color: 'text-destructive',
     bg: 'bg-destructive/10',
-  },
-  testing: {
-    label: 'Testing',
-    icon: RefreshCw,
-    color: 'text-primary',
-    bg: 'bg-primary/10',
   },
   disconnected: {
     label: 'Disconnected',
@@ -256,11 +251,7 @@ export function IntegrationCard({
             ) : (
               <Badge variant="outline" className={cn('gap-1', status.bg)}>
                 <StatusIcon
-                  className={cn(
-                    'size-3',
-                    status.color,
-                    integration.status === 'testing' && 'animate-spin'
-                  )}
+                  className={cn('size-3', status.color)}
                 />
                 <span className={status.color}>{status.label}</span>
               </Badge>
