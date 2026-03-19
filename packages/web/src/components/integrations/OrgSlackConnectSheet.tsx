@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useProjectConnectWithSlack } from '@/hooks/useApi';
+import { useOrg } from '@/contexts/OrgContext';
+import { useConnectWithWebhook } from '@/hooks/useApi';
 import { ApiError } from '@/lib/api';
 import {
   Sheet,
@@ -14,15 +15,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ProviderLogo } from '@/components/icons';
 
-interface SlackConnectSheetProps {
-  projectId: string;
+interface OrgSlackConnectSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
 }
 
-export function SlackConnectSheet({ projectId, open, onOpenChange, onSuccess }: SlackConnectSheetProps) {
-  const connectWithSlack = useProjectConnectWithSlack();
+export function OrgSlackConnectSheet({ open, onOpenChange, onSuccess }: OrgSlackConnectSheetProps) {
+  const { currentOrg } = useOrg();
+  const connectWithWebhook = useConnectWithWebhook();
 
   const [webhookUrl, setWebhookUrl] = useState('');
   const [channelLabel, setChannelLabel] = useState('');
@@ -40,13 +41,14 @@ export function SlackConnectSheet({ projectId, open, onOpenChange, onSuccess }: 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!currentOrg) return;
 
     setError(null);
     setIsSubmitting(true);
 
     try {
-      await connectWithSlack.mutateAsync({
-        projectId,
+      await connectWithWebhook.mutateAsync({
+        orgId: currentOrg.id,
         webhookUrl,
         channelLabel: channelLabel.trim() || undefined,
       });
