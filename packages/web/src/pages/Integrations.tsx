@@ -11,7 +11,7 @@ import {
   type ProviderInfo,
 } from '@/components/integrations';
 import { ApiKeyConnectSheet } from '@/components/integrations/ApiKeyConnectSheet';
-import { SlackConnectSheet } from '@/components/integrations/SlackConnectSheet';
+import { OrgSlackConnectSheet } from '@/components/integrations/OrgSlackConnectSheet';
 
 const AI_PROVIDERS = new Set(['anthropic', 'openai', 'openrouter', 'gemini']);
 const SLACK_PROVIDERS = new Set(['slack']);
@@ -433,7 +433,7 @@ export function Integrations() {
         onSuccess={() => {}}
       />
 
-      <SlackConnectSheet
+      <OrgSlackConnectSheet
         open={slackSheetOpen}
         onOpenChange={setSlackSheetOpen}
         onSuccess={() => {}}

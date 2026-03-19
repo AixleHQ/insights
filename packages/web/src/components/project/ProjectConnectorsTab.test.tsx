@@ -10,6 +10,7 @@ import type { ProjectConnector } from '@/lib/types';
 const mockProjectConnectors = vi.fn();
 const mockConnectWithApiKey = vi.fn();
 const mockConnectWithSlack = vi.fn();
+const mockConnectWithWebhook = vi.fn();
 const mockDeleteConnector = vi.fn();
 const mockTestConnector = vi.fn();
 
@@ -223,6 +224,7 @@ describe('ProjectConnectorsTab', () => {
           webhookUrl: 'https://hooks.slack.com/services/T00/B00/xxx',
           channelLabel: '#alerts',
         });
+        expect(mockConnectWithWebhook).not.toHaveBeenCalled();
       });
     });
 
