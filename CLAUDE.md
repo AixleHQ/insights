@@ -62,11 +62,39 @@ All commands run from the repo root via `Makefile`.
 
 ## Git Conventions
 
-- Branch from `develop`. Merge to `develop` via PR.
-- `staging` branch deploys to staging automatically via CI.
-- `main` branch deploys to production.
-- Commit messages: `[TICKET-ID] Short description` (e.g., `[AIX-58] Add connector health display`).
-- All branches go through CI: RSpec, RuboCop, Brakeman, Vitest, ESLint, TypeScript typecheck.
+### Branch Naming
+
+Always branch from `develop`. Branch names follow this format:
+
+```
+feature/AIX-XX-short-description
+```
+
+- `AIX-XX` is the Linear ticket ID (e.g., `AIX-61`)
+- `short-description` is kebab-case, 2-4 words summarizing the work
+- Examples: `feature/AIX-61-user-auth`, `feature/AIX-72-slack-alerts`
+
+Never branch from `staging` or `main`.
+
+### Commit Messages
+
+```
+[AIX-XX] Short imperative description
+```
+
+- Always prefix with the ticket ID in brackets
+- Use imperative mood: "Add", "Fix", "Update", "Remove" — not "Added" or "Adds"
+- Keep the subject line under 72 characters
+- Examples:
+  - `[AIX-58] Add connector health display`
+  - `[AIX-61] Fix N+1 query in usage report`
+
+### Flow
+
+- All feature branches merge to `develop` via PR
+- `staging` branch deploys to staging automatically via CI
+- `main` branch deploys to production
+- All branches go through CI: RSpec, RuboCop, Brakeman, Vitest, ESLint, TypeScript typecheck
 
 ## Environment
 
