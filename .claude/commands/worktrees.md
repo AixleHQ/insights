@@ -1,5 +1,5 @@
 ---
-allowed-tools: Bash(git worktree:*), Bash(git branch:*), Bash(git checkout:*), Bash(git status:*), Bash(git log:*), Bash(ln:*), Bash(ls:*), Bash(mkdir:*), Bash(rm:*)
+allowed-tools: Bash(git worktree:*), Bash(git branch:*), Bash(git status:*), Bash(git log:*), Bash(git fetch:*), Bash(ln:*), Bash(ls:*), Bash(mkdir:*), Bash(rm -rf ../db90-rails-*:*)
 description: Manage git worktrees for parallel development on multiple tickets. Use when the user wants to create a new worktree, set up a worktree for a ticket, switch between worktrees, clean up worktrees, or work on multiple branches simultaneously. Handles dependency symlinking for Rails (vendor/bundle) and Node (node_modules) to avoid redundant installs.
 ---
 
@@ -36,20 +36,18 @@ Read the user's request and determine which action to take:
 
 1. Extract the ticket ID (e.g., `AIX-61`). If the user didn't provide a short feature name, ask for one before proceeding.
 
-2. Update `develop` to make sure the worktree starts from the latest code:
+2. Fetch the latest `develop` without switching branches:
    ```
    git fetch origin develop
-   git checkout develop
-   git pull origin develop
    ```
 
 3. Build names using the conventions above:
    - Branch: `feature/AIX-XX-feature-name`
    - Directory: `../db90-rails-AIX-XX`
 
-4. Create the worktree from `develop`:
+4. Create the worktree from `origin/develop` directly:
    ```
-   git worktree add ../db90-rails-AIX-XX -b feature/AIX-XX-feature-name develop
+   git worktree add ../db90-rails-AIX-XX -b feature/AIX-XX-feature-name origin/develop
    ```
 
 5. Symlink Rails gems to avoid reinstalling:

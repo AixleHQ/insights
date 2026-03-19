@@ -1,15 +1,16 @@
 ---
-allowed-tools: Bash(git diff:*), Bash(git log:*), Bash(git branch:*), Bash(git blame:*), Bash(bundle exec rubocop:*), Bash(bundle exec brakeman:*), Bash(npm run:*), Bash(npx tsc:*)
+allowed-tools: Bash(git diff:*), Bash(git log:*), Bash(git branch:*), Bash(git blame:*), Bash(bundle exec rubocop:*), Bash(bundle exec brakeman:*), Bash(npm run:*), Bash(npx tsc:*), Read, Grep, Glob
 description: Senior Staff Engineer code review — deep analysis of Ruby/Rails and React/TypeScript code through the lenses of maintainability, security, and performance. Use when you want an architectural review of your changes before opening a PR.
 ---
 
 ## Context
 
 - Current branch: !`git branch --show-current`
-- Commits ahead of develop: !`git log develop..HEAD --oneline`
-- Changed Ruby files: !`git diff develop..HEAD --name-only -- '*.rb'`
-- Changed JS/TS files: !`git diff develop..HEAD --name-only -- '*.ts' '*.tsx' '*.js' '*.jsx'`
-- Full diff: !`git diff develop..HEAD`
+- Base branch: !`git branch --show-current | grep -q '^hotfix/' && echo "main" || echo "develop"`
+- Commits ahead of base: !`BASE=$(git branch --show-current | grep -q '^hotfix/' && echo main || echo develop); git log $BASE..HEAD --oneline`
+- Changed Ruby files: !`BASE=$(git branch --show-current | grep -q '^hotfix/' && echo main || echo develop); git diff $BASE..HEAD --name-only -- '*.rb'`
+- Changed JS/TS files: !`BASE=$(git branch --show-current | grep -q '^hotfix/' && echo main || echo develop); git diff $BASE..HEAD --name-only -- '*.ts' '*.tsx' '*.js' '*.jsx'`
+- Full diff: !`BASE=$(git branch --show-current | grep -q '^hotfix/' && echo main || echo develop); git diff $BASE..HEAD`
 
 ---
 
@@ -41,7 +42,8 @@ Run only the relevant review sections based on which files changed.
 
 1. **RuboCop**:
    ```
-   cd packages/api && bundle exec rubocop --parallel $(git -C .. diff develop..HEAD --name-only -- '*.rb' | sed 's|packages/api/||' | tr '\n' ' ')
+   BASE=$(git branch --show-current | grep -q '^hotfix/' && echo main || echo develop)
+   cd packages/api && bundle exec rubocop --parallel $(git -C .. diff $BASE..HEAD --name-only -- '*.rb' | sed 's|packages/api/||' | tr '\n' ' ')
    ```
 2. **Brakeman**:
    ```

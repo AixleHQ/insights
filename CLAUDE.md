@@ -41,9 +41,21 @@ All commands run from the repo root via `Makefile`.
   - Run tests with `make test-api` or `bundle exec rspec` from `packages/api/`.
   - Do not mock the database in integration/request specs — use real DB with transactions.
 - **Serializers**: Alba (not ActiveModelSerializers or Blueprinter).
-- **Authorization**: ActionPolicy (not Pundit or CanCan).
-- **Background jobs**: Sidekiq. Job classes live in `app/jobs/`.
+- **Authorization**: ActionPolicy (not Pundit or CanCan). Policies live in `app/policies/` and inherit from `ApplicationPolicy`. Always call `authorize!` at the start of controller actions.
+- **Background jobs**: Sidekiq for standard async jobs (`app/jobs/`). Temporal.io for long-running, multi-step, or durable workflows — use Temporal when a job needs retries with state, human-in-the-loop steps, or orchestration across services.
 - **API-only**: No views or assets in the Rails app. All rendering is JSON.
+
+### Application Layer Conventions
+
+The Rails app uses a layered architecture beyond standard MVC:
+
+- `app/domain/` — Domain-Driven Design: entities, value objects, aggregates. Use for core business logic that is independent of Rails.
+- `app/services/` — Service objects for multi-step operations that don't belong in a single model or controller.
+- `app/query_builders/` — Query builder objects for complex ActiveRecord queries. Keep controllers and models free of query logic.
+- `app/repositories/` — Repository pattern for data access abstraction, particularly for domain objects.
+- `app/policies/` — ActionPolicy authorization policies. All policies inherit from `ApplicationPolicy`.
+
+Follow this decision hierarchy: standard Rails patterns first → existing codebase patterns → new patterns (justify explicitly).
 
 ## JavaScript / TypeScript Guidelines
 

@@ -1,16 +1,17 @@
 ---
-allowed-tools: Bash(git diff:*), Bash(git log:*), Bash(git status:*), Bash(bundle exec rubocop:*), Bash(bundle exec brakeman:*), Bash(bundle exec rspec:*), Bash(npm run:*), Bash(npx tsc:*)
+allowed-tools: Bash(git diff:*), Bash(git log:*), Bash(git status:*), Bash(git branch:*), Bash(bundle exec rubocop:*), Bash(bundle exec brakeman:*), Bash(bundle exec rspec:*), Bash(npm run:*), Bash(npx tsc:*), Bash(npx vitest:*)
 description: Review Ruby/Rails and JavaScript/TypeScript commits before pushing
 ---
 
 ## Context
 
 - Current branch: !`git branch --show-current`
-- Commits ahead of develop: !`git log develop..HEAD --oneline`
-- Changed Ruby files: !`git diff develop..HEAD --name-only -- '*.rb'`
-- Changed JS/TS files: !`git diff develop..HEAD --name-only -- '*.ts' '*.tsx' '*.js' '*.jsx'`
-- Full Ruby diff: !`git diff develop..HEAD -- '*.rb'`
-- Full JS/TS diff: !`git diff develop..HEAD -- '*.ts' '*.tsx' '*.js' '*.jsx'`
+- Base branch: !`git branch --show-current | grep -q '^hotfix/' && echo "main" || echo "develop"`
+- Commits ahead of base: !`BASE=$(git branch --show-current | grep -q '^hotfix/' && echo main || echo develop); git log $BASE..HEAD --oneline`
+- Changed Ruby files: !`BASE=$(git branch --show-current | grep -q '^hotfix/' && echo main || echo develop); git diff $BASE..HEAD --name-only -- '*.rb'`
+- Changed JS/TS files: !`BASE=$(git branch --show-current | grep -q '^hotfix/' && echo main || echo develop); git diff $BASE..HEAD --name-only -- '*.ts' '*.tsx' '*.js' '*.jsx'`
+- Full Ruby diff: !`BASE=$(git branch --show-current | grep -q '^hotfix/' && echo main || echo develop); git diff $BASE..HEAD -- '*.rb'`
+- Full JS/TS diff: !`BASE=$(git branch --show-current | grep -q '^hotfix/' && echo main || echo develop); git diff $BASE..HEAD -- '*.ts' '*.tsx' '*.js' '*.jsx'`
 
 ## Your task
 
@@ -22,7 +23,8 @@ Review all changes on this branch before they are pushed. Run all steps in order
 
 1. **RuboCop** — lint changed Ruby files:
    ```
-   cd packages/api && bundle exec rubocop --parallel $(git -C .. diff develop..HEAD --name-only -- '*.rb' | sed 's|packages/api/||' | tr '\n' ' ')
+   BASE=$(git branch --show-current | grep -q '^hotfix/' && echo main || echo develop)
+   cd packages/api && bundle exec rubocop --parallel $(git -C .. diff $BASE..HEAD --name-only -- '*.rb' | sed 's|packages/api/||' | tr '\n' ' ')
    ```
    Skip if no Ruby files changed.
 
@@ -56,9 +58,11 @@ Review all changes on this branch before they are pushed. Run all steps in order
   ```
 - Skip if no Ruby files changed or no matching specs found (note it).
 
-**Vitest** — run tests related to changed JS/TS files:
+**Vitest** — run only tests related to changed JS/TS files:
 ```
-cd packages/web && npm run test -- --run
+BASE=$(git branch --show-current | grep -q '^hotfix/' && echo main || echo develop)
+FILES=$(git diff $BASE..HEAD --name-only -- '*.ts' '*.tsx' '*.js' '*.jsx' | sed 's|packages/web/||' | tr '\n' ' ')
+cd packages/web && npx vitest related $FILES --run
 ```
 Skip if no JS/TS files changed.
 
