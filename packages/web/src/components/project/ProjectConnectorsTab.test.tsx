@@ -27,6 +27,7 @@ vi.mock('@/hooks/useApi', () => ({
   useProjectDeleteConnector: () => ({ mutateAsync: mockDeleteConnector }),
   useProjectTestConnector: () => ({ mutateAsync: mockTestConnector }),
   useConnectWithApiKey: () => ({ mutateAsync: vi.fn() }),
+  useConnectWithWebhook: () => ({ mutateAsync: vi.fn() }),
 }));
 
 const PROJECT_ID = 'test-project-id';
