@@ -37,7 +37,7 @@ class ProjectAuditLog < ApplicationRecord
       metadata: metadata,
       ip_address: request&.remote_ip
     )
-  rescue ActiveRecord::RecordInvalid => e
+  rescue StandardError => e
     Rails.logger.error("[ProjectAuditLog] Failed to log action '#{action}': #{e.message}")
     nil
   end

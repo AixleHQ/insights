@@ -79,6 +79,7 @@ module Api
       def update
         authorize! @connector
 
+        # Track only non-sensitive fields; token fields are intentionally excluded from audit logs.
         changes_before = @connector.slice(:is_active, :status, :external_org_name)
 
         if @connector.update(connector_update_params)

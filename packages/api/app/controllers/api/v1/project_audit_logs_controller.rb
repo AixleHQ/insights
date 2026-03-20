@@ -16,8 +16,15 @@ module Api
         logs = logs.by_actor(params[:actor_id]) if params[:actor_id].present?
         logs = logs.by_action(params[:log_action]) if params[:log_action].present?
         logs = logs.by_resource_type(params[:resource_type]) if params[:resource_type].present?
-        logs = logs.from_date(params[:from_date]) if params[:from_date].present?
-        logs = logs.to_date(params[:to_date]) if params[:to_date].present?
+        if params[:from_date].present?
+          from_date = parse_date_param(params[:from_date], :from_date) or return
+          logs = logs.from_date(from_date)
+        end
+
+        if params[:to_date].present?
+          to_date = parse_date_param(params[:to_date], :to_date) or return
+          logs = logs.to_date(to_date)
+        end
 
         paginated = paginate(logs)
 
@@ -31,6 +38,13 @@ module Api
 
       def set_project
         @project = Project.find(params[:project_id])
+      end
+
+      def parse_date_param(value, param_name)
+        Time.zone.parse(value)
+      rescue ArgumentError
+        render_bad_request("Invalid #{param_name} format — expected ISO 8601")
+        nil
       end
     end
   end
