@@ -33,27 +33,7 @@ module Admin
         user_agent: request.user_agent
       )
 
-      user.organizations.each do |organization|
-        OrganizationAuditLog.log(
-          organization: organization,
-          actor: current_admin_user,
-          action: "impersonation.started",
-          resource: user,
-          metadata: { impersonator_email: current_admin_user.email },
-          request: request
-        )
-      end
-
-      user.projects.each do |project|
-        ProjectAuditLog.log(
-          project: project,
-          actor: current_admin_user,
-          action: "impersonation.started",
-          resource: user,
-          metadata: { impersonator_email: current_admin_user.email },
-          request: request
-        )
-      end
+      ImpersonationAuditService.log_started(user: user, actor: current_admin_user, request: request)
 
       # Generate an impersonation token
       token = ImpersonationService.generate_token(
