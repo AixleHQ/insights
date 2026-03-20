@@ -64,7 +64,11 @@ Read the user's request and determine which action to take:
 7. Report a summary:
    - Worktree path
    - Branch name
-   - How to open it: `claude --path ../db90-rails-AIX-XX`
+   - How to open it (use the actual worktree path, e.g. `../db90-rails-AIX-XX`):
+     ```
+     cd <worktree-path>
+     claude
+     ```
 
 ---
 
@@ -129,15 +133,21 @@ Display path, branch, and HEAD commit for each. Mark the main worktree clearly.
 
 ---
 
-### ACTION: Switch to / open a worktree
+### ACTION: Navigate to / open a worktree
 
-**Trigger:** user says "switch to worktree [TICKET-ID]", "open worktree", or similar.
+**Trigger:** user says "switch to worktree [TICKET-ID]", "open worktree", "navigate to worktree", "how do I start working on [TICKET-ID]", or similar.
 
 1. Find the matching worktree path from `git worktree list`.
-2. Tell the user to open it with:
+2. Tell the user they can get the exact path by running:
    ```
-   claude --path ../db90-rails-AIX-XX
+   git worktree list
    ```
+3. Then open a new terminal tab, navigate to the worktree, and start Claude:
+   ```
+   cd <worktree-path>
+   claude
+   ```
+4. Remind them that Claude will automatically pick up the branch context from the directory.
 
 ---
 
