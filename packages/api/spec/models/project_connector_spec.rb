@@ -120,10 +120,11 @@ RSpec.describe ProjectConnector, type: :model do
   end
 
   describe '#mark_testing!' do
-    it 'sets status to testing' do
-      connector = create(:project_connector, status: 'connected')
+    it 'sets status to testing and clears last_error' do
+      connector = create(:project_connector, :with_error)
       connector.mark_testing!
       expect(connector.status).to eq('testing')
+      expect(connector.last_error).to be_nil
     end
   end
 

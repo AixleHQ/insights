@@ -5,6 +5,10 @@ RSpec.describe OrganizationConnector, type: :model do
     it 'defines valid connector types' do
       expect(OrganizationConnector::CONNECTOR_TYPES).to eq(%w[github gitlab bitbucket jira linear openrouter anthropic openai gemini slack])
     end
+
+    it 'defines valid statuses' do
+      expect(OrganizationConnector::STATUSES).to eq(%w[connected testing error disconnected])
+    end
   end
 
   describe 'associations' do
@@ -136,10 +140,11 @@ RSpec.describe OrganizationConnector, type: :model do
   end
 
   describe '#mark_testing!' do
-    it 'sets status to testing' do
-      connector = create(:organization_connector, status: 'connected')
+    it 'sets status to testing and clears last_error' do
+      connector = create(:organization_connector, status: 'error', last_error: 'previous error')
       connector.mark_testing!
       expect(connector.status).to eq('testing')
+      expect(connector.last_error).to be_nil
     end
   end
 

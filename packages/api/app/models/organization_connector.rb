@@ -39,7 +39,7 @@ class OrganizationConnector < ApplicationRecord
   end
 
   def mark_testing!
-    update!(status: "testing")
+    update!(status: "testing", last_error: nil)
   end
 
   def mark_connected!

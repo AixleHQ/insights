@@ -91,7 +91,7 @@ export interface Connector {
   connector_type?: ConnectorProvider;
   isActive: boolean;
   is_active?: boolean;
-  status?: ConnectorStatus;
+  status: ConnectorStatus;
   externalAccountId?: string | null;
   external_account_id?: string | null;
   externalAccountName?: string | null;
@@ -119,7 +119,7 @@ export interface ProjectConnector {
   connector_type?: ProjectConnectorProvider;
   isActive: boolean;
   is_active?: boolean;
-  status?: ConnectorStatus;
+  status: ConnectorStatus;
   externalAccountId?: string | null;
   external_account_id?: string | null;
   externalAccountName?: string | null;

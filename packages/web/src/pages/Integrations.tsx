@@ -270,7 +270,7 @@ export function Integrations() {
       const externalAccountName = c.externalAccountName || c.external_account_name;
       const lastSyncAt = c.lastSyncAt || c.last_sync_at;
 
-      const status: ConnectorStatus = c.status ?? 'connected';
+      const status: ConnectorStatus = c.status;
 
       return {
         id: c.id,
