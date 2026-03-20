@@ -266,6 +266,23 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
       expect(error_connector.reload.status).to eq('connected')
       expect(error_connector.reload.last_error).to be_nil
     end
+
+    it 'creates a connector.create audit log on success' do
+      allow_any_instance_of(Oauth::AnthropicProvider)
+        .to receive(:test_connection).and_return({ success: true })
+
+      expect {
+        authenticated_post "/api/v1/projects/#{fresh_project.id}/connectors",
+                           user: org_admin,
+                           organization: organization,
+                           params: { connector_type: 'anthropic', access_token: 'valid-key' }
+      }.to change(ProjectAuditLog, :count).by(1)
+
+      log = ProjectAuditLog.last
+      expect(log.action).to eq('connector.create')
+      expect(log.actor).to eq(org_admin)
+      expect(log.tracked_changes['connector_type']).to eq('anthropic')
+    end
   end
 
   describe 'PATCH /api/v1/projects/:project_id/connectors/:id' do
@@ -277,6 +294,21 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
 
       expect_success
       expect(json_data[:isActive]).to be false
+    end
+
+    it 'creates a connector.update audit log' do
+      expect {
+        authenticated_patch "/api/v1/projects/#{project.id}/connectors/#{connector.id}",
+                            user: org_admin,
+                            organization: organization,
+                            params: { is_active: false }
+      }.to change(ProjectAuditLog, :count).by(1)
+
+      log = ProjectAuditLog.last
+      expect(log.action).to eq('connector.update')
+      expect(log.actor).to eq(org_admin)
+      expect(log.tracked_changes['before']).to include('is_active' => true)
+      expect(log.tracked_changes['after']).to include('is_active' => false)
     end
 
     it 'returns 403 for regular project members' do
@@ -297,6 +329,19 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
 
       expect_no_content
       expect(ProjectConnector.find_by(id: connector.id)).to be_nil
+    end
+
+    it 'creates a connector.delete audit log' do
+      expect {
+        authenticated_delete "/api/v1/projects/#{project.id}/connectors/#{connector.id}",
+                             user: org_admin,
+                             organization: organization
+      }.to change(ProjectAuditLog, :count).by(1)
+
+      log = ProjectAuditLog.last
+      expect(log.action).to eq('connector.delete')
+      expect(log.actor).to eq(org_admin)
+      expect(log.tracked_changes['connector_type']).to eq('anthropic')
     end
 
     it 'returns 403 for regular project members' do
@@ -336,6 +381,19 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
         expect_success
         expect(json_data[:success]).to be true
         expect(connector.reload.status).to eq('connected')
+      end
+
+      it 'creates a connector.test audit log with success: true' do
+        expect {
+          authenticated_post "/api/v1/projects/#{project.id}/connectors/#{connector.id}/test",
+                             user: org_admin,
+                             organization: organization
+        }.to change(ProjectAuditLog, :count).by(1)
+
+        log = ProjectAuditLog.last
+        expect(log.action).to eq('connector.test')
+        expect(log.actor).to eq(org_admin)
+        expect(log.tracked_changes['success']).to be true
       end
     end
 
@@ -520,6 +578,19 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
       expect_success
       expect(connector.reload.last_sync_at).to be_present
       expect(connector.reload.status).to eq('connected')
+    end
+
+    it 'creates a connector.sync audit log' do
+      expect {
+        authenticated_post "/api/v1/projects/#{project.id}/connectors/#{connector.id}/sync",
+                           user: org_admin,
+                           organization: organization
+      }.to change(ProjectAuditLog, :count).by(1)
+
+      log = ProjectAuditLog.last
+      expect(log.action).to eq('connector.sync')
+      expect(log.actor).to eq(org_admin)
+      expect(log.tracked_changes['connector_type']).to eq('anthropic')
     end
 
     it 'returns 403 for regular project members' do

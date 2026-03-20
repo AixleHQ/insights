@@ -45,6 +45,20 @@ RSpec.describe 'Api::V1::ProjectMembers', type: :request do
       expect(json_data[:role]).to eq('member')
     end
 
+    it 'creates a member.invited audit log' do
+      expect {
+        authenticated_post "/api/v1/projects/#{project.id}/members",
+                           user: admin,
+                           params: { user_id: new_user.id, role: 'member' }
+      }.to change(ProjectAuditLog, :count).by(1)
+
+      log = ProjectAuditLog.last
+      expect(log.action).to eq('member.invited')
+      expect(log.actor).to eq(admin)
+      expect(log.tracked_changes['user_id']).to eq(new_user.id)
+      expect(log.tracked_changes['role']).to eq('member')
+    end
+
     it 'returns 403 for non-admins' do
       authenticated_post "/api/v1/projects/#{project.id}/members",
                          user: member,
@@ -63,6 +77,20 @@ RSpec.describe 'Api::V1::ProjectMembers', type: :request do
       expect_success
       expect(json_data[:role]).to eq('viewer')
     end
+
+    it 'creates a member.role_changed audit log' do
+      expect {
+        authenticated_patch "/api/v1/projects/#{project.id}/members/#{project_member_membership.id}",
+                            user: admin,
+                            params: { role: 'viewer' }
+      }.to change(ProjectAuditLog, :count).by(1)
+
+      log = ProjectAuditLog.last
+      expect(log.action).to eq('member.role_changed')
+      expect(log.actor).to eq(admin)
+      expect(log.tracked_changes['before']).to eq('member')
+      expect(log.tracked_changes['after']).to eq('viewer')
+    end
   end
 
   describe 'DELETE /api/v1/projects/:project_id/members/:id' do
@@ -72,6 +100,19 @@ RSpec.describe 'Api::V1::ProjectMembers', type: :request do
 
       expect_no_content
       expect(ProjectMembership.find_by(id: project_member_membership.id)).to be_nil
+    end
+
+    it 'creates a member.removed audit log' do
+      expect {
+        authenticated_delete "/api/v1/projects/#{project.id}/members/#{project_member_membership.id}",
+                             user: admin
+      }.to change(ProjectAuditLog, :count).by(1)
+
+      log = ProjectAuditLog.last
+      expect(log.action).to eq('member.removed')
+      expect(log.actor).to eq(admin)
+      expect(log.tracked_changes['user_id']).to eq(member.id)
+      expect(log.tracked_changes['role']).to eq('member')
     end
   end
 end

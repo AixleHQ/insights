@@ -58,6 +58,14 @@ module Api
 
         @connector.assign_attributes(is_active: true, status: "connected", last_error: nil, last_sync_at: Time.current)
         if @connector.save
+          ProjectAuditLog.log(
+            project: @project,
+            actor: current_user,
+            action: "connector.create",
+            resource: @connector,
+            tracked_changes: { connector_type: @connector.connector_type },
+            request: request
+          )
           render_created(@connector, ProjectConnectorSerializer)
         else
           render json: {
@@ -71,7 +79,19 @@ module Api
       def update
         authorize! @connector
 
+        # Track only non-sensitive fields; token fields are intentionally excluded from audit logs.
+        changes_before = @connector.slice(:is_active, :status, :external_org_name)
+
         if @connector.update(connector_update_params)
+          changes_after = @connector.slice(:is_active, :status, :external_org_name)
+          ProjectAuditLog.log(
+            project: @project,
+            actor: current_user,
+            action: "connector.update",
+            resource: @connector,
+            tracked_changes: { before: changes_before, after: changes_after },
+            request: request
+          )
           render_resource(@connector, ProjectConnectorSerializer)
         else
           render json: {
@@ -84,7 +104,19 @@ module Api
       # DELETE /api/v1/projects/:project_id/connectors/:id
       def destroy
         authorize! @connector
+
+        connector_type = @connector.connector_type
         @connector.destroy!
+
+        ProjectAuditLog.log(
+          project: @project,
+          actor: current_user,
+          action: "connector.delete",
+          resource: @connector,
+          tracked_changes: { connector_type: connector_type },
+          request: request
+        )
+
         render_no_content
       end
 
@@ -104,15 +136,39 @@ module Api
 
         if result[:success]
           @connector.mark_connected!
+          ProjectAuditLog.log(
+            project: @project,
+            actor: current_user,
+            action: "connector.test",
+            resource: @connector,
+            tracked_changes: { connector_type: @connector.connector_type, success: true },
+            request: request
+          )
           render json: { data: { success: true, message: "Connection successful" } }
         else
           @connector.mark_error!(result[:error])
+          ProjectAuditLog.log(
+            project: @project,
+            actor: current_user,
+            action: "connector.test",
+            resource: @connector,
+            tracked_changes: { connector_type: @connector.connector_type, success: false, error: result[:error] },
+            request: request
+          )
           render json: { data: { success: false, error: result[:error] } }, status: :ok
         end
       rescue ActionPolicy::Unauthorized
         raise
       rescue StandardError => e
         @connector.mark_error!(e.message)
+        ProjectAuditLog.log(
+          project: @project,
+          actor: current_user,
+          action: "connector.test",
+          resource: @connector,
+          tracked_changes: { connector_type: @connector.connector_type, success: false, error: e.message },
+          request: request
+        )
         render json: { data: { success: false, error: e.message } }, status: :ok
       end
 
@@ -120,6 +176,14 @@ module Api
       def sync
         authorize! @connector, to: :sync?
         @connector.mark_synced!
+        ProjectAuditLog.log(
+          project: @project,
+          actor: current_user,
+          action: "connector.sync",
+          resource: @connector,
+          tracked_changes: { connector_type: @connector.connector_type },
+          request: request
+        )
         render_resource(@connector, ProjectConnectorSerializer)
       end
 

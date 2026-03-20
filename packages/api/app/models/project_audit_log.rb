@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class OrganizationAuditLog < ApplicationRecord
+class ProjectAuditLog < ApplicationRecord
   ACTIONS = %w[
     settings.create
     settings.update
@@ -17,7 +17,7 @@ class OrganizationAuditLog < ApplicationRecord
     impersonation.ended
   ].freeze
 
-  belongs_to :organization
+  belongs_to :project
   belongs_to :actor, class_name: "User", optional: true
 
   validates :action, presence: true, inclusion: { in: ACTIONS }
@@ -28,9 +28,9 @@ class OrganizationAuditLog < ApplicationRecord
   scope :from_date, ->(date) { where("created_at >= ?", date) }
   scope :to_date, ->(date) { where("created_at <= ?", date) }
 
-  def self.log(organization:, actor:, action:, resource: nil, tracked_changes: {}, metadata: {}, request: nil)
+  def self.log(project:, actor:, action:, resource: nil, tracked_changes: {}, metadata: {}, request: nil)
     create!(
-      organization: organization,
+      project: project,
       actor: actor,
       action: action,
       resource_type: resource&.class&.name,
@@ -40,7 +40,7 @@ class OrganizationAuditLog < ApplicationRecord
       ip_address: request&.remote_ip
     )
   rescue StandardError => e
-    Rails.logger.error("[OrganizationAuditLog] Failed to log action '#{action}': #{e.message}")
+    Rails.logger.error("[ProjectAuditLog] Failed to log action '#{action}': #{e.message}")
     nil
   end
 end

@@ -136,6 +136,24 @@ RSpec.describe 'Api::V1::Users', type: :request do
                            impersonator: admin
         }.to change(OrganizationAuditLog, :count).by(2)
       end
+
+      it 'logs impersonation.ended to each project the user belongs to' do
+        project = create(:project, organization: organization)
+        create(:project_membership, user: user, project: project, role: 'member')
+
+        expect {
+          impersonated_post '/api/v1/users/me/stop_impersonation',
+                           user: user,
+                           impersonator: admin
+        }.to change(ProjectAuditLog, :count).by(1)
+
+        log = ProjectAuditLog.last
+        expect(log.action).to eq('impersonation.ended')
+        expect(log.project).to eq(project)
+        expect(log.actor).to eq(admin)
+        expect(log.resource_type).to eq('User')
+        expect(log.resource_id).to eq(user.id)
+      end
     end
 
     context 'when not in impersonation mode' do

@@ -100,16 +100,7 @@ module Api
 
         impersonator = User.find_by(id: request.env["jwt.impersonator_id"])
 
-        current_user.organizations.each do |organization|
-          OrganizationAuditLog.log(
-            organization: organization,
-            actor: impersonator,
-            action: "impersonation.ended",
-            resource: current_user,
-            metadata: { impersonator_email: request.env["jwt.impersonator_email"] },
-            request: request
-          )
-        end
+        ImpersonationAuditService.log_ended(user: current_user, actor: impersonator, request: request)
 
         render json: { data: { success: true } }
       end
