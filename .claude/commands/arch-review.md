@@ -6,11 +6,11 @@ description: Architectural code review — deep analysis of Ruby/Rails and React
 ## Context
 
 - Current branch: !`git branch --show-current`
-- Base branch: !`git branch --show-current | grep -q '^hotfix/' && echo "main" || echo "develop"`
-- Commits ahead of base: !`BASE=$(git branch --show-current | grep -q '^hotfix/' && echo main || echo develop); git log $BASE..HEAD --oneline`
-- Changed Ruby files: !`BASE=$(git branch --show-current | grep -q '^hotfix/' && echo main || echo develop); git diff $BASE..HEAD --name-only -- '*.rb'`
-- Changed JS/TS files: !`BASE=$(git branch --show-current | grep -q '^hotfix/' && echo main || echo develop); git diff $BASE..HEAD --name-only -- '*.ts' '*.tsx' '*.js' '*.jsx'`
-- Full diff: !`BASE=$(git branch --show-current | grep -q '^hotfix/' && echo main || echo develop); git diff $BASE..HEAD`
+- Base branch: develop
+- Commits ahead of base: !`git log develop..HEAD --oneline`
+- Changed Ruby files: !`git diff develop..HEAD --name-only -- '*.rb'`
+- Changed JS/TS files: !`git diff develop..HEAD --name-only -- '*.ts' '*.tsx' '*.js' '*.jsx'`
+- Full diff: !`git diff develop..HEAD`
 
 ---
 
@@ -42,8 +42,7 @@ Run only the relevant review sections based on which files changed.
 
 1. **RuboCop**:
    ```
-   BASE=$(git branch --show-current | grep -q '^hotfix/' && echo main || echo develop)
-   cd packages/api && bundle exec rubocop --parallel $(git -C .. diff $BASE..HEAD --name-only -- '*.rb' | sed 's|packages/api/||' | tr '\n' ' ')
+   cd packages/api && bundle exec rubocop --parallel $(git diff develop..HEAD --name-only -- '*.rb' | sed 's|packages/api/||' | tr '\n' ' ')
    ```
 2. **Brakeman**:
    ```
