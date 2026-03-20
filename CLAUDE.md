@@ -108,6 +108,35 @@ Never branch from `staging` or `main`.
 - `main` branch deploys to production
 - All branches go through CI: RSpec, RuboCop, Brakeman, Vitest, ESLint, TypeScript typecheck
 
+## Worktree Workflow
+
+Each ticket gets its own git worktree — a separate directory on its own branch, sharing the same repo history. This lets you work on multiple tickets simultaneously without switching branches.
+
+### Commands (use `/worktrees` skill)
+
+| Step | Command | Where |
+|------|---------|-------|
+| 1. Create | `/worktrees create a worktree for AIX-XX` | main repo |
+| 2. Navigate | `/worktrees open worktree AIX-XX` | main repo |
+| 3. Open | `cd <worktree-path> && claude` | terminal |
+| 4. Work | commit + push normally | worktree session |
+| 5. Clean up | `/worktrees clean up worktree AIX-XX` | main repo |
+
+### Directory structure
+
+```
+~/
+  db90-rails/              # main repo (develop)
+  db90-rails-AIX-51/    # worktree for ticket 51
+  db90-rails-AIX-72/    # worktree for ticket 72
+```
+
+### Rules
+
+- **Never run `bundle install` or `npm install` in a worktree** — `vendor/` and `node_modules/` are symlinked from the main repo. Only reinstall if you added a new gem or package on that branch (remove the symlink first).
+- **Docker does not follow symlinks** outside the build context. If you need to run Docker from a worktree, replace the `vendor/` symlink with a real copy: `cp -r ../db90-rails/packages/api/vendor packages/api/vendor`.
+- All worktrees share the same `.git` — commits, fetches, and branches are visible everywhere.
+
 ## Environment
 
 - `.env.example` — copy to `.env` and fill in values (Google OAuth credentials required).
