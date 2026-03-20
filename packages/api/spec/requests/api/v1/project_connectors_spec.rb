@@ -309,6 +309,19 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
   end
 
   describe 'POST /api/v1/projects/:project_id/connectors/:id/test' do
+    it 'sets connector status to testing before running the test' do
+      allow_any_instance_of(Oauth::AnthropicProvider).to receive(:test_connection) do
+        expect(connector.reload.status).to eq('testing')
+        { success: true }
+      end
+
+      authenticated_post "/api/v1/projects/#{project.id}/connectors/#{connector.id}/test",
+                         user: org_admin,
+                         organization: organization
+
+      expect_success
+    end
+
     context 'when the connection succeeds' do
       before do
         allow_any_instance_of(Oauth::AnthropicProvider)

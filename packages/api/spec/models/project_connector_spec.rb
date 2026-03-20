@@ -11,7 +11,7 @@ RSpec.describe ProjectConnector, type: :model do
     end
 
     it 'defines valid statuses' do
-      expect(ProjectConnector::STATUSES).to eq(%w[connected error disconnected])
+      expect(ProjectConnector::STATUSES).to eq(%w[connected testing error disconnected])
     end
   end
 
@@ -116,6 +116,14 @@ RSpec.describe ProjectConnector, type: :model do
 
     it 'returns false for AI providers' do
       expect(build(:project_connector, connector_type: 'anthropic').slack_webhook?).to be false
+    end
+  end
+
+  describe '#mark_testing!' do
+    it 'sets status to testing' do
+      connector = create(:project_connector, status: 'connected')
+      connector.mark_testing!
+      expect(connector.status).to eq('testing')
     end
   end
 

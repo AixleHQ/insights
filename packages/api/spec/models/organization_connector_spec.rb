@@ -135,6 +135,14 @@ RSpec.describe OrganizationConnector, type: :model do
     end
   end
 
+  describe '#mark_testing!' do
+    it 'sets status to testing' do
+      connector = create(:organization_connector, status: 'connected')
+      connector.mark_testing!
+      expect(connector.status).to eq('testing')
+    end
+  end
+
   describe '#mark_error!' do
     it 'updates last_error' do
       connector = create(:organization_connector)

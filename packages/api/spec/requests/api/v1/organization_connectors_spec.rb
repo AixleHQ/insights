@@ -214,7 +214,20 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
   end
 
   describe 'POST /api/v1/organizations/:organization_id/connectors/:id/test' do
-    it 'tests the connector connection' do
+    it 'sets connector status to testing before running the test' do
+      allow_any_instance_of(Oauth::GithubProvider).to receive(:test_connection) do
+        expect(connector.reload.status).to eq('testing')
+        { success: true, account: 'testuser', name: 'Test User' }
+      end
+
+      authenticated_post "/api/v1/organizations/#{organization.id}/connectors/#{connector.id}/test",
+                         user: admin,
+                         organization: organization
+
+      expect_success
+    end
+
+    it 'marks connector as connected on success' do
       allow_any_instance_of(Oauth::GithubProvider).to receive(:test_connection)
         .and_return({ success: true, account: 'testuser', name: 'Test User' })
 
@@ -224,6 +237,43 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
 
       expect_success
       expect(json_data[:success]).to be true
+      expect(connector.reload.status).to eq('connected')
+    end
+
+    it 'marks connector as error on failure' do
+      allow_any_instance_of(Oauth::GithubProvider).to receive(:test_connection)
+        .and_return({ success: false, error: 'Token expired' })
+
+      authenticated_post "/api/v1/organizations/#{organization.id}/connectors/#{connector.id}/test",
+                         user: admin,
+                         organization: organization
+
+      expect_success
+      expect(json_data[:success]).to be false
+      expect(connector.reload.status).to eq('error')
+      expect(connector.reload.last_error).to eq('Token expired')
+    end
+
+    it 'marks connector as error and returns 200 when an unexpected exception is raised' do
+      allow_any_instance_of(Oauth::GithubProvider).to receive(:test_connection)
+        .and_raise(RuntimeError, 'unexpected failure')
+
+      authenticated_post "/api/v1/organizations/#{organization.id}/connectors/#{connector.id}/test",
+                         user: admin,
+                         organization: organization
+
+      expect_success
+      expect(json_data[:success]).to be false
+      expect(connector.reload.status).to eq('error')
+      expect(connector.reload.last_error).to eq('unexpected failure')
+    end
+
+    it 'returns 403 for non-admins' do
+      authenticated_post "/api/v1/organizations/#{organization.id}/connectors/#{connector.id}/test",
+                         user: member,
+                         organization: organization
+
+      expect_forbidden
     end
 
     context 'with a slack connector' do

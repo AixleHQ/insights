@@ -131,6 +131,8 @@ module Api
           )
           render json: { data: { success: false, error: result[:error] } }, status: :ok
         end
+      rescue ActionPolicy::Unauthorized
+        raise
       rescue StandardError => e
         @connector.mark_error!(e.message)
         render json: { data: { success: false, error: e.message } }, status: :ok
