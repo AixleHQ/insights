@@ -103,6 +103,59 @@ RSpec.describe 'Admin Users', type: :request do
         }.not_to change(OrganizationAuditLog, :count)
       end
     end
+
+    context 'when the impersonated user belongs to projects' do
+      let(:organization) { create(:organization) }
+      let(:project) { create(:project, organization: organization) }
+
+      before do
+        create(:organization_membership, user: user, organization: organization)
+        create(:project_membership, user: user, project: project, role: 'member')
+      end
+
+      it 'logs impersonation.started to each project audit log' do
+        expect {
+          post impersonate_admin_user_path(user)
+        }.to change(ProjectAuditLog, :count).by(1)
+
+        log = ProjectAuditLog.last
+        expect(log.action).to eq('impersonation.started')
+        expect(log.project).to eq(project)
+        expect(log.actor).to eq(global_admin)
+        expect(log.resource_type).to eq('User')
+        expect(log.resource_id).to eq(user.id)
+        expect(log.metadata['impersonator_email']).to eq(global_admin.email)
+      end
+    end
+
+    context 'when the impersonated user belongs to multiple projects' do
+      let(:organization) { create(:organization) }
+      let(:project1) { create(:project, organization: organization) }
+      let(:project2) { create(:project, organization: organization) }
+
+      before do
+        create(:organization_membership, user: user, organization: organization)
+        create(:project_membership, user: user, project: project1, role: 'member')
+        create(:project_membership, user: user, project: project2, role: 'member')
+      end
+
+      it 'logs impersonation.started to every project' do
+        expect {
+          post impersonate_admin_user_path(user)
+        }.to change(ProjectAuditLog, :count).by(2)
+
+        actions = ProjectAuditLog.last(2).map(&:action)
+        expect(actions).to all(eq('impersonation.started'))
+      end
+    end
+
+    context 'when the impersonated user belongs to no projects' do
+      it 'does not create any project audit log' do
+        expect {
+          post impersonate_admin_user_path(user)
+        }.not_to change(ProjectAuditLog, :count)
+      end
+    end
   end
 
   describe 'GET /admin/users/export' do

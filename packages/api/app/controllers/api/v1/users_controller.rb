@@ -111,6 +111,17 @@ module Api
           )
         end
 
+        current_user.projects.each do |project|
+          ProjectAuditLog.log(
+            project: project,
+            actor: impersonator,
+            action: "impersonation.ended",
+            resource: current_user,
+            metadata: { impersonator_email: request.env["jwt.impersonator_email"] },
+            request: request
+          )
+        end
+
         render json: { data: { success: true } }
       end
 

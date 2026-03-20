@@ -13,6 +13,8 @@ class ProjectAuditLog < ApplicationRecord
     member.invited
     member.role_changed
     member.removed
+    impersonation.started
+    impersonation.ended
   ].freeze
 
   belongs_to :project

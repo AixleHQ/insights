@@ -44,6 +44,17 @@ module Admin
         )
       end
 
+      user.projects.each do |project|
+        ProjectAuditLog.log(
+          project: project,
+          actor: current_admin_user,
+          action: "impersonation.started",
+          resource: user,
+          metadata: { impersonator_email: current_admin_user.email },
+          request: request
+        )
+      end
+
       # Generate an impersonation token
       token = ImpersonationService.generate_token(
         admin_user: current_admin_user,
