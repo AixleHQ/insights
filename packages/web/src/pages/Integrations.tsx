@@ -10,6 +10,7 @@ import {
   type IntegrationProvider,
   type ProviderInfo,
 } from '@/components/integrations';
+import type { ConnectorStatus } from '@/lib/types';
 import { ApiKeyConnectSheet } from '@/components/integrations/ApiKeyConnectSheet';
 import { OrgSlackConnectSheet } from '@/components/integrations/OrgSlackConnectSheet';
 
@@ -269,8 +270,7 @@ export function Integrations() {
       const externalAccountName = c.externalAccountName || c.external_account_name;
       const lastSyncAt = c.lastSyncAt || c.last_sync_at;
 
-      // Use backend status field as the single source of truth
-      const status = (c.status as IntegrationData['status']) || (lastError ? 'error' : (c.isActive ?? c.is_active ?? true) ? 'connected' : 'disconnected');
+      const status: ConnectorStatus = c.status;
 
       return {
         id: c.id,

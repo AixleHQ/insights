@@ -104,6 +104,11 @@ module Api
       def test
         authorize! @connector, to: :test?
 
+        # Mark testing immediately so concurrent readers see the in-progress state.
+        # Note: if this process is killed before the provider call completes, the
+        # connector will remain in "testing". A background cleanup job or Temporal
+        # workflow should reset connectors stuck in this state beyond a timeout.
+        @connector.mark_testing!
         provider = Oauth::BaseProvider.for(@connector)
         result = provider.test_connection
 
@@ -130,6 +135,8 @@ module Api
           )
           render json: { data: { success: false, error: result[:error] } }, status: :ok
         end
+      rescue ActionPolicy::Unauthorized
+        raise
       rescue StandardError => e
         @connector.mark_error!(e.message)
         render json: { data: { success: false, error: e.message } }, status: :ok

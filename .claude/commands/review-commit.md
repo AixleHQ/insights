@@ -6,12 +6,12 @@ description: Review Ruby/Rails and JavaScript/TypeScript commits before pushing
 ## Context
 
 - Current branch: !`git branch --show-current`
-- Base branch: !`git branch --show-current | grep -q '^hotfix/' && echo "main" || echo "develop"`
-- Commits ahead of base: !`BASE=$(git branch --show-current | grep -q '^hotfix/' && echo main || echo develop); git log $BASE..HEAD --oneline`
-- Changed Ruby files: !`BASE=$(git branch --show-current | grep -q '^hotfix/' && echo main || echo develop); git diff $BASE..HEAD --name-only -- '*.rb'`
-- Changed JS/TS files: !`BASE=$(git branch --show-current | grep -q '^hotfix/' && echo main || echo develop); git diff $BASE..HEAD --name-only -- '*.ts' '*.tsx' '*.js' '*.jsx'`
-- Full Ruby diff: !`BASE=$(git branch --show-current | grep -q '^hotfix/' && echo main || echo develop); git diff $BASE..HEAD -- '*.rb'`
-- Full JS/TS diff: !`BASE=$(git branch --show-current | grep -q '^hotfix/' && echo main || echo develop); git diff $BASE..HEAD -- '*.ts' '*.tsx' '*.js' '*.jsx'`
+- Base branch: develop
+- Commits ahead of base: !`git log develop..HEAD --oneline`
+- Changed Ruby files: !`git diff develop..HEAD --name-only -- '*.rb'`
+- Changed JS/TS files: !`git diff develop..HEAD --name-only -- '*.ts' '*.tsx' '*.js' '*.jsx'`
+- Full Ruby diff: !`git diff develop..HEAD -- '*.rb'`
+- Full JS/TS diff: !`git diff develop..HEAD -- '*.ts' '*.tsx' '*.js' '*.jsx'`
 
 ## Your task
 
@@ -60,9 +60,7 @@ Review all changes on this branch before they are pushed. Run all steps in order
 
 **Vitest** — run only tests related to changed JS/TS files:
 ```
-BASE=$(git branch --show-current | grep -q '^hotfix/' && echo main || echo develop)
-FILES=$(git diff $BASE..HEAD --name-only -- '*.ts' '*.tsx' '*.js' '*.jsx' | sed 's|packages/web/||' | tr '\n' ' ')
-cd packages/web && npx vitest related $FILES --run
+cd packages/web && npx vitest related $(git diff develop..HEAD --name-only -- '*.ts' '*.tsx' '*.js' '*.jsx' | sed 's|packages/web/||' | tr '\n' ' ') --run
 ```
 Skip if no JS/TS files changed.
 

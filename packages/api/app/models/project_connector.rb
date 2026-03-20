@@ -2,7 +2,7 @@ class ProjectConnector < ApplicationRecord
   AI_PROVIDER_TYPES = %w[openrouter anthropic openai gemini].freeze
   SLACK_TYPES = %w[slack].freeze
   CONNECTOR_TYPES = (AI_PROVIDER_TYPES + SLACK_TYPES).freeze
-  STATUSES = %w[connected error disconnected].freeze
+  STATUSES = %w[connected testing error disconnected].freeze
 
   belongs_to :project
 
@@ -29,6 +29,10 @@ class ProjectConnector < ApplicationRecord
 
   def slack_webhook?
     connector_type.in?(SLACK_TYPES)
+  end
+
+  def mark_testing!
+    update!(status: "testing", last_error: nil)
   end
 
   def mark_connected!

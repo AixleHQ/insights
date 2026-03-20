@@ -1,6 +1,6 @@
 class OrganizationConnector < ApplicationRecord
   CONNECTOR_TYPES = %w[github gitlab bitbucket jira linear openrouter anthropic openai gemini slack].freeze
-  STATUSES = %w[connected error disconnected].freeze
+  STATUSES = %w[connected testing error disconnected].freeze
 
   belongs_to :organization
   has_many :repositories, dependent: :destroy
@@ -36,6 +36,10 @@ class OrganizationConnector < ApplicationRecord
 
   def slack_webhook?
     connector_type == "slack"
+  end
+
+  def mark_testing!
+    update!(status: "testing", last_error: nil)
   end
 
   def mark_connected!
