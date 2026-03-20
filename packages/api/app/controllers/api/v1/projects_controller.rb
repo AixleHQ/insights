@@ -96,9 +96,19 @@ module Api
         authorize! @project, to: :settings?
 
         setting = @project.project_settings.find_or_initialize_by(key: params[:key])
+        action = setting.new_record? ? "settings.create" : "settings.update"
+        old_value = setting.value
         setting.value = params[:value]
 
         if setting.save
+          ProjectAuditLog.log(
+            project: @project,
+            actor: current_user,
+            action: action,
+            resource: setting,
+            tracked_changes: { key: params[:key], before: old_value, after: setting.value },
+            request: request
+          )
           render_resource(setting, ProjectSettingSerializer)
         else
           render json: {
@@ -114,6 +124,16 @@ module Api
 
         setting = @project.project_settings.find_by!(key: params[:key])
         setting.destroy!
+
+        ProjectAuditLog.log(
+          project: @project,
+          actor: current_user,
+          action: "settings.delete",
+          resource: setting,
+          tracked_changes: { key: params[:key], before: setting.value },
+          request: request
+        )
+
         render_no_content
       end
 

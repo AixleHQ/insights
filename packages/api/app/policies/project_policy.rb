@@ -46,6 +46,11 @@ class ProjectPolicy < ApplicationPolicy
     update?
   end
 
+  # Only project admins/owners can view audit logs
+  def audit_logs?
+    update?
+  end
+
   private
 
   def own_personal_project?

@@ -134,6 +134,9 @@ Rails.application.routes.draw do
             post :sync
           end
         end
+
+        # Project audit logs
+        resources :audit_logs, controller: "project_audit_logs", only: [ :index ]
       end
 
       # Personal projects index

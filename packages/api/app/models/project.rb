@@ -6,6 +6,7 @@ class Project < ApplicationRecord
   has_many :project_settings, dependent: :destroy
   has_many :project_connectors, dependent: :destroy
   has_many :repositories, dependent: :destroy
+  has_many :project_audit_logs, dependent: :destroy
   has_many :tool_events, class_name: "ToolEvent", dependent: :restrict_with_error
 
   validates :name, presence: true
