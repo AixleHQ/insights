@@ -122,6 +122,58 @@ RSpec.describe 'Api::V1::Projects', type: :request do
     end
   end
 
+  describe 'PUT /api/v1/projects/:id/settings/:key' do
+    let!(:project) { create(:project, owner: user, organization: nil) }
+
+    it 'creates a settings.create audit log for a new key' do
+      expect {
+        authenticated_put "/api/v1/projects/#{project.id}/settings/new_key",
+                          user: user,
+                          params: { value: 'some_value' }
+      }.to change(ProjectAuditLog, :count).by(1)
+
+      log = ProjectAuditLog.last
+      expect(log.action).to eq('settings.create')
+      expect(log.actor).to eq(user)
+      expect(log.tracked_changes['key']).to eq('new_key')
+      expect(log.tracked_changes['after']).to eq('some_value')
+    end
+
+    it 'creates a settings.update audit log for an existing key' do
+      create(:project_setting, project: project, key: 'existing_key', value: 'old_value')
+
+      expect {
+        authenticated_put "/api/v1/projects/#{project.id}/settings/existing_key",
+                          user: user,
+                          params: { value: 'new_value' }
+      }.to change(ProjectAuditLog, :count).by(1)
+
+      log = ProjectAuditLog.last
+      expect(log.action).to eq('settings.update')
+      expect(log.actor).to eq(user)
+      expect(log.tracked_changes['key']).to eq('existing_key')
+      expect(log.tracked_changes['before']).to eq('old_value')
+      expect(log.tracked_changes['after']).to eq('new_value')
+    end
+  end
+
+  describe 'DELETE /api/v1/projects/:id/settings/:key' do
+    let!(:project) { create(:project, owner: user, organization: nil) }
+    let!(:setting) { create(:project_setting, project: project, key: 'delete_me', value: 'goodbye') }
+
+    it 'creates a settings.delete audit log' do
+      expect {
+        authenticated_delete "/api/v1/projects/#{project.id}/settings/delete_me", user: user
+      }.to change(ProjectAuditLog, :count).by(1)
+
+      log = ProjectAuditLog.last
+      expect(log.action).to eq('settings.delete')
+      expect(log.actor).to eq(user)
+      expect(log.tracked_changes['key']).to eq('delete_me')
+      expect(log.tracked_changes['before']).to eq('goodbye')
+    end
+  end
+
   describe 'GET /api/v1/projects/:id/stats' do
     let!(:project) { create(:project, organization: organization, owner: nil) }
 

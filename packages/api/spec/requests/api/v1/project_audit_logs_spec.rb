@@ -167,5 +167,44 @@ RSpec.describe "Api::V1::ProjectAuditLogs", type: :request do
         expect(ids).not_to include(other_log.id)
       end
     end
+
+    context "with invalid date params" do
+      it "returns 400 for malformed from_date" do
+        authenticated_get "/api/v1/projects/#{project.id}/audit_logs",
+                          user: owner_user,
+                          params: { from_date: "not-a-date" }
+
+        expect(response).to have_http_status(:bad_request)
+      end
+
+      it "returns 400 for malformed to_date" do
+        authenticated_get "/api/v1/projects/#{project.id}/audit_logs",
+                          user: owner_user,
+                          params: { to_date: "not-a-date" }
+
+        expect(response).to have_http_status(:bad_request)
+      end
+    end
+  end
+
+  describe "GET /api/v1/projects/:project_id/audit_logs for personal project" do
+    let(:personal_owner) { create(:user) }
+    let(:personal_project) { create(:project, :personal, owner: personal_owner) }
+    let!(:personal_log) { create(:project_audit_log, project: personal_project, actor: personal_owner) }
+
+    it "allows the personal project owner to view audit logs" do
+      authenticated_get "/api/v1/projects/#{personal_project.id}/audit_logs", user: personal_owner
+
+      expect_success
+      expect(json_data.map { |l| l[:id] }).to include(personal_log.id)
+    end
+
+    it "denies access to another user" do
+      other = create(:user)
+
+      authenticated_get "/api/v1/projects/#{personal_project.id}/audit_logs", user: other
+
+      expect(response).to have_http_status(:forbidden)
+    end
   end
 end
