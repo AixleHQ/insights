@@ -85,6 +85,12 @@ const statusConfig = {
     color: 'text-success',
     bg: 'bg-success/10',
   },
+  testing: {
+    label: 'Testing',
+    icon: RefreshCw,
+    color: 'text-primary',
+    bg: 'bg-primary/10',
+  },
   error: {
     label: 'Error',
     icon: AlertCircle,
@@ -251,7 +257,7 @@ export function IntegrationCard({
             ) : (
               <Badge variant="outline" className={cn('gap-1', status.bg)}>
                 <StatusIcon
-                  className={cn('size-3', status.color)}
+                  className={cn('size-3', status.color, integration.status === 'testing' && 'animate-spin')}
                 />
                 <span className={status.color}>{status.label}</span>
               </Badge>

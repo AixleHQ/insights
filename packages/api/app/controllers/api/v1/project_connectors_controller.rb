@@ -94,6 +94,7 @@ module Api
       def test
         authorize! @connector, to: :test?
 
+        @connector.mark_testing!
         provider = Oauth::BaseProvider.for(@connector)
         result = provider.test_connection
 
