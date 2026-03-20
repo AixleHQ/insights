@@ -33,16 +33,6 @@ module Api
           meta: pagination_meta(paginated)
         }
       end
-      private
-
-      def parse_date_param(value, param_name)
-        parsed = Time.zone.parse(value)
-        raise ArgumentError if parsed.nil?
-        parsed
-      rescue ArgumentError
-        render_bad_request("Invalid #{param_name} format — expected ISO 8601")
-        nil
-      end
     end
   end
 end

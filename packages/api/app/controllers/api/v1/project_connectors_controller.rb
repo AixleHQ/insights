@@ -161,6 +161,14 @@ module Api
         raise
       rescue StandardError => e
         @connector.mark_error!(e.message)
+        ProjectAuditLog.log(
+          project: @project,
+          actor: current_user,
+          action: "connector.test",
+          resource: @connector,
+          tracked_changes: { connector_type: @connector.connector_type, success: false, error: e.message },
+          request: request
+        )
         render json: { data: { success: false, error: e.message } }, status: :ok
       end
 
