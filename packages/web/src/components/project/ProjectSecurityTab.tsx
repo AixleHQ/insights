@@ -188,9 +188,9 @@ export function ProjectSecurityTab({ projectId }: { projectId: string }) {
                       >
                         {AUDIT_ACTION_LABELS[log.action] ?? log.action}
                       </Badge>
-                      {log.action.startsWith('impersonation') && log.metadata?.impersonator_email && (
+                      {log.action.startsWith('impersonation') && typeof log.metadata?.impersonator_email === 'string' && (
                         <p className="mt-0.5 text-xs text-muted-foreground">
-                          by {String(log.metadata.impersonator_email)}
+                          by {log.metadata.impersonator_email}
                         </p>
                       )}
                     </TableCell>
