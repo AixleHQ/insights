@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Settings, Shield } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Settings, Shield, Check } from 'lucide-react';
 import { useProject, useUpdateProject } from '@/hooks/useApi';
 import { ProjectForm, type ProjectFormData } from '@/components/projects';
 import { ProjectSecurityTab } from './ProjectSecurityTab';
@@ -47,6 +47,13 @@ function ProjectSettingsNav({
 function GeneralSettings({ projectId }: { projectId: string }) {
   const { data: project, isLoading } = useProject(projectId);
   const updateProject = useUpdateProject();
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (!saved) return;
+    const timer = setTimeout(() => setSaved(false), 2000);
+    return () => clearTimeout(timer);
+  }, [saved]);
 
   const handleSubmit = async (data: ProjectFormData) => {
     await updateProject.mutateAsync({
@@ -73,11 +80,19 @@ function GeneralSettings({ projectId }: { projectId: string }) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-medium">General</h2>
-        <p className="text-sm text-muted-foreground">
-          Update your project settings
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-medium">General</h2>
+          <p className="text-sm text-muted-foreground">
+            Update your project settings
+          </p>
+        </div>
+        {saved && (
+          <p className="flex items-center gap-1 text-sm text-green-600">
+            <Check className="size-4" />
+            Saved
+          </p>
+        )}
       </div>
       <ProjectForm
         isEditing
@@ -90,7 +105,7 @@ function GeneralSettings({ projectId }: { projectId: string }) {
           is_active: project.isActive ?? true,
         }}
         onSubmit={handleSubmit}
-        onSuccess={() => {}}
+        onSuccess={() => setSaved(true)}
       />
     </div>
   );

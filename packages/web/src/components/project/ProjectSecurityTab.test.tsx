@@ -367,17 +367,26 @@ describe('ProjectSecurityTab', () => {
       expect(screen.getByRole('button', { name: /next/i })).toBeEnabled();
     });
 
-    it('disables Next button on last page', () => {
+    it('disables Next button on last page', async () => {
       mockUseProjectAuditLogs.mockReturnValue({
-        data: { data: [makelog()], meta: { ...multiPageMeta, current_page: 3 } },
+        data: { data: [makelog()], meta: multiPageMeta },
         isLoading: false,
       });
+      const user = userEvent.setup();
       renderComponent();
 
-      // Component uses internal page state (starts at 1), but we simulate being on page 3
-      // by setting the mock meta — however the disabled check uses internal `page` state.
-      // We need to navigate to page 3 first.
-      expect(screen.getByRole('button', { name: /previous/i })).toBeDisabled();
+      // Navigate to page 3 (last page) by clicking Next twice
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      mockUseProjectAuditLogs.mockReturnValue({
+        data: { data: [makelog()], meta: { ...multiPageMeta, current_page: 2 } },
+        isLoading: false,
+      });
+      await user.click(screen.getByRole('button', { name: /next/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /next/i })).toBeDisabled();
+      });
+      expect(screen.getByRole('button', { name: /previous/i })).toBeEnabled();
     });
 
     it('navigates to next page when Next is clicked', async () => {
