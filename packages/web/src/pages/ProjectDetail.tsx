@@ -40,7 +40,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { EventsTable, EventDrawer, type EventRow } from '@/components/events';
 import { ToolUsageByDayChart } from '@/components/dashboard';
-import { ProjectTeamSection, ProjectReposSection, ProjectConnectorsTab } from '@/components/project';
+import { ProjectTeamSection, ProjectReposSection, ProjectConnectorsTab, ProjectSecurityTab } from '@/components/project';
 import { formatDistanceToNow } from '@/lib/utils';
 
 function formatCurrency(value: number): string {
@@ -286,7 +286,7 @@ export function ProjectDetail() {
         <TabsList>
           <TabsTrigger value="activity">Recent Activity</TabsTrigger>
           <TabsTrigger value="integrations">Integrations</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsTrigger value="security">Security & Audit</TabsTrigger>
         </TabsList>
         <TabsContent value="activity" className="mt-4">
           <Card>
@@ -319,20 +319,8 @@ export function ProjectDetail() {
             </CardContent>
           </Card>
         </TabsContent>
-        <TabsContent value="settings" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Project Settings</CardTitle>
-              <CardDescription>
-                Configure project-specific options
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Project settings coming soon...
-              </p>
-            </CardContent>
-          </Card>
+        <TabsContent value="security" className="mt-4">
+          <ProjectSecurityTab projectId={id!} />
         </TabsContent>
       </Tabs>
 
