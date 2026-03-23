@@ -19,6 +19,9 @@ interface ProjectFormProps {
   initialData?: ProjectFormData;
   isEditing?: boolean;
   onSubmit: (data: ProjectFormData) => Promise<void>;
+  onSuccess?: () => void;
+  hideHeader?: boolean;
+  hideCancel?: boolean;
   className?: string;
 }
 
@@ -26,6 +29,9 @@ export function ProjectForm({
   initialData,
   isEditing = false,
   onSubmit,
+  onSuccess,
+  hideHeader = false,
+  hideCancel = false,
   className,
 }: ProjectFormProps) {
   const navigate = useNavigate();
@@ -74,7 +80,11 @@ export function ProjectForm({
     setIsSubmitting(true);
     try {
       await onSubmit(formData);
-      navigate('/projects');
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        navigate('/projects');
+      }
     } catch (error) {
       console.error('Failed to save project:', error);
     } finally {
@@ -94,21 +104,23 @@ export function ProjectForm({
 
   return (
     <div className={cn('space-y-6', className)}>
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/projects')}>
-          <ArrowLeft className="size-4" />
-        </Button>
-        <div>
-          <h1 className="text-xl font-semibold">
-            {isEditing ? 'Edit Project' : 'New Project'}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {isEditing
-              ? 'Update your project settings'
-              : 'Create a new project to track AI tool usage'}
-          </p>
+      {!hideHeader && (
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/projects')}>
+            <ArrowLeft className="size-4" />
+          </Button>
+          <div>
+            <h1 className="text-xl font-semibold">
+              {isEditing ? 'Edit Project' : 'New Project'}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {isEditing
+                ? 'Update your project settings'
+                : 'Create a new project to track AI tool usage'}
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       <form onSubmit={handleSubmit}>
         <Card>
@@ -178,14 +190,16 @@ export function ProjectForm({
         </Card>
 
         <div className="mt-6 flex items-center justify-end gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => navigate('/projects')}
-            disabled={isSubmitting}
-          >
-            Cancel
-          </Button>
+          {!hideCancel && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate('/projects')}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+          )}
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
             {isEditing ? 'Save Changes' : 'Create Project'}
