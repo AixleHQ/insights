@@ -7,6 +7,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useProjectAuditLogs, type AuditLogFilters } from '@/hooks/useApi';
+import { ProjectSettingsSection } from './ProjectSettingsSection';
 import { AUDIT_ACTION_LABELS, AUDIT_ACTION_OPTIONS } from '@/lib/audit-actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -76,6 +77,8 @@ export function ProjectSecurityTab({ projectId }: { projectId: string }) {
 
   return (
     <div className="space-y-6">
+      <ProjectSettingsSection projectId={projectId} />
+
       <div>
         <h2 className="text-lg font-medium">Security & Audit Log</h2>
         <p className="text-sm text-muted-foreground">

@@ -29,6 +29,7 @@ class UserSyncService
       Rails.logger.info "[UserSyncService] User orgs: #{user.organization_memberships.count}, events: #{ToolEvent.where(user_id: user.id).count}"
 
       auto_assign_organization(user, claims)
+      auto_assign_project(user, claims)
 
       user
     end
@@ -111,6 +112,30 @@ class UserSyncService
           end
           Rails.logger.info "[UserSyncService] Auto-assigned #{user.email} to org #{setting.organization.slug} (domain setting)"
         end
+    end
+
+    def auto_assign_project(user, claims)
+      email = claims["email"]
+      return unless email.present?
+
+      domain = email.split("@").last&.downcase
+      return unless domain.present?
+
+      user_org_ids = user.organization_memberships.select(:organization_id)
+
+      ActiveRecord::Base.transaction do
+        ProjectSetting
+          .where(key: "allowed_email_domain", value: domain)
+          .joins(:project)
+          .where(projects: { organization_id: user_org_ids })
+          .includes(:project)
+          .each do |setting|
+            ProjectMembership.find_or_create_by!(user: user, project: setting.project) do |m|
+              m.role = "member"
+            end
+            Rails.logger.info "[UserSyncService] Auto-assigned #{user.email} to project #{setting.project.name} (domain setting)"
+          end
+      end
     end
   end
 end

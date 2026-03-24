@@ -9233,6 +9233,13 @@ CREATE UNIQUE INDEX index_project_memberships_on_user_id_and_project_id ON publi
 
 
 --
+-- Name: index_project_settings_on_allowed_email_domain; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_project_settings_on_allowed_email_domain ON public.project_settings USING btree (value) WHERE ((key)::text = 'allowed_email_domain'::text);
+
+
+--
 -- Name: index_project_settings_on_project_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -11083,6 +11090,7 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260324000001'),
 ('20260320000001'),
 ('20260317000001'),
 ('20260309000002'),
