@@ -33,11 +33,11 @@ class ProjectPolicy < ApplicationPolicy
     false
   end
 
-  # Only admins can destroy projects
+  # Only owners can destroy projects
   def destroy?
     return true if global_admin?
     return own_personal_project? if record.personal?
-    return project_admin?(record) if record.organization_project?
+    return project_owner?(record) || org_owner?(record.organization) if record.organization_project?
     false
   end
 

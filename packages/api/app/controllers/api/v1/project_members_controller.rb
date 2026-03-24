@@ -8,6 +8,8 @@ module Api
 
       # GET /api/v1/projects/:project_id/members
       def index
+        authorize! @project.project_memberships.new, to: :index?
+
         memberships = @project.project_memberships.includes(:user).order("users.name")
 
         # Allow filtering by role
@@ -75,18 +77,23 @@ module Api
 
         user_id = @membership.user_id
         role = @membership.role
-        @membership.destroy!
 
-        ProjectAuditLog.log(
-          project: @project,
-          actor: current_user,
-          action: "member.removed",
-          resource: @membership,
-          tracked_changes: { user_id: user_id, role: role },
-          request: request
-        )
-
-        render_no_content
+        if @membership.destroy
+          ProjectAuditLog.log(
+            project: @project,
+            actor: current_user,
+            action: "member.removed",
+            resource: @membership,
+            tracked_changes: { user_id: user_id, role: role },
+            request: request
+          )
+          render_no_content
+        else
+          render json: {
+            error: "Unprocessable Entity",
+            errors: format_validation_errors(@membership.errors)
+          }, status: :unprocessable_entity
+        end
       end
 
       private
