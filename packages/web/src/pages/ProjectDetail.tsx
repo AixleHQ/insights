@@ -17,7 +17,6 @@ import {
   useEvents,
   useDeleteProject,
   useProjectDailyByTool,
-  useProjectMembers,
   useProjectRepositories,
 } from '@/hooks/useApi';
 import { Button } from '@/components/ui/button';
@@ -39,7 +38,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { EventsTable, EventDrawer, type EventRow } from '@/components/events';
 import { ToolUsageByDayChart } from '@/components/dashboard';
-import { ProjectTeamSection, ProjectReposSection } from '@/components/project';
+import { ProjectReposSection } from '@/components/project';
 import { formatDistanceToNow } from '@/lib/utils';
 
 function formatCurrency(value: number): string {
@@ -93,7 +92,6 @@ export function ProjectDetail() {
     { project_id: id, per_page: 10 }
   );
   const { data: dailyByToolData, isLoading: isLoadingDailyByTool } = useProjectDailyByTool(id || '');
-  const { data: projectMembers, isLoading: isLoadingMembers } = useProjectMembers(id || '');
   const { data: projectRepositories, isLoading: isLoadingRepositories } = useProjectRepositories(id || '');
   const deleteProject = useDeleteProject();
 
@@ -253,17 +251,10 @@ export function ProjectDetail() {
         />
       </div>
 
-      {/* Team and Repositories */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <ProjectTeamSection
-          members={projectMembers}
-          isLoading={isLoadingMembers}
-        />
-        <ProjectReposSection
-          repositories={projectRepositories}
-          isLoading={isLoadingRepositories}
-        />
-      </div>
+      <ProjectReposSection
+        repositories={projectRepositories}
+        isLoading={isLoadingRepositories}
+      />
 
       {project.repositoryUrl && (
         <Card>

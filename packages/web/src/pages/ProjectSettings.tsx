@@ -29,7 +29,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { ProjectTeamSection, ProjectConnectorsTab, ProjectSecurityTab } from '@/components/project';
+import { ProjectTeamSection, ProjectConnectorsTab, ProjectSecurityTab, ProjectSettingsSection } from '@/components/project';
 import { cn } from '@/lib/utils';
 
 const getNavItems = (id: string) => [
@@ -171,6 +171,8 @@ function ProjectGeneralSettingsForm({
           Save Changes
         </Button>
       </div>
+
+      <ProjectSettingsSection projectId={projectId} />
 
       <Separator />
 
