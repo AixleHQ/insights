@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@/test/utils';
-import userEvent from '@testing-library/user-event';
 import { ProjectDetail } from './ProjectDetail';
 
 const mockNavigate = vi.fn();
@@ -28,8 +27,6 @@ const mockUseDeleteProject = vi.fn();
 const mockUseProjectDailyByTool = vi.fn();
 const mockUseProjectMembers = vi.fn();
 const mockUseProjectRepositories = vi.fn();
-const mockUseProjectAuditLogs = vi.fn();
-const mockUseProjectSettings = vi.fn();
 
 vi.mock('@/hooks/useApi', () => ({
   useProject: (...args: unknown[]) => mockUseProject(...args),
@@ -39,10 +36,6 @@ vi.mock('@/hooks/useApi', () => ({
   useProjectDailyByTool: (...args: unknown[]) => mockUseProjectDailyByTool(...args),
   useProjectMembers: (...args: unknown[]) => mockUseProjectMembers(...args),
   useProjectRepositories: (...args: unknown[]) => mockUseProjectRepositories(...args),
-  useProjectAuditLogs: (...args: unknown[]) => mockUseProjectAuditLogs(...args),
-  useProjectSettings: (...args: unknown[]) => mockUseProjectSettings(...args),
-  useUpdateProjectSetting: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useDeleteProjectSetting: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 const mockProject = {
@@ -64,8 +57,6 @@ function setupDefaultMocks() {
   mockUseProjectDailyByTool.mockReturnValue({ data: undefined, isLoading: false });
   mockUseProjectMembers.mockReturnValue({ data: undefined, isLoading: false });
   mockUseProjectRepositories.mockReturnValue({ data: undefined, isLoading: false });
-  mockUseProjectAuditLogs.mockReturnValue({ data: undefined, isLoading: true });
-  mockUseProjectSettings.mockReturnValue({ data: { data: [] }, isLoading: false });
 }
 
 describe('ProjectDetail', () => {
@@ -104,38 +95,10 @@ describe('ProjectDetail', () => {
     expect(screen.getByText('Last Activity')).toBeInTheDocument();
   });
 
-  describe('Tabs', () => {
-    it('renders all three tab triggers', () => {
-      render(<ProjectDetail />);
+  it('renders Recent Events section', () => {
+    render(<ProjectDetail />);
 
-      expect(screen.getByRole('tab', { name: /recent activity/i })).toBeInTheDocument();
-      expect(screen.getByRole('tab', { name: /integrations/i })).toBeInTheDocument();
-      expect(screen.getByRole('tab', { name: /settings/i })).toBeInTheDocument();
-    });
-
-    it('shows Recent Activity as default tab', () => {
-      render(<ProjectDetail />);
-
-      expect(screen.getByText('Recent Events')).toBeInTheDocument();
-    });
-
-    it('renders SecurityTab content when Settings tab is clicked', async () => {
-      render(<ProjectDetail />);
-      const user = userEvent.setup();
-
-      await user.click(screen.getByRole('tab', { name: /settings/i }));
-
-      expect(screen.getByText('Security & Audit Log')).toBeInTheDocument();
-    });
-
-    it('hides activity content when switching to Settings', async () => {
-      render(<ProjectDetail />);
-      const user = userEvent.setup();
-
-      await user.click(screen.getByRole('tab', { name: /settings/i }));
-
-      expect(screen.queryByText('Recent Events')).not.toBeInTheDocument();
-    });
+    expect(screen.getByText('Recent Events')).toBeInTheDocument();
   });
 
   describe('Active badge', () => {

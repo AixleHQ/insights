@@ -15,8 +15,8 @@ import { Events } from './pages/Events';
 import { EventDetailPage } from './pages/EventDetailPage';
 import { Projects } from './pages/Projects';
 import { NewProject } from './pages/NewProject';
-import { EditProject } from './pages/EditProject';
 import { ProjectDetail } from './pages/ProjectDetail';
+import { ProjectSettings } from './pages/ProjectSettings';
 import { Integrations } from './pages/Integrations';
 import { IntegrationSetup } from './pages/IntegrationSetup';
 import { IntegrationOAuthCallback } from './pages/IntegrationOAuthCallback';
@@ -40,6 +40,11 @@ import {
 function TeamIdRedirect() {
   const { id } = useParams<{ id: string }>();
   return <Navigate to={`/settings/members/${id}`} replace />;
+}
+
+function EditProjectRedirect() {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={`/projects/${id}/settings`} replace />;
 }
 
 function App() {
@@ -95,7 +100,8 @@ function App() {
                   <Route path="/projects" element={<Projects />} />
                   <Route path="/projects/new" element={<NewProject />} />
                   <Route path="/projects/:id" element={<ProjectDetail />} />
-                  <Route path="/projects/:id/edit" element={<EditProject />} />
+                  <Route path="/projects/:id/settings/*" element={<ProjectSettings />} />
+                  <Route path="/projects/:id/edit" element={<EditProjectRedirect />} />
                   <Route path="/integrations" element={<Integrations />} />
                   <Route path="/integrations/new/:provider" element={<IntegrationSetup />} />
                   {/* /team/* redirects to /settings/members/* for backwards compatibility */}
