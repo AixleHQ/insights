@@ -104,7 +104,7 @@ export function ProjectSettingsSection({ projectId }: { projectId: string }) {
               onClick={handleSaveEmailDomain}
               disabled={updateSetting.isPending || deleteSetting.isPending || emailDomain.trim().toLowerCase() === savedEmailDomain}
             >
-              {updateSetting.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
+              {(updateSetting.isPending || deleteSetting.isPending) && <Loader2 className="mr-2 size-4 animate-spin" />}
               <Save className="mr-2 size-4" />
               Save
             </Button>

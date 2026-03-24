@@ -14,7 +14,10 @@ class Project < ApplicationRecord
   validates :is_active, inclusion: { in: [ true, false ] }
   validate :must_belong_to_org_or_owner
 
+  before_destroy :flag_as_being_destroyed, prepend: true
   before_validation :generate_slug, on: :create
+
+  attr_reader :being_destroyed
 
   scope :active, -> { where(is_active: true) }
   scope :organization_projects, -> { where.not(organization_id: nil) }
@@ -29,6 +32,10 @@ class Project < ApplicationRecord
   end
 
   private
+
+  def flag_as_being_destroyed
+    @being_destroyed = true
+  end
 
   def generate_slug
     return if slug.present?

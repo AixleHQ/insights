@@ -24,6 +24,54 @@ RSpec.describe ProjectMembership, type: :model do
       expect(duplicate).not_to be_valid
       expect(duplicate.errors[:user_id]).to include('is already a member of this project')
     end
+
+    describe 'last owner protection on role downgrade' do
+      let(:project) { create(:project) }
+
+      it 'prevents downgrading the last owner' do
+        owner_membership = create(:project_membership, project: project, role: 'owner')
+        owner_membership.role = 'admin'
+        expect(owner_membership).not_to be_valid
+        expect(owner_membership.errors[:role]).to include('Cannot downgrade the last owner of a project')
+      end
+
+      it 'allows downgrading an owner when another owner exists' do
+        owner_membership = create(:project_membership, project: project, role: 'owner')
+        create(:project_membership, project: project, role: 'owner')
+        owner_membership.role = 'admin'
+        expect(owner_membership).to be_valid
+      end
+    end
+  end
+
+  describe 'last owner protection on destroy' do
+    let(:project) { create(:project) }
+
+    it 'prevents destroying the last owner membership' do
+      owner_membership = create(:project_membership, project: project, role: 'owner')
+      expect(owner_membership.destroy).to be_falsey
+      expect(owner_membership.errors[:base]).to include('Cannot remove the last owner of a project')
+      expect(ProjectMembership.exists?(owner_membership.id)).to be true
+    end
+
+    it 'allows destroying an owner membership when another owner exists' do
+      owner_membership = create(:project_membership, project: project, role: 'owner')
+      create(:project_membership, project: project, role: 'owner')
+      expect(owner_membership.destroy).to be_truthy
+      expect(ProjectMembership.exists?(owner_membership.id)).to be false
+    end
+
+    it 'allows destroying a non-owner membership regardless' do
+      create(:project_membership, project: project, role: 'owner')
+      member_membership = create(:project_membership, project: project, role: 'member')
+      expect(member_membership.destroy).to be_truthy
+    end
+
+    it 'allows cascaded destroy when project itself is being destroyed' do
+      owner_membership = create(:project_membership, project: project, role: 'owner')
+      expect { project.destroy! }.not_to raise_error
+      expect(ProjectMembership.exists?(owner_membership.id)).to be false
+    end
   end
 
   describe 'scopes' do

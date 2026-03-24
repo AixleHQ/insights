@@ -82,6 +82,33 @@ RSpec.describe ProjectPolicy, type: :policy do
         expect(policy(org_project, current_user: viewer).apply(:update?)).to be false
       end
     end
+
+    describe '#destroy?' do
+      it 'allows project owners to destroy' do
+        project_membership.update!(role: 'owner')
+        expect(policy(org_project, current_user: user).apply(:destroy?)).to be true
+      end
+
+      it 'denies project admins from destroying' do
+        expect(policy(org_project, current_user: user).apply(:destroy?)).to be false
+      end
+
+      it 'allows org owners to destroy' do
+        org_owner = create(:user)
+        create(:organization_membership, user: org_owner, organization: organization, role: 'owner')
+        expect(policy(org_project, current_user: org_owner).apply(:destroy?)).to be true
+      end
+
+      it 'denies org admins from destroying' do
+        org_admin = create(:user)
+        create(:organization_membership, user: org_admin, organization: organization, role: 'admin')
+        expect(policy(org_project, current_user: org_admin).apply(:destroy?)).to be false
+      end
+
+      it 'allows global admins' do
+        expect(policy(org_project, current_user: global_admin).apply(:destroy?)).to be true
+      end
+    end
   end
 
   describe '#create?' do
