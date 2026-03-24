@@ -40,7 +40,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { EventsTable, EventDrawer, type EventRow } from '@/components/events';
 import { ToolUsageByDayChart } from '@/components/dashboard';
-import { ProjectTeamSection, ProjectReposSection, ProjectConnectorsTab, ProjectSettingsTab } from '@/components/project';
+import { ProjectTeamSection, ProjectReposSection, ProjectConnectorsTab, ProjectSecurityTab } from '@/components/project';
 import { formatDistanceToNow } from '@/lib/utils';
 
 function formatCurrency(value: number): string {
@@ -85,7 +85,6 @@ export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const { currentOrg } = useOrg();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('activity');
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -206,7 +205,7 @@ export function ProjectDetail() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setActiveTab('settings')}>
+            <DropdownMenuItem onClick={() => navigate(`/projects/${id}/edit`)}>
               <Settings className="mr-2 size-4" />
               Edit project
             </DropdownMenuItem>
@@ -283,7 +282,7 @@ export function ProjectDetail() {
         </Card>
       )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs defaultValue="activity">
         <TabsList>
           <TabsTrigger value="activity">Recent Activity</TabsTrigger>
           <TabsTrigger value="integrations">Integrations</TabsTrigger>
@@ -321,7 +320,7 @@ export function ProjectDetail() {
           </Card>
         </TabsContent>
         <TabsContent value="settings" className="mt-4">
-          <ProjectSettingsTab projectId={id!} />
+          <ProjectSecurityTab projectId={id!} />
         </TabsContent>
       </Tabs>
 
