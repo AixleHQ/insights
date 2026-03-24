@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Loader2, Save } from 'lucide-react';
+import { Loader2, Save, AlertCircle, CheckCircle2 } from 'lucide-react';
 import {
   useProjectSettings,
   useUpdateProjectSetting,
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Card,
   CardContent,
@@ -17,25 +18,36 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 
+const DOMAIN_RE = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z]{2,})+$/;
+
+type FeedbackState = { type: 'error' | 'success'; message: string } | null;
+
 export function ProjectSettingsSection({ projectId }: { projectId: string }) {
   const { data: settings, isLoading } = useProjectSettings(projectId);
   const updateSetting = useUpdateProjectSetting();
   const deleteSetting = useDeleteProjectSetting();
 
   const [emailDomain, setEmailDomain] = useState('');
+  const [feedback, setFeedback] = useState<FeedbackState>(null);
 
   const savedEmailDomain =
-    (settings as { data: Array<{ key: string; value: string }> })?.data?.find(
-      (s) => s.key === 'allowed_email_domain'
-    )?.value ?? '';
+    settings?.data.find((s) => s.key === 'allowed_email_domain')?.value ?? '';
 
   useEffect(() => {
     setEmailDomain(savedEmailDomain);
   }, [savedEmailDomain]);
 
   const handleSaveEmailDomain = async () => {
+    const trimmed = emailDomain.trim().toLowerCase();
+
+    if (trimmed && !DOMAIN_RE.test(trimmed)) {
+      setFeedback({ type: 'error', message: 'Enter a valid domain like example.com' });
+      return;
+    }
+
+    setFeedback(null);
+
     try {
-      const trimmed = emailDomain.trim().toLowerCase();
       if (!trimmed && savedEmailDomain) {
         await deleteSetting.mutateAsync({ projectId, key: 'allowed_email_domain' });
       } else if (trimmed) {
@@ -45,8 +57,10 @@ export function ProjectSettingsSection({ projectId }: { projectId: string }) {
           value: trimmed,
         });
       }
+      setFeedback({ type: 'success', message: 'Settings saved' });
     } catch (error) {
       console.error('Failed to save email domain:', error);
+      setFeedback({ type: 'error', message: 'Failed to save. Please try again.' });
     }
   };
 
@@ -82,7 +96,7 @@ export function ProjectSettingsSection({ projectId }: { projectId: string }) {
                 id="projectEmailDomain"
                 className="pl-7"
                 value={emailDomain}
-                onChange={(e) => setEmailDomain(e.target.value)}
+                onChange={(e) => { setEmailDomain(e.target.value); setFeedback(null); }}
                 placeholder="example.com"
               />
             </div>
@@ -99,6 +113,17 @@ export function ProjectSettingsSection({ projectId }: { projectId: string }) {
             Leave empty to disable auto-join. Only one domain is supported per project.
           </p>
         </div>
+
+        {feedback && (
+          <Alert variant={feedback.type === 'error' ? 'destructive' : 'default'}>
+            {feedback.type === 'error' ? (
+              <AlertCircle className="size-4" />
+            ) : (
+              <CheckCircle2 className="size-4" />
+            )}
+            <AlertDescription>{feedback.message}</AlertDescription>
+          </Alert>
+        )}
       </CardContent>
     </Card>
   );

@@ -235,10 +235,19 @@ export function useDeleteOrganizationSetting() {
 }
 
 // Project Settings (key-value store)
+export interface ProjectSettingEntry {
+  key: string;
+  value: string;
+}
+
+export interface ProjectSettingsResponse {
+  data: ProjectSettingEntry[];
+}
+
 export function useProjectSettings(projectId: string) {
   return useQuery({
     queryKey: ['projects', projectId, 'settings'],
-    queryFn: () => api.get<Record<string, unknown>>(`/projects/${projectId}/settings`),
+    queryFn: () => api.get<ProjectSettingsResponse>(`/projects/${projectId}/settings`),
     enabled: !!projectId,
   });
 }

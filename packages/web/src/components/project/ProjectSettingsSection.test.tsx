@@ -92,6 +92,49 @@ describe('ProjectSettingsSection', () => {
     });
   });
 
+  it('shows success feedback after saving', async () => {
+    mockUseProjectSettings.mockReturnValue({ data: { data: [] }, isLoading: false });
+    mockUpdateMutateAsync.mockResolvedValue({});
+
+    render(<ProjectSettingsSection projectId="proj-1" />);
+    const user = userEvent.setup();
+
+    await user.type(screen.getByPlaceholderText('example.com'), 'acme.com');
+    await user.click(screen.getByRole('button', { name: /save/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Settings saved')).toBeInTheDocument();
+    });
+  });
+
+  it('shows error feedback when save fails', async () => {
+    mockUseProjectSettings.mockReturnValue({ data: { data: [] }, isLoading: false });
+    mockUpdateMutateAsync.mockRejectedValue(new Error('Network error'));
+
+    render(<ProjectSettingsSection projectId="proj-1" />);
+    const user = userEvent.setup();
+
+    await user.type(screen.getByPlaceholderText('example.com'), 'acme.com');
+    await user.click(screen.getByRole('button', { name: /save/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Failed to save. Please try again.')).toBeInTheDocument();
+    });
+  });
+
+  it('shows validation error for invalid domain format', async () => {
+    mockUseProjectSettings.mockReturnValue({ data: { data: [] }, isLoading: false });
+
+    render(<ProjectSettingsSection projectId="proj-1" />);
+    const user = userEvent.setup();
+
+    await user.type(screen.getByPlaceholderText('example.com'), 'not-a-domain');
+    await user.click(screen.getByRole('button', { name: /save/i }));
+
+    expect(screen.getByText('Enter a valid domain like example.com')).toBeInTheDocument();
+    expect(mockUpdateMutateAsync).not.toHaveBeenCalled();
+  });
+
   it('calls delete mutation when clearing a previously saved domain', async () => {
     mockUseProjectSettings.mockReturnValue({
       data: { data: [{ key: 'allowed_email_domain', value: 'acme.com' }] },
