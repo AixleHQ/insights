@@ -40,7 +40,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { EventsTable, EventDrawer, type EventRow } from '@/components/events';
 import { ToolUsageByDayChart } from '@/components/dashboard';
-import { ProjectTeamSection, ProjectReposSection, ProjectConnectorsTab } from '@/components/project';
+import { ProjectTeamSection, ProjectReposSection, ProjectConnectorsTab, ProjectSecurityTab } from '@/components/project';
 import { formatDistanceToNow } from '@/lib/utils';
 
 function formatCurrency(value: number): string {
@@ -320,19 +320,7 @@ export function ProjectDetail() {
           </Card>
         </TabsContent>
         <TabsContent value="settings" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Project Settings</CardTitle>
-              <CardDescription>
-                Configure project-specific options
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Project settings coming soon...
-              </p>
-            </CardContent>
-          </Card>
+          <ProjectSecurityTab projectId={id!} />
         </TabsContent>
       </Tabs>
 

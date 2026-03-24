@@ -235,8 +235,8 @@ export interface Alert {
   created_at: string;
 }
 
-// Organization audit log types
-export interface OrganizationAuditLog {
+// Audit log types (shared shape — both serializers output identical JSON)
+export interface AuditLog {
   id: string;
   action: string;
   resourceType: string | null;
@@ -247,6 +247,9 @@ export interface OrganizationAuditLog {
   createdAt: string;
   actor: { id: string; email: string; name: string | null } | null;
 }
+
+export type OrganizationAuditLog = AuditLog;
+export type ProjectAuditLog = AuditLog;
 
 // Pagination types
 export interface PaginatedResponse<T> {

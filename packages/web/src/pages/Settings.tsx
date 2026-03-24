@@ -30,6 +30,7 @@ import {
   useConnectors,
   type AuditLogFilters,
 } from '@/hooks/useApi';
+import { AUDIT_ACTION_LABELS, AUDIT_ACTION_OPTIONS } from '@/lib/audit-actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -963,39 +964,6 @@ function BillingSettings() {
   );
 }
 
-const ACTION_LABELS: Record<string, string> = {
-  'settings.create': 'Settings Created',
-  'settings.update': 'Settings Updated',
-  'settings.delete': 'Settings Deleted',
-  'connector.create': 'Connector Created',
-  'connector.update': 'Connector Updated',
-  'connector.delete': 'Connector Deleted',
-  'connector.test': 'Connector Tested',
-  'connector.sync': 'Connector Synced',
-  'member.invited': 'Member Invited',
-  'member.role_changed': 'Role Changed',
-  'member.removed': 'Member Removed',
-  'impersonation.started': 'Impersonation Started',
-  'impersonation.ended': 'Impersonation Ended',
-};
-
-const ACTION_OPTIONS = [
-  { value: 'all', label: 'All Actions' },
-  { value: 'settings.create', label: 'Settings Created' },
-  { value: 'settings.update', label: 'Settings Updated' },
-  { value: 'settings.delete', label: 'Settings Deleted' },
-  { value: 'connector.create', label: 'Connector Created' },
-  { value: 'connector.update', label: 'Connector Updated' },
-  { value: 'connector.delete', label: 'Connector Deleted' },
-  { value: 'connector.test', label: 'Connector Tested' },
-  { value: 'connector.sync', label: 'Connector Synced' },
-  { value: 'member.invited', label: 'Member Invited' },
-  { value: 'member.role_changed', label: 'Role Changed' },
-  { value: 'member.removed', label: 'Member Removed' },
-  { value: 'impersonation.started', label: 'Impersonation Started' },
-  { value: 'impersonation.ended', label: 'Impersonation Ended' },
-];
-
 function SecuritySettings() {
   const { currentOrg } = useOrg();
   const [page, setPage] = useState(1);
@@ -1057,7 +1025,7 @@ function SecuritySettings() {
                   <SelectValue placeholder="Filter by action" />
                 </SelectTrigger>
                 <SelectContent>
-                  {ACTION_OPTIONS.map((opt) => (
+                  {AUDIT_ACTION_OPTIONS.map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>
                       {opt.label}
                     </SelectItem>
@@ -1066,8 +1034,9 @@ function SecuritySettings() {
               </Select>
             </div>
             <div className="flex items-center gap-2">
-              <Label className="text-xs text-muted-foreground">From</Label>
+              <Label htmlFor="org-audit-from-date" className="text-xs text-muted-foreground">From</Label>
               <Input
+                id="org-audit-from-date"
                 type="date"
                 className="w-36"
                 value={fromDate}
@@ -1075,8 +1044,9 @@ function SecuritySettings() {
               />
             </div>
             <div className="flex items-center gap-2">
-              <Label className="text-xs text-muted-foreground">To</Label>
+              <Label htmlFor="org-audit-to-date" className="text-xs text-muted-foreground">To</Label>
               <Input
+                id="org-audit-to-date"
                 type="date"
                 className="w-36"
                 value={toDate}
@@ -1146,8 +1116,13 @@ function SecuritySettings() {
                         }
                         className="text-xs"
                       >
-                        {ACTION_LABELS[log.action] ?? log.action}
+                        {AUDIT_ACTION_LABELS[log.action] ?? log.action}
                       </Badge>
+                      {log.action.startsWith('impersonation') && typeof log.metadata?.impersonator_email === 'string' && (
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          by {log.metadata.impersonator_email}
+                        </p>
+                      )}
                     </TableCell>
                     <TableCell className="text-sm">
                       {log.resourceType ? (
