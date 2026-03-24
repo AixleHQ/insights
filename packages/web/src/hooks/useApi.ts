@@ -249,6 +249,7 @@ export function useProjectSettings(projectId: string) {
     queryKey: ['projects', projectId, 'settings'],
     queryFn: () => api.get<ProjectSettingsResponse>(`/projects/${projectId}/settings`),
     enabled: !!projectId,
+    staleTime: 30_000,
   });
 }
 
@@ -256,7 +257,7 @@ export function useUpdateProjectSetting() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ projectId, key, value }: { projectId: string; key: string; value: unknown }) =>
+    mutationFn: ({ projectId, key, value }: { projectId: string; key: string; value: string }) =>
       api.put(`/projects/${projectId}/settings/${key}`, { value }),
     onSuccess: (_, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'settings'] });

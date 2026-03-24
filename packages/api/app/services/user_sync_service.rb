@@ -95,8 +95,12 @@ class UserSyncService
       if org_slug
         organization = Organization.find_by(slug: org_slug)
         if organization
-          OrganizationMembership.find_or_create_by!(user: user, organization: organization) do |m|
-            m.role = "member"
+          begin
+            OrganizationMembership.find_or_create_by!(user: user, organization: organization) do |m|
+              m.role = "member"
+            end
+          rescue ActiveRecord::RecordNotUnique
+            # Concurrent sync won the race; membership already exists
           end
           Rails.logger.info "[UserSyncService] Auto-assigned #{user.email} to org #{org_slug} (legacy mapping)"
         end
@@ -107,8 +111,12 @@ class UserSyncService
         .where(key: "allowed_email_domain", value: domain)
         .includes(:organization)
         .each do |setting|
-          OrganizationMembership.find_or_create_by!(user: user, organization: setting.organization) do |m|
-            m.role = "member"
+          begin
+            OrganizationMembership.find_or_create_by!(user: user, organization: setting.organization) do |m|
+              m.role = "member"
+            end
+          rescue ActiveRecord::RecordNotUnique
+            # Concurrent sync won the race; membership already exists
           end
           Rails.logger.info "[UserSyncService] Auto-assigned #{user.email} to org #{setting.organization.slug} (domain setting)"
         end
@@ -130,8 +138,12 @@ class UserSyncService
           .where(projects: { organization_id: user_org_ids })
           .includes(:project)
           .each do |setting|
-            ProjectMembership.find_or_create_by!(user: user, project: setting.project) do |m|
-              m.role = "member"
+            begin
+              ProjectMembership.find_or_create_by!(user: user, project: setting.project) do |m|
+                m.role = "member"
+              end
+            rescue ActiveRecord::RecordNotUnique
+              # Concurrent sync won the race; membership already exists
             end
             Rails.logger.info "[UserSyncService] Auto-assigned #{user.email} to project #{setting.project.name} (domain setting)"
           end
