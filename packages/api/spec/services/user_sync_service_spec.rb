@@ -141,6 +141,49 @@ RSpec.describe UserSyncService do
       end
     end
 
+    context 'with auto-assign project' do
+      let(:claims_project) do
+        {
+          'sub' => 'keycloak-project-user',
+          'email' => 'developer@projectdomain.com',
+          'name' => 'Project User'
+        }
+      end
+
+      let!(:project) { create(:project) }
+      let!(:project_setting) do
+        create(:project_setting, project: project, key: 'allowed_email_domain', value: 'projectdomain.com')
+      end
+
+      it 'auto-assigns user to project based on email domain' do
+        user = described_class.sync_from_claims(claims_project)
+
+        expect(user.projects).to include(project)
+      end
+
+      it 'creates membership with member role' do
+        user = described_class.sync_from_claims(claims_project)
+
+        membership = user.project_memberships.find_by(project: project)
+        expect(membership.role).to eq('member')
+      end
+
+      it 'does not create duplicate memberships' do
+        user = described_class.sync_from_claims(claims_project)
+
+        expect {
+          described_class.sync_from_claims(claims_project)
+        }.not_to change(ProjectMembership, :count)
+      end
+
+      it 'handles no matching domain gracefully' do
+        claims_no_match = claims_project.merge('email' => 'user@otherdomain.com')
+
+        user = described_class.sync_from_claims(claims_no_match)
+        expect(user.project_memberships).to be_empty
+      end
+    end
+
     context 'when organization for domain does not exist' do
       let(:claims_unknown) do
         {

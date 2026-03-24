@@ -234,6 +234,39 @@ export function useDeleteOrganizationSetting() {
   });
 }
 
+// Project Settings (key-value store)
+export function useProjectSettings(projectId: string) {
+  return useQuery({
+    queryKey: ['projects', projectId, 'settings'],
+    queryFn: () => api.get<Record<string, unknown>>(`/projects/${projectId}/settings`),
+    enabled: !!projectId,
+  });
+}
+
+export function useUpdateProjectSetting() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ projectId, key, value }: { projectId: string; key: string; value: unknown }) =>
+      api.put(`/projects/${projectId}/settings/${key}`, { value }),
+    onSuccess: (_, { projectId }) => {
+      queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'settings'] });
+    },
+  });
+}
+
+export function useDeleteProjectSetting() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ projectId, key }: { projectId: string; key: string }) =>
+      api.delete(`/projects/${projectId}/settings/${key}`),
+    onSuccess: (_, { projectId }) => {
+      queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'settings'] });
+    },
+  });
+}
+
 // ============================================================================
 // Organization Members Hooks
 // ============================================================================

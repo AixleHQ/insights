@@ -29,6 +29,7 @@ const mockUseProjectDailyByTool = vi.fn();
 const mockUseProjectMembers = vi.fn();
 const mockUseProjectRepositories = vi.fn();
 const mockUseProjectAuditLogs = vi.fn();
+const mockUseProjectSettings = vi.fn();
 
 vi.mock('@/hooks/useApi', () => ({
   useProject: (...args: unknown[]) => mockUseProject(...args),
@@ -39,6 +40,9 @@ vi.mock('@/hooks/useApi', () => ({
   useProjectMembers: (...args: unknown[]) => mockUseProjectMembers(...args),
   useProjectRepositories: (...args: unknown[]) => mockUseProjectRepositories(...args),
   useProjectAuditLogs: (...args: unknown[]) => mockUseProjectAuditLogs(...args),
+  useProjectSettings: (...args: unknown[]) => mockUseProjectSettings(...args),
+  useUpdateProjectSetting: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDeleteProjectSetting: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 const mockProject = {
@@ -61,6 +65,7 @@ function setupDefaultMocks() {
   mockUseProjectMembers.mockReturnValue({ data: undefined, isLoading: false });
   mockUseProjectRepositories.mockReturnValue({ data: undefined, isLoading: false });
   mockUseProjectAuditLogs.mockReturnValue({ data: undefined, isLoading: true });
+  mockUseProjectSettings.mockReturnValue({ data: { data: [] }, isLoading: false });
 }
 
 describe('ProjectDetail', () => {
