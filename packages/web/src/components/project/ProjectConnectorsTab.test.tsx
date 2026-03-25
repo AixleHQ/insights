@@ -358,6 +358,22 @@ describe('ProjectConnectorsTab', () => {
 
       expect(mockDeleteConnector).not.toHaveBeenCalled();
     });
+
+    it('shows inline error alert when disconnect mutation fails', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      mockDeleteConnector.mockRejectedValue(new Error('Network error'));
+      mockProjectConnectors.mockReturnValue({ data: [connectedAnthropicConnector], isLoading: false });
+      const user = userEvent.setup();
+      renderComponent();
+
+      await user.click(screen.getByRole('button', { name: /actions/i }));
+      await user.click(screen.getByRole('menuitem', { name: /disconnect/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Failed to disconnect. Please try again.')).toBeInTheDocument();
+      });
+    });
+
   });
 
   describe('Test connection flow', () => {
@@ -395,6 +411,41 @@ describe('ProjectConnectorsTab', () => {
 
       // Resolve inside act so the resulting state update (setTestingConnectorId(null)) is flushed cleanly
       await act(async () => { resolveTest(); });
+    });
+
+    it('shows inline error alert when test mutation fails', async () => {
+      mockTestConnector.mockRejectedValue(new Error('Network error'));
+      mockProjectConnectors.mockReturnValue({ data: [connectedAnthropicConnector], isLoading: false });
+      const user = userEvent.setup();
+      renderComponent();
+
+      await user.click(screen.getByRole('button', { name: /actions/i }));
+      await user.click(screen.getByRole('menuitem', { name: /test connection/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Failed to run connection test. Please try again.')).toBeInTheDocument();
+      });
+    });
+
+    it('clears the error alert when a subsequent test is triggered', async () => {
+      mockTestConnector.mockRejectedValueOnce(new Error('Network error'));
+      mockProjectConnectors.mockReturnValue({ data: [connectedAnthropicConnector], isLoading: false });
+      const user = userEvent.setup();
+      renderComponent();
+
+      await user.click(screen.getByRole('button', { name: /actions/i }));
+      await user.click(screen.getByRole('menuitem', { name: /test connection/i }));
+      await waitFor(() => {
+        expect(screen.getByText('Failed to run connection test. Please try again.')).toBeInTheDocument();
+      });
+
+      mockTestConnector.mockResolvedValue({ data: { success: true } });
+      await user.click(screen.getByRole('button', { name: /actions/i }));
+      await user.click(screen.getByRole('menuitem', { name: /test connection/i }));
+
+      await waitFor(() => {
+        expect(screen.queryByText('Failed to run connection test. Please try again.')).not.toBeInTheDocument();
+      });
     });
 
     it('shows updated status badge after test completes and query refreshes', async () => {

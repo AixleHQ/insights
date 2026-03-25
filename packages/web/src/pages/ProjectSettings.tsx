@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Routes, Route, Link, useLocation, Navigate, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
+  AlertCircle,
   Building2,
   Users,
   Plug,
@@ -16,6 +17,7 @@ import {
   useDeleteProject,
   useProjectMembers,
 } from '@/hooks/useApi';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -46,7 +48,9 @@ function ProjectSettingsNav({ projectId }: { projectId: string }) {
   return (
     <nav className="flex flex-col gap-1">
       {navItems.map((item) => {
-        const isActive = location.pathname === item.href;
+        const isActive = item.href === `/projects/${projectId}/settings`
+          ? location.pathname === item.href
+          : location.pathname.startsWith(item.href);
         return (
           <Link
             key={item.href}
@@ -87,6 +91,8 @@ function ProjectGeneralSettingsForm({
 
   const [formData, setFormData] = useState(defaultValues);
   const [hasChanges, setHasChanges] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const handleChange = (field: keyof GeneralFormData, value: string | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -94,21 +100,23 @@ function ProjectGeneralSettingsForm({
   };
 
   const handleSave = async () => {
+    setSaveError(null);
     try {
       await updateProject.mutateAsync({ id: projectId, data: formData });
       setHasChanges(false);
-    } catch (error) {
-      console.error('Failed to save:', error);
+    } catch {
+      setSaveError('Failed to save changes. Please try again.');
     }
   };
 
   const handleDelete = async () => {
     if (window.confirm('Are you sure you want to delete this project? This cannot be undone.')) {
+      setDeleteError(null);
       try {
         await deleteProject.mutateAsync(projectId);
         navigate('/projects');
-      } catch (error) {
-        console.error('Failed to delete project:', error);
+      } catch {
+        setDeleteError('Failed to delete project. Please try again.');
       }
     }
   };
@@ -164,6 +172,13 @@ function ProjectGeneralSettingsForm({
         </CardContent>
       </Card>
 
+      {saveError && (
+        <Alert variant="destructive">
+          <AlertCircle className="size-4" />
+          <AlertDescription>{saveError}</AlertDescription>
+        </Alert>
+      )}
+
       <div className="flex justify-end">
         <Button onClick={handleSave} disabled={updateProject.isPending || !hasChanges}>
           {updateProject.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
@@ -191,7 +206,13 @@ function ProjectGeneralSettingsForm({
             project will be permanently deleted.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {deleteError && (
+            <Alert variant="destructive">
+              <AlertCircle className="size-4" />
+              <AlertDescription>{deleteError}</AlertDescription>
+            </Alert>
+          )}
           <Button variant="destructive" onClick={handleDelete} disabled={deleteProject.isPending}>
             {deleteProject.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
             <Trash2 className="mr-2 size-4" />
@@ -203,9 +224,15 @@ function ProjectGeneralSettingsForm({
   );
 }
 
-function ProjectGeneralSettings({ projectId }: { projectId: string }) {
-  const { data: project, isLoading } = useProject(projectId);
-
+function ProjectGeneralSettings({
+  projectId,
+  project,
+  isLoading,
+}: {
+  projectId: string;
+  project: ReturnType<typeof useProject>['data'];
+  isLoading: boolean;
+}) {
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -283,7 +310,7 @@ export function ProjectSettings() {
         </aside>
         <div className="flex-1 min-w-0">
           <Routes>
-            <Route index element={<ProjectGeneralSettings projectId={id} />} />
+            <Route index element={<ProjectGeneralSettings projectId={id} project={project} isLoading={isLoadingProject} />} />
             <Route path="members" element={<ProjectMembersSettings projectId={id} />} />
             <Route path="integrations" element={<ProjectIntegrationsSettings projectId={id} />} />
             <Route path="security" element={<ProjectSecurityTab projectId={id} />} />
