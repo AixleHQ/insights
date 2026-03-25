@@ -17,13 +17,11 @@ import {
   useEvents,
   useDeleteProject,
   useProjectDailyByTool,
-  useProjectMembers,
   useProjectRepositories,
 } from '@/hooks/useApi';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Card,
   CardContent,
@@ -40,7 +38,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { EventsTable, EventDrawer, type EventRow } from '@/components/events';
 import { ToolUsageByDayChart } from '@/components/dashboard';
-import { ProjectTeamSection, ProjectReposSection, ProjectConnectorsTab, ProjectSecurityTab } from '@/components/project';
+import { ProjectReposSection, ProjectNotFound } from '@/components/project';
 import { formatDistanceToNow } from '@/lib/utils';
 
 function formatCurrency(value: number): string {
@@ -94,7 +92,6 @@ export function ProjectDetail() {
     { project_id: id, per_page: 10 }
   );
   const { data: dailyByToolData, isLoading: isLoadingDailyByTool } = useProjectDailyByTool(id || '');
-  const { data: projectMembers, isLoading: isLoadingMembers } = useProjectMembers(id || '');
   const { data: projectRepositories, isLoading: isLoadingRepositories } = useProjectRepositories(id || '');
   const deleteProject = useDeleteProject();
 
@@ -166,17 +163,7 @@ export function ProjectDetail() {
   }
 
   if (!project) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <p className="text-muted-foreground">Project not found</p>
-        <Button asChild variant="link" className="mt-2">
-          <Link to="/projects">
-            <ArrowLeft className="mr-2 size-4" />
-            Back to projects
-          </Link>
-        </Button>
-      </div>
-    );
+    return <ProjectNotFound />;
   }
 
   return (
@@ -205,9 +192,9 @@ export function ProjectDetail() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => navigate(`/projects/${id}/edit`)}>
+            <DropdownMenuItem onClick={() => navigate(`/projects/${id}/settings`)}>
               <Settings className="mr-2 size-4" />
-              Edit project
+              Settings
             </DropdownMenuItem>
             <DropdownMenuItem>
               <RefreshCw className="mr-2 size-4" />
@@ -254,17 +241,10 @@ export function ProjectDetail() {
         />
       </div>
 
-      {/* Team and Repositories */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <ProjectTeamSection
-          members={projectMembers}
-          isLoading={isLoadingMembers}
-        />
-        <ProjectReposSection
-          repositories={projectRepositories}
-          isLoading={isLoadingRepositories}
-        />
-      </div>
+      <ProjectReposSection
+        repositories={projectRepositories}
+        isLoading={isLoadingRepositories}
+      />
 
       {project.repositoryUrl && (
         <Card>
@@ -282,47 +262,22 @@ export function ProjectDetail() {
         </Card>
       )}
 
-      <Tabs defaultValue="activity">
-        <TabsList>
-          <TabsTrigger value="activity">Recent Activity</TabsTrigger>
-          <TabsTrigger value="integrations">Integrations</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
-        </TabsList>
-        <TabsContent value="activity" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Recent Events</CardTitle>
-              <CardDescription>
-                Latest AI tool activity for this project
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <EventsTable
-                events={events}
-                isLoading={isLoadingEvents}
-                onEventClick={handleEventClick}
-                selectedEventId={selectedEventId}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="integrations" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">AI Provider Connectors</CardTitle>
-              <CardDescription>
-                Connect AI providers to track usage and costs for this project
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ProjectConnectorsTab projectId={id!} />
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="settings" className="mt-4">
-          <ProjectSecurityTab projectId={id!} />
-        </TabsContent>
-      </Tabs>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Recent Events</CardTitle>
+          <CardDescription>
+            Latest AI tool activity for this project
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          <EventsTable
+            events={events}
+            isLoading={isLoadingEvents}
+            onEventClick={handleEventClick}
+            selectedEventId={selectedEventId}
+          />
+        </CardContent>
+      </Card>
 
       <EventDrawer
         eventId={selectedEventId}

@@ -26,10 +26,7 @@ const mockUseEvents = vi.fn();
 const mockUseEvent = vi.fn();
 const mockUseDeleteProject = vi.fn();
 const mockUseProjectDailyByTool = vi.fn();
-const mockUseProjectMembers = vi.fn();
 const mockUseProjectRepositories = vi.fn();
-const mockUseProjectAuditLogs = vi.fn();
-const mockUseProjectSettings = vi.fn();
 
 vi.mock('@/hooks/useApi', () => ({
   useProject: (...args: unknown[]) => mockUseProject(...args),
@@ -37,12 +34,7 @@ vi.mock('@/hooks/useApi', () => ({
   useEvent: (...args: unknown[]) => mockUseEvent(...args),
   useDeleteProject: () => mockUseDeleteProject(),
   useProjectDailyByTool: (...args: unknown[]) => mockUseProjectDailyByTool(...args),
-  useProjectMembers: (...args: unknown[]) => mockUseProjectMembers(...args),
   useProjectRepositories: (...args: unknown[]) => mockUseProjectRepositories(...args),
-  useProjectAuditLogs: (...args: unknown[]) => mockUseProjectAuditLogs(...args),
-  useProjectSettings: (...args: unknown[]) => mockUseProjectSettings(...args),
-  useUpdateProjectSetting: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useDeleteProjectSetting: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 const mockProject = {
@@ -62,10 +54,7 @@ function setupDefaultMocks() {
   mockUseEvent.mockReturnValue({ data: undefined, isLoading: false });
   mockUseDeleteProject.mockReturnValue({ mutateAsync: vi.fn() });
   mockUseProjectDailyByTool.mockReturnValue({ data: undefined, isLoading: false });
-  mockUseProjectMembers.mockReturnValue({ data: undefined, isLoading: false });
   mockUseProjectRepositories.mockReturnValue({ data: undefined, isLoading: false });
-  mockUseProjectAuditLogs.mockReturnValue({ data: undefined, isLoading: true });
-  mockUseProjectSettings.mockReturnValue({ data: { data: [] }, isLoading: false });
 }
 
 describe('ProjectDetail', () => {
@@ -104,38 +93,26 @@ describe('ProjectDetail', () => {
     expect(screen.getByText('Last Activity')).toBeInTheDocument();
   });
 
-  describe('Tabs', () => {
-    it('renders all three tab triggers', () => {
-      render(<ProjectDetail />);
+  it('renders Recent Events section', () => {
+    render(<ProjectDetail />);
 
-      expect(screen.getByRole('tab', { name: /recent activity/i })).toBeInTheDocument();
-      expect(screen.getByRole('tab', { name: /integrations/i })).toBeInTheDocument();
-      expect(screen.getByRole('tab', { name: /settings/i })).toBeInTheDocument();
-    });
+    expect(screen.getByText('Recent Events')).toBeInTheDocument();
+  });
 
-    it('shows Recent Activity as default tab', () => {
-      render(<ProjectDetail />);
+  it('does not render Team section on the overview', () => {
+    render(<ProjectDetail />);
 
-      expect(screen.getByText('Recent Events')).toBeInTheDocument();
-    });
+    expect(screen.queryByText('Team')).not.toBeInTheDocument();
+  });
 
-    it('renders SecurityTab content when Settings tab is clicked', async () => {
-      render(<ProjectDetail />);
-      const user = userEvent.setup();
+  it('navigates to settings when Settings menu item is clicked', async () => {
+    const user = userEvent.setup();
+    render(<ProjectDetail />);
 
-      await user.click(screen.getByRole('tab', { name: /settings/i }));
+    await user.click(screen.getByRole('button', { name: '' }));
+    await user.click(screen.getByText('Settings'));
 
-      expect(screen.getByText('Security & Audit Log')).toBeInTheDocument();
-    });
-
-    it('hides activity content when switching to Settings', async () => {
-      render(<ProjectDetail />);
-      const user = userEvent.setup();
-
-      await user.click(screen.getByRole('tab', { name: /settings/i }));
-
-      expect(screen.queryByText('Recent Events')).not.toBeInTheDocument();
-    });
+    expect(mockNavigate).toHaveBeenCalledWith('/projects/proj-1/settings');
   });
 
   describe('Active badge', () => {
