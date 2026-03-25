@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
+import { AlertCircle } from 'lucide-react';
 import { useProjectConnectors, useProjectConnectWithApiKey, useProjectDeleteConnector, useProjectTestConnector } from '@/hooks/useApi';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   IntegrationCard,
   type IntegrationData,
@@ -112,6 +114,7 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
   const [slackSheetOpen, setSlackSheetOpen] = useState(false);
   const [connectingProvider, setConnectingProvider] = useState<ProviderInfo | null>(null);
   const [testingConnectorId, setTestingConnectorId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const integrations: IntegrationData[] = useMemo(() => {
     if (!connectorsData) return [];
@@ -161,20 +164,22 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
 
   const handleDisconnect = async (id: string) => {
     if (window.confirm('Are you sure you want to disconnect this integration?')) {
+      setActionError(null);
       try {
         await deleteConnector.mutateAsync({ projectId, connectorId: id });
-      } catch (error) {
-        console.error('Failed to disconnect integration:', error);
+      } catch {
+        setActionError('Failed to disconnect. Please try again.');
       }
     }
   };
 
   const handleTest = async (id: string) => {
     setTestingConnectorId(id);
+    setActionError(null);
     try {
       await testConnector.mutateAsync({ projectId, connectorId: id });
-    } catch (error) {
-      console.error('Failed to test connector:', error);
+    } catch {
+      setActionError('Failed to run connection test. Please try again.');
     } finally {
       setTestingConnectorId(null);
     }
@@ -182,6 +187,12 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
 
   return (
     <>
+      {actionError && (
+        <Alert variant="destructive">
+          <AlertCircle className="size-4" />
+          <AlertDescription>{actionError}</AlertDescription>
+        </Alert>
+      )}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="connected">
