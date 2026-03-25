@@ -177,4 +177,26 @@ describe('ProjectRetentionPolicySection', () => {
       expect(screen.queryByText('Reduce retention period?')).not.toBeInTheDocument();
     });
   });
+
+  it('shows error alert when mutation fails', async () => {
+    const mutateAsync = vi.fn().mockRejectedValue(new Error('Server error'));
+    mockUseUpdateProjectRetentionPolicy.mockReturnValue({ mutateAsync, isPending: false });
+
+    mockUseProjectRetentionPolicy.mockReturnValue({
+      data: { ...mockPolicy, rawEventTtl: '24_hours' },
+      isLoading: false,
+    });
+
+    const user = userEvent.setup();
+    renderComponent();
+
+    const rawEventSelect = screen.getAllByRole('combobox')[0];
+    await user.click(rawEventSelect);
+    const option = await screen.findByRole('option', { name: '48 hours' });
+    await user.click(option);
+
+    await waitFor(() => {
+      expect(screen.getByText('Failed to save. Please try again.')).toBeInTheDocument();
+    });
+  });
 });

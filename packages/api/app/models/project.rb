@@ -37,7 +37,7 @@ class Project < ApplicationRecord
   private
 
   def create_default_retention_policy
-    create_retention_policy! unless retention_policy.present?
+    create_retention_policy!
   end
 
   def flag_as_being_destroyed

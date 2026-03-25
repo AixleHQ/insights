@@ -249,9 +249,12 @@ module Api
       def update_retention_policy
         authorize! @project, to: :retention_policy?
 
+        return render_resource(@project.retention_policy || @project.create_retention_policy!, ProjectRetentionPolicySerializer) if retention_policy_params.empty?
+
         policy = @project.retention_policy || @project.build_retention_policy
         changes_before = policy.attributes.slice(*retention_policy_params.keys)
 
+        policy.updated_by = current_user
         if policy.update(retention_policy_params)
           ProjectAuditLog.log(
             project: @project,
@@ -273,7 +276,7 @@ module Api
       private
 
       def set_project
-        @project = Project.find(params[:id])
+        @project = Project.includes(:retention_policy).find(params[:id])
       end
 
       def project_params
