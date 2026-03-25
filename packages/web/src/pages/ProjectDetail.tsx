@@ -187,7 +187,7 @@ export function ProjectDetail() {
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon">
+            <Button variant="outline" size="icon" aria-label="Project actions">
               <MoreHorizontal className="size-4" />
             </Button>
           </DropdownMenuTrigger>

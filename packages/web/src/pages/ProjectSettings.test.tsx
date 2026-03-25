@@ -214,6 +214,39 @@ describe('ProjectSettings', () => {
 
       expect(mutateAsync).not.toHaveBeenCalled();
     });
+
+    it('shows inline error alert when save fails', async () => {
+      mockUseUpdateProject.mockReturnValue({
+        mutateAsync: vi.fn().mockRejectedValue(new Error('Network error')),
+        isPending: false,
+      });
+      const user = userEvent.setup();
+      renderAtPath('/projects/proj-1/settings');
+
+      await user.clear(screen.getByLabelText('Name'));
+      await user.type(screen.getByLabelText('Name'), 'Renamed');
+      await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Failed to save changes. Please try again.')).toBeInTheDocument();
+      });
+    });
+
+    it('shows inline error alert when delete fails', async () => {
+      mockUseDeleteProject.mockReturnValue({
+        mutateAsync: vi.fn().mockRejectedValue(new Error('Network error')),
+        isPending: false,
+      });
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      const user = userEvent.setup();
+      renderAtPath('/projects/proj-1/settings');
+
+      await user.click(screen.getByRole('button', { name: /delete project/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Failed to delete project. Please try again.')).toBeInTheDocument();
+      });
+    });
   });
 
   describe('Sub-routes', () => {

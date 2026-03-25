@@ -109,7 +109,7 @@ describe('ProjectDetail', () => {
     const user = userEvent.setup();
     render(<ProjectDetail />);
 
-    await user.click(screen.getByRole('button', { name: '' }));
+    await user.click(screen.getByRole('button', { name: /project actions/i }));
     await user.click(screen.getByText('Settings'));
 
     expect(mockNavigate).toHaveBeenCalledWith('/projects/proj-1/settings');
