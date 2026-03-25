@@ -27,6 +27,7 @@ import type {
   Alert,
   PaginatedResponse,
   RetentionPolicy,
+  ProjectRetentionPolicy,
   Invitation,
   InvitationPublic,
   MemberRole,
@@ -197,6 +198,29 @@ export function useUpdateRetentionPolicy() {
       api.patch<{ data: RetentionPolicy }>(`/organizations/${orgId}/retention_policy`, data),
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: ['organizations', orgId, 'retention_policy'] });
+    },
+  });
+}
+
+export function useProjectRetentionPolicy(projectId: string) {
+  return useQuery({
+    queryKey: ['projects', projectId, 'retention_policy'],
+    queryFn: async () => {
+      const response = await api.get<{ data: ProjectRetentionPolicy }>(`/projects/${projectId}/retention_policy`);
+      return response.data;
+    },
+    enabled: !!projectId,
+  });
+}
+
+export function useUpdateProjectRetentionPolicy() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ projectId, data }: { projectId: string; data: Record<string, string> }) =>
+      api.patch<{ data: ProjectRetentionPolicy }>(`/projects/${projectId}/retention_policy`, data),
+    onSuccess: (_, { projectId }) => {
+      queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'retention_policy'] });
     },
   });
 }

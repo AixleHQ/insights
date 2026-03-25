@@ -275,6 +275,19 @@ export interface RetentionPolicy {
   dailyAggregateRetention: DailyAggregateRetention;
 }
 
+export interface ProjectRetentionPolicy {
+  id: string;
+  projectId: string;
+  rawEventTtl: RawEventTtl;
+  toolEventsRetention: ToolEventsRetention;
+  hourlyAggregateRetention: HourlyAggregateRetention;
+  dailyAggregateRetention: DailyAggregateRetention;
+  retentionReason?: string;
+  updatedById?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Invitation types
 export type InvitationStatus = 'pending' | 'accepted' | 'revoked' | 'expired';
 export type MemberRole = 'owner' | 'admin' | 'member' | 'viewer';

@@ -20,4 +20,10 @@ class ProjectFullSerializer < ProjectSerializer
   attribute :repository_count do |project|
     project.repositories.count
   end
+
+  attribute :retention_policy do |project|
+    if project.retention_policy
+      ::ProjectRetentionPolicySerializer.new(project.retention_policy).serializable_hash
+    end
+  end
 end

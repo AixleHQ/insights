@@ -3,7 +3,7 @@
 module Api
   module V1
     class ProjectsController < BaseController
-      before_action :set_project, only: %i[show update destroy settings update_setting destroy_setting stats daily_by_tool members]
+      before_action :set_project, only: %i[show update destroy settings update_setting destroy_setting stats daily_by_tool members retention_policy update_retention_policy]
 
       # GET /api/v1/projects
       # GET /api/v1/organizations/:organization_id/projects
@@ -238,6 +238,38 @@ module Api
         render json: { data: members_data }
       end
 
+      # GET /api/v1/projects/:id/retention_policy
+      def retention_policy
+        authorize! @project, to: :retention_policy?
+        policy = @project.retention_policy || @project.create_retention_policy!
+        render_resource(policy, ProjectRetentionPolicySerializer)
+      end
+
+      # PATCH /api/v1/projects/:id/retention_policy
+      def update_retention_policy
+        authorize! @project, to: :retention_policy?
+
+        policy = @project.retention_policy || @project.build_retention_policy
+        changes_before = policy.attributes.slice(*retention_policy_params.keys)
+
+        if policy.update(retention_policy_params)
+          ProjectAuditLog.log(
+            project: @project,
+            actor: current_user,
+            action: "settings.update",
+            resource: policy,
+            tracked_changes: { before: changes_before, after: policy.attributes.slice(*retention_policy_params.keys) },
+            request: request
+          )
+          render_resource(policy, ProjectRetentionPolicySerializer)
+        else
+          render json: {
+            error: "Unprocessable Entity",
+            errors: format_validation_errors(policy.errors)
+          }, status: :unprocessable_entity
+        end
+      end
+
       private
 
       def set_project
@@ -250,6 +282,11 @@ module Api
 
       def project_update_params
         params.permit(:name, :slug, :description, :repository_url, :is_active)
+      end
+
+      def retention_policy_params
+        params.permit(:raw_event_ttl, :tool_events_retention, :hourly_aggregate_retention,
+                      :daily_aggregate_retention, :retention_reason)
       end
     end
   end

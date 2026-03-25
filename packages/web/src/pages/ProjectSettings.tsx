@@ -7,6 +7,7 @@ import {
   Users,
   Plug,
   FileSearch,
+  Shield,
   Loader2,
   Save,
   Trash2,
@@ -31,7 +32,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { ProjectTeamSection, ProjectConnectorsTab, ProjectSecurityTab, ProjectSettingsSection, ProjectNotFound } from '@/components/project';
+import { ProjectTeamSection, ProjectConnectorsTab, ProjectSecurityTab, ProjectSettingsSection, ProjectNotFound, ProjectRetentionPolicySection } from '@/components/project';
 import { cn } from '@/lib/utils';
 
 const getNavItems = (id: string) => [
@@ -39,6 +40,7 @@ const getNavItems = (id: string) => [
   { title: 'Members', href: `/projects/${id}/settings/members`, icon: Users },
   { title: 'Integrations', href: `/projects/${id}/settings/integrations`, icon: Plug },
   { title: 'Security & Audit', href: `/projects/${id}/settings/security`, icon: FileSearch },
+  { title: 'Policies', href: `/projects/${id}/settings/policies`, icon: Shield },
 ];
 
 function ProjectSettingsNav({ projectId }: { projectId: string }) {
@@ -314,6 +316,7 @@ export function ProjectSettings() {
             <Route path="members" element={<ProjectMembersSettings projectId={id} />} />
             <Route path="integrations" element={<ProjectIntegrationsSettings projectId={id} />} />
             <Route path="security" element={<ProjectSecurityTab projectId={id} />} />
+            <Route path="policies" element={<ProjectRetentionPolicySection projectId={id} />} />
             <Route path="*" element={<Navigate to={`/projects/${id}/settings`} replace />} />
           </Routes>
         </div>

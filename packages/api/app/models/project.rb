@@ -8,11 +8,14 @@ class Project < ApplicationRecord
   has_many :repositories, dependent: :destroy
   has_many :project_audit_logs, dependent: :destroy
   has_many :tool_events, class_name: "ToolEvent", dependent: :restrict_with_error
+  has_one :retention_policy, class_name: "ProjectRetentionPolicy", dependent: :destroy
 
   validates :name, presence: true
   validates :slug, presence: true, format: { with: /\A[a-z0-9]+(?:-[a-z0-9]+)*\z/, message: "must be lowercase alphanumeric with hyphens" }
   validates :is_active, inclusion: { in: [ true, false ] }
   validate :must_belong_to_org_or_owner
+
+  after_create :create_default_retention_policy
 
   before_destroy :flag_as_being_destroyed, prepend: true
   before_validation :generate_slug, on: :create
@@ -32,6 +35,10 @@ class Project < ApplicationRecord
   end
 
   private
+
+  def create_default_retention_policy
+    create_retention_policy! unless retention_policy.present?
+  end
 
   def flag_as_being_destroyed
     @being_destroyed = true
