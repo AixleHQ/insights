@@ -38,7 +38,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { EventsTable, EventDrawer, type EventRow } from '@/components/events';
 import { ToolUsageByDayChart } from '@/components/dashboard';
-import { ProjectReposSection } from '@/components/project';
+import { ProjectReposSection, ProjectNotFound } from '@/components/project';
 import { formatDistanceToNow } from '@/lib/utils';
 
 function formatCurrency(value: number): string {
@@ -163,17 +163,7 @@ export function ProjectDetail() {
   }
 
   if (!project) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <p className="text-muted-foreground">Project not found</p>
-        <Button asChild variant="link" className="mt-2">
-          <Link to="/projects">
-            <ArrowLeft className="mr-2 size-4" />
-            Back to projects
-          </Link>
-        </Button>
-      </div>
-    );
+    return <ProjectNotFound />;
   }
 
   return (

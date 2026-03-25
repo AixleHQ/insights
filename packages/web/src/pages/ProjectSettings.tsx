@@ -29,7 +29,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { ProjectTeamSection, ProjectConnectorsTab, ProjectSecurityTab, ProjectSettingsSection } from '@/components/project';
+import { ProjectTeamSection, ProjectConnectorsTab, ProjectSecurityTab, ProjectSettingsSection, ProjectNotFound } from '@/components/project';
 import { cn } from '@/lib/utils';
 
 const getNavItems = (id: string) => [
@@ -88,7 +88,7 @@ function ProjectGeneralSettingsForm({
   const [formData, setFormData] = useState(defaultValues);
   const [hasChanges, setHasChanges] = useState(false);
 
-  const handleChange = (field: string, value: string | boolean) => {
+  const handleChange = (field: keyof GeneralFormData, value: string | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     setHasChanges(true);
   };
@@ -215,13 +215,15 @@ function ProjectGeneralSettings({ projectId }: { projectId: string }) {
     );
   }
 
-  if (!project) return null;
+  if (!project) {
+    return <ProjectNotFound />;
+  }
 
   const defaultValues: GeneralFormData = {
     name: project.name || '',
     description: project.description || '',
-    repository_url: project.repositoryUrl || (project as { repository_url?: string }).repository_url || '',
-    is_active: (project as { is_active?: boolean }).is_active ?? project.isActive ?? true,
+    repository_url: project.repositoryUrl ?? project.repository_url ?? '',
+    is_active: project.isActive ?? project.is_active,
   };
 
   return <ProjectGeneralSettingsForm key={project.id} projectId={projectId} defaultValues={defaultValues} />;
@@ -230,17 +232,7 @@ function ProjectGeneralSettings({ projectId }: { projectId: string }) {
 function ProjectMembersSettings({ projectId }: { projectId: string }) {
   const { data: members, isLoading } = useProjectMembers(projectId);
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-medium">Members</h2>
-        <p className="text-sm text-muted-foreground">
-          People who have access to this project
-        </p>
-      </div>
-      <ProjectTeamSection members={members} isLoading={isLoading} />
-    </div>
-  );
+  return <ProjectTeamSection members={members} isLoading={isLoading} />;
 }
 
 function ProjectIntegrationsSettings({ projectId }: { projectId: string }) {
@@ -276,7 +268,7 @@ export function ProjectSettings() {
             <Skeleton className="h-7 w-48" />
           ) : (
             <h1 className="text-2xl font-semibold tracking-tight">
-              {project?.name} — Settings
+              {project ? `${project.name} — Settings` : 'Settings'}
             </h1>
           )}
           <p className="text-sm text-muted-foreground">

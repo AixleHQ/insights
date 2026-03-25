@@ -10,9 +10,6 @@ const mockUseProjectAuditLogs = vi.fn();
 
 vi.mock('@/hooks/useApi', () => ({
   useProjectAuditLogs: (...args: unknown[]) => mockUseProjectAuditLogs(...args),
-  useProjectSettings: () => ({ data: undefined, isLoading: false }),
-  useUpdateProjectSetting: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useDeleteProjectSetting: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 const PROJECT_ID = 'test-project-id';
