@@ -20,12 +20,16 @@ const mockUseProject = vi.fn();
 const mockUseUpdateProject = vi.fn();
 const mockUseDeleteProject = vi.fn();
 const mockUseProjectMembers = vi.fn();
+const mockUseProjectRetentionPolicy = vi.fn();
+const mockUseUpdateProjectRetentionPolicy = vi.fn();
 
 vi.mock('@/hooks/useApi', () => ({
   useProject: (...args: unknown[]) => mockUseProject(...args),
   useUpdateProject: () => mockUseUpdateProject(),
   useDeleteProject: () => mockUseDeleteProject(),
   useProjectMembers: (...args: unknown[]) => mockUseProjectMembers(...args),
+  useProjectRetentionPolicy: (...args: unknown[]) => mockUseProjectRetentionPolicy(...args),
+  useUpdateProjectRetentionPolicy: () => mockUseUpdateProjectRetentionPolicy(),
 }));
 
 vi.mock('@/components/project', () => ({
@@ -33,6 +37,7 @@ vi.mock('@/components/project', () => ({
   ProjectConnectorsTab: () => <div>Connectors Tab</div>,
   ProjectSecurityTab: () => <div>Security Tab</div>,
   ProjectSettingsSection: () => <div>Email Domain Section</div>,
+  ProjectRetentionPolicySection: () => <div>Retention Policy Section</div>,
   ProjectNotFound: () => (
     <div>
       <p>Project not found</p>
@@ -71,6 +76,8 @@ function setupDefaultMocks() {
   mockUseUpdateProject.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
   mockUseDeleteProject.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
   mockUseProjectMembers.mockReturnValue({ data: [], isLoading: false });
+  mockUseProjectRetentionPolicy.mockReturnValue({ data: undefined, isLoading: false });
+  mockUseUpdateProjectRetentionPolicy.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
 }
 
 describe('ProjectSettings', () => {
@@ -102,13 +109,14 @@ describe('ProjectSettings', () => {
   });
 
   describe('Sidebar navigation', () => {
-    it('renders all 4 nav links', () => {
+    it('renders all 5 nav links', () => {
       renderAtPath('/projects/proj-1/settings');
 
       expect(screen.getByRole('link', { name: /general/i })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: /members/i })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: /integrations/i })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: /security & audit/i })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /policies/i })).toBeInTheDocument();
     });
 
     it('marks General as active on the index route', () => {
@@ -266,6 +274,12 @@ describe('ProjectSettings', () => {
       renderAtPath('/projects/proj-1/settings/security');
 
       expect(screen.getByText('Security Tab')).toBeInTheDocument();
+    });
+
+    it('renders Policies section at /settings/policies', () => {
+      renderAtPath('/projects/proj-1/settings/policies');
+
+      expect(screen.getByText('Retention Policy Section')).toBeInTheDocument();
     });
   });
 });

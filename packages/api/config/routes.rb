@@ -115,6 +115,8 @@ Rails.application.routes.draw do
           get :stats
           get "stats/daily_by_tool", action: :daily_by_tool
           get :members
+          get :retention_policy
+          patch :retention_policy, action: :update_retention_policy
         end
 
         # Project members

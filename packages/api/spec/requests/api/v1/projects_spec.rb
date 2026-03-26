@@ -301,4 +301,79 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       expect_forbidden
     end
   end
+
+  describe 'GET /api/v1/projects/:id/retention_policy' do
+    let!(:project) { create(:project, organization: organization, owner: nil) }
+    let!(:project_membership) { create(:project_membership, project: project, user: user, role: 'admin') }
+
+    it 'returns the retention policy with camelCase keys' do
+      authenticated_get "/api/v1/projects/#{project.id}/retention_policy", user: user
+
+      expect_success
+      expect(json_data[:rawEventTtl]).to eq('24_hours')
+      expect(json_data[:toolEventsRetention]).to eq('90_days')
+      expect(json_data[:hourlyAggregateRetention]).to eq('365_days')
+      expect(json_data[:dailyAggregateRetention]).to eq('forever')
+      expect(json_data[:projectId]).to eq(project.id)
+    end
+
+    it 'returns 403 for non-admin members' do
+      non_admin = create(:user)
+      create(:organization_membership, user: non_admin, organization: organization, role: 'member')
+      authenticated_get "/api/v1/projects/#{project.id}/retention_policy", user: non_admin
+
+      expect_forbidden
+    end
+
+    it 'returns 401 for unauthenticated requests' do
+      get "/api/v1/projects/#{project.id}/retention_policy"
+
+      expect(response).to have_http_status(:unauthorized)
+    end
+  end
+
+  describe 'PATCH /api/v1/projects/:id/retention_policy' do
+    let!(:project) { create(:project, organization: organization, owner: nil) }
+    let!(:project_membership) { create(:project_membership, project: project, user: user, role: 'admin') }
+
+    it 'updates the retention policy and returns 200' do
+      authenticated_patch "/api/v1/projects/#{project.id}/retention_policy",
+                          user: user,
+                          params: { raw_event_ttl: '48_hours' }
+
+      expect_success
+      expect(json_data[:rawEventTtl]).to eq('48_hours')
+    end
+
+    it 'creates a project audit log on update' do
+      expect {
+        authenticated_patch "/api/v1/projects/#{project.id}/retention_policy",
+                            user: user,
+                            params: { tool_events_retention: '180_days' }
+      }.to change(ProjectAuditLog, :count).by(1)
+
+      log = ProjectAuditLog.last
+      expect(log.action).to eq('settings.update')
+      expect(log.actor).to eq(user)
+    end
+
+    it 'returns 422 with errors for invalid enum value' do
+      authenticated_patch "/api/v1/projects/#{project.id}/retention_policy",
+                          user: user,
+                          params: { raw_event_ttl: 'invalid_value' }
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(json_response[:errors]).to be_present
+    end
+
+    it 'returns 403 for non-admin members' do
+      non_admin = create(:user)
+      create(:organization_membership, user: non_admin, organization: organization, role: 'member')
+      authenticated_patch "/api/v1/projects/#{project.id}/retention_policy",
+                          user: non_admin,
+                          params: { raw_event_ttl: '48_hours' }
+
+      expect_forbidden
+    end
+  end
 end

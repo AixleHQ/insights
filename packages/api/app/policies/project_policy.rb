@@ -46,6 +46,11 @@ class ProjectPolicy < ApplicationPolicy
     update?
   end
 
+  # Retention policy access
+  def retention_policy?
+    update?
+  end
+
   # Only project admins/owners can view audit logs
   def audit_logs?
     return true if global_admin?

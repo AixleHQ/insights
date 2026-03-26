@@ -3863,6 +3863,24 @@ CREATE TABLE public.project_memberships (
 
 
 --
+-- Name: project_retention_policies; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.project_retention_policies (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    project_id uuid NOT NULL,
+    updated_by_id uuid,
+    raw_event_ttl public.raw_event_ttl DEFAULT '24_hours'::public.raw_event_ttl NOT NULL,
+    tool_events_retention public.tool_events_retention DEFAULT '90_days'::public.tool_events_retention NOT NULL,
+    hourly_aggregate_retention public.hourly_aggregate_retention DEFAULT '365_days'::public.hourly_aggregate_retention NOT NULL,
+    daily_aggregate_retention public.daily_aggregate_retention DEFAULT 'forever'::public.daily_aggregate_retention NOT NULL,
+    retention_reason character varying,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
 -- Name: project_settings; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -6767,6 +6785,14 @@ ALTER TABLE ONLY public.project_memberships
 
 
 --
+-- Name: project_retention_policies project_retention_policies_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.project_retention_policies
+    ADD CONSTRAINT project_retention_policies_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: project_settings project_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -9233,6 +9259,20 @@ CREATE UNIQUE INDEX index_project_memberships_on_user_id_and_project_id ON publi
 
 
 --
+-- Name: index_project_retention_policies_on_project_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_project_retention_policies_on_project_id ON public.project_retention_policies USING btree (project_id);
+
+
+--
+-- Name: index_project_retention_policies_on_updated_by_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_project_retention_policies_on_updated_by_id ON public.project_retention_policies USING btree (updated_by_id);
+
+
+--
 -- Name: index_project_settings_on_allowed_email_domain; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -10956,6 +10996,14 @@ ALTER TABLE ONLY public.organization_connectors
 
 
 --
+-- Name: project_retention_policies fk_rails_81cdd6d032; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.project_retention_policies
+    ADD CONSTRAINT fk_rails_81cdd6d032 FOREIGN KEY (project_id) REFERENCES public.projects(id);
+
+
+--
 -- Name: project_memberships fk_rails_86b046ec96; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -11009,6 +11057,14 @@ ALTER TABLE ONLY public.projects
 
 ALTER TABLE ONLY public.organization_retention_policies
     ADD CONSTRAINT fk_rails_aea4165a3f FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+
+
+--
+-- Name: project_retention_policies fk_rails_b240657e32; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.project_retention_policies
+    ADD CONSTRAINT fk_rails_b240657e32 FOREIGN KEY (updated_by_id) REFERENCES public.users(id);
 
 
 --
@@ -11090,6 +11146,7 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260325000001'),
 ('20260324000001'),
 ('20260320000001'),
 ('20260317000001'),
