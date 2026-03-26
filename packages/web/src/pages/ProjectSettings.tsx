@@ -280,9 +280,6 @@ function ProjectIntegrationsSettings({ projectId }: { projectId: string }) {
   );
 }
 
-function ProjectAlertsSettings({ projectId, orgId }: { projectId: string; orgId: string }) {
-  return <ProjectAlertsSection projectId={projectId} orgId={orgId} />;
-}
 
 export function ProjectSettings() {
   const { id } = useParams<{ id: string }>();
@@ -326,9 +323,9 @@ export function ProjectSettings() {
             <Route
               path="alerts"
               element={
-                <ProjectAlertsSettings
+                <ProjectAlertsSection
                   projectId={id}
-                  orgId={project?.organization_id ?? project?.organizationId ?? ''}
+                  orgId={project?.organization_id ?? ''}
                 />
               }
             />

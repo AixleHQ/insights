@@ -142,11 +142,10 @@ describe('ProjectAlertsSection', () => {
     await user.tab();
 
     await waitFor(() => {
-      expect(mockUpdateMutate).toHaveBeenCalledWith({
-        projectId: 'proj-1',
-        key: 'alert_cost_daily',
-        value: '250',
-      });
+      expect(mockUpdateMutate).toHaveBeenCalledWith(
+        { projectId: 'proj-1', key: 'alert_cost_daily', value: '250' },
+        expect.objectContaining({ onError: expect.any(Function) })
+      );
     });
   });
 
@@ -159,11 +158,10 @@ describe('ProjectAlertsSection', () => {
     await user.tab();
 
     await waitFor(() => {
-      expect(mockUpdateMutate).toHaveBeenCalledWith({
-        projectId: 'proj-1',
-        key: 'alert_cost_monthly',
-        value: '4000',
-      });
+      expect(mockUpdateMutate).toHaveBeenCalledWith(
+        { projectId: 'proj-1', key: 'alert_cost_monthly', value: '4000' },
+        expect.objectContaining({ onError: expect.any(Function) })
+      );
     });
   });
 
@@ -180,10 +178,10 @@ describe('ProjectAlertsSection', () => {
     await user.tab();
 
     await waitFor(() => {
-      expect(mockDeleteMutate).toHaveBeenCalledWith({
-        projectId: 'proj-1',
-        key: 'alert_cost_daily',
-      });
+      expect(mockDeleteMutate).toHaveBeenCalledWith(
+        { projectId: 'proj-1', key: 'alert_cost_daily' },
+        expect.objectContaining({ onError: expect.any(Function) })
+      );
     });
   });
 

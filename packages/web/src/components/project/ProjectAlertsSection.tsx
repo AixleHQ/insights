@@ -17,6 +17,7 @@ import {
   useOrganizationSettings,
 } from '@/hooks/useApi';
 import { cn, formatCurrency } from '@/lib/utils';
+import { validateCostInput } from '@/lib/validation';
 
 interface Props {
   projectId: string;
@@ -32,12 +33,10 @@ export function ProjectAlertsSection({ projectId, orgId }: Props) {
   const isLoading = isLoadingProject || isLoadingOrg;
 
   const getProjSetting = (key: string) =>
-    (projectSettings as { data?: { key: string; value: string }[] })?.data?.find(
-      (s) => s.key === key
-    )?.value;
+    projectSettings?.data?.find((s) => s.key === key)?.value;
 
   const getOrgSetting = (key: string) =>
-    (orgSettings as { data?: { key: string; value: string }[] })?.data?.find(
+    (orgSettings as { data?: { key: string; value: string }[] } | undefined)?.data?.find(
       (s) => s.key === key
     )?.value;
 
@@ -58,38 +57,38 @@ export function ProjectAlertsSection({ projectId, orgId }: Props) {
     const daily = getProjSetting('alert_cost_daily');
     if (daily !== undefined) setCostDaily(daily);
     else setCostDaily('');
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectSettings]);
 
   useEffect(() => {
     const monthly = getProjSetting('alert_cost_monthly');
     if (monthly !== undefined) setCostMonthly(monthly);
     else setCostMonthly('');
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectSettings]);
-
-  const validateCostInput = (value: string): string => {
-    if (value === '') return '';
-    if (!/^\d+(\.\d+)?$/.test(value.trim())) return 'Must be a non-negative number';
-    if (Number(value) < 0) return 'Must be non-negative';
-    return '';
-  };
 
   const handleCostBlur = (
     value: string,
     projectValue: string | undefined,
     key: 'alert_cost_daily' | 'alert_cost_monthly',
-    setError: (e: string) => void
+    setError: (e: string) => void,
+    setValue: (v: string) => void
   ) => {
     const error = validateCostInput(value);
     setError(error);
     if (error) return;
     if (value === '') {
       if (projectValue !== undefined) {
-        deleteSetting.mutate({ projectId, key });
+        deleteSetting.mutate(
+          { projectId, key },
+          { onError: () => setValue(projectValue) }
+        );
       }
     } else if (value !== projectValue) {
-      updateSetting.mutate({ projectId, key, value });
+      updateSetting.mutate(
+        { projectId, key, value },
+        { onError: () => setValue(projectValue ?? '') }
+      );
     }
   };
 
@@ -154,7 +153,9 @@ export function ProjectAlertsSection({ projectId, orgId }: Props) {
                 setCostDaily(e.target.value);
                 setCostDailyError(validateCostInput(e.target.value));
               }}
-              onBlur={() => handleCostBlur(costDaily, projectCostDaily, 'alert_cost_daily', setCostDailyError)}
+              onBlur={() =>
+                handleCostBlur(costDaily, projectCostDaily, 'alert_cost_daily', setCostDailyError, setCostDaily)
+              }
               className={cn(costDailyError && 'border-destructive focus-visible:ring-destructive')}
             />
             {costDailyError ? (
@@ -182,7 +183,9 @@ export function ProjectAlertsSection({ projectId, orgId }: Props) {
                 setCostMonthly(e.target.value);
                 setCostMonthlyError(validateCostInput(e.target.value));
               }}
-              onBlur={() => handleCostBlur(costMonthly, projectCostMonthly, 'alert_cost_monthly', setCostMonthlyError)}
+              onBlur={() =>
+                handleCostBlur(costMonthly, projectCostMonthly, 'alert_cost_monthly', setCostMonthlyError, setCostMonthly)
+              }
               className={cn(costMonthlyError && 'border-destructive focus-visible:ring-destructive')}
             />
             {costMonthlyError ? (
