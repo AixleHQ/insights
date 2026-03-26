@@ -114,7 +114,7 @@ describe('AlertSettings', () => {
       await user.clear(input);
       await user.type(input, '-5');
 
-      expect(screen.getByText('Must be a positive number')).toBeInTheDocument();
+      expect(screen.getByText('Must be a non-negative number')).toBeInTheDocument();
     });
 
     it('shows error message for negative monthly input', async () => {
@@ -125,7 +125,7 @@ describe('AlertSettings', () => {
       await user.clear(input);
       await user.type(input, '-5');
 
-      expect(screen.getByText('Must be a positive number')).toBeInTheDocument();
+      expect(screen.getByText('Must be a non-negative number')).toBeInTheDocument();
     });
 
     it('does not save daily cost on blur when input is invalid', async () => {
@@ -163,11 +163,11 @@ describe('AlertSettings', () => {
       const input = screen.getByLabelText('Daily Cost Limit (USD)');
       await user.clear(input);
       await user.type(input, '-5');
-      expect(screen.getByText('Must be a positive number')).toBeInTheDocument();
+      expect(screen.getByText('Must be a non-negative number')).toBeInTheDocument();
 
       await user.clear(input);
       await user.type(input, '100');
-      expect(screen.queryByText('Must be a positive number')).not.toBeInTheDocument();
+      expect(screen.queryByText('Must be a non-negative number')).not.toBeInTheDocument();
     });
 
     it('applies destructive border style to daily input when invalid', async () => {

@@ -70,7 +70,7 @@ export function ProjectAlertsSection({ projectId, orgId }: Props) {
 
   const validateCostInput = (value: string): string => {
     if (value === '') return '';
-    if (!/^\d+(\.\d+)?$/.test(value.trim())) return 'Must be a positive number';
+    if (!/^\d+(\.\d+)?$/.test(value.trim())) return 'Must be a non-negative number';
     if (Number(value) < 0) return 'Must be non-negative';
     return '';
   };
