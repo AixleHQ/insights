@@ -38,6 +38,7 @@ vi.mock('@/components/project', () => ({
   ProjectSecurityTab: () => <div>Security Tab</div>,
   ProjectSettingsSection: () => <div>Email Domain Section</div>,
   ProjectRetentionPolicySection: () => <div>Retention Policy Section</div>,
+  ProjectAlertsSection: () => <div>Alerts Section</div>,
   ProjectNotFound: () => (
     <div>
       <p>Project not found</p>

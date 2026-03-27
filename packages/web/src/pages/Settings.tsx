@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { validateCostInput as validateCostInputLib } from '@/lib/validation';
 import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { Team } from './Team';
 import {
@@ -628,12 +629,7 @@ export function AlertSettings() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings]);
 
-  const validateCostInput = (value: string): string => {
-    if (value === '' || value === null) return 'Value is required';
-    if (!/^\d+(\.\d+)?$/.test(value.trim())) return 'Must be a positive number';
-    if (Number(value) < 0) return 'Must be non-negative';
-    return '';
-  };
+  const validateCostInput = (value: string) => validateCostInputLib(value, { required: true });
 
   const handleCostDailyChange = (value: string) => {
     setCostDaily(value);
