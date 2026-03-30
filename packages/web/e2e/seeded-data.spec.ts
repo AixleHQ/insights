@@ -95,12 +95,14 @@ test.describe('Seeded Data Verification', () => {
     // Should show the User Settings layout with heading and sidebar navigation
     await expect(page.getByRole('heading', { name: /user settings/i })).toBeVisible({ timeout: 15000 });
 
-    // Sidebar nav links should all be present
-    await expect(page.getByRole('link', { name: /profile/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /preferences/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /notifications/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /security/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /tools/i })).toBeVisible();
+    // Sidebar nav links should all be present — scoped to the settings nav to avoid
+    // matching the app sidebar's "Profile" link which also appears on this page
+    const settingsNav = page.getByRole('navigation').filter({ hasText: 'Preferences' });
+    await expect(settingsNav.getByRole('link', { name: /profile/i })).toBeVisible();
+    await expect(settingsNav.getByRole('link', { name: /preferences/i })).toBeVisible();
+    await expect(settingsNav.getByRole('link', { name: /notifications/i })).toBeVisible();
+    await expect(settingsNav.getByRole('link', { name: /security/i })).toBeVisible();
+    await expect(settingsNav.getByRole('link', { name: /tools/i })).toBeVisible();
 
     // Profile section shows the authenticated user's email
     await expect(page.getByText(/billy\.boozer@dualbootpartners\.com/i)).toBeVisible();
