@@ -22,7 +22,7 @@ import { IntegrationSetup } from './pages/IntegrationSetup';
 import { IntegrationOAuthCallback } from './pages/IntegrationOAuthCallback';
 import { TeamInvite } from './pages/TeamInvite';
 import { MemberProfile } from './pages/MemberProfile';
-import { MyProfile } from './pages/MyProfile';
+import { UserSettings } from './pages/UserSettings';
 import { Settings } from './pages/Settings';
 import { ToolAccounts } from './pages/ToolAccounts';
 import { UnattributedEvents } from './pages/UnattributedEvents';
@@ -94,7 +94,7 @@ function App() {
                   }
                 >
                   <Route path="/" element={<Dashboard />} />
-                  <Route path="/profile" element={<MyProfile />} />
+                  <Route path="/profile/*" element={<UserSettings />} />
                   <Route path="/events" element={<Events />} />
                   <Route path="/events/:id" element={<EventDetailPage />} />
                   <Route path="/projects" element={<Projects />} />

@@ -89,15 +89,21 @@ test.describe('Seeded Data Verification', () => {
     await expect(page.getByText(/billy\.boozer@dualbootpartners\.com/i)).toBeVisible({ timeout: 10000 });
   });
 
-  test('user profile shows their stats', async ({ page }) => {
+  test('user profile shows user settings page', async ({ page }) => {
     await page.goto('/profile');
 
-    // Should redirect to member profile page and show stats
-    // Wait for profile to load
-    await expect(page.getByText(/total events/i)).toBeVisible({ timeout: 15000 });
+    // Should show the User Settings layout with heading and sidebar navigation
+    await expect(page.getByRole('heading', { name: /user settings/i })).toBeVisible({ timeout: 15000 });
 
-    // The seeded user has 1500 events - verify non-zero stats
-    await expect(page.getByText(/[1-9][0-9,]*/).first()).toBeVisible();
+    // Sidebar nav links should all be present
+    await expect(page.getByRole('link', { name: /profile/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /preferences/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /notifications/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /security/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /tools/i })).toBeVisible();
+
+    // Profile section shows the authenticated user's email
+    await expect(page.getByText(/billy\.boozer@dualbootpartners\.com/i)).toBeVisible();
   });
 
   test('user can see projects', async ({ page }) => {
