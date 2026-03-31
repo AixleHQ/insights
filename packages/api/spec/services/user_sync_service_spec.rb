@@ -59,12 +59,18 @@ RSpec.describe UserSyncService do
         }.not_to change(User, :count)
       end
 
-      it 'updates user attributes from claims' do
+      it 'updates non-editable attributes from claims' do
         user = described_class.sync_from_claims(claims)
 
         expect(user.id).to eq(existing_user.id)
         expect(user.email).to eq('test@example.com')
-        expect(user.name).to eq('Test User')
+      end
+
+      it 'does not overwrite user-editable attributes (name, avatar_url)' do
+        user = described_class.sync_from_claims(claims)
+
+        expect(user.name).to eq('Old Name')
+        expect(user.avatar_url).to be_nil
       end
 
       it 'updates last_login_at for fresh login' do
