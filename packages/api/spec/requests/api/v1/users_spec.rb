@@ -31,6 +31,22 @@ RSpec.describe 'Api::V1::Users', type: :request do
       expect(user.reload.name).to eq('New Name')
     end
 
+    it 'updates the avatar_url' do
+      authenticated_patch '/api/v1/users/me', user: user, params: { avatar_url: 'https://example.com/avatar.png' }
+
+      expect_success
+      expect(json_data[:avatarUrl]).to eq('https://example.com/avatar.png')
+      expect(user.reload.avatar_url).to eq('https://example.com/avatar.png')
+    end
+
+    it 'updates name and avatar_url together' do
+      authenticated_patch '/api/v1/users/me', user: user, params: { name: 'New Name', avatar_url: 'https://example.com/avatar.png' }
+
+      expect_success
+      expect(json_data[:name]).to eq('New Name')
+      expect(json_data[:avatarUrl]).to eq('https://example.com/avatar.png')
+    end
+
     it 'does not allow updating email directly' do
       old_email = user.email
       authenticated_patch '/api/v1/users/me', user: user, params: { email: 'new@example.com' }

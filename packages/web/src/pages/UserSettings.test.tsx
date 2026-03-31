@@ -22,7 +22,7 @@ vi.mock('@/hooks/useApi', () => {
     id: 'u1',
     email: 'test@example.com',
     name: 'Test User',
-    avatar_url: null as string | null,
+    avatarUrl: null as string | null,
     role: 'member' as const,
     super_admin: false,
     created_at: '2024-01-01T00:00:00Z',
@@ -79,6 +79,8 @@ vi.mock('@/hooks/useApi', () => {
     data: { data: [] },
     isLoading: false,
   }),
+  useCurrentUser: () => ({ data: mockUser }),
+  useUpdateCurrentUser: () => ({ mutate: vi.fn(), isPending: false }),
   };
 });
 

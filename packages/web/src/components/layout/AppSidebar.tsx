@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrg, type MemberRole } from '@/contexts/OrgContext';
-import { useCreateOrganization } from '@/hooks/useApi';
+import { useCreateOrganization, useCurrentUser } from '@/hooks/useApi';
 import {
   Sidebar,
   SidebarContent,
@@ -293,7 +293,11 @@ function OrgSwitcher() {
 
 function UserMenu() {
   const { profile, logout } = useAuth();
+  const { data: currentUser } = useCurrentUser();
   const { state } = useSidebar();
+
+  const displayName = currentUser?.name || profile?.name || 'User';
+  const avatarSrc = currentUser?.avatarUrl || profile?.picture;
 
   const getInitials = (name?: string, email?: string) => {
     if (name) {
@@ -315,15 +319,13 @@ function UserMenu() {
           className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
         >
           <Avatar className="size-8">
-            {profile?.picture && (
-              <AvatarImage src={profile.picture} alt={profile.name || 'User'} />
-            )}
+            {avatarSrc && <AvatarImage src={avatarSrc} alt={displayName} />}
             <AvatarFallback className="bg-sidebar-accent text-sidebar-accent-foreground text-xs">
-              {getInitials(profile?.name, profile?.email)}
+              {getInitials(displayName, profile?.email)}
             </AvatarFallback>
           </Avatar>
           <div className="grid flex-1 text-left text-sm leading-tight">
-            <span className="truncate font-semibold">{profile?.name || 'User'}</span>
+            <span className="truncate font-semibold">{displayName}</span>
             <span className="truncate text-xs text-sidebar-foreground/60">
               {profile?.email}
             </span>
@@ -339,7 +341,7 @@ function UserMenu() {
       >
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium">{profile?.name || 'User'}</p>
+            <p className="text-sm font-medium">{displayName}</p>
             <p className="text-xs text-muted-foreground">{profile?.email}</p>
           </div>
         </DropdownMenuLabel>
