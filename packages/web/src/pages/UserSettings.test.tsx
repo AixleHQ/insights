@@ -17,11 +17,70 @@ vi.mock('@/contexts/OrgContext', () => ({
   }),
 }));
 
-vi.mock('@/hooks/useApi', () => ({
+vi.mock('@/hooks/useApi', () => {
+  const mockUser = {
+    id: 'u1',
+    email: 'test@example.com',
+    name: 'Test User',
+    avatar_url: null as string | null,
+    role: 'member' as const,
+    super_admin: false,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+  };
+
+  return {
   useToolAccounts: () => ({ data: [], isLoading: false }),
   useCreateToolAccount: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteToolAccount: () => ({ mutateAsync: vi.fn(), isPending: false }),
-}));
+  useOrganizationMembers: () => ({
+    data: [
+      {
+        id: 'member-m1',
+        user_id: 'u1',
+        organization_id: 'test-org-id',
+        role: 'member' as const,
+        user: mockUser,
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-01T00:00:00Z',
+      },
+    ],
+  }),
+  useMember: () => ({
+    data: {
+      id: 'member-m1',
+      user_id: 'u1',
+      organization_id: 'test-org-id',
+      role: 'member' as const,
+      user: mockUser,
+      created_at: '2024-01-01T00:00:00Z',
+      updated_at: '2024-01-01T00:00:00Z',
+    },
+    isLoading: false,
+  }),
+  useMemberStats: () => ({
+    data: {
+      total_events: 0,
+      total_cost: 0,
+      events_today: 0,
+      events_this_week: 0,
+      events_this_month: 0,
+      most_used_tool: null,
+      tokens: { total_in: 0, total_out: 0, total: 0 },
+      tool_breakdown: [],
+      model_breakdown: [],
+      daily_activity: [],
+      projects: [],
+      organizations: [],
+      tool_accounts: [],
+    },
+  }),
+  useMemberEvents: () => ({
+    data: { data: [] },
+    isLoading: false,
+  }),
+  };
+});
 
 function renderAtPath(path: string) {
   const queryClient = new QueryClient({
@@ -98,6 +157,12 @@ describe('UserSettings', () => {
 
       expect(screen.getByText('Test User')).toBeInTheDocument();
       expect(screen.getByText('test@example.com')).toBeInTheDocument();
+    });
+
+    it('renders embedded org member activity below the profile card', () => {
+      renderAtPath('/profile');
+
+      expect(screen.getByText('Total Events')).toBeInTheDocument();
     });
 
     it('renders Preferences section at /profile/settings', () => {

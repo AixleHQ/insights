@@ -1,6 +1,10 @@
+import { useMemo } from 'react';
 import { Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import { User, Settings2, Bell, Shield, Wrench } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrg } from '@/contexts/OrgContext';
+import { useOrganizationMembers } from '@/hooks/useApi';
+import { MemberProfileView } from './MemberProfile';
 import { cn } from '@/lib/utils';
 import {
   Card,
@@ -9,6 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ToolAccounts } from './ToolAccounts';
 
 const navItems = [
@@ -48,6 +53,13 @@ function UserSettingsNav() {
 
 function ProfileSection() {
   const { profile } = useAuth();
+  const { currentOrg } = useOrg();
+  const { data: members, isLoading: membersLoading } = useOrganizationMembers(currentOrg?.id || '');
+
+  const myMemberId = useMemo(
+    () => members?.find((m) => m.user.email === profile?.email)?.id,
+    [members, profile?.email]
+  );
 
   return (
     <div className="space-y-6">
@@ -67,6 +79,11 @@ function ProfileSection() {
           </div>
         </CardContent>
       </Card>
+      {membersLoading ? (
+        <Skeleton className="h-[400px]" />
+      ) : myMemberId ? (
+        <MemberProfileView memberId={myMemberId} embedded />
+      ) : null}
     </div>
   );
 }
