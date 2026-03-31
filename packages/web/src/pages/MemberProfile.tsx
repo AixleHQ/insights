@@ -128,8 +128,13 @@ function ProfileSkeleton() {
 type ToolSortField = 'tool' | 'count' | 'tokens' | 'cost';
 type ModelSortField = 'model' | 'tokens' | 'cost';
 
-export function MemberProfile() {
-  const { id } = useParams<{ id: string }>();
+export interface MemberProfileViewProps {
+  memberId: string;
+  /** When true, hides the standalone page header (back control, avatar, identity row) for use inside User Settings. */
+  embedded?: boolean;
+}
+
+export function MemberProfileView({ memberId, embedded = false }: MemberProfileViewProps) {
   const { currentOrg } = useOrg();
 
   // Tool usage sorting state
@@ -140,11 +145,11 @@ export function MemberProfile() {
   const [modelSortField, setModelSortField] = useState<ModelSortField>('tokens');
   const [modelSortDirection, setModelSortDirection] = useState<SortDirection>('desc');
 
-  const { data: member, isLoading: memberLoading } = useMember(currentOrg?.id || '', id || '');
-  const { data: statsData } = useMemberStats(currentOrg?.id || '', id || '');
+  const { data: member, isLoading: memberLoading } = useMember(currentOrg?.id || '', memberId);
+  const { data: statsData } = useMemberStats(currentOrg?.id || '', memberId);
   const { data: eventsResponse, isLoading: eventsLoading } = useMemberEvents(
     currentOrg?.id || '',
-    id || '',
+    memberId,
     { per_page: 10 }
   );
 
@@ -274,46 +279,48 @@ export function MemberProfile() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-3 sm:gap-4">
-          <Button asChild variant="ghost" size="icon" className="shrink-0">
-            <Link to="/settings/members">
-              <ArrowLeft className="size-4" />
-            </Link>
-          </Button>
-          <Avatar className="size-12 sm:size-16 border-2 border-muted shrink-0">
-            {member.user?.avatar_url && (
-              <AvatarImage src={member.user.avatar_url} alt={member.user?.name || member.user?.email || 'User'} />
-            )}
-            <AvatarFallback className="text-base sm:text-lg font-semibold bg-gradient-to-br from-primary/20 to-primary/5">
-              {getInitials(member.user?.name, member.user?.email)}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <h1 className="text-lg sm:text-xl font-semibold truncate">
-                {member.user?.name || member.user?.email?.split('@')[0] || 'Unknown User'}
-              </h1>
-              <Badge variant="outline" className={cn('gap-1 shrink-0', role.bg, role.color)}>
-                <RoleIcon className="size-3" />
-                {role.label}
-              </Badge>
-            </div>
-            <div className="mt-1 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1.5 truncate">
-                <Mail className="size-3.5 shrink-0" />
-                <span className="truncate">{member.user?.email}</span>
-              </span>
-              <Separator orientation="vertical" className="hidden sm:block h-4" />
-              <span className="flex items-center gap-1.5">
-                <Calendar className="size-3.5 shrink-0" />
-                Joined {formattedJoinDate}
-              </span>
+      {/* Header — hidden when embedded under User Settings (identity is shown in Profile card above). */}
+      {!embedded && (
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-3 sm:gap-4">
+            <Button asChild variant="ghost" size="icon" className="shrink-0">
+              <Link to="/settings/members">
+                <ArrowLeft className="size-4" />
+              </Link>
+            </Button>
+            <Avatar className="size-12 sm:size-16 border-2 border-muted shrink-0">
+              {member.user?.avatar_url && (
+                <AvatarImage src={member.user.avatar_url} alt={member.user?.name || member.user?.email || 'User'} />
+              )}
+              <AvatarFallback className="text-base sm:text-lg font-semibold bg-gradient-to-br from-primary/20 to-primary/5">
+                {getInitials(member.user?.name, member.user?.email)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                <h1 className="text-lg sm:text-xl font-semibold truncate">
+                  {member.user?.name || member.user?.email?.split('@')[0] || 'Unknown User'}
+                </h1>
+                <Badge variant="outline" className={cn('gap-1 shrink-0', role.bg, role.color)}>
+                  <RoleIcon className="size-3" />
+                  {role.label}
+                </Badge>
+              </div>
+              <div className="mt-1 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-sm text-muted-foreground">
+                <span className="flex items-center gap-1.5 truncate">
+                  <Mail className="size-3.5 shrink-0" />
+                  <span className="truncate">{member.user?.email}</span>
+                </span>
+                <Separator orientation="vertical" className="hidden sm:block h-4" />
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="size-3.5 shrink-0" />
+                  Joined {formattedJoinDate}
+                </span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Activity Heatmap */}
       {stats.daily_activity && stats.daily_activity.length > 0 && (
@@ -665,4 +672,9 @@ export function MemberProfile() {
       </Card>
     </div>
   );
+}
+
+export function MemberProfile() {
+  const { id } = useParams<{ id: string }>();
+  return <MemberProfileView memberId={id ?? ''} />;
 }

@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -178,7 +179,7 @@ function ConnectDialog({ provider, open, onOpenChange, onSubmit, isSubmitting }:
   );
 }
 
-export function ToolAccounts() {
+export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
   const { currentOrg } = useOrg();
   const [connectingProvider, setConnectingProvider] = useState<ToolProvider | null>(null);
 
@@ -222,20 +223,22 @@ export function ToolAccounts() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div className="flex items-center gap-4">
-        <Button asChild variant="ghost" size="icon">
-          <Link to="/settings">
-            <ArrowLeft className="size-4" />
-          </Link>
-        </Button>
-        <div>
-          <h1 className="text-xl font-semibold">Tool Accounts</h1>
-          <p className="text-sm text-muted-foreground">
-            Link your AI tool accounts for automatic event attribution
-          </p>
+    <div className={cn('space-y-6', !embedded && 'mx-auto max-w-2xl')}>
+      {!embedded && (
+        <div className="flex items-center gap-4">
+          <Button asChild variant="ghost" size="icon" aria-label="Back to settings">
+            <Link to="/settings">
+              <ArrowLeft className="size-4" />
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-xl font-semibold">Tool Accounts</h1>
+            <p className="text-sm text-muted-foreground">
+              Link your AI tool accounts for automatic event attribution
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       <Card>
         <CardHeader>

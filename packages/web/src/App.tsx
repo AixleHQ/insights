@@ -22,9 +22,8 @@ import { IntegrationSetup } from './pages/IntegrationSetup';
 import { IntegrationOAuthCallback } from './pages/IntegrationOAuthCallback';
 import { TeamInvite } from './pages/TeamInvite';
 import { MemberProfile } from './pages/MemberProfile';
-import { MyProfile } from './pages/MyProfile';
+import { UserSettings } from './pages/UserSettings';
 import { Settings } from './pages/Settings';
-import { ToolAccounts } from './pages/ToolAccounts';
 import { UnattributedEvents } from './pages/UnattributedEvents';
 import { Notifications } from './pages/Notifications';
 import { Onboarding } from './pages/Onboarding';
@@ -94,7 +93,7 @@ function App() {
                   }
                 >
                   <Route path="/" element={<Dashboard />} />
-                  <Route path="/profile" element={<MyProfile />} />
+                  <Route path="/profile/*" element={<UserSettings />} />
                   <Route path="/events" element={<Events />} />
                   <Route path="/events/:id" element={<EventDetailPage />} />
                   <Route path="/projects" element={<Projects />} />
@@ -110,7 +109,7 @@ function App() {
                   <Route path="/team/invitations" element={<Navigate to="/settings/members/invitations" replace />} />
                   <Route path="/team/:id" element={<TeamIdRedirect />} />
                   <Route path="/settings/*" element={<Settings />} />
-                  <Route path="/settings/tool-accounts" element={<ToolAccounts />} />
+                  <Route path="/settings/tool-accounts" element={<Navigate to="/profile/tools" replace />} />
                   <Route path="/settings/members/invite" element={<TeamInvite />} />
                   <Route path="/settings/members/invitations" element={<InvitationsManagement />} />
                   <Route path="/settings/members/:id" element={<MemberProfile />} />
