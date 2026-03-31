@@ -9,7 +9,7 @@ export interface User {
   id: string;
   email: string;
   name: string | null;
-  avatar_url: string | null;
+  avatarUrl: string | null;
   role: 'admin' | 'member' | 'viewer';
   super_admin: boolean;
   created_at: string;

@@ -297,7 +297,7 @@ function UserMenu() {
   const { state } = useSidebar();
 
   const displayName = currentUser?.name || profile?.name || 'User';
-  const avatarSrc = currentUser?.avatar_url || profile?.picture;
+  const avatarSrc = currentUser?.avatarUrl || profile?.picture;
 
   const getInitials = (name?: string, email?: string) => {
     if (name) {

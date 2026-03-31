@@ -74,14 +74,14 @@ function ProfileSection() {
 
   function handleEdit() {
     setName(currentUser?.name ?? '');
-    setAvatarUrl(currentUser?.avatar_url ?? '');
+    setAvatarUrl(currentUser?.avatarUrl ?? '');
     setError(null);
     setIsEditing(true);
   }
 
   function handleCancel() {
     setName(currentUser?.name ?? '');
-    setAvatarUrl(currentUser?.avatar_url ?? '');
+    setAvatarUrl(currentUser?.avatarUrl ?? '');
     setError(null);
     setIsEditing(false);
   }
@@ -169,7 +169,7 @@ function ProfileSection() {
             <>
               <div className="flex items-center gap-4">
                 <Avatar size="lg" className="size-16">
-                  <AvatarImage src={currentUser?.avatar_url || undefined} />
+                  <AvatarImage src={currentUser?.avatarUrl || undefined} />
                   <AvatarFallback>{initials}</AvatarFallback>
                 </Avatar>
               </div>

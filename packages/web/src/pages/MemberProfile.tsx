@@ -289,8 +289,8 @@ export function MemberProfileView({ memberId, embedded = false }: MemberProfileV
               </Link>
             </Button>
             <Avatar className="size-12 sm:size-16 border-2 border-muted shrink-0">
-              {member.user?.avatar_url && (
-                <AvatarImage src={member.user.avatar_url} alt={member.user?.name || member.user?.email || 'User'} />
+              {member.user?.avatarUrl && (
+                <AvatarImage src={member.user.avatarUrl} alt={member.user?.name || member.user?.email || 'User'} />
               )}
               <AvatarFallback className="text-base sm:text-lg font-semibold bg-gradient-to-br from-primary/20 to-primary/5">
                 {getInitials(member.user?.name, member.user?.email)}
