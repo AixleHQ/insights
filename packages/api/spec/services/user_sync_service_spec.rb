@@ -67,10 +67,11 @@ RSpec.describe UserSyncService do
       end
 
       it 'does not overwrite user-editable attributes (name, avatar_url)' do
+        original_avatar = existing_user.avatar_url
         user = described_class.sync_from_claims(claims)
 
         expect(user.name).to eq('Old Name')
-        expect(user.avatar_url).to be_nil
+        expect(user.avatar_url).to eq(original_avatar)
       end
 
       it 'updates last_login_at for fresh login' do
