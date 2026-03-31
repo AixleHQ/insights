@@ -1,9 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
-import { User, Settings2, Bell, Shield, Wrench } from 'lucide-react';
+import { User, Settings2, Bell, Shield, Wrench, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrg } from '@/contexts/OrgContext';
-import { useOrganizationMembers } from '@/hooks/useApi';
+import { useOrganizationMembers, useCurrentUser, useUpdateCurrentUser } from '@/hooks/useApi';
 import { MemberProfileView } from './MemberProfile';
 import { cn } from '@/lib/utils';
 import {
@@ -14,6 +14,10 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { ToolAccounts } from './ToolAccounts';
 
 const navItems = [
@@ -55,28 +59,130 @@ function ProfileSection() {
   const { profile } = useAuth();
   const { currentOrg } = useOrg();
   const { data: members, isLoading: membersLoading } = useOrganizationMembers(currentOrg?.id || '');
+  const { data: currentUser } = useCurrentUser();
+  const updateUser = useUpdateCurrentUser();
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [name, setName] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   const myMemberId = useMemo(
     () => members?.find((m) => m.user.email === profile?.email)?.id,
     [members, profile?.email]
   );
 
+  function handleEdit() {
+    setName(currentUser?.name ?? '');
+    setAvatarUrl(currentUser?.avatar_url ?? '');
+    setError(null);
+    setIsEditing(true);
+  }
+
+  function handleCancel() {
+    setName(currentUser?.name ?? '');
+    setAvatarUrl(currentUser?.avatar_url ?? '');
+    setError(null);
+    setIsEditing(false);
+  }
+
+  function handleSave() {
+    setError(null);
+    updateUser.mutate(
+      { name: name || undefined, avatar_url: avatarUrl || undefined },
+      {
+        onSuccess: () => setIsEditing(false),
+        onError: (err: unknown) => {
+          const apiError = err as { response?: { data?: { errors?: Record<string, string[]> } } };
+          const errors = apiError?.response?.data?.errors;
+          if (errors) {
+            setError(Object.values(errors).flat().join(', '));
+          } else {
+            setError('Failed to save changes. Please try again.');
+          }
+        },
+      }
+    );
+  }
+
+  const displayName = currentUser?.name || profile?.name || '—';
+  const initials = displayName !== '—' ? displayName.slice(0, 2).toUpperCase() : '?';
+
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle>Profile</CardTitle>
-          <CardDescription>Your personal information and account details.</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <div>
+            <CardTitle>Profile</CardTitle>
+            <CardDescription>Your personal information and account details.</CardDescription>
+          </div>
+          {!isEditing && (
+            <Button variant="outline" size="sm" onClick={handleEdit}>
+              Edit
+            </Button>
+          )}
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-1">
-            <p className="text-sm font-medium">Name</p>
-            <p className="text-sm text-muted-foreground">{profile?.name || '—'}</p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-sm font-medium">Email</p>
-            <p className="text-sm text-muted-foreground">{profile?.email || '—'}</p>
-          </div>
+          {isEditing ? (
+            <>
+              <div className="flex items-center gap-4">
+                <Avatar size="lg" className="size-16">
+                  <AvatarImage src={avatarUrl || undefined} />
+                  <AvatarFallback>{initials}</AvatarFallback>
+                </Avatar>
+                <p className="text-sm text-muted-foreground">Avatar preview</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="display-name">Display Name</Label>
+                <Input
+                  id="display-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Your name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="avatar-url">Avatar URL</Label>
+                <Input
+                  id="avatar-url"
+                  value={avatarUrl}
+                  onChange={(e) => setAvatarUrl(e.target.value)}
+                  placeholder="https://example.com/avatar.png"
+                />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Email</p>
+                <p className="text-sm text-muted-foreground">{profile?.email || '—'}</p>
+              </div>
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              <div className="flex gap-2">
+                <Button onClick={handleSave} disabled={updateUser.isPending}>
+                  {updateUser.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
+                  Save
+                </Button>
+                <Button variant="outline" onClick={handleCancel} disabled={updateUser.isPending}>
+                  Cancel
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-4">
+                <Avatar size="lg" className="size-16">
+                  <AvatarImage src={currentUser?.avatar_url || undefined} />
+                  <AvatarFallback>{initials}</AvatarFallback>
+                </Avatar>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Name</p>
+                <p className="text-sm text-muted-foreground">{displayName}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Email</p>
+                <p className="text-sm text-muted-foreground">{profile?.email || '—'}</p>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
       {membersLoading ? (

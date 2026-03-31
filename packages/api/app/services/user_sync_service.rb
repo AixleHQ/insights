@@ -7,6 +7,9 @@ class UserSyncService
     "picture" => :avatar_url
   }.freeze
 
+  # Attributes the user can edit themselves — only seeded from claims on first create
+  USER_EDITABLE_ATTRIBUTES = %i[name avatar_url].freeze
+
   # Email domains that should be auto-assigned to organizations
   DOMAIN_ORG_MAPPING = {
     "example.com" => "dualboot-partners",
@@ -68,7 +71,11 @@ class UserSyncService
     def update_user_attributes(user, claims)
       CLAIM_MAPPING.each do |claim_key, attribute|
         value = claims[claim_key]
-        user.send("#{attribute}=", value) if value.present?
+        next unless value.present?
+        # Don't overwrite user-editable fields for existing users
+        next if user.persisted? && USER_EDITABLE_ATTRIBUTES.include?(attribute)
+
+        user.send("#{attribute}=", value)
       end
 
       # Update last login time when:

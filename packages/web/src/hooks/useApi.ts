@@ -115,6 +115,18 @@ export function useCurrentUser() {
   });
 }
 
+export function useUpdateCurrentUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: { name?: string; avatar_url?: string }) =>
+      api.patch<{ data: CurrentUser }>('/users/me', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.current });
+    },
+  });
+}
+
 export function useUserOrganizations() {
   return useQuery({
     queryKey: queryKeys.user.organizations,
