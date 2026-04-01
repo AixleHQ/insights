@@ -332,15 +332,45 @@ function NotificationsSection() {
 }
 
 function SecuritySection() {
+  const { data: currentUser, isLoading } = useCurrentUser();
+
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Security</CardTitle>
-          <CardDescription>Manage your account security and active sessions.</CardDescription>
+          <CardDescription>Account security information and session details.</CardDescription>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">Security settings coming soon.</p>
+        <CardContent className="space-y-6">
+          <div className="space-y-1.5">
+            <Label>Email address</Label>
+            {isLoading ? (
+              <Skeleton className="h-4 w-48" />
+            ) : (
+              <p className="text-sm text-muted-foreground">{currentUser?.email}</p>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Last sign-in</Label>
+            {isLoading ? (
+              <Skeleton className="h-4 w-36" />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {currentUser?.lastSignInAt
+                  ? new Date(currentUser.lastSignInAt).toLocaleString()
+                  : 'No sign-in recorded'}
+              </p>
+            )}
+          </div>
+
+          <div className="rounded-md border p-4">
+            <p className="text-sm text-muted-foreground">
+              Password and authentication settings are managed through your identity provider.
+              Contact your administrator to change your password or update multi-factor
+              authentication.
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>

@@ -42,6 +42,13 @@ RSpec.describe UserSyncService do
           expect(user.last_login_at).to eq(Time.current)
         end
       end
+
+      it 'sets last_sign_in_at on first login' do
+        freeze_time do
+          user = described_class.sync_from_claims(claims)
+          expect(user.last_sign_in_at).to eq(Time.current)
+        end
+      end
     end
 
     context 'when user already exists' do
@@ -79,6 +86,22 @@ RSpec.describe UserSyncService do
           user = described_class.sync_from_claims(claims)
           expect(user.last_login_at).to eq(Time.current)
         end
+      end
+
+      it 'updates last_sign_in_at for fresh login' do
+        freeze_time do
+          user = described_class.sync_from_claims(claims)
+          expect(user.last_sign_in_at).to eq(Time.current)
+        end
+      end
+
+      it 'does not update last_sign_in_at for old token' do
+        existing_user.update!(last_sign_in_at: 1.hour.ago)
+        old_token_claims = claims.merge('iat' => 3.minutes.ago.to_i)
+
+        user = described_class.sync_from_claims(old_token_claims)
+
+        expect(user.last_sign_in_at).to be_within(1.second).of(1.hour.ago)
       end
 
       it 'does not update last_login_at for old token if recently logged in' do

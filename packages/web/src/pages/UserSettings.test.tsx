@@ -38,6 +38,7 @@ vi.mock('@/hooks/useApi', () => {
     settings: {} as Record<string, string>,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
+    lastSignInAt: '2024-06-01T10:00:00Z',
   };
 
   const mockOrgs = [
@@ -230,10 +231,24 @@ describe('UserSettings', () => {
       expect(screen.getByLabelText('Alert emails')).not.toBeChecked();
     });
 
-    it('renders Security section at /profile/settings/security', () => {
-      renderAtPath('/profile/settings/security');
+    describe('SecuritySection', () => {
+      it('renders the email address', () => {
+        renderAtPath('/profile/settings/security');
 
-      expect(screen.getByText('Security settings coming soon.')).toBeInTheDocument();
+        expect(screen.getByText('test@example.com')).toBeInTheDocument();
+      });
+
+      it('renders the last sign-in timestamp', () => {
+        renderAtPath('/profile/settings/security');
+
+        expect(screen.getByText(/2024/)).toBeInTheDocument();
+      });
+
+      it('renders the identity provider informational text', () => {
+        renderAtPath('/profile/settings/security');
+
+        expect(screen.getByText(/identity provider/i)).toBeInTheDocument();
+      });
     });
 
     it('renders Tools section at /profile/tools', () => {
