@@ -153,6 +153,31 @@ RSpec.describe 'Api::V1::Users', type: :request do
         expect(json_response[:errors][:value]).to include('must be a valid organization you belong to')
       end
     end
+
+    context 'notification key validation' do
+      %w[notify_in_app_risk notify_in_app_cost notify_email_digest notify_email_alerts].each do |key|
+        it "accepts true for #{key}" do
+          authenticated_put "/api/v1/users/me/settings/#{key}", user: user, params: { value: 'true' }
+
+          expect_success
+          expect(json_data[:value]).to eq('true')
+        end
+
+        it "accepts false for #{key}" do
+          authenticated_put "/api/v1/users/me/settings/#{key}", user: user, params: { value: 'false' }
+
+          expect_success
+          expect(json_data[:value]).to eq('false')
+        end
+
+        it "rejects invalid value for #{key}" do
+          authenticated_put "/api/v1/users/me/settings/#{key}", user: user, params: { value: 'yes' }
+
+          expect_unprocessable
+          expect(json_response[:errors][:value]).to include('must be true or false')
+        end
+      end
+    end
   end
 
   describe 'DELETE /api/v1/users/me/settings/:key' do

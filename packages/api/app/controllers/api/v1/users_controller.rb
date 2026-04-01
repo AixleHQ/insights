@@ -4,6 +4,10 @@ module Api
   module V1
     class UsersController < BaseController
       ALLOWED_THEMES = %w[light dark system].freeze
+      NOTIFICATION_KEYS = %w[
+        notify_in_app_risk notify_in_app_cost
+        notify_email_digest notify_email_alerts
+      ].freeze
 
       # GET /api/v1/users/me
       def me
@@ -130,6 +134,8 @@ module Api
           "must be one of: light, dark, system" unless ALLOWED_THEMES.include?(value)
         when "default_org_id"
           "must be a valid organization you belong to" unless current_user.organizations.exists?(id: value)
+        when *NOTIFICATION_KEYS
+          "must be true or false" unless %w[true false].include?(value)
         end
       end
     end
