@@ -14,6 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -276,7 +277,21 @@ function PreferencesSection() {
   );
 }
 
+const NOTIFICATION_TOGGLES = [
+  { key: 'notify_in_app_risk',  label: 'In-app risk alerts',  description: 'Show alerts in-app when a risk is detected.' },
+  { key: 'notify_in_app_cost',  label: 'In-app cost alerts',  description: 'Show alerts in-app when cost thresholds are exceeded.' },
+  { key: 'notify_email_digest', label: 'Weekly email digest', description: 'Receive a weekly summary of usage and costs by email.' },
+  { key: 'notify_email_alerts', label: 'Alert emails',        description: 'Receive email notifications for risk and cost alerts.' },
+] as const;
+
 function NotificationsSection() {
+  const { data: currentUser } = useCurrentUser();
+  const updateSetting = useUpdateUserSetting();
+
+  function handleToggle(key: string, checked: boolean) {
+    updateSetting.mutate({ key, value: String(checked) });
+  }
+
   return (
     <div className="space-y-6">
       <Card>
@@ -284,8 +299,24 @@ function NotificationsSection() {
           <CardTitle>Notifications</CardTitle>
           <CardDescription>Control how and when you receive notifications.</CardDescription>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">Notification settings coming soon.</p>
+        <CardContent className="space-y-4">
+          {NOTIFICATION_TOGGLES.map(({ key, label, description }) => {
+            const enabled = currentUser?.settings?.[key] === 'true';
+            return (
+              <div key={key} className="flex items-center justify-between gap-4">
+                <div className="space-y-0.5">
+                  <Label htmlFor={key}>{label}</Label>
+                  <p className="text-xs text-muted-foreground">{description}</p>
+                </div>
+                <Switch
+                  id={key}
+                  checked={enabled}
+                  onCheckedChange={(checked) => handleToggle(key, checked)}
+                  disabled={updateSetting.isPending}
+                />
+              </div>
+            );
+          })}
         </CardContent>
       </Card>
     </div>

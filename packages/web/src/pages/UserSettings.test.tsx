@@ -201,7 +201,19 @@ describe('UserSettings', () => {
     it('renders Notifications section at /profile/settings/notifications', () => {
       renderAtPath('/profile/settings/notifications');
 
-      expect(screen.getByText('Notification settings coming soon.')).toBeInTheDocument();
+      expect(screen.getByText('Control how and when you receive notifications.')).toBeInTheDocument();
+      expect(screen.getByLabelText('In-app risk alerts')).toBeInTheDocument();
+      expect(screen.getByLabelText('In-app cost alerts')).toBeInTheDocument();
+      expect(screen.getByLabelText('Weekly email digest')).toBeInTheDocument();
+      expect(screen.getByLabelText('Alert emails')).toBeInTheDocument();
+    });
+
+    it('renders notification toggles as unchecked by default', () => {
+      renderAtPath('/profile/settings/notifications');
+
+      const switches = screen.getAllByRole('switch');
+      expect(switches).toHaveLength(4);
+      switches.forEach((sw) => expect(sw).not.toBeChecked());
     });
 
     it('renders Security section at /profile/settings/security', () => {
