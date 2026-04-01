@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, type ComponentType } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Bell, Search, Command, Moon, Sun, Monitor } from 'lucide-react';
 import { useTheme, type Theme } from '@/contexts/ThemeContext';
@@ -182,7 +182,7 @@ function Notifications() {
   );
 }
 
-const themeOptions: { value: Theme; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+const themeOptions: { value: Theme; label: string; icon: ComponentType<{ className?: string }> }[] = [
   { value: 'light', label: 'Light', icon: Sun },
   { value: 'dark', label: 'Dark', icon: Moon },
   { value: 'system', label: 'System', icon: Monitor },

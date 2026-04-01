@@ -4,16 +4,27 @@ import {
   useState,
   useEffect,
   useCallback,
+  useRef,
   type ReactNode,
 } from 'react';
 import { api } from '../lib/api';
 import { queryClient } from '../lib/queryClient';
-import { queryKeys } from '../hooks/useApi';
+import { queryKeys, useCurrentUser } from '../hooks/useApi';
 
 export type Theme = 'light' | 'dark' | 'system';
 export type ResolvedTheme = 'light' | 'dark';
 
 const THEME_STORAGE_KEY = 'db90_theme';
+const VALID_THEMES: readonly Theme[] = ['light', 'dark', 'system'];
+
+function isValidTheme(value: string | null): value is Theme {
+  return VALID_THEMES.includes(value as Theme);
+}
+
+function readStoredTheme(): Theme {
+  const stored = localStorage.getItem(THEME_STORAGE_KEY);
+  return isValidTheme(stored) ? stored : 'system';
+}
 
 interface ThemeContextValue {
   theme: Theme;
@@ -40,10 +51,29 @@ interface ThemeProviderProps {
   initialTheme?: Theme;
 }
 
+// Syncs the server-persisted theme preference on first authenticated load.
+// Rendered inside ThemeContext.Provider so it can call useTheme().
+function ThemeSyncFromServer() {
+  const { theme, setTheme } = useTheme();
+  const { data: currentUser } = useCurrentUser();
+  const hasSynced = useRef(false);
+
+  useEffect(() => {
+    if (hasSynced.current || !currentUser) return;
+    hasSynced.current = true;
+    const serverTheme = currentUser.settings?.theme;
+    if (isValidTheme(serverTheme) && serverTheme !== theme) {
+      setTheme(serverTheme);
+    }
+  }, [currentUser, theme, setTheme]);
+
+  return null;
+}
+
 export function ThemeProvider({ children, initialTheme }: ThemeProviderProps) {
   const [theme, setThemeState] = useState<Theme>(() => {
     if (initialTheme) return initialTheme;
-    return (localStorage.getItem(THEME_STORAGE_KEY) as Theme) ?? 'system';
+    return readStoredTheme();
   });
 
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
@@ -72,19 +102,20 @@ export function ThemeProvider({ children, initialTheme }: ThemeProviderProps) {
     const resolved = resolveTheme(newTheme);
     setResolvedTheme(resolved);
     localStorage.setItem(THEME_STORAGE_KEY, newTheme);
-    // Persist to API (fire-and-forget)
+    // Persist to API (fire-and-forget). Silently ignored if unauthenticated.
     api
       .put(`/users/me/settings/theme`, { value: newTheme })
       .then(() => {
         queryClient.invalidateQueries({ queryKey: queryKeys.user.current });
       })
       .catch(() => {
-        // Ignore API errors — local state is already updated
+        // Local state is already updated — API errors are non-fatal
       });
   }, []);
 
   return (
     <ThemeContext.Provider value={{ theme, resolvedTheme, setTheme }}>
+      <ThemeSyncFromServer />
       {children}
     </ThemeContext.Provider>
   );

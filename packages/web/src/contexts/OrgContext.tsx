@@ -81,12 +81,16 @@ export function OrgProvider({ children, apiBaseUrl = '/api/v1' }: OrgProviderPro
 
     try {
       const token = await getAccessToken();
-      const response = await fetch(`${apiBaseUrl}/users/me/organizations`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      };
+
+      // Fetch orgs and user settings in parallel
+      const [response, userResponse] = await Promise.all([
+        fetch(`${apiBaseUrl}/users/me/organizations`, { headers }),
+        fetch(`${apiBaseUrl}/users/me`, { headers }).catch(() => null),
+      ]);
 
       if (!response.ok) {
         throw new Error(`Failed to fetch organizations: ${response.status}`);
@@ -109,21 +113,11 @@ export function OrgProvider({ children, apiBaseUrl = '/api/v1' }: OrgProviderPro
         role: org.user_role || 'member',
       }));
 
-      // Fetch user settings to get default_org_id preference
+      // Read default_org_id from user settings (non-fatal if unavailable)
       let defaultOrgId: string | null = null;
-      try {
-        const userResponse = await fetch(`${apiBaseUrl}/users/me`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-        if (userResponse.ok) {
-          const userData = await userResponse.json();
-          defaultOrgId = (userData.data?.settings?.default_org_id as string) ?? null;
-        }
-      } catch {
-        // Non-fatal: fall back to localStorage / first org
+      if (userResponse?.ok) {
+        const userData = await userResponse.json();
+        defaultOrgId = (userData.data?.settings?.default_org_id as string) ?? null;
       }
 
       // Restore previously selected org: localStorage > default_org_id setting > first org

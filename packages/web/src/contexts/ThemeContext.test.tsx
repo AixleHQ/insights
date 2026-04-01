@@ -17,11 +17,12 @@ vi.mock('@/lib/queryClient', () => ({
   },
 }));
 
-// Mock queryKeys
+// Mock queryKeys and useCurrentUser
 vi.mock('@/hooks/useApi', () => ({
   queryKeys: {
     user: { current: ['user', 'current'] },
   },
+  useCurrentUser: () => ({ data: undefined }),
 }));
 
 // localStorage mock
@@ -139,5 +140,11 @@ describe('ThemeContext', () => {
     expect(() => {
       renderHook(() => useTheme());
     }).toThrow('useTheme must be used within a ThemeProvider');
+  });
+
+  it('falls back to system when localStorage contains an invalid value', () => {
+    localStorage.setItem('db90_theme', 'purple');
+    const { result } = renderHook(() => useTheme(), { wrapper });
+    expect(result.current.theme).toBe('system');
   });
 });

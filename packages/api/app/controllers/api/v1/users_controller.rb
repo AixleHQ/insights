@@ -3,8 +3,11 @@
 module Api
   module V1
     class UsersController < BaseController
+      ALLOWED_THEMES = %w[light dark system].freeze
+
       # GET /api/v1/users/me
       def me
+        current_user.user_settings.load
         response_data = UserSerializer.new(current_user).serialize
 
         # Include impersonation info if this is an impersonation request
@@ -36,6 +39,7 @@ module Api
         authorize! current_user, to: :update?
 
         if current_user.update(user_params)
+          current_user.user_settings.load
           render_resource(current_user, UserSerializer)
         else
           render json: {
@@ -118,8 +122,8 @@ module Api
         params.permit(:name, :avatar_url)
       end
 
-      ALLOWED_THEMES = %w[light dark system].freeze
-
+      # Returns an error string for invalid values, or nil if the value is acceptable.
+      # Unknown keys pass through without validation — the settings store is intentionally open-ended.
       def validate_setting_value(key, value)
         case key
         when "theme"
