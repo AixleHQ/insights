@@ -49,6 +49,14 @@ RSpec.describe UserSyncService do
           expect(user.last_sign_in_at).to eq(Time.current)
         end
       end
+
+      it 'sets last_sign_in_at on first sync even without iat claim' do
+        claims_without_iat = claims.except('iat')
+        freeze_time do
+          user = described_class.sync_from_claims(claims_without_iat)
+          expect(user.last_sign_in_at).to eq(Time.current)
+        end
+      end
     end
 
     context 'when user already exists' do

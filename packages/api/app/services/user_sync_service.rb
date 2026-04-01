@@ -89,6 +89,8 @@ class UserSyncService
         user.last_login_at = Time.current
       end
 
+      # last_sign_in_at records discrete sign-in events (fresh JWT only).
+      # last_login_at is a throttled activity tracker updated every hour.
       user.last_sign_in_at = Time.current if user.last_sign_in_at.nil? || is_fresh_login
     end
 

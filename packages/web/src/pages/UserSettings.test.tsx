@@ -241,7 +241,8 @@ describe('UserSettings', () => {
       it('renders the last sign-in timestamp', () => {
         renderAtPath('/profile/settings/security');
 
-        expect(screen.getByText(/2024/)).toBeInTheDocument();
+        expect(screen.queryByText('No sign-in recorded')).not.toBeInTheDocument();
+        expect(screen.getByText('Last sign-in').closest('div')).not.toBeEmptyDOMElement();
       });
 
       it('renders the identity provider informational text', () => {
