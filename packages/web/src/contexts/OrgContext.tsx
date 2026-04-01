@@ -81,12 +81,16 @@ export function OrgProvider({ children, apiBaseUrl = '/api/v1' }: OrgProviderPro
 
     try {
       const token = await getAccessToken();
-      const response = await fetch(`${apiBaseUrl}/users/me/organizations`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      };
+
+      // Fetch orgs and user settings in parallel
+      const [response, userResponse] = await Promise.all([
+        fetch(`${apiBaseUrl}/users/me/organizations`, { headers }),
+        fetch(`${apiBaseUrl}/users/me`, { headers }).catch(() => null),
+      ]);
 
       if (!response.ok) {
         throw new Error(`Failed to fetch organizations: ${response.status}`);
@@ -109,11 +113,23 @@ export function OrgProvider({ children, apiBaseUrl = '/api/v1' }: OrgProviderPro
         role: org.user_role || 'member',
       }));
 
-      // Restore previously selected org from localStorage
+      // Read default_org_id from user settings (non-fatal if unavailable)
+      let defaultOrgId: string | null = null;
+      if (userResponse?.ok) {
+        const userData = await userResponse.json();
+        defaultOrgId = (userData.data?.settings?.default_org_id as string) ?? null;
+      }
+
+      // Restore previously selected org: localStorage > default_org_id setting > first org
       const storedOrgId = localStorage.getItem(ORG_STORAGE_KEY);
       let currentOrg = organizations.find((o) => o.id === storedOrgId) || null;
 
-      // If no stored org or stored org not found, use first org
+      // No localStorage entry — try the server-persisted default_org_id
+      if (!currentOrg && defaultOrgId) {
+        currentOrg = organizations.find((o) => o.id === defaultOrgId) || null;
+      }
+
+      // If still no org, use first org
       if (!currentOrg && organizations.length > 0) {
         currentOrg = organizations[0];
         // Clear invalid stored org ID (e.g., after DB reseed)

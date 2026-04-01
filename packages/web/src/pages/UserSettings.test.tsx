@@ -17,6 +17,14 @@ vi.mock('@/contexts/OrgContext', () => ({
   }),
 }));
 
+vi.mock('@/contexts/ThemeContext', () => ({
+  useTheme: () => ({
+    theme: 'system',
+    resolvedTheme: 'dark',
+    setTheme: vi.fn(),
+  }),
+}));
+
 vi.mock('@/hooks/useApi', () => {
   const mockUser = {
     id: 'u1',
@@ -25,9 +33,22 @@ vi.mock('@/hooks/useApi', () => {
     avatarUrl: null as string | null,
     role: 'member' as const,
     super_admin: false,
+    settings: {} as Record<string, string>,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
   };
+
+  const mockOrgs = [
+    {
+      id: 'test-org-id',
+      name: 'Test Org',
+      slug: 'test-org',
+      logo_url: null,
+      is_active: true,
+      created_at: '2024-01-01T00:00:00Z',
+      updated_at: '2024-01-01T00:00:00Z',
+    },
+  ];
 
   return {
   useToolAccounts: () => ({ data: [], isLoading: false }),
@@ -81,6 +102,8 @@ vi.mock('@/hooks/useApi', () => {
   }),
   useCurrentUser: () => ({ data: mockUser }),
   useUpdateCurrentUser: () => ({ mutate: vi.fn(), isPending: false }),
+  useUserOrganizations: () => ({ data: mockOrgs, isLoading: false }),
+  useUpdateUserSetting: () => ({ mutate: vi.fn(), isPending: false }),
   };
 });
 
@@ -170,7 +193,9 @@ describe('UserSettings', () => {
     it('renders Preferences section at /profile/settings', () => {
       renderAtPath('/profile/settings');
 
-      expect(screen.getByText('Preference settings coming soon.')).toBeInTheDocument();
+      expect(screen.getByText('Customize your experience in DB90.')).toBeInTheDocument();
+      expect(screen.getByLabelText('Theme')).toBeInTheDocument();
+      expect(screen.getByLabelText('Default Organisation')).toBeInTheDocument();
     });
 
     it('renders Notifications section at /profile/settings/notifications', () => {

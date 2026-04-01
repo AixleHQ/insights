@@ -3,8 +3,11 @@
 module Api
   module V1
     class UsersController < BaseController
+      ALLOWED_THEMES = %w[light dark system].freeze
+
       # GET /api/v1/users/me
       def me
+        current_user.user_settings.load
         response_data = UserSerializer.new(current_user).serialize
 
         # Include impersonation info if this is an impersonation request
@@ -36,6 +39,7 @@ module Api
         authorize! current_user, to: :update?
 
         if current_user.update(user_params)
+          current_user.user_settings.load
           render_resource(current_user, UserSerializer)
         else
           render json: {
@@ -69,6 +73,13 @@ module Api
       # PUT /api/v1/users/me/settings/:key
       def update_setting
         authorize! current_user, to: :settings?
+
+        if (error = validate_setting_value(params[:key], params[:value]))
+          return render json: {
+            error: "Unprocessable Entity",
+            errors: { value: [ error ] }
+          }, status: :unprocessable_entity
+        end
 
         setting = current_user.user_settings.find_or_initialize_by(key: params[:key])
         setting.value = params[:value]
@@ -109,6 +120,17 @@ module Api
 
       def user_params
         params.permit(:name, :avatar_url)
+      end
+
+      # Returns an error string for invalid values, or nil if the value is acceptable.
+      # Unknown keys pass through without validation — the settings store is intentionally open-ended.
+      def validate_setting_value(key, value)
+        case key
+        when "theme"
+          "must be one of: light, dark, system" unless ALLOWED_THEMES.include?(value)
+        when "default_org_id"
+          "must be a valid organization you belong to" unless current_user.organizations.exists?(id: value)
+        end
       end
     end
   end

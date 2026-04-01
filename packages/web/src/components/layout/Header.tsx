@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ComponentType } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Bell, Search, Command, Moon, Sun } from 'lucide-react';
+import { Bell, Search, Command, Moon, Sun, Monitor } from 'lucide-react';
+import { useTheme, type Theme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -181,24 +182,37 @@ function Notifications() {
   );
 }
 
-function ThemeToggle() {
-  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+const themeOptions: { value: Theme; label: string; icon: ComponentType<{ className?: string }> }[] = [
+  { value: 'light', label: 'Light', icon: Sun },
+  { value: 'dark', label: 'Dark', icon: Moon },
+  { value: 'system', label: 'System', icon: Monitor },
+];
 
-  const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light';
-    setTheme(newTheme);
-    document.documentElement.classList.toggle('dark', newTheme === 'dark');
-  };
+function ThemeToggle() {
+  const { theme, resolvedTheme, setTheme } = useTheme();
+  const CurrentIcon = theme === 'system' ? Monitor : resolvedTheme === 'dark' ? Moon : Sun;
 
   return (
-    <Button variant="ghost" size="icon" onClick={toggleTheme} className="size-8">
-      {theme === 'light' ? (
-        <Moon className="size-4" />
-      ) : (
-        <Sun className="size-4" />
-      )}
-      <span className="sr-only">Toggle theme</span>
-    </Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="size-8">
+          <CurrentIcon className="size-4" />
+          <span className="sr-only">Toggle theme</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {themeOptions.map(({ value, label, icon: Icon }) => (
+          <DropdownMenuItem
+            key={value}
+            onClick={() => setTheme(value)}
+            className={theme === value ? 'bg-accent' : ''}
+          >
+            <Icon className="mr-2 size-4" />
+            {label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

@@ -137,6 +137,18 @@ export function useUserOrganizations() {
   });
 }
 
+export function useUpdateUserSetting() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ key, value }: { key: string; value: string }) =>
+      api.put<{ data: { key: string; value: string } }>(`/users/me/settings/${key}`, { value }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.current });
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.settings });
+    },
+  });
+}
+
 // ============================================================================
 // Organization Hooks
 // ============================================================================
