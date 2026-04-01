@@ -15,6 +15,22 @@ RSpec.describe 'Api::V1::Users', type: :request do
       expect(json_data[:email]).to eq(user.email)
     end
 
+    it 'includes settings hash in response' do
+      create(:user_setting, user: user, key: 'theme', value: 'dark')
+
+      authenticated_get '/api/v1/users/me', user: user
+
+      expect_success
+      expect(json_data[:settings]).to eq({ theme: 'dark' })
+    end
+
+    it 'returns empty settings hash when user has no settings' do
+      authenticated_get '/api/v1/users/me', user: user
+
+      expect_success
+      expect(json_data[:settings]).to eq({})
+    end
+
     it 'returns unauthorized without authentication' do
       get '/api/v1/users/me'
 
@@ -98,6 +114,44 @@ RSpec.describe 'Api::V1::Users', type: :request do
 
       expect_success
       expect(json_data[:value]).to eq('light')
+    end
+
+    context 'theme validation' do
+      it 'accepts valid theme values' do
+        %w[light dark system].each do |theme|
+          authenticated_put '/api/v1/users/me/settings/theme', user: user, params: { value: theme }
+
+          expect_success
+          expect(json_data[:value]).to eq(theme)
+        end
+      end
+
+      it 'rejects invalid theme values' do
+        authenticated_put '/api/v1/users/me/settings/theme', user: user, params: { value: 'purple' }
+
+        expect_unprocessable_entity
+        expect(json_response[:errors][:value]).to include('must be one of: light, dark, system')
+      end
+    end
+
+    context 'default_org_id validation' do
+      let!(:org) { create(:organization) }
+      let!(:_membership) { create(:organization_membership, user: user, organization: org) }
+      let!(:other_org) { create(:organization) }
+
+      it 'accepts an org the user belongs to' do
+        authenticated_put '/api/v1/users/me/settings/default_org_id', user: user, params: { value: org.id }
+
+        expect_success
+        expect(json_data[:value]).to eq(org.id)
+      end
+
+      it 'rejects an org the user does not belong to' do
+        authenticated_put '/api/v1/users/me/settings/default_org_id', user: user, params: { value: other_org.id }
+
+        expect_unprocessable_entity
+        expect(json_response[:errors][:value]).to include('must be a valid organization you belong to')
+      end
     end
   end
 

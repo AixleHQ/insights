@@ -109,11 +109,33 @@ export function OrgProvider({ children, apiBaseUrl = '/api/v1' }: OrgProviderPro
         role: org.user_role || 'member',
       }));
 
-      // Restore previously selected org from localStorage
+      // Fetch user settings to get default_org_id preference
+      let defaultOrgId: string | null = null;
+      try {
+        const userResponse = await fetch(`${apiBaseUrl}/users/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        if (userResponse.ok) {
+          const userData = await userResponse.json();
+          defaultOrgId = (userData.data?.settings?.default_org_id as string) ?? null;
+        }
+      } catch {
+        // Non-fatal: fall back to localStorage / first org
+      }
+
+      // Restore previously selected org: localStorage > default_org_id setting > first org
       const storedOrgId = localStorage.getItem(ORG_STORAGE_KEY);
       let currentOrg = organizations.find((o) => o.id === storedOrgId) || null;
 
-      // If no stored org or stored org not found, use first org
+      // No localStorage entry — try the server-persisted default_org_id
+      if (!currentOrg && defaultOrgId) {
+        currentOrg = organizations.find((o) => o.id === defaultOrgId) || null;
+      }
+
+      // If still no org, use first org
       if (!currentOrg && organizations.length > 0) {
         currentOrg = organizations[0];
         // Clear invalid stored org ID (e.g., after DB reseed)

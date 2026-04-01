@@ -7,7 +7,13 @@ import { rollbarConfig } from './lib/rollbar'
 import './index.css'
 import App from './App.tsx'
 
-document.documentElement.classList.add('dark')
+// Apply theme from localStorage before React renders to avoid flash
+;(function () {
+  const stored = localStorage.getItem('db90_theme')
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+  const isDark = stored === 'dark' || (stored !== 'light' && prefersDark)
+  document.documentElement.classList.toggle('dark', isDark)
+})()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

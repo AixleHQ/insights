@@ -18,6 +18,7 @@ export interface User {
 
 export interface CurrentUser extends User {
   organizations: Organization[];
+  settings: Record<string, string>;
 }
 
 // Organization types

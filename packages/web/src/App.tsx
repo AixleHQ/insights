@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { OrgProvider } from './contexts/OrgContext';
 import { NotificationsProvider } from './contexts/NotificationsContext';
 import { ImpersonationProvider } from './contexts/ImpersonationContext';
@@ -51,6 +52,7 @@ function App() {
     <BrowserRouter>
       <ImpersonationProvider>
         <AuthProvider>
+          <ThemeProvider>
           <OrgProvider apiBaseUrl={import.meta.env.VITE_API_URL || '/api/v1'}>
             <NotificationsProvider>
               <ImpersonationBar />
@@ -126,6 +128,7 @@ function App() {
               </Routes>
             </NotificationsProvider>
           </OrgProvider>
+          </ThemeProvider>
         </AuthProvider>
       </ImpersonationProvider>
     </BrowserRouter>

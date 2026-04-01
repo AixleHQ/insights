@@ -3,7 +3,8 @@ import { Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import { User, Settings2, Bell, Shield, Wrench, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrg } from '@/contexts/OrgContext';
-import { useOrganizationMembers, useCurrentUser, useUpdateCurrentUser } from '@/hooks/useApi';
+import { useTheme, type Theme } from '@/contexts/ThemeContext';
+import { useOrganizationMembers, useCurrentUser, useUpdateCurrentUser, useUserOrganizations, useUpdateUserSetting } from '@/hooks/useApi';
 import { MemberProfileView } from './MemberProfile';
 import { cn } from '@/lib/utils';
 import {
@@ -18,6 +19,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { ToolAccounts } from './ToolAccounts';
 
 const navItems = [
@@ -194,7 +202,20 @@ function ProfileSection() {
   );
 }
 
+const themeOptions: { value: Theme; label: string }[] = [
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'system', label: 'System' },
+];
+
 function PreferencesSection() {
+  const { theme, setTheme } = useTheme();
+  const { data: currentUser } = useCurrentUser();
+  const { data: orgs, isLoading: orgsLoading } = useUserOrganizations();
+  const updateSetting = useUpdateUserSetting();
+
+  const savedDefaultOrgId = currentUser?.settings?.default_org_id ?? '';
+
   return (
     <div className="space-y-6">
       <Card>
@@ -202,8 +223,53 @@ function PreferencesSection() {
           <CardTitle>Preferences</CardTitle>
           <CardDescription>Customize your experience in DB90.</CardDescription>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">Preference settings coming soon.</p>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="theme-select">Theme</Label>
+            <Select value={theme} onValueChange={(v) => setTheme(v as Theme)}>
+              <SelectTrigger id="theme-select" className="w-48">
+                <SelectValue placeholder="Select theme" />
+              </SelectTrigger>
+              <SelectContent>
+                {themeOptions.map(({ value, label }) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Changes apply immediately and are saved to your account.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="default-org-select">Default Organisation</Label>
+            {orgsLoading ? (
+              <Skeleton className="h-9 w-48" />
+            ) : (
+              <Select
+                value={savedDefaultOrgId}
+                onValueChange={(v) =>
+                  updateSetting.mutate({ key: 'default_org_id', value: v })
+                }
+              >
+                <SelectTrigger id="default-org-select" className="w-48">
+                  <SelectValue placeholder="Select organisation" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(orgs ?? []).map((org) => (
+                    <SelectItem key={org.id} value={org.id}>
+                      {org.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Used when you log in on a new device or browser.
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>

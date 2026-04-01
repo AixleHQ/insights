@@ -70,6 +70,13 @@ module Api
       def update_setting
         authorize! current_user, to: :settings?
 
+        if (error = validate_setting_value(params[:key], params[:value]))
+          return render json: {
+            error: "Unprocessable Entity",
+            errors: { value: [ error ] }
+          }, status: :unprocessable_entity
+        end
+
         setting = current_user.user_settings.find_or_initialize_by(key: params[:key])
         setting.value = params[:value]
 
@@ -109,6 +116,17 @@ module Api
 
       def user_params
         params.permit(:name, :avatar_url)
+      end
+
+      ALLOWED_THEMES = %w[light dark system].freeze
+
+      def validate_setting_value(key, value)
+        case key
+        when "theme"
+          "must be one of: light, dark, system" unless ALLOWED_THEMES.include?(value)
+        when "default_org_id"
+          "must be a valid organization you belong to" unless current_user.organizations.exists?(id: value)
+        end
       end
     end
   end
