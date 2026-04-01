@@ -14,6 +14,7 @@ export interface User {
   super_admin: boolean;
   created_at: string;
   updated_at: string;
+  lastSignInAt: string | null;
 }
 
 export interface CurrentUser extends User {
