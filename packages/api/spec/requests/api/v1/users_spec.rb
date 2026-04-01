@@ -129,7 +129,7 @@ RSpec.describe 'Api::V1::Users', type: :request do
       it 'rejects invalid theme values' do
         authenticated_put '/api/v1/users/me/settings/theme', user: user, params: { value: 'purple' }
 
-        expect_unprocessable_entity
+        expect_unprocessable
         expect(json_response[:errors][:value]).to include('must be one of: light, dark, system')
       end
     end
@@ -149,7 +149,7 @@ RSpec.describe 'Api::V1::Users', type: :request do
       it 'rejects an org the user does not belong to' do
         authenticated_put '/api/v1/users/me/settings/default_org_id', user: user, params: { value: other_org.id }
 
-        expect_unprocessable_entity
+        expect_unprocessable
         expect(json_response[:errors][:value]).to include('must be a valid organization you belong to')
       end
     end
