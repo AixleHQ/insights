@@ -4,6 +4,8 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { UserSettings } from './UserSettings';
 
+const notificationSettings = vi.hoisted<{ value: Record<string, string> }>(() => ({ value: {} }));
+
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
     profile: { name: 'Test User', email: 'test@example.com' },
@@ -100,7 +102,7 @@ vi.mock('@/hooks/useApi', () => {
     data: { data: [] },
     isLoading: false,
   }),
-  useCurrentUser: () => ({ data: mockUser }),
+  useCurrentUser: () => ({ data: { ...mockUser, settings: notificationSettings.value } }),
   useUpdateCurrentUser: () => ({ mutate: vi.fn(), isPending: false }),
   useUserOrganizations: () => ({ data: mockOrgs, isLoading: false }),
   useUpdateUserSetting: () => ({ mutate: vi.fn(), isPending: false }),
@@ -125,6 +127,7 @@ function renderAtPath(path: string) {
 describe('UserSettings', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    notificationSettings.value = {};
   });
 
   describe('Header', () => {
@@ -214,6 +217,17 @@ describe('UserSettings', () => {
       const switches = screen.getAllByRole('switch');
       expect(switches).toHaveLength(4);
       switches.forEach((sw) => expect(sw).not.toBeChecked());
+    });
+
+    it('checks toggles whose setting value is "true"', () => {
+      notificationSettings.value = { notify_in_app_risk: 'true' };
+
+      renderAtPath('/profile/settings/notifications');
+
+      expect(screen.getByLabelText('In-app risk alerts')).toBeChecked();
+      expect(screen.getByLabelText('In-app cost alerts')).not.toBeChecked();
+      expect(screen.getByLabelText('Weekly email digest')).not.toBeChecked();
+      expect(screen.getByLabelText('Alert emails')).not.toBeChecked();
     });
 
     it('renders Security section at /profile/settings/security', () => {

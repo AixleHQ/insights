@@ -146,6 +146,9 @@ export function useUpdateUserSetting() {
       queryClient.invalidateQueries({ queryKey: queryKeys.user.current });
       queryClient.invalidateQueries({ queryKey: queryKeys.user.settings });
     },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.current });
+    },
   });
 }
 

@@ -285,7 +285,7 @@ const NOTIFICATION_TOGGLES = [
 ] as const;
 
 function NotificationsSection() {
-  const { data: currentUser } = useCurrentUser();
+  const { data: currentUser, isLoading } = useCurrentUser();
   const updateSetting = useUpdateUserSetting();
 
   function handleToggle(key: string, checked: boolean) {
@@ -300,23 +300,31 @@ function NotificationsSection() {
           <CardDescription>Control how and when you receive notifications.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {NOTIFICATION_TOGGLES.map(({ key, label, description }) => {
-            const enabled = currentUser?.settings?.[key] === 'true';
-            return (
-              <div key={key} className="flex items-center justify-between gap-4">
-                <div className="space-y-0.5">
-                  <Label htmlFor={key}>{label}</Label>
-                  <p className="text-xs text-muted-foreground">{description}</p>
+          {isLoading ? (
+            <div className="space-y-4">
+              {NOTIFICATION_TOGGLES.map(({ key }) => (
+                <Skeleton key={key} className="h-10" />
+              ))}
+            </div>
+          ) : (
+            NOTIFICATION_TOGGLES.map(({ key, label, description }) => {
+              const enabled = currentUser?.settings?.[key] === 'true';
+              return (
+                <div key={key} className="flex items-center justify-between gap-4">
+                  <div className="space-y-0.5">
+                    <Label htmlFor={key}>{label}</Label>
+                    <p className="text-xs text-muted-foreground">{description}</p>
+                  </div>
+                  <Switch
+                    id={key}
+                    checked={enabled}
+                    onCheckedChange={(checked) => handleToggle(key, checked)}
+                    disabled={updateSetting.isPending}
+                  />
                 </div>
-                <Switch
-                  id={key}
-                  checked={enabled}
-                  onCheckedChange={(checked) => handleToggle(key, checked)}
-                  disabled={updateSetting.isPending}
-                />
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </CardContent>
       </Card>
     </div>
