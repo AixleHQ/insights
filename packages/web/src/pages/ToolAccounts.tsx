@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 import {
@@ -54,6 +54,7 @@ interface ToolProvider {
   description: string;
   icon: React.ReactNode;
   color: string;
+  tokenLabel: string;
 }
 
 const toolProviders: ToolProvider[] = [
@@ -67,6 +68,7 @@ const toolProviders: ToolProvider[] = [
       </svg>
     ),
     color: 'bg-[#d4a27f]',
+    tokenLabel: 'Access Token',
   },
   {
     id: 'github_copilot',
@@ -74,6 +76,7 @@ const toolProviders: ToolProvider[] = [
     description: 'Link your GitHub account to attribute Copilot events',
     icon: <Github className="size-5" />,
     color: 'bg-[#24292f]',
+    tokenLabel: 'Personal Access Token',
   },
   {
     id: 'cursor',
@@ -85,6 +88,7 @@ const toolProviders: ToolProvider[] = [
       </svg>
     ),
     color: 'bg-[#6366f1]',
+    tokenLabel: 'API Key',
   },
   {
     id: 'windsurf',
@@ -96,6 +100,7 @@ const toolProviders: ToolProvider[] = [
       </svg>
     ),
     color: 'bg-[#0ea5e9]',
+    tokenLabel: 'API Key',
   },
   {
     id: 'openai_api',
@@ -107,6 +112,7 @@ const toolProviders: ToolProvider[] = [
       </svg>
     ),
     color: 'bg-[#10a37f]',
+    tokenLabel: 'API Key',
   },
   {
     id: 'anthropic_api',
@@ -118,6 +124,7 @@ const toolProviders: ToolProvider[] = [
       </svg>
     ),
     color: 'bg-[#cc785c]',
+    tokenLabel: 'API Key',
   },
   {
     id: 'gemini_api',
@@ -129,6 +136,7 @@ const toolProviders: ToolProvider[] = [
       </svg>
     ),
     color: 'bg-[#4285f4]',
+    tokenLabel: 'API Key',
   },
   {
     id: 'aider',
@@ -140,6 +148,7 @@ const toolProviders: ToolProvider[] = [
       </svg>
     ),
     color: 'bg-[#7c3aed]',
+    tokenLabel: 'API Key',
   },
 ];
 
@@ -158,11 +167,18 @@ function AccountSkeleton() {
   );
 }
 
+interface ConnectFormData {
+  providerId: string;
+  accountId: string;
+  accountName: string;
+  token: string;
+}
+
 interface ConnectDialogProps {
   provider: ToolProvider | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (providerId: string, accountId: string, accountName: string, token: string) => Promise<void>;
+  onSubmit: (data: ConnectFormData) => Promise<void>;
   isSubmitting: boolean;
 }
 
@@ -172,29 +188,30 @@ function ConnectDialog({ provider, open, onOpenChange, onSubmit, isSubmitting }:
   const [token, setToken] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!open) {
+  const handleOpenChange = (next: boolean) => {
+    if (!next) {
       setAccountId('');
       setAccountName('');
       setToken('');
       setError(null);
     }
-  }, [open]);
+    onOpenChange(next);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!provider || !accountId.trim()) return;
     setError(null);
     try {
-      await onSubmit(provider.id, accountId.trim(), accountName.trim(), token.trim());
-      onOpenChange(false);
+      await onSubmit({ providerId: provider.id, accountId: accountId.trim(), accountName: accountName.trim(), token: token.trim() });
+      handleOpenChange(false);
     } catch {
       setError('Failed to connect account. Please try again.');
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Connect {provider?.name}</DialogTitle>
@@ -227,13 +244,13 @@ function ConnectDialog({ provider, open, onOpenChange, onSubmit, isSubmitting }:
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="access-token">Access Token (optional)</Label>
+              <Label htmlFor="access-token">{provider?.tokenLabel} (optional)</Label>
               <Input
                 id="access-token"
                 type="password"
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
-                placeholder="Paste your API key or token"
+                placeholder={`Paste your ${provider?.tokenLabel?.toLowerCase()}`}
               />
               <p className="text-xs text-muted-foreground">
                 Stored encrypted. Used for event attribution.
@@ -242,7 +259,7 @@ function ConnectDialog({ provider, open, onOpenChange, onSubmit, isSubmitting }:
             {error && <p className="text-sm text-destructive">{error}</p>}
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={!accountId.trim() || isSubmitting}>
@@ -357,12 +374,7 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
     };
   }, [accounts]);
 
-  const handleConnectSubmit = async (
-    providerId: string,
-    accountId: string,
-    accountName: string,
-    token: string
-  ) => {
+  const handleConnectSubmit = async ({ providerId, accountId, accountName, token }: ConnectFormData) => {
     if (!selectedOrgId) return;
     await createAccount.mutateAsync({
       orgId: selectedOrgId,
