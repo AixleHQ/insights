@@ -419,11 +419,23 @@ describe('ToolAccounts', () => {
       expect(container.querySelector('.opacity-60')).toBeInTheDocument();
     });
 
-    it('disables the toggle button while the mutation is pending', () => {
-      mockUseUpdateToolAccount.mockReturnValue({ mutateAsync: mockUpdateMutateAsync, isPending: true });
-      mockUseToolAccounts.mockReturnValue({ data: [mockAccount({ isActive: true })], isLoading: false });
+    it('disables only the toggled account button while the mutation is pending', () => {
+      mockUseUpdateToolAccount.mockReturnValue({
+        mutateAsync: mockUpdateMutateAsync,
+        isPending: true,
+        variables: { accountId: 'acct-1', orgId: 'org-1', isActive: false },
+      });
+      mockUseToolAccounts.mockReturnValue({
+        data: [
+          mockAccount({ id: 'acct-1', toolName: 'claude_code', isActive: true }),
+          mockAccount({ id: 'acct-2', toolName: 'cursor', isActive: true }),
+        ],
+        isLoading: false,
+      });
       renderToolAccounts();
-      expect(screen.getByRole('button', { name: 'Disable' })).toBeDisabled();
+      const buttons = screen.getAllByRole('button', { name: 'Disable' });
+      expect(buttons[0]).toBeDisabled();
+      expect(buttons[1]).not.toBeDisabled();
     });
 
     it('does not show Disable or Enable buttons for unconnected providers', () => {

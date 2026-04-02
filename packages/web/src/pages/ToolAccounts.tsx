@@ -475,7 +475,7 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
                   onConnect={setConnectingProvider}
                   onDisconnect={handleDisconnect}
                   onToggleActive={handleToggleActive}
-                  isToggling={updateAccount.isPending}
+                  isToggling={updateAccount.isPending && updateAccount.variables?.accountId === linkedProviders.get(provider.id)?.id}
                 />
               ))}
             </div>
