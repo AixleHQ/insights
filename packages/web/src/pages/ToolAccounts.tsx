@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 import {
@@ -162,23 +162,31 @@ interface ConnectDialogProps {
   provider: ToolProvider | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (providerId: string, accountId: string, accountName: string) => Promise<void>;
+  onSubmit: (providerId: string, accountId: string, accountName: string, token: string) => Promise<void>;
   isSubmitting: boolean;
 }
 
 function ConnectDialog({ provider, open, onOpenChange, onSubmit, isSubmitting }: ConnectDialogProps) {
   const [accountId, setAccountId] = useState('');
   const [accountName, setAccountName] = useState('');
+  const [token, setToken] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setAccountId('');
+      setAccountName('');
+      setToken('');
+      setError(null);
+    }
+  }, [open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!provider || !accountId.trim()) return;
     setError(null);
     try {
-      await onSubmit(provider.id, accountId.trim(), accountName.trim());
-      setAccountId('');
-      setAccountName('');
+      await onSubmit(provider.id, accountId.trim(), accountName.trim(), token.trim());
       onOpenChange(false);
     } catch {
       setError('Failed to connect account. Please try again.');
@@ -217,6 +225,19 @@ function ConnectDialog({ provider, open, onOpenChange, onSubmit, isSubmitting }:
                 onChange={(e) => setAccountName(e.target.value)}
                 placeholder="How you want it displayed"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="access-token">Access Token (optional)</Label>
+              <Input
+                id="access-token"
+                type="password"
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                placeholder="Paste your API key or token"
+              />
+              <p className="text-xs text-muted-foreground">
+                Stored encrypted. Used for event attribution.
+              </p>
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
           </div>
@@ -339,7 +360,8 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
   const handleConnectSubmit = async (
     providerId: string,
     accountId: string,
-    accountName: string
+    accountName: string,
+    token: string
   ) => {
     if (!selectedOrgId) return;
     await createAccount.mutateAsync({
@@ -347,6 +369,7 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
       toolName: providerId,
       externalUserId: accountId,
       externalUsername: accountName || undefined,
+      accessToken: token || undefined,
     });
   };
 
@@ -448,8 +471,9 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
           <div className="space-y-1 text-sm">
             <p className="font-medium">Privacy Note</p>
             <p className="text-muted-foreground">
-              DB90 only stores your account identifier for attribution purposes. We do not
-              store your credentials or access your tool data directly.
+              DB90 only stores your account identifier and, if provided, your API token —
+              encrypted at rest. We use these only for event attribution and do not access
+              your tool data directly.
             </p>
           </div>
         </CardContent>
