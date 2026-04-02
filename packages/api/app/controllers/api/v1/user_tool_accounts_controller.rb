@@ -9,6 +9,7 @@ module Api
 
       # GET /api/v1/organizations/:organization_id/tool_accounts
       def index
+        authorize! @membership, to: :index?, with: UserToolAccountPolicy
         accounts = @membership.user_tool_accounts.order(:tool_name)
 
         # Allow filtering by tool
@@ -74,12 +75,12 @@ module Api
 
       def tool_account_params
         params.permit(:tool_name, :access_token, :refresh_token, :token_expires_at,
-                      :external_account_id, :external_account_name, :is_active)
+                      :external_user_id, :external_username, :is_active)
       end
 
       def tool_account_update_params
         params.permit(:access_token, :refresh_token, :token_expires_at,
-                      :external_account_id, :external_account_name, :is_active)
+                      :external_user_id, :external_username, :is_active)
       end
     end
   end
