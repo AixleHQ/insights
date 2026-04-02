@@ -867,13 +867,20 @@ export function useCreateToolAccount() {
   return useMutation({
     mutationFn: ({
       orgId,
-      provider,
-      code,
+      toolName,
+      externalAccountId,
+      externalAccountName,
     }: {
       orgId: string;
-      provider: string;
-      code: string;
-    }) => api.post<ToolAccount>(`/organizations/${orgId}/tool_accounts`, { provider, code }),
+      toolName: string;
+      externalAccountId: string;
+      externalAccountName?: string;
+    }) =>
+      api.post<ToolAccount>(`/organizations/${orgId}/tool_accounts`, {
+        tool_name: toolName,
+        external_account_id: externalAccountId,
+        external_account_name: externalAccountName,
+      }),
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.toolAccounts.all(orgId) });
     },

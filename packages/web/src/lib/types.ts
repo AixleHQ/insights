@@ -141,13 +141,16 @@ export interface ProjectConnector {
 // Tool account types
 export interface ToolAccount {
   id: string;
-  user_id: string;
-  provider: string;
-  external_id: string;
-  external_username: string | null;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  toolName: string;
+  isActive: boolean;
+  externalUserId: string | null;
+  externalUsername: string | null;
+  externalEmail: string | null;
+  organizationMembershipId: string;
+  tokenExpired: boolean;
+  tokenExpiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Event types
