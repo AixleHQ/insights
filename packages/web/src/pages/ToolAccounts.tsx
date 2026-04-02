@@ -284,7 +284,7 @@ function ToolRow({
   linkedAccount?: ToolAccount;
   onConnect: (provider: ToolProvider) => void;
   onDisconnect: (accountId: string) => void;
-  onToggleActive: (accountId: string, newValue: boolean) => void;
+  onToggleActive?: (accountId: string, newValue: boolean) => void;
   isToggling?: boolean;
 }) {
   const isLinked = !!linkedAccount;
@@ -323,36 +323,36 @@ function ToolRow({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => onToggleActive(linkedAccount.id, !linkedAccount.isActive)}
+            onClick={() => onToggleActive?.(linkedAccount.id, !linkedAccount.isActive)}
             disabled={isToggling}
           >
             {linkedAccount.isActive ? 'Disable' : 'Enable'}
           </Button>
           <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <Trash2 className="size-4 text-destructive" />
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Disconnect {provider.name}?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This will unlink your {provider.name} account. Future events from this tool
-                may not be attributed to you.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => onDisconnect(linkedAccount.id)}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                Disconnect
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Trash2 className="size-4 text-destructive" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Disconnect {provider.name}?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will unlink your {provider.name} account. Future events from this tool
+                  may not be attributed to you.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => onDisconnect(linkedAccount.id)}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Disconnect
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       ) : (
         <Button variant="outline" size="sm" onClick={() => onConnect(provider)}>
@@ -492,7 +492,6 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
                   provider={provider}
                   onConnect={setConnectingProvider}
                   onDisconnect={handleDisconnect}
-                  onToggleActive={handleToggleActive}
                 />
               ))
             ) : (
