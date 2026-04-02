@@ -868,18 +868,18 @@ export function useCreateToolAccount() {
     mutationFn: ({
       orgId,
       toolName,
-      externalAccountId,
-      externalAccountName,
+      externalUserId,
+      externalUsername,
     }: {
       orgId: string;
       toolName: string;
-      externalAccountId: string;
-      externalAccountName?: string;
+      externalUserId: string;
+      externalUsername?: string;
     }) =>
       api.post<ToolAccount>(`/organizations/${orgId}/tool_accounts`, {
         tool_name: toolName,
-        external_account_id: externalAccountId,
-        external_account_name: externalAccountName,
+        external_user_id: externalUserId,
+        external_username: externalUsername,
       }),
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.toolAccounts.all(orgId) });

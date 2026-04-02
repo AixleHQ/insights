@@ -336,8 +336,8 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
       await createAccount.mutateAsync({
         orgId: selectedOrgId,
         toolName: providerId,
-        externalAccountId: accountId,
-        externalAccountName: accountName || undefined,
+        externalUserId: accountId,
+        externalUsername: accountName || undefined,
       });
     } catch (error) {
       console.error('Failed to connect account:', error);
