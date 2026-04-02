@@ -902,6 +902,20 @@ export function useDeleteToolAccount() {
   });
 }
 
+export function useUpdateToolAccount() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ orgId, accountId, isActive }: { orgId: string; accountId: string; isActive: boolean }) =>
+      api.patch<{ data: ToolAccount }>(`/organizations/${orgId}/tool_accounts/${accountId}`, {
+        is_active: isActive,
+      }),
+    onSuccess: (_, { orgId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.toolAccounts.all(orgId) });
+    },
+  });
+}
+
 // ============================================================================
 // Events Hooks
 // ============================================================================

@@ -10,7 +10,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { useOrg } from '@/contexts/OrgContext';
-import { useToolAccounts, useDeleteToolAccount, useCreateToolAccount, useUserOrganizations } from '@/hooks/useApi';
+import { useToolAccounts, useDeleteToolAccount, useCreateToolAccount, useUpdateToolAccount, useUserOrganizations } from '@/hooks/useApi';
 import type { ToolAccount } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -277,16 +277,20 @@ function ToolRow({
   linkedAccount,
   onConnect,
   onDisconnect,
+  onToggleActive,
+  isToggling,
 }: {
   provider: ToolProvider;
   linkedAccount?: ToolAccount;
   onConnect: (provider: ToolProvider) => void;
   onDisconnect: (accountId: string) => void;
+  onToggleActive?: (accountId: string, newValue: boolean) => void;
+  isToggling?: boolean;
 }) {
   const isLinked = !!linkedAccount;
 
   return (
-    <div className="flex items-center justify-between rounded-lg border p-4">
+    <div className={cn('flex items-center justify-between rounded-lg border p-4', isLinked && !linkedAccount.isActive && 'opacity-60')}>
       <div className="flex items-center gap-4">
         <div
           className={`flex size-10 items-center justify-center rounded-lg text-white ${provider.color}`}
@@ -315,31 +319,41 @@ function ToolRow({
       </div>
 
       {isLinked ? (
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <Trash2 className="size-4 text-destructive" />
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Disconnect {provider.name}?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This will unlink your {provider.name} account. Future events from this tool
-                may not be attributed to you.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => onDisconnect(linkedAccount.id)}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                Disconnect
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onToggleActive?.(linkedAccount.id, !linkedAccount.isActive)}
+            disabled={isToggling}
+          >
+            {linkedAccount.isActive ? 'Disable' : 'Enable'}
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Trash2 className="size-4 text-destructive" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Disconnect {provider.name}?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will unlink your {provider.name} account. Future events from this tool
+                  may not be attributed to you.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => onDisconnect(linkedAccount.id)}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Disconnect
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       ) : (
         <Button variant="outline" size="sm" onClick={() => onConnect(provider)}>
           <Plus className="mr-2 size-4" />
@@ -361,6 +375,7 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
   const { data: accounts, isLoading } = useToolAccounts(selectedOrgId);
   const createAccount = useCreateToolAccount();
   const deleteAccount = useDeleteToolAccount();
+  const updateAccount = useUpdateToolAccount();
 
   const { linkedProviders, connectedProviders, availableProviders } = useMemo(() => {
     const linkedMap = new Map<string, ToolAccount>();
@@ -391,6 +406,15 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
       await deleteAccount.mutateAsync({ orgId: selectedOrgId, accountId });
     } catch (error) {
       console.error('Failed to disconnect account:', error);
+    }
+  };
+
+  const handleToggleActive = async (accountId: string, isActive: boolean) => {
+    if (!selectedOrgId) return;
+    try {
+      await updateAccount.mutateAsync({ orgId: selectedOrgId, accountId, isActive });
+    } catch (error) {
+      console.error('Failed to update account status:', error);
     }
   };
 
@@ -450,6 +474,8 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
                   linkedAccount={linkedProviders.get(provider.id)}
                   onConnect={setConnectingProvider}
                   onDisconnect={handleDisconnect}
+                  onToggleActive={handleToggleActive}
+                  isToggling={updateAccount.isPending && updateAccount.variables?.accountId === linkedProviders.get(provider.id)?.id}
                 />
               ))}
             </div>
