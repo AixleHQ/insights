@@ -9,6 +9,7 @@ module Api
 
       # GET /api/v1/organizations/:organization_id/tool_accounts
       def index
+        authorize! @membership, to: :index?, with: UserToolAccountPolicy
         accounts = @membership.user_tool_accounts.order(:tool_name)
 
         # Allow filtering by tool

@@ -169,14 +169,20 @@ interface ConnectDialogProps {
 function ConnectDialog({ provider, open, onOpenChange, onSubmit, isSubmitting }: ConnectDialogProps) {
   const [accountId, setAccountId] = useState('');
   const [accountName, setAccountName] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!provider || !accountId.trim()) return;
-    await onSubmit(provider.id, accountId.trim(), accountName.trim());
-    setAccountId('');
-    setAccountName('');
-    onOpenChange(false);
+    setError(null);
+    try {
+      await onSubmit(provider.id, accountId.trim(), accountName.trim());
+      setAccountId('');
+      setAccountName('');
+      onOpenChange(false);
+    } catch {
+      setError('Failed to connect account. Please try again.');
+    }
   };
 
   return (
@@ -212,6 +218,7 @@ function ConnectDialog({ provider, open, onOpenChange, onSubmit, isSubmitting }:
                 placeholder="How you want it displayed"
               />
             </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
@@ -252,9 +259,12 @@ function ToolRow({
           <div className="flex items-center gap-2">
             <span className="font-medium">{provider.name}</span>
             {isLinked && (
-              <Badge variant="outline" className="text-success">
+              <Badge
+                variant="outline"
+                className={linkedAccount.isActive ? 'text-success' : 'text-muted-foreground'}
+              >
                 <Check className="mr-1 size-3" />
-                Connected
+                {linkedAccount.isActive ? 'Connected' : 'Inactive'}
               </Badge>
             )}
           </div>
@@ -304,7 +314,7 @@ function ToolRow({
 
 export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
   const { currentOrg } = useOrg();
-  const { data: orgs } = useUserOrganizations();
+  const { data: orgs, isLoading: orgsLoading } = useUserOrganizations();
   // null means "follow the global org context"; a string means user manually picked an org
   const [userSelectedOrgId, setUserSelectedOrgId] = useState<string | null>(null);
   const selectedOrgId = userSelectedOrgId ?? currentOrg?.id ?? '';
@@ -332,16 +342,12 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
     accountName: string
   ) => {
     if (!selectedOrgId) return;
-    try {
-      await createAccount.mutateAsync({
-        orgId: selectedOrgId,
-        toolName: providerId,
-        externalUserId: accountId,
-        externalUsername: accountName || undefined,
-      });
-    } catch (error) {
-      console.error('Failed to connect account:', error);
-    }
+    await createAccount.mutateAsync({
+      orgId: selectedOrgId,
+      toolName: providerId,
+      externalUserId: accountId,
+      externalUsername: accountName || undefined,
+    });
   };
 
   const handleDisconnect = async (accountId: string) => {
@@ -375,7 +381,7 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
         <Label htmlFor="org-select" className="shrink-0 text-sm font-medium">
           Organisation
         </Label>
-        <Select value={selectedOrgId} onValueChange={setUserSelectedOrgId}>
+        <Select value={selectedOrgId} onValueChange={setUserSelectedOrgId} disabled={orgsLoading}>
           <SelectTrigger id="org-select" className="w-56">
             <SelectValue placeholder="Select organisation" />
           </SelectTrigger>
