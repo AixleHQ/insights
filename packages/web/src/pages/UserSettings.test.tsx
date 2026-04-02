@@ -57,6 +57,7 @@ vi.mock('@/hooks/useApi', () => {
   useToolAccounts: () => ({ data: [], isLoading: false }),
   useCreateToolAccount: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteToolAccount: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateToolAccount: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useOrganizationMembers: () => ({
     data: [
       {

@@ -98,6 +98,37 @@ RSpec.describe 'Api::V1::UserToolAccounts', type: :request do
       expect_success
       expect(json_data[:isActive]).to be false
     end
+
+    it 're-enables a disabled tool account' do
+      tool_account.update!(is_active: false)
+
+      authenticated_patch "/api/v1/organizations/#{organization.id}/tool_accounts/#{tool_account.id}",
+                          user: user,
+                          organization: organization,
+                          params: { is_active: true }
+
+      expect_success
+      expect(json_data[:isActive]).to be true
+    end
+
+    it 'persists is_active change to the database' do
+      authenticated_patch "/api/v1/organizations/#{organization.id}/tool_accounts/#{tool_account.id}",
+                          user: user,
+                          organization: organization,
+                          params: { is_active: false }
+
+      expect_success
+      expect(tool_account.reload.is_active).to be false
+    end
+
+    it 'does not allow another user to update the account' do
+      authenticated_patch "/api/v1/organizations/#{organization.id}/tool_accounts/#{tool_account.id}",
+                          user: other_user,
+                          organization: organization,
+                          params: { is_active: false }
+
+      expect(response).to have_http_status(:not_found)
+    end
   end
 
   describe 'DELETE /api/v1/organizations/:organization_id/tool_accounts/:id' do

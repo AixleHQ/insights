@@ -14,12 +14,15 @@ vi.mock('@/contexts/OrgContext', () => ({
 
 const mockCreateMutateAsync = vi.fn();
 const mockDeleteMutateAsync = vi.fn();
+const mockUpdateMutateAsync = vi.fn();
 const mockUseToolAccounts = vi.fn();
+const mockUseUpdateToolAccount = vi.fn();
 
 vi.mock('@/hooks/useApi', () => ({
   useToolAccounts: (...args: unknown[]) => mockUseToolAccounts(...args),
   useCreateToolAccount: () => ({ mutateAsync: mockCreateMutateAsync, isPending: false }),
   useDeleteToolAccount: () => ({ mutateAsync: mockDeleteMutateAsync, isPending: false }),
+  useUpdateToolAccount: (...args: unknown[]) => mockUseUpdateToolAccount(...args),
   useUserOrganizations: () => ({
     data: [{ id: 'org-1', name: 'Acme', slug: 'acme' }],
     isLoading: false,
@@ -54,6 +57,8 @@ describe('ToolAccounts', () => {
     vi.clearAllMocks();
     mockCreateMutateAsync.mockResolvedValue({});
     mockDeleteMutateAsync.mockResolvedValue({});
+    mockUpdateMutateAsync.mockResolvedValue({});
+    mockUseUpdateToolAccount.mockReturnValue({ mutateAsync: mockUpdateMutateAsync, isPending: false });
     mockUseToolAccounts.mockReturnValue({ data: [], isLoading: false });
   });
 
@@ -360,6 +365,72 @@ describe('ToolAccounts', () => {
       await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
       expect(mockDeleteMutateAsync).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('enable/disable flow', () => {
+    it('shows Disable button for an active connected account', () => {
+      mockUseToolAccounts.mockReturnValue({ data: [mockAccount({ isActive: true })], isLoading: false });
+      renderToolAccounts();
+      expect(screen.getByRole('button', { name: 'Disable' })).toBeInTheDocument();
+    });
+
+    it('shows Enable button for an inactive connected account', () => {
+      mockUseToolAccounts.mockReturnValue({ data: [mockAccount({ isActive: false })], isLoading: false });
+      renderToolAccounts();
+      expect(screen.getByRole('button', { name: 'Enable' })).toBeInTheDocument();
+    });
+
+    it('calls updateAccount with isActive: false when Disable is clicked', async () => {
+      mockUseToolAccounts.mockReturnValue({ data: [mockAccount({ id: 'acct-1', isActive: true })], isLoading: false });
+      const user = userEvent.setup();
+      renderToolAccounts();
+
+      await user.click(screen.getByRole('button', { name: 'Disable' }));
+
+      await waitFor(() => {
+        expect(mockUpdateMutateAsync).toHaveBeenCalledWith({
+          orgId: 'org-1',
+          accountId: 'acct-1',
+          isActive: false,
+        });
+      });
+    });
+
+    it('calls updateAccount with isActive: true when Enable is clicked', async () => {
+      mockUseToolAccounts.mockReturnValue({ data: [mockAccount({ id: 'acct-1', isActive: false })], isLoading: false });
+      const user = userEvent.setup();
+      renderToolAccounts();
+
+      await user.click(screen.getByRole('button', { name: 'Enable' }));
+
+      await waitFor(() => {
+        expect(mockUpdateMutateAsync).toHaveBeenCalledWith({
+          orgId: 'org-1',
+          accountId: 'acct-1',
+          isActive: true,
+        });
+      });
+    });
+
+    it('applies opacity-60 to an inactive account row', () => {
+      mockUseToolAccounts.mockReturnValue({ data: [mockAccount({ isActive: false })], isLoading: false });
+      const { container } = renderToolAccounts();
+      expect(container.querySelector('.opacity-60')).toBeInTheDocument();
+    });
+
+    it('disables the toggle button while the mutation is pending', () => {
+      mockUseUpdateToolAccount.mockReturnValue({ mutateAsync: mockUpdateMutateAsync, isPending: true });
+      mockUseToolAccounts.mockReturnValue({ data: [mockAccount({ isActive: true })], isLoading: false });
+      renderToolAccounts();
+      expect(screen.getByRole('button', { name: 'Disable' })).toBeDisabled();
+    });
+
+    it('does not show Disable or Enable buttons for unconnected providers', () => {
+      mockUseToolAccounts.mockReturnValue({ data: [], isLoading: false });
+      renderToolAccounts();
+      expect(screen.queryByRole('button', { name: 'Disable' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Enable' })).not.toBeInTheDocument();
     });
   });
 });
