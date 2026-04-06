@@ -126,10 +126,28 @@ describe('ToolAccounts', () => {
       expect(screen.getAllByText('Connected').length).toBeGreaterThanOrEqual(2);
     });
 
-    it('shows Inactive badge when isActive is false', () => {
+    it('shows Disabled badge when isActive is false', () => {
       mockUseToolAccounts.mockReturnValue({ data: [mockAccount({ isActive: false })], isLoading: false });
       renderToolAccounts();
-      expect(screen.getByText('Inactive')).toBeInTheDocument();
+      expect(screen.getByText('Disabled')).toBeInTheDocument();
+    });
+
+    it('shows Token expired warning badge when tokenExpired is true', () => {
+      mockUseToolAccounts.mockReturnValue({
+        data: [mockAccount({ tokenExpired: true })],
+        isLoading: false,
+      });
+      renderToolAccounts();
+      expect(screen.getByText('Token expired')).toBeInTheDocument();
+    });
+
+    it('does not show Token expired warning badge when tokenExpired is false', () => {
+      mockUseToolAccounts.mockReturnValue({
+        data: [mockAccount({ tokenExpired: false })],
+        isLoading: false,
+      });
+      renderToolAccounts();
+      expect(screen.queryByText('Token expired')).not.toBeInTheDocument();
     });
 
     it('shows linked username below provider name', () => {
