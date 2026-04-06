@@ -906,9 +906,20 @@ export function useUpdateToolAccount() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ orgId, accountId, isActive }: { orgId: string; accountId: string; isActive: boolean }) =>
+    mutationFn: ({
+      orgId,
+      accountId,
+      isActive,
+      accessToken,
+    }: {
+      orgId: string;
+      accountId: string;
+      isActive?: boolean;
+      accessToken?: string;
+    }) =>
       api.patch<{ data: ToolAccount }>(`/organizations/${orgId}/tool_accounts/${accountId}`, {
-        is_active: isActive,
+        ...(isActive !== undefined && { is_active: isActive }),
+        ...(accessToken !== undefined && { access_token: accessToken }),
       }),
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.toolAccounts.all(orgId) });

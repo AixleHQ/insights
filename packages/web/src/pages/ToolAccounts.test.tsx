@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { ToolAccounts } from './ToolAccounts';
@@ -383,6 +383,104 @@ describe('ToolAccounts', () => {
       await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
       expect(mockDeleteMutateAsync).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('reconnect flow', () => {
+    it('shows Reconnect button when tokenExpired is true', () => {
+      mockUseToolAccounts.mockReturnValue({ data: [mockAccount({ tokenExpired: true })], isLoading: false });
+      renderToolAccounts();
+      expect(screen.getByRole('button', { name: 'Reconnect' })).toBeInTheDocument();
+    });
+
+    it('does not show Reconnect button when tokenExpired is false', () => {
+      mockUseToolAccounts.mockReturnValue({ data: [mockAccount({ tokenExpired: false })], isLoading: false });
+      renderToolAccounts();
+      expect(screen.queryByRole('button', { name: 'Reconnect' })).not.toBeInTheDocument();
+    });
+
+    it('opens dialog with provider name when Reconnect is clicked', async () => {
+      mockUseToolAccounts.mockReturnValue({ data: [mockAccount({ tokenExpired: true })], isLoading: false });
+      const user = userEvent.setup();
+      renderToolAccounts();
+
+      await user.click(screen.getByRole('button', { name: 'Reconnect' }));
+
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /reconnect claude code/i })).toBeInTheDocument();
+    });
+
+    it('submit button is disabled when token field is empty', async () => {
+      mockUseToolAccounts.mockReturnValue({ data: [mockAccount({ tokenExpired: true })], isLoading: false });
+      const user = userEvent.setup();
+      renderToolAccounts();
+
+      await user.click(screen.getByRole('button', { name: 'Reconnect' }));
+
+      const dialog = screen.getByRole('dialog');
+      expect(within(dialog).getByRole('button', { name: 'Reconnect' })).toBeDisabled();
+    });
+
+    it('calls updateAccount with accessToken on submit', async () => {
+      mockUseToolAccounts.mockReturnValue({
+        data: [mockAccount({ id: 'acct-1', tokenExpired: true })],
+        isLoading: false,
+      });
+      const user = userEvent.setup();
+      renderToolAccounts();
+
+      await user.click(screen.getByRole('button', { name: 'Reconnect' }));
+      const dialog = screen.getByRole('dialog');
+      await user.type(within(dialog).getByLabelText('Access Token'), 'new-secret-token');
+      await user.click(within(dialog).getByRole('button', { name: 'Reconnect' }));
+
+      await waitFor(() => {
+        expect(mockUpdateMutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({
+            orgId: 'org-1',
+            accountId: 'acct-1',
+            accessToken: 'new-secret-token',
+          })
+        );
+      });
+    });
+
+    it('closes dialog after successful submission', async () => {
+      mockUseToolAccounts.mockReturnValue({
+        data: [mockAccount({ tokenExpired: true })],
+        isLoading: false,
+      });
+      const user = userEvent.setup();
+      renderToolAccounts();
+
+      await user.click(screen.getByRole('button', { name: 'Reconnect' }));
+      const dialog = screen.getByRole('dialog');
+      await user.type(within(dialog).getByLabelText('Access Token'), 'new-token');
+      await user.click(within(dialog).getByRole('button', { name: 'Reconnect' }));
+
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      });
+    });
+
+    it('shows error message when reconnect submission fails', async () => {
+      mockUpdateMutateAsync.mockRejectedValue(new Error('Network error'));
+      mockUseUpdateToolAccount.mockReturnValue({ mutateAsync: mockUpdateMutateAsync, isPending: false });
+      mockUseToolAccounts.mockReturnValue({
+        data: [mockAccount({ tokenExpired: true })],
+        isLoading: false,
+      });
+      const user = userEvent.setup();
+      renderToolAccounts();
+
+      await user.click(screen.getByRole('button', { name: 'Reconnect' }));
+      const dialog = screen.getByRole('dialog');
+      await user.type(within(dialog).getByLabelText('Access Token'), 'bad-token');
+      await user.click(within(dialog).getByRole('button', { name: 'Reconnect' }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Failed to reconnect. Please try again.')).toBeInTheDocument();
+      });
     });
   });
 
