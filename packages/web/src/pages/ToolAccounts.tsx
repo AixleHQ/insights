@@ -8,6 +8,7 @@ import {
   Github,
   Check,
   AlertCircle,
+  AlertTriangle,
 } from 'lucide-react';
 import { useOrg } from '@/contexts/OrgContext';
 import { useToolAccounts, useDeleteToolAccount, useCreateToolAccount, useUpdateToolAccount, useUserOrganizations } from '@/hooks/useApi';
@@ -306,7 +307,13 @@ function ToolRow({
                 className={linkedAccount.isActive ? 'text-success' : 'text-muted-foreground'}
               >
                 <Check className="mr-1 size-3" />
-                {linkedAccount.isActive ? 'Connected' : 'Inactive'}
+                {linkedAccount.isActive ? 'Connected' : 'Disabled'}
+              </Badge>
+            )}
+            {isLinked && linkedAccount.tokenExpired && (
+              <Badge variant="outline" className="border-warning/50 text-warning">
+                <AlertTriangle className="mr-1 size-3" />
+                Token expired
               </Badge>
             )}
           </div>
