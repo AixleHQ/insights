@@ -140,5 +140,13 @@ RSpec.describe 'Api::V1::UserToolAccounts', type: :request do
       expect_no_content
       expect(UserToolAccount.find_by(id: tool_account.id)).to be_nil
     end
+
+    it 'does not allow another user to delete the account' do
+      authenticated_delete "/api/v1/organizations/#{organization.id}/tool_accounts/#{tool_account.id}",
+                           user: other_user,
+                           organization: organization
+
+      expect(response).to have_http_status(:not_found)
+    end
   end
 end
