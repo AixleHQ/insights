@@ -200,7 +200,7 @@ describe('UserSettings', () => {
 
       expect(screen.getByText('Customize your experience in DB90.')).toBeInTheDocument();
       expect(screen.getByLabelText('Theme')).toBeInTheDocument();
-      expect(screen.getByLabelText('Default Organisation')).toBeInTheDocument();
+      expect(screen.getByLabelText('Default Organization')).toBeInTheDocument();
     });
 
     it('renders Notifications section at /profile/settings/notifications', () => {

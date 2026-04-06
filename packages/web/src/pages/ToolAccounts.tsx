@@ -8,6 +8,7 @@ import {
   Github,
   Check,
   AlertCircle,
+  AlertTriangle,
 } from 'lucide-react';
 import { useOrg } from '@/contexts/OrgContext';
 import { useToolAccounts, useDeleteToolAccount, useCreateToolAccount, useUpdateToolAccount, useUserOrganizations } from '@/hooks/useApi';
@@ -306,7 +307,13 @@ function ToolRow({
                 className={linkedAccount.isActive ? 'text-success' : 'text-muted-foreground'}
               >
                 <Check className="mr-1 size-3" />
-                {linkedAccount.isActive ? 'Connected' : 'Inactive'}
+                {linkedAccount.isActive ? 'Connected' : 'Disabled'}
+              </Badge>
+            )}
+            {isLinked && linkedAccount.tokenExpired && (
+              <Badge variant="outline" className="border-warning/50 text-warning">
+                <AlertTriangle className="mr-1 size-3" />
+                Token expired
               </Badge>
             )}
           </div>
@@ -438,7 +445,7 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
 
       <div className="flex items-center gap-3">
         <Label htmlFor="org-select" className="shrink-0 text-sm font-medium">
-          Organisation
+          Organization
         </Label>
         <Select value={selectedOrgId} onValueChange={setUserSelectedOrgId} disabled={orgsLoading}>
           <SelectTrigger id="org-select" className="w-56">
