@@ -80,9 +80,9 @@ describe('ToolAccounts', () => {
       expect(screen.queryByRole('heading', { name: 'Tool Accounts' })).not.toBeInTheDocument();
     });
 
-    it('shows organisation selector', () => {
+    it('shows organization selector', () => {
       renderToolAccounts();
-      expect(screen.getByLabelText('Organisation')).toBeInTheDocument();
+      expect(screen.getByLabelText('Organization')).toBeInTheDocument();
     });
 
     it('shows loading skeletons while fetching', () => {

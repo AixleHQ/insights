@@ -445,7 +445,7 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
 
       <div className="flex items-center gap-3">
         <Label htmlFor="org-select" className="shrink-0 text-sm font-medium">
-          Organisation
+          Organization
         </Label>
         <Select value={selectedOrgId} onValueChange={setUserSelectedOrgId} disabled={orgsLoading}>
           <SelectTrigger id="org-select" className="w-56">

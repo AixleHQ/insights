@@ -245,7 +245,7 @@ function PreferencesSection() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="default-org-select">Default Organisation</Label>
+            <Label htmlFor="default-org-select">Default Organization</Label>
             {orgsLoading ? (
               <Skeleton className="h-9 w-48" />
             ) : (
