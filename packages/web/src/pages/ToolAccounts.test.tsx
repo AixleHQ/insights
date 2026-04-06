@@ -63,9 +63,9 @@ describe('ToolAccounts', () => {
   });
 
   describe('page layout', () => {
-    it('shows Available section heading', () => {
+    it('shows Available tab', () => {
       renderToolAccounts();
-      expect(screen.getByText('Available')).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: /available/i })).toBeInTheDocument();
     });
 
     it('shows back button and title when not embedded', () => {
@@ -88,8 +88,8 @@ describe('ToolAccounts', () => {
     it('shows loading skeletons while fetching', () => {
       mockUseToolAccounts.mockReturnValue({ data: undefined, isLoading: true });
       const { container } = renderToolAccounts();
-      // skeletons render as animated divs — check Connected/Available headings are absent
-      expect(screen.queryByText('Available')).not.toBeInTheDocument();
+      // skeletons render as animated divs — check tabs are absent
+      expect(screen.queryByRole('tab', { name: /available/i })).not.toBeInTheDocument();
       expect(container.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0);
     });
 
@@ -100,30 +100,33 @@ describe('ToolAccounts', () => {
   });
 
   describe('with no connected accounts', () => {
-    it('shows Connect button for each provider', () => {
+    it('shows Connect button for each provider', async () => {
+      const user = userEvent.setup();
       renderToolAccounts();
+      // Default tab is "available" when no accounts connected — click it to see cards
+      await user.click(screen.getByRole('tab', { name: /available/i }));
       const connectButtons = screen.getAllByRole('button', { name: /connect/i });
       expect(connectButtons.length).toBeGreaterThan(0);
     });
 
-    it('does not show Connected section heading', () => {
+    it('shows Connected tab with count 0', () => {
       renderToolAccounts();
-      expect(screen.queryByText('Connected')).not.toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: /connected \(0\)/i })).toBeInTheDocument();
     });
   });
 
   describe('with connected accounts', () => {
-    it('shows Connected section heading', () => {
+    it('shows Connected tab with count > 0', () => {
       mockUseToolAccounts.mockReturnValue({ data: [mockAccount()], isLoading: false });
       renderToolAccounts();
-      expect(screen.getByRole('heading', { name: 'Connected' })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: /connected \(1\)/i })).toBeInTheDocument();
     });
 
     it('shows Connected badge when isActive', () => {
       mockUseToolAccounts.mockReturnValue({ data: [mockAccount({ isActive: true })], isLoading: false });
       renderToolAccounts();
-      // Both the section heading and the badge render "Connected"
-      expect(screen.getAllByText('Connected').length).toBeGreaterThanOrEqual(2);
+      // The connected badge inside the card
+      expect(screen.getByText('Connected')).toBeInTheDocument();
     });
 
     it('shows Disabled badge when isActive is false', () => {
@@ -168,17 +171,20 @@ describe('ToolAccounts', () => {
       expect(screen.getByText('Linked as user-123')).toBeInTheDocument();
     });
 
-    it('shows "all tools connected" message when no providers are available', () => {
-      // Mock all 8 toolProviders as connected by providing accounts for each
+    it('shows "all tools connected" message when no providers are available', async () => {
+      // Mock all 14 toolProviders as connected by providing accounts for each
       const allToolNames = [
-        'claude_code', 'github_copilot', 'cursor', 'windsurf',
-        'openai_api', 'anthropic_api', 'gemini_api', 'aider',
+        'claude_code', 'cursor', 'windsurf', 'github_copilot', 'aider',
+        'continue', 'cody', 'tabnine', 'amazon_q', 'openrouter',
+        'anthropic_api', 'openai_api', 'gemini_api', 'custom',
       ];
       const accounts = allToolNames.map((toolName, i) =>
         mockAccount({ id: `acct-${i}`, toolName })
       );
       mockUseToolAccounts.mockReturnValue({ data: accounts, isLoading: false });
+      const user = userEvent.setup();
       renderToolAccounts();
+      await user.click(screen.getByRole('tab', { name: /available/i }));
       expect(screen.getByText('All available tools are connected.')).toBeInTheDocument();
     });
   });
