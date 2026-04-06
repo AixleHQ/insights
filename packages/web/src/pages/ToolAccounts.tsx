@@ -358,7 +358,7 @@ function ToolRow({
   onConnect: (provider: ToolProvider) => void;
   onDisconnect: (accountId: string) => void;
   onToggleActive?: (accountId: string, newValue: boolean) => void;
-  onReconnect?: (provider: ToolProvider, accountId: string) => void;
+  onReconnect?: (accountId: string) => void;
   isToggling?: boolean;
 }) {
   const isLinked = !!linkedAccount;
@@ -405,7 +405,7 @@ function ToolRow({
               variant="outline"
               size="sm"
               className="border-warning/50 text-warning hover:bg-warning/10"
-              onClick={() => onReconnect?.(provider, linkedAccount.id)}
+              onClick={() => onReconnect?.(linkedAccount.id)}
             >
               Reconnect
             </Button>
@@ -461,7 +461,7 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
   const [userSelectedOrgId, setUserSelectedOrgId] = useState<string | null>(null);
   const selectedOrgId = userSelectedOrgId ?? currentOrg?.id ?? '';
   const [connectingProvider, setConnectingProvider] = useState<ToolProvider | null>(null);
-  const [reconnectingTarget, setReconnectingTarget] = useState<{ provider: ToolProvider; accountId: string } | null>(null);
+  const [reconnectingAccountId, setReconnectingAccountId] = useState<string | null>(null);
 
   const { data: accounts, isLoading } = useToolAccounts(selectedOrgId);
   const createAccount = useCreateToolAccount();
@@ -509,9 +509,14 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
     }
   };
 
+  const reconnectingAccount = accounts?.find((a) => a.id === reconnectingAccountId) ?? null;
+  const reconnectingProvider = reconnectingAccount
+    ? toolProviders.find((p) => p.id === reconnectingAccount.toolName) ?? null
+    : null;
+
   const handleReconnect = async (accessToken: string) => {
-    if (!selectedOrgId || !reconnectingTarget) return;
-    await updateAccount.mutateAsync({ orgId: selectedOrgId, accountId: reconnectingTarget.accountId, accessToken });
+    if (!selectedOrgId || !reconnectingAccountId) return;
+    await updateAccount.mutateAsync({ orgId: selectedOrgId, accountId: reconnectingAccountId, accessToken });
   };
 
   return (
@@ -571,8 +576,8 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
                   onConnect={setConnectingProvider}
                   onDisconnect={handleDisconnect}
                   onToggleActive={handleToggleActive}
-                  onReconnect={(p, accountId) => setReconnectingTarget({ provider: p, accountId })}
-                  isToggling={updateAccount.isPending && updateAccount.variables?.accountId === linkedProviders.get(provider.id)?.id}
+                  onReconnect={setReconnectingAccountId}
+                  isToggling={updateAccount.isPending && updateAccount.variables?.accountId === linkedProviders.get(provider.id)?.id && !updateAccount.variables?.accessToken}
                 />
               ))}
             </div>
@@ -623,11 +628,11 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
       />
 
       <ReconnectDialog
-        provider={reconnectingTarget?.provider ?? null}
-        open={!!reconnectingTarget}
-        onOpenChange={(open) => !open && setReconnectingTarget(null)}
+        provider={reconnectingProvider}
+        open={!!reconnectingAccountId}
+        onOpenChange={(open) => !open && setReconnectingAccountId(null)}
         onSubmit={handleReconnect}
-        isSubmitting={updateAccount.isPending && !!reconnectingTarget && updateAccount.variables?.accountId === reconnectingTarget.accountId}
+        isSubmitting={updateAccount.isPending && updateAccount.variables?.accountId === reconnectingAccountId}
       />
     </div>
   );
