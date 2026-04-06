@@ -273,12 +273,84 @@ function ConnectDialog({ provider, open, onOpenChange, onSubmit, isSubmitting }:
   );
 }
 
+interface ReconnectDialogProps {
+  provider: ToolProvider | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (token: string) => Promise<void>;
+  isSubmitting: boolean;
+}
+
+function ReconnectDialog({ provider, open, onOpenChange, onSubmit, isSubmitting }: ReconnectDialogProps) {
+  const [token, setToken] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const handleOpenChange = (next: boolean) => {
+    if (!next) {
+      setToken('');
+      setError(null);
+    }
+    onOpenChange(next);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!provider || !token.trim()) return;
+    setError(null);
+    try {
+      await onSubmit(token.trim());
+      handleOpenChange(false);
+    } catch {
+      setError('Failed to reconnect. Please try again.');
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Reconnect {provider?.name}</DialogTitle>
+          <DialogDescription>
+            Your {provider?.name} token has expired. Enter a new {provider?.tokenLabel?.toLowerCase()} to
+            restore access.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="reconnect-token">{provider?.tokenLabel}</Label>
+              <Input
+                id="reconnect-token"
+                type="password"
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                placeholder={`Paste your new ${provider?.tokenLabel?.toLowerCase()}`}
+                required
+              />
+            </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={!token.trim() || isSubmitting}>
+              {isSubmitting ? 'Reconnecting...' : 'Reconnect'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function ToolRow({
   provider,
   linkedAccount,
   onConnect,
   onDisconnect,
   onToggleActive,
+  onReconnect,
   isToggling,
 }: {
   provider: ToolProvider;
@@ -286,6 +358,7 @@ function ToolRow({
   onConnect: (provider: ToolProvider) => void;
   onDisconnect: (accountId: string) => void;
   onToggleActive?: (accountId: string, newValue: boolean) => void;
+  onReconnect?: (accountId: string) => void;
   isToggling?: boolean;
 }) {
   const isLinked = !!linkedAccount;
@@ -327,6 +400,16 @@ function ToolRow({
 
       {isLinked ? (
         <div className="flex items-center gap-2">
+          {linkedAccount.tokenExpired && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-warning/50 text-warning hover:bg-warning/10"
+              onClick={() => onReconnect?.(linkedAccount.id)}
+            >
+              Reconnect
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -378,6 +461,7 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
   const [userSelectedOrgId, setUserSelectedOrgId] = useState<string | null>(null);
   const selectedOrgId = userSelectedOrgId ?? currentOrg?.id ?? '';
   const [connectingProvider, setConnectingProvider] = useState<ToolProvider | null>(null);
+  const [reconnectingAccountId, setReconnectingAccountId] = useState<string | null>(null);
 
   const { data: accounts, isLoading } = useToolAccounts(selectedOrgId);
   const createAccount = useCreateToolAccount();
@@ -423,6 +507,16 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
     } catch (error) {
       console.error('Failed to update account status:', error);
     }
+  };
+
+  const reconnectingAccount = accounts?.find((a) => a.id === reconnectingAccountId) ?? null;
+  const reconnectingProvider = reconnectingAccount
+    ? toolProviders.find((p) => p.id === reconnectingAccount.toolName) ?? null
+    : null;
+
+  const handleReconnect = async (accessToken: string) => {
+    if (!selectedOrgId || !reconnectingAccountId) return;
+    await updateAccount.mutateAsync({ orgId: selectedOrgId, accountId: reconnectingAccountId, accessToken });
   };
 
   return (
@@ -482,7 +576,8 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
                   onConnect={setConnectingProvider}
                   onDisconnect={handleDisconnect}
                   onToggleActive={handleToggleActive}
-                  isToggling={updateAccount.isPending && updateAccount.variables?.accountId === linkedProviders.get(provider.id)?.id}
+                  onReconnect={setReconnectingAccountId}
+                  isToggling={updateAccount.isPending && updateAccount.variables?.accountId === linkedProviders.get(provider.id)?.id && !updateAccount.variables?.accessToken}
                 />
               ))}
             </div>
@@ -530,6 +625,14 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
         onOpenChange={(open) => !open && setConnectingProvider(null)}
         onSubmit={handleConnectSubmit}
         isSubmitting={createAccount.isPending}
+      />
+
+      <ReconnectDialog
+        provider={reconnectingProvider}
+        open={!!reconnectingAccountId}
+        onOpenChange={(open) => !open && setReconnectingAccountId(null)}
+        onSubmit={handleReconnect}
+        isSubmitting={updateAccount.isPending && updateAccount.variables?.accountId === reconnectingAccountId}
       />
     </div>
   );
