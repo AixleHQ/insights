@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   Plus,
   Trash2,
-  Github,
   Check,
   AlertCircle,
   AlertTriangle,
@@ -48,122 +47,142 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ProviderLogo } from '@/components/icons';
+
+type ToolCategory = 'ai-editors' | 'ai-apis' | 'other';
 
 interface ToolProvider {
   id: string;
   name: string;
   description: string;
-  icon: React.ReactNode;
-  color: string;
+  category: ToolCategory;
   tokenLabel: string;
 }
 
 const toolProviders: ToolProvider[] = [
+  // AI Code Editors
   {
     id: 'claude_code',
     name: 'Claude Code',
     description: 'Link your Anthropic account to attribute Claude Code usage',
-    icon: (
-      <svg className="size-5" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 2L2 22h20L12 2zm0 6l6 12H6l6-12z" />
-      </svg>
-    ),
-    color: 'bg-[#d4a27f]',
+    category: 'ai-editors',
     tokenLabel: 'Access Token',
-  },
-  {
-    id: 'github_copilot',
-    name: 'GitHub Copilot',
-    description: 'Link your GitHub account to attribute Copilot events',
-    icon: <Github className="size-5" />,
-    color: 'bg-[#24292f]',
-    tokenLabel: 'Personal Access Token',
   },
   {
     id: 'cursor',
     name: 'Cursor',
     description: 'Link your Cursor account for AI code editor attribution',
-    icon: (
-      <svg className="size-5" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-      </svg>
-    ),
-    color: 'bg-[#6366f1]',
+    category: 'ai-editors',
     tokenLabel: 'API Key',
   },
   {
     id: 'windsurf',
     name: 'Windsurf',
     description: 'Link your Windsurf account for AI-assisted coding attribution',
-    icon: (
-      <svg className="size-5" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z" />
-      </svg>
-    ),
-    color: 'bg-[#0ea5e9]',
+    category: 'ai-editors',
     tokenLabel: 'API Key',
   },
   {
-    id: 'openai_api',
-    name: 'OpenAI',
-    description: 'Link your OpenAI account for ChatGPT / Codex tracking',
-    icon: (
-      <svg className="size-5" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.985 5.985 0 0 0-3.998 2.9 6.046 6.046 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073zM13.26 22.43a4.476 4.476 0 0 1-2.876-1.04l.141-.081 4.779-2.758a.795.795 0 0 0 .392-.681v-6.737l2.02 1.168a.071.071 0 0 1 .038.052v5.583a4.504 4.504 0 0 1-4.494 4.494zM3.6 18.304a4.47 4.47 0 0 1-.535-3.014l.142.085 4.783 2.759a.771.771 0 0 0 .78 0l5.843-3.369v2.332a.08.08 0 0 1-.033.062L9.74 19.95a4.5 4.5 0 0 1-6.14-1.646zM2.34 7.896a4.485 4.485 0 0 1 2.366-1.973V11.6a.766.766 0 0 0 .388.676l5.815 3.355-2.02 1.168a.076.076 0 0 1-.071 0l-4.83-2.786A4.504 4.504 0 0 1 2.34 7.872zm16.597 3.855l-5.833-3.387L15.119 7.2a.076.076 0 0 1 .071 0l4.83 2.791a4.494 4.494 0 0 1-.676 8.105v-5.678a.79.79 0 0 0-.407-.667zm2.01-3.023l-.141-.085-4.774-2.782a.776.776 0 0 0-.785 0L9.409 9.23V6.897a.066.066 0 0 1 .028-.061l4.83-2.787a4.5 4.5 0 0 1 6.68 4.66zm-12.64 4.135l-2.02-1.164a.08.08 0 0 1-.038-.057V6.075a4.5 4.5 0 0 1 7.375-3.453l-.142.08L8.704 5.46a.795.795 0 0 0-.393.681z" />
-      </svg>
-    ),
-    color: 'bg-[#10a37f]',
+    id: 'github_copilot',
+    name: 'GitHub Copilot',
+    description: 'Link your GitHub account to attribute Copilot events',
+    category: 'ai-editors',
+    tokenLabel: 'Personal Access Token',
+  },
+  {
+    id: 'aider',
+    name: 'Aider',
+    description: 'Link your Aider account for AI pair programming attribution',
+    category: 'ai-editors',
+    tokenLabel: 'API Key',
+  },
+  {
+    id: 'continue',
+    name: 'Continue',
+    description: 'Link your Continue account for open-source AI code assistant attribution',
+    category: 'ai-editors',
+    tokenLabel: 'API Key',
+  },
+  {
+    id: 'cody',
+    name: 'Cody',
+    description: 'Link your Sourcegraph Cody account for AI coding attribution',
+    category: 'ai-editors',
+    tokenLabel: 'API Key',
+  },
+  {
+    id: 'tabnine',
+    name: 'Tabnine',
+    description: 'Link your Tabnine account for AI code completion attribution',
+    category: 'ai-editors',
+    tokenLabel: 'API Key',
+  },
+  {
+    id: 'amazon_q',
+    name: 'Amazon Q',
+    description: 'Link your Amazon Q account for AI developer tool attribution',
+    category: 'ai-editors',
+    tokenLabel: 'API Key',
+  },
+  // AI APIs
+  {
+    id: 'openrouter',
+    name: 'OpenRouter',
+    description: 'Link your OpenRouter account for multi-model AI gateway tracking',
+    category: 'ai-apis',
     tokenLabel: 'API Key',
   },
   {
     id: 'anthropic_api',
     name: 'Anthropic API',
     description: 'Link your Anthropic API account for direct API usage tracking',
-    icon: (
-      <svg className="size-5" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 2L2 22h20L12 2zm0 6l6 12H6l6-12z" />
-      </svg>
-    ),
-    color: 'bg-[#cc785c]',
+    category: 'ai-apis',
+    tokenLabel: 'API Key',
+  },
+  {
+    id: 'openai_api',
+    name: 'OpenAI API',
+    description: 'Link your OpenAI account for ChatGPT / Codex tracking',
+    category: 'ai-apis',
     tokenLabel: 'API Key',
   },
   {
     id: 'gemini_api',
-    name: 'Gemini',
+    name: 'Gemini API',
     description: 'Link your Google account for Gemini API usage tracking',
-    icon: (
-      <svg className="size-5" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm-1-5h2v2h-2zm0-8h2v6h-2z" />
-      </svg>
-    ),
-    color: 'bg-[#4285f4]',
+    category: 'ai-apis',
     tokenLabel: 'API Key',
   },
+  // Other
   {
-    id: 'aider',
-    name: 'Aider',
-    description: 'Link your Aider account for AI pair programming attribution',
-    icon: (
-      <svg className="size-5" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-      </svg>
-    ),
-    color: 'bg-[#7c3aed]',
+    id: 'custom',
+    name: 'Custom Tool',
+    description: 'Link a custom or internal AI tool for usage attribution',
+    category: 'other',
     tokenLabel: 'API Key',
   },
 ];
 
+const categoryLabels: Record<ToolCategory, string> = {
+  'ai-editors': 'AI Code Editors',
+  'ai-apis': 'AI APIs',
+  'other': 'Other',
+};
+
+const categoryOrder: ToolCategory[] = ['ai-editors', 'ai-apis', 'other'];
+
 function AccountSkeleton() {
   return (
-    <div className="flex items-center justify-between rounded-lg border p-4">
-      <div className="flex items-center gap-4">
+    <div className="rounded-lg border p-4 space-y-4">
+      <div className="flex items-center gap-3">
         <Skeleton className="size-10 rounded-lg" />
         <div className="space-y-2">
           <Skeleton className="h-5 w-32" />
           <Skeleton className="h-4 w-48" />
         </div>
       </div>
-      <Skeleton className="size-9" />
+      <Skeleton className="h-8 w-24 ml-auto" />
     </div>
   );
 }
@@ -344,7 +363,7 @@ function ReconnectDialog({ provider, open, onOpenChange, onSubmit, isSubmitting 
   );
 }
 
-function ToolRow({
+function ToolCard({
   provider,
   linkedAccount,
   onConnect,
@@ -364,100 +383,99 @@ function ToolRow({
   const isLinked = !!linkedAccount;
 
   return (
-    <div className={cn('flex items-center justify-between rounded-lg border p-4', isLinked && !linkedAccount.isActive && 'opacity-60')}>
-      <div className="flex items-center gap-4">
-        <div
-          className={`flex size-10 items-center justify-center rounded-lg text-white ${provider.color}`}
-        >
-          {provider.icon}
-        </div>
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="font-medium">{provider.name}</span>
-            {isLinked && (
-              <Badge
-                variant="outline"
-                className={linkedAccount.isActive ? 'text-success' : 'text-muted-foreground'}
-              >
-                <Check className="mr-1 size-3" />
-                {linkedAccount.isActive ? 'Connected' : 'Disabled'}
-              </Badge>
-            )}
-            {isLinked && linkedAccount.tokenExpired && (
-              <Badge variant="outline" className="border-warning/50 text-warning">
-                <AlertTriangle className="mr-1 size-3" />
-                Token expired
-              </Badge>
-            )}
+    <Card className={cn(isLinked && !linkedAccount.isActive && 'opacity-60')}>
+      <CardContent className="flex flex-col gap-4 p-4">
+        <div className="flex items-start gap-3">
+          <ProviderLogo provider={provider.id} showBackground size="md" className="shrink-0" />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium">{provider.name}</span>
+              {isLinked && (
+                <Badge
+                  variant="outline"
+                  className={linkedAccount.isActive ? 'text-success' : 'text-muted-foreground'}
+                >
+                  <Check className="mr-1 size-3" />
+                  {linkedAccount.isActive ? 'Connected' : 'Disabled'}
+                </Badge>
+              )}
+              {isLinked && linkedAccount.tokenExpired && (
+                <Badge variant="outline" className="border-warning/50 text-warning">
+                  <AlertTriangle className="mr-1 size-3" />
+                  Token expired
+                </Badge>
+              )}
+            </div>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {isLinked
+                ? `Linked as ${linkedAccount.externalUsername || linkedAccount.externalUserId}`
+                : provider.description}
+            </p>
           </div>
-          <p className="text-sm text-muted-foreground">
-            {isLinked
-              ? `Linked as ${linkedAccount.externalUsername || linkedAccount.externalUserId}`
-              : provider.description}
-          </p>
         </div>
-      </div>
 
-      {isLinked ? (
-        <div className="flex items-center gap-2">
-          {linkedAccount.tokenExpired && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-warning/50 text-warning hover:bg-warning/10"
-              onClick={() => onReconnect?.(linkedAccount.id)}
-            >
-              Reconnect
+        <div className="flex items-center justify-end gap-2">
+          {isLinked ? (
+            <>
+              {linkedAccount.tokenExpired && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-warning/50 text-warning hover:bg-warning/10"
+                  onClick={() => onReconnect?.(linkedAccount.id)}
+                >
+                  Reconnect
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onToggleActive?.(linkedAccount.id, !linkedAccount.isActive)}
+                disabled={isToggling}
+              >
+                {linkedAccount.isActive ? 'Disable' : 'Enable'}
+              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <Trash2 className="size-4 text-destructive" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Disconnect {provider.name}?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will unlink your {provider.name} account. Future events from this tool
+                      may not be attributed to you.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => onDisconnect(linkedAccount.id)}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Disconnect
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
+          ) : (
+            <Button variant="outline" size="sm" onClick={() => onConnect(provider)}>
+              <Plus className="mr-2 size-4" />
+              Connect
             </Button>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onToggleActive?.(linkedAccount.id, !linkedAccount.isActive)}
-            disabled={isToggling}
-          >
-            {linkedAccount.isActive ? 'Disable' : 'Enable'}
-          </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Trash2 className="size-4 text-destructive" />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Disconnect {provider.name}?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will unlink your {provider.name} account. Future events from this tool
-                  may not be attributed to you.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => onDisconnect(linkedAccount.id)}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                >
-                  Disconnect
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
         </div>
-      ) : (
-        <Button variant="outline" size="sm" onClick={() => onConnect(provider)}>
-          <Plus className="mr-2 size-4" />
-          Connect
-        </Button>
-      )}
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 
 export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
   const { currentOrg } = useOrg();
   const { data: orgs, isLoading: orgsLoading } = useUserOrganizations();
-  // null means "follow the global org context"; a string means user manually picked an org
   const [userSelectedOrgId, setUserSelectedOrgId] = useState<string | null>(null);
   const selectedOrgId = userSelectedOrgId ?? currentOrg?.id ?? '';
   const [connectingProvider, setConnectingProvider] = useState<ToolProvider | null>(null);
@@ -479,6 +497,18 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
       availableProviders: toolProviders.filter((p) => !linkedMap.has(p.id)),
     };
   }, [accounts]);
+
+  const providersByCategory = useMemo(() => {
+    const grouped: Record<ToolCategory, ToolProvider[]> = {
+      'ai-editors': [],
+      'ai-apis': [],
+      'other': [],
+    };
+    availableProviders.forEach((p) => {
+      grouped[p.category].push(p);
+    });
+    return grouped;
+  }, [availableProviders]);
 
   const handleConnectSubmit = async ({ providerId, accountId, accountName, token }: ConnectFormData) => {
     if (!selectedOrgId) return;
@@ -520,7 +550,7 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
   };
 
   return (
-    <div className={cn('space-y-6', !embedded && 'mx-auto max-w-2xl')}>
+    <div className={cn('space-y-6', !embedded && 'mx-auto max-w-4xl')}>
       {!embedded && (
         <div className="flex items-center gap-4">
           <Button asChild variant="ghost" size="icon" aria-label="Back to settings">
@@ -556,53 +586,76 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
       </div>
 
       {isLoading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 4 }).map((_, i) => (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
             <AccountSkeleton key={i} />
           ))}
         </div>
       ) : (
-        <>
-          {connectedProviders.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-                Connected
-              </h2>
-              {connectedProviders.map((provider) => (
-                <ToolRow
-                  key={provider.id}
-                  provider={provider}
-                  linkedAccount={linkedProviders.get(provider.id)}
-                  onConnect={setConnectingProvider}
-                  onDisconnect={handleDisconnect}
-                  onToggleActive={handleToggleActive}
-                  onReconnect={setReconnectingAccountId}
-                  isToggling={updateAccount.isPending && updateAccount.variables?.accountId === linkedProviders.get(provider.id)?.id && !updateAccount.variables?.accessToken}
-                />
-              ))}
-            </div>
-          )}
+        <Tabs defaultValue={connectedProviders.length > 0 ? 'connected' : 'available'}>
+          <TabsList>
+            <TabsTrigger value="connected">
+              Connected ({connectedProviders.length})
+            </TabsTrigger>
+            <TabsTrigger value="available">
+              Available ({availableProviders.length})
+            </TabsTrigger>
+          </TabsList>
 
-          <div className="space-y-3">
-            <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-              Available
-            </h2>
-            {availableProviders.length > 0 ? (
-              availableProviders.map((provider) => (
-                <ToolRow
-                  key={provider.id}
-                  provider={provider}
-                  onConnect={setConnectingProvider}
-                  onDisconnect={handleDisconnect}
-                />
-              ))
+          <TabsContent value="connected" className="space-y-4 pt-2">
+            {connectedProviders.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12">
+                <p className="text-muted-foreground">No tools connected yet</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Switch to Available to connect your first tool
+                </p>
+              </div>
             ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {connectedProviders.map((provider) => (
+                  <ToolCard
+                    key={provider.id}
+                    provider={provider}
+                    linkedAccount={linkedProviders.get(provider.id)}
+                    onConnect={setConnectingProvider}
+                    onDisconnect={handleDisconnect}
+                    onToggleActive={handleToggleActive}
+                    onReconnect={setReconnectingAccountId}
+                    isToggling={updateAccount.isPending && updateAccount.variables?.accountId === linkedProviders.get(provider.id)?.id && !updateAccount.variables?.accessToken}
+                  />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="available" className="space-y-8 pt-2">
+            {availableProviders.length === 0 ? (
               <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
                 All available tools are connected.
               </p>
+            ) : (
+              categoryOrder.map((category) => {
+                const providers = providersByCategory[category];
+                if (providers.length === 0) return null;
+                return (
+                  <div key={category} className="space-y-4">
+                    <h2 className="text-base font-medium">{categoryLabels[category]}</h2>
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                      {providers.map((provider) => (
+                        <ToolCard
+                          key={provider.id}
+                          provider={provider}
+                          onConnect={setConnectingProvider}
+                          onDisconnect={handleDisconnect}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })
             )}
-          </div>
-        </>
+          </TabsContent>
+        </Tabs>
       )}
 
       <Card className="border-muted bg-muted/50">

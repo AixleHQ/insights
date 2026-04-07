@@ -256,7 +256,7 @@ describe('UserSettings', () => {
     it('renders Tools section at /profile/tools', () => {
       renderAtPath('/profile/tools');
 
-      expect(screen.getByText('Available')).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: /available/i })).toBeInTheDocument();
     });
 
     it('does not render ToolAccounts back button when embedded', () => {

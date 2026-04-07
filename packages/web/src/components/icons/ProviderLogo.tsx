@@ -18,8 +18,21 @@ const logoMap: Record<string, string> = {
   openrouter: '/logos/openrouter.svg',
   copilot: '/logos/copilot.svg',
 
+  // Tool account aliases (backend uses underscores which normalize to hyphens)
+  'github-copilot': '/logos/copilot.svg',
+  'anthropic-api': '/logos/anthropic.svg',
+  'openai-api': '/logos/openai.svg',
+  'gemini-api': '/logos/google.svg',
+
   // Editors / IDEs
   cursor: '/logos/cursor.svg',
+  windsurf: '/logos/windsurf.svg',
+  aider: '/logos/aider.svg',
+  continue: '/logos/continue.svg',
+  cody: '/logos/cody.svg',
+  tabnine: '/logos/tabnine.svg',
+  'amazon-q': '/logos/amazon-q.svg',
+  custom: '/logos/custom.svg',
 
   // Design
   figma: '/logos/figma.svg',
@@ -44,7 +57,18 @@ const providerColors: Record<string, string> = {
   openai: 'bg-[#10a37f]',
   openrouter: 'bg-[#6366f1]',
   copilot: 'bg-[#000000]',
+  'github-copilot': 'bg-[#24292f]',
+  'anthropic-api': 'bg-[#d97757]',
+  'openai-api': 'bg-[#10a37f]',
+  'gemini-api': 'bg-[#4285f4]',
   cursor: 'bg-[#000000]',
+  windsurf: 'bg-[#0ea5e9]',
+  aider: 'bg-[#7c3aed]',
+  continue: 'bg-[#1e1e2e]',
+  cody: 'bg-[#a305f1]',
+  tabnine: 'bg-[#6b4ef6]',
+  'amazon-q': 'bg-[#232f3e]',
+  custom: 'bg-[#6b7280]',
   figma: 'bg-gradient-to-br from-[#f24e1e] via-[#a259ff] to-[#1abcfe]',
   google: 'bg-white',
   slack: 'bg-[#4a154b]',
