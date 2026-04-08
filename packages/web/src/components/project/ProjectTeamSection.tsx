@@ -1,16 +1,17 @@
 import { Link } from 'react-router-dom';
-import { Users } from 'lucide-react';
+import { Users, GitCommitHorizontal } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
-import type { ProjectMember } from '@/hooks/useApi';
+import { cn, formatDistanceToNow } from '@/lib/utils';
+import type { ProjectMember, MemberCommitStat } from '@/hooks/useApi';
 
 interface ProjectTeamSectionProps {
   members: ProjectMember[] | undefined;
   isLoading?: boolean;
   className?: string;
+  commitStats?: MemberCommitStat[];
 }
 
 function getInitials(name?: string | null, email?: string): string {
@@ -32,7 +33,8 @@ const roleColors: Record<string, string> = {
   viewer: 'bg-slate-500/10 text-slate-400',
 };
 
-export function ProjectTeamSection({ members, isLoading, className }: ProjectTeamSectionProps) {
+export function ProjectTeamSection({ members, isLoading, className, commitStats }: ProjectTeamSectionProps) {
+  const commitsByUserId = new Map(commitStats?.map((s) => [s.userId, s]) ?? []);
   if (isLoading) {
     return (
       <Card className={className}>
@@ -70,28 +72,42 @@ export function ProjectTeamSection({ members, isLoading, className }: ProjectTea
       <CardContent>
         {memberCount > 0 ? (
           <div className="flex flex-wrap gap-3">
-            {members?.map((member) => (
-              <Link
-                key={member.id}
-                to={`/team/${member.userId}`}
-                className="group flex items-center gap-2 rounded-lg border p-2 transition-colors hover:bg-muted/50"
-              >
-                <Avatar className="size-8">
-                  {member.avatarUrl && <AvatarImage src={member.avatarUrl} alt={member.name || member.email} />}
-                  <AvatarFallback className="text-xs bg-muted">
-                    {getInitials(member.name, member.email)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium group-hover:underline">
-                    {member.name || member.email.split('@')[0]}
-                  </p>
-                  <Badge variant="outline" className={cn('text-[10px] px-1.5 py-0', roleColors[member.role])}>
-                    {member.role}
-                  </Badge>
-                </div>
-              </Link>
-            ))}
+            {members?.map((member) => {
+              const stats = commitsByUserId.get(member.userId);
+              return (
+                <Link
+                  key={member.id}
+                  to={`/team/${member.userId}`}
+                  className="group flex items-center gap-2 rounded-lg border p-2 transition-colors hover:bg-muted/50"
+                >
+                  <Avatar className="size-8">
+                    {member.avatarUrl && <AvatarImage src={member.avatarUrl} alt={member.name || member.email} />}
+                    <AvatarFallback className="text-xs bg-muted">
+                      {getInitials(member.name, member.email)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium group-hover:underline">
+                      {member.name || member.email.split('@')[0]}
+                    </p>
+                    <Badge variant="outline" className={cn('text-[10px] px-1.5 py-0', roleColors[member.role])}>
+                      {member.role}
+                    </Badge>
+                  </div>
+                  {stats && (
+                    <div className="flex flex-col items-end shrink-0 text-muted-foreground">
+                      <span className="flex items-center gap-1 text-xs font-medium">
+                        <GitCommitHorizontal className="size-3" />
+                        {stats.commitCount}
+                      </span>
+                      {stats.lastCommitAt && (
+                        <span className="text-[10px]">{formatDistanceToNow(stats.lastCommitAt)}</span>
+                      )}
+                    </div>
+                  )}
+                </Link>
+              );
+            })}
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">No team members assigned to this project</p>

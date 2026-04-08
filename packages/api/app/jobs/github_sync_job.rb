@@ -133,6 +133,7 @@ class GithubSyncJob
       organization_id: @connector.organization_id,
       user_id: user&.id,
       repository_id: repository.id,
+      project_id: repository.project_id,
       tool_name: "github",
       event_type: "commit",
       occurred_at: Time.parse(commit["timestamp"]),

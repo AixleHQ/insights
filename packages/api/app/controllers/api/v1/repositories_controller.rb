@@ -94,10 +94,12 @@ module Api
         connector = repository.organization_connector
         return unless connector
 
+        # Runs sync_repositories which refreshes repo metadata from the provider.
+        # Commit history arrives via webhooks going forward.
         case connector.connector_type
-        when "github"    then GithubSyncJob.perform_later(connector.id, "webhook")
-        when "gitlab"    then GitlabSyncJob.perform_later(connector.id, "webhook")
-        when "bitbucket" then BitbucketSyncJob.perform_later(connector.id, "webhook")
+        when "github"    then GithubSyncJob.perform_later(connector.id)
+        when "gitlab"    then GitlabSyncJob.perform_later(connector.id)
+        when "bitbucket" then BitbucketSyncJob.perform_later(connector.id)
         end
       end
     end

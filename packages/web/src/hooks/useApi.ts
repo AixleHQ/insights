@@ -674,6 +674,39 @@ export function useConnectRepo(projectId: string) {
   });
 }
 
+export function useDisconnectRepo(projectId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (repoId: string) => api.delete(`/projects/${projectId}/repositories/${repoId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'repositories'] });
+    },
+  });
+}
+
+export interface MemberCommitStat {
+  userId: string;
+  name: string | null;
+  email: string;
+  avatarUrl: string | null;
+  commitCount: number;
+  lastCommitAt: string | null;
+}
+
+export function useProjectCommitStats(projectId: string, days = 30) {
+  return useQuery({
+    queryKey: ['projects', projectId, 'stats', 'commits_by_user', days],
+    queryFn: async () => {
+      const response = await api.get<{ data: MemberCommitStat[] }>(
+        `/projects/${projectId}/stats/commits_by_user?days=${days}`
+      );
+      return response.data;
+    },
+    enabled: !!projectId,
+  });
+}
+
 // ============================================================================
 // Connectors Hooks
 // ============================================================================

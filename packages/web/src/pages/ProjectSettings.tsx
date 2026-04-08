@@ -18,6 +18,7 @@ import {
   useUpdateProject,
   useDeleteProject,
   useProjectMembers,
+  useProjectCommitStats,
 } from '@/hooks/useApi';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -262,8 +263,9 @@ function ProjectGeneralSettings({
 
 function ProjectMembersSettings({ projectId }: { projectId: string }) {
   const { data: members, isLoading } = useProjectMembers(projectId);
+  const { data: commitStats } = useProjectCommitStats(projectId);
 
-  return <ProjectTeamSection members={members} isLoading={isLoading} />;
+  return <ProjectTeamSection members={members} isLoading={isLoading} commitStats={commitStats} />;
 }
 
 function ProjectIntegrationsSettings({ projectId }: { projectId: string }) {

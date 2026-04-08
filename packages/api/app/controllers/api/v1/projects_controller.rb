@@ -3,7 +3,7 @@
 module Api
   module V1
     class ProjectsController < BaseController
-      before_action :set_project, only: %i[show update destroy settings update_setting destroy_setting stats daily_by_tool members retention_policy update_retention_policy]
+      before_action :set_project, only: %i[show update destroy settings update_setting destroy_setting stats daily_by_tool commits_by_user members retention_policy update_retention_policy]
 
       # GET /api/v1/projects
       # GET /api/v1/organizations/:organization_id/projects
@@ -213,6 +213,38 @@ module Api
           data: date_map.values.sort_by { |d| d[:date] },
           tools: top_tools + [ "Other" ]
         }
+      end
+
+      # GET /api/v1/projects/:id/stats/commits_by_user
+      def commits_by_user
+        authorize! @project, to: :show?
+
+        days = (params[:days] || 30).to_i
+        since = days.days.ago.beginning_of_day
+
+        rows = @project.tool_events
+          .where(tool_name: %w[github gitlab bitbucket], event_type: "commit")
+          .where(occurred_at: since..)
+          .where.not(user_id: nil)
+          .group(:user_id)
+          .select("user_id, COUNT(*) as commit_count, MAX(occurred_at) as last_commit_at")
+
+        user_ids = rows.map(&:user_id)
+        users_by_id = User.where(id: user_ids).index_by(&:id)
+
+        data = rows.map do |row|
+          user = users_by_id[row.user_id]
+          {
+            userId: row.user_id,
+            name: user&.name,
+            email: user&.email,
+            avatarUrl: user&.avatar_url,
+            commitCount: row.commit_count,
+            lastCommitAt: row.last_commit_at&.iso8601
+          }
+        end.sort_by { |d| -d[:commitCount] }
+
+        render json: { data: data }
       end
 
       # GET /api/v1/projects/:id/members
