@@ -110,8 +110,8 @@ class BitbucketSyncJob
 
     ToolEvent.create!(
       organization_id: @connector.organization_id,
-      tool_name: "bitbucket",
-      event_type: "pull_request",
+      tool_name: "custom",
+      event_type: "review",
       occurred_at: Time.parse(pr["updated_on"]),
       metadata: {
         action: action,
@@ -137,7 +137,7 @@ class BitbucketSyncJob
       user_id: user&.id,
       repository_id: repository.id,
       project_id: repository.project_id,
-      tool_name: "bitbucket",
+      tool_name: "custom",
       event_type: "commit",
       occurred_at: Time.parse(commit["date"]),
       metadata: {

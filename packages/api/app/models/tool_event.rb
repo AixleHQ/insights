@@ -6,11 +6,10 @@ class ToolEvent < ApplicationRecord
     claude_code cursor windsurf github_copilot
     aider continue cody tabnine amazon_q
     openrouter anthropic_api openai_api gemini_api
-    github gitlab bitbucket
     custom
   ].freeze
 
-  EVENT_TYPES = %w[chat completion edit commit review test debug refactor documentation pull_request merge_request pipeline other].freeze
+  EVENT_TYPES = %w[chat completion edit commit review test debug refactor documentation other].freeze
 
   belongs_to :user, optional: true
   belongs_to :organization

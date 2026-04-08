@@ -223,7 +223,7 @@ module Api
         since = days.days.ago.beginning_of_day
 
         rows = @project.tool_events
-          .where(tool_name: %w[github gitlab bitbucket], event_type: "commit")
+          .where(event_type: "commit")
           .where(occurred_at: since..)
           .where.not(user_id: nil)
           .group(:user_id)

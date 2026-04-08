@@ -1,9 +1,7 @@
 # frozen_string_literal: true
 
-class GithubSyncJob
-  include Sidekiq::Job
-
-  sidekiq_options queue: "connectors", retry: 3
+class GithubSyncJob < ApplicationJob
+  queue_as :connectors
 
   def perform(connector_id, action = "sync", options = {})
     @connector = OrganizationConnector.find(connector_id)
@@ -107,8 +105,8 @@ class GithubSyncJob
 
     ToolEvent.create!(
       organization_id: @connector.organization_id,
-      tool_name: "github",
-      event_type: "pull_request",
+      tool_name: "github_copilot",
+      event_type: "review",
       occurred_at: Time.parse(pr["updated_at"]),
       metadata: {
         action: action,
@@ -134,7 +132,7 @@ class GithubSyncJob
       user_id: user&.id,
       repository_id: repository.id,
       project_id: repository.project_id,
-      tool_name: "github",
+      tool_name: "github_copilot",
       event_type: "commit",
       occurred_at: Time.parse(commit["timestamp"]),
       metadata: {

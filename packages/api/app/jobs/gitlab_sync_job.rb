@@ -106,8 +106,8 @@ class GitlabSyncJob
 
     ToolEvent.create!(
       organization_id: @connector.organization_id,
-      tool_name: "gitlab",
-      event_type: "merge_request",
+      tool_name: "custom",
+      event_type: "review",
       occurred_at: Time.parse(mr["updated_at"]),
       metadata: {
         action: mr["action"],
@@ -128,8 +128,8 @@ class GitlabSyncJob
 
     ToolEvent.create!(
       organization_id: @connector.organization_id,
-      tool_name: "gitlab",
-      event_type: "pipeline",
+      tool_name: "custom",
+      event_type: "other",
       occurred_at: Time.parse(pipeline["created_at"]),
       metadata: {
         pipeline_id: pipeline["id"],
@@ -154,7 +154,7 @@ class GitlabSyncJob
       user_id: user&.id,
       repository_id: repository.id,
       project_id: repository.project_id,
-      tool_name: "gitlab",
+      tool_name: "custom",
       event_type: "commit",
       occurred_at: Time.parse(commit["timestamp"]),
       metadata: {

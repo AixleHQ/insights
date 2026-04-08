@@ -153,9 +153,14 @@ module Api
         )
 
         linked_ids = @connector.repositories.pluck(:external_id).to_set
-        repos = repos.map { |r| r.merge(already_linked: linked_ids.include?(r[:external_id])) }
+        repos = repos.map do |r|
+          r.merge(already_linked: linked_ids.include?(r[:external_id]))
+           .transform_keys { |k| k.to_s.camelize(:lower) }
+        end
 
         render json: { data: repos }
+      rescue ActionPolicy::Unauthorized
+        raise
       rescue StandardError => e
         render json: { error: e.message }, status: :unprocessable_entity
       end
