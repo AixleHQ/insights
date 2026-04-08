@@ -35,6 +35,11 @@ class OrganizationConnectorPolicy < ApplicationPolicy
     org_admin?(record.organization) || global_admin?
   end
 
+  # Only admins can list available repositories from the provider
+  def available_repos?
+    org_admin?(record.organization) || global_admin?
+  end
+
   # Only admins can start OAuth flow
   def authorize?
     org_admin?(record.organization) || global_admin?

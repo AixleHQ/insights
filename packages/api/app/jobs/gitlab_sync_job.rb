@@ -35,7 +35,7 @@ class GitlabSyncJob
 
   def sync_projects
     provider = Oauth::BaseProvider.for(@connector)
-    projects = provider.list_repositories
+    projects = provider.fetch_repositories
 
     projects.each do |project_data|
       sync_project(project_data)
@@ -146,8 +146,13 @@ class GitlabSyncJob
   end
 
   def create_commit_event(repository, commit)
+    author_email = commit.dig("author", "email")&.downcase
+    user = @connector.organization.members.find_by(email: author_email) if author_email
+
     ToolEvent.create!(
       organization_id: @connector.organization_id,
+      user_id: user&.id,
+      repository_id: repository.id,
       tool_name: "gitlab",
       event_type: "commit",
       occurred_at: Time.parse(commit["timestamp"]),
@@ -155,8 +160,7 @@ class GitlabSyncJob
         sha: commit["id"],
         message: commit["message"],
         author_name: commit.dig("author", "name"),
-        author_email: commit.dig("author", "email"),
-        repository_id: repository.id,
+        git_author_email: author_email,
         url: commit["url"]
       }
     )

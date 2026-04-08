@@ -324,12 +324,63 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
 
   describe 'POST /api/v1/organizations/:organization_id/connectors/:id/sync' do
     it 'triggers a sync' do
+      allow(GithubSyncJob).to receive(:perform_later)
+
       authenticated_post "/api/v1/organizations/#{organization.id}/connectors/#{connector.id}/sync",
                          user: admin,
                          organization: organization
 
       expect_success
       expect(connector.reload.last_sync_at).to be_present
+      expect(GithubSyncJob).to have_received(:perform_later).with(connector.id)
+    end
+  end
+
+  describe 'GET /api/v1/organizations/:organization_id/connectors/:id/available_repos' do
+    let(:available_repos) do
+      [
+        { external_id: "1", name: "repo-a", full_name: "org/repo-a", html_url: "https://github.com/org/repo-a",
+          default_branch: "main", is_private: false },
+        { external_id: "2", name: "repo-b", full_name: "org/repo-b", html_url: "https://github.com/org/repo-b",
+          default_branch: "main", is_private: true }
+      ]
+    end
+
+    before do
+      allow_any_instance_of(Oauth::GithubProvider).to receive(:fetch_repositories).and_return(available_repos)
+    end
+
+    it 'returns available repos for org admin' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{connector.id}/available_repos",
+                        user: admin,
+                        organization: organization
+
+      expect_success
+      expect(json_data.length).to eq(2)
+      expect(json_data.first[:fullName]).to eq("org/repo-a")
+    end
+
+    it 'marks already-linked repos with already_linked: true' do
+      project = create(:project, organization: organization)
+      create(:repository, organization_connector: connector, project: project, external_id: "1")
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{connector.id}/available_repos",
+                        user: admin,
+                        organization: organization
+
+      expect_success
+      linked = json_data.find { |r| r[:externalId] == "1" }
+      unlinked = json_data.find { |r| r[:externalId] == "2" }
+      expect(linked[:alreadyLinked]).to be true
+      expect(unlinked[:alreadyLinked]).to be false
+    end
+
+    it 'returns 403 for org members' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{connector.id}/available_repos",
+                        user: member,
+                        organization: organization
+
+      expect_forbidden
     end
   end
 end

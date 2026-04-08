@@ -1,5 +1,6 @@
 export { ProjectTeamSection } from './ProjectTeamSection';
 export { ProjectReposSection } from './ProjectReposSection';
+export { ConnectRepoSheet } from './ConnectRepoSheet';
 export { ProjectConnectorsTab } from './ProjectConnectorsTab';
 export { ProjectSecurityTab } from './ProjectSecurityTab';
 export { ProjectSettingsSection } from './ProjectSettingsSection';

@@ -60,6 +60,7 @@ Rails.application.routes.draw do
           member do
             post :test
             post :sync
+            get  :available_repos
           end
           collection do
             get "authorize/:type", action: :authorize_url

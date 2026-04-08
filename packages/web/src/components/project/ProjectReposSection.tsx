@@ -1,5 +1,6 @@
-import { GitBranch, Github, ExternalLink } from 'lucide-react';
+import { GitBranch, Github, ExternalLink, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow } from '@/lib/utils';
@@ -9,6 +10,7 @@ interface ProjectReposSectionProps {
   repositories: ProjectRepository[] | undefined;
   isLoading?: boolean;
   className?: string;
+  onConnectRepo?: () => void;
 }
 
 function getProviderIcon(provider: string) {
@@ -20,7 +22,7 @@ function getProviderIcon(provider: string) {
   }
 }
 
-export function ProjectReposSection({ repositories, isLoading, className }: ProjectReposSectionProps) {
+export function ProjectReposSection({ repositories, isLoading, className, onConnectRepo }: ProjectReposSectionProps) {
   if (isLoading) {
     return (
       <Card className={className}>
@@ -47,9 +49,16 @@ export function ProjectReposSection({ repositories, isLoading, className }: Proj
   return (
     <Card className={className}>
       <CardHeader className="pb-3">
-        <div className="flex items-center gap-2">
-          <GitBranch className="size-4 text-muted-foreground" />
-          <CardTitle className="text-base">Repositories</CardTitle>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <GitBranch className="size-4 text-muted-foreground" />
+            <CardTitle className="text-base">Repositories</CardTitle>
+          </div>
+          {onConnectRepo && (
+            <Button size="sm" variant="outline" onClick={onConnectRepo} className="gap-1">
+              <Plus className="size-3" /> Connect Repository
+            </Button>
+          )}
         </div>
         <CardDescription>
           {repoCount} {repoCount === 1 ? 'repository' : 'repositories'} linked

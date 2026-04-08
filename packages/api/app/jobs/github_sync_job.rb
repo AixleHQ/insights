@@ -35,7 +35,7 @@ class GithubSyncJob
 
   def sync_repositories
     provider = Oauth::BaseProvider.for(@connector)
-    repos = provider.list_repositories
+    repos = provider.fetch_repositories
 
     repos.each do |repo_data|
       sync_repository(repo_data)
@@ -126,8 +126,13 @@ class GithubSyncJob
   end
 
   def create_commit_event(repository, commit)
+    author_email = commit.dig("author", "email")&.downcase
+    user = @connector.organization.members.find_by(email: author_email) if author_email
+
     ToolEvent.create!(
       organization_id: @connector.organization_id,
+      user_id: user&.id,
+      repository_id: repository.id,
       tool_name: "github",
       event_type: "commit",
       occurred_at: Time.parse(commit["timestamp"]),
@@ -135,8 +140,7 @@ class GithubSyncJob
         sha: commit["id"],
         message: commit["message"],
         author_name: commit.dig("author", "name"),
-        author_email: commit.dig("author", "email"),
-        repository_id: repository.id,
+        git_author_email: author_email,
         url: commit["url"]
       }
     )

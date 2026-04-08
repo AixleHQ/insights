@@ -35,7 +35,7 @@ class BitbucketSyncJob
 
   def sync_repositories
     provider = Oauth::BaseProvider.for(@connector)
-    repos = provider.list_repositories
+    repos = provider.fetch_repositories
 
     repos.each do |repo_data|
       sync_repository(repo_data)
@@ -129,8 +129,13 @@ class BitbucketSyncJob
   end
 
   def create_commit_event(repository, commit)
+    author_email = extract_email(commit.dig("author", "raw"))
+    user = @connector.organization.members.find_by(email: author_email) if author_email
+
     ToolEvent.create!(
       organization_id: @connector.organization_id,
+      user_id: user&.id,
+      repository_id: repository.id,
       tool_name: "bitbucket",
       event_type: "commit",
       occurred_at: Time.parse(commit["date"]),
@@ -138,8 +143,14 @@ class BitbucketSyncJob
         sha: commit["hash"],
         message: commit["message"],
         author_name: commit.dig("author", "user", "display_name"),
-        repository_id: repository.id
+        git_author_email: author_email
       }
     )
+  end
+
+  def extract_email(raw_author)
+    return nil if raw_author.blank?
+    match = raw_author.match(/<(.+)>/)
+    match ? match[1].downcase : nil
   end
 end

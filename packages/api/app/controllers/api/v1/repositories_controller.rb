@@ -29,6 +29,7 @@ module Api
         authorize! @repository
 
         if @repository.save
+          enqueue_sync(@repository)
           render_created(@repository, RepositorySerializer)
         else
           render json: {
@@ -82,11 +83,22 @@ module Api
 
       def repository_params
         params.permit(:organization_connector_id, :external_id, :name, :full_name,
-                      :url, :default_branch, :is_private)
+                      :url, :html_url, :clone_url, :default_branch, :is_private, :description)
       end
 
       def repository_update_params
         params.permit(:default_branch, :url)
+      end
+
+      def enqueue_sync(repository)
+        connector = repository.organization_connector
+        return unless connector
+
+        case connector.connector_type
+        when "github"    then GithubSyncJob.perform_later(connector.id, "webhook")
+        when "gitlab"    then GitlabSyncJob.perform_later(connector.id, "webhook")
+        when "bitbucket" then BitbucketSyncJob.perform_later(connector.id, "webhook")
+        end
       end
     end
   end

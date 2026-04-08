@@ -38,7 +38,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { EventsTable, EventDrawer, type EventRow } from '@/components/events';
 import { ToolUsageByDayChart } from '@/components/dashboard';
-import { ProjectReposSection, ProjectNotFound } from '@/components/project';
+import { ProjectReposSection, ProjectNotFound, ConnectRepoSheet } from '@/components/project';
 import { formatDistanceToNow } from '@/lib/utils';
 
 function formatCurrency(value: number): string {
@@ -85,6 +85,7 @@ export function ProjectDetail() {
   const navigate = useNavigate();
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [connectRepoOpen, setConnectRepoOpen] = useState(false);
 
   const { data: project, isLoading: isLoadingProject } = useProject(id || '');
   const { data: eventsResponse, isLoading: isLoadingEvents } = useEvents(
@@ -244,6 +245,7 @@ export function ProjectDetail() {
       <ProjectReposSection
         repositories={projectRepositories}
         isLoading={isLoadingRepositories}
+        onConnectRepo={() => setConnectRepoOpen(true)}
       />
 
       {project.repositoryUrl && (
@@ -286,6 +288,13 @@ export function ProjectDetail() {
         onNavigate={handleNavigate}
         hasPrev={selectedEventIndex > 0}
         hasNext={selectedEventIndex < events.length - 1}
+      />
+
+      <ConnectRepoSheet
+        projectId={id || ''}
+        open={connectRepoOpen}
+        onOpenChange={setConnectRepoOpen}
+        onSuccess={() => setConnectRepoOpen(false)}
       />
     </div>
   );

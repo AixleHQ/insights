@@ -3918,7 +3918,7 @@ CREATE TABLE public.projects (
 
 CREATE TABLE public.repositories (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
-    project_id uuid NOT NULL,
+    project_id uuid,
     organization_connector_id uuid NOT NULL,
     external_id character varying NOT NULL,
     name character varying NOT NULL,
@@ -11146,6 +11146,7 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260408000001'),
 ('20260325000001'),
 ('20260324000001'),
 ('20260320000001'),
