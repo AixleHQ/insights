@@ -58,6 +58,8 @@ export const queryKeys = {
   connectors: {
     all: (orgId: string) => ['organizations', orgId, 'connectors'] as const,
     detail: (orgId: string, id: string) => ['organizations', orgId, 'connectors', id] as const,
+    availableRepos: (orgId: string, connectorId: string) =>
+      ['organizations', orgId, 'connectors', connectorId, 'available_repos'] as const,
   },
   projectConnectors: {
     all: (projectId: string) => ['projects', projectId, 'connectors'] as const,
@@ -624,6 +626,81 @@ export function useProjectRepositories(projectId: string) {
     queryKey: ['projects', projectId, 'repositories'],
     queryFn: async () => {
       const response = await api.get<{ data: ProjectRepository[] }>(`/projects/${projectId}/repositories`);
+      return response.data;
+    },
+    enabled: !!projectId,
+  });
+}
+
+export interface AvailableRepository {
+  externalId: string;
+  name: string;
+  fullName: string;
+  htmlUrl: string;
+  defaultBranch: string;
+  isPrivate: boolean;
+  alreadyLinked: boolean;
+}
+
+export function useAvailableRepos(orgId: string, connectorId: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.connectors.availableRepos(orgId, connectorId),
+    queryFn: async () => {
+      const response = await api.get<{ data: AvailableRepository[] }>(
+        `/organizations/${orgId}/connectors/${connectorId}/available_repos`
+      );
+      return response.data;
+    },
+    enabled: !!orgId && !!connectorId && enabled,
+  });
+}
+
+export function useConnectRepo(projectId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: {
+      organization_connector_id: string;
+      external_id: string;
+      name: string;
+      full_name: string;
+      url: string;
+      default_branch: string;
+      is_private: boolean;
+    }) => api.post<{ data: ProjectRepository }>(`/projects/${projectId}/repositories`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'repositories'] });
+    },
+  });
+}
+
+export function useDisconnectRepo(projectId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (repoId: string) => api.delete(`/projects/${projectId}/repositories/${repoId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'repositories'] });
+    },
+  });
+}
+
+export interface MemberCommitStat {
+  userId: string;
+  name: string | null;
+  email: string;
+  avatarUrl: string | null;
+  commitCount: number;
+  lastCommitAt: string | null;
+}
+
+export function useProjectCommitStats(projectId: string, days = 30) {
+  return useQuery({
+    queryKey: ['projects', projectId, 'stats', 'commits_by_user', days],
+    queryFn: async () => {
+      const response = await api.get<{ data: MemberCommitStat[] }>(
+        `/projects/${projectId}/stats/commits_by_user?days=${days}`
+      );
       return response.data;
     },
     enabled: !!projectId,

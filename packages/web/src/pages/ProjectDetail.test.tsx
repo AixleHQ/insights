@@ -35,6 +35,10 @@ vi.mock('@/hooks/useApi', () => ({
   useDeleteProject: () => mockUseDeleteProject(),
   useProjectDailyByTool: (...args: unknown[]) => mockUseProjectDailyByTool(...args),
   useProjectRepositories: (...args: unknown[]) => mockUseProjectRepositories(...args),
+  useConnectors: () => ({ data: [] }),
+  useAvailableRepos: () => ({ data: [], isLoading: false }),
+  useConnectRepo: () => ({ mutateAsync: vi.fn() }),
+  useDisconnectRepo: () => ({ mutateAsync: vi.fn() }),
 }));
 
 const mockProject = {

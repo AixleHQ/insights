@@ -18,6 +18,7 @@ import {
   useDeleteProject,
   useProjectDailyByTool,
   useProjectRepositories,
+  useDisconnectRepo,
 } from '@/hooks/useApi';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -38,7 +39,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { EventsTable, EventDrawer, type EventRow } from '@/components/events';
 import { ToolUsageByDayChart } from '@/components/dashboard';
-import { ProjectReposSection, ProjectNotFound } from '@/components/project';
+import { ProjectReposSection, ProjectNotFound, ConnectRepoSheet } from '@/components/project';
 import { formatDistanceToNow } from '@/lib/utils';
 
 function formatCurrency(value: number): string {
@@ -85,6 +86,7 @@ export function ProjectDetail() {
   const navigate = useNavigate();
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [connectRepoOpen, setConnectRepoOpen] = useState(false);
 
   const { data: project, isLoading: isLoadingProject } = useProject(id || '');
   const { data: eventsResponse, isLoading: isLoadingEvents } = useEvents(
@@ -93,6 +95,7 @@ export function ProjectDetail() {
   );
   const { data: dailyByToolData, isLoading: isLoadingDailyByTool } = useProjectDailyByTool(id || '');
   const { data: projectRepositories, isLoading: isLoadingRepositories } = useProjectRepositories(id || '');
+  const disconnectRepo = useDisconnectRepo(id || '');
   const deleteProject = useDeleteProject();
 
   // Transform events for the table
@@ -244,6 +247,8 @@ export function ProjectDetail() {
       <ProjectReposSection
         repositories={projectRepositories}
         isLoading={isLoadingRepositories}
+        onConnectRepo={() => setConnectRepoOpen(true)}
+        onDisconnect={(repoId) => disconnectRepo.mutateAsync(repoId)}
       />
 
       {project.repositoryUrl && (
@@ -286,6 +291,13 @@ export function ProjectDetail() {
         onNavigate={handleNavigate}
         hasPrev={selectedEventIndex > 0}
         hasNext={selectedEventIndex < events.length - 1}
+      />
+
+      <ConnectRepoSheet
+        projectId={id || ''}
+        open={connectRepoOpen}
+        onOpenChange={setConnectRepoOpen}
+        onSuccess={() => setConnectRepoOpen(false)}
       />
     </div>
   );

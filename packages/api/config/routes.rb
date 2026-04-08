@@ -60,6 +60,7 @@ Rails.application.routes.draw do
           member do
             post :test
             post :sync
+            get  :available_repos
           end
           collection do
             get "authorize/:type", action: :authorize_url
@@ -114,6 +115,7 @@ Rails.application.routes.draw do
           delete "settings/:key", action: :destroy_setting
           get :stats
           get "stats/daily_by_tool", action: :daily_by_tool
+          get "stats/commits_by_user", action: :commits_by_user
           get :members
           get :retention_policy
           patch :retention_policy, action: :update_retention_policy

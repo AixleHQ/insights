@@ -18,6 +18,10 @@ class RepositorySerializer < BaseSerializer
     repo.provider
   end
 
+  attribute :is_active do |repo|
+    repo.organization_connector.is_active
+  end
+
   attribute :needs_sync do |repo|
     repo.needs_sync?
   end

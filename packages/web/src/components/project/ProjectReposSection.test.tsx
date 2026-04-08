@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ProjectReposSection } from './ProjectReposSection';
 import type { ProjectRepository } from '@/hooks/useApi';
 
@@ -23,6 +24,13 @@ const mockRepositories: ProjectRepository[] = [
     isActive: false,
   },
 ];
+
+beforeAll(() => {
+  window.Element.prototype.hasPointerCapture = vi.fn(() => false);
+  window.Element.prototype.setPointerCapture = vi.fn();
+  window.Element.prototype.releasePointerCapture = vi.fn();
+  window.Element.prototype.scrollIntoView = vi.fn();
+});
 
 const renderComponent = (props: Partial<Parameters<typeof ProjectReposSection>[0]> = {}) => {
   return render(<ProjectReposSection repositories={mockRepositories} {...props} />);
@@ -136,6 +144,42 @@ describe('ProjectReposSection', () => {
     it('applies custom className to container', () => {
       const { container } = renderComponent({ className: 'custom-class' });
       expect(container.firstChild).toHaveClass('custom-class');
+    });
+  });
+
+  describe('Disconnect', () => {
+    it('does not render disconnect buttons when onDisconnect is not provided', () => {
+      renderComponent();
+      expect(screen.queryByRole('button', { name: /disconnect/i })).not.toBeInTheDocument();
+    });
+
+    it('renders disconnect buttons when onDisconnect is provided', () => {
+      const onDisconnect = vi.fn().mockResolvedValue({});
+      renderComponent({ onDisconnect });
+      const buttons = screen.getAllByRole('button', { name: /disconnect/i });
+      expect(buttons).toHaveLength(2);
+    });
+
+    it('calls onDisconnect with repo id after confirmation', async () => {
+      const user = userEvent.setup();
+      const onDisconnect = vi.fn().mockResolvedValue({});
+      renderComponent({ onDisconnect });
+
+      await user.click(screen.getAllByRole('button', { name: /disconnect/i })[0]);
+      await user.click(screen.getByRole('button', { name: 'Disconnect' }));
+
+      expect(onDisconnect).toHaveBeenCalledWith('1');
+    });
+
+    it('does not call onDisconnect when confirmation is cancelled', async () => {
+      const user = userEvent.setup();
+      const onDisconnect = vi.fn();
+      renderComponent({ onDisconnect });
+
+      await user.click(screen.getAllByRole('button', { name: /disconnect/i })[0]);
+      await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+      expect(onDisconnect).not.toHaveBeenCalled();
     });
   });
 

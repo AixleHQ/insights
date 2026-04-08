@@ -4,7 +4,7 @@ module Api
   module V1
     class OrganizationConnectorsController < BaseController
       before_action :require_organization!
-      before_action :set_connector, only: %i[show update destroy test sync]
+      before_action :set_connector, only: %i[show update destroy test sync available_repos]
 
       # GET /api/v1/organizations/:organization_id/connectors
       def index
@@ -142,12 +142,34 @@ module Api
         render json: { data: { success: false, error: e.message } }, status: :ok
       end
 
+      # GET /api/v1/organizations/:organization_id/connectors/:id/available_repos
+      def available_repos
+        authorize! @connector, to: :available_repos?
+
+        provider = Oauth::BaseProvider.for(@connector)
+        repos = provider.fetch_repositories(
+          page: params.fetch(:page, 1).to_i,
+          per_page: params.fetch(:per_page, 50).to_i
+        )
+
+        linked_ids = @connector.repositories.pluck(:external_id).to_set
+        repos = repos.map do |r|
+          r.merge(already_linked: linked_ids.include?(r[:external_id]))
+           .transform_keys { |k| k.to_s.camelize(:lower) }
+        end
+
+        render json: { data: repos }
+      rescue ActionPolicy::Unauthorized
+        raise
+      rescue StandardError => e
+        render json: { error: e.message }, status: :unprocessable_entity
+      end
+
       # POST /api/v1/organizations/:organization_id/connectors/:id/sync
       def sync
         authorize! @connector, to: :sync?
 
-        # Queue sync job
-        # ConnectorSyncJob.perform_later(@connector.id)
+        ConnectorSyncService.enqueue(@connector)
 
         @connector.mark_synced!
         OrganizationAuditLog.log(

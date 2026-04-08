@@ -1,9 +1,7 @@
 # frozen_string_literal: true
 
-class BitbucketSyncJob
-  include Sidekiq::Job
-
-  sidekiq_options queue: "connectors", retry: 3
+class BitbucketSyncJob < ApplicationJob
+  queue_as :connectors
 
   def perform(connector_id, action = "sync", options = {})
     @connector = OrganizationConnector.find(connector_id)
@@ -35,7 +33,7 @@ class BitbucketSyncJob
 
   def sync_repositories
     provider = Oauth::BaseProvider.for(@connector)
-    repos = provider.list_repositories
+    repos = provider.fetch_repositories
 
     repos.each do |repo_data|
       sync_repository(repo_data)
@@ -44,19 +42,17 @@ class BitbucketSyncJob
 
   def sync_repository(repo_data)
     repository = @connector.repositories.find_or_initialize_by(
-      external_id: repo_data[:uuid]
+      external_id: repo_data[:external_id].to_s
     )
 
     repository.update!(
       name: repo_data[:name],
       full_name: repo_data[:full_name],
-      url: repo_data.dig(:links, :html, :href),
-      default_branch: repo_data.dig(:mainbranch, :name) || "main",
+      url: repo_data[:html_url],
+      default_branch: repo_data[:default_branch],
       is_private: repo_data[:is_private],
       metadata: {
-        description: repo_data[:description],
-        language: repo_data[:language],
-        updated_on: repo_data[:updated_on]
+        description: repo_data[:description]
       }
     )
   end
@@ -92,13 +88,11 @@ class BitbucketSyncJob
 
     push = payload["push"]
     changes = push["changes"] || []
+    all_commits = changes.flat_map { |c| c["commits"] || [] }
+    return if all_commits.empty?
 
-    changes.each do |change|
-      commits = change["commits"] || []
-      commits.each do |commit|
-        create_commit_event(repository, commit)
-      end
-    end
+    member_by_email = load_member_by_email
+    all_commits.each { |commit| create_commit_event(repository, commit, member_by_email) }
   end
 
   def process_pull_request_event(payload, event_type)
@@ -110,8 +104,8 @@ class BitbucketSyncJob
 
     ToolEvent.create!(
       organization_id: @connector.organization_id,
-      tool_name: "bitbucket",
-      event_type: "pull_request",
+      tool_name: "custom",
+      event_type: "review",
       occurred_at: Time.parse(pr["updated_on"]),
       metadata: {
         action: action,
@@ -128,18 +122,34 @@ class BitbucketSyncJob
     @connector.repositories.find_by(external_id: external_id)
   end
 
-  def create_commit_event(repository, commit)
+  def load_member_by_email
+    @connector.organization.members.index_by { |m| m.email.downcase }
+  end
+
+  def create_commit_event(repository, commit, member_by_email = {})
+    author_email = extract_email(commit.dig("author", "raw"))
+    user = member_by_email[author_email] if author_email
+
     ToolEvent.create!(
       organization_id: @connector.organization_id,
-      tool_name: "bitbucket",
+      user_id: user&.id,
+      repository_id: repository.id,
+      project_id: repository.project_id,
+      tool_name: "custom",
       event_type: "commit",
       occurred_at: Time.parse(commit["date"]),
       metadata: {
         sha: commit["hash"],
         message: commit["message"],
         author_name: commit.dig("author", "user", "display_name"),
-        repository_id: repository.id
+        git_author_email: author_email
       }
     )
+  end
+
+  def extract_email(raw_author)
+    return nil if raw_author.blank?
+    match = raw_author.match(/<(.+)>/)
+    match ? match[1].downcase : nil
   end
 end

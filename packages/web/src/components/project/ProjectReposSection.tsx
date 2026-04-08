@@ -1,7 +1,19 @@
-import { GitBranch, Github, ExternalLink } from 'lucide-react';
+import { useState } from 'react';
+import { GitBranch, Github, ExternalLink, Plus, Unlink } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { formatDistanceToNow } from '@/lib/utils';
 import type { ProjectRepository } from '@/hooks/useApi';
 
@@ -9,6 +21,8 @@ interface ProjectReposSectionProps {
   repositories: ProjectRepository[] | undefined;
   isLoading?: boolean;
   className?: string;
+  onConnectRepo?: () => void;
+  onDisconnect?: (repoId: string) => Promise<unknown>;
 }
 
 function getProviderIcon(provider: string) {
@@ -20,7 +34,9 @@ function getProviderIcon(provider: string) {
   }
 }
 
-export function ProjectReposSection({ repositories, isLoading, className }: ProjectReposSectionProps) {
+export function ProjectReposSection({ repositories, isLoading, className, onConnectRepo, onDisconnect }: ProjectReposSectionProps) {
+  const [disconnectTarget, setDisconnectTarget] = useState<{ id: string; name: string } | null>(null);
+
   if (isLoading) {
     return (
       <Card className={className}>
@@ -45,11 +61,19 @@ export function ProjectReposSection({ repositories, isLoading, className }: Proj
   const repoCount = repositories?.length || 0;
 
   return (
+    <>
     <Card className={className}>
       <CardHeader className="pb-3">
-        <div className="flex items-center gap-2">
-          <GitBranch className="size-4 text-muted-foreground" />
-          <CardTitle className="text-base">Repositories</CardTitle>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <GitBranch className="size-4 text-muted-foreground" />
+            <CardTitle className="text-base">Repositories</CardTitle>
+          </div>
+          {onConnectRepo && (
+            <Button size="sm" variant="outline" onClick={onConnectRepo} className="gap-1">
+              <Plus className="size-3" /> Connect Repository
+            </Button>
+          )}
         </div>
         <CardDescription>
           {repoCount} {repoCount === 1 ? 'repository' : 'repositories'} linked
@@ -61,15 +85,17 @@ export function ProjectReposSection({ repositories, isLoading, className }: Proj
             {repositories?.map((repo) => {
               const ProviderIcon = getProviderIcon(repo.provider);
               return (
-                <a
+                <div
                   key={repo.id}
-                  href={repo.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
                   className="group flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/50"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex size-8 items-center justify-center rounded bg-muted">
+                  <a
+                    href={repo.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 min-w-0 flex-1"
+                  >
+                    <div className="flex size-8 items-center justify-center rounded bg-muted shrink-0">
                       <ProviderIcon className="size-4 text-muted-foreground" />
                     </div>
                     <div className="min-w-0">
@@ -82,14 +108,25 @@ export function ProjectReposSection({ repositories, isLoading, className }: Proj
                         </p>
                       )}
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
+                  </a>
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
                     <Badge variant={repo.isActive ? 'default' : 'secondary'} className="text-xs">
                       {repo.isActive ? 'Active' : 'Inactive'}
                     </Badge>
                     <ExternalLink className="size-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                    {onDisconnect && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="size-7 opacity-0 transition-opacity group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                        aria-label={`Disconnect ${repo.fullName || repo.name}`}
+                        onClick={() => setDisconnectTarget({ id: repo.id, name: repo.fullName || repo.name })}
+                      >
+                        <Unlink className="size-3.5" />
+                      </Button>
+                    )}
                   </div>
-                </a>
+                </div>
               );
             })}
           </div>
@@ -98,5 +135,29 @@ export function ProjectReposSection({ repositories, isLoading, className }: Proj
         )}
       </CardContent>
     </Card>
+
+    <AlertDialog open={disconnectTarget !== null} onOpenChange={(open) => !open && setDisconnectTarget(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Disconnect repository?</AlertDialogTitle>
+          <AlertDialogDescription>
+            <strong>{disconnectTarget?.name}</strong> will be unlinked from this project. Existing commit history will be preserved.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={() => {
+              if (disconnectTarget) onDisconnect!(disconnectTarget.id);
+              setDisconnectTarget(null);
+            }}
+          >
+            Disconnect
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

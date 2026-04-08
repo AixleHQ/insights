@@ -1,9 +1,7 @@
 # frozen_string_literal: true
 
-class GitlabSyncJob
-  include Sidekiq::Job
-
-  sidekiq_options queue: "connectors", retry: 3
+class GitlabSyncJob < ApplicationJob
+  queue_as :connectors
 
   def perform(connector_id, action = "sync", options = {})
     @connector = OrganizationConnector.find(connector_id)
@@ -35,7 +33,7 @@ class GitlabSyncJob
 
   def sync_projects
     provider = Oauth::BaseProvider.for(@connector)
-    projects = provider.list_repositories
+    projects = provider.fetch_repositories
 
     projects.each do |project_data|
       sync_project(project_data)
@@ -44,19 +42,17 @@ class GitlabSyncJob
 
   def sync_project(project_data)
     repository = @connector.repositories.find_or_initialize_by(
-      external_id: project_data[:id].to_s
+      external_id: project_data[:external_id].to_s
     )
 
     repository.update!(
       name: project_data[:name],
-      full_name: project_data[:path_with_namespace],
-      url: project_data[:web_url],
+      full_name: project_data[:full_name],
+      url: project_data[:html_url],
       default_branch: project_data[:default_branch],
-      is_private: project_data[:visibility] == "private",
+      is_private: project_data[:is_private],
       metadata: {
-        description: project_data[:description],
-        namespace: project_data[:namespace],
-        updated_at: project_data[:last_activity_at]
+        description: project_data[:description]
       }
     )
   end
@@ -93,9 +89,10 @@ class GitlabSyncJob
     return unless repository
 
     commits = payload["commits"] || []
-    commits.each do |commit|
-      create_commit_event(repository, commit)
-    end
+    return if commits.empty?
+
+    member_by_email = load_member_by_email
+    commits.each { |commit| create_commit_event(repository, commit, member_by_email) }
   end
 
   def process_merge_request_event(payload)
@@ -106,8 +103,8 @@ class GitlabSyncJob
 
     ToolEvent.create!(
       organization_id: @connector.organization_id,
-      tool_name: "gitlab",
-      event_type: "merge_request",
+      tool_name: "custom",
+      event_type: "review",
       occurred_at: Time.parse(mr["updated_at"]),
       metadata: {
         action: mr["action"],
@@ -128,8 +125,8 @@ class GitlabSyncJob
 
     ToolEvent.create!(
       organization_id: @connector.organization_id,
-      tool_name: "gitlab",
-      event_type: "pipeline",
+      tool_name: "custom",
+      event_type: "other",
       occurred_at: Time.parse(pipeline["created_at"]),
       metadata: {
         pipeline_id: pipeline["id"],
@@ -145,18 +142,27 @@ class GitlabSyncJob
     @connector.repositories.find_by(external_id: external_id.to_s)
   end
 
-  def create_commit_event(repository, commit)
+  def load_member_by_email
+    @connector.organization.members.index_by { |m| m.email.downcase }
+  end
+
+  def create_commit_event(repository, commit, member_by_email = {})
+    author_email = commit.dig("author", "email")&.downcase
+    user = member_by_email[author_email] if author_email
+
     ToolEvent.create!(
       organization_id: @connector.organization_id,
-      tool_name: "gitlab",
+      user_id: user&.id,
+      repository_id: repository.id,
+      project_id: repository.project_id,
+      tool_name: "custom",
       event_type: "commit",
       occurred_at: Time.parse(commit["timestamp"]),
       metadata: {
         sha: commit["id"],
         message: commit["message"],
         author_name: commit.dig("author", "name"),
-        author_email: commit.dig("author", "email"),
-        repository_id: repository.id,
+        git_author_email: author_email,
         url: commit["url"]
       }
     )
