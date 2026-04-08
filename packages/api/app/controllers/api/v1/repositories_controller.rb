@@ -96,11 +96,7 @@ module Api
 
         # Runs sync_repositories which refreshes repo metadata from the provider.
         # Commit history arrives via webhooks going forward.
-        case connector.connector_type
-        when "github"    then GithubSyncJob.perform_later(connector.id)
-        when "gitlab"    then GitlabSyncJob.perform_later(connector.id)
-        when "bitbucket" then BitbucketSyncJob.perform_later(connector.id)
-        end
+        ConnectorSyncService.enqueue(connector)
       end
     end
   end

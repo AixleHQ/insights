@@ -1,9 +1,7 @@
 # frozen_string_literal: true
 
-class GitlabSyncJob
-  include Sidekiq::Job
-
-  sidekiq_options queue: "connectors", retry: 3
+class GitlabSyncJob < ApplicationJob
+  queue_as :connectors
 
   def perform(connector_id, action = "sync", options = {})
     @connector = OrganizationConnector.find(connector_id)
@@ -91,9 +89,10 @@ class GitlabSyncJob
     return unless repository
 
     commits = payload["commits"] || []
-    commits.each do |commit|
-      create_commit_event(repository, commit)
-    end
+    return if commits.empty?
+
+    member_by_email = load_member_by_email
+    commits.each { |commit| create_commit_event(repository, commit, member_by_email) }
   end
 
   def process_merge_request_event(payload)
@@ -143,9 +142,13 @@ class GitlabSyncJob
     @connector.repositories.find_by(external_id: external_id.to_s)
   end
 
-  def create_commit_event(repository, commit)
+  def load_member_by_email
+    @connector.organization.members.index_by { |m| m.email.downcase }
+  end
+
+  def create_commit_event(repository, commit, member_by_email = {})
     author_email = commit.dig("author", "email")&.downcase
-    user = @connector.organization.members.find_by(email: author_email) if author_email
+    user = member_by_email[author_email] if author_email
 
     ToolEvent.create!(
       organization_id: @connector.organization_id,

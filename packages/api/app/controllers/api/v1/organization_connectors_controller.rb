@@ -169,11 +169,7 @@ module Api
       def sync
         authorize! @connector, to: :sync?
 
-        case @connector.connector_type
-        when "github"    then GithubSyncJob.perform_later(@connector.id)
-        when "gitlab"    then GitlabSyncJob.perform_later(@connector.id)
-        when "bitbucket" then BitbucketSyncJob.perform_later(@connector.id)
-        end
+        ConnectorSyncService.enqueue(@connector)
 
         @connector.mark_synced!
         OrganizationAuditLog.log(

@@ -346,8 +346,11 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
       ]
     end
 
+    let(:provider_double) { instance_double(Oauth::GithubProvider) }
+
     before do
-      allow_any_instance_of(Oauth::GithubProvider).to receive(:fetch_repositories).and_return(available_repos)
+      allow(Oauth::BaseProvider).to receive(:for).with(connector).and_return(provider_double)
+      allow(provider_double).to receive(:fetch_repositories).and_return(available_repos)
     end
 
     it 'returns available repos for org admin' do

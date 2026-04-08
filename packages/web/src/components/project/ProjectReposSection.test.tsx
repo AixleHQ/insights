@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ProjectReposSection } from './ProjectReposSection';
@@ -24,6 +24,13 @@ const mockRepositories: ProjectRepository[] = [
     isActive: false,
   },
 ];
+
+beforeAll(() => {
+  window.Element.prototype.hasPointerCapture = vi.fn(() => false);
+  window.Element.prototype.setPointerCapture = vi.fn();
+  window.Element.prototype.releasePointerCapture = vi.fn();
+  window.Element.prototype.scrollIntoView = vi.fn();
+});
 
 const renderComponent = (props: Partial<Parameters<typeof ProjectReposSection>[0]> = {}) => {
   return render(<ProjectReposSection repositories={mockRepositories} {...props} />);
@@ -156,10 +163,10 @@ describe('ProjectReposSection', () => {
     it('calls onDisconnect with repo id after confirmation', async () => {
       const user = userEvent.setup();
       const onDisconnect = vi.fn().mockResolvedValue({});
-      vi.spyOn(window, 'confirm').mockReturnValue(true);
       renderComponent({ onDisconnect });
 
       await user.click(screen.getAllByRole('button', { name: /disconnect/i })[0]);
+      await user.click(screen.getByRole('button', { name: 'Disconnect' }));
 
       expect(onDisconnect).toHaveBeenCalledWith('1');
     });
@@ -167,10 +174,10 @@ describe('ProjectReposSection', () => {
     it('does not call onDisconnect when confirmation is cancelled', async () => {
       const user = userEvent.setup();
       const onDisconnect = vi.fn();
-      vi.spyOn(window, 'confirm').mockReturnValue(false);
       renderComponent({ onDisconnect });
 
       await user.click(screen.getAllByRole('button', { name: /disconnect/i })[0]);
+      await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
       expect(onDisconnect).not.toHaveBeenCalled();
     });

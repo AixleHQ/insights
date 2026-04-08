@@ -1,8 +1,19 @@
+import { useState } from 'react';
 import { GitBranch, Github, ExternalLink, Plus, Unlink } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { formatDistanceToNow } from '@/lib/utils';
 import type { ProjectRepository } from '@/hooks/useApi';
 
@@ -24,6 +35,8 @@ function getProviderIcon(provider: string) {
 }
 
 export function ProjectReposSection({ repositories, isLoading, className, onConnectRepo, onDisconnect }: ProjectReposSectionProps) {
+  const [disconnectTarget, setDisconnectTarget] = useState<{ id: string; name: string } | null>(null);
+
   if (isLoading) {
     return (
       <Card className={className}>
@@ -48,6 +61,7 @@ export function ProjectReposSection({ repositories, isLoading, className, onConn
   const repoCount = repositories?.length || 0;
 
   return (
+    <>
     <Card className={className}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
@@ -106,11 +120,7 @@ export function ProjectReposSection({ repositories, isLoading, className, onConn
                         variant="ghost"
                         className="size-7 opacity-0 transition-opacity group-hover:opacity-100 text-muted-foreground hover:text-destructive"
                         aria-label={`Disconnect ${repo.fullName || repo.name}`}
-                        onClick={() => {
-                          if (window.confirm(`Disconnect "${repo.fullName || repo.name}" from this project?`)) {
-                            onDisconnect(repo.id);
-                          }
-                        }}
+                        onClick={() => setDisconnectTarget({ id: repo.id, name: repo.fullName || repo.name })}
                       >
                         <Unlink className="size-3.5" />
                       </Button>
@@ -125,5 +135,29 @@ export function ProjectReposSection({ repositories, isLoading, className, onConn
         )}
       </CardContent>
     </Card>
+
+    <AlertDialog open={disconnectTarget !== null} onOpenChange={(open) => !open && setDisconnectTarget(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Disconnect repository?</AlertDialogTitle>
+          <AlertDialogDescription>
+            <strong>{disconnectTarget?.name}</strong> will be unlinked from this project. Existing commit history will be preserved.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={() => {
+              if (disconnectTarget) onDisconnect!(disconnectTarget.id);
+              setDisconnectTarget(null);
+            }}
+          >
+            Disconnect
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
