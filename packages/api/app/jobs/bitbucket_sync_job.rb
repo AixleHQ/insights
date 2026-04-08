@@ -44,19 +44,17 @@ class BitbucketSyncJob
 
   def sync_repository(repo_data)
     repository = @connector.repositories.find_or_initialize_by(
-      external_id: repo_data[:uuid]
+      external_id: repo_data[:external_id].to_s
     )
 
     repository.update!(
       name: repo_data[:name],
       full_name: repo_data[:full_name],
-      url: repo_data.dig(:links, :html, :href),
-      default_branch: repo_data.dig(:mainbranch, :name) || "main",
+      url: repo_data[:html_url],
+      default_branch: repo_data[:default_branch],
       is_private: repo_data[:is_private],
       metadata: {
-        description: repo_data[:description],
-        language: repo_data[:language],
-        updated_on: repo_data[:updated_on]
+        description: repo_data[:description]
       }
     )
   end

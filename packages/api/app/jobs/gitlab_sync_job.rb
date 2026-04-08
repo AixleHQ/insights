@@ -44,19 +44,17 @@ class GitlabSyncJob
 
   def sync_project(project_data)
     repository = @connector.repositories.find_or_initialize_by(
-      external_id: project_data[:id].to_s
+      external_id: project_data[:external_id].to_s
     )
 
     repository.update!(
       name: project_data[:name],
-      full_name: project_data[:path_with_namespace],
-      url: project_data[:web_url],
+      full_name: project_data[:full_name],
+      url: project_data[:html_url],
       default_branch: project_data[:default_branch],
-      is_private: project_data[:visibility] == "private",
+      is_private: project_data[:is_private],
       metadata: {
-        description: project_data[:description],
-        namespace: project_data[:namespace],
-        updated_at: project_data[:last_activity_at]
+        description: project_data[:description]
       }
     )
   end

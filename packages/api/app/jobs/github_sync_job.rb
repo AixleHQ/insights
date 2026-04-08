@@ -42,7 +42,7 @@ class GithubSyncJob < ApplicationJob
 
   def sync_repository(repo_data)
     repository = @connector.repositories.find_or_initialize_by(
-      external_id: repo_data[:id].to_s
+      external_id: repo_data[:external_id].to_s
     )
 
     repository.update!(
@@ -50,7 +50,7 @@ class GithubSyncJob < ApplicationJob
       full_name: repo_data[:full_name],
       url: repo_data[:html_url],
       default_branch: repo_data[:default_branch],
-      is_private: repo_data[:private],
+      is_private: repo_data[:is_private],
       metadata: {
         language: repo_data[:language],
         description: repo_data[:description],
