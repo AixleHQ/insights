@@ -1,7 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ConnectRepoSheet } from './ConnectRepoSheet';
+
+// Radix UI Select requires these methods in jsdom
+beforeAll(() => {
+  window.Element.prototype.hasPointerCapture = vi.fn(() => false);
+  window.Element.prototype.setPointerCapture = vi.fn();
+  window.Element.prototype.releasePointerCapture = vi.fn();
+  window.Element.prototype.scrollIntoView = vi.fn();
+});
 
 vi.mock('@/contexts/OrgContext', () => ({
   useOrg: () => ({

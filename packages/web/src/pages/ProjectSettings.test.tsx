@@ -28,6 +28,7 @@ vi.mock('@/hooks/useApi', () => ({
   useUpdateProject: () => mockUseUpdateProject(),
   useDeleteProject: () => mockUseDeleteProject(),
   useProjectMembers: (...args: unknown[]) => mockUseProjectMembers(...args),
+  useProjectCommitStats: () => ({ data: undefined, isLoading: false }),
   useProjectRetentionPolicy: (...args: unknown[]) => mockUseProjectRetentionPolicy(...args),
   useUpdateProjectRetentionPolicy: () => mockUseUpdateProjectRetentionPolicy(),
 }));
