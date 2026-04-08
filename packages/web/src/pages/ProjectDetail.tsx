@@ -18,6 +18,7 @@ import {
   useDeleteProject,
   useProjectDailyByTool,
   useProjectRepositories,
+  useDisconnectRepo,
 } from '@/hooks/useApi';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -94,6 +95,7 @@ export function ProjectDetail() {
   );
   const { data: dailyByToolData, isLoading: isLoadingDailyByTool } = useProjectDailyByTool(id || '');
   const { data: projectRepositories, isLoading: isLoadingRepositories } = useProjectRepositories(id || '');
+  const disconnectRepo = useDisconnectRepo(id || '');
   const deleteProject = useDeleteProject();
 
   // Transform events for the table
@@ -246,6 +248,7 @@ export function ProjectDetail() {
         repositories={projectRepositories}
         isLoading={isLoadingRepositories}
         onConnectRepo={() => setConnectRepoOpen(true)}
+        onDisconnect={(repoId) => disconnectRepo.mutateAsync(repoId)}
       />
 
       {project.repositoryUrl && (

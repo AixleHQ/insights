@@ -1,4 +1,4 @@
-import { GitBranch, Github, ExternalLink, Plus } from 'lucide-react';
+import { GitBranch, Github, ExternalLink, Plus, Unlink } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +11,7 @@ interface ProjectReposSectionProps {
   isLoading?: boolean;
   className?: string;
   onConnectRepo?: () => void;
+  onDisconnect?: (repoId: string) => Promise<unknown>;
 }
 
 function getProviderIcon(provider: string) {
@@ -22,7 +23,7 @@ function getProviderIcon(provider: string) {
   }
 }
 
-export function ProjectReposSection({ repositories, isLoading, className, onConnectRepo }: ProjectReposSectionProps) {
+export function ProjectReposSection({ repositories, isLoading, className, onConnectRepo, onDisconnect }: ProjectReposSectionProps) {
   if (isLoading) {
     return (
       <Card className={className}>
@@ -70,15 +71,17 @@ export function ProjectReposSection({ repositories, isLoading, className, onConn
             {repositories?.map((repo) => {
               const ProviderIcon = getProviderIcon(repo.provider);
               return (
-                <a
+                <div
                   key={repo.id}
-                  href={repo.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
                   className="group flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/50"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex size-8 items-center justify-center rounded bg-muted">
+                  <a
+                    href={repo.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 min-w-0 flex-1"
+                  >
+                    <div className="flex size-8 items-center justify-center rounded bg-muted shrink-0">
                       <ProviderIcon className="size-4 text-muted-foreground" />
                     </div>
                     <div className="min-w-0">
@@ -91,14 +94,29 @@ export function ProjectReposSection({ repositories, isLoading, className, onConn
                         </p>
                       )}
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
+                  </a>
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
                     <Badge variant={repo.isActive ? 'default' : 'secondary'} className="text-xs">
                       {repo.isActive ? 'Active' : 'Inactive'}
                     </Badge>
                     <ExternalLink className="size-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                    {onDisconnect && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="size-7 opacity-0 transition-opacity group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                        aria-label={`Disconnect ${repo.fullName || repo.name}`}
+                        onClick={() => {
+                          if (window.confirm(`Disconnect "${repo.fullName || repo.name}" from this project?`)) {
+                            onDisconnect(repo.id);
+                          }
+                        }}
+                      >
+                        <Unlink className="size-3.5" />
+                      </Button>
+                    )}
                   </div>
-                </a>
+                </div>
               );
             })}
           </div>

@@ -38,6 +38,7 @@ vi.mock('@/hooks/useApi', () => ({
   useConnectors: () => ({ data: [] }),
   useAvailableRepos: () => ({ data: [], isLoading: false }),
   useConnectRepo: () => ({ mutateAsync: vi.fn() }),
+  useDisconnectRepo: () => ({ mutateAsync: vi.fn() }),
 }));
 
 const mockProject = {
