@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import type { ToolEvent } from '@/lib/types';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -76,6 +77,30 @@ const TOOL_NAME_MAP: Record<string, string> = {
   'openai': 'OpenAI',
   'anthropic': 'Anthropic',
 };
+
+/**
+ * Map a ToolEvent API response to the EventRow shape expected by EventsTable.
+ */
+export function toEventRow(e: ToolEvent) {
+  return {
+    id: e.id,
+    tool_name: e.toolName,
+    event_type: e.eventType,
+    risk_level: e.riskLevel,
+    cost_usd: e.costUsd,
+    token_count: (e.inputTokens || 0) + (e.outputTokens || 0),
+    created_at: e.occurredAt || e.createdAt,
+    user: e.user ? { email: e.user.email } : undefined,
+    project: e.project ? { name: e.project.name } : undefined,
+  };
+}
+
+/**
+ * Return a member's display name, falling back to the email local-part.
+ */
+export function getMemberDisplayName(member: { name?: string | null; email: string }): string {
+  return member.name ?? member.email.split('@')[0];
+}
 
 /**
  * Humanize a tool name for display

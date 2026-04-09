@@ -1021,7 +1021,7 @@ export interface EventsParams {
   project_id?: string;
 }
 
-export function useEvents(orgId: string, params?: EventsParams) {
+export function useEvents(orgId: string, params?: EventsParams, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.events.all(orgId, params),
     queryFn: () => {
@@ -1038,7 +1038,7 @@ export function useEvents(orgId: string, params?: EventsParams) {
         `/organizations/${orgId}/events${query ? `?${query}` : ''}`
       );
     },
-    enabled: !!orgId,
+    enabled: options?.enabled !== false && !!orgId,
   });
 }
 

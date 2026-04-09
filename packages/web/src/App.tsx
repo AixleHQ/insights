@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { OrgProvider } from './contexts/OrgContext';
@@ -39,7 +39,12 @@ import {
 
 function TeamIdRedirect() {
   const { id } = useParams<{ id: string }>();
-  return <Navigate to={`/settings/members/${id}`} replace />;
+  const [searchParams] = useSearchParams();
+  const projectId = searchParams.get('projectId');
+  const to = projectId
+    ? `/settings/members/${id}?projectId=${projectId}`
+    : `/settings/members/${id}`;
+  return <Navigate to={to} replace />;
 }
 
 function EditProjectRedirect() {

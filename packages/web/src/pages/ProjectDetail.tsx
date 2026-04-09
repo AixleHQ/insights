@@ -1,6 +1,7 @@
 import { useMemo, useState, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
+  AlertCircle,
   ArrowLeft,
   Activity,
   DollarSign,
@@ -19,10 +20,13 @@ import {
   useProjectDailyByTool,
   useProjectRepositories,
   useDisconnectRepo,
+  useProjectMembers,
+  type ProjectMember,
 } from '@/hooks/useApi';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Card,
   CardContent,
@@ -37,10 +41,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { EventsTable, EventDrawer, type EventRow } from '@/components/events';
+import { EventsTable, EventDrawer, FilterChip, type EventRow } from '@/components/events';
 import { ToolUsageByDayChart } from '@/components/dashboard';
 import { ProjectReposSection, ProjectNotFound, ConnectRepoSheet } from '@/components/project';
-import { formatDistanceToNow } from '@/lib/utils';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { formatDistanceToNow, toEventRow, getMemberDisplayName } from '@/lib/utils';
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -88,30 +99,27 @@ export function ProjectDetail() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [connectRepoOpen, setConnectRepoOpen] = useState(false);
 
+  const [selectedUserId, setSelectedUserId] = useState<string | undefined>(undefined);
+
   const { data: project, isLoading: isLoadingProject } = useProject(id || '');
-  const { data: eventsResponse, isLoading: isLoadingEvents } = useEvents(
+  const { data: projectMembers } = useProjectMembers(id || '');
+  const { data: eventsResponse, isLoading: isLoadingEvents, isError: isEventsError } = useEvents(
     currentOrg?.id || '',
-    { project_id: id, per_page: 10 }
+    { project_id: id, per_page: 10, user_id: selectedUserId }
   );
   const { data: dailyByToolData, isLoading: isLoadingDailyByTool } = useProjectDailyByTool(id || '');
   const { data: projectRepositories, isLoading: isLoadingRepositories } = useProjectRepositories(id || '');
   const disconnectRepo = useDisconnectRepo(id || '');
   const deleteProject = useDeleteProject();
 
-  // Transform events for the table
-  const events: EventRow[] = useMemo(() => {
-    return eventsResponse?.data?.map((e) => ({
-      id: e.id,
-      tool_name: e.toolName,
-      event_type: e.eventType,
-      risk_level: e.riskLevel,
-      cost_usd: e.costUsd,
-      token_count: (e.inputTokens || 0) + (e.outputTokens || 0),
-      created_at: e.occurredAt || e.createdAt,
-      user: e.user ? { email: e.user.email } : undefined,
-      project: e.project ? { name: e.project.name } : undefined,
-    })) || [];
-  }, [eventsResponse]);
+  const events: EventRow[] = useMemo(
+    () => eventsResponse?.data?.map(toEventRow) ?? [],
+    [eventsResponse]
+  );
+
+  const selectedMember = selectedUserId
+    ? projectMembers?.find((m) => m.userId === selectedUserId)
+    : undefined;
 
   const handleEventClick = useCallback((eventId: string) => {
     setSelectedEventId(eventId);
@@ -274,13 +282,47 @@ export function ProjectDetail() {
             Latest AI tool activity for this project
           </CardDescription>
         </CardHeader>
+        {projectMembers && projectMembers.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 px-6 pb-3">
+            <Select
+              value={selectedUserId ?? '__all__'}
+              onValueChange={(val) => setSelectedUserId(val === '__all__' ? undefined : val)}
+            >
+              <SelectTrigger className="h-8 w-[180px] text-sm">
+                <SelectValue placeholder="All members" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All members</SelectItem>
+                {projectMembers.map((member: ProjectMember) => (
+                  <SelectItem key={member.userId} value={member.userId}>
+                    {getMemberDisplayName(member)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedUserId && selectedMember && (
+              <FilterChip
+                label="Member"
+                value={getMemberDisplayName(selectedMember)}
+                onRemove={() => setSelectedUserId(undefined)}
+              />
+            )}
+          </div>
+        )}
         <CardContent className="p-0">
-          <EventsTable
-            events={events}
-            isLoading={isLoadingEvents}
-            onEventClick={handleEventClick}
-            selectedEventId={selectedEventId}
-          />
+          {isEventsError ? (
+            <Alert variant="destructive" className="m-4">
+              <AlertCircle className="size-4" />
+              <AlertDescription>Failed to load events. Please try again.</AlertDescription>
+            </Alert>
+          ) : (
+            <EventsTable
+              events={events}
+              isLoading={isLoadingEvents}
+              onEventClick={handleEventClick}
+              selectedEventId={selectedEventId}
+            />
+          )}
         </CardContent>
       </Card>
 

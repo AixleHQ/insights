@@ -332,6 +332,78 @@ RSpec.describe 'Api::V1::Projects', type: :request do
     end
   end
 
+  describe 'GET /api/v1/projects/:id/stats/commits_by_user' do
+    let!(:project) { create(:project, organization: organization, owner: nil) }
+    let!(:other_member) { create(:user) }
+
+    context 'with commit events' do
+      before do
+        create(:tool_event, project: project, organization: organization,
+               user: user, event_type: 'commit', tool_name: 'github_copilot',
+               occurred_at: 1.day.ago)
+        create(:tool_event, project: project, organization: organization,
+               user: user, event_type: 'commit', tool_name: 'github_copilot',
+               occurred_at: 2.days.ago)
+        create(:tool_event, project: project, organization: organization,
+               user: other_member, event_type: 'commit', tool_name: 'github_copilot',
+               occurred_at: 1.day.ago)
+      end
+
+      it 'returns pagination meta' do
+        authenticated_get "/api/v1/projects/#{project.id}/stats/commits_by_user", user: user
+
+        expect_success
+        expect(json_response[:meta]).to include(
+          :current_page, :total_pages, :total_count, :per_page
+        )
+      end
+
+      it 'returns commit counts grouped by user' do
+        authenticated_get "/api/v1/projects/#{project.id}/stats/commits_by_user", user: user
+
+        expect_success
+        data = json_response[:data]
+        top_user = data.find { |d| d[:userId] == user.id }
+        expect(top_user[:commitCount]).to eq(2)
+      end
+
+      it 'respects per_page param' do
+        authenticated_get "/api/v1/projects/#{project.id}/stats/commits_by_user",
+                          user: user, params: { per_page: 1 }
+
+        expect_success
+        expect(json_response[:data].length).to eq(1)
+        expect(json_response[:meta][:total_count]).to eq(2)
+        expect(json_response[:meta][:total_pages]).to eq(2)
+      end
+
+      it 'respects page param' do
+        authenticated_get "/api/v1/projects/#{project.id}/stats/commits_by_user",
+                          user: user, params: { per_page: 1, page: 2 }
+
+        expect_success
+        expect(json_response[:data].length).to eq(1)
+        expect(json_response[:meta][:current_page]).to eq(2)
+      end
+    end
+
+    context 'without commit events' do
+      it 'returns empty data with pagination meta' do
+        authenticated_get "/api/v1/projects/#{project.id}/stats/commits_by_user", user: user
+
+        expect_success
+        expect(json_response[:data]).to eq([])
+        expect(json_response[:meta][:total_count]).to eq(0)
+      end
+    end
+
+    it 'returns 403 for unauthorized users' do
+      authenticated_get "/api/v1/projects/#{project.id}/stats/commits_by_user", user: other_user
+
+      expect_forbidden
+    end
+  end
+
   describe 'PATCH /api/v1/projects/:id/retention_policy' do
     let!(:project) { create(:project, organization: organization, owner: nil) }
     let!(:project_membership) { create(:project_membership, project: project, user: user, role: 'admin') }

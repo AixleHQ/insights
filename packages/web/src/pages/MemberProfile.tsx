@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Mail,
@@ -19,9 +19,10 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   Layers,
+  GitCommitHorizontal,
 } from 'lucide-react';
 import { useOrg } from '@/contexts/OrgContext';
-import { useMember, useMemberEvents, useMemberStats } from '@/hooks/useApi';
+import { useMember, useMemberEvents, useMemberStats, useProject, useEvents } from '@/hooks/useApi';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -40,7 +41,7 @@ import { EventsTable, type EventRow } from '@/components/events';
 import { ActivityHeatmap } from '@/components/dashboard';
 import { SortButton, type SortDirection } from '@/components/ui/sort-button';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { cn, humanizeToolName } from '@/lib/utils';
+import { cn, humanizeToolName, toEventRow } from '@/lib/utils';
 
 type MemberRole = 'owner' | 'admin' | 'member' | 'viewer';
 
@@ -132,9 +133,11 @@ export interface MemberProfileViewProps {
   memberId: string;
   /** When true, hides the standalone page header (back control, avatar, identity row) for use inside User Settings. */
   embedded?: boolean;
+  /** When set, shows a project-scoped commit history section. */
+  projectId?: string;
 }
 
-export function MemberProfileView({ memberId, embedded = false }: MemberProfileViewProps) {
+export function MemberProfileView({ memberId, embedded = false, projectId }: MemberProfileViewProps) {
   const { currentOrg } = useOrg();
 
   // Tool usage sorting state
@@ -153,21 +156,24 @@ export function MemberProfileView({ memberId, embedded = false }: MemberProfileV
     { per_page: 10 }
   );
 
-  // Transform events to EventRow format
-  const events: EventRow[] = useMemo(() => {
-    if (!eventsResponse?.data) return [];
-    return eventsResponse.data.map((e) => ({
-      id: e.id,
-      tool_name: e.toolName,
-      event_type: e.eventType,
-      risk_level: e.riskLevel,
-      cost_usd: e.costUsd,
-      token_count: (e.inputTokens || 0) + (e.outputTokens || 0),
-      created_at: e.occurredAt || e.createdAt,
-      user: e.user ? { email: e.user.email } : undefined,
-      project: e.project ? { name: e.project.name } : undefined,
-    }));
-  }, [eventsResponse]);
+  const [projectCommitsPage, setProjectCommitsPage] = useState(1);
+
+  const { data: projectData } = useProject(projectId || '');
+  const { data: projectCommitsResponse, isLoading: projectCommitsLoading } = useEvents(
+    currentOrg?.id || '',
+    { user_id: member?.user_id, project_id: projectId, event_type: 'commit', per_page: 20, page: projectCommitsPage },
+    { enabled: !!projectId && !!member?.user_id }
+  );
+
+  const events: EventRow[] = useMemo(
+    () => eventsResponse?.data?.map(toEventRow) ?? [],
+    [eventsResponse]
+  );
+
+  const projectCommits: EventRow[] = useMemo(
+    () => projectCommitsResponse?.data?.map(toEventRow) ?? [],
+    [projectCommitsResponse]
+  );
 
   const handleToolSort = (field: ToolSortField) => {
     if (toolSortField === field) {
@@ -670,11 +676,57 @@ export function MemberProfileView({ memberId, embedded = false }: MemberProfileV
           />
         </CardContent>
       </Card>
+
+      {projectId && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <GitCommitHorizontal className="size-4" />
+              Commits in {projectData?.name ?? 'Project'}
+            </CardTitle>
+            <CardDescription>
+              Commit history for this member scoped to the project
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="px-0 pb-0">
+            <EventsTable
+              events={projectCommits}
+              isLoading={projectCommitsLoading}
+              className="border-0 rounded-none"
+            />
+            {projectCommitsResponse?.meta && projectCommitsResponse.meta.total_pages > 1 && (
+              <div className="flex items-center justify-end gap-2 px-6 py-3 text-sm text-muted-foreground">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setProjectCommitsPage((p) => Math.max(1, p - 1))}
+                  disabled={projectCommitsPage === 1}
+                >
+                  Previous
+                </Button>
+                <span className="text-xs">
+                  Page {projectCommitsPage} of {projectCommitsResponse.meta.total_pages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setProjectCommitsPage((p) => Math.min(projectCommitsResponse.meta.total_pages, p + 1))}
+                  disabled={projectCommitsPage === projectCommitsResponse.meta.total_pages}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
 
 export function MemberProfile() {
   const { id } = useParams<{ id: string }>();
-  return <MemberProfileView memberId={id ?? ''} />;
+  const [searchParams] = useSearchParams();
+  const projectId = searchParams.get('projectId') ?? undefined;
+  return <MemberProfileView key={projectId ?? ''} memberId={id ?? ''} projectId={projectId} />;
 }

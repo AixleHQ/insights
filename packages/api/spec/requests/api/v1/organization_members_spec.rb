@@ -84,13 +84,30 @@ RSpec.describe 'Api::V1::OrganizationMembers', type: :request do
   end
 
   describe 'GET /api/v1/organizations/:organization_id/members/:id' do
-    it 'returns the membership' do
+    it 'returns the membership by membership id' do
       authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}",
                         user: member,
                         organization: organization
 
       expect_success
       expect(json_data[:id]).to eq(member_membership.id)
+    end
+
+    it 'returns the membership when :id is the user uuid' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member.id}",
+                        user: member,
+                        organization: organization
+
+      expect_success
+      expect(json_data[:id]).to eq(member_membership.id)
+    end
+
+    it 'returns 404 when neither membership id nor user id matches' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/nonexistent-id",
+                        user: member,
+                        organization: organization
+
+      expect_not_found
     end
   end
 

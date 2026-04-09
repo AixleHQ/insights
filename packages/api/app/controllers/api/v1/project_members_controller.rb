@@ -103,7 +103,7 @@ module Api
       end
 
       def set_membership
-        @membership = @project.project_memberships.find(params[:id])
+        @membership = @project.project_memberships.includes(:user).find(params[:id])
       end
 
       def membership_params

@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn, formatDistanceToNow } from '@/lib/utils';
+import { cn, formatDistanceToNow, getMemberDisplayName } from '@/lib/utils';
 import type { ProjectMember, MemberCommitStat } from '@/hooks/useApi';
 
 interface ProjectTeamSectionProps {
@@ -12,6 +12,7 @@ interface ProjectTeamSectionProps {
   isLoading?: boolean;
   className?: string;
   commitStats?: MemberCommitStat[];
+  projectId?: string;
 }
 
 function getInitials(name?: string | null, email?: string): string {
@@ -33,7 +34,7 @@ const roleColors: Record<string, string> = {
   viewer: 'bg-slate-500/10 text-slate-400',
 };
 
-export function ProjectTeamSection({ members, isLoading, className, commitStats }: ProjectTeamSectionProps) {
+export function ProjectTeamSection({ members, isLoading, className, commitStats, projectId }: ProjectTeamSectionProps) {
   const commitsByUserId = new Map(commitStats?.map((s) => [s.userId, s]) ?? []);
   if (isLoading) {
     return (
@@ -77,7 +78,7 @@ export function ProjectTeamSection({ members, isLoading, className, commitStats 
               return (
                 <Link
                   key={member.id}
-                  to={`/team/${member.userId}`}
+                  to={projectId ? `/team/${member.userId}?projectId=${projectId}` : `/team/${member.userId}`}
                   className="group flex items-center gap-2 rounded-lg border p-2 transition-colors hover:bg-muted/50"
                 >
                   <Avatar className="size-8">
@@ -88,7 +89,7 @@ export function ProjectTeamSection({ members, isLoading, className, commitStats 
                   </Avatar>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium group-hover:underline">
-                      {member.name || member.email.split('@')[0]}
+                      {getMemberDisplayName(member)}
                     </p>
                     <Badge variant="outline" className={cn('text-[10px] px-1.5 py-0', roleColors[member.role])}>
                       {member.role}

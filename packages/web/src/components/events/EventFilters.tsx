@@ -46,7 +46,7 @@ const eventTypes = [
   { value: 'file_operation', label: 'File Operation' },
 ];
 
-function FilterChip({
+export function FilterChip({
   label,
   value,
   onRemove,

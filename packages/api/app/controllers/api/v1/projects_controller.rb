@@ -244,7 +244,8 @@ module Api
           }
         end.sort_by { |d| -d[:commitCount] }
 
-        render json: { data: data }
+        paged = paginate(Kaminari.paginate_array(data))
+        render json: { data: paged, meta: pagination_meta(paged) }
       end
 
       # GET /api/v1/projects/:id/members
