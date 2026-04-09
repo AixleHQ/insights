@@ -339,13 +339,13 @@ RSpec.describe 'Api::V1::Projects', type: :request do
     context 'with commit events' do
       before do
         create(:tool_event, project: project, organization: organization,
-               user: user, event_type: 'commit', tool_name: 'github',
+               user: user, event_type: 'commit', tool_name: 'github_copilot',
                occurred_at: 1.day.ago)
         create(:tool_event, project: project, organization: organization,
-               user: user, event_type: 'commit', tool_name: 'github',
+               user: user, event_type: 'commit', tool_name: 'github_copilot',
                occurred_at: 2.days.ago)
         create(:tool_event, project: project, organization: organization,
-               user: other_member, event_type: 'commit', tool_name: 'github',
+               user: other_member, event_type: 'commit', tool_name: 'github_copilot',
                occurred_at: 1.day.ago)
       end
 

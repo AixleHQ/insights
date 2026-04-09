@@ -283,14 +283,14 @@ export function ProjectDetail() {
         {projectMembers && projectMembers.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 px-6 pb-3">
             <Select
-              value={selectedUserId ?? ''}
-              onValueChange={(val) => setSelectedUserId(val || undefined)}
+              value={selectedUserId ?? '__all__'}
+              onValueChange={(val) => setSelectedUserId(val === '__all__' ? undefined : val)}
             >
               <SelectTrigger className="h-8 w-[180px] text-sm">
                 <SelectValue placeholder="All members" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All members</SelectItem>
+                <SelectItem value="__all__">All members</SelectItem>
                 {projectMembers.map((member: ProjectMember) => (
                   <SelectItem key={member.userId} value={member.userId}>
                     {getMemberDisplayName(member)}
