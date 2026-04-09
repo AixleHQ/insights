@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -157,7 +157,6 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
   );
 
   const [projectCommitsPage, setProjectCommitsPage] = useState(1);
-  useEffect(() => { setProjectCommitsPage(1); }, [projectId]);
 
   const { data: projectData } = useProject(projectId || '');
   const { data: projectCommitsResponse, isLoading: projectCommitsLoading } = useEvents(
@@ -729,5 +728,5 @@ export function MemberProfile() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const projectId = searchParams.get('projectId') ?? undefined;
-  return <MemberProfileView memberId={id ?? ''} projectId={projectId} />;
+  return <MemberProfileView key={projectId ?? ''} memberId={id ?? ''} projectId={projectId} />;
 }
