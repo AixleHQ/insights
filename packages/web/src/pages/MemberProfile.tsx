@@ -41,7 +41,7 @@ import { EventsTable, type EventRow } from '@/components/events';
 import { ActivityHeatmap } from '@/components/dashboard';
 import { SortButton, type SortDirection } from '@/components/ui/sort-button';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { cn, humanizeToolName } from '@/lib/utils';
+import { cn, humanizeToolName, toEventRow } from '@/lib/utils';
 
 type MemberRole = 'owner' | 'admin' | 'member' | 'viewer';
 
@@ -163,36 +163,15 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
     { enabled: !!projectId && !!member?.user_id }
   );
 
-  // Transform events to EventRow format
-  const events: EventRow[] = useMemo(() => {
-    if (!eventsResponse?.data) return [];
-    return eventsResponse.data.map((e) => ({
-      id: e.id,
-      tool_name: e.toolName,
-      event_type: e.eventType,
-      risk_level: e.riskLevel,
-      cost_usd: e.costUsd,
-      token_count: (e.inputTokens || 0) + (e.outputTokens || 0),
-      created_at: e.occurredAt || e.createdAt,
-      user: e.user ? { email: e.user.email } : undefined,
-      project: e.project ? { name: e.project.name } : undefined,
-    }));
-  }, [eventsResponse]);
+  const events: EventRow[] = useMemo(
+    () => eventsResponse?.data?.map(toEventRow) ?? [],
+    [eventsResponse]
+  );
 
-  const projectCommits: EventRow[] = useMemo(() => {
-    if (!projectCommitsResponse?.data) return [];
-    return projectCommitsResponse.data.map((e) => ({
-      id: e.id,
-      tool_name: e.toolName,
-      event_type: e.eventType,
-      risk_level: e.riskLevel,
-      cost_usd: e.costUsd,
-      token_count: (e.inputTokens || 0) + (e.outputTokens || 0),
-      created_at: e.occurredAt || e.createdAt,
-      user: e.user ? { email: e.user.email } : undefined,
-      project: e.project ? { name: e.project.name } : undefined,
-    }));
-  }, [projectCommitsResponse]);
+  const projectCommits: EventRow[] = useMemo(
+    () => projectCommitsResponse?.data?.map(toEventRow) ?? [],
+    [projectCommitsResponse]
+  );
 
   const handleToolSort = (field: ToolSortField) => {
     if (toolSortField === field) {
@@ -696,7 +675,6 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
         </CardContent>
       </Card>
 
-      {/* Project-scoped Commits */}
       {projectId && (
         <Card>
           <CardHeader>

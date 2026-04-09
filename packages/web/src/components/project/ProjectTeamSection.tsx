@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn, formatDistanceToNow } from '@/lib/utils';
+import { cn, formatDistanceToNow, getMemberDisplayName } from '@/lib/utils';
 import type { ProjectMember, MemberCommitStat } from '@/hooks/useApi';
 
 interface ProjectTeamSectionProps {
@@ -89,7 +89,7 @@ export function ProjectTeamSection({ members, isLoading, className, commitStats,
                   </Avatar>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium group-hover:underline">
-                      {member.name || member.email.split('@')[0]}
+                      {getMemberDisplayName(member)}
                     </p>
                     <Badge variant="outline" className={cn('text-[10px] px-1.5 py-0', roleColors[member.role])}>
                       {member.role}

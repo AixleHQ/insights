@@ -49,7 +49,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { formatDistanceToNow } from '@/lib/utils';
+import { formatDistanceToNow, toEventRow, getMemberDisplayName } from '@/lib/utils';
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -110,20 +110,14 @@ export function ProjectDetail() {
   const disconnectRepo = useDisconnectRepo(id || '');
   const deleteProject = useDeleteProject();
 
-  // Transform events for the table
-  const events: EventRow[] = useMemo(() => {
-    return eventsResponse?.data?.map((e) => ({
-      id: e.id,
-      tool_name: e.toolName,
-      event_type: e.eventType,
-      risk_level: e.riskLevel,
-      cost_usd: e.costUsd,
-      token_count: (e.inputTokens || 0) + (e.outputTokens || 0),
-      created_at: e.occurredAt || e.createdAt,
-      user: e.user ? { email: e.user.email } : undefined,
-      project: e.project ? { name: e.project.name } : undefined,
-    })) || [];
-  }, [eventsResponse]);
+  const events: EventRow[] = useMemo(
+    () => eventsResponse?.data?.map(toEventRow) ?? [],
+    [eventsResponse]
+  );
+
+  const selectedMember = selectedUserId
+    ? projectMembers?.find((m) => m.userId === selectedUserId)
+    : undefined;
 
   const handleEventClick = useCallback((eventId: string) => {
     setSelectedEventId(eventId);
@@ -299,19 +293,15 @@ export function ProjectDetail() {
                 <SelectItem value="">All members</SelectItem>
                 {projectMembers.map((member: ProjectMember) => (
                   <SelectItem key={member.userId} value={member.userId}>
-                    {member.name ?? member.email.split('@')[0]}
+                    {getMemberDisplayName(member)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {selectedUserId && (
+            {selectedUserId && selectedMember && (
               <FilterChip
                 label="Member"
-                value={
-                  projectMembers.find((m: ProjectMember) => m.userId === selectedUserId)?.name ??
-                  projectMembers.find((m: ProjectMember) => m.userId === selectedUserId)?.email.split('@')[0] ??
-                  'Selected'
-                }
+                value={getMemberDisplayName(selectedMember)}
                 onRemove={() => setSelectedUserId(undefined)}
               />
             )}
