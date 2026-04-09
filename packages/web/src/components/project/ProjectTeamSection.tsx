@@ -12,6 +12,7 @@ interface ProjectTeamSectionProps {
   isLoading?: boolean;
   className?: string;
   commitStats?: MemberCommitStat[];
+  projectId?: string;
 }
 
 function getInitials(name?: string | null, email?: string): string {
@@ -33,7 +34,7 @@ const roleColors: Record<string, string> = {
   viewer: 'bg-slate-500/10 text-slate-400',
 };
 
-export function ProjectTeamSection({ members, isLoading, className, commitStats }: ProjectTeamSectionProps) {
+export function ProjectTeamSection({ members, isLoading, className, commitStats, projectId }: ProjectTeamSectionProps) {
   const commitsByUserId = new Map(commitStats?.map((s) => [s.userId, s]) ?? []);
   if (isLoading) {
     return (
@@ -77,7 +78,7 @@ export function ProjectTeamSection({ members, isLoading, className, commitStats 
               return (
                 <Link
                   key={member.id}
-                  to={`/team/${member.userId}`}
+                  to={projectId ? `/team/${member.userId}?projectId=${projectId}` : `/team/${member.userId}`}
                   className="group flex items-center gap-2 rounded-lg border p-2 transition-colors hover:bg-muted/50"
                 >
                   <Avatar className="size-8">

@@ -75,6 +75,20 @@ describe('ProjectTeamSection', () => {
       expect(links[0]).toHaveAttribute('href', '/team/user-1');
       expect(links[1]).toHaveAttribute('href', '/team/user-2');
     });
+
+    it('appends projectId query param to links when projectId is provided', () => {
+      renderComponent({ projectId: 'proj-abc' });
+      const links = screen.getAllByRole('link');
+      expect(links[0]).toHaveAttribute('href', '/team/user-1?projectId=proj-abc');
+      expect(links[1]).toHaveAttribute('href', '/team/user-2?projectId=proj-abc');
+    });
+
+    it('does not append projectId when prop is omitted', () => {
+      renderComponent();
+      const links = screen.getAllByRole('link');
+      expect(links[0]).toHaveAttribute('href', '/team/user-1');
+      expect(links[1]).toHaveAttribute('href', '/team/user-2');
+    });
   });
 
   describe('Avatar Display', () => {

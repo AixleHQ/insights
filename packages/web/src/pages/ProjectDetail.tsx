@@ -19,6 +19,8 @@ import {
   useProjectDailyByTool,
   useProjectRepositories,
   useDisconnectRepo,
+  useProjectMembers,
+  type ProjectMember,
 } from '@/hooks/useApi';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -37,9 +39,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { EventsTable, EventDrawer, type EventRow } from '@/components/events';
+import { EventsTable, EventDrawer, FilterChip, type EventRow } from '@/components/events';
 import { ToolUsageByDayChart } from '@/components/dashboard';
 import { ProjectReposSection, ProjectNotFound, ConnectRepoSheet } from '@/components/project';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { formatDistanceToNow } from '@/lib/utils';
 
 function formatCurrency(value: number): string {
@@ -88,10 +97,13 @@ export function ProjectDetail() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [connectRepoOpen, setConnectRepoOpen] = useState(false);
 
+  const [selectedUserId, setSelectedUserId] = useState<string | undefined>(undefined);
+
   const { data: project, isLoading: isLoadingProject } = useProject(id || '');
+  const { data: projectMembers } = useProjectMembers(id || '');
   const { data: eventsResponse, isLoading: isLoadingEvents } = useEvents(
     currentOrg?.id || '',
-    { project_id: id, per_page: 10 }
+    { project_id: id, per_page: 10, user_id: selectedUserId }
   );
   const { data: dailyByToolData, isLoading: isLoadingDailyByTool } = useProjectDailyByTool(id || '');
   const { data: projectRepositories, isLoading: isLoadingRepositories } = useProjectRepositories(id || '');
@@ -274,6 +286,37 @@ export function ProjectDetail() {
             Latest AI tool activity for this project
           </CardDescription>
         </CardHeader>
+        {projectMembers && projectMembers.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 px-6 pb-3">
+            <Select
+              value={selectedUserId ?? ''}
+              onValueChange={(val) => setSelectedUserId(val || undefined)}
+            >
+              <SelectTrigger className="h-8 w-[180px] text-sm">
+                <SelectValue placeholder="All members" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">All members</SelectItem>
+                {projectMembers.map((member: ProjectMember) => (
+                  <SelectItem key={member.userId} value={member.userId}>
+                    {member.name ?? member.email.split('@')[0]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedUserId && (
+              <FilterChip
+                label="Member"
+                value={
+                  projectMembers.find((m: ProjectMember) => m.userId === selectedUserId)?.name ??
+                  projectMembers.find((m: ProjectMember) => m.userId === selectedUserId)?.email.split('@')[0] ??
+                  'Selected'
+                }
+                onRemove={() => setSelectedUserId(undefined)}
+              />
+            )}
+          </div>
+        )}
         <CardContent className="p-0">
           <EventsTable
             events={events}

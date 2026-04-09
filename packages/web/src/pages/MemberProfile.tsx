@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Mail,
@@ -19,9 +19,10 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   Layers,
+  GitCommitHorizontal,
 } from 'lucide-react';
 import { useOrg } from '@/contexts/OrgContext';
-import { useMember, useMemberEvents, useMemberStats } from '@/hooks/useApi';
+import { useMember, useMemberEvents, useMemberStats, useProject, useEvents } from '@/hooks/useApi';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -132,9 +133,11 @@ export interface MemberProfileViewProps {
   memberId: string;
   /** When true, hides the standalone page header (back control, avatar, identity row) for use inside User Settings. */
   embedded?: boolean;
+  /** When set, shows a project-scoped commit history section. */
+  projectId?: string;
 }
 
-export function MemberProfileView({ memberId, embedded = false }: MemberProfileViewProps) {
+export function MemberProfileView({ memberId, embedded = false, projectId }: MemberProfileViewProps) {
   const { currentOrg } = useOrg();
 
   // Tool usage sorting state
@@ -153,6 +156,13 @@ export function MemberProfileView({ memberId, embedded = false }: MemberProfileV
     { per_page: 10 }
   );
 
+  const { data: projectData } = useProject(projectId || '');
+  const { data: projectCommitsResponse, isLoading: projectCommitsLoading } = useEvents(
+    currentOrg?.id || '',
+    { user_id: member?.user_id, project_id: projectId, event_type: 'commit', per_page: 20 },
+    { enabled: !!projectId && !!member?.user_id }
+  );
+
   // Transform events to EventRow format
   const events: EventRow[] = useMemo(() => {
     if (!eventsResponse?.data) return [];
@@ -168,6 +178,21 @@ export function MemberProfileView({ memberId, embedded = false }: MemberProfileV
       project: e.project ? { name: e.project.name } : undefined,
     }));
   }, [eventsResponse]);
+
+  const projectCommits: EventRow[] = useMemo(() => {
+    if (!projectCommitsResponse?.data) return [];
+    return projectCommitsResponse.data.map((e) => ({
+      id: e.id,
+      tool_name: e.toolName,
+      event_type: e.eventType,
+      risk_level: e.riskLevel,
+      cost_usd: e.costUsd,
+      token_count: (e.inputTokens || 0) + (e.outputTokens || 0),
+      created_at: e.occurredAt || e.createdAt,
+      user: e.user ? { email: e.user.email } : undefined,
+      project: e.project ? { name: e.project.name } : undefined,
+    }));
+  }, [projectCommitsResponse]);
 
   const handleToolSort = (field: ToolSortField) => {
     if (toolSortField === field) {
@@ -670,11 +695,35 @@ export function MemberProfileView({ memberId, embedded = false }: MemberProfileV
           />
         </CardContent>
       </Card>
+
+      {/* Project-scoped Commits */}
+      {projectId && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <GitCommitHorizontal className="size-4" />
+              Commits in {projectData?.name ?? 'Project'}
+            </CardTitle>
+            <CardDescription>
+              Commit history for this member scoped to the project
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="px-0 pb-0">
+            <EventsTable
+              events={projectCommits}
+              isLoading={projectCommitsLoading}
+              className="border-0 rounded-none"
+            />
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
 
 export function MemberProfile() {
   const { id } = useParams<{ id: string }>();
-  return <MemberProfileView memberId={id ?? ''} />;
+  const [searchParams] = useSearchParams();
+  const projectId = searchParams.get('projectId') ?? undefined;
+  return <MemberProfileView memberId={id ?? ''} projectId={projectId} />;
 }

@@ -27,6 +27,7 @@ const mockUseEvent = vi.fn();
 const mockUseDeleteProject = vi.fn();
 const mockUseProjectDailyByTool = vi.fn();
 const mockUseProjectRepositories = vi.fn();
+const mockUseProjectMembers = vi.fn();
 
 vi.mock('@/hooks/useApi', () => ({
   useProject: (...args: unknown[]) => mockUseProject(...args),
@@ -35,6 +36,7 @@ vi.mock('@/hooks/useApi', () => ({
   useDeleteProject: () => mockUseDeleteProject(),
   useProjectDailyByTool: (...args: unknown[]) => mockUseProjectDailyByTool(...args),
   useProjectRepositories: (...args: unknown[]) => mockUseProjectRepositories(...args),
+  useProjectMembers: (...args: unknown[]) => mockUseProjectMembers(...args),
   useConnectors: () => ({ data: [] }),
   useAvailableRepos: () => ({ data: [], isLoading: false }),
   useConnectRepo: () => ({ mutateAsync: vi.fn() }),
@@ -52,6 +54,11 @@ const mockProject = {
   lastEventAt: '2026-03-20T10:30:00Z',
 };
 
+const mockMembers = [
+  { id: '1', userId: 'user-1', email: 'alice@example.com', name: 'Alice Johnson', avatarUrl: null, role: 'owner', joinedAt: '2024-01-01T00:00:00Z' },
+  { id: '2', userId: 'user-2', email: 'bob@example.com', name: null, avatarUrl: null, role: 'member', joinedAt: '2024-01-01T00:00:00Z' },
+];
+
 function setupDefaultMocks() {
   mockUseProject.mockReturnValue({ data: mockProject, isLoading: false });
   mockUseEvents.mockReturnValue({ data: { data: [] }, isLoading: false });
@@ -59,6 +66,7 @@ function setupDefaultMocks() {
   mockUseDeleteProject.mockReturnValue({ mutateAsync: vi.fn() });
   mockUseProjectDailyByTool.mockReturnValue({ data: undefined, isLoading: false });
   mockUseProjectRepositories.mockReturnValue({ data: undefined, isLoading: false });
+  mockUseProjectMembers.mockReturnValue({ data: mockMembers, isLoading: false });
 }
 
 describe('ProjectDetail', () => {
@@ -134,6 +142,53 @@ describe('ProjectDetail', () => {
       render(<ProjectDetail />);
 
       expect(screen.getByText('Inactive')).toBeInTheDocument();
+    });
+  });
+
+  describe('User filter', () => {
+    it('renders member filter dropdown when project has members', () => {
+      render(<ProjectDetail />);
+      expect(screen.getByRole('combobox')).toBeInTheDocument();
+    });
+
+    it('does not render filter dropdown when project has no members', () => {
+      mockUseProjectMembers.mockReturnValue({ data: [], isLoading: false });
+      render(<ProjectDetail />);
+      expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    });
+
+    it('does not render filter dropdown when members are undefined', () => {
+      mockUseProjectMembers.mockReturnValue({ data: undefined, isLoading: false });
+      render(<ProjectDetail />);
+      expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    });
+
+    it('passes user_id to useEvents when a member is selected', async () => {
+      const user = userEvent.setup();
+      render(<ProjectDetail />);
+
+      await user.click(screen.getByRole('combobox'));
+      await user.click(await screen.findByText('Alice Johnson'));
+
+      const lastCall = mockUseEvents.mock.calls[mockUseEvents.mock.calls.length - 1];
+      expect(lastCall[1]).toMatchObject({ user_id: 'user-1' });
+    });
+
+    it('falls back to email prefix for members without a name', async () => {
+      const user = userEvent.setup();
+      render(<ProjectDetail />);
+
+      await user.click(screen.getByRole('combobox'));
+      expect(await screen.findByText('bob')).toBeInTheDocument();
+    });
+
+    it('shows empty events without error when filtered user has no events', () => {
+      mockUseEvents.mockReturnValue({
+        data: { data: [], meta: { current_page: 1, total_pages: 0, total_count: 0, per_page: 10 } },
+        isLoading: false,
+      });
+      render(<ProjectDetail />);
+      expect(screen.getByText('Recent Events')).toBeInTheDocument();
     });
   });
 });
