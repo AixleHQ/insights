@@ -23,6 +23,17 @@ RSpec.describe 'Api::V1::ProjectMembers', type: :request do
       expect(json_data.length).to eq(3)
     end
 
+    it 'includes flat user fields (userId, email, name, avatarUrl, joinedAt)' do
+      authenticated_get "/api/v1/projects/#{project.id}/members", user: member
+
+      expect_success
+      record = json_data.find { |m| m[:userId] == member.id }
+      expect(record).to be_present
+      expect(record[:email]).to eq(member.email)
+      expect(record[:name]).to eq(member.name)
+      expect(record[:joinedAt]).to be_present
+    end
+
     it 'filters by role' do
       authenticated_get "/api/v1/projects/#{project.id}/members", user: member, params: { role: 'owner' }
 

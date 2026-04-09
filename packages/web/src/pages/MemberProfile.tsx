@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -156,10 +156,13 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
     { per_page: 10 }
   );
 
+  const [projectCommitsPage, setProjectCommitsPage] = useState(1);
+  useEffect(() => { setProjectCommitsPage(1); }, [projectId]);
+
   const { data: projectData } = useProject(projectId || '');
   const { data: projectCommitsResponse, isLoading: projectCommitsLoading } = useEvents(
     currentOrg?.id || '',
-    { user_id: member?.user_id, project_id: projectId, event_type: 'commit', per_page: 20 },
+    { user_id: member?.user_id, project_id: projectId, event_type: 'commit', per_page: 20, page: projectCommitsPage },
     { enabled: !!projectId && !!member?.user_id }
   );
 
@@ -692,6 +695,29 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
               isLoading={projectCommitsLoading}
               className="border-0 rounded-none"
             />
+            {projectCommitsResponse?.meta && projectCommitsResponse.meta.total_pages > 1 && (
+              <div className="flex items-center justify-end gap-2 px-6 py-3 text-sm text-muted-foreground">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setProjectCommitsPage((p) => Math.max(1, p - 1))}
+                  disabled={projectCommitsPage === 1}
+                >
+                  Previous
+                </Button>
+                <span className="text-xs">
+                  Page {projectCommitsPage} of {projectCommitsResponse.meta.total_pages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setProjectCommitsPage((p) => Math.min(projectCommitsResponse.meta.total_pages, p + 1))}
+                  disabled={projectCommitsPage === projectCommitsResponse.meta.total_pages}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

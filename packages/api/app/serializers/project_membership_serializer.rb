@@ -1,14 +1,21 @@
 # frozen_string_literal: true
 
 class ProjectMembershipSerializer < BaseSerializer
-  attributes :id, :role
-  timestamps
+  attributes :id, :role, :user_id, :project_id
 
-  attribute :user do |membership|
-    ::UserMinimalSerializer.new(membership.user).serializable_hash
+  attribute :email do |membership|
+    membership.user.email
   end
 
-  attribute :project_id do |membership|
-    membership.project_id
+  attribute :name do |membership|
+    membership.user.name
+  end
+
+  attribute :avatar_url do |membership|
+    membership.user.avatar_url
+  end
+
+  attribute :joined_at do |membership|
+    membership.created_at
   end
 end

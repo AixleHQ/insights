@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@/test/utils';
+import userEvent from '@testing-library/user-event';
 import { MemberProfileView } from './MemberProfile';
 
 vi.mock('@/contexts/OrgContext', () => ({
@@ -130,6 +131,68 @@ describe('MemberProfileView', () => {
         expect.objectContaining({ project_id: 'proj-1' }),
         expect.objectContaining({ enabled: false })
       );
+    });
+
+    it('shows loading state while project commits are loading', () => {
+      mockUseEvents.mockReturnValue({ data: undefined, isLoading: true });
+      render(<MemberProfileView memberId="mem-1" projectId="proj-1" />);
+      expect(screen.getByText('Commits in Frontend App')).toBeInTheDocument();
+    });
+
+    it('renders commits section without error when useEvents returns undefined data', () => {
+      mockUseEvents.mockReturnValue({ data: undefined, isLoading: false });
+      render(<MemberProfileView memberId="mem-1" projectId="proj-1" />);
+      expect(screen.getByText('Commits in Frontend App')).toBeInTheDocument();
+    });
+
+    it('renders commits section without crashing when useEvents returns an error', () => {
+      mockUseEvents.mockReturnValue({ data: undefined, isLoading: false, isError: true });
+      render(<MemberProfileView memberId="mem-1" projectId="proj-1" />);
+      expect(screen.getByText('Commits in Frontend App')).toBeInTheDocument();
+    });
+
+    describe('pagination', () => {
+      it('does not show pagination controls when there is only one page', () => {
+        mockUseEvents.mockReturnValue({
+          data: { data: [], meta: { current_page: 1, total_pages: 1, total_count: 5, per_page: 20 } },
+          isLoading: false,
+        });
+        render(<MemberProfileView memberId="mem-1" projectId="proj-1" />);
+        expect(screen.queryByRole('button', { name: /previous/i })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /next/i })).not.toBeInTheDocument();
+      });
+
+      it('shows Previous and Next buttons when there are multiple pages', () => {
+        mockUseEvents.mockReturnValue({
+          data: { data: [], meta: { current_page: 1, total_pages: 3, total_count: 50, per_page: 20 } },
+          isLoading: false,
+        });
+        render(<MemberProfileView memberId="mem-1" projectId="proj-1" />);
+        expect(screen.getByRole('button', { name: /previous/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /next/i })).toBeInTheDocument();
+      });
+
+      it('disables Previous on the first page', () => {
+        mockUseEvents.mockReturnValue({
+          data: { data: [], meta: { current_page: 1, total_pages: 3, total_count: 50, per_page: 20 } },
+          isLoading: false,
+        });
+        render(<MemberProfileView memberId="mem-1" projectId="proj-1" />);
+        expect(screen.getByRole('button', { name: /previous/i })).toBeDisabled();
+        expect(screen.getByRole('button', { name: /next/i })).toBeEnabled();
+      });
+
+      it('advances to page 2 when Next is clicked', async () => {
+        const user = userEvent.setup();
+        mockUseEvents.mockReturnValue({
+          data: { data: [], meta: { current_page: 1, total_pages: 3, total_count: 50, per_page: 20 } },
+          isLoading: false,
+        });
+        render(<MemberProfileView memberId="mem-1" projectId="proj-1" />);
+        await user.click(screen.getByRole('button', { name: /next/i }));
+        const lastCall = mockUseEvents.mock.calls[mockUseEvents.mock.calls.length - 1];
+        expect(lastCall[1]).toMatchObject({ page: 2 });
+      });
     });
   });
 });

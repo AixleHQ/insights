@@ -309,7 +309,10 @@ module Api
       private
 
       def set_membership
-        @membership = current_organization.organization_memberships.find(params[:id])
+        @membership = current_organization.organization_memberships
+          .where(id: params[:id]).or(
+            current_organization.organization_memberships.where(user_id: params[:id])
+          ).first!
       end
 
       def membership_params

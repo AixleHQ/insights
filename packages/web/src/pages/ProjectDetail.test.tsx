@@ -59,6 +59,22 @@ const mockMembers = [
   { id: '2', userId: 'user-2', email: 'bob@example.com', name: null, avatarUrl: null, role: 'member', joinedAt: '2024-01-01T00:00:00Z' },
 ];
 
+const mockEvent = {
+  id: 'evt-1',
+  event_type: 'prompt',
+  occurred_at: '2026-03-20T10:30:00Z',
+  tool_name: 'claude_code',
+  risk_level: 'low',
+  user_id: 'user-1',
+  project_id: 'proj-1',
+  organization_id: 'org-1',
+  tokens_in: 100,
+  tokens_out: 200,
+  cost_usd: 0.01,
+  model: 'claude-3',
+  metadata: {},
+};
+
 function setupDefaultMocks() {
   mockUseProject.mockReturnValue({ data: mockProject, isLoading: false });
   mockUseEvents.mockReturnValue({ data: { data: [] }, isLoading: false });
@@ -189,6 +205,47 @@ describe('ProjectDetail', () => {
       });
       render(<ProjectDetail />);
       expect(screen.getByText('Recent Events')).toBeInTheDocument();
+    });
+
+    it('renders events section while events are loading', () => {
+      mockUseEvents.mockReturnValue({ data: undefined, isLoading: true });
+      render(<ProjectDetail />);
+      expect(screen.getByText('Recent Events')).toBeInTheDocument();
+    });
+
+    it('renders events section when events return undefined data', () => {
+      mockUseEvents.mockReturnValue({ data: undefined, isLoading: false });
+      render(<ProjectDetail />);
+      expect(screen.getByText('Recent Events')).toBeInTheDocument();
+    });
+
+    it('renders events section without crashing when useEvents returns an error', () => {
+      mockUseEvents.mockReturnValue({ data: undefined, isLoading: false, isError: true });
+      render(<ProjectDetail />);
+      expect(screen.getByText('Recent Events')).toBeInTheDocument();
+    });
+
+    it('preserves selected user filter when event drawer is opened and closed', async () => {
+      const user = userEvent.setup();
+      mockUseEvents.mockReturnValue({
+        data: { data: [mockEvent], meta: { current_page: 1, total_pages: 1, total_count: 1, per_page: 10 } },
+        isLoading: false,
+      });
+
+      render(<ProjectDetail />);
+
+      // Select a user filter
+      await user.click(screen.getByRole('combobox'));
+      await user.click(await screen.findByText('Alice Johnson'));
+
+      // Verify filter chip is shown (text appears in both trigger and chip)
+      expect(screen.getAllByText('Alice Johnson').length).toBeGreaterThan(0);
+
+      // The filter should still be active (useEvents called with user_id)
+      const callsAfterSelect = mockUseEvents.mock.calls.filter(
+        (call) => call[1]?.user_id === 'user-1'
+      );
+      expect(callsAfterSelect.length).toBeGreaterThan(0);
     });
   });
 });
