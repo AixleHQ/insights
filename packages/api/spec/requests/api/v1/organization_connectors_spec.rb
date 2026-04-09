@@ -386,4 +386,108 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
       expect_forbidden
     end
   end
+
+  describe 'GET /api/v1/organizations/:organization_id/connectors/authorize/:type' do
+    let(:fake_provider) do
+      Class.new do
+        def self.authorization_url(organization_id:, redirect_uri:, state: nil)
+          "https://github.com/login/oauth/authorize?client_id=test&redirect_uri=#{redirect_uri}&state=#{organization_id}:abc123"
+        end
+      end
+    end
+
+    before do
+      allow(Oauth::BaseProvider).to receive(:provider_class).with('github').and_return(fake_provider)
+    end
+
+    it 'returns an authorization URL containing the frontend callback as redirect_uri' do
+      frontend_url = ENV.fetch('FRONTEND_URL', 'http://localhost:5173')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/authorize/github",
+                        user: admin,
+                        organization: organization
+
+      expect_success
+      authorize_url = json_data[:authorize_url]
+      expect(authorize_url).to include(CGI.escape("#{frontend_url}/integrations/callback"))
+    end
+
+    it 'returns 403 for org members' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/authorize/github",
+                        user: member,
+                        organization: organization
+
+      expect_forbidden
+    end
+  end
+
+  describe 'POST /api/v1/organizations/:organization_id/connectors/callback' do
+    let(:fake_provider) do
+      Class.new do
+        def self.exchange_code(_code, redirect_uri:)
+          {
+            access_token: 'gho_token123',
+            refresh_token: nil,
+            expires_at: nil,
+            account_id: 'gh-42',
+            account_name: 'octocat'
+          }
+        end
+      end
+    end
+
+    before do
+      allow(Oauth::BaseProvider).to receive(:provider_class).with('github').and_return(fake_provider)
+    end
+
+    it 'creates a connector and returns it with connected status' do
+      connector.destroy!
+
+      authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
+                         user: admin,
+                         organization: organization,
+                         params: { connector_type: 'github', code: 'oauth_code_abc' }
+
+      expect_success
+      expect(json_data[:connectorType]).to eq('github')
+      expect(json_data[:status]).to eq('connected')
+      expect(json_data[:externalAccountName]).to eq('octocat')
+    end
+
+    it 'updates an existing connector when one already exists' do
+      expect {
+        authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
+                           user: admin,
+                           organization: organization,
+                           params: { connector_type: 'github', code: 'oauth_code_abc' }
+      }.not_to change(OrganizationConnector, :count)
+
+      expect_success
+      expect(connector.reload.status).to eq('connected')
+    end
+
+    it 'returns 403 for org members' do
+      authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
+                         user: member,
+                         organization: organization,
+                         params: { connector_type: 'github', code: 'oauth_code_abc' }
+
+      expect_forbidden
+    end
+
+    context 'when the OAuth provider returns an error' do
+      before do
+        allow(fake_provider).to receive(:exchange_code).and_raise('OAuth error: bad_verification_code')
+      end
+
+      it 'returns 422' do
+        expect {
+          authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
+                             user: admin,
+                             organization: organization,
+                             params: { connector_type: 'github', code: 'bad_code' }
+        }.to raise_error(RuntimeError, /OAuth error/)
+      end
+    end
+  end
 end
