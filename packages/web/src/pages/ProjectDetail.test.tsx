@@ -61,18 +61,19 @@ const mockMembers = [
 
 const mockEvent = {
   id: 'evt-1',
-  event_type: 'prompt',
-  occurred_at: '2026-03-20T10:30:00Z',
-  tool_name: 'claude_code',
-  risk_level: 'low',
-  user_id: 'user-1',
-  project_id: 'proj-1',
-  organization_id: 'org-1',
-  tokens_in: 100,
-  tokens_out: 200,
-  cost_usd: 0.01,
+  eventType: 'prompt',
+  occurredAt: '2026-03-20T10:30:00Z',
+  createdAt: '2026-03-20T10:30:00Z',
+  toolName: 'claude_code',
+  riskLevel: 'low',
+  costUsd: 0.01,
+  inputTokens: 100,
+  outputTokens: 200,
   model: 'claude-3',
-  metadata: {},
+  sanitizedContent: null,
+  securityFindings: [],
+  user: { id: 'user-1', email: 'alice@example.com', name: 'Alice Johnson' },
+  project: { id: 'proj-1', name: 'My Project' },
 };
 
 function setupDefaultMocks() {
@@ -219,10 +220,10 @@ describe('ProjectDetail', () => {
       expect(screen.getByText('Recent Events')).toBeInTheDocument();
     });
 
-    it('renders events section without crashing when useEvents returns an error', () => {
+    it('shows an error alert when useEvents fails', () => {
       mockUseEvents.mockReturnValue({ data: undefined, isLoading: false, isError: true });
       render(<ProjectDetail />);
-      expect(screen.getByText('Recent Events')).toBeInTheDocument();
+      expect(screen.getByText('Failed to load events. Please try again.')).toBeInTheDocument();
     });
 
     it('preserves selected user filter when event drawer is opened and closed', async () => {
@@ -234,18 +235,24 @@ describe('ProjectDetail', () => {
 
       render(<ProjectDetail />);
 
-      // Select a user filter
+      // Select a member filter
       await user.click(screen.getByRole('combobox'));
       await user.click(await screen.findByText('Alice Johnson'));
 
-      // Verify filter chip is shown (text appears in both trigger and chip)
-      expect(screen.getAllByText('Alice Johnson').length).toBeGreaterThan(0);
+      // Open the drawer by clicking the event row
+      const rows = screen.getAllByRole('row');
+      const eventRow = rows.find((r) => r.getAttribute('class')?.includes('cursor-pointer'));
+      expect(eventRow).toBeDefined();
+      await user.click(eventRow!);
 
-      // The filter should still be active (useEvents called with user_id)
-      const callsAfterSelect = mockUseEvents.mock.calls.filter(
+      // Close the drawer with Escape
+      await user.keyboard('{Escape}');
+
+      // Filter is still active after drawer close
+      const callsAfterClose = mockUseEvents.mock.calls.filter(
         (call) => call[1]?.user_id === 'user-1'
       );
-      expect(callsAfterSelect.length).toBeGreaterThan(0);
+      expect(callsAfterClose.length).toBeGreaterThan(0);
     });
   });
 });

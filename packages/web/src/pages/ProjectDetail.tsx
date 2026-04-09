@@ -1,6 +1,7 @@
 import { useMemo, useState, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
+  AlertCircle,
   ArrowLeft,
   Activity,
   DollarSign,
@@ -25,6 +26,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Card,
   CardContent,
@@ -101,7 +103,7 @@ export function ProjectDetail() {
 
   const { data: project, isLoading: isLoadingProject } = useProject(id || '');
   const { data: projectMembers } = useProjectMembers(id || '');
-  const { data: eventsResponse, isLoading: isLoadingEvents } = useEvents(
+  const { data: eventsResponse, isLoading: isLoadingEvents, isError: isEventsError } = useEvents(
     currentOrg?.id || '',
     { project_id: id, per_page: 10, user_id: selectedUserId }
   );
@@ -308,12 +310,19 @@ export function ProjectDetail() {
           </div>
         )}
         <CardContent className="p-0">
-          <EventsTable
-            events={events}
-            isLoading={isLoadingEvents}
-            onEventClick={handleEventClick}
-            selectedEventId={selectedEventId}
-          />
+          {isEventsError ? (
+            <Alert variant="destructive" className="m-4">
+              <AlertCircle className="size-4" />
+              <AlertDescription>Failed to load events. Please try again.</AlertDescription>
+            </Alert>
+          ) : (
+            <EventsTable
+              events={events}
+              isLoading={isLoadingEvents}
+              onEventClick={handleEventClick}
+              selectedEventId={selectedEventId}
+            />
+          )}
         </CardContent>
       </Card>
 
