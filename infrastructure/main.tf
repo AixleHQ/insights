@@ -471,6 +471,7 @@ locals {
     S3_BUCKET        = module.s3_raw_events.bucket_name
     S3_REGION        = var.region
     MINIO_ENDPOINT   = "https://s3.${var.region}.amazonaws.com"
+    FRONTEND_URL     = "https://${var.app_domain}"
   }
 
   common_secrets = [
