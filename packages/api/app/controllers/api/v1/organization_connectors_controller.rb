@@ -212,8 +212,8 @@ module Api
           access_token: token_data[:access_token],
           refresh_token: token_data[:refresh_token],
           token_expires_at: token_data[:expires_at],
-          external_account_id: token_data[:account_id],
-          external_account_name: token_data[:account_name],
+          external_org_id: token_data[:account_id],
+          external_org_name: token_data[:account_name],
           is_active: true,
           status: "connected",
           last_error: nil

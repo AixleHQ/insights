@@ -1,12 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
 
 export function IntegrationOAuthCallback() {
   const [params] = useSearchParams();
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
+  const hasSent = useRef(false);
 
   useEffect(() => {
+    if (hasSent.current) return;
+    hasSent.current = true;
+
     const code = params.get('code');
     const state = params.get('state');
     const error = params.get('error');
@@ -26,12 +30,10 @@ export function IntegrationOAuthCallback() {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setStatus(error ? 'error' : 'success');
 
-      // Close the popup after a short delay
       setTimeout(() => {
         window.close();
       }, 1500);
     } else {
-      // If opened directly (not as popup), redirect to integrations
       setStatus('error');
     }
   }, [params]);

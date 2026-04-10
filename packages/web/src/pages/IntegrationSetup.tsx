@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -30,7 +30,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { useOrg } from '@/contexts/OrgContext';
-import { useProjects } from '@/hooks/useApi';
+import { useProjects, useCreateConnector } from '@/hooks/useApi';
 import { api } from '@/lib/api';
 import { ProviderLogo } from '@/components/icons';
 import type { IntegrationProvider } from '@/components/integrations';
@@ -164,6 +164,8 @@ export function IntegrationSetup() {
   const navigate = useNavigate();
   const { currentOrg } = useOrg();
   const { data: projects } = useProjects(currentOrg?.id || '');
+  const { mutateAsync: createConnector } = useCreateConnector();
+  const isProcessingCallback = useRef(false);
 
   const [step, setStep] = useState<SetupStep>('overview');
   const [isAuthorizing, setIsAuthorizing] = useState(false);
@@ -194,23 +196,25 @@ export function IntegrationSetup() {
       }
 
       if (code && currentOrg && provider) {
+        if (isProcessingCallback.current) return;
+        isProcessingCallback.current = true;
+
         try {
-          await api.post(`/organizations/${currentOrg.id}/connectors/callback`, {
-            code,
-            connector_type: provider.name,
-          });
+          await createConnector({ orgId: currentOrg.id, code, connectorType: provider.name });
+          setError(null);
           setIsAuthorizing(false);
           setStep('configure');
         } catch {
           setError('Failed to complete authorization. Please try again.');
           setIsAuthorizing(false);
+          isProcessingCallback.current = false;
         }
       }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [currentOrg, provider]);
+  }, [currentOrg, provider, createConnector]);
 
   if (!provider) {
     return (
@@ -228,6 +232,7 @@ export function IntegrationSetup() {
 
   const handleAuthorize = async () => {
     if (!currentOrg) return;
+    isProcessingCallback.current = false;
     setIsAuthorizing(true);
     setError(null);
 

@@ -738,12 +738,16 @@ export function useCreateConnector() {
     mutationFn: ({
       orgId,
       code,
-      provider,
+      connectorType,
     }: {
       orgId: string;
       code: string;
-      provider: string;
-    }) => api.post<Connector>(`/organizations/${orgId}/connectors/callback`, { code, provider }),
+      connectorType: string;
+    }) =>
+      api.post<Connector>(`/organizations/${orgId}/connectors/callback`, {
+        code,
+        connector_type: connectorType,
+      }),
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
     },
