@@ -256,10 +256,13 @@ export function Integrations() {
   const deleteConnector = useDeleteConnector();
   const testConnector = useTestConnector();
 
+  const [activeTab, setActiveTab] = useState('connected');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [connectingProvider, setConnectingProvider] = useState<ProviderInfo | null>(null);
   const [slackSheetOpen, setSlackSheetOpen] = useState(false);
   const [testingConnectorId, setTestingConnectorId] = useState<string | null>(null);
+
+  const handleConnectSuccess = () => setActiveTab('connected');
 
   // Transform API response to component format
   const integrations: IntegrationData[] = useMemo(() => {
@@ -363,7 +366,7 @@ export function Integrations() {
         </p>
       </div>
 
-      <Tabs defaultValue="connected" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="connected">
             Connected ({integrations.length})
@@ -430,13 +433,13 @@ export function Integrations() {
         provider={connectingProvider}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
-        onSuccess={() => {}}
+        onSuccess={handleConnectSuccess}
       />
 
       <OrgSlackConnectSheet
         open={slackSheetOpen}
         onOpenChange={setSlackSheetOpen}
-        onSuccess={() => {}}
+        onSuccess={handleConnectSuccess}
       />
     </div>
   );
