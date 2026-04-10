@@ -391,7 +391,7 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
     let(:fake_provider) do
       Class.new do
         def self.authorization_url(organization_id:, redirect_uri:, state: nil)
-          "https://github.com/login/oauth/authorize?client_id=test&redirect_uri=#{redirect_uri}&state=#{organization_id}:abc123"
+          "https://github.com/login/oauth/authorize?client_id=test&redirect_uri=#{CGI.escape(redirect_uri)}&state=#{organization_id}:abc123"
         end
       end
     end
