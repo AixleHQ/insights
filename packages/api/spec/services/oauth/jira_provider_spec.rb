@@ -150,36 +150,48 @@ RSpec.describe Oauth::JiraProvider, type: :service do
   end
 
   describe '.authorization_url' do
-    before do
-      allow(described_class).to receive(:client_id).and_return('atlassian-client-id')
+    context 'when client_id is missing' do
+      before { allow(described_class).to receive(:client_id).and_return(nil) }
+
+      it 'raises MissingCredentialsError' do
+        expect {
+          described_class.authorization_url(organization_id: 'org-1', redirect_uri: 'https://example.com/cb')
+        }.to raise_error(Oauth::MissingCredentialsError, /Jira.*missing client_id/)
+      end
     end
 
-    it 'builds a URL pointing to Atlassian authorize endpoint' do
-      url = described_class.authorization_url(
-        organization_id: 'org-1',
-        redirect_uri: 'http://localhost:5173/integrations/callback'
-      )
+    context 'when client_id is present' do
+      before do
+        allow(described_class).to receive(:client_id).and_return('atlassian-client-id')
+      end
 
-      expect(url).to start_with('https://auth.atlassian.com/authorize')
-      expect(url).to include('client_id=atlassian-client-id')
-    end
+      it 'builds a URL pointing to Atlassian authorize endpoint' do
+        url = described_class.authorization_url(
+          organization_id: 'org-1',
+          redirect_uri: 'http://localhost:5173/integrations/callback'
+        )
 
-    it 'includes the audience param for Atlassian' do
-      url = described_class.authorization_url(
-        organization_id: 'org-1',
-        redirect_uri: 'http://localhost:5173/integrations/callback'
-      )
+        expect(url).to start_with('https://auth.atlassian.com/authorize')
+        expect(url).to include('client_id=atlassian-client-id')
+      end
 
-      expect(url).to include('audience=api.atlassian.com')
-    end
+      it 'includes the audience param for Atlassian' do
+        url = described_class.authorization_url(
+          organization_id: 'org-1',
+          redirect_uri: 'http://localhost:5173/integrations/callback'
+        )
 
-    it 'includes prompt=consent' do
-      url = described_class.authorization_url(
-        organization_id: 'org-1',
-        redirect_uri: 'http://localhost:5173/integrations/callback'
-      )
+        expect(url).to include('audience=api.atlassian.com')
+      end
 
-      expect(url).to include('prompt=consent')
+      it 'includes prompt=consent' do
+        url = described_class.authorization_url(
+          organization_id: 'org-1',
+          redirect_uri: 'http://localhost:5173/integrations/callback'
+        )
+
+        expect(url).to include('prompt=consent')
+      end
     end
   end
 end

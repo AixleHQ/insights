@@ -63,6 +63,59 @@ RSpec.describe Oauth::BaseProvider, type: :service do
     end
   end
 
+  describe '.authorization_url' do
+    context 'when client_id is missing' do
+      before { allow(Oauth::GithubProvider).to receive(:client_id).and_return(nil) }
+
+      it 'raises MissingCredentialsError with the provider name' do
+        expect {
+          Oauth::GithubProvider.authorization_url(organization_id: 'org-1', redirect_uri: 'https://example.com/cb')
+        }.to raise_error(Oauth::MissingCredentialsError, /Github.*missing client_id/)
+      end
+    end
+  end
+
+  describe '.exchange_code' do
+    context 'when client_secret is missing' do
+      before do
+        allow(Oauth::GithubProvider).to receive(:client_id).and_return('client-id')
+        allow(Oauth::GithubProvider).to receive(:client_secret).and_return(nil)
+      end
+
+      it 'raises MissingCredentialsError mentioning client_secret' do
+        expect {
+          Oauth::GithubProvider.exchange_code('code', redirect_uri: 'https://example.com/cb')
+        }.to raise_error(Oauth::MissingCredentialsError, /missing client_secret/)
+      end
+    end
+
+    context 'when client_id is missing' do
+      before do
+        allow(Oauth::GithubProvider).to receive(:client_id).and_return(nil)
+        allow(Oauth::GithubProvider).to receive(:client_secret).and_return('client-secret')
+      end
+
+      it 'raises MissingCredentialsError mentioning client_id' do
+        expect {
+          Oauth::GithubProvider.exchange_code('code', redirect_uri: 'https://example.com/cb')
+        }.to raise_error(Oauth::MissingCredentialsError, /missing client_id/)
+      end
+    end
+
+    context 'when both client_id and client_secret are missing' do
+      before do
+        allow(Oauth::GithubProvider).to receive(:client_id).and_return(nil)
+        allow(Oauth::GithubProvider).to receive(:client_secret).and_return(nil)
+      end
+
+      it 'raises MissingCredentialsError mentioning both' do
+        expect {
+          Oauth::GithubProvider.exchange_code('code', redirect_uri: 'https://example.com/cb')
+        }.to raise_error(Oauth::MissingCredentialsError, /missing client_id and client_secret/)
+      end
+    end
+  end
+
   describe '#test_connection' do
     it 'raises NotImplementedError on the base class' do
       connector = instance_double('OrganizationConnector')
