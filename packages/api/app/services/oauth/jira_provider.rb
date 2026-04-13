@@ -70,11 +70,19 @@ module Oauth
         %w[read:jira-user read:jira-work manage:jira-project offline_access]
       end
 
+      # exchange_code is inherited from BaseProvider which validates both client_id and client_secret.
+      # If this method is ever overridden here, add the credential guard.
       def authorization_url(organization_id:, redirect_uri:, state: nil)
+        id = client_id
+        if id.blank?
+          raise Oauth::MissingCredentialsError,
+                "#{provider_display_name} integration is not configured (missing client_id)"
+        end
+
         state ||= SecureRandom.hex(32)
         params = {
           audience: "api.atlassian.com",
-          client_id: client_id,
+          client_id: id,
           redirect_uri: redirect_uri,
           scope: scopes.join(" "),
           state: "#{organization_id}:#{state}",

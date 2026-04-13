@@ -31,7 +31,7 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { useOrg } from '@/contexts/OrgContext';
 import { useProjects, useCreateConnector } from '@/hooks/useApi';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { ProviderLogo } from '@/components/icons';
 import type { IntegrationProvider } from '@/components/integrations';
 
@@ -257,8 +257,15 @@ export function IntegrationSetup() {
 
       // The popup will post a message back when authorization is complete
       // We listen for this in the useEffect above
-    } catch {
-      setError('Failed to start authorization. Please try again.');
+    } catch (err) {
+      const isNotConfigured =
+        err instanceof ApiError &&
+        (err.data as { code?: string })?.code === 'integration_not_configured';
+      setError(
+        isNotConfigured
+          ? 'This integration is not available in this environment. Please contact your administrator.'
+          : 'Failed to start authorization. Please try again.'
+      );
       setIsAuthorizing(false);
     }
   };

@@ -83,6 +83,56 @@ variable "google_client_secret" {
   sensitive = true
 }
 
+variable "github_client_id" {
+  type      = string
+  sensitive = true
+}
+
+variable "github_client_secret" {
+  type      = string
+  sensitive = true
+}
+
+variable "gitlab_client_id" {
+  type      = string
+  sensitive = true
+}
+
+variable "gitlab_client_secret" {
+  type      = string
+  sensitive = true
+}
+
+variable "bitbucket_client_id" {
+  type      = string
+  sensitive = true
+}
+
+variable "bitbucket_client_secret" {
+  type      = string
+  sensitive = true
+}
+
+variable "atlassian_client_id" {
+  type      = string
+  sensitive = true
+}
+
+variable "atlassian_client_secret" {
+  type      = string
+  sensitive = true
+}
+
+variable "linear_client_id" {
+  type      = string
+  sensitive = true
+}
+
+variable "linear_client_secret" {
+  type      = string
+  sensitive = true
+}
+
 variable "shared_database" {
   type = object({
     username         = string

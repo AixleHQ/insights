@@ -42,6 +42,41 @@ aws ssm put-parameter --name "/db90/staging/KEYCLOAK_ADMIN_PASSWORD" --type Secu
 aws ssm put-parameter --name "/db90/staging/RDS_PASSWORD" --type SecureString --value "<rds-master-password>" --overwrite
 ```
 
+#### OAuth Integration Credentials
+
+Each integration OAuth provider requires **one OAuth App registered for the entire DB90 platform** — not one per organization. All organizations share the same `client_id`/`client_secret`; each organization gets its own `access_token` after completing the OAuth flow, stored in `organization_connectors`.
+
+| Provider | Register at | SSM parameters |
+|----------|------------|----------------|
+| GitHub | github.com → Settings → Developer settings → OAuth Apps | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` |
+| GitLab | gitlab.com → User Settings → Applications | `GITLAB_CLIENT_ID`, `GITLAB_CLIENT_SECRET` |
+| Bitbucket | bitbucket.org → Workspace Settings → OAuth consumers | `BITBUCKET_CLIENT_ID`, `BITBUCKET_CLIENT_SECRET` |
+| Jira / Atlassian | developer.atlassian.com → OAuth 2.0 | `ATLASSIAN_CLIENT_ID`, `ATLASSIAN_CLIENT_SECRET` |
+| Linear | linear.app → Settings → API → OAuth applications | `LINEAR_CLIENT_ID`, `LINEAR_CLIENT_SECRET` |
+
+Set the **Authorization callback URL** to `https://<app_domain>/integrations/callback` when registering each app.
+
+Once you have the credentials, write them to SSM:
+
+```bash
+aws ssm put-parameter --name "/db90/staging/GITHUB_CLIENT_ID"     --type SecureString --value "<id>"     --overwrite
+aws ssm put-parameter --name "/db90/staging/GITHUB_CLIENT_SECRET"  --type SecureString --value "<secret>" --overwrite
+
+# Repeat for each provider you want to enable. Use the same pattern:
+# aws ssm put-parameter --name "/db90/staging/<PROVIDER>_CLIENT_ID"     --type SecureString --value "<id>"     --overwrite
+# aws ssm put-parameter --name "/db90/staging/<PROVIDER>_CLIENT_SECRET"  --type SecureString --value "<secret>" --overwrite
+```
+
+Then update `tfvars/staging/terraform.tfvars` with the real values (replacing `"pending"`) and run `make push_vars` to keep Terraform state in sync. Finally, force a new ECS deployment so the containers pick up the updated secrets:
+
+```bash
+aws ecs update-service --cluster db90-staging-cluster --service db90-staging-api --force-new-deployment
+aws ecs update-service --cluster db90-staging-cluster --service db90-staging-sidekiq --force-new-deployment
+aws ecs update-service --cluster db90-staging-cluster --service db90-staging-temporal-worker --force-new-deployment
+```
+
+> **Providers with `"pending"` credentials are safe to deploy** — the API returns a clear `503 { code: "integration_not_configured" }` and the UI shows "This integration is not available in this environment. Please contact your administrator." No broken OAuth URLs are generated.
+
 ### 4. Update Domain Placeholders
 
 After bootstrap, copy the `zone_id` output into `tfvars/staging/terraform.tfvars` and `tfvars/production/terraform.tfvars` (replace `CHANGE_ME_AFTER_BOOTSTRAP`).
