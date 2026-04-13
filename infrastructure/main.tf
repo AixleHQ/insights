@@ -414,6 +414,66 @@ resource "aws_ssm_parameter" "google_client_secret" {
   value = var.google_client_secret
 }
 
+resource "aws_ssm_parameter" "github_client_id" {
+  name  = "/${local.ssm_prefix}/GITHUB_CLIENT_ID"
+  type  = "SecureString"
+  value = var.github_client_id
+}
+
+resource "aws_ssm_parameter" "github_client_secret" {
+  name  = "/${local.ssm_prefix}/GITHUB_CLIENT_SECRET"
+  type  = "SecureString"
+  value = var.github_client_secret
+}
+
+resource "aws_ssm_parameter" "gitlab_client_id" {
+  name  = "/${local.ssm_prefix}/GITLAB_CLIENT_ID"
+  type  = "SecureString"
+  value = var.gitlab_client_id
+}
+
+resource "aws_ssm_parameter" "gitlab_client_secret" {
+  name  = "/${local.ssm_prefix}/GITLAB_CLIENT_SECRET"
+  type  = "SecureString"
+  value = var.gitlab_client_secret
+}
+
+resource "aws_ssm_parameter" "bitbucket_client_id" {
+  name  = "/${local.ssm_prefix}/BITBUCKET_CLIENT_ID"
+  type  = "SecureString"
+  value = var.bitbucket_client_id
+}
+
+resource "aws_ssm_parameter" "bitbucket_client_secret" {
+  name  = "/${local.ssm_prefix}/BITBUCKET_CLIENT_SECRET"
+  type  = "SecureString"
+  value = var.bitbucket_client_secret
+}
+
+resource "aws_ssm_parameter" "atlassian_client_id" {
+  name  = "/${local.ssm_prefix}/ATLASSIAN_CLIENT_ID"
+  type  = "SecureString"
+  value = var.atlassian_client_id
+}
+
+resource "aws_ssm_parameter" "atlassian_client_secret" {
+  name  = "/${local.ssm_prefix}/ATLASSIAN_CLIENT_SECRET"
+  type  = "SecureString"
+  value = var.atlassian_client_secret
+}
+
+resource "aws_ssm_parameter" "linear_client_id" {
+  name  = "/${local.ssm_prefix}/LINEAR_CLIENT_ID"
+  type  = "SecureString"
+  value = var.linear_client_id
+}
+
+resource "aws_ssm_parameter" "linear_client_secret" {
+  name  = "/${local.ssm_prefix}/LINEAR_CLIENT_SECRET"
+  type  = "SecureString"
+  value = var.linear_client_secret
+}
+
 resource "aws_ssm_parameter" "ar_encryption_primary_key" {
   name  = "/${local.ssm_prefix}/ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY"
   type  = "SecureString"
@@ -482,6 +542,16 @@ locals {
     { name = "ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY", valueFrom = aws_ssm_parameter.ar_encryption_deterministic_key.arn },
     { name = "ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT", valueFrom = aws_ssm_parameter.ar_encryption_key_derivation_salt.arn },
     { name = "ROLLBAR_ACCESS_TOKEN", valueFrom = aws_ssm_parameter.rollbar_access_token.arn },
+    { name = "GITHUB_CLIENT_ID",        valueFrom = aws_ssm_parameter.github_client_id.arn },
+    { name = "GITHUB_CLIENT_SECRET",    valueFrom = aws_ssm_parameter.github_client_secret.arn },
+    { name = "GITLAB_CLIENT_ID",        valueFrom = aws_ssm_parameter.gitlab_client_id.arn },
+    { name = "GITLAB_CLIENT_SECRET",    valueFrom = aws_ssm_parameter.gitlab_client_secret.arn },
+    { name = "BITBUCKET_CLIENT_ID",     valueFrom = aws_ssm_parameter.bitbucket_client_id.arn },
+    { name = "BITBUCKET_CLIENT_SECRET", valueFrom = aws_ssm_parameter.bitbucket_client_secret.arn },
+    { name = "ATLASSIAN_CLIENT_ID",     valueFrom = aws_ssm_parameter.atlassian_client_id.arn },
+    { name = "ATLASSIAN_CLIENT_SECRET", valueFrom = aws_ssm_parameter.atlassian_client_secret.arn },
+    { name = "LINEAR_CLIENT_ID",        valueFrom = aws_ssm_parameter.linear_client_id.arn },
+    { name = "LINEAR_CLIENT_SECRET",    valueFrom = aws_ssm_parameter.linear_client_secret.arn },
   ]
 }
 

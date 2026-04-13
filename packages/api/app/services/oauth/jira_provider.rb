@@ -71,6 +71,11 @@ module Oauth
       end
 
       def authorization_url(organization_id:, redirect_uri:, state: nil)
+        if client_id.blank?
+          raise Oauth::MissingCredentialsError,
+                "#{provider_display_name} integration is not configured (missing client_id)"
+        end
+
         state ||= SecureRandom.hex(32)
         params = {
           audience: "api.atlassian.com",

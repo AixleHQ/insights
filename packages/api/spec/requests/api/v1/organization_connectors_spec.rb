@@ -419,6 +419,23 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
 
       expect_forbidden
     end
+
+    context 'when provider credentials are missing' do
+      before do
+        allow(Oauth::BaseProvider).to receive(:provider_class).with('github').and_call_original
+        allow(Oauth::GithubProvider).to receive(:client_id).and_return(nil)
+      end
+
+      it 'returns 503 with an integration_not_configured code' do
+        authenticated_get "/api/v1/organizations/#{organization.id}/connectors/authorize/github",
+                          user: admin,
+                          organization: organization
+
+        expect(response).to have_http_status(:service_unavailable)
+        expect(json_response[:code]).to eq('integration_not_configured')
+        expect(json_error).to include('not configured')
+      end
+    end
   end
 
   describe 'POST /api/v1/organizations/:organization_id/connectors/callback' do

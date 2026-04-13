@@ -194,6 +194,8 @@ module Api
         )
 
         render json: { data: { authorize_url: auth_url } }
+      rescue Oauth::MissingCredentialsError => e
+        render json: { error: e.message, code: "integration_not_configured" }, status: :service_unavailable
       end
 
       # POST /api/v1/organizations/:organization_id/connectors/callback
@@ -227,6 +229,8 @@ module Api
             errors: format_validation_errors(connector.errors)
           }, status: :unprocessable_entity
         end
+      rescue Oauth::MissingCredentialsError => e
+        render json: { error: e.message, code: "integration_not_configured" }, status: :service_unavailable
       end
 
       private
