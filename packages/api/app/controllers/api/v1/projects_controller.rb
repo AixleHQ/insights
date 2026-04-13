@@ -3,7 +3,7 @@
 module Api
   module V1
     class ProjectsController < BaseController
-      before_action :set_project, only: %i[show update destroy settings update_setting destroy_setting stats daily_by_tool commits_by_user members retention_policy update_retention_policy]
+      before_action :set_project, only: %i[show update destroy settings update_setting destroy_setting stats daily_by_tool commits_by_user members retention_policy update_retention_policy link_jira]
 
       # GET /api/v1/projects
       # GET /api/v1/organizations/:organization_id/projects
@@ -269,6 +269,25 @@ module Api
         end
 
         render json: { data: members_data }
+      end
+
+      # POST /api/v1/projects/:id/link_jira
+      def link_jira
+        authorize! @project, to: :link_jira?
+
+        connector_id     = params.require(:connector_id)
+        jira_project_key = params.require(:jira_project_key)
+
+        # Verify connector belongs to the same org as the project (prevents cross-org injection)
+        connector = current_organization.organization_connectors.find(connector_id)
+
+        ApplicationRecord.transaction do
+          @project.project_settings.find_or_initialize_by(key: "jira_connector_id").update!(value: connector.id.to_s)
+          @project.project_settings.find_or_initialize_by(key: "jira_project_key").update!(value: jira_project_key)
+        end
+
+        JiraSyncJob.perform_later(connector.id, "sync")
+        render json: { data: { linked: true } }
       end
 
       # GET /api/v1/projects/:id/retention_policy

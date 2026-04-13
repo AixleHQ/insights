@@ -31,6 +31,8 @@ import type {
   Invitation,
   InvitationPublic,
   MemberRole,
+  Issue,
+  JiraProject,
 } from '@/lib/types';
 
 // Query keys factory
@@ -60,6 +62,13 @@ export const queryKeys = {
     detail: (orgId: string, id: string) => ['organizations', orgId, 'connectors', id] as const,
     availableRepos: (orgId: string, connectorId: string) =>
       ['organizations', orgId, 'connectors', connectorId, 'available_repos'] as const,
+    availableProjects: (orgId: string, connectorId: string) =>
+      ['organizations', orgId, 'connectors', connectorId, 'available_projects'] as const,
+  },
+  issues: {
+    all: (projectId: string, filters?: Record<string, unknown>) =>
+      ['projects', projectId, 'issues', filters] as const,
+    detail: (projectId: string, id: string) => ['projects', projectId, 'issues', id] as const,
   },
   projectConnectors: {
     all: (projectId: string) => ['projects', projectId, 'connectors'] as const,
@@ -1293,5 +1302,62 @@ export function useProjectAuditLogs(projectId: string, filters: AuditLogFilters 
       );
     },
     enabled: !!projectId,
+  });
+}
+
+// ============================================================================
+// Jira Issues Hooks
+// ============================================================================
+
+export interface IssueFilters {
+  status_category?: string;
+  type?: string;
+  assignee?: string;
+  page?: number;
+}
+
+export function useProjectIssues(projectId: string, filters?: IssueFilters) {
+  return useQuery({
+    queryKey: queryKeys.issues.all(projectId, filters as Record<string, unknown>),
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (filters?.status_category) params.set('status_category', filters.status_category);
+      if (filters?.type) params.set('type', filters.type);
+      if (filters?.assignee) params.set('assignee', filters.assignee);
+      if (filters?.page) params.set('page', String(filters.page));
+      const query = params.toString();
+      return api.get<PaginatedResponse<Issue>>(
+        `/projects/${projectId}/issues${query ? `?${query}` : ''}`
+      );
+    },
+    enabled: !!projectId,
+  });
+}
+
+// GET /api/v1/organizations/:orgId/connectors/:connectorId/available_projects
+export function useAvailableJiraProjects(orgId: string, connectorId: string) {
+  return useQuery({
+    queryKey: queryKeys.connectors.availableProjects(orgId, connectorId),
+    queryFn: async () => {
+      const response = await api.get<{ data: JiraProject[] }>(
+        `/organizations/${orgId}/connectors/${connectorId}/available_projects`
+      );
+      return response.data;
+    },
+    enabled: !!orgId && !!connectorId,
+  });
+}
+
+// POST /api/v1/projects/:projectId/link_jira
+export function useLinkJira(projectId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: { connector_id: string; jira_project_key: string }) =>
+      api.post<{ data: { linked: boolean } }>(`/projects/${projectId}/link_jira`, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects.detail(projectId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.issues.all(projectId) });
+    },
   });
 }

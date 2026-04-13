@@ -14,6 +14,7 @@ class JiraSyncJob
     case action
     when "sync"
       sync_projects
+      sync_all_issues
     when "refresh_token"
       refresh_token
     when "webhook"
@@ -35,15 +36,52 @@ class JiraSyncJob
 
   def sync_projects
     provider = Oauth::BaseProvider.for(@connector)
-    projects = provider.list_projects
+    projects = provider.fetch_projects
 
     projects.each do |project_data|
       sync_project(project_data)
     end
   end
 
+  def sync_all_issues
+    linked_connector_project_ids = ProjectSetting.where(key: "jira_connector_id", value: @connector.id.to_s).select(:project_id)
+    ProjectSetting.where(key: "jira_project_key", project_id: linked_connector_project_ids)
+                  .includes(:project)
+                  .each do |setting|
+      sync_project_issues(setting.project, setting.value) if setting.value.present?
+    end
+  end
+
+  def sync_project_issues(project, jira_key)
+    provider = Oauth::BaseProvider.for(@connector)
+    start_at = 0
+    loop do
+      result = provider.fetch_issues(jira_key, start_at: start_at)
+      upsert_issues(result[:issues], project)
+      start_at += result[:issues].size
+      break if start_at >= result[:total] || result[:issues].empty?
+    end
+  end
+
+  def upsert_issues(issues_data, project)
+    org = @connector.organization
+    issues_data.each do |attrs|
+      issue = Issue.find_or_initialize_by(
+        organization_connector: @connector,
+        external_id: attrs[:external_id]
+      )
+      issue.update!(attrs.merge(organization: org, project: project, synced_at: Time.current))
+    end
+  end
+
+  def resolve_project_for_key(jira_project_key)
+    ProjectSetting.joins(:project)
+      .where(key: "jira_project_key", value: jira_project_key)
+      .where(projects: { organization_id: @connector.organization_id })
+      .first&.project
+  end
+
   def sync_project(project_data)
-    # Store project info in connector metadata
     @connector.metadata ||= {}
     @connector.metadata["projects"] ||= {}
     @connector.metadata["projects"][project_data[:key]] = {
@@ -83,8 +121,8 @@ class JiraSyncJob
   end
 
   def process_issue_event(payload, event_type)
-    issue = payload["issue"]
-    return unless issue
+    issue_data = payload["issue"]
+    return unless issue_data
 
     action = event_type.split(":").last.gsub("issue_", "")
 
@@ -95,17 +133,21 @@ class JiraSyncJob
       occurred_at: Time.current,
       metadata: {
         action: action,
-        issue_key: issue["key"],
-        issue_id: issue["id"],
-        summary: issue.dig("fields", "summary"),
-        status: issue.dig("fields", "status", "name"),
-        issue_type: issue.dig("fields", "issuetype", "name"),
-        project_key: issue.dig("fields", "project", "key"),
-        assignee: issue.dig("fields", "assignee", "displayName"),
-        reporter: issue.dig("fields", "reporter", "displayName"),
+        issue_key: issue_data["key"],
+        issue_id: issue_data["id"],
+        summary: issue_data.dig("fields", "summary"),
+        status: issue_data.dig("fields", "status", "name"),
+        issue_type: issue_data.dig("fields", "issuetype", "name"),
+        project_key: issue_data.dig("fields", "project", "key"),
+        assignee: issue_data.dig("fields", "assignee", "displayName"),
+        reporter: issue_data.dig("fields", "reporter", "displayName"),
         changelog: extract_changelog(payload)
       }
     )
+
+    provider = Oauth::BaseProvider.for(@connector)
+    attrs = provider.map_issue(issue_data)
+    upsert_issues([ attrs ], resolve_project_for_key(attrs[:jira_project_key]))
   end
 
   def process_comment_event(payload, event_type)

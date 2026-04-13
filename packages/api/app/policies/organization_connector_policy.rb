@@ -40,6 +40,11 @@ class OrganizationConnectorPolicy < ApplicationPolicy
     org_admin?(record.organization) || global_admin?
   end
 
+  # Only admins can list available Jira projects from the provider
+  def available_projects?
+    org_admin?(record.organization) || global_admin?
+  end
+
   # Only admins can start OAuth flow
   def authorize?
     org_admin?(record.organization) || global_admin?

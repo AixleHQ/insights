@@ -79,6 +79,7 @@ export interface ProjectWithStats extends Project {
   last_event_at: string | null;
   lastEventAt?: string | null;
   connectors: { id: string; provider: string }[];
+  jiraProjectKey?: string | null;
 }
 
 // Connector types
@@ -330,4 +331,32 @@ export interface InvitationPublic {
   invitedByName: string;
   expired: boolean;
   expiresAt: string;
+}
+
+// Jira issue types
+export interface Issue {
+  id: string;
+  key: string;
+  summary: string;
+  status?: string;
+  statusCategory?: string;
+  issueType?: string;
+  priority?: string;
+  assigneeName?: string;
+  assigneeId?: string;
+  reporterName?: string;
+  jiraProjectKey: string;
+  dueDate?: string;
+  labels?: string[];
+  externalCreatedAt?: string;
+  externalUpdatedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JiraProject {
+  externalId: string;
+  key: string;
+  name: string;
+  avatarUrl?: string;
 }

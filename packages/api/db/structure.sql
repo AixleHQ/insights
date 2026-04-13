@@ -89,7 +89,10 @@ CREATE TYPE public.event_type AS ENUM (
     'debug',
     'refactor',
     'documentation',
-    'other'
+    'other',
+    'issue',
+    'comment',
+    'sprint'
 );
 
 
@@ -186,7 +189,8 @@ CREATE TYPE public.tool_name AS ENUM (
     'anthropic_api',
     'openai_api',
     'gemini_api',
-    'custom'
+    'custom',
+    'jira'
 );
 
 
@@ -3700,6 +3704,41 @@ CREATE TABLE public.invitations (
 
 
 --
+-- Name: issues; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.issues (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    project_id uuid,
+    organization_connector_id uuid NOT NULL,
+    assignee_id uuid,
+    external_id character varying NOT NULL,
+    key character varying NOT NULL,
+    summary character varying NOT NULL,
+    description text,
+    status character varying,
+    status_category character varying,
+    issue_type character varying,
+    priority character varying,
+    jira_project_key character varying NOT NULL,
+    jira_project_id character varying NOT NULL,
+    assignee_account_id character varying,
+    assignee_name character varying,
+    reporter_name character varying,
+    parent_key character varying,
+    labels text[] DEFAULT '{}'::text[],
+    due_date date,
+    metadata jsonb DEFAULT '{}'::jsonb,
+    external_created_at timestamp(6) without time zone,
+    external_updated_at timestamp(6) without time zone,
+    synced_at timestamp(6) without time zone,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
 -- Name: organization_audit_logs; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -6713,6 +6752,14 @@ ALTER TABLE ONLY public.invitations
 
 
 --
+-- Name: issues issues_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.issues
+    ADD CONSTRAINT issues_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: organization_audit_logs organization_audit_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -9070,6 +9117,62 @@ CREATE UNIQUE INDEX index_invitations_on_token ON public.invitations USING btree
 
 
 --
+-- Name: index_issues_on_assignee_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_issues_on_assignee_id ON public.issues USING btree (assignee_id);
+
+
+--
+-- Name: index_issues_on_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_issues_on_key ON public.issues USING btree (key);
+
+
+--
+-- Name: index_issues_on_organization_connector_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_issues_on_organization_connector_id ON public.issues USING btree (organization_connector_id);
+
+
+--
+-- Name: index_issues_on_organization_connector_id_and_external_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_issues_on_organization_connector_id_and_external_id ON public.issues USING btree (organization_connector_id, external_id);
+
+
+--
+-- Name: index_issues_on_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_issues_on_organization_id ON public.issues USING btree (organization_id);
+
+
+--
+-- Name: index_issues_on_organization_id_and_external_updated_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_issues_on_organization_id_and_external_updated_at ON public.issues USING btree (organization_id, external_updated_at);
+
+
+--
+-- Name: index_issues_on_project_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_issues_on_project_id ON public.issues USING btree (project_id);
+
+
+--
+-- Name: index_issues_on_project_id_and_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_issues_on_project_id_and_status ON public.issues USING btree (project_id, status);
+
+
+--
 -- Name: index_organization_audit_logs_on_action; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -10940,6 +11043,14 @@ ALTER TABLE ONLY public.repositories
 
 
 --
+-- Name: issues fk_rails_4b8ef071a8; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.issues
+    ADD CONSTRAINT fk_rails_4b8ef071a8 FOREIGN KEY (organization_connector_id) REFERENCES public.organization_connectors(id);
+
+
+--
 -- Name: project_audit_logs fk_rails_525d91a68d; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -11009,6 +11120,14 @@ ALTER TABLE ONLY public.project_retention_policies
 
 ALTER TABLE ONLY public.project_memberships
     ADD CONSTRAINT fk_rails_86b046ec96 FOREIGN KEY (user_id) REFERENCES public.users(id);
+
+
+--
+-- Name: issues fk_rails_899c8f3231; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.issues
+    ADD CONSTRAINT fk_rails_899c8f3231 FOREIGN KEY (project_id) REFERENCES public.projects(id);
 
 
 --
@@ -11084,6 +11203,14 @@ ALTER TABLE ONLY public.project_settings
 
 
 --
+-- Name: issues fk_rails_ccc5514bad; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.issues
+    ADD CONSTRAINT fk_rails_ccc5514bad FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+
+
+--
 -- Name: user_settings fk_rails_d1371c6356; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -11105,6 +11232,14 @@ ALTER TABLE ONLY public.invitations
 
 ALTER TABLE ONLY public.admin_audit_logs
     ADD CONSTRAINT fk_rails_f48ad7fa19 FOREIGN KEY (admin_user_id) REFERENCES public.users(id);
+
+
+--
+-- Name: issues fk_rails_ff669b5916; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.issues
+    ADD CONSTRAINT fk_rails_ff669b5916 FOREIGN KEY (assignee_id) REFERENCES public.users(id);
 
 
 --
@@ -11146,6 +11281,8 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260413165455'),
+('20260413165431'),
 ('20260408000001'),
 ('20260325000001'),
 ('20260324000001'),

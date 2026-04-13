@@ -23,16 +23,6 @@ module Oauth
     end
 
     def fetch_projects
-      # First get the cloud ID
-      resources_response = http_client.get("#{API_URL}/oauth/token/accessible-resources")
-      return [] unless resources_response.success?
-
-      resources = JSON.parse(resources_response.body)
-      return [] if resources.empty?
-
-      cloud_id = resources.first["id"]
-
-      # Then fetch projects
       response = http_client.get("#{API_URL}/ex/jira/#{cloud_id}/rest/api/3/project/search")
       return [] unless response.success?
 
@@ -44,6 +34,57 @@ module Oauth
           name: project["name"],
           avatar_url: project.dig("avatarUrls", "48x48")
         }
+      end
+    end
+
+    def fetch_issues(project_key, max_results: 100, start_at: 0)
+      # Quote the key per Jira JQL spec to handle special characters
+      jql = "project = \"#{project_key}\" ORDER BY updated DESC"
+      response = http_client.get(
+        "#{API_URL}/ex/jira/#{cloud_id}/rest/api/3/search",
+        params: {
+          jql: jql,
+          maxResults: max_results,
+          startAt: start_at,
+          fields: "summary,status,issuetype,priority,assignee,reporter,parent,labels,duedate,created,updated,project"
+        }
+      )
+      return { issues: [], total: 0 } unless response.success?
+
+      data = JSON.parse(response.body)
+      issues = data["issues"].map { |i| map_issue(i) }
+      { issues: issues, total: data["total"], next_start: start_at + issues.size }
+    end
+
+    def map_issue(raw)
+      fields = raw["fields"]
+      {
+        external_id:         raw["id"],
+        key:                 raw["key"],
+        summary:             fields["summary"],
+        status:              fields.dig("status", "name"),
+        status_category:     fields.dig("status", "statusCategory", "key"),
+        issue_type:          fields.dig("issuetype", "name"),
+        priority:            fields.dig("priority", "name"),
+        assignee_account_id: fields.dig("assignee", "accountId"),
+        assignee_name:       fields.dig("assignee", "displayName"),
+        reporter_name:       fields.dig("reporter", "displayName"),
+        jira_project_key:    fields.dig("project", "key"),
+        jira_project_id:     fields.dig("project", "id"),
+        parent_key:          fields.dig("parent", "key"),
+        labels:              fields["labels"] || [],
+        due_date:            fields["duedate"],
+        external_created_at: fields["created"],
+        external_updated_at: fields["updated"]
+      }
+    end
+
+    private
+
+    def cloud_id
+      @cloud_id ||= begin
+        response = http_client.get("#{API_URL}/oauth/token/accessible-resources")
+        JSON.parse(response.body).first["id"]
       end
     end
 

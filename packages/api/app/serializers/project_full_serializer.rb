@@ -26,4 +26,8 @@ class ProjectFullSerializer < ProjectSerializer
       ::ProjectRetentionPolicySerializer.new(project.retention_policy).serializable_hash
     end
   end
+
+  attribute :jira_project_key do |project|
+    project.project_settings.find_by(key: "jira_project_key")&.value
+  end
 end

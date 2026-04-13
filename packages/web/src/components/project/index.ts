@@ -7,3 +7,5 @@ export { ProjectSettingsSection } from './ProjectSettingsSection';
 export { ProjectNotFound } from './ProjectNotFound';
 export { ProjectRetentionPolicySection } from './ProjectRetentionPolicySection';
 export { ProjectAlertsSection } from './ProjectAlertsSection';
+export { ConnectJiraSheet } from './ConnectJiraSheet';
+export { ProjectIssuesTab } from './ProjectIssuesTab';
