@@ -53,17 +53,19 @@ module Oauth
     end
 
     def self.exchange_code(code, redirect_uri:)
+      id     = client_id
       secret = client_secret
-      if secret.blank?
+      missing = [ ("client_id" if id.blank?), ("client_secret" if secret.blank?) ].compact
+      if missing.any?
         raise Oauth::MissingCredentialsError,
-              "#{provider_display_name} integration is not configured (missing client_secret)"
+              "#{provider_display_name} integration is not configured (missing #{missing.join(" and ")})"
       end
 
       response = Faraday.post(token_endpoint) do |req|
         req.headers["Accept"] = "application/json"
         req.headers["Content-Type"] = "application/x-www-form-urlencoded"
         req.body = {
-          client_id: client_id,
+          client_id: id,
           client_secret: secret,
           code: code,
           redirect_uri: redirect_uri,
@@ -116,10 +118,6 @@ module Oauth
     end
 
     class << self
-      def provider_display_name
-        name.demodulize.delete_suffix("Provider")
-      end
-
       def client_id
         raise NotImplementedError
       end
@@ -142,6 +140,12 @@ module Oauth
 
       def fetch_account_info(_access_token)
         raise NotImplementedError
+      end
+
+      private
+
+      def provider_display_name
+        name.demodulize.delete_suffix("Provider")
       end
     end
 
