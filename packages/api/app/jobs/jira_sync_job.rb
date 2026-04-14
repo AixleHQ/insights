@@ -1,9 +1,8 @@
 # frozen_string_literal: true
 
-class JiraSyncJob
-  include Sidekiq::Job
-
-  sidekiq_options queue: "connectors", retry: 3
+class JiraSyncJob < ApplicationJob
+  queue_as :connectors
+  retry_on StandardError, wait: :polynomially_longer, attempts: 3
 
   def perform(connector_id, action = "sync", options = {})
     @connector = OrganizationConnector.find(connector_id)
