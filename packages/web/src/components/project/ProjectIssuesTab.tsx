@@ -87,7 +87,7 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
       : undefined
   );
 
-  const allIssues = issuesResponse?.data ?? [];
+  const allIssues = useMemo(() => issuesResponse?.data ?? [], [issuesResponse]);
 
   const uniqueAssignees = useMemo(
     () =>
