@@ -64,14 +64,27 @@ class JiraSyncJob
   end
 
   def upsert_issues(issues_data, project)
-    org = @connector.organization
+    org      = @connector.organization
+    provider = Oauth::BaseProvider.for(@connector)
     issues_data.each do |attrs|
+      assignee = resolve_assignee(org, provider, attrs[:assignee_account_id])
       issue = Issue.find_or_initialize_by(
         organization_connector: @connector,
         external_id: attrs[:external_id]
       )
-      issue.update!(attrs.merge(organization: org, project: project, synced_at: Time.current))
+      issue.update!(attrs.merge(organization: org, project: project, assignee: assignee, synced_at: Time.current))
     end
+  end
+
+  def resolve_assignee(org, provider, account_id)
+    return nil if account_id.blank?
+
+    @assignee_cache ||= {}
+    unless @assignee_cache.key?(account_id)
+      email = provider.fetch_user_email(account_id)
+      @assignee_cache[account_id] = email ? org.users.find_by(email: email) : nil
+    end
+    @assignee_cache[account_id]
   end
 
   def resolve_project_for_key(jira_project_key)

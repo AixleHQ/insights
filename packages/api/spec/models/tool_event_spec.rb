@@ -7,7 +7,7 @@ RSpec.describe ToolEvent, type: :model do
         claude_code cursor windsurf github_copilot
         aider continue cody tabnine amazon_q
         openrouter anthropic_api openai_api gemini_api
-        custom jira
+        custom jira linear github
       ]
       expect(ToolEvent::TOOL_NAMES).to eq(expected)
     end

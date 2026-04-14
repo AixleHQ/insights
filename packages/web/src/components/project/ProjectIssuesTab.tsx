@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Layers } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Layers, Bug, BookOpen, CheckSquare, Zap, Circle } from 'lucide-react';
 import { useProjectIssues } from '@/hooks/useApi';
 import type { ProjectWithStats } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -34,6 +34,36 @@ const STATUS_CATEGORY_VARIANTS: Record<string, 'default' | 'secondary' | 'outlin
   done: 'secondary',
 };
 
+const ISSUE_TYPE_ICONS: Record<string, React.ElementType> = {
+  Bug: Bug,
+  Story: BookOpen,
+  Task: CheckSquare,
+  Epic: Zap,
+};
+
+function IssueTypeIcon({ type }: { type?: string }) {
+  const Icon = type ? (ISSUE_TYPE_ICONS[type] ?? Circle) : Circle;
+  return <Icon className="size-3.5 shrink-0 text-muted-foreground" />;
+}
+
+function AssigneeAvatar({ name }: { name?: string }) {
+  if (!name) return null;
+  const initials = name
+    .split(' ')
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
+  return (
+    <span
+      className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-[9px] font-medium text-muted-foreground"
+      title={name}
+    >
+      {initials}
+    </span>
+  );
+}
+
 interface ProjectIssuesTabProps {
   projectId: string;
   project: ProjectWithStats;
@@ -43,6 +73,7 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
   const [connectJiraOpen, setConnectJiraOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [typeFilter, setTypeFilter] = useState<string>('');
+  const [assigneeFilter, setAssigneeFilter] = useState<string>('');
 
   const isLinked = !!project.jiraProjectKey;
 
@@ -56,7 +87,19 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
       : undefined
   );
 
-  const issues = issuesResponse?.data ?? [];
+  const allIssues = issuesResponse?.data ?? [];
+
+  const uniqueAssignees = useMemo(
+    () =>
+      Array.from(
+        new Set(allIssues.map((i) => i.assigneeName).filter(Boolean) as string[])
+      ).sort(),
+    [allIssues]
+  );
+
+  const issues = assigneeFilter
+    ? allIssues.filter((i) => i.assigneeName === assigneeFilter)
+    : allIssues;
 
   if (!isLinked) {
     return (
@@ -132,6 +175,24 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
               <SelectItem value="Epic">Epic</SelectItem>
             </SelectContent>
           </Select>
+
+          <Select
+            value={assigneeFilter || '__all__'}
+            onValueChange={(v) => setAssigneeFilter(v === '__all__' ? '' : v)}
+            disabled={uniqueAssignees.length === 0}
+          >
+            <SelectTrigger className="h-8 w-[160px] text-sm">
+              <SelectValue placeholder="All assignees" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All assignees</SelectItem>
+              {uniqueAssignees.map((name) => (
+                <SelectItem key={name} value={name}>
+                  {name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <CardContent className="p-0">
@@ -147,7 +208,7 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
             </div>
           ) : issues.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8 px-6">
-              No issues found{statusFilter || typeFilter ? ' matching the selected filters' : ''}.
+              No issues found{statusFilter || typeFilter || assigneeFilter ? ' matching the selected filters' : ''}.
             </p>
           ) : (
             <div className="divide-y">
@@ -159,12 +220,18 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
                   <div className="flex-1 min-w-0">
                     <p className="text-sm truncate">{issue.summary}</p>
                     {issue.assigneeName && (
-                      <p className="text-xs text-muted-foreground mt-0.5">{issue.assigneeName}</p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <AssigneeAvatar name={issue.assigneeName} />
+                        <p className="text-xs text-muted-foreground">{issue.assigneeName}</p>
+                      </div>
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {issue.issueType && (
-                      <span className="text-xs text-muted-foreground">{issue.issueType}</span>
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <IssueTypeIcon type={issue.issueType} />
+                        {issue.issueType}
+                      </span>
                     )}
                     {issue.statusCategory && (
                       <Badge

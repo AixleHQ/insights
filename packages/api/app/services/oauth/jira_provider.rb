@@ -82,6 +82,21 @@ module Oauth
       }
     end
 
+    def fetch_user_email(account_id)
+      id = cloud_id
+      return nil if id.nil? || account_id.blank?
+
+      response = http_client.get(
+        "#{API_URL}/ex/jira/#{id}/rest/api/3/user",
+        params: { accountId: account_id }
+      )
+      return nil unless response.success?
+
+      JSON.parse(response.body)["emailAddress"]
+    rescue StandardError
+      nil
+    end
+
     private
 
     def cloud_id

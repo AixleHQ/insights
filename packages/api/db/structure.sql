@@ -190,7 +190,9 @@ CREATE TYPE public.tool_name AS ENUM (
     'openai_api',
     'gemini_api',
     'custom',
-    'jira'
+    'jira',
+    'linear',
+    'github'
 );
 
 
@@ -11281,6 +11283,7 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260414000001'),
 ('20260413165455'),
 ('20260413165431'),
 ('20260408000001'),
