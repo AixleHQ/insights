@@ -40,23 +40,24 @@ module Oauth
       end
     end
 
-    def fetch_issues(project_key, max_results: 100, start_at: 0)
-      # Quote the key per Jira JQL spec to handle special characters
+    def fetch_issues(project_key, max_results: 100, next_page_token: nil)
       jql = "project = \"#{project_key}\" ORDER BY updated DESC"
-      response = http_client.get(
-        "#{API_URL}/ex/jira/#{cloud_id}/rest/api/3/search",
-        params: {
-          jql: jql,
-          maxResults: max_results,
-          startAt: start_at,
-          fields: "summary,status,issuetype,priority,assignee,reporter,parent,labels,duedate,created,updated,project"
-        }
-      )
+      body = {
+        jql: jql,
+        maxResults: max_results,
+        fields: %w[summary status issuetype priority assignee reporter parent labels duedate created updated project]
+      }
+      body[:nextPageToken] = next_page_token if next_page_token
+
+      response = http_client.post("#{API_URL}/ex/jira/#{cloud_id}/rest/api/3/search/jql") do |req|
+        req.headers["Content-Type"] = "application/json"
+        req.body = body.to_json
+      end
       return { issues: [], total: 0 } unless response.success?
 
       data = JSON.parse(response.body)
       issues = data["issues"].map { |i| map_issue(i) }
-      { issues: issues, total: data["total"], next_start: start_at + issues.size }
+      { issues: issues, total: data["total"] || issues.size, next_page_token: data["nextPageToken"] }
     end
 
     def map_issue(raw)

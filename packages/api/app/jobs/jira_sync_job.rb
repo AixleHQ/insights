@@ -53,12 +53,12 @@ class JiraSyncJob < ApplicationJob
 
   def sync_project_issues(project, jira_key)
     provider = Oauth::BaseProvider.for(@connector)
-    start_at = 0
+    next_page_token = nil
     loop do
-      result = provider.fetch_issues(jira_key, start_at: start_at)
+      result = provider.fetch_issues(jira_key, next_page_token: next_page_token)
       upsert_issues(result[:issues], project)
-      start_at += result[:issues].size
-      break if start_at >= result[:total] || result[:issues].empty?
+      next_page_token = result[:next_page_token]
+      break if next_page_token.nil? || result[:issues].empty?
     end
   end
 
