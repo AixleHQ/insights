@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Layers, ExternalLink } from 'lucide-react';
+import { Layers } from 'lucide-react';
 import { useProjectIssues } from '@/hooks/useApi';
 import type { ProjectWithStats } from '@/lib/types';
 import { Button } from '@/components/ui/button';
