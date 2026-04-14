@@ -201,14 +201,14 @@ BITBUCKET_CLIENT_SECRET: "${BITBUCKET_CLIENT_SECRET}"
 4. Copy the **Client ID** and **Secret** from the **Authorization** tab
 
 ```env
-JIRA_CLIENT_ID=your-client-id
-JIRA_CLIENT_SECRET=your-client-secret
+ATLASSIAN_CLIENT_ID=your-atlassian-client-id
+ATLASSIAN_CLIENT_SECRET=your-atlassian-client-secret
 ```
 
 `docker-compose.yml` → `api.environment`:
 ```yaml
-JIRA_CLIENT_ID: "${JIRA_CLIENT_ID}"
-JIRA_CLIENT_SECRET: "${JIRA_CLIENT_SECRET}"
+ATLASSIAN_CLIENT_ID: "${ATLASSIAN_CLIENT_ID}"
+ATLASSIAN_CLIENT_SECRET: "${ATLASSIAN_CLIENT_SECRET}"
 ```
 
 ---
