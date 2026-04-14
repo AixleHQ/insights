@@ -279,7 +279,7 @@ module Api
         jira_project_key = params.require(:jira_project_key)
 
         # Verify connector belongs to the same org as the project (prevents cross-org injection)
-        connector = current_organization.organization_connectors.find(connector_id)
+        connector = @project.organization.organization_connectors.find(connector_id)
 
         ApplicationRecord.transaction do
           @project.project_settings.find_or_initialize_by(key: "jira_connector_id").update!(value: connector.id.to_s)
