@@ -146,8 +146,9 @@ class JiraSyncJob
     )
 
     provider = Oauth::BaseProvider.for(@connector)
-    attrs = provider.map_issue(issue_data)
-    upsert_issues([ attrs ], resolve_project_for_key(attrs[:jira_project_key]))
+    attrs    = provider.map_issue(issue_data)
+    project  = resolve_project_for_key(attrs[:jira_project_key])
+    upsert_issues([ attrs ], project) if project
   end
 
   def process_comment_event(payload, event_type)

@@ -7,13 +7,13 @@ RSpec.describe ToolEvent, type: :model do
         claude_code cursor windsurf github_copilot
         aider continue cody tabnine amazon_q
         openrouter anthropic_api openai_api gemini_api
-        custom
+        custom jira
       ]
       expect(ToolEvent::TOOL_NAMES).to eq(expected)
     end
 
     it 'defines valid event types' do
-      expected = %w[chat completion edit commit review test debug refactor documentation other]
+      expected = %w[chat completion edit commit review test debug refactor documentation other issue comment sprint]
       expect(ToolEvent::EVENT_TYPES).to eq(expected)
     end
   end

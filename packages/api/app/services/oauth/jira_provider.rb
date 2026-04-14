@@ -23,7 +23,10 @@ module Oauth
     end
 
     def fetch_projects
-      response = http_client.get("#{API_URL}/ex/jira/#{cloud_id}/rest/api/3/project/search")
+      id = cloud_id
+      return [] if id.nil?
+
+      response = http_client.get("#{API_URL}/ex/jira/#{id}/rest/api/3/project/search")
       return [] unless response.success?
 
       data = JSON.parse(response.body)
@@ -82,9 +85,11 @@ module Oauth
     private
 
     def cloud_id
-      @cloud_id ||= begin
-        response = http_client.get("#{API_URL}/oauth/token/accessible-resources")
-        JSON.parse(response.body).first["id"]
+      return @cloud_id if instance_variable_defined?(:@cloud_id)
+
+      response = http_client.get("#{API_URL}/oauth/token/accessible-resources")
+      @cloud_id = if response.success?
+        JSON.parse(response.body).first&.dig("id")
       end
     end
 
