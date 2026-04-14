@@ -13,7 +13,7 @@ module Api
         issues = issues.where(status_category: params[:status_category]) if params[:status_category].present?
         issues = issues.where(issue_type: params[:type]) if params[:type].present?
         issues = issues.where(assignee_id: params[:assignee]) if params[:assignee].present?
-        render_collection(paginate(issues), IssueSerializer, meta: pagination_meta(issues))
+        render_collection(issues, IssueSerializer)
       end
 
       # GET /api/v1/projects/:project_id/issues/:id
