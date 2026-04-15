@@ -1348,6 +1348,19 @@ export function useAvailableJiraProjects(orgId: string, connectorId: string) {
   });
 }
 
+// POST /api/v1/projects/:projectId/sync_issues
+// Runs synchronously — only invalidate after the server confirms completion.
+export function useSyncJiraIssues(projectId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => api.post(`/projects/${projectId}/sync_issues`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'issues'] });
+    },
+  });
+}
+
 // POST /api/v1/projects/:projectId/link_jira
 export function useLinkJira(projectId: string) {
   const queryClient = useQueryClient();
@@ -1357,7 +1370,7 @@ export function useLinkJira(projectId: string) {
       api.post<{ data: { linked: boolean } }>(`/projects/${projectId}/link_jira`, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projects.detail(projectId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.issues.all(projectId) });
+      queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'issues'] });
     },
   });
 }
