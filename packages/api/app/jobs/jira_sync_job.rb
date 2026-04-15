@@ -47,11 +47,11 @@ class JiraSyncJob < ApplicationJob
     projects = provider.fetch_projects
     return if projects.empty?
 
-    # Accumulate all metadata changes and persist in a single save.
-    @connector.metadata ||= {}
-    @connector.metadata["projects"] ||= {}
+    # Store available Jira projects in connector config for reference.
+    @connector.config ||= {}
+    @connector.config["projects"] ||= {}
     projects.each do |project_data|
-      @connector.metadata["projects"][project_data[:key]] = {
+      @connector.config["projects"][project_data[:key]] = {
         id:           project_data[:id],
         name:         project_data[:name],
         key:          project_data[:key],
