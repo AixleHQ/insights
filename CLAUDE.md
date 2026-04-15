@@ -6,11 +6,6 @@
 - Frontend: TypeScript (React)
 - This is a full-stack monorepo. Most features require changes across both backend and frontend.
 
-## Testing
-
-- Always run the full test suite before committing. Fix any test failures before proceeding.
-- Common test pitfalls: use `expect_unprocessable` (not `expect_unprocessable_entity`) for RSpec helpers. Check factory default values before writing assertions.
-
 ## Project Overview
 
 DB90 is an AI tool analytics platform that tracks and manages coding assistant usage across organizations. It monitors token consumption, costs, and usage patterns for tools like ChatGPT, Claude, and GitHub Copilot, with risk scanning and data retention policies.
@@ -131,13 +126,13 @@ Each ticket gets its own git worktree — a separate directory on its own branch
 
 ### Commands (use `/worktrees` skill)
 
-| Step | Command | Where |
-|------|---------|-------|
-| 1. Create | `/worktrees create a worktree for AIX-XX` | main repo |
-| 2. Navigate | `/worktrees open worktree AIX-XX` | main repo |
-| 3. Open | `cd <worktree-path> && claude` | terminal |
-| 4. Work | commit + push normally | worktree session |
-| 5. Clean up | `/worktrees clean up worktree AIX-XX` | main repo |
+| Step        | Command                                      | Where            |
+| ----------- | -------------------------------------------- | ---------------- |
+| 1. Create   | `/worktrees create a worktree for AIX-XX` | main repo        |
+| 2. Navigate | `/worktrees open worktree AIX-XX`         | main repo        |
+| 3. Open     | `cd <worktree-path> && claude`               | terminal         |
+| 4. Work     | commit + push normally                       | worktree session |
+| 5. Clean up | `/worktrees clean up worktree AIX-XX`     | main repo        |
 
 ### Directory structure
 
@@ -161,6 +156,7 @@ Each ticket gets its own git worktree — a separate directory on its own branch
 - Docker Compose manages all backing services locally.
 
 <!-- code-review-graph MCP tools -->
+
 ## MCP Tools: code-review-graph
 
 **IMPORTANT: This project has a knowledge graph. ALWAYS use the
@@ -181,16 +177,16 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 
 ### Key Tools
 
-| Tool | Use when |
-|------|----------|
-| `detect_changes` | Reviewing code changes — gives risk-scored analysis |
-| `get_review_context` | Need source snippets for review — token-efficient |
-| `get_impact_radius` | Understanding blast radius of a change |
-| `get_affected_flows` | Finding which execution paths are impacted |
-| `query_graph` | Tracing callers, callees, imports, tests, dependencies |
-| `semantic_search_nodes` | Finding functions/classes by name or keyword |
-| `get_architecture_overview` | Understanding high-level codebase structure |
-| `refactor_tool` | Planning renames, finding dead code |
+| Tool                        | Use when                                               |
+| --------------------------- | ------------------------------------------------------ |
+| `detect_changes`            | Reviewing code changes — gives risk-scored analysis    |
+| `get_review_context`        | Need source snippets for review — token-efficient      |
+| `get_impact_radius`         | Understanding blast radius of a change                 |
+| `get_affected_flows`        | Finding which execution paths are impacted             |
+| `query_graph`               | Tracing callers, callees, imports, tests, dependencies |
+| `semantic_search_nodes`     | Finding functions/classes by name or keyword           |
+| `get_architecture_overview` | Understanding high-level codebase structure            |
+| `refactor_tool`             | Planning renames, finding dead code                    |
 
 ### Workflow
 

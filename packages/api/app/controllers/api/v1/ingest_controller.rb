@@ -42,11 +42,15 @@ module Api
       end
 
       def store_raw_event(raw_payload, org)
+        RawEventStore.ensure_bucket_exists!
         RawEventStore.store(
           raw_payload,
           organization_id: org.id,
           metadata: { content_type: request.content_type }
         )
+      rescue StandardError => e
+        Rails.logger.warn "[Ingest] Raw event storage failed (continuing): #{e.message}"
+        nil
       end
 
       def start_ingestion_workflow(raw_key, event_params, org)

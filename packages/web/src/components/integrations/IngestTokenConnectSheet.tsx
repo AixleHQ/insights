@@ -42,7 +42,7 @@ function SetupInstructions({ providerId, token }: { providerId: string; token: s
         "hooks": [
           {
             "type": "command",
-            "command": "curl -s -X POST https://app.db90.io/api/v1/ingest/events -H 'Authorization: Bearer ${token}' -H 'Content-Type: application/json' -d @-"
+            "command": "curl -s -X POST ${window.location.origin}/api/v1/ingest/events -H 'Authorization: Bearer ${token}' -H 'Content-Type: application/json' -d @-"
           }
         ]
       }
