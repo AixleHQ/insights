@@ -80,6 +80,7 @@ export interface ProjectWithStats extends Project {
   lastEventAt?: string | null;
   connectors: { id: string; provider: string }[];
   jiraProjectKey?: string | null;
+  jiraConnectorId?: string | null;
 }
 
 // Connector types

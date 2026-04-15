@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Layers, Bug, BookOpen, CheckSquare, Zap, Circle } from 'lucide-react';
-import { useProjectIssues } from '@/hooks/useApi';
+import { Layers, Bug, BookOpen, CheckSquare, Zap, Circle, RefreshCw } from 'lucide-react';
+import { useProjectIssues, useSyncJiraIssues } from '@/hooks/useApi';
 import type { ProjectWithStats } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -76,6 +76,7 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
   const [assigneeFilter, setAssigneeFilter] = useState<string>('');
 
   const isLinked = !!project.jiraProjectKey;
+  const syncJira = useSyncJiraIssues(projectId);
 
   const { data: issuesResponse, isLoading } = useProjectIssues(
     projectId,
@@ -143,9 +144,20 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
                 </span>
               </CardTitle>
             </div>
-            <Button variant="outline" size="sm" onClick={() => setConnectJiraOpen(true)}>
-              Change project
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={syncJira.isPending}
+                onClick={() => syncJira.mutate()}
+              >
+                <RefreshCw className={`mr-1.5 size-3.5 ${syncJira.isPending ? 'animate-spin' : ''}`} />
+                Sync
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setConnectJiraOpen(true)}>
+                Change project
+              </Button>
+            </div>
           </div>
         </CardHeader>
 

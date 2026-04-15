@@ -3,7 +3,7 @@
 module Api
   module V1
     class ProjectsController < BaseController
-      before_action :set_project, only: %i[show update destroy settings update_setting destroy_setting stats daily_by_tool commits_by_user members retention_policy update_retention_policy link_jira]
+      before_action :set_project, only: %i[show update destroy settings update_setting destroy_setting stats daily_by_tool commits_by_user members retention_policy update_retention_policy link_jira sync_issues]
 
       # GET /api/v1/projects
       # GET /api/v1/organizations/:organization_id/projects
@@ -288,6 +288,25 @@ module Api
 
         JiraSyncJob.perform_later(connector.id, "sync")
         render json: { data: { linked: true } }
+      end
+
+      # POST /api/v1/projects/:id/sync_issues
+      # Runs the Jira issue sync synchronously so the response returns only
+      # after issues are updated in the DB — no polling needed on the client.
+      def sync_issues
+        authorize! @project, to: :link_jira?
+
+        connector_id = @project.project_settings.find_by(key: "jira_connector_id")&.value
+        return render json: { error: "No Jira project linked" }, status: :unprocessable_entity if connector_id.blank?
+
+        connector = @project.organization.organization_connectors.find(connector_id)
+        JiraSyncJob.perform_now(connector.id, "sync", project_id: @project.id)
+
+        render json: { data: { synced_at: Time.current } }
+      rescue ActiveRecord::RecordNotFound
+        render json: { error: "Connector not found" }, status: :not_found
+      rescue StandardError => e
+        render json: { error: e.message }, status: :unprocessable_entity
       end
 
       # GET /api/v1/projects/:id/retention_policy

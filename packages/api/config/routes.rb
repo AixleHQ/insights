@@ -121,6 +121,7 @@ Rails.application.routes.draw do
           get :retention_policy
           patch :retention_policy, action: :update_retention_policy
           post :link_jira
+          post :sync_issues
         end
 
         resources :issues, only: [ :index, :show ]
