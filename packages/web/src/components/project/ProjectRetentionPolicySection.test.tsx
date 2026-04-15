@@ -179,6 +179,7 @@ describe("ProjectRetentionPolicySection", () => {
   });
 
   it("shows error alert when mutation fails", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const mutateAsync = vi.fn().mockRejectedValue(new Error("Server error"));
     mockUseUpdateProjectRetentionPolicy.mockReturnValue({ mutateAsync, isPending: false });
 
@@ -198,5 +199,6 @@ describe("ProjectRetentionPolicySection", () => {
     await waitFor(() => {
       expect(screen.getByText("Failed to save. Please try again.")).toBeInTheDocument();
     });
+    consoleSpy.mockRestore();
   });
 });

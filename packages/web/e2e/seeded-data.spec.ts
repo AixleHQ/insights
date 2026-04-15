@@ -66,6 +66,9 @@ test.describe("Seeded Data Verification", () => {
   test("user can access events page with data", async ({ page }) => {
     await page.goto("/events");
 
+    // Wait for page to load past auth
+    await expect(page.getByRole("heading", { name: /events/i })).toBeVisible({ timeout: 20000 });
+
     // Wait for events table to load
     await expect(page.getByRole("table")).toBeVisible({ timeout: 15000 });
 
@@ -105,7 +108,8 @@ test.describe("Seeded Data Verification", () => {
     await expect(settingsNav.getByRole("link", { name: /tools/i })).toBeVisible();
 
     // Profile section shows the authenticated user's email
-    await expect(page.getByText(/billy\.boozer@dualbootpartners\.com/i)).toBeVisible();
+    const testEmail = process.env.E2E_TEST_EMAIL ?? "ada.lovelace@example.com";
+    await expect(page.getByText(new RegExp(testEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i")).first()).toBeVisible();
   });
 
   test("user can see projects", async ({ page }) => {
@@ -177,8 +181,9 @@ test.describe("API Integration", () => {
     expect(response.ok()).toBeTruthy();
     const data = await response.json();
 
-    // User should be ada.lovelace
-    expect(data.data.email).toBe("ada.lovelace@example.com");
+    // User should be the configured test user
+    const testEmail = process.env.E2E_TEST_EMAIL ?? "ada.lovelace@example.com";
+    expect(data.data.email).toBe(testEmail);
 
     // Debug info should show events count (in development)
     if (data.data._debug) {

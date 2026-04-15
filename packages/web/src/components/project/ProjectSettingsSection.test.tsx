@@ -108,6 +108,7 @@ describe("ProjectSettingsSection", () => {
   });
 
   it("shows error feedback when save fails", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     mockUseProjectSettings.mockReturnValue({ data: { data: [] }, isLoading: false });
     mockUpdateMutateAsync.mockRejectedValue(new Error("Network error"));
 
@@ -120,6 +121,7 @@ describe("ProjectSettingsSection", () => {
     await waitFor(() => {
       expect(screen.getByText("Failed to save. Please try again.")).toBeInTheDocument();
     });
+    consoleSpy.mockRestore();
   });
 
   it("shows validation error for invalid domain format", async () => {

@@ -1,6 +1,11 @@
 import { useMemo, useState } from "react";
 import { AlertCircle } from "lucide-react";
-import { useProjectConnectors, useProjectConnectWithApiKey, useProjectDeleteConnector, useProjectTestConnector } from "@/hooks/useApi";
+import {
+  useProjectConnectors,
+  useProjectConnectWithApiKey,
+  useProjectDeleteConnector,
+  useProjectTestConnector,
+} from "@/hooks/useApi";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -18,7 +23,7 @@ const PROVIDERS: ProviderInfo[] = [
   {
     id: "anthropic",
     name: "Anthropic API",
-    description: "Direct Anthropic API integration",
+    description: "Direct Anthropic API integration 1",
     category: "ai",
     features: [
       "API key management",
@@ -112,8 +117,11 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
   const [activeTab, setActiveTab] = useState("connected");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [slackSheetOpen, setSlackSheetOpen] = useState(false);
-  const [connectingProvider, setConnectingProvider] = useState<ProviderInfo | null>(null);
-  const [testingConnectorId, setTestingConnectorId] = useState<string | null>(null);
+  const [connectingProvider, setConnectingProvider] =
+    useState<ProviderInfo | null>(null);
+  const [testingConnectorId, setTestingConnectorId] = useState<string | null>(
+    null,
+  );
   const [actionError, setActionError] = useState<string | null>(null);
 
   const integrations: IntegrationData[] = useMemo(() => {
@@ -121,7 +129,8 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
     return connectorsData.map((c) => {
       const connectorType = c.connectorType || c.connector_type || "anthropic";
       const lastError = c.lastError || c.last_error;
-      const externalAccountName = c.externalAccountName || c.external_account_name;
+      const externalAccountName =
+        c.externalAccountName || c.external_account_name;
       const lastSyncAt = c.lastSyncAt || c.last_sync_at;
       const status: ConnectorStatus = c.status;
 
@@ -141,7 +150,9 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
   }, [connectorsData]);
 
   const connectedProviderIds = new Set(integrations.map((c) => c.provider));
-  const availableProviders = PROVIDERS.filter((p) => !connectedProviderIds.has(p.id));
+  const availableProviders = PROVIDERS.filter(
+    (p) => !connectedProviderIds.has(p.id),
+  );
 
   const handleConnect = (providerId: string) => {
     const provider = PROVIDERS.find((p) => p.id === providerId) ?? null;
@@ -163,7 +174,9 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
   };
 
   const handleDisconnect = async (id: string) => {
-    if (window.confirm("Are you sure you want to disconnect this integration?")) {
+    if (
+      window.confirm("Are you sure you want to disconnect this integration?")
+    ) {
       setActionError(null);
       try {
         await deleteConnector.mutateAsync({ projectId, connectorId: id });
@@ -193,7 +206,11 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
           <AlertDescription>{actionError}</AlertDescription>
         </Alert>
       )}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="space-y-4"
+      >
         <TabsList>
           <TabsTrigger value="connected">
             Connected ({integrations.length})
@@ -212,7 +229,9 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
             </div>
           ) : integrations.length === 0 ? (
             <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-8">
-              <p className="text-muted-foreground text-sm">No providers connected</p>
+              <p className="text-muted-foreground text-sm">
+                No providers connected
+              </p>
               <p className="mt-1 text-xs text-muted-foreground">
                 Switch to the Available tab to connect a provider
               </p>
@@ -235,7 +254,9 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
         <TabsContent value="available" className="space-y-4">
           {availableProviders.length === 0 ? (
             <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-8">
-              <p className="text-muted-foreground text-sm">All providers are connected</p>
+              <p className="text-muted-foreground text-sm">
+                All providers are connected
+              </p>
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2">

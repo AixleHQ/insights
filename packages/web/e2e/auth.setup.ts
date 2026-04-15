@@ -4,10 +4,10 @@ import * as path from "path";
 
 const authFile = "./e2e/.auth/user.json";
 
-// Test credentials - these match the seeded user
-// Note: Requires the user to exist in Keycloak with password enabled
-const TEST_EMAIL = "ada.lovelace@example.com";
-const TEST_PASSWORD = "password123";
+// Test credentials — override locally via E2E_TEST_EMAIL / E2E_TEST_PASSWORD env vars.
+// Defaults to the canonical seeded user (ada.lovelace) used in CI and shared environments.
+const TEST_EMAIL = process.env.E2E_TEST_EMAIL ?? "ada.lovelace@example.com";
+const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD ?? "password123";
 
 // Keycloak configuration (must match frontend config)
 const KEYCLOAK_URL = "http://localhost:8080";
@@ -144,7 +144,8 @@ setup("authenticate", async ({ page, request }) => {
     });
   }
 
-  // Save to file
+  // Save to file (ensure directory exists)
+  fs.mkdirSync(path.dirname(authPath), { recursive: true });
   fs.writeFileSync(authPath, JSON.stringify(storageState, null, 2));
   console.log("Authentication state saved!");
 });
