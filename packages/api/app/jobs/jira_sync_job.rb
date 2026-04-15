@@ -12,8 +12,13 @@ class JiraSyncJob < ApplicationJob
 
     case action
     when "sync"
+      ensure_valid_token!
       sync_projects
-      sync_all_issues
+      if @options[:project_id]
+        sync_single_project(@options[:project_id])
+      else
+        sync_all_issues
+      end
     when "refresh_token"
       refresh_token
     when "webhook"
@@ -40,6 +45,12 @@ class JiraSyncJob < ApplicationJob
     projects.each do |project_data|
       sync_project(project_data)
     end
+  end
+
+  def sync_single_project(project_id)
+    project  = Project.find(project_id)
+    jira_key = project.project_settings.find_by(key: "jira_project_key")&.value
+    sync_project_issues(project, jira_key) if jira_key.present?
   end
 
   def sync_all_issues
@@ -105,15 +116,18 @@ class JiraSyncJob < ApplicationJob
     @connector.save!
   end
 
+  def ensure_valid_token!
+    return if @connector.token_expires_at && @connector.token_expires_at > 5.minutes.from_now
+
+    Rails.logger.info("[JiraSyncJob] Token expired or expiring soon, refreshing...")
+    provider = Oauth::BaseProvider.for(@connector)
+    provider.refresh_token!
+    @connector.reload
+  end
+
   def refresh_token
     provider = Oauth::BaseProvider.for(@connector)
-    token_data = provider.refresh_access_token
-
-    @connector.update!(
-      access_token: token_data[:access_token],
-      refresh_token: token_data[:refresh_token],
-      token_expires_at: token_data[:expires_at]
-    )
+    provider.refresh_token!
   end
 
   def process_webhook
