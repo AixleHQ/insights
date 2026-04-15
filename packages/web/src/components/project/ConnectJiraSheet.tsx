@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Search, Layers } from 'lucide-react';
 import { useOrg } from '@/contexts/OrgContext';
-import { useConnectors, useAvailableJiraProjects, useLinkJira } from '@/hooks/useApi';
+import { useConnectors, useAvailableJiraProjects, useLinkJira, useSyncJiraIssues } from '@/hooks/useApi';
 import {
   Sheet,
   SheetContent,
@@ -44,6 +44,7 @@ export function ConnectJiraSheet({ projectId, open, onOpenChange, onSuccess }: C
   );
 
   const linkJira = useLinkJira(projectId);
+  const syncJira = useSyncJiraIssues(projectId);
 
   const filteredProjects = (jiraProjects || []).filter((p) =>
     `${p.name} ${p.key}`.toLowerCase().includes(search.toLowerCase())
@@ -64,6 +65,8 @@ export function ConnectJiraSheet({ projectId, open, onOpenChange, onSuccess }: C
     setError(null);
     try {
       await linkJira.mutateAsync({ connector_id: selectedConnectorId, jira_project_key: key });
+      // Run an initial sync synchronously so issues are ready when the sheet closes.
+      await syncJira.mutateAsync();
       handleOpenChange(false);
       onSuccess();
     } catch {
@@ -154,7 +157,7 @@ export function ConnectJiraSheet({ projectId, open, onOpenChange, onSuccess }: C
                       </div>
                       {connectingKey === project.key && (
                         <span className="text-xs text-muted-foreground shrink-0 ml-2">
-                          Linking…
+                          {syncJira.isPending ? 'Syncing…' : 'Linking…'}
                         </span>
                       )}
                     </button>
