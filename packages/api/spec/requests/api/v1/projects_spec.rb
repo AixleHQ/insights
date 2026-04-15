@@ -479,8 +479,7 @@ RSpec.describe 'Api::V1::Projects', type: :request do
     end
 
     it 'overwrites existing settings on re-link' do
-      other_connector = create(:organization_connector, :jira, organization: organization)
-      project.project_settings.create!(key: 'jira_connector_id', value: other_connector.id.to_s)
+      project.project_settings.create!(key: 'jira_connector_id', value: connector.id.to_s)
       project.project_settings.create!(key: 'jira_project_key', value: 'OLD')
 
       authenticated_post "/api/v1/projects/#{project.id}/link_jira",
@@ -488,7 +487,7 @@ RSpec.describe 'Api::V1::Projects', type: :request do
                          params: { connector_id: connector.id, jira_project_key: 'NEW' }
 
       expect_success
-      expect(project.project_settings.find_by(key: 'jira_project_key')&.value).to eq('NEW')
+      expect(project.reload.project_settings.find_by(key: 'jira_project_key')&.value).to eq('NEW')
     end
 
     it 'returns 404 when connector belongs to another org' do

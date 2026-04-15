@@ -70,13 +70,13 @@ RSpec.describe 'Api::V1::Issues', type: :request do
 
       expect_success
       expect(json_data.length).to eq(2)
-      expect(json_meta[:totalCount]).to eq(4)
+      expect(json_meta[:total_count]).to eq(4)
     end
 
-    it 'returns 403 for users not in the project' do
+    it 'returns 404 for users not in the project' do
       authenticated_get "/api/v1/projects/#{project.id}/issues", user: outsider
 
-      expect_forbidden
+      expect_not_found
     end
 
     it 'returns 401 without authentication' do
@@ -127,10 +127,10 @@ RSpec.describe 'Api::V1::Issues', type: :request do
       expect(json_data[:summary]).to eq(issue.summary)
     end
 
-    it 'returns 403 for users not in the project' do
+    it 'returns 404 for users not in the project' do
       authenticated_get "/api/v1/projects/#{project.id}/issues/#{issue.id}", user: outsider
 
-      expect_forbidden
+      expect_not_found
     end
 
     it 'returns 404 for issues in other projects' do
