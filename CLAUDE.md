@@ -1,5 +1,16 @@
 # DB90 Rails — Claude Code Guide
 
+## Stack
+
+- Backend: Ruby (RSpec for tests)
+- Frontend: TypeScript (React)
+- This is a full-stack monorepo. Most features require changes across both backend and frontend.
+
+## Testing
+
+- Always run the full test suite before committing. Fix any test failures before proceeding.
+- Common test pitfalls: use `expect_unprocessable` (not `expect_unprocessable_entity`) for RSpec helpers. Check factory default values before writing assertions.
+
 ## Project Overview
 
 DB90 is an AI tool analytics platform that tracks and manages coding assistant usage across organizations. It monitors token consumption, costs, and usage patterns for tools like ChatGPT, Claude, and GitHub Copilot, with risk scanning and data retention policies.
@@ -71,6 +82,12 @@ Follow this decision hierarchy: standard Rails patterns first → existing codeb
 - Multi-database setup in production (primary, cache, queue, cable).
 - Migrations live in `packages/api/db/migrate/`. Always write reversible migrations.
 - Never drop columns in the same migration that removes them from the model — use a two-step deploy.
+
+## Git Workflow
+
+- When cleaning up worktrees, always `cd` to the main repo directory first to avoid CWD removal issues.
+- Before creating a PR, verify `gh auth status` succeeds. If not, inform the user instead of attempting and failing.
+- Worktree branch naming convention: `<ticket-id>` (e.g., `AIX-62`).
 
 ## Git Conventions
 

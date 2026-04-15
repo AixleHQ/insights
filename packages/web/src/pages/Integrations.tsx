@@ -5,7 +5,9 @@ import {
   useConnectors,
   useSyncConnector,
   useDeleteConnector,
-  useTestConnector,
+  useTestConnector, 
+  useToolAccounts, 
+  useDeleteToolAccount,
 } from "@/hooks/useApi";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,6 +25,11 @@ import { IngestTokenConnectSheet } from "@/components/integrations/IngestTokenCo
 const AI_PROVIDERS = new Set(["anthropic", "openai", "openrouter", "gemini"]);
 const SLACK_PROVIDERS = new Set(["slack"]);
 const INGEST_PROVIDERS = new Set(["cursor", "claude-code"]);
+
+const TOOL_NAME_TO_PROVIDER: Record<string, IntegrationProvider> = {
+  cursor: "cursor",
+  claude_code: "claude-code",
+};
 
 const availableProviders: ProviderInfo[] = [
   // Code Hosting / Version Control
@@ -249,8 +256,10 @@ export function Integrations() {
   const { data: connectorsData, isLoading } = useConnectors(
     currentOrg?.id || "",
   );
+  const { data: toolAccountsData } = useToolAccounts(currentOrg?.id || '');
   const syncConnector = useSyncConnector();
   const deleteConnector = useDeleteConnector();
+  const deleteToolAccount = useDeleteToolAccount();
   const testConnector = useTestConnector();
 
   const activeTab = status === "available" ? "available" : "connected";
@@ -267,22 +276,19 @@ export function Integrations() {
   const handleConnectSuccess = () => navigate("/integrations/connected");
 
   // Transform API response to component format
-  const integrations: IntegrationData[] = useMemo(() => {
-    if (!connectorsData) return [];
-    return connectorsData.map((c) => {
+  const { integrations, ingestAccountIds } = useMemo(() => {
+    const connectorIntegrations: IntegrationData[] = (connectorsData ?? []).map((c) => {
       const connectorType = c.connectorType || c.connector_type || "github";
       const lastError = c.lastError || c.last_error;
       const externalAccountName =
         c.externalAccountName || c.external_account_name;
       const lastSyncAt = c.lastSyncAt || c.last_sync_at;
 
-      const status: ConnectorStatus = c.status;
-
       return {
         id: c.id,
         provider: connectorType as IntegrationProvider,
         name: externalAccountName || connectorType,
-        status,
+        status: c.status as ConnectorStatus,
         last_sync_at: lastSyncAt || undefined,
         sync_error: lastError || undefined,
         metadata: {
@@ -291,7 +297,27 @@ export function Integrations() {
         },
       };
     });
-  }, [connectorsData]);
+
+    const ingestIds = new Set<string>();
+    const ingestIntegrations: IntegrationData[] = (toolAccountsData ?? [])
+      .filter((a) => TOOL_NAME_TO_PROVIDER[a.toolName])
+      .map((a) => {
+        ingestIds.add(a.id);
+        const provider = TOOL_NAME_TO_PROVIDER[a.toolName];
+        const providerInfo = availableProviders.find((p) => p.id === provider);
+        return {
+          id: a.id,
+          provider,
+          name: providerInfo?.name ?? a.toolName,
+          status: (a.isActive ? 'connected' : 'disconnected') as ConnectorStatus,
+        };
+      });
+
+    return {
+      integrations: [...connectorIntegrations, ...ingestIntegrations],
+      ingestAccountIds: ingestIds,
+    };
+  }, [connectorsData, toolAccountsData]);
 
   const handleConnect = (providerId: string) => {
     if (INGEST_PROVIDERS.has(providerId)) {
@@ -326,10 +352,11 @@ export function Integrations() {
       window.confirm("Are you sure you want to disconnect this integration?")
     ) {
       try {
-        await deleteConnector.mutateAsync({
-          orgId: currentOrg.id,
-          connectorId: id,
-        });
+        if (ingestAccountIds.has(id)) {
+          await deleteToolAccount.mutateAsync({ orgId: currentOrg.id, accountId: id });
+        } else {
+          await deleteConnector.mutateAsync({ orgId: currentOrg.id, connectorId: id });
+        }
       } catch (error) {
         console.error("Failed to disconnect integration:", error);
       }
@@ -420,10 +447,10 @@ export function Integrations() {
                 <IntegrationCard
                   key={integration.id}
                   integration={integration}
-                  onSync={
+                  onSync={ingestAccountIds.has(integration.id) || 
                     integration.provider === "slack" ? undefined : handleSync
                   }
-                  onTest={handleTest}
+                  onTest={ingestAccountIds.has(integration.id) ? undefined : handleTest}
                   onDisconnect={handleDisconnect}
                   isTesting={testingConnectorId === integration.id}
                 />
