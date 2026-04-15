@@ -48,11 +48,19 @@ RSpec.describe 'Api::V1::Ingest', type: :request do
         expect(json_data[:workflowId]).to be_present
       end
 
-      it 'defaults tool_name to the account tool_name when not provided' do
-        ingest_post(payload: valid_payload.except(:tool_name))
+      it 'always uses the account tool_name regardless of payload' do
+        ingest_post(payload: valid_payload.merge(tool_name: 'Edit'))
         expect(response).to have_http_status(:accepted)
         expect(Temporal::Client).to have_received(:start_workflow) do |_workflow, **kwargs|
           expect(kwargs[:args][:event][:tool_name]).to eq('cursor')
+        end
+      end
+
+      it 'defaults event_type to "other" when not provided' do
+        ingest_post(payload: valid_payload.except(:event_type))
+        expect(response).to have_http_status(:accepted)
+        expect(Temporal::Client).to have_received(:start_workflow) do |_workflow, **kwargs|
+          expect(kwargs[:args][:event][:event_type]).to eq('other')
         end
       end
     end

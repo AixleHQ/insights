@@ -11,7 +11,8 @@ module Api
         org = @tool_account.organization
         event_params[:organization_id] = org.id
         event_params[:user_id] = @tool_account.user.id
-        event_params[:tool_name] ||= @tool_account.tool_name
+        event_params[:tool_name] = @tool_account.tool_name
+        event_params[:event_type] = event_params[:event_type].presence || "other"
 
         raw_key = store_raw_event(request.raw_post, org)
         workflow_result = start_ingestion_workflow(raw_key, event_params, org)
