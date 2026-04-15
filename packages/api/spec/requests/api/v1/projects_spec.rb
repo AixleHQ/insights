@@ -448,4 +448,105 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       expect_forbidden
     end
   end
+
+  describe 'POST /api/v1/projects/:id/link_jira' do
+    let!(:project) { create(:project, organization: organization, owner: nil) }
+    let!(:project_membership) { create(:project_membership, project: project, user: user, role: 'admin') }
+    let!(:connector) { create(:organization_connector, :jira, organization: organization) }
+
+    it 'saves jira_connector_id and jira_project_key settings' do
+      authenticated_post "/api/v1/projects/#{project.id}/link_jira",
+                         user: user,
+                         params: { connector_id: connector.id, jira_project_key: 'SCRUM' }
+
+      expect_success
+      expect(json_data[:linked]).to be true
+      expect(project.project_settings.find_by(key: 'jira_connector_id')&.value).to eq(connector.id.to_s)
+      expect(project.project_settings.find_by(key: 'jira_project_key')&.value).to eq('SCRUM')
+    end
+
+    it 'overwrites existing settings on re-link' do
+      project.project_settings.create!(key: 'jira_connector_id', value: connector.id.to_s)
+      project.project_settings.create!(key: 'jira_project_key', value: 'OLD')
+
+      authenticated_post "/api/v1/projects/#{project.id}/link_jira",
+                         user: user,
+                         params: { connector_id: connector.id, jira_project_key: 'NEW' }
+
+      expect_success
+      expect(project.reload.project_settings.find_by(key: 'jira_project_key')&.value).to eq('NEW')
+    end
+
+    it 'returns 404 when connector belongs to another org' do
+      other_org = create(:organization)
+      other_connector = create(:organization_connector, :jira, organization: other_org)
+
+      authenticated_post "/api/v1/projects/#{project.id}/link_jira",
+                         user: user,
+                         params: { connector_id: other_connector.id, jira_project_key: 'SCRUM' }
+
+      expect_not_found
+    end
+
+    it 'returns 403 for project members without update permission' do
+      member_only = create(:user)
+      create(:organization_membership, user: member_only, organization: organization, role: 'member')
+      create(:project_membership, project: project, user: member_only, role: 'member')
+
+      authenticated_post "/api/v1/projects/#{project.id}/link_jira",
+                         user: member_only,
+                         params: { connector_id: connector.id, jira_project_key: 'SCRUM' }
+
+      expect_forbidden
+    end
+
+    it 'returns 401 without authentication' do
+      post "/api/v1/projects/#{project.id}/link_jira",
+           params: { connector_id: connector.id, jira_project_key: 'SCRUM' }
+
+      expect_unauthorized
+    end
+
+    it 'returns 422 for an invalid jira_project_key format' do
+      authenticated_post "/api/v1/projects/#{project.id}/link_jira",
+                         user: user,
+                         params: { connector_id: connector.id, jira_project_key: 'invalid key!' }
+
+      expect_unprocessable
+    end
+  end
+
+  describe 'POST /api/v1/projects/:id/sync_issues' do
+    let!(:project) { create(:project, organization: organization, owner: nil) }
+    let!(:project_membership) { create(:project_membership, project: project, user: user, role: 'admin') }
+    let!(:connector) { create(:organization_connector, :jira, organization: organization) }
+
+    before do
+      project.project_settings.create!(key: 'jira_connector_id', value: connector.id.to_s)
+      project.project_settings.create!(key: 'jira_project_key', value: 'SCRUM')
+      allow(JiraSyncJob).to receive(:perform_now)
+    end
+
+    it 'runs the sync job synchronously and returns synced_at' do
+      authenticated_post "/api/v1/projects/#{project.id}/sync_issues", user: user
+
+      expect_success
+      expect(json_data[:synced_at]).to be_present
+      expect(JiraSyncJob).to have_received(:perform_now).with(connector.id, 'sync', project_id: project.id)
+    end
+
+    it 'returns 422 when no Jira project is linked' do
+      project.project_settings.find_by(key: 'jira_connector_id')&.destroy!
+
+      authenticated_post "/api/v1/projects/#{project.id}/sync_issues", user: user
+
+      expect_unprocessable
+    end
+
+    it 'returns 401 without authentication' do
+      post "/api/v1/projects/#{project.id}/sync_issues"
+
+      expect_unauthorized
+    end
+  end
 end

@@ -525,4 +525,55 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
       end
     end
   end
+
+  describe 'GET /api/v1/organizations/:organization_id/connectors/:id/available_projects' do
+    let!(:jira_connector) { create(:organization_connector, :jira, organization: organization) }
+    let(:jira_projects) do
+      [
+        { id: "10001", key: "SCRUM", name: "Scrum Project", projectTypeKey: "software" },
+        { id: "10002", key: "OPS", name: "Operations", projectTypeKey: "business" }
+      ]
+    end
+    let(:provider_double) { instance_double(Oauth::JiraProvider) }
+
+    before do
+      allow(Oauth::BaseProvider).to receive(:for).with(jira_connector).and_return(provider_double)
+      allow(provider_double).to receive(:fetch_projects).and_return(jira_projects)
+    end
+
+    it 'returns available Jira projects for org admin' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{jira_connector.id}/available_projects",
+                        user: admin,
+                        organization: organization
+
+      expect_success
+      expect(json_data.length).to eq(2)
+      expect(json_data.first[:key]).to eq("SCRUM")
+      expect(json_data.first[:name]).to eq("Scrum Project")
+    end
+
+    it 'camelCases keys in the response' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{jira_connector.id}/available_projects",
+                        user: admin,
+                        organization: organization
+
+      expect_success
+      expect(json_data.first).to have_key(:projectTypeKey)
+    end
+
+    it 'returns 403 for org members' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{jira_connector.id}/available_projects",
+                        user: member,
+                        organization: organization
+
+      expect_forbidden
+    end
+
+    it 'returns 401 without authentication' do
+      get "/api/v1/organizations/#{organization.id}/connectors/#{jira_connector.id}/available_projects",
+          headers: { 'X-Organization-ID' => organization.id }
+
+      expect_unauthorized
+    end
+  end
 end

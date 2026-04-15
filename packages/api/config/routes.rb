@@ -61,6 +61,7 @@ Rails.application.routes.draw do
             post :test
             post :sync
             get  :available_repos
+            get  :available_projects
           end
           collection do
             get "authorize/:type", action: :authorize_url
@@ -119,7 +120,11 @@ Rails.application.routes.draw do
           get :members
           get :retention_policy
           patch :retention_policy, action: :update_retention_policy
+          post :link_jira
+          post :sync_issues
         end
+
+        resources :issues, only: [ :index, :show ]
 
         # Project members
         resources :members, controller: "project_members"

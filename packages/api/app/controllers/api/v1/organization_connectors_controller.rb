@@ -4,7 +4,7 @@ module Api
   module V1
     class OrganizationConnectorsController < BaseController
       before_action :require_organization!
-      before_action :set_connector, only: %i[show update destroy test sync available_repos]
+      before_action :set_connector, only: %i[show update destroy test sync available_repos available_projects]
 
       # GET /api/v1/organizations/:organization_id/connectors
       def index
@@ -159,6 +159,21 @@ module Api
         end
 
         render json: { data: repos }
+      rescue ActionPolicy::Unauthorized
+        raise
+      rescue StandardError => e
+        render json: { error: e.message }, status: :unprocessable_entity
+      end
+
+      # GET /api/v1/organizations/:organization_id/connectors/:id/available_projects
+      def available_projects
+        authorize! @connector, to: :available_projects?
+
+        provider = Oauth::BaseProvider.for(@connector)
+        projects = provider.fetch_projects.map do |p|
+          p.transform_keys { |k| k.to_s.camelize(:lower) }
+        end
+        render json: { data: projects }
       rescue ActionPolicy::Unauthorized
         raise
       rescue StandardError => e

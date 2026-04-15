@@ -51,6 +51,11 @@ class ProjectPolicy < ApplicationPolicy
     update?
   end
 
+  # Linking a Jira project requires the same permission as updating the project
+  def link_jira?
+    update?
+  end
+
   # Only project admins/owners can view audit logs
   def audit_logs?
     return true if global_admin?
