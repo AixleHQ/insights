@@ -19,6 +19,7 @@ class JiraSyncJob < ApplicationJob
       else
         sync_all_issues
       end
+      @connector.mark_synced!
     when "refresh_token"
       refresh_token
     when "webhook"
@@ -27,7 +28,6 @@ class JiraSyncJob < ApplicationJob
       Rails.logger.warn("[JiraSyncJob] Unknown action: #{action}")
     end
 
-    @connector.mark_synced!
     Rails.logger.info("[JiraSyncJob] Completed #{action} for connector #{connector_id}")
   rescue ActiveRecord::RecordNotFound
     Rails.logger.error("[JiraSyncJob] Connector #{connector_id} not found")
@@ -38,13 +38,27 @@ class JiraSyncJob < ApplicationJob
 
   private
 
-  def sync_projects
-    provider = Oauth::BaseProvider.for(@connector)
-    projects = provider.fetch_projects
+  # Memoized provider — reuses a single Faraday connection for the entire job.
+  def provider
+    @provider ||= Oauth::BaseProvider.for(@connector)
+  end
 
+  def sync_projects
+    projects = provider.fetch_projects
+    return if projects.empty?
+
+    # Accumulate all metadata changes and persist in a single save.
+    @connector.metadata ||= {}
+    @connector.metadata["projects"] ||= {}
     projects.each do |project_data|
-      sync_project(project_data)
+      @connector.metadata["projects"][project_data[:key]] = {
+        id:           project_data[:id],
+        name:         project_data[:name],
+        key:          project_data[:key],
+        project_type: project_data[:projectTypeKey]
+      }
     end
+    @connector.save!
   end
 
   def sync_single_project(project_id)
@@ -63,7 +77,6 @@ class JiraSyncJob < ApplicationJob
   end
 
   def sync_project_issues(project, jira_key)
-    provider = Oauth::BaseProvider.for(@connector)
     next_page_token = nil
     loop do
       result = provider.fetch_issues(jira_key, next_page_token: next_page_token)
@@ -73,20 +86,41 @@ class JiraSyncJob < ApplicationJob
     end
   end
 
+  # Bulk-upserts issues using a single INSERT ... ON CONFLICT statement.
+  # This avoids N+1 UPDATE queries (one per issue) and is safe to call
+  # repeatedly — re-syncing the same external_id simply updates the row.
   def upsert_issues(issues_data, project)
-    org      = @connector.organization
-    provider = Oauth::BaseProvider.for(@connector)
-    issues_data.each do |attrs|
-      assignee = resolve_assignee(org, provider, attrs[:assignee_account_id])
-      issue = Issue.find_or_initialize_by(
-        organization_connector: @connector,
-        external_id: attrs[:external_id]
+    return if issues_data.empty?
+
+    org = @connector.organization
+    now = Time.current
+
+    rows = issues_data.map do |attrs|
+      assignee = resolve_assignee(org, attrs[:assignee_account_id])
+      attrs.except(:assignee_account_id).merge(
+        organization_id:           org.id,
+        organization_connector_id: @connector.id,
+        project_id:                project.id,
+        assignee_id:               assignee&.id,
+        synced_at:                 now,
+        created_at:                now,
+        updated_at:                now
       )
-      issue.update!(attrs.merge(organization: org, project: project, assignee: assignee, synced_at: Time.current))
     end
+
+    Issue.upsert_all(
+      rows,
+      unique_by: %i[organization_connector_id external_id],
+      update_only: %i[
+        summary status status_category issue_type priority
+        assignee_id assignee_name reporter_name jira_project_key jira_project_id
+        parent_key labels due_date external_created_at external_updated_at
+        project_id synced_at updated_at
+      ]
+    )
   end
 
-  def resolve_assignee(org, provider, account_id)
+  def resolve_assignee(org, account_id)
     return nil if account_id.blank?
 
     @assignee_cache ||= {}
@@ -104,29 +138,19 @@ class JiraSyncJob < ApplicationJob
       .first&.project
   end
 
-  def sync_project(project_data)
-    @connector.metadata ||= {}
-    @connector.metadata["projects"] ||= {}
-    @connector.metadata["projects"][project_data[:key]] = {
-      id: project_data[:id],
-      name: project_data[:name],
-      key: project_data[:key],
-      project_type: project_data[:projectTypeKey]
-    }
-    @connector.save!
-  end
-
+  # Refreshes the access token if it is expired or expires within 5 minutes.
+  # When token_expires_at is nil the token has never been refreshed — treat it
+  # as expired so we always start with a valid token.
   def ensure_valid_token!
     return if @connector.token_expires_at && @connector.token_expires_at > 5.minutes.from_now
 
     Rails.logger.info("[JiraSyncJob] Token expired or expiring soon, refreshing...")
-    provider = Oauth::BaseProvider.for(@connector)
     provider.refresh_token!
     @connector.reload
+    @provider = nil # reset so provider re-initializes with the new token
   end
 
   def refresh_token
-    provider = Oauth::BaseProvider.for(@connector)
     provider.refresh_token!
   end
 
@@ -171,9 +195,8 @@ class JiraSyncJob < ApplicationJob
       }
     )
 
-    provider = Oauth::BaseProvider.for(@connector)
-    attrs    = provider.map_issue(issue_data)
-    project  = resolve_project_for_key(attrs[:jira_project_key])
+    attrs   = provider.map_issue(issue_data)
+    project = resolve_project_for_key(attrs[:jira_project_key])
     upsert_issues([ attrs ], project) if project
   end
 
@@ -183,12 +206,17 @@ class JiraSyncJob < ApplicationJob
     return unless comment && issue
 
     action = event_type.gsub("comment_", "")
+    occurred_at = Time.zone.parse(comment["created"].to_s) rescue nil
+    if occurred_at.nil?
+      Rails.logger.warn("[JiraSyncJob] Unparseable comment timestamp: #{comment['created'].inspect}, using Time.current")
+      occurred_at = Time.current
+    end
 
     ToolEvent.create!(
       organization_id: @connector.organization_id,
       tool_name: "jira",
       event_type: "comment",
-      occurred_at: Time.parse(comment["created"]),
+      occurred_at: occurred_at,
       metadata: {
         action: action,
         comment_id: comment["id"],

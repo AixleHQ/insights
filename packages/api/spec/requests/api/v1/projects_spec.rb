@@ -519,5 +519,47 @@ RSpec.describe 'Api::V1::Projects', type: :request do
 
       expect_unauthorized
     end
+
+    it 'returns 422 for an invalid jira_project_key format' do
+      authenticated_post "/api/v1/projects/#{project.id}/link_jira",
+                         user: user,
+                         params: { connector_id: connector.id, jira_project_key: 'invalid key!' }
+
+      expect_unprocessable
+    end
+  end
+
+  describe 'POST /api/v1/projects/:id/sync_issues' do
+    let!(:project) { create(:project, organization: organization, owner: nil) }
+    let!(:project_membership) { create(:project_membership, project: project, user: user, role: 'admin') }
+    let!(:connector) { create(:organization_connector, :jira, organization: organization) }
+
+    before do
+      project.project_settings.create!(key: 'jira_connector_id', value: connector.id.to_s)
+      project.project_settings.create!(key: 'jira_project_key', value: 'SCRUM')
+      allow(JiraSyncJob).to receive(:perform_now)
+    end
+
+    it 'runs the sync job synchronously and returns synced_at' do
+      authenticated_post "/api/v1/projects/#{project.id}/sync_issues", user: user
+
+      expect_success
+      expect(json_data[:synced_at]).to be_present
+      expect(JiraSyncJob).to have_received(:perform_now).with(connector.id, 'sync', project_id: project.id)
+    end
+
+    it 'returns 422 when no Jira project is linked' do
+      project.project_settings.find_by(key: 'jira_connector_id')&.destroy!
+
+      authenticated_post "/api/v1/projects/#{project.id}/sync_issues", user: user
+
+      expect_unprocessable
+    end
+
+    it 'returns 401 without authentication' do
+      post "/api/v1/projects/#{project.id}/sync_issues"
+
+      expect_unauthorized
+    end
   end
 end

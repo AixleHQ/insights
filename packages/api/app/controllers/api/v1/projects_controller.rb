@@ -278,6 +278,10 @@ module Api
         connector_id     = params.require(:connector_id)
         jira_project_key = params.require(:jira_project_key)
 
+        unless jira_project_key.match?(/\A[A-Z][A-Z0-9_]{1,9}\z/)
+          return render json: { error: "Invalid Jira project key format" }, status: :unprocessable_entity
+        end
+
         # Verify connector belongs to the same org as the project (prevents cross-org injection)
         connector = @project.organization.organization_connectors.find(connector_id)
 
@@ -347,7 +351,7 @@ module Api
       private
 
       def set_project
-        @project = Project.includes(:retention_policy).find(params[:id])
+        @project = Project.includes(:retention_policy, :project_settings).find(params[:id])
       end
 
       def project_params

@@ -56,7 +56,7 @@ module Oauth
       return { issues: [], total: 0 } unless response.success?
 
       data = JSON.parse(response.body)
-      issues = data["issues"].map { |i| map_issue(i) }
+      issues = (data["issues"] || []).map { |i| map_issue(i) }
       { issues: issues, total: data["total"] || issues.size, next_page_token: data["nextPageToken"] }
     end
 
