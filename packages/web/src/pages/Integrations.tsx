@@ -18,9 +18,11 @@ import {
 import type { ConnectorStatus } from "@/lib/types";
 import { ApiKeyConnectSheet } from "@/components/integrations/ApiKeyConnectSheet";
 import { OrgSlackConnectSheet } from "@/components/integrations/OrgSlackConnectSheet";
+import { IngestTokenConnectSheet } from "@/components/integrations/IngestTokenConnectSheet";
 
 const AI_PROVIDERS = new Set(["anthropic", "openai", "openrouter", "gemini"]);
 const SLACK_PROVIDERS = new Set(["slack"]);
+const INGEST_PROVIDERS = new Set(["cursor", "claude-code"]);
 
 const availableProviders: ProviderInfo[] = [
   // Code Hosting / Version Control
@@ -186,8 +188,7 @@ const availableProviders: ProviderInfo[] = [
       "Token consumption",
       "Session insights",
     ],
-    available: false,
-    comingSoon: true,
+    available: true,
   },
 
   // Design
@@ -257,6 +258,8 @@ export function Integrations() {
   const [connectingProvider, setConnectingProvider] =
     useState<ProviderInfo | null>(null);
   const [slackSheetOpen, setSlackSheetOpen] = useState(false);
+  const [ingestSheetOpen, setIngestSheetOpen] = useState(false);
+  const [ingestProvider, setIngestProvider] = useState<ProviderInfo | null>(null);
   const [testingConnectorId, setTestingConnectorId] = useState<string | null>(
     null,
   );
@@ -291,9 +294,11 @@ export function Integrations() {
   }, [connectorsData]);
 
   const handleConnect = (providerId: string) => {
-    if (AI_PROVIDERS.has(providerId)) {
-      const provider =
-        availableProviders.find((p) => p.id === providerId) ?? null;
+    if (INGEST_PROVIDERS.has(providerId)) {
+      setIngestProvider(availableProviders.find((p) => p.id === providerId) ?? null);
+      setIngestSheetOpen(true);
+    } else if (AI_PROVIDERS.has(providerId)) {
+      const provider = availableProviders.find((p) => p.id === providerId) ?? null;
       setConnectingProvider(provider);
       setSheetOpen(true);
     } else if (SLACK_PROVIDERS.has(providerId)) {
@@ -460,6 +465,13 @@ export function Integrations() {
       <OrgSlackConnectSheet
         open={slackSheetOpen}
         onOpenChange={setSlackSheetOpen}
+        onSuccess={handleConnectSuccess}
+      />
+
+      <IngestTokenConnectSheet
+        provider={ingestProvider}
+        open={ingestSheetOpen}
+        onOpenChange={setIngestSheetOpen}
         onSuccess={handleConnectSuccess}
       />
     </div>

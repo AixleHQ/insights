@@ -13,7 +13,8 @@ class JwtAuth
     "/api/v1/health",
     "/up",
     "/admin",
-    "/api/internal"
+    "/api/internal",
+    "/api/v1/ingest"
   ].freeze
 
   EXCLUDED_PATTERNS = [

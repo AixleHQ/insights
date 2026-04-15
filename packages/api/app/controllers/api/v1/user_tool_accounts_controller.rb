@@ -5,7 +5,7 @@ module Api
     class UserToolAccountsController < BaseController
       before_action :require_organization!
       before_action :set_membership
-      before_action :set_tool_account, only: %i[show update destroy]
+      before_action :set_tool_account, only: %i[show update destroy regenerate_token]
 
       # GET /api/v1/organizations/:organization_id/tool_accounts
       def index
@@ -33,7 +33,9 @@ module Api
         authorize! @membership, to: :create?, with: UserToolAccountPolicy
 
         if @tool_account.save
-          render_created(@tool_account, UserToolAccountSerializer)
+          data = UserToolAccountSerializer.new(@tool_account).serialize
+          data[:ingestToken] = @tool_account.plaintext_token if @tool_account.plaintext_token
+          render json: { data: data }, status: :created
         else
           render json: {
             error: "Unprocessable Entity",
@@ -61,6 +63,15 @@ module Api
         authorize! @tool_account
         @tool_account.destroy!
         render_no_content
+      end
+
+      # POST /api/v1/organizations/:organization_id/tool_accounts/:id/regenerate_token
+      def regenerate_token
+        authorize! @tool_account, to: :update?
+        raw = "db90_#{SecureRandom.hex(32)}"
+        @tool_account.update!(access_token: raw, token_hash: Digest::SHA256.hexdigest(raw))
+        data = UserToolAccountSerializer.new(@tool_account).serialize
+        render json: { data: data.merge(ingestToken: raw) }, status: :ok
       end
 
       private

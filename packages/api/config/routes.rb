@@ -70,7 +70,11 @@ Rails.application.routes.draw do
         end
 
         # User tool accounts (scoped to current user's membership)
-        resources :tool_accounts, controller: "user_tool_accounts"
+        resources :tool_accounts, controller: "user_tool_accounts" do
+          member do
+            post :regenerate_token
+          end
+        end
 
         # Organization projects
         resources :projects, only: [ :index, :create ]
@@ -107,6 +111,9 @@ Rails.application.routes.draw do
 
       # Webhooks (outside organization scope, uses connector_id)
       post "webhooks/:provider/:connector_id", to: "webhooks#receive"
+
+      # Public ingest endpoint — Bearer token auth, no JWT/org context
+      post "ingest/events", to: "ingest#create"
 
       # Project routes (can be accessed outside org context for personal projects)
       resources :projects, except: [ :index, :create ] do

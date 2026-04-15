@@ -86,6 +86,44 @@ RSpec.describe 'Api::V1::UserToolAccounts', type: :request do
 
       expect_unprocessable
     end
+
+    context 'for ingest tools' do
+      it 'includes ingestToken in the response for claude_code' do
+        authenticated_post "/api/v1/organizations/#{organization.id}/tool_accounts",
+                           user: user,
+                           organization: organization,
+                           params: { tool_name: 'cursor' }
+
+        expect_created
+        expect(json_data[:ingestToken]).to be_present
+        expect(json_data[:ingestToken]).to start_with('db90_')
+      end
+
+      it 'includes ingestToken in the response for cursor' do
+        tool_account.destroy! # remove the existing claude_code account
+
+        authenticated_post "/api/v1/organizations/#{organization.id}/tool_accounts",
+                           user: user,
+                           organization: organization,
+                           params: { tool_name: 'claude_code' }
+
+        expect_created
+        expect(json_data[:ingestToken]).to be_present
+        expect(json_data[:ingestToken]).to start_with('db90_')
+      end
+    end
+
+    context 'for non-ingest tools' do
+      it 'does not include ingestToken in the response for windsurf' do
+        authenticated_post "/api/v1/organizations/#{organization.id}/tool_accounts",
+                           user: user,
+                           organization: organization,
+                           params: { tool_name: 'windsurf', access_token: 'some_token' }
+
+        expect_created
+        expect(json_data).not_to have_key(:ingestToken)
+      end
+    end
   end
 
   describe 'PATCH /api/v1/organizations/:organization_id/tool_accounts/:id' do
@@ -145,6 +183,70 @@ RSpec.describe 'Api::V1::UserToolAccounts', type: :request do
       authenticated_delete "/api/v1/organizations/#{organization.id}/tool_accounts/#{tool_account.id}",
                            user: other_user,
                            organization: organization
+
+      expect(response).to have_http_status(:not_found)
+    end
+  end
+
+  describe 'POST /api/v1/organizations/:organization_id/tool_accounts/:id/regenerate_token' do
+    it 'returns a new ingestToken in the response' do
+      authenticated_post "/api/v1/organizations/#{organization.id}/tool_accounts/#{tool_account.id}/regenerate_token",
+                         user: user,
+                         organization: organization
+
+      expect_success
+      expect(json_data[:ingestToken]).to be_present
+      expect(json_data[:ingestToken]).to start_with('db90_')
+    end
+
+    it 'issues a different token each time' do
+      old_token = tool_account.plaintext_token
+
+      authenticated_post "/api/v1/organizations/#{organization.id}/tool_accounts/#{tool_account.id}/regenerate_token",
+                         user: user,
+                         organization: organization
+
+      expect_success
+      expect(json_data[:ingestToken]).not_to eq(old_token)
+    end
+
+    it 'old token no longer authenticates on ingest endpoint after regeneration' do
+      old_token = tool_account.plaintext_token
+
+      authenticated_post "/api/v1/organizations/#{organization.id}/tool_accounts/#{tool_account.id}/regenerate_token",
+                         user: user,
+                         organization: organization
+      expect_success
+
+      post '/api/v1/ingest/events',
+           params: { event_type: 'completion' }.to_json,
+           headers: { 'Content-Type' => 'application/json', 'Authorization' => "Bearer #{old_token}" }
+
+      expect(response).to have_http_status(:unauthorized)
+    end
+
+    it 'new token authenticates on ingest endpoint after regeneration' do
+      allow(RawEventStore).to receive(:store).and_return('events/test-key.json')
+      allow(Temporal::Client).to receive(:start_workflow).and_return({ workflow_id: 'test-id' })
+
+      authenticated_post "/api/v1/organizations/#{organization.id}/tool_accounts/#{tool_account.id}/regenerate_token",
+                         user: user,
+                         organization: organization
+      expect_success
+
+      new_token = json_data[:ingestToken]
+
+      post '/api/v1/ingest/events',
+           params: { event_type: 'completion' }.to_json,
+           headers: { 'Content-Type' => 'application/json', 'Authorization' => "Bearer #{new_token}" }
+
+      expect(response).to have_http_status(:accepted)
+    end
+
+    it 'does not allow another user to regenerate the token' do
+      authenticated_post "/api/v1/organizations/#{organization.id}/tool_accounts/#{tool_account.id}/regenerate_token",
+                         user: other_user,
+                         organization: organization
 
       expect(response).to have_http_status(:not_found)
     end

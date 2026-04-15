@@ -981,15 +981,15 @@ export function useCreateToolAccount() {
     }: {
       orgId: string;
       toolName: string;
-      externalUserId: string;
+      externalUserId?: string;
       externalUsername?: string;
       accessToken?: string;
     }) =>
-      api.post<ToolAccount>(`/organizations/${orgId}/tool_accounts`, {
+      api.post<{ data: ToolAccount }>(`/organizations/${orgId}/tool_accounts`, {
         tool_name: toolName,
-        external_user_id: externalUserId,
-        external_username: externalUsername,
-        access_token: accessToken,
+        ...(externalUserId !== undefined && { external_user_id: externalUserId }),
+        ...(externalUsername !== undefined && { external_username: externalUsername }),
+        ...(accessToken !== undefined && { access_token: accessToken }),
       }),
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.toolAccounts.all(orgId) });
@@ -1028,6 +1028,18 @@ export function useUpdateToolAccount() {
         ...(isActive !== undefined && { is_active: isActive }),
         ...(accessToken !== undefined && { access_token: accessToken }),
       }),
+    onSuccess: (_, { orgId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.toolAccounts.all(orgId) });
+    },
+  });
+}
+
+export function useRegenerateIngestToken() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ orgId, accountId }: { orgId: string; accountId: string }) =>
+      api.post<{ data: ToolAccount }>(`/organizations/${orgId}/tool_accounts/${accountId}/regenerate_token`),
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.toolAccounts.all(orgId) });
     },
