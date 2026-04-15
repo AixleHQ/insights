@@ -65,15 +65,19 @@ export function ConnectJiraSheet({ projectId, open, onOpenChange, onSuccess }: C
     setError(null);
     try {
       await linkJira.mutateAsync({ connector_id: selectedConnectorId, jira_project_key: key });
-      // Run an initial sync synchronously so issues are ready when the sheet closes.
-      await syncJira.mutateAsync();
-      handleOpenChange(false);
-      onSuccess();
     } catch {
       setError('Failed to link Jira project. Please try again.');
-    } finally {
       setConnectingKey(null);
+      return;
     }
+    try {
+      await syncJira.mutateAsync();
+    } catch {
+      // Link succeeded but sync failed — close anyway, user can retry sync manually
+    }
+    setConnectingKey(null);
+    handleOpenChange(false);
+    onSuccess();
   };
 
   return (

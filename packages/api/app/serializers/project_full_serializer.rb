@@ -28,10 +28,10 @@ class ProjectFullSerializer < ProjectSerializer
   end
 
   attribute :jira_project_key do |project|
-    project.project_settings.find_by(key: "jira_project_key")&.value
+    project.project_settings.to_a.find { |s| s.key == "jira_project_key" }&.value
   end
 
   attribute :jira_connector_id do |project|
-    project.project_settings.find_by(key: "jira_connector_id")&.value
+    project.project_settings.to_a.find { |s| s.key == "jira_connector_id" }&.value
   end
 end

@@ -290,7 +290,6 @@ module Api
           @project.project_settings.find_or_initialize_by(key: "jira_project_key").update!(value: jira_project_key)
         end
 
-        JiraSyncJob.perform_later(connector.id, "sync")
         render json: { data: { linked: true } }
       end
 
