@@ -98,6 +98,7 @@ class JiraSyncJob < ApplicationJob
     rows = issues_data.map do |attrs|
       assignee = resolve_assignee(org, attrs[:assignee_account_id])
       attrs.except(:assignee_account_id).merge(
+        id:                        SecureRandom.uuid,
         organization_id:           org.id,
         organization_connector_id: @connector.id,
         project_id:                project.id,
@@ -115,7 +116,7 @@ class JiraSyncJob < ApplicationJob
         summary status status_category issue_type priority
         assignee_id assignee_name reporter_name jira_project_key jira_project_id
         parent_key labels due_date external_created_at external_updated_at
-        project_id synced_at updated_at
+        project_id synced_at
       ]
     )
   end
