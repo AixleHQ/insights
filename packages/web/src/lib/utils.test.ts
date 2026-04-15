@@ -1,27 +1,27 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { cn, formatDistanceToNow, formatCurrency, formatNumber } from './utils';
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { cn, formatDistanceToNow, formatCurrency, formatNumber } from "./utils";
 
-describe('cn', () => {
-  it('should merge class names', () => {
-    expect(cn('px-2', 'py-1')).toBe('px-2 py-1');
+describe("cn", () => {
+  it("should merge class names", () => {
+    expect(cn("px-2", "py-1")).toBe("px-2 py-1");
   });
 
-  it('should handle conditional classes', () => {
+  it("should handle conditional classes", () => {
     const isAdded = true;
     const isNotAdded = false;
-    expect(cn('base', isAdded && 'added', isNotAdded && 'not-added')).toBe('base added');
+    expect(cn("base", isAdded && "added", isNotAdded && "not-added")).toBe("base added");
   });
 
-  it('should merge tailwind classes correctly', () => {
-    expect(cn('px-2 px-4')).toBe('px-4');
-    expect(cn('bg-red-500', 'bg-blue-500')).toBe('bg-blue-500');
+  it("should merge tailwind classes correctly", () => {
+    expect(cn("px-2 px-4")).toBe("px-4");
+    expect(cn("bg-red-500", "bg-blue-500")).toBe("bg-blue-500");
   });
 });
 
-describe('formatDistanceToNow', () => {
+describe("formatDistanceToNow", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-01-26T12:00:00Z'));
+    vi.setSystemTime(new Date("2026-01-26T12:00:00Z"));
   });
 
   afterEach(() => {
@@ -31,63 +31,63 @@ describe('formatDistanceToNow', () => {
   it('should return "just now" for recent times', () => {
     const now = new Date();
     const tenSecondsAgo = new Date(now.getTime() - 10 * 1000);
-    expect(formatDistanceToNow(tenSecondsAgo)).toBe('just now');
+    expect(formatDistanceToNow(tenSecondsAgo)).toBe("just now");
   });
 
-  it('should return minutes for times within an hour', () => {
+  it("should return minutes for times within an hour", () => {
     const now = new Date();
     const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
-    expect(formatDistanceToNow(fiveMinutesAgo)).toBe('5m ago');
+    expect(formatDistanceToNow(fiveMinutesAgo)).toBe("5m ago");
   });
 
-  it('should return hours for times within a day', () => {
+  it("should return hours for times within a day", () => {
     const now = new Date();
     const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
-    expect(formatDistanceToNow(twoHoursAgo)).toBe('2h ago');
+    expect(formatDistanceToNow(twoHoursAgo)).toBe("2h ago");
   });
 
-  it('should return days for times within a week', () => {
+  it("should return days for times within a week", () => {
     const now = new Date();
     const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
-    expect(formatDistanceToNow(threeDaysAgo)).toBe('3d ago');
+    expect(formatDistanceToNow(threeDaysAgo)).toBe("3d ago");
   });
 
-  it('should return weeks for times within a month', () => {
+  it("should return weeks for times within a month", () => {
     const now = new Date();
     const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-    expect(formatDistanceToNow(twoWeeksAgo)).toBe('2w ago');
+    expect(formatDistanceToNow(twoWeeksAgo)).toBe("2w ago");
   });
 
-  it('should accept string dates', () => {
-    expect(formatDistanceToNow('2026-01-26T11:55:00Z')).toBe('5m ago');
-  });
-});
-
-describe('formatCurrency', () => {
-  it('should format currency with 2 decimal places', () => {
-    expect(formatCurrency(100)).toBe('$100.00');
-    expect(formatCurrency(99.99)).toBe('$99.99');
-    expect(formatCurrency(1234.567)).toBe('$1,234.57');
-  });
-
-  it('should handle zero', () => {
-    expect(formatCurrency(0)).toBe('$0.00');
-  });
-
-  it('should handle large numbers', () => {
-    expect(formatCurrency(1000000)).toBe('$1,000,000.00');
+  it("should accept string dates", () => {
+    expect(formatDistanceToNow("2026-01-26T11:55:00Z")).toBe("5m ago");
   });
 });
 
-describe('formatNumber', () => {
-  it('should format numbers with thousand separators', () => {
-    expect(formatNumber(1000)).toBe('1,000');
-    expect(formatNumber(1000000)).toBe('1,000,000');
-    expect(formatNumber(12345678)).toBe('12,345,678');
+describe("formatCurrency", () => {
+  it("should format currency with 2 decimal places", () => {
+    expect(formatCurrency(100)).toBe("$100.00");
+    expect(formatCurrency(99.99)).toBe("$99.99");
+    expect(formatCurrency(1234.567)).toBe("$1,234.57");
   });
 
-  it('should handle small numbers', () => {
-    expect(formatNumber(0)).toBe('0');
-    expect(formatNumber(42)).toBe('42');
+  it("should handle zero", () => {
+    expect(formatCurrency(0)).toBe("$0.00");
+  });
+
+  it("should handle large numbers", () => {
+    expect(formatCurrency(1000000)).toBe("$1,000,000.00");
+  });
+});
+
+describe("formatNumber", () => {
+  it("should format numbers with thousand separators", () => {
+    expect(formatNumber(1000)).toBe("1,000");
+    expect(formatNumber(1000000)).toBe("1,000,000");
+    expect(formatNumber(12345678)).toBe("12,345,678");
+  });
+
+  it("should handle small numbers", () => {
+    expect(formatNumber(0)).toBe("0");
+    expect(formatNumber(42)).toBe("42");
   });
 });

@@ -1,27 +1,27 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
-import { ProjectTeamSection } from './ProjectTeamSection';
-import type { ProjectMember } from '@/hooks/useApi';
+import { describe, it, expect } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { BrowserRouter } from "react-router-dom";
+import { ProjectTeamSection } from "./ProjectTeamSection";
+import type { ProjectMember } from "@/hooks/useApi";
 
 const mockMembers: ProjectMember[] = [
   {
-    id: '1',
-    userId: 'user-1',
-    email: 'alice@example.com',
-    name: 'Alice Johnson',
-    avatarUrl: 'https://example.com/avatar1.jpg',
-    role: 'owner',
-    joinedAt: '2024-01-15T10:00:00Z',
+    id: "1",
+    userId: "user-1",
+    email: "alice@example.com",
+    name: "Alice Johnson",
+    avatarUrl: "https://example.com/avatar1.jpg",
+    role: "owner",
+    joinedAt: "2024-01-15T10:00:00Z",
   },
   {
-    id: '2',
-    userId: 'user-2',
-    email: 'bob@example.com',
+    id: "2",
+    userId: "user-2",
+    email: "bob@example.com",
     name: null,
     avatarUrl: null,
-    role: 'member',
-    joinedAt: '2024-01-20T10:00:00Z',
+    role: "member",
+    joinedAt: "2024-01-20T10:00:00Z",
   },
 ];
 
@@ -33,152 +33,152 @@ const renderComponent = (props: Partial<Parameters<typeof ProjectTeamSection>[0]
   );
 };
 
-describe('ProjectTeamSection', () => {
-  describe('Initial Render', () => {
-    it('renders the component with title', () => {
+describe("ProjectTeamSection", () => {
+  describe("Initial Render", () => {
+    it("renders the component with title", () => {
       renderComponent();
-      expect(screen.getByText('Team')).toBeInTheDocument();
+      expect(screen.getByText("Team")).toBeInTheDocument();
     });
 
-    it('displays member count correctly', () => {
+    it("displays member count correctly", () => {
       renderComponent();
-      expect(screen.getByText('2 members')).toBeInTheDocument();
+      expect(screen.getByText("2 members")).toBeInTheDocument();
     });
 
-    it('displays singular member text for single member', () => {
+    it("displays singular member text for single member", () => {
       renderComponent({ members: [mockMembers[0]] });
-      expect(screen.getByText('1 member')).toBeInTheDocument();
+      expect(screen.getByText("1 member")).toBeInTheDocument();
     });
   });
 
-  describe('Member Display', () => {
-    it('renders member names', () => {
+  describe("Member Display", () => {
+    it("renders member names", () => {
       renderComponent();
-      expect(screen.getByText('Alice Johnson')).toBeInTheDocument();
+      expect(screen.getByText("Alice Johnson")).toBeInTheDocument();
     });
 
-    it('falls back to email prefix when name is null', () => {
+    it("falls back to email prefix when name is null", () => {
       renderComponent();
-      expect(screen.getByText('bob')).toBeInTheDocument();
+      expect(screen.getByText("bob")).toBeInTheDocument();
     });
 
-    it('displays role badges', () => {
+    it("displays role badges", () => {
       renderComponent();
-      expect(screen.getByText('owner')).toBeInTheDocument();
-      expect(screen.getByText('member')).toBeInTheDocument();
+      expect(screen.getByText("owner")).toBeInTheDocument();
+      expect(screen.getByText("member")).toBeInTheDocument();
     });
 
-    it('renders links to member profiles', () => {
+    it("renders links to member profiles", () => {
       renderComponent();
-      const links = screen.getAllByRole('link');
+      const links = screen.getAllByRole("link");
       expect(links.length).toBe(2);
-      expect(links[0]).toHaveAttribute('href', '/team/user-1');
-      expect(links[1]).toHaveAttribute('href', '/team/user-2');
+      expect(links[0]).toHaveAttribute("href", "/team/user-1");
+      expect(links[1]).toHaveAttribute("href", "/team/user-2");
     });
 
-    it('appends projectId query param to links when projectId is provided', () => {
-      renderComponent({ projectId: 'proj-abc' });
-      const links = screen.getAllByRole('link');
-      expect(links[0]).toHaveAttribute('href', '/team/user-1?projectId=proj-abc');
-      expect(links[1]).toHaveAttribute('href', '/team/user-2?projectId=proj-abc');
+    it("appends projectId query param to links when projectId is provided", () => {
+      renderComponent({ projectId: "proj-abc" });
+      const links = screen.getAllByRole("link");
+      expect(links[0]).toHaveAttribute("href", "/team/user-1?projectId=proj-abc");
+      expect(links[1]).toHaveAttribute("href", "/team/user-2?projectId=proj-abc");
     });
 
-    it('does not append projectId when prop is omitted', () => {
+    it("does not append projectId when prop is omitted", () => {
       renderComponent();
-      const links = screen.getAllByRole('link');
-      expect(links[0]).toHaveAttribute('href', '/team/user-1');
-      expect(links[1]).toHaveAttribute('href', '/team/user-2');
+      const links = screen.getAllByRole("link");
+      expect(links[0]).toHaveAttribute("href", "/team/user-1");
+      expect(links[1]).toHaveAttribute("href", "/team/user-2");
     });
   });
 
-  describe('Avatar Display', () => {
-    it('renders fallback initials when name is provided', () => {
+  describe("Avatar Display", () => {
+    it("renders fallback initials when name is provided", () => {
       renderComponent();
-      expect(screen.getByText('AJ')).toBeInTheDocument();
+      expect(screen.getByText("AJ")).toBeInTheDocument();
     });
 
-    it('renders fallback initials from email when name is null', () => {
+    it("renders fallback initials from email when name is null", () => {
       renderComponent();
-      expect(screen.getByText('BO')).toBeInTheDocument();
+      expect(screen.getByText("BO")).toBeInTheDocument();
     });
 
-    it('has avatar container for each member', () => {
+    it("has avatar container for each member", () => {
       const { container } = renderComponent();
       const avatars = container.querySelectorAll('[data-slot="avatar"]');
       expect(avatars.length).toBe(2);
     });
   });
 
-  describe('Loading State', () => {
-    it('shows loading text when isLoading is true', () => {
+  describe("Loading State", () => {
+    it("shows loading text when isLoading is true", () => {
       renderComponent({ isLoading: true });
-      expect(screen.getByText('Loading team members...')).toBeInTheDocument();
+      expect(screen.getByText("Loading team members...")).toBeInTheDocument();
     });
 
-    it('shows skeleton loaders when loading', () => {
+    it("shows skeleton loaders when loading", () => {
       const { container } = renderComponent({ isLoading: true });
       const skeletons = container.querySelectorAll('[class*="animate-pulse"]');
       expect(skeletons.length).toBeGreaterThan(0);
     });
   });
 
-  describe('Empty State', () => {
-    it('shows empty message when no members', () => {
+  describe("Empty State", () => {
+    it("shows empty message when no members", () => {
       renderComponent({ members: [] });
-      expect(screen.getByText('No team members assigned to this project')).toBeInTheDocument();
+      expect(screen.getByText("No team members assigned to this project")).toBeInTheDocument();
     });
 
-    it('shows empty message when members is undefined', () => {
+    it("shows empty message when members is undefined", () => {
       renderComponent({ members: undefined });
-      expect(screen.getByText('No team members assigned to this project')).toBeInTheDocument();
+      expect(screen.getByText("No team members assigned to this project")).toBeInTheDocument();
     });
 
-    it('displays 0 members count', () => {
+    it("displays 0 members count", () => {
       renderComponent({ members: [] });
-      expect(screen.getByText('0 members')).toBeInTheDocument();
+      expect(screen.getByText("0 members")).toBeInTheDocument();
     });
   });
 
-  describe('Role Badge Colors', () => {
-    it('applies correct color class for owner role', () => {
+  describe("Role Badge Colors", () => {
+    it("applies correct color class for owner role", () => {
       renderComponent({ members: [mockMembers[0]] });
-      const ownerBadge = screen.getByText('owner');
-      expect(ownerBadge).toHaveClass('text-violet-400');
+      const ownerBadge = screen.getByText("owner");
+      expect(ownerBadge).toHaveClass("text-violet-400");
     });
 
-    it('applies correct color class for member role', () => {
+    it("applies correct color class for member role", () => {
       renderComponent({ members: [mockMembers[1]] });
-      const memberBadge = screen.getByText('member');
-      expect(memberBadge).toHaveClass('text-blue-400');
+      const memberBadge = screen.getByText("member");
+      expect(memberBadge).toHaveClass("text-blue-400");
     });
 
-    it('handles admin role', () => {
+    it("handles admin role", () => {
       const adminMember: ProjectMember = {
         ...mockMembers[0],
-        id: '3',
-        role: 'admin',
+        id: "3",
+        role: "admin",
       };
       renderComponent({ members: [adminMember] });
-      const adminBadge = screen.getByText('admin');
-      expect(adminBadge).toHaveClass('text-amber-400');
+      const adminBadge = screen.getByText("admin");
+      expect(adminBadge).toHaveClass("text-amber-400");
     });
 
-    it('handles viewer role', () => {
+    it("handles viewer role", () => {
       const viewerMember: ProjectMember = {
         ...mockMembers[0],
-        id: '4',
-        role: 'viewer',
+        id: "4",
+        role: "viewer",
       };
       renderComponent({ members: [viewerMember] });
-      const viewerBadge = screen.getByText('viewer');
-      expect(viewerBadge).toHaveClass('text-slate-400');
+      const viewerBadge = screen.getByText("viewer");
+      expect(viewerBadge).toHaveClass("text-slate-400");
     });
   });
 
-  describe('Custom className', () => {
-    it('applies custom className to container', () => {
-      const { container } = renderComponent({ className: 'custom-class' });
-      expect(container.firstChild).toHaveClass('custom-class');
+  describe("Custom className", () => {
+    it("applies custom className to container", () => {
+      const { container } = renderComponent({ className: "custom-class" });
+      expect(container.firstChild).toHaveClass("custom-class");
     });
   });
 });

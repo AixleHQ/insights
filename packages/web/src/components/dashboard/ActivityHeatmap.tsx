@@ -1,7 +1,7 @@
-import { useMemo, useState, useEffect, useRef } from 'react';
-import { Activity, Calendar, Zap } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
+import { useMemo, useState, useEffect, useRef } from "react";
+import { Activity, Calendar, Zap } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 interface ToolBreakdown {
   name: string;
@@ -28,34 +28,34 @@ interface ActivityHeatmapProps {
   className?: string;
 }
 
-const DAYS_OF_WEEK_FULL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const DAYS_OF_WEEK_SHORT = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const DAYS_OF_WEEK_FULL = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAYS_OF_WEEK_SHORT = ["S", "M", "T", "W", "T", "F", "S"];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 const TOOL_COLORS: Record<string, string> = {
-  'Claude Code': 'bg-amber-500',
-  'GitHub Copilot': 'bg-blue-500',
-  'Cursor': 'bg-purple-500',
-  'Aider': 'bg-green-500',
-  'default': 'bg-gray-500',
+  "Claude Code": "bg-amber-500",
+  "GitHub Copilot": "bg-blue-500",
+  "Cursor": "bg-purple-500",
+  "Aider": "bg-green-500",
+  "default": "bg-gray-500",
 };
 
 function getIntensityClass(count: number, maxCount: number): string {
-  if (count === 0) return 'bg-muted/30 dark:bg-muted/20';
+  if (count === 0) return "bg-muted/30 dark:bg-muted/20";
   const intensity = count / maxCount;
-  if (intensity < 0.25) return 'bg-emerald-400/40 dark:bg-emerald-500/30';
-  if (intensity < 0.5) return 'bg-emerald-400/60 dark:bg-emerald-500/50';
-  if (intensity < 0.75) return 'bg-emerald-400/80 dark:bg-emerald-500/70';
-  return 'bg-emerald-500 dark:bg-emerald-400';
+  if (intensity < 0.25) return "bg-emerald-400/40 dark:bg-emerald-500/30";
+  if (intensity < 0.5) return "bg-emerald-400/60 dark:bg-emerald-500/50";
+  if (intensity < 0.75) return "bg-emerald-400/80 dark:bg-emerald-500/70";
+  return "bg-emerald-500 dark:bg-emerald-400";
 }
 
 function formatDateLong(dateStr: string): string {
   const date = new Date(dateStr);
-  return date.toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
+  return date.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
   });
 }
 
@@ -115,7 +115,7 @@ function DayTooltip({ day }: { day: DayData }) {
                 {day.tools.map((tool) => (
                   <div key={tool.name} className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
-                      <div className={cn('size-2 rounded-full', tool.color || TOOL_COLORS[tool.name] || TOOL_COLORS.default)} />
+                      <div className={cn("size-2 rounded-full", tool.color || TOOL_COLORS[tool.name] || TOOL_COLORS.default)} />
                       <span>{tool.name}</span>
                     </div>
                     <span className="text-muted-foreground">
@@ -221,7 +221,7 @@ export function ActivityHeatmap({ data, className }: ActivityHeatmapProps) {
     let weekIndex = 0;
 
     while (currentDate <= today) {
-      const dateStr = currentDate.toISOString().split('T')[0];
+      const dateStr = currentDate.toISOString().split("T")[0];
       const dayData = countMap.get(dateStr);
       const month = currentDate.getMonth();
 
@@ -269,7 +269,7 @@ export function ActivityHeatmap({ data, className }: ActivityHeatmapProps) {
   const labelWidth = isCompact ? 16 : 28;
 
   return (
-    <div ref={containerRef} className={cn('rounded-xl border bg-card p-4 sm:p-6', className)}>
+    <div ref={containerRef} className={cn("rounded-xl border bg-card p-4 sm:p-6", className)}>
       {/* Header - stacks on mobile */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 mb-4 sm:mb-6">
         <div className="flex items-center gap-2">
@@ -331,7 +331,7 @@ export function ActivityHeatmap({ data, className }: ActivityHeatmapProps) {
                 className="flex items-center justify-end h-full"
               >
                 {/* Only show every other day label on very compact views */}
-                {isCompact ? (idx % 2 === 1 ? day : '') : day}
+                {isCompact ? (idx % 2 === 1 ? day : "") : day}
               </div>
             ))}
           </div>
@@ -355,9 +355,9 @@ export function ActivityHeatmap({ data, className }: ActivityHeatmapProps) {
                       <TooltipTrigger asChild>
                         <div
                           className={cn(
-                            'aspect-square w-full rounded-[2px] sm:rounded-sm transition-colors cursor-default',
+                            "aspect-square w-full rounded-[2px] sm:rounded-sm transition-colors cursor-default",
                             getIntensityClass(day.count, maxCount),
-                            day.count > 0 && 'hover:ring-1 hover:ring-emerald-400/50 hover:ring-offset-1 hover:ring-offset-background'
+                            day.count > 0 && "hover:ring-1 hover:ring-emerald-400/50 hover:ring-offset-1 hover:ring-offset-background"
                           )}
                         />
                       </TooltipTrigger>

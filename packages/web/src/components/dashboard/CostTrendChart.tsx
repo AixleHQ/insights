@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState } from "react";
 import {
   Area,
   AreaChart,
@@ -6,16 +6,16 @@ import {
   ResponsiveContainer,
   XAxis,
   YAxis,
-} from 'recharts';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+} from "recharts";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-} from '@/components/ui/chart';
-import type { ChartConfig } from '@/components/ui/chart';
-import { cn } from '@/lib/utils';
+} from "@/components/ui/chart";
+import type { ChartConfig } from "@/components/ui/chart";
+import { cn } from "@/lib/utils";
 
 export interface DailyCostData {
   date: string;
@@ -29,40 +29,40 @@ interface CostTrendChartProps {
   className?: string;
 }
 
-type TimeRange = '7d' | '30d';
+type TimeRange = "7d" | "30d";
 
 const chartConfig = {
   cost: {
-    label: 'Cost',
-    color: 'var(--chart-1)',
+    label: "Cost",
+    color: "var(--chart-1)",
   },
   events: {
-    label: 'Events',
-    color: 'var(--chart-2)',
+    label: "Events",
+    color: "var(--chart-2)",
   },
 } satisfies ChartConfig;
 
 function formatDate(dateStr: string, range: TimeRange): string {
   const date = new Date(dateStr);
-  if (range === '7d') {
-    return date.toLocaleDateString('en-US', { weekday: 'short' });
+  if (range === "7d") {
+    return date.toLocaleDateString("en-US", { weekday: "short" });
   }
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value);
 }
 
 export function CostTrendChart({ data, isLoading, className }: CostTrendChartProps) {
-  const [timeRange, setTimeRange] = useState<TimeRange>('7d');
+  const [timeRange, setTimeRange] = useState<TimeRange>("7d");
 
-  const filteredData = timeRange === '7d' ? data.slice(-7) : data.slice(-30);
+  const filteredData = timeRange === "7d" ? data.slice(-7) : data.slice(-30);
   const formattedData = filteredData.map((item) => ({
     ...item,
     dateLabel: formatDate(item.date, timeRange),
@@ -72,7 +72,7 @@ export function CostTrendChart({ data, isLoading, className }: CostTrendChartPro
   const avgCost = filteredData.length > 0 ? totalCost / filteredData.length : 0;
 
   return (
-    <Card className={cn('col-span-full lg:col-span-2', className)}>
+    <Card className={cn("col-span-full lg:col-span-2", className)}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <div>
           <CardTitle className="text-base font-medium">Cost Trend</CardTitle>
@@ -82,18 +82,18 @@ export function CostTrendChart({ data, isLoading, className }: CostTrendChartPro
         </div>
         <div className="flex gap-1">
           <Button
-            variant={timeRange === '7d' ? 'secondary' : 'ghost'}
+            variant={timeRange === "7d" ? "secondary" : "ghost"}
             size="sm"
             className="h-7 text-xs"
-            onClick={() => setTimeRange('7d')}
+            onClick={() => setTimeRange("7d")}
           >
             7 days
           </Button>
           <Button
-            variant={timeRange === '30d' ? 'secondary' : 'ghost'}
+            variant={timeRange === "30d" ? "secondary" : "ghost"}
             size="sm"
             className="h-7 text-xs"
-            onClick={() => setTimeRange('30d')}
+            onClick={() => setTimeRange("30d")}
           >
             30 days
           </Button>
@@ -121,21 +121,21 @@ export function CostTrendChart({ data, isLoading, className }: CostTrendChartPro
                   axisLine={false}
                   tickMargin={8}
                   className="text-xs text-muted-foreground"
-                  tick={{ fill: 'currentColor', fontSize: 11 }}
+                  tick={{ fill: "currentColor", fontSize: 11 }}
                 />
                 <YAxis
                   tickLine={false}
                   axisLine={false}
                   tickFormatter={(value) => `$${value}`}
                   className="text-xs text-muted-foreground"
-                  tick={{ fill: 'currentColor', fontSize: 11 }}
+                  tick={{ fill: "currentColor", fontSize: 11 }}
                   width={50}
                 />
                 <ChartTooltip
                   content={
                     <ChartTooltipContent
                       formatter={(value, name) =>
-                        name === 'cost' ? formatCurrency(value as number) : value
+                        name === "cost" ? formatCurrency(value as number) : value
                       }
                     />
                   }

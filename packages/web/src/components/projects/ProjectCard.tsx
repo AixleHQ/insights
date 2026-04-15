@@ -1,16 +1,16 @@
-import { Link } from 'react-router-dom';
-import { MoreHorizontal, GitBranch, Activity, DollarSign, Calendar } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Link } from "react-router-dom";
+import { MoreHorizontal, GitBranch, Activity, DollarSign, Calendar } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { cn } from '@/lib/utils';
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 
 export interface ProjectData {
   id: string;
@@ -36,16 +36,16 @@ interface ProjectCardProps {
 }
 
 function formatDate(dateStr: string | undefined | null): string {
-  if (!dateStr) return '-';
+  if (!dateStr) return "-";
   const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return '-';
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  if (isNaN(date.getTime())) return "-";
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(value);
@@ -53,7 +53,7 @@ function formatCurrency(value: number): string {
 
 export function ProjectCard({ project, onEdit, onDelete, className }: ProjectCardProps) {
   return (
-    <Card className={cn('group relative transition-shadow hover:shadow-md', className)}>
+    <Card className={cn("group relative transition-shadow hover:shadow-md", className)}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="space-y-1">
@@ -72,8 +72,8 @@ export function ProjectCard({ project, onEdit, onDelete, className }: ProjectCar
             )}
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant={project.is_active ? 'default' : 'secondary'} className="text-xs">
-              {project.is_active ? 'Active' : 'Inactive'}
+            <Badge variant={project.is_active ? "default" : "secondary"} className="text-xs">
+              {project.is_active ? "Active" : "Inactive"}
             </Badge>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -143,7 +143,7 @@ export function ProjectCard({ project, onEdit, onDelete, className }: ProjectCar
               rel="noopener noreferrer"
               className="truncate hover:text-foreground hover:underline"
             >
-              {project.repository_url.replace(/^https?:\/\/(github|gitlab|bitbucket)\.com\//, '')}
+              {project.repository_url.replace(/^https?:\/\/(github|gitlab|bitbucket)\.com\//, "")}
             </a>
           </div>
         )}

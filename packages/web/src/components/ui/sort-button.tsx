@@ -1,7 +1,7 @@
-import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
-export type SortDirection = 'asc' | 'desc';
+export type SortDirection = "asc" | "desc";
 
 interface SortButtonProps<T extends string> {
   field: T;
@@ -29,7 +29,7 @@ export function SortButton<T extends string>({
     >
       {children}
       {isActive ? (
-        currentDirection === 'asc' ? (
+        currentDirection === "asc" ? (
           <ArrowUp className="ml-2 size-3" />
         ) : (
           <ArrowDown className="ml-2 size-3" />

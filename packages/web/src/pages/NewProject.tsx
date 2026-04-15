@@ -1,7 +1,7 @@
-import { useNavigate } from 'react-router-dom';
-import { useOrg } from '@/contexts/OrgContext';
-import { useCreateProject } from '@/hooks/useApi';
-import { ProjectForm, type ProjectFormData } from '@/components/projects';
+import { useNavigate } from "react-router-dom";
+import { useOrg } from "@/contexts/OrgContext";
+import { useCreateProject } from "@/hooks/useApi";
+import { ProjectForm, type ProjectFormData } from "@/components/projects";
 
 export function NewProject() {
   const navigate = useNavigate();

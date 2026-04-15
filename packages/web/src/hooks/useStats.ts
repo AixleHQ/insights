@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useOrg } from '@/contexts/OrgContext';
+import { useState, useEffect, useCallback } from "react";
+import { useOrg } from "@/contexts/OrgContext";
 
 export interface OverviewStats {
   total_events: number;
@@ -70,7 +70,7 @@ export function useStats(): UseStatsReturn {
         const date = new Date();
         date.setDate(date.getDate() - (29 - i));
         return {
-          date: date.toISOString().split('T')[0],
+          date: date.toISOString().split("T")[0],
           cost: Math.random() * 100 + 20,
           events: Math.floor(Math.random() * 500 + 100),
         };
@@ -78,14 +78,14 @@ export function useStats(): UseStatsReturn {
       setDaily(mockDaily);
 
       setTools([
-        { tool_name: 'GitHub Copilot', event_count: 2340, total_cost: 156.8 },
-        { tool_name: 'Claude Code', event_count: 1890, total_cost: 234.5 },
-        { tool_name: 'Cursor', event_count: 1245, total_cost: 89.2 },
-        { tool_name: 'Aider', event_count: 567, total_cost: 45.6 },
-        { tool_name: 'Codeium', event_count: 234, total_cost: 12.3 },
+        { tool_name: "GitHub Copilot", event_count: 2340, total_cost: 156.8 },
+        { tool_name: "Claude Code", event_count: 1890, total_cost: 234.5 },
+        { tool_name: "Cursor", event_count: 1245, total_cost: 89.2 },
+        { tool_name: "Aider", event_count: 567, total_cost: 45.6 },
+        { tool_name: "Codeium", event_count: 234, total_cost: 12.3 },
       ]);
     } catch (err) {
-      setError(err instanceof Error ? err : new Error('Failed to fetch stats'));
+      setError(err instanceof Error ? err : new Error("Failed to fetch stats"));
     } finally {
       setIsLoading(false);
     }
@@ -123,14 +123,14 @@ export function useEventStats(days: number = 7) {
           const date = new Date();
           date.setDate(date.getDate() - (days - 1 - i));
           return {
-            date: date.toISOString().split('T')[0],
+            date: date.toISOString().split("T")[0],
             cost: Math.random() * 100 + 20,
             events: Math.floor(Math.random() * 500 + 100),
           };
         });
         setStats(mockData);
       } catch (err) {
-        setError(err instanceof Error ? err : new Error('Failed to fetch stats'));
+        setError(err instanceof Error ? err : new Error("Failed to fetch stats"));
       } finally {
         setIsLoading(false);
       }

@@ -5,8 +5,8 @@
  * and optimistic updates for all API resources.
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 import type {
   CurrentUser,
   Organization,
@@ -38,39 +38,39 @@ import type {
   ToolUserStat,
   ToolDailyPoint,
   ConnectorSyncStatus,
-} from '@/lib/types';
+} from "@/lib/types";
 
 // Query keys factory
 export const queryKeys = {
   user: {
-    current: ['user', 'current'] as const,
-    organizations: ['user', 'organizations'] as const,
-    settings: ['user', 'settings'] as const,
+    current: ["user", "current"] as const,
+    organizations: ["user", "organizations"] as const,
+    settings: ["user", "settings"] as const,
   },
   organizations: {
-    all: ['organizations'] as const,
-    detail: (id: string) => ['organizations', id] as const,
-    stats: (id: string) => ['organizations', id, 'stats'] as const,
+    all: ["organizations"] as const,
+    detail: (id: string) => ["organizations", id] as const,
+    stats: (id: string) => ["organizations", id, "stats"] as const,
   },
   members: {
-    all: (orgId: string) => ['organizations', orgId, 'members'] as const,
-    detail: (orgId: string, id: string) => ['organizations', orgId, 'members', id] as const,
-    events: (orgId: string, id: string) => ['organizations', orgId, 'members', id, 'events'] as const,
-    stats: (orgId: string, id: string) => ['organizations', orgId, 'members', id, 'stats'] as const,
+    all: (orgId: string) => ["organizations", orgId, "members"] as const,
+    detail: (orgId: string, id: string) => ["organizations", orgId, "members", id] as const,
+    events: (orgId: string, id: string) => ["organizations", orgId, "members", id, "events"] as const,
+    stats: (orgId: string, id: string) => ["organizations", orgId, "members", id, "stats"] as const,
   },
   projects: {
-    all: (orgId: string) => ['organizations', orgId, 'projects'] as const,
-    detail: (id: string) => ['projects', id] as const,
+    all: (orgId: string) => ["organizations", orgId, "projects"] as const,
+    detail: (id: string) => ["projects", id] as const,
   },
   connectors: {
-    all: (orgId: string) => ['organizations', orgId, 'connectors'] as const,
-    detail: (orgId: string, id: string) => ['organizations', orgId, 'connectors', id] as const,
+    all: (orgId: string) => ["organizations", orgId, "connectors"] as const,
+    detail: (orgId: string, id: string) => ["organizations", orgId, "connectors", id] as const,
     availableRepos: (orgId: string, connectorId: string) =>
-      ['organizations', orgId, 'connectors', connectorId, 'available_repos'] as const,
+      ["organizations", orgId, "connectors", connectorId, "available_repos"] as const,
     availableProjects: (orgId: string, connectorId: string) =>
-      ['organizations', orgId, 'connectors', connectorId, 'available_projects'] as const,
+      ["organizations", orgId, "connectors", connectorId, "available_projects"] as const,
     syncStatus: (orgId: string, connectorId: string) =>
-      ['organizations', orgId, 'connectors', connectorId, 'sync_status'] as const,
+      ["organizations", orgId, "connectors", connectorId, "sync_status"] as const,
   },
   issues: {
     all: (projectId: string, filters?: Record<string, unknown>) =>
@@ -78,54 +78,54 @@ export const queryKeys = {
     detail: (projectId: string, id: string) => ['projects', projectId, 'issues', id] as const,
   },
   projectConnectors: {
-    all: (projectId: string) => ['projects', projectId, 'connectors'] as const,
-    detail: (projectId: string, id: string) => ['projects', projectId, 'connectors', id] as const,
+    all: (projectId: string) => ["projects", projectId, "connectors"] as const,
+    detail: (projectId: string, id: string) => ["projects", projectId, "connectors", id] as const,
   },
   toolAccounts: {
-    all: (orgId: string) => ['organizations', orgId, 'tool_accounts'] as const,
+    all: (orgId: string) => ["organizations", orgId, "tool_accounts"] as const,
   },
   events: {
     all: (orgId: string, params?: Record<string, unknown>) =>
-      ['organizations', orgId, 'events', params] as const,
-    detail: (orgId: string, id: string) => ['organizations', orgId, 'events', id] as const,
+      ["organizations", orgId, "events", params] as const,
+    detail: (orgId: string, id: string) => ["organizations", orgId, "events", id] as const,
     auditTrail: (orgId: string, id: string) =>
-      ['organizations', orgId, 'events', id, 'audit_trail'] as const,
-    unattributed: (orgId: string) => ['organizations', orgId, 'events', 'unattributed'] as const,
-    summary: (orgId: string) => ['organizations', orgId, 'events', 'summary'] as const,
+      ["organizations", orgId, "events", id, "audit_trail"] as const,
+    unattributed: (orgId: string) => ["organizations", orgId, "events", "unattributed"] as const,
+    summary: (orgId: string) => ["organizations", orgId, "events", "summary"] as const,
   },
   stats: {
-    overview: (orgId: string) => ['organizations', orgId, 'stats', 'overview'] as const,
+    overview: (orgId: string) => ["organizations", orgId, "stats", "overview"] as const,
     daily: (orgId: string, days?: number) =>
-      ['organizations', orgId, 'stats', 'daily', days] as const,
+      ["organizations", orgId, "stats", "daily", days] as const,
     hourly: (orgId: string, hours?: number) =>
-      ['organizations', orgId, 'stats', 'hourly', hours] as const,
+      ["organizations", orgId, "stats", "hourly", hours] as const,
     toolOverview: (orgId: string, tool: string) =>
-      ['organizations', orgId, 'stats', 'tools', tool, 'overview'] as const,
+      ["organizations", orgId, "stats", "tools", tool, "overview"] as const,
     toolModels: (orgId: string, tool: string, days?: number) =>
-      ['organizations', orgId, 'stats', 'tools', tool, 'models', days] as const,
+      ["organizations", orgId, "stats", "tools", tool, "models", days] as const,
     toolUsers: (orgId: string, tool: string, days?: number) =>
-      ['organizations', orgId, 'stats', 'tools', tool, 'users', days] as const,
+      ["organizations", orgId, "stats", "tools", tool, "users", days] as const,
     toolDaily: (orgId: string, tool: string, days?: number) =>
-      ['organizations', orgId, 'stats', 'tools', tool, 'daily', days] as const,
+      ["organizations", orgId, "stats", "tools", tool, "daily", days] as const,
     toolEventTypes: (orgId: string, tool: string, days?: number) =>
-      ['organizations', orgId, 'stats', 'tools', tool, 'event_types', days] as const,
+      ["organizations", orgId, "stats", "tools", tool, "event_types", days] as const,
   },
   alerts: {
-    all: (orgId: string) => ['organizations', orgId, 'alerts'] as const,
+    all: (orgId: string) => ["organizations", orgId, "alerts"] as const,
   },
   invitations: {
-    all: (orgId: string) => ['organizations', orgId, 'invitations'] as const,
-    detail: (orgId: string, id: string) => ['organizations', orgId, 'invitations', id] as const,
-    byToken: (token: string) => ['invitations', token] as const,
-    check: ['invitations', 'check'] as const,
+    all: (orgId: string) => ["organizations", orgId, "invitations"] as const,
+    detail: (orgId: string, id: string) => ["organizations", orgId, "invitations", id] as const,
+    byToken: (token: string) => ["invitations", token] as const,
+    check: ["invitations", "check"] as const,
   },
   auditLogs: {
     all: (orgId: string, params?: Record<string, unknown>) =>
-      ['organizations', orgId, 'audit_logs', params] as const,
+      ["organizations", orgId, "audit_logs", params] as const,
   },
   projectAuditLogs: {
     all: (projectId: string, params?: Record<string, unknown>) =>
-      ['projects', projectId, 'audit_logs', params] as const,
+      ["projects", projectId, "audit_logs", params] as const,
   },
 };
 
@@ -137,7 +137,7 @@ export function useCurrentUser() {
   return useQuery({
     queryKey: queryKeys.user.current,
     queryFn: async () => {
-      const response = await api.get<{ data: CurrentUser }>('/users/me');
+      const response = await api.get<{ data: CurrentUser }>("/users/me");
       return response.data;
     },
   });
@@ -148,7 +148,7 @@ export function useUpdateCurrentUser() {
 
   return useMutation({
     mutationFn: (data: { name?: string; avatar_url?: string }) =>
-      api.patch<{ data: CurrentUser }>('/users/me', data),
+      api.patch<{ data: CurrentUser }>("/users/me", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.user.current });
     },
@@ -159,7 +159,7 @@ export function useUserOrganizations() {
   return useQuery({
     queryKey: queryKeys.user.organizations,
     queryFn: async () => {
-      const response = await api.get<{ data: Organization[] }>('/users/me/organizations');
+      const response = await api.get<{ data: Organization[] }>("/users/me/organizations");
       return response.data;
     },
   });
@@ -200,7 +200,7 @@ export function useCreateOrganization() {
 
   return useMutation({
     mutationFn: (data: { name: string; description?: string }) =>
-      api.post<Organization>('/organizations', data),
+      api.post<Organization>("/organizations", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.user.organizations });
       queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all });
@@ -236,7 +236,7 @@ export function useLeaveOrganization() {
 
 export function useRetentionPolicy(orgId: string) {
   return useQuery({
-    queryKey: ['organizations', orgId, 'retention_policy'],
+    queryKey: ["organizations", orgId, "retention_policy"],
     queryFn: async () => {
       const response = await api.get<{ data: RetentionPolicy }>(`/organizations/${orgId}/retention_policy`);
       return response.data;
@@ -252,14 +252,14 @@ export function useUpdateRetentionPolicy() {
     mutationFn: ({ orgId, data }: { orgId: string; data: Record<string, string> }) =>
       api.patch<{ data: RetentionPolicy }>(`/organizations/${orgId}/retention_policy`, data),
     onSuccess: (_, { orgId }) => {
-      queryClient.invalidateQueries({ queryKey: ['organizations', orgId, 'retention_policy'] });
+      queryClient.invalidateQueries({ queryKey: ["organizations", orgId, "retention_policy"] });
     },
   });
 }
 
 export function useProjectRetentionPolicy(projectId: string) {
   return useQuery({
-    queryKey: ['projects', projectId, 'retention_policy'],
+    queryKey: ["projects", projectId, "retention_policy"],
     queryFn: async () => {
       const response = await api.get<{ data: ProjectRetentionPolicy }>(`/projects/${projectId}/retention_policy`);
       return response.data;
@@ -275,7 +275,7 @@ export function useUpdateProjectRetentionPolicy() {
     mutationFn: ({ projectId, data }: { projectId: string; data: Record<string, string> }) =>
       api.patch<{ data: ProjectRetentionPolicy }>(`/projects/${projectId}/retention_policy`, data),
     onSuccess: (_, { projectId }) => {
-      queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'retention_policy'] });
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "retention_policy"] });
     },
   });
 }
@@ -283,7 +283,7 @@ export function useUpdateProjectRetentionPolicy() {
 // Organization Settings (key-value store)
 export function useOrganizationSettings(orgId: string) {
   return useQuery({
-    queryKey: ['organizations', orgId, 'settings'],
+    queryKey: ["organizations", orgId, "settings"],
     queryFn: () => api.get<Record<string, unknown>>(`/organizations/${orgId}/settings`),
     enabled: !!orgId,
   });
@@ -296,7 +296,7 @@ export function useUpdateOrganizationSetting() {
     mutationFn: ({ orgId, key, value }: { orgId: string; key: string; value: unknown }) =>
       api.put(`/organizations/${orgId}/settings/${key}`, { value }),
     onSuccess: (_, { orgId }) => {
-      queryClient.invalidateQueries({ queryKey: ['organizations', orgId, 'settings'] });
+      queryClient.invalidateQueries({ queryKey: ["organizations", orgId, "settings"] });
     },
   });
 }
@@ -308,7 +308,7 @@ export function useDeleteOrganizationSetting() {
     mutationFn: ({ orgId, key }: { orgId: string; key: string }) =>
       api.delete(`/organizations/${orgId}/settings/${key}`),
     onSuccess: (_, { orgId }) => {
-      queryClient.invalidateQueries({ queryKey: ['organizations', orgId, 'settings'] });
+      queryClient.invalidateQueries({ queryKey: ["organizations", orgId, "settings"] });
     },
   });
 }
@@ -325,7 +325,7 @@ export interface ProjectSettingsResponse {
 
 export function useProjectSettings(projectId: string) {
   return useQuery({
-    queryKey: ['projects', projectId, 'settings'],
+    queryKey: ["projects", projectId, "settings"],
     queryFn: () => api.get<ProjectSettingsResponse>(`/projects/${projectId}/settings`),
     enabled: !!projectId,
     staleTime: 30_000,
@@ -339,7 +339,7 @@ export function useUpdateProjectSetting() {
     mutationFn: ({ projectId, key, value }: { projectId: string; key: string; value: string }) =>
       api.put(`/projects/${projectId}/settings/${key}`, { value }),
     onSuccess: (_, { projectId }) => {
-      queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'settings'] });
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "settings"] });
     },
   });
 }
@@ -351,7 +351,7 @@ export function useDeleteProjectSetting() {
     mutationFn: ({ projectId, key }: { projectId: string; key: string }) =>
       api.delete(`/projects/${projectId}/settings/${key}`),
     onSuccess: (_, { projectId }) => {
-      queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'settings'] });
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "settings"] });
     },
   });
 }
@@ -435,14 +435,14 @@ export function useMemberEvents(orgId: string, memberId: string, params?: Events
       const searchParams = new URLSearchParams();
       if (params) {
         Object.entries(params).forEach(([key, value]) => {
-          if (value !== undefined && value !== null && value !== '') {
+          if (value !== undefined && value !== null && value !== "") {
             searchParams.append(key, String(value));
           }
         });
       }
       const query = searchParams.toString();
       const response = await api.get<PaginatedResponse<ToolEvent>>(
-        `/organizations/${orgId}/members/${memberId}/events${query ? `?${query}` : ''}`
+        `/organizations/${orgId}/members/${memberId}/events${query ? `?${query}` : ""}`
       );
       return response;
     },
@@ -567,7 +567,7 @@ export function useUpdateProject() {
       api.patch<Project>(`/projects/${id}`, data),
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projects.detail(id) });
-      queryClient.invalidateQueries({ queryKey: ['organizations'] });
+      queryClient.invalidateQueries({ queryKey: ["organizations"] });
     },
   });
 }
@@ -578,8 +578,8 @@ export function useDeleteProject() {
   return useMutation({
     mutationFn: (id: string) => api.delete(`/projects/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-      queryClient.invalidateQueries({ queryKey: ['organizations'] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["organizations"] });
     },
   });
 }
@@ -599,7 +599,7 @@ export interface ProjectStatsResponse {
 
 export function useProjectStats(projectId: string, days = 30) {
   return useQuery({
-    queryKey: ['projects', projectId, 'stats', days],
+    queryKey: ["projects", projectId, "stats", days],
     queryFn: () => api.get<ProjectStatsResponse>(`/projects/${projectId}/stats?days=${days}`),
     enabled: !!projectId,
   });
@@ -608,7 +608,7 @@ export function useProjectStats(projectId: string, days = 30) {
 // Project daily by tool for stacked bar chart
 export function useProjectDailyByTool(projectId: string, days = 30) {
   return useQuery({
-    queryKey: ['projects', projectId, 'stats', 'daily_by_tool', days],
+    queryKey: ["projects", projectId, "stats", "daily_by_tool", days],
     queryFn: () => api.get<DailyByToolResponse>(`/projects/${projectId}/stats/daily_by_tool?days=${days}`),
     enabled: !!projectId,
   });
@@ -627,7 +627,7 @@ export interface ProjectMember {
 
 export function useProjectMembers(projectId: string) {
   return useQuery({
-    queryKey: ['projects', projectId, 'members'],
+    queryKey: ["projects", projectId, "members"],
     queryFn: async () => {
       const response = await api.get<{ data: ProjectMember[] }>(`/projects/${projectId}/members`);
       return response.data;
@@ -649,7 +649,7 @@ export interface ProjectRepository {
 
 export function useProjectRepositories(projectId: string) {
   return useQuery({
-    queryKey: ['projects', projectId, 'repositories'],
+    queryKey: ["projects", projectId, "repositories"],
     queryFn: async () => {
       const response = await api.get<{ data: ProjectRepository[] }>(`/projects/${projectId}/repositories`);
       return response.data;
@@ -695,7 +695,7 @@ export function useConnectRepo(projectId: string) {
       is_private: boolean;
     }) => api.post<{ data: ProjectRepository }>(`/projects/${projectId}/repositories`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'repositories'] });
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "repositories"] });
     },
   });
 }
@@ -706,7 +706,7 @@ export function useDisconnectRepo(projectId: string) {
   return useMutation({
     mutationFn: (repoId: string) => api.delete(`/projects/${projectId}/repositories/${repoId}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'repositories'] });
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "repositories"] });
     },
   });
 }
@@ -722,7 +722,7 @@ export interface MemberCommitStat {
 
 export function useProjectCommitStats(projectId: string, days = 30) {
   return useQuery({
-    queryKey: ['projects', projectId, 'stats', 'commits_by_user', days],
+    queryKey: ["projects", projectId, "stats", "commits_by_user", days],
     queryFn: async () => {
       const response = await api.get<{ data: MemberCommitStat[] }>(
         `/projects/${projectId}/stats/commits_by_user?days=${days}`
@@ -750,7 +750,7 @@ export function useConnectors(orgId: string) {
 
 export function useConnectorAuthorizeUrl(orgId: string, provider: string) {
   return useQuery({
-    queryKey: ['connectors', 'authorize', orgId, provider],
+    queryKey: ["connectors", "authorize", orgId, provider],
     queryFn: () =>
       api.get<{ url: string }>(`/organizations/${orgId}/connectors/authorize/${provider}`),
     enabled: false, // Only fetch when explicitly called
@@ -841,7 +841,7 @@ export function useConnectWithWebhook() {
       channelLabel?: string;
     }) =>
       api.post<Connector>(`/organizations/${orgId}/connectors`, {
-        connector_type: 'slack',
+        connector_type: "slack",
         access_token: webhookUrl,
         ...(channelLabel ? { external_account_name: channelLabel } : {}),
       }),
@@ -917,7 +917,7 @@ export function useProjectConnectWithSlack() {
       channelLabel?: string;
     }) =>
       api.post<ProjectConnector>(`/projects/${projectId}/connectors`, {
-        connector_type: 'slack',
+        connector_type: "slack",
         access_token: webhookUrl,
         ...(channelLabel ? { external_org_name: channelLabel } : {}),
       }),
@@ -1058,14 +1058,14 @@ export function useEvents(orgId: string, params?: EventsParams, options?: { enab
       const searchParams = new URLSearchParams();
       if (params) {
         Object.entries(params).forEach(([key, value]) => {
-          if (value !== undefined && value !== null && value !== '') {
+          if (value !== undefined && value !== null && value !== "") {
             searchParams.append(key, String(value));
           }
         });
       }
       const query = searchParams.toString();
       return api.get<PaginatedResponse<ToolEvent>>(
-        `/organizations/${orgId}/events${query ? `?${query}` : ''}`
+        `/organizations/${orgId}/events${query ? `?${query}` : ""}`
       );
     },
     enabled: options?.enabled !== false && !!orgId,
@@ -1141,7 +1141,7 @@ interface ActivityHeatmapData {
 
 export function useActivityHeatmap(orgId: string) {
   return useQuery({
-    queryKey: ['organizations', orgId, 'stats', 'heatmap'],
+    queryKey: ["organizations", orgId, "stats", "heatmap"],
     queryFn: () => api.get<ActivityHeatmapData[]>(`/organizations/${orgId}/stats/heatmap`),
     enabled: !!orgId,
   });
@@ -1159,7 +1159,7 @@ export interface DailyByToolResponse {
 
 export function useDailyByTool(orgId: string, days = 30) {
   return useQuery({
-    queryKey: ['organizations', orgId, 'stats', 'daily_by_tool', days],
+    queryKey: ["organizations", orgId, "stats", "daily_by_tool", days],
     queryFn: () => api.get<DailyByToolResponse>(`/organizations/${orgId}/stats/daily_by_tool?days=${days}`),
     enabled: !!orgId,
   });
@@ -1248,7 +1248,7 @@ export function useInvitations(orgId: string, status?: string) {
   return useQuery({
     queryKey: queryKeys.invitations.all(orgId),
     queryFn: async () => {
-      const params = status ? `?status=${status}` : '';
+      const params = status ? `?status=${status}` : "";
       const response = await api.get<{ data: Invitation[] }>(`/organizations/${orgId}/invitations${params}`);
       return response.data;
     },
@@ -1323,7 +1323,7 @@ export function useCheckPendingInvitations() {
   return useQuery({
     queryKey: queryKeys.invitations.check,
     queryFn: async () => {
-      const response = await api.get<{ data: InvitationPublic[] }>('/invitations/check');
+      const response = await api.get<{ data: InvitationPublic[] }>("/invitations/check");
       return response.data;
     },
   });
@@ -1348,16 +1348,16 @@ export function useOrganizationAuditLogs(orgId: string, filters: AuditLogFilters
     queryKey: queryKeys.auditLogs.all(orgId, filters as Record<string, unknown>),
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (filters.page) params.set('page', String(filters.page));
-      if (filters.per_page) params.set('per_page', String(filters.per_page));
-      if (filters.actor_id) params.set('actor_id', filters.actor_id);
-      if (filters.log_action) params.set('log_action', filters.log_action);
-      if (filters.resource_type) params.set('resource_type', filters.resource_type);
-      if (filters.from_date) params.set('from_date', filters.from_date);
-      if (filters.to_date) params.set('to_date', filters.to_date);
+      if (filters.page) params.set("page", String(filters.page));
+      if (filters.per_page) params.set("per_page", String(filters.per_page));
+      if (filters.actor_id) params.set("actor_id", filters.actor_id);
+      if (filters.log_action) params.set("log_action", filters.log_action);
+      if (filters.resource_type) params.set("resource_type", filters.resource_type);
+      if (filters.from_date) params.set("from_date", filters.from_date);
+      if (filters.to_date) params.set("to_date", filters.to_date);
       const query = params.toString();
       return api.get<PaginatedResponse<OrganizationAuditLog>>(
-        `/organizations/${orgId}/audit_logs${query ? `?${query}` : ''}`
+        `/organizations/${orgId}/audit_logs${query ? `?${query}` : ""}`
       );
     },
     enabled: !!orgId,
@@ -1369,16 +1369,16 @@ export function useProjectAuditLogs(projectId: string, filters: AuditLogFilters 
     queryKey: queryKeys.projectAuditLogs.all(projectId, filters as Record<string, unknown>),
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (filters.page) params.set('page', String(filters.page));
-      if (filters.per_page) params.set('per_page', String(filters.per_page));
-      if (filters.actor_id) params.set('actor_id', filters.actor_id);
-      if (filters.log_action) params.set('log_action', filters.log_action);
-      if (filters.resource_type) params.set('resource_type', filters.resource_type);
-      if (filters.from_date) params.set('from_date', filters.from_date);
-      if (filters.to_date) params.set('to_date', filters.to_date);
+      if (filters.page) params.set("page", String(filters.page));
+      if (filters.per_page) params.set("per_page", String(filters.per_page));
+      if (filters.actor_id) params.set("actor_id", filters.actor_id);
+      if (filters.log_action) params.set("log_action", filters.log_action);
+      if (filters.resource_type) params.set("resource_type", filters.resource_type);
+      if (filters.from_date) params.set("from_date", filters.from_date);
+      if (filters.to_date) params.set("to_date", filters.to_date);
       const query = params.toString();
       return api.get<PaginatedResponse<ProjectAuditLog>>(
-        `/projects/${projectId}/audit_logs${query ? `?${query}` : ''}`
+        `/projects/${projectId}/audit_logs${query ? `?${query}` : ""}`
       );
     },
     enabled: !!projectId,

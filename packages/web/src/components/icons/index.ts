@@ -1,1 +1,1 @@
-export { ProviderLogo, logoMap, providerColors } from './ProviderLogo';
+export { ProviderLogo, logoMap, providerColors } from "./ProviderLogo";

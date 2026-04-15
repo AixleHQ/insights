@@ -1,14 +1,14 @@
-import { useMemo } from 'react';
-import { useParams } from 'react-router-dom';
-import { useOrg } from '@/contexts/OrgContext';
-import { useEvent } from '@/hooks/useApi';
-import { EventDetail, type EventDetailData } from '@/components/events';
+import { useMemo } from "react";
+import { useParams } from "react-router-dom";
+import { useOrg } from "@/contexts/OrgContext";
+import { useEvent } from "@/hooks/useApi";
+import { EventDetail, type EventDetailData } from "@/components/events";
 
 export function EventDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { currentOrg } = useOrg();
 
-  const { data: apiEvent, isLoading } = useEvent(currentOrg?.id || '', id || '');
+  const { data: apiEvent, isLoading } = useEvent(currentOrg?.id || "", id || "");
 
   // Transform API response to EventDetailData format
   const event: EventDetailData | null = useMemo(() => {

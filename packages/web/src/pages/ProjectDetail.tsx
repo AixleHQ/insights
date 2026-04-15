@@ -1,5 +1,5 @@
-import { useMemo, useState, useCallback } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useMemo, useState, useCallback } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   AlertCircle,
   ArrowLeft,
@@ -11,8 +11,8 @@ import {
   MoreHorizontal,
   RefreshCw,
   Trash2,
-} from 'lucide-react';
-import { useOrg } from '@/contexts/OrgContext';
+} from "lucide-react";
+import { useOrg } from "@/contexts/OrgContext";
 import {
   useProject,
   useEvents,
@@ -22,42 +22,42 @@ import {
   useDisconnectRepo,
   useProjectMembers,
   type ProjectMember,
-} from '@/hooks/useApi';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+} from "@/hooks/useApi";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
+} from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { EventsTable, EventDrawer, FilterChip, type EventRow } from '@/components/events';
-import { ToolUsageByDayChart } from '@/components/dashboard';
-import { ProjectReposSection, ProjectNotFound, ConnectRepoSheet, ProjectIssuesTab } from '@/components/project';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+} from "@/components/ui/dropdown-menu";
+import { EventsTable, EventDrawer, FilterChip, type EventRow } from "@/components/events";
+import { ToolUsageByDayChart } from "@/components/dashboard";
+import { ProjectReposSection, ProjectNotFound, ConnectRepoSheet, ProjectIssuesTab } from "@/components/project";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { formatDistanceToNow, toEventRow, getMemberDisplayName } from '@/lib/utils';
+} from "@/components/ui/select";
+import { formatDistanceToNow, toEventRow, getMemberDisplayName } from "@/lib/utils";
 
 function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
     minimumFractionDigits: 2,
   }).format(value);
 }
@@ -102,15 +102,15 @@ export function ProjectDetail() {
 
   const [selectedUserId, setSelectedUserId] = useState<string | undefined>(undefined);
 
-  const { data: project, isLoading: isLoadingProject } = useProject(id || '');
-  const { data: projectMembers } = useProjectMembers(id || '');
+  const { data: project, isLoading: isLoadingProject } = useProject(id || "");
+  const { data: projectMembers } = useProjectMembers(id || "");
   const { data: eventsResponse, isLoading: isLoadingEvents, isError: isEventsError } = useEvents(
-    currentOrg?.id || '',
+    currentOrg?.id || "",
     { project_id: id, per_page: 10, user_id: selectedUserId }
   );
-  const { data: dailyByToolData, isLoading: isLoadingDailyByTool } = useProjectDailyByTool(id || '');
-  const { data: projectRepositories, isLoading: isLoadingRepositories } = useProjectRepositories(id || '');
-  const disconnectRepo = useDisconnectRepo(id || '');
+  const { data: dailyByToolData, isLoading: isLoadingDailyByTool } = useProjectDailyByTool(id || "");
+  const { data: projectRepositories, isLoading: isLoadingRepositories } = useProjectRepositories(id || "");
+  const disconnectRepo = useDisconnectRepo(id || "");
   const deleteProject = useDeleteProject();
 
   const events: EventRow[] = useMemo(
@@ -127,12 +127,12 @@ export function ProjectDetail() {
     setDrawerOpen(true);
   }, []);
 
-  const handleNavigate = useCallback((direction: 'prev' | 'next') => {
+  const handleNavigate = useCallback((direction: "prev" | "next") => {
     if (!selectedEventId) return;
     const currentIndex = events.findIndex((e) => e.id === selectedEventId);
     if (currentIndex === -1) return;
 
-    const newIndex = direction === 'prev' ? currentIndex - 1 : currentIndex + 1;
+    const newIndex = direction === "prev" ? currentIndex - 1 : currentIndex + 1;
     if (newIndex >= 0 && newIndex < events.length) {
       setSelectedEventId(events[newIndex].id);
     }
@@ -144,12 +144,12 @@ export function ProjectDetail() {
 
   const handleDelete = async () => {
     if (!id) return;
-    if (window.confirm('Are you sure you want to delete this project?')) {
+    if (window.confirm("Are you sure you want to delete this project?")) {
       try {
         await deleteProject.mutateAsync(id);
-        navigate('/projects');
+        navigate("/projects");
       } catch (error) {
-        console.error('Failed to delete project:', error);
+        console.error("Failed to delete project:", error);
       }
     }
   };
@@ -190,8 +190,8 @@ export function ProjectDetail() {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-xl font-semibold">{project.name}</h1>
-              <Badge variant={(project.is_active ?? project.isActive) ? 'default' : 'secondary'}>
-                {(project.is_active ?? project.isActive) ? 'Active' : 'Inactive'}
+              <Badge variant={(project.is_active ?? project.isActive) ? "default" : "secondary"}>
+                {(project.is_active ?? project.isActive) ? "Active" : "Inactive"}
               </Badge>
             </div>
             <p className="text-sm text-muted-foreground">{project.description}</p>
@@ -344,7 +344,7 @@ export function ProjectDetail() {
           />
 
           <ConnectRepoSheet
-            projectId={id || ''}
+            projectId={id || ""}
             open={connectRepoOpen}
             onOpenChange={setConnectRepoOpen}
             onSuccess={() => setConnectRepoOpen(false)}

@@ -1,15 +1,15 @@
-import { useState } from 'react';
-import { AlertCircle } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useState } from "react";
+import { AlertCircle } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,10 +19,10 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useProjectRetentionPolicy, useUpdateProjectRetentionPolicy } from '@/hooks/useApi';
-import { retentionOrder, formatRetentionLabel } from '@/lib/retention-utils';
+} from "@/components/ui/alert-dialog";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useProjectRetentionPolicy, useUpdateProjectRetentionPolicy } from "@/hooks/useApi";
+import { retentionOrder, formatRetentionLabel } from "@/lib/retention-utils";
 
 interface Props {
   projectId: string;
@@ -45,8 +45,8 @@ export function ProjectRetentionPolicySection({ projectId }: Props) {
     try {
       await updateRetention.mutateAsync({ projectId, data: { [field]: value } });
     } catch (error) {
-      console.error('Failed to update retention:', error);
-      setSaveError('Failed to save. Please try again.');
+      console.error("Failed to update retention:", error);
+      setSaveError("Failed to save. Please try again.");
     }
   };
 
@@ -93,9 +93,9 @@ export function ProjectRetentionPolicySection({ projectId }: Props) {
             <div className="space-y-2">
               <Label>Raw Event TTL</Label>
               <Select
-                value={retentionPolicy?.rawEventTtl || '24_hours'}
+                value={retentionPolicy?.rawEventTtl || "24_hours"}
                 onValueChange={(value) =>
-                  handleRetentionChange('raw_event_ttl', retentionPolicy?.rawEventTtl || '24_hours', value)
+                  handleRetentionChange("raw_event_ttl", retentionPolicy?.rawEventTtl || "24_hours", value)
                 }
               >
                 <SelectTrigger>
@@ -113,9 +113,9 @@ export function ProjectRetentionPolicySection({ projectId }: Props) {
             <div className="space-y-2">
               <Label>Tool Events</Label>
               <Select
-                value={retentionPolicy?.toolEventsRetention || '90_days'}
+                value={retentionPolicy?.toolEventsRetention || "90_days"}
                 onValueChange={(value) =>
-                  handleRetentionChange('tool_events_retention', retentionPolicy?.toolEventsRetention || '90_days', value)
+                  handleRetentionChange("tool_events_retention", retentionPolicy?.toolEventsRetention || "90_days", value)
                 }
               >
                 <SelectTrigger>
@@ -134,9 +134,9 @@ export function ProjectRetentionPolicySection({ projectId }: Props) {
             <div className="space-y-2">
               <Label>Hourly Aggregates</Label>
               <Select
-                value={retentionPolicy?.hourlyAggregateRetention || '365_days'}
+                value={retentionPolicy?.hourlyAggregateRetention || "365_days"}
                 onValueChange={(value) =>
-                  handleRetentionChange('hourly_aggregate_retention', retentionPolicy?.hourlyAggregateRetention || '365_days', value)
+                  handleRetentionChange("hourly_aggregate_retention", retentionPolicy?.hourlyAggregateRetention || "365_days", value)
                 }
               >
                 <SelectTrigger>
@@ -153,9 +153,9 @@ export function ProjectRetentionPolicySection({ projectId }: Props) {
             <div className="space-y-2">
               <Label>Daily Aggregates</Label>
               <Select
-                value={retentionPolicy?.dailyAggregateRetention || 'forever'}
+                value={retentionPolicy?.dailyAggregateRetention || "forever"}
                 onValueChange={(value) =>
-                  handleRetentionChange('daily_aggregate_retention', retentionPolicy?.dailyAggregateRetention || 'forever', value)
+                  handleRetentionChange("daily_aggregate_retention", retentionPolicy?.dailyAggregateRetention || "forever", value)
                 }
               >
                 <SelectTrigger>
@@ -185,8 +185,8 @@ export function ProjectRetentionPolicySection({ projectId }: Props) {
           <AlertDialogHeader>
             <AlertDialogTitle>Reduce retention period?</AlertDialogTitle>
             <AlertDialogDescription>
-              You are reducing the retention from{' '}
-              <strong>{pendingChange?.currentLabel}</strong> to{' '}
+              You are reducing the retention from{" "}
+              <strong>{pendingChange?.currentLabel}</strong> to{" "}
               <strong>{pendingChange?.newLabel}</strong>. Data older than the
               new limit may be permanently deleted. This action cannot be undone.
             </AlertDialogDescription>

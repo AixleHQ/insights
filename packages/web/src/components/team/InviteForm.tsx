@@ -1,20 +1,20 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, Plus, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Loader2, Plus, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
-import type { MemberRole } from './MemberRow';
+} from "@/components/ui/select";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import type { MemberRole } from "./MemberRow";
 
 interface InviteFormProps {
   onSubmit: (invites: Array<{ email: string; role: MemberRole }>) => Promise<void>;
@@ -33,30 +33,30 @@ function isValidEmail(email: string): boolean {
 export function InviteForm({ onSubmit, className }: InviteFormProps) {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [email, setEmail] = useState('');
-  const [role, setRole] = useState<MemberRole>('member');
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<MemberRole>("member");
   const [invites, setInvites] = useState<InviteEntry[]>([]);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   const handleAddInvite = () => {
     if (!email.trim()) {
-      setError('Please enter an email address');
+      setError("Please enter an email address");
       return;
     }
 
     if (!isValidEmail(email)) {
-      setError('Please enter a valid email address');
+      setError("Please enter a valid email address");
       return;
     }
 
     if (invites.some((inv) => inv.email.toLowerCase() === email.toLowerCase())) {
-      setError('This email has already been added');
+      setError("This email has already been added");
       return;
     }
 
     setInvites((prev) => [...prev, { email: email.trim(), role }]);
-    setEmail('');
-    setError('');
+    setEmail("");
+    setError("");
   };
 
   const handleRemoveInvite = (emailToRemove: string) => {
@@ -67,24 +67,24 @@ export function InviteForm({ onSubmit, className }: InviteFormProps) {
     e.preventDefault();
 
     if (invites.length === 0) {
-      setError('Please add at least one email address');
+      setError("Please add at least one email address");
       return;
     }
 
     setIsSubmitting(true);
     try {
       await onSubmit(invites);
-      navigate('/team');
+      navigate("/team");
     } catch (error) {
-      console.error('Failed to send invites:', error);
+      console.error("Failed to send invites:", error);
       // Extract specific validation error message if available
-      let errorMessage = 'Failed to send invites. Please try again.';
-      if (error && typeof error === 'object' && 'data' in error) {
+      let errorMessage = "Failed to send invites. Please try again.";
+      if (error && typeof error === "object" && "data" in error) {
         const apiError = error as { data?: { errors?: Record<string, string[]> } };
         if (apiError.data?.errors) {
           const messages = Object.entries(apiError.data.errors)
-            .map(([field, msgs]) => `${field} ${(msgs as string[]).join(', ')}`)
-            .join('. ');
+            .map(([field, msgs]) => `${field} ${(msgs as string[]).join(", ")}`)
+            .join(". ");
           if (messages) {
             errorMessage = messages;
           }
@@ -97,16 +97,16 @@ export function InviteForm({ onSubmit, className }: InviteFormProps) {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       e.preventDefault();
       handleAddInvite();
     }
   };
 
   return (
-    <div className={cn('space-y-6', className)}>
+    <div className={cn("space-y-6", className)}>
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/team')}>
+        <Button variant="ghost" size="icon" onClick={() => navigate("/team")}>
           <ArrowLeft className="size-4" />
         </Button>
         <div>
@@ -136,10 +136,10 @@ export function InviteForm({ onSubmit, className }: InviteFormProps) {
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
-                    setError('');
+                    setError("");
                   }}
                   onKeyDown={handleKeyDown}
-                  className={cn(error && 'border-destructive')}
+                  className={cn(error && "border-destructive")}
                 />
                 {error && <p className="text-xs text-destructive">{error}</p>}
               </div>
@@ -214,7 +214,7 @@ export function InviteForm({ onSubmit, className }: InviteFormProps) {
           <Button
             type="button"
             variant="outline"
-            onClick={() => navigate('/team')}
+            onClick={() => navigate("/team")}
             disabled={isSubmitting}
           >
             Cancel
@@ -222,7 +222,7 @@ export function InviteForm({ onSubmit, className }: InviteFormProps) {
           <Button type="submit" disabled={isSubmitting || invites.length === 0}>
             {isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
             Send {invites.length > 0 && `(${invites.length})`} Invite
-            {invites.length !== 1 && 's'}
+            {invites.length !== 1 && "s"}
           </Button>
         </div>
       </form>

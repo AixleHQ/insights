@@ -1,9 +1,9 @@
-import { Bell, Check, Trash2, AlertTriangle, Info, CheckCircle, Zap } from 'lucide-react';
-import { useNotifications, type Notification } from '@/contexts/NotificationsContext';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { cn } from '@/lib/utils';
+import { Bell, Check, Trash2, AlertTriangle, Info, CheckCircle, Zap } from "lucide-react";
+import { useNotifications, type Notification } from "@/contexts/NotificationsContext";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 const typeIcons = {
   alert: AlertTriangle,
@@ -13,10 +13,10 @@ const typeIcons = {
 };
 
 const typeColors = {
-  alert: 'text-destructive',
-  info: 'text-primary',
-  success: 'text-success',
-  event: 'text-muted-foreground',
+  alert: "text-destructive",
+  info: "text-primary",
+  success: "text-success",
+  event: "text-muted-foreground",
 };
 
 function NotificationItem({
@@ -27,24 +27,24 @@ function NotificationItem({
   onMarkAsRead: (id: string) => void;
 }) {
   const Icon = typeIcons[notification.type] || Info;
-  const colorClass = typeColors[notification.type] || 'text-muted-foreground';
+  const colorClass = typeColors[notification.type] || "text-muted-foreground";
 
   return (
     <div
       className={cn(
-        'flex items-start gap-4 rounded-lg border p-4 transition-colors',
-        notification.read ? 'bg-muted/30' : 'bg-card'
+        "flex items-start gap-4 rounded-lg border p-4 transition-colors",
+        notification.read ? "bg-muted/30" : "bg-card"
       )}
     >
-      <div className={cn('mt-0.5', colorClass)}>
+      <div className={cn("mt-0.5", colorClass)}>
         <Icon className="size-5" />
       </div>
       <div className="flex-1 space-y-1">
         <div className="flex items-start justify-between gap-2">
           <p
             className={cn(
-              'text-sm font-medium',
-              notification.read ? 'text-muted-foreground' : 'text-foreground'
+              "text-sm font-medium",
+              notification.read ? "text-muted-foreground" : "text-foreground"
             )}
           >
             {notification.title}
@@ -78,8 +78,8 @@ export function Notifications() {
           <h1 className="text-2xl font-semibold tracking-tight">Notifications</h1>
           <p className="text-sm text-muted-foreground">
             {unreadCount > 0
-              ? `${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}`
-              : 'All caught up!'}
+              ? `${unreadCount} unread notification${unreadCount > 1 ? "s" : ""}`
+              : "All caught up!"}
           </p>
         </div>
         <div className="flex gap-2">

@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { useProjectConnectWithSlack } from '@/hooks/useApi';
-import { ApiError } from '@/lib/api';
+import { useState } from "react";
+import { useProjectConnectWithSlack } from "@/hooks/useApi";
+import { ApiError } from "@/lib/api";
 import {
   Sheet,
   SheetContent,
@@ -8,11 +8,11 @@ import {
   SheetTitle,
   SheetDescription,
   SheetFooter,
-} from '@/components/ui/sheet';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { ProviderLogo } from '@/components/icons';
+} from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ProviderLogo } from "@/components/icons";
 
 interface SlackConnectSheetProps {
   projectId: string;
@@ -24,15 +24,15 @@ interface SlackConnectSheetProps {
 export function SlackConnectSheet({ projectId, open, onOpenChange, onSuccess }: SlackConnectSheetProps) {
   const connectWithSlack = useProjectConnectWithSlack();
 
-  const [webhookUrl, setWebhookUrl] = useState('');
-  const [channelLabel, setChannelLabel] = useState('');
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [channelLabel, setChannelLabel] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
-      setWebhookUrl('');
-      setChannelLabel('');
+      setWebhookUrl("");
+      setChannelLabel("");
       setError(null);
     }
     onOpenChange(nextOpen);
@@ -50,18 +50,18 @@ export function SlackConnectSheet({ projectId, open, onOpenChange, onSuccess }: 
         webhookUrl,
         channelLabel: channelLabel.trim() || undefined,
       });
-      setWebhookUrl('');
-      setChannelLabel('');
+      setWebhookUrl("");
+      setChannelLabel("");
       onOpenChange(false);
       onSuccess();
     } catch (err) {
       if (err instanceof ApiError && err.status === 422) {
         const data = err.data as { errors?: { access_token?: string[] } } | null;
-        setError(data?.errors?.access_token?.[0] ?? 'Invalid webhook URL');
+        setError(data?.errors?.access_token?.[0] ?? "Invalid webhook URL");
       } else if (err instanceof Error) {
         setError(err.message);
       } else {
-        setError('Something went wrong. Please try again.');
+        setError("Something went wrong. Please try again.");
       }
     } finally {
       setIsSubmitting(false);
@@ -99,7 +99,7 @@ export function SlackConnectSheet({ projectId, open, onOpenChange, onSuccess }: 
 
           <div className="space-y-2">
             <Label htmlFor="channel-label">
-              Channel label{' '}
+              Channel label{" "}
               <span className="text-xs text-muted-foreground">(optional)</span>
             </Label>
             <Input
@@ -124,7 +124,7 @@ export function SlackConnectSheet({ projectId, open, onOpenChange, onSuccess }: 
             onClick={handleSubmit}
             disabled={isSubmitting || !webhookUrl.trim()}
           >
-            {isSubmitting ? 'Connecting…' : 'Connect'}
+            {isSubmitting ? "Connecting…" : "Connect"}
           </Button>
         </SheetFooter>
       </SheetContent>

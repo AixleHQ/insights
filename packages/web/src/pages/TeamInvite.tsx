@@ -1,6 +1,6 @@
-import { useOrg } from '@/contexts/OrgContext';
-import { useCreateInvitation } from '@/hooks/useApi';
-import { InviteForm, type MemberRole } from '@/components/team';
+import { useOrg } from "@/contexts/OrgContext";
+import { useCreateInvitation } from "@/hooks/useApi";
+import { InviteForm, type MemberRole } from "@/components/team";
 
 export function TeamInvite() {
   const { currentOrg } = useOrg();

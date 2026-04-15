@@ -5,17 +5,17 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Skeleton } from '@/components/ui/skeleton';
-import { SortButton, type SortDirection } from '@/components/ui/sort-button';
-import { RiskBadge } from '@/components/dashboard/ActivityFeed';
-import { formatDistanceToNow, humanizeToolName, cn } from '@/lib/utils';
+} from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
+import { SortButton, type SortDirection } from "@/components/ui/sort-button";
+import { RiskBadge } from "@/components/dashboard/ActivityFeed";
+import { formatDistanceToNow, humanizeToolName, cn } from "@/lib/utils";
 
 export interface EventRow {
   id: string;
   tool_name?: string;
   event_type?: string;
-  risk_level?: 'critical' | 'high' | 'medium' | 'low' | 'none';
+  risk_level?: "critical" | "high" | "medium" | "low" | "none";
   cost_usd?: number;
   created_at?: string;
   user?: { email: string };
@@ -23,7 +23,7 @@ export interface EventRow {
   token_count?: number;
 }
 
-type SortField = 'created_at' | 'tool_name' | 'risk_level' | 'cost_usd';
+type SortField = "created_at" | "tool_name" | "risk_level" | "cost_usd";
 
 interface EventsTableProps {
   events: EventRow[];
@@ -68,14 +68,14 @@ function EventRowSkeleton() {
 }
 
 function formatCost(cost: unknown): string {
-  if (cost === undefined || cost === null) return '-';
+  if (cost === undefined || cost === null) return "-";
   const numCost = Number(cost);
-  if (isNaN(numCost)) return '-';
+  if (isNaN(numCost)) return "-";
   return `$${numCost.toFixed(3)}`;
 }
 
 function formatTokens(tokens: number | undefined): string {
-  if (tokens === undefined || tokens === null) return '-';
+  if (tokens === undefined || tokens === null) return "-";
   if (tokens >= 1_000_000) {
     return `${(tokens / 1_000_000).toFixed(1)}M`;
   }
@@ -96,7 +96,7 @@ export function EventsTable({
   className,
 }: EventsTableProps) {
   return (
-    <div className={cn('rounded-md border overflow-x-auto', className)}>
+    <div className={cn("rounded-md border overflow-x-auto", className)}>
       <Table className="min-w-[700px]">
         <TableHeader>
           <TableRow>
@@ -160,8 +160,8 @@ export function EventsTable({
               <TableRow
                 key={event.id}
                 className={cn(
-                  'group cursor-pointer hover:bg-muted/50 transition-colors',
-                  selectedEventId === event.id && 'bg-muted'
+                  "group cursor-pointer hover:bg-muted/50 transition-colors",
+                  selectedEventId === event.id && "bg-muted"
                 )}
                 onClick={() => onEventClick?.(event.id)}
               >
@@ -172,20 +172,20 @@ export function EventsTable({
                 </TableCell>
                 <TableCell className="hidden sm:table-cell">
                   <span className="text-xs capitalize text-muted-foreground">
-                    {(event.event_type || 'unknown').replace('_', ' ')}
+                    {(event.event_type || "unknown").replace("_", " ")}
                   </span>
                 </TableCell>
                 <TableCell>
-                  <RiskBadge level={event.risk_level || 'none'} />
+                  <RiskBadge level={event.risk_level || "none"} />
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
                   <span className="text-sm text-muted-foreground truncate max-w-[150px] block">
-                    {event.user?.email || '-'}
+                    {event.user?.email || "-"}
                   </span>
                 </TableCell>
                 <TableCell className="hidden lg:table-cell">
                   <span className="text-sm text-muted-foreground truncate max-w-[120px] block">
-                    {event.project?.name || '-'}
+                    {event.project?.name || "-"}
                   </span>
                 </TableCell>
                 <TableCell>

@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect, useRef } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
@@ -8,18 +8,18 @@ import {
   Loader2,
   Shield,
   Zap,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -48,135 +48,135 @@ interface ProviderConfig {
 
 const providers: Record<string, ProviderConfig> = {
   github: {
-    id: 'github',
-    name: 'github',
-    displayName: 'GitHub',
-    description: 'Connect your GitHub organization to track AI tool usage across repositories.',
+    id: "github",
+    name: "github",
+    displayName: "GitHub",
+    description: "Connect your GitHub organization to track AI tool usage across repositories.",
     features: [
-      'Repository activity monitoring',
-      'Pull request AI suggestions tracking',
-      'Copilot usage analytics',
-      'Commit message analysis',
+      "Repository activity monitoring",
+      "Pull request AI suggestions tracking",
+      "Copilot usage analytics",
+      "Commit message analysis",
     ],
     scopes: [
-      { name: 'repo', description: 'Access repository data and commits' },
-      { name: 'read:org', description: 'Read organization membership' },
-      { name: 'admin:repo_hook', description: 'Manage repository webhooks' },
+      { name: "repo", description: "Access repository data and commits" },
+      { name: "read:org", description: "Read organization membership" },
+      { name: "admin:repo_hook", description: "Manage repository webhooks" },
     ],
     requiresWebhook: true,
     requiresOAuth: true,
   },
   gitlab: {
-    id: 'gitlab',
-    name: 'gitlab',
-    displayName: 'GitLab',
-    description: 'Connect your GitLab instance to monitor AI-assisted development.',
+    id: "gitlab",
+    name: "gitlab",
+    displayName: "GitLab",
+    description: "Connect your GitLab instance to monitor AI-assisted development.",
     features: [
-      'Merge request tracking',
-      'Pipeline AI suggestions',
-      'Code review analytics',
-      'Project activity monitoring',
+      "Merge request tracking",
+      "Pipeline AI suggestions",
+      "Code review analytics",
+      "Project activity monitoring",
     ],
     scopes: [
-      { name: 'api', description: 'Full API access' },
-      { name: 'read_repository', description: 'Read repository content' },
+      { name: "api", description: "Full API access" },
+      { name: "read_repository", description: "Read repository content" },
     ],
     requiresWebhook: true,
     requiresOAuth: true,
   },
   bitbucket: {
-    id: 'bitbucket',
-    name: 'bitbucket',
-    displayName: 'Bitbucket',
-    description: 'Connect Bitbucket Cloud or Server for complete visibility.',
+    id: "bitbucket",
+    name: "bitbucket",
+    displayName: "Bitbucket",
+    description: "Connect Bitbucket Cloud or Server for complete visibility.",
     features: [
-      'Pull request monitoring',
-      'Repository insights',
-      'Team activity tracking',
-      'Code search analytics',
+      "Pull request monitoring",
+      "Repository insights",
+      "Team activity tracking",
+      "Code search analytics",
     ],
     scopes: [
-      { name: 'repository', description: 'Read repository data' },
-      { name: 'pullrequest', description: 'Access pull requests' },
+      { name: "repository", description: "Read repository data" },
+      { name: "pullrequest", description: "Access pull requests" },
     ],
     requiresWebhook: true,
     requiresOAuth: true,
   },
   jira: {
-    id: 'jira',
-    name: 'jira',
-    displayName: 'Jira',
-    description: 'Link Jira projects to correlate AI tool usage with issues.',
+    id: "jira",
+    name: "jira",
+    displayName: "Jira",
+    description: "Link Jira projects to correlate AI tool usage with issues.",
     features: [
-      'Issue tracking integration',
-      'Sprint AI metrics',
-      'Worklog correlation',
-      'Project analytics',
+      "Issue tracking integration",
+      "Sprint AI metrics",
+      "Worklog correlation",
+      "Project analytics",
     ],
     scopes: [
-      { name: 'read:jira-work', description: 'Read project and issue data' },
-      { name: 'write:jira-work', description: 'Update issues with AI metadata' },
+      { name: "read:jira-work", description: "Read project and issue data" },
+      { name: "write:jira-work", description: "Update issues with AI metadata" },
     ],
     requiresWebhook: false,
     requiresOAuth: true,
   },
   linear: {
-    id: 'linear',
-    name: 'linear',
-    displayName: 'Linear',
-    description: 'Connect Linear to track AI-assisted issue resolution.',
+    id: "linear",
+    name: "linear",
+    displayName: "Linear",
+    description: "Connect Linear to track AI-assisted issue resolution.",
     features: [
-      'Issue lifecycle tracking',
-      'Team productivity insights',
-      'Cycle analytics',
-      'AI usage per project',
+      "Issue lifecycle tracking",
+      "Team productivity insights",
+      "Cycle analytics",
+      "AI usage per project",
     ],
     scopes: [
-      { name: 'read', description: 'Read workspace data' },
-      { name: 'issues:create', description: 'Create issues for alerts' },
+      { name: "read", description: "Read workspace data" },
+      { name: "issues:create", description: "Create issues for alerts" },
     ],
     requiresWebhook: true,
     requiresOAuth: true,
   },
-  'claude-code': {
-    id: 'claude-code',
-    name: 'claude-code',
-    displayName: 'Claude Code',
-    description: 'Monitor Claude Code CLI sessions and AI usage.',
+  "claude-code": {
+    id: "claude-code",
+    name: "claude-code",
+    displayName: "Claude Code",
+    description: "Monitor Claude Code CLI sessions and AI usage.",
     features: [
-      'Session tracking',
-      'Token consumption analytics',
-      'Code generation insights',
-      'Project attribution',
+      "Session tracking",
+      "Token consumption analytics",
+      "Code generation insights",
+      "Project attribution",
     ],
     scopes: [
-      { name: 'telemetry', description: 'Receive usage telemetry' },
+      { name: "telemetry", description: "Receive usage telemetry" },
     ],
     requiresWebhook: false,
     requiresOAuth: false,
   },
 };
 
-type SetupStep = 'overview' | 'authorize' | 'configure' | 'complete';
+type SetupStep = "overview" | "authorize" | "configure" | "complete";
 
 export function IntegrationSetup() {
   const { provider: providerKey } = useParams<{ provider: string }>();
   const navigate = useNavigate();
   const { currentOrg } = useOrg();
-  const { data: projects } = useProjects(currentOrg?.id || '');
+  const { data: projects } = useProjects(currentOrg?.id || "");
   const { mutateAsync: createConnector } = useCreateConnector();
   const isProcessingCallback = useRef(false);
 
-  const [step, setStep] = useState<SetupStep>('overview');
+  const [step, setStep] = useState<SetupStep>("overview");
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [config, setConfig] = useState({
-    name: '',
+    name: "",
     syncRepos: true,
     syncPRs: true,
     webhookEnabled: true,
-    selectedProject: '',
+    selectedProject: "",
   });
 
   const provider = providerKey ? providers[providerKey] : null;
@@ -185,7 +185,7 @@ export function IntegrationSetup() {
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
-      if (event.data?.type !== 'integration_oauth_callback') return;
+      if (event.data?.type !== "integration_oauth_callback") return;
 
       const { code, error: oauthError } = event.data;
 
@@ -203,17 +203,17 @@ export function IntegrationSetup() {
           await createConnector({ orgId: currentOrg.id, code, connectorType: provider.name });
           setError(null);
           setIsAuthorizing(false);
-          setStep('configure');
+          setStep("configure");
         } catch {
-          setError('Failed to complete authorization. Please try again.');
+          setError("Failed to complete authorization. Please try again.");
           setIsAuthorizing(false);
           isProcessingCallback.current = false;
         }
       }
     };
 
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
   }, [currentOrg, provider, createConnector]);
 
   if (!provider) {
@@ -251,7 +251,7 @@ export function IntegrationSetup() {
 
       window.open(
         authUrl,
-        'oauth_popup',
+        "oauth_popup",
         `width=${width},height=${height},left=${left},top=${top}`
       );
 
@@ -272,7 +272,7 @@ export function IntegrationSetup() {
 
   const handleSkipOAuth = () => {
     // For providers that don't require OAuth (like claude-code)
-    setStep('configure');
+    setStep("configure");
   };
 
   const handleConnect = async () => {
@@ -285,15 +285,15 @@ export function IntegrationSetup() {
       // In a real implementation, you might update the connector with additional config
       await new Promise((resolve) => setTimeout(resolve, 500));
       setIsConnecting(false);
-      setStep('complete');
+      setStep("complete");
     } catch {
-      setError('Failed to complete setup. Please try again.');
+      setError("Failed to complete setup. Please try again.");
       setIsConnecting(false);
     }
   };
 
   const handleFinish = () => {
-    navigate('/integrations');
+    navigate("/integrations");
   };
 
   return (
@@ -316,18 +316,18 @@ export function IntegrationSetup() {
 
       {/* Progress Steps */}
       <div className="flex items-center justify-center gap-2">
-        {(['overview', 'authorize', 'configure', 'complete'] as SetupStep[]).map((s, i) => (
+        {(["overview", "authorize", "configure", "complete"] as SetupStep[]).map((s, i) => (
           <div key={s} className="flex items-center">
             <div
               className={`flex size-8 items-center justify-center rounded-full text-xs font-medium transition-colors ${
                 step === s
-                  ? 'bg-primary text-primary-foreground'
-                  : ['overview', 'authorize', 'configure', 'complete'].indexOf(step) > i
-                  ? 'bg-primary/20 text-primary'
-                  : 'bg-muted text-muted-foreground'
+                  ? "bg-primary text-primary-foreground"
+                  : ["overview", "authorize", "configure", "complete"].indexOf(step) > i
+                  ? "bg-primary/20 text-primary"
+                  : "bg-muted text-muted-foreground"
               }`}
             >
-              {['overview', 'authorize', 'configure', 'complete'].indexOf(step) > i ? (
+              {["overview", "authorize", "configure", "complete"].indexOf(step) > i ? (
                 <Check className="size-4" />
               ) : (
                 i + 1
@@ -336,9 +336,9 @@ export function IntegrationSetup() {
             {i < 3 && (
               <div
                 className={`mx-2 h-0.5 w-8 transition-colors ${
-                  ['overview', 'authorize', 'configure', 'complete'].indexOf(step) > i
-                    ? 'bg-primary'
-                    : 'bg-muted'
+                  ["overview", "authorize", "configure", "complete"].indexOf(step) > i
+                    ? "bg-primary"
+                    : "bg-muted"
                 }`}
               />
             )}
@@ -354,7 +354,7 @@ export function IntegrationSetup() {
       )}
 
       {/* Step Content */}
-      {step === 'overview' && (
+      {step === "overview" && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Overview</CardTitle>
@@ -398,7 +398,7 @@ export function IntegrationSetup() {
             )}
 
             <div className="flex justify-end">
-              <Button onClick={() => setStep('authorize')}>
+              <Button onClick={() => setStep("authorize")}>
                 Continue
                 <ArrowRight className="ml-2 size-4" />
               </Button>
@@ -407,11 +407,11 @@ export function IntegrationSetup() {
         </Card>
       )}
 
-      {step === 'authorize' && (
+      {step === "authorize" && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">
-              {provider.requiresOAuth ? 'Authorize Access' : 'Configuration'}
+              {provider.requiresOAuth ? "Authorize Access" : "Configuration"}
             </CardTitle>
             <CardDescription>
               {provider.requiresOAuth
@@ -456,7 +456,7 @@ export function IntegrationSetup() {
             )}
 
             <div className="flex justify-between">
-              <Button variant="outline" onClick={() => setStep('overview')}>
+              <Button variant="outline" onClick={() => setStep("overview")}>
                 <ArrowLeft className="mr-2 size-4" />
                 Back
               </Button>
@@ -486,7 +486,7 @@ export function IntegrationSetup() {
         </Card>
       )}
 
-      {step === 'configure' && (
+      {step === "configure" && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Configure Integration</CardTitle>
@@ -586,7 +586,7 @@ export function IntegrationSetup() {
             </div>
 
             <div className="flex justify-between">
-              <Button variant="outline" onClick={() => setStep('authorize')}>
+              <Button variant="outline" onClick={() => setStep("authorize")}>
                 <ArrowLeft className="mr-2 size-4" />
                 Back
               </Button>
@@ -608,7 +608,7 @@ export function IntegrationSetup() {
         </Card>
       )}
 
-      {step === 'complete' && (
+      {step === "complete" && (
         <Card>
           <CardContent className="py-12 text-center">
             <div className="mx-auto mb-6 flex size-16 items-center justify-center rounded-full bg-primary/10">

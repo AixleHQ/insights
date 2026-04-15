@@ -5,11 +5,11 @@ import {
   useEffect,
   useCallback,
   type ReactNode,
-} from 'react';
-import { useAuth } from './AuthContext';
-import { setCurrentOrganizationId } from '../lib/api';
+} from "react";
+import { useAuth } from "./AuthContext";
+import { setCurrentOrganizationId } from "../lib/api";
 
-export type MemberRole = 'owner' | 'admin' | 'member' | 'viewer';
+export type MemberRole = "owner" | "admin" | "member" | "viewer";
 
 // Organization type matching the Rails API response
 export interface Organization {
@@ -46,14 +46,14 @@ interface OrgContextValue extends OrgState {
 
 const OrgContext = createContext<OrgContextValue | null>(null);
 
-const ORG_STORAGE_KEY = 'db90_current_org_id';
+const ORG_STORAGE_KEY = "db90_current_org_id";
 
 interface OrgProviderProps {
   children: ReactNode;
   apiBaseUrl?: string;
 }
 
-export function OrgProvider({ children, apiBaseUrl = '/api/v1' }: OrgProviderProps) {
+export function OrgProvider({ children, apiBaseUrl = "/api/v1" }: OrgProviderProps) {
   const { isAuthenticated, isLoading: authLoading, getAccessToken } = useAuth();
 
   const [state, setState] = useState<OrgState>({
@@ -83,7 +83,7 @@ export function OrgProvider({ children, apiBaseUrl = '/api/v1' }: OrgProviderPro
       const token = await getAccessToken();
       const headers = {
         Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       };
 
       // Fetch orgs and user settings in parallel
@@ -106,11 +106,11 @@ export function OrgProvider({ children, apiBaseUrl = '/api/v1' }: OrgProviderPro
         slug: org.slug as string,
         description: org.description as string | undefined,
         is_active: org.isActive as boolean,
-        user_role: (org.userRole as MemberRole) || 'member',
+        user_role: (org.userRole as MemberRole) || "member",
       }));
       const memberships: OrganizationMembership[] = organizations.map((org) => ({
         organization: org,
-        role: org.user_role || 'member',
+        role: org.user_role || "member",
       }));
 
       // Read default_org_id from user settings (non-fatal if unavailable)
@@ -155,7 +155,7 @@ export function OrgProvider({ children, apiBaseUrl = '/api/v1' }: OrgProviderPro
         ...prev,
         isLoading: false,
         isInitialized: true,
-        error: error instanceof Error ? error : new Error('Failed to fetch organizations'),
+        error: error instanceof Error ? error : new Error("Failed to fetch organizations"),
       }));
     }
   }, [isAuthenticated, getAccessToken, apiBaseUrl]);
@@ -228,7 +228,7 @@ export function OrgProvider({ children, apiBaseUrl = '/api/v1' }: OrgProviderPro
 export function useOrg(): OrgContextValue {
   const context = useContext(OrgContext);
   if (!context) {
-    throw new Error('useOrg must be used within an OrgProvider');
+    throw new Error("useOrg must be used within an OrgProvider");
   }
   return context;
 }

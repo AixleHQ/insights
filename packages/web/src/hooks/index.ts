@@ -1,11 +1,11 @@
-export { useIsMobile } from './use-mobile';
+export { useIsMobile } from "./use-mobile";
 export {
   useWebSocket,
   useDashboardEvents,
   useEventsPageUpdates,
   type UseWebSocketOptions,
   type UseWebSocketReturn,
-} from './useWebSocket';
+} from "./useWebSocket";
 export {
   useStats,
   useEventStats,
@@ -13,4 +13,4 @@ export {
   type DailyStats,
   type ToolStats,
   type UseStatsReturn,
-} from './useStats';
+} from "./useStats";

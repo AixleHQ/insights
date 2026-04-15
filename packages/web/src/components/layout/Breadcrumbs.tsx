@@ -1,6 +1,6 @@
-import { Fragment } from 'react';
-import { Link, useLocation, useParams } from 'react-router-dom';
-import { ChevronRight, Home } from 'lucide-react';
+import { Fragment } from "react";
+import { Link, useLocation, useParams } from "react-router-dom";
+import { ChevronRight, Home } from "lucide-react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -8,7 +8,7 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
+} from "@/components/ui/breadcrumb";
 
 interface BreadcrumbConfig {
   label: string;
@@ -16,16 +16,16 @@ interface BreadcrumbConfig {
 }
 
 const routeLabels: Record<string, string> = {
-  events: 'Events',
-  projects: 'Projects',
-  integrations: 'Integrations',
-  team: 'Team',
-  settings: 'Settings',
-  new: 'New',
-  invite: 'Invite',
-  policies: 'Policies',
-  alerts: 'Alerts',
-  billing: 'Billing',
+  events: "Events",
+  projects: "Projects",
+  integrations: "Integrations",
+  team: "Team",
+  settings: "Settings",
+  new: "New",
+  invite: "Invite",
+  policies: "Policies",
+  alerts: "Alerts",
+  billing: "Billing",
 };
 
 function useBreadcrumbs(): BreadcrumbConfig[] {
@@ -33,15 +33,15 @@ function useBreadcrumbs(): BreadcrumbConfig[] {
   // Note: params available for future use with dynamic breadcrumb labels
   useParams();
 
-  const pathSegments = location.pathname.split('/').filter(Boolean);
+  const pathSegments = location.pathname.split("/").filter(Boolean);
 
   if (pathSegments.length === 0) {
-    return [{ label: 'Dashboard' }];
+    return [{ label: "Dashboard" }];
   }
 
-  const crumbs: BreadcrumbConfig[] = [{ label: 'Dashboard', href: '/' }];
+  const crumbs: BreadcrumbConfig[] = [{ label: "Dashboard", href: "/" }];
 
-  let currentPath = '';
+  let currentPath = "";
   pathSegments.forEach((segment, index) => {
     currentPath += `/${segment}`;
     const isLast = index === pathSegments.length - 1;
@@ -52,7 +52,7 @@ function useBreadcrumbs(): BreadcrumbConfig[] {
     if (isId) {
       // For IDs, we'll show a generic label or could fetch the actual name
       crumbs.push({
-        label: 'Detail',
+        label: "Detail",
         href: isLast ? undefined : currentPath,
       });
     } else {
@@ -91,7 +91,7 @@ export function Breadcrumbs() {
                   <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
                 ) : (
                   <BreadcrumbLink asChild>
-                    <Link to={crumb.href || '/'}>
+                    <Link to={crumb.href || "/"}>
                       {index === 0 ? (
                         <span className="flex items-center gap-1.5">
                           <Home className="size-3.5" />

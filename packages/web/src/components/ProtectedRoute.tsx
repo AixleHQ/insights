@@ -1,7 +1,7 @@
-import { type ReactNode } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { useOrg } from '../contexts/OrgContext';
+import { type ReactNode } from "react";
+import { Navigate, useLocation } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import { useOrg } from "../contexts/OrgContext";
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -42,7 +42,7 @@ export function ProtectedRoute({
 
   // Redirect to onboarding if user has no organizations (unless allowNoOrg is set)
   // Don't redirect if we're already on the onboarding page
-  if (!allowNoOrg && organizations.length === 0 && location.pathname !== '/onboarding') {
+  if (!allowNoOrg && organizations.length === 0 && location.pathname !== "/onboarding") {
     return <Navigate to="/onboarding" state={{ from: location }} replace />;
   }
 
@@ -69,7 +69,7 @@ export function ProtectedRoute({
 }
 
 // Convenience wrapper for routes that require organization context
-export function OrgRoute({ children, ...props }: Omit<ProtectedRouteProps, 'requireOrg'>) {
+export function OrgRoute({ children, ...props }: Omit<ProtectedRouteProps, "requireOrg">) {
   return (
     <ProtectedRoute requireOrg {...props}>
       {children}
@@ -78,9 +78,9 @@ export function OrgRoute({ children, ...props }: Omit<ProtectedRouteProps, 'requ
 }
 
 // Convenience wrapper for admin-only routes
-export function AdminRoute({ children, ...props }: Omit<ProtectedRouteProps, 'requireRoles'>) {
+export function AdminRoute({ children, ...props }: Omit<ProtectedRouteProps, "requireRoles">) {
   return (
-    <ProtectedRoute requireOrg requireRoles={['owner', 'admin']} {...props}>
+    <ProtectedRoute requireOrg requireRoles={["owner", "admin"]} {...props}>
       {children}
     </ProtectedRoute>
   );
