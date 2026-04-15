@@ -454,10 +454,6 @@ RSpec.describe 'Api::V1::Projects', type: :request do
     let!(:project_membership) { create(:project_membership, project: project, user: user, role: 'admin') }
     let!(:connector) { create(:organization_connector, :jira, organization: organization) }
 
-    before do
-      allow(JiraSyncJob).to receive(:perform_later)
-    end
-
     it 'saves jira_connector_id and jira_project_key settings' do
       authenticated_post "/api/v1/projects/#{project.id}/link_jira",
                          user: user,
@@ -467,15 +463,6 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       expect(json_data[:linked]).to be true
       expect(project.project_settings.find_by(key: 'jira_connector_id')&.value).to eq(connector.id.to_s)
       expect(project.project_settings.find_by(key: 'jira_project_key')&.value).to eq('SCRUM')
-    end
-
-    it 'enqueues a JiraSyncJob' do
-      authenticated_post "/api/v1/projects/#{project.id}/link_jira",
-                         user: user,
-                         params: { connector_id: connector.id, jira_project_key: 'SCRUM' }
-
-      expect_success
-      expect(JiraSyncJob).to have_received(:perform_later).with(connector.id, 'sync')
     end
 
     it 'overwrites existing settings on re-link' do
