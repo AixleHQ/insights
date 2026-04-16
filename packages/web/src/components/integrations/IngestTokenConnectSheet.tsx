@@ -31,12 +31,10 @@ const TOOL_NAME_MAP: Record<string, string> = {
 };
 
 function SetupInstructions({ providerId, token }: { providerId: string; token: string }) {
+  const [copiedSettings, setCopiedSettings] = useState(false);
+
   if (providerId === 'claude-code') {
-    return (
-      <div className="space-y-2">
-        <p className="text-sm font-medium">Add to <code className="text-xs bg-muted px-1 py-0.5 rounded">~/.claude/settings.json</code></p>
-        <pre className="text-xs bg-muted rounded p-3 overflow-x-auto whitespace-pre-wrap break-all">
-{`{
+    const settingsSnippet = `{
   "hooks": {
     "PostToolUse": [
       {
@@ -60,7 +58,25 @@ function SetupInstructions({ providerId, token }: { providerId: string; token: s
       }
     ]
   }
-}`}
+}`;
+
+    const handleCopySettings = async () => {
+      await navigator.clipboard.writeText(settingsSnippet);
+      setCopiedSettings(true);
+      setTimeout(() => setCopiedSettings(false), 2000);
+    };
+
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium">Add to <code className="text-xs bg-muted px-1 py-0.5 rounded">~/.claude/settings.json</code></p>
+          <Button variant="outline" size="sm" onClick={handleCopySettings} aria-label={copiedSettings ? 'Copied' : 'Copy settings'}>
+            {copiedSettings ? <Check className="size-3.5 mr-1" /> : <Copy className="size-3.5 mr-1" />}
+            {copiedSettings ? 'Copied' : 'Copy'}
+          </Button>
+        </div>
+        <pre className="text-xs bg-muted rounded p-3 overflow-x-auto whitespace-pre-wrap break-all">
+          {settingsSnippet}
         </pre>
         <p className="text-xs text-muted-foreground">The PostToolUse hook requires <code className="bg-muted px-1 rounded">jq</code> — install with <code className="bg-muted px-1 rounded">brew install jq</code>. The Stop hook uses <code className="bg-muted px-1 rounded">python3</code>, which ships with macOS.</p>
       </div>
