@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
-import { Check, Copy } from 'lucide-react';
-import { useOrg } from '@/contexts/OrgContext';
-import { useCreateToolAccount } from '@/hooks/useApi';
-import { ApiError } from '@/lib/api';
+import { useState, useEffect } from "react";
+import { Check, Copy } from "lucide-react";
+import { useOrg } from "@/contexts/OrgContext";
+import { useCreateToolAccount } from "@/hooks/useApi";
+import { ApiError } from "@/lib/api";
 import {
   Sheet,
   SheetContent,
@@ -10,11 +10,11 @@ import {
   SheetTitle,
   SheetDescription,
   SheetFooter,
-} from '@/components/ui/sheet';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ProviderLogo } from '@/components/icons';
-import type { ProviderInfo } from './IntegrationCard';
+} from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ProviderLogo } from "@/components/icons";
+import type { ProviderInfo } from "./IntegrationCard";
 
 interface IngestTokenConnectSheetProps {
   provider: ProviderInfo | null;
@@ -26,8 +26,8 @@ interface IngestTokenConnectSheetProps {
 }
 
 const TOOL_NAME_MAP: Record<string, string> = {
-  'claude-code': 'claude_code',
-  cursor: 'cursor',
+  "claude-code": "claude_code",
+  cursor: "cursor",
 };
 
 function ingestEndpointUrl(): string {
@@ -79,7 +79,7 @@ function buildClaudeCodeSettingsSnippet(token: string): string {
 function SetupInstructions({ providerId, token }: { providerId: string; token: string }) {
   const [copiedSettings, setCopiedSettings] = useState(false);
 
-  if (providerId === 'claude-code') {
+  if (providerId === "claude-code") {
     const settingsSnippet = buildClaudeCodeSettingsSnippet(token);
 
     const handleCopySettings = async () => {
@@ -92,9 +92,9 @@ function SetupInstructions({ providerId, token }: { providerId: string; token: s
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium">Add to <code className="text-xs bg-muted px-1 py-0.5 rounded">~/.claude/settings.json</code></p>
-          <Button variant="outline" size="sm" onClick={handleCopySettings} aria-label={copiedSettings ? 'Copied' : 'Copy settings'}>
+          <Button variant="outline" size="sm" onClick={handleCopySettings} aria-label={copiedSettings ? "Copied" : "Copy settings"}>
             {copiedSettings ? <Check className="size-3.5 mr-1" /> : <Copy className="size-3.5 mr-1" />}
-            {copiedSettings ? 'Copied' : 'Copy'}
+            {copiedSettings ? "Copied" : "Copy"}
           </Button>
         </div>
         <pre className="text-xs bg-muted rounded p-3 overflow-x-auto whitespace-pre-wrap break-all">
@@ -125,7 +125,7 @@ export function IngestTokenConnectSheet({
   const { currentOrg } = useOrg();
   const createToolAccount = useCreateToolAccount();
 
-  const [step, setStep] = useState<'connect' | 'setup'>(initialToken ? 'setup' : 'connect');
+  const [step, setStep] = useState<"connect" | "setup">(initialToken ? "setup" : "connect");
   const [token, setToken] = useState<string | null>(initialToken ?? null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -133,7 +133,7 @@ export function IngestTokenConnectSheet({
 
   useEffect(() => {
     if (open && initialToken) {
-      setStep('setup');
+      setStep("setup");
       setToken(initialToken);
       setCopied(false);
       setError(null);
@@ -142,7 +142,7 @@ export function IngestTokenConnectSheet({
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
-      setStep('connect');
+      setStep("connect");
       setToken(null);
       setCopied(false);
       setError(null);
@@ -168,7 +168,7 @@ export function IngestTokenConnectSheet({
       });
       const rawToken = result.data.ingestToken ?? null;
       setToken(rawToken);
-      setStep('setup');
+      setStep("setup");
     } catch (err) {
       if (err instanceof ApiError) {
         const data = err.data as { errors?: Record<string, string[]> } | null;
@@ -177,7 +177,7 @@ export function IngestTokenConnectSheet({
       } else if (err instanceof Error) {
         setError(err.message);
       } else {
-        setError('Something went wrong. Please try again.');
+        setError("Something went wrong. Please try again.");
       }
     } finally {
       setIsSubmitting(false);
@@ -212,7 +212,7 @@ export function IngestTokenConnectSheet({
         </SheetHeader>
 
         <div className="flex flex-col gap-4 px-4">
-          {step === 'connect' && (
+          {step === "connect" && (
             <>
               {provider?.features && provider.features.length > 0 && (
                 <ul className="space-y-1">
@@ -230,7 +230,7 @@ export function IngestTokenConnectSheet({
             </>
           )}
 
-          {step === 'setup' && token && (
+          {step === "setup" && token && (
             <div className="space-y-4">
               <div className="space-y-2">
                 <p className="text-sm font-medium">Your ingest token</p>
@@ -245,7 +245,7 @@ export function IngestTokenConnectSheet({
                     variant="outline"
                     size="icon"
                     onClick={handleCopy}
-                    aria-label={copied ? 'Copied' : 'Copy token'}
+                    aria-label={copied ? "Copied" : "Copy token"}
                   >
                     {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
                   </Button>
@@ -261,7 +261,7 @@ export function IngestTokenConnectSheet({
         </div>
 
         <SheetFooter>
-          {step === 'connect' ? (
+          {step === "connect" ? (
             <>
               <Button
                 variant="outline"
@@ -274,7 +274,7 @@ export function IngestTokenConnectSheet({
                 onClick={handleConnect}
                 disabled={isSubmitting}
               >
-                {isSubmitting ? 'Connecting…' : 'Connect'}
+                {isSubmitting ? "Connecting…" : "Connect"}
               </Button>
             </>
           ) : (

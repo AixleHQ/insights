@@ -257,7 +257,7 @@ export function Integrations() {
   const { data: connectorsData, isLoading } = useConnectors(
     currentOrg?.id || "",
   );
-  const { data: toolAccountsData } = useToolAccounts(currentOrg?.id || '');
+  const { data: toolAccountsData } = useToolAccounts(currentOrg?.id || "");
   const syncConnector = useSyncConnector();
   const deleteConnector = useDeleteConnector();
   const deleteToolAccount = useDeleteToolAccount();
@@ -313,7 +313,7 @@ export function Integrations() {
           id: a.id,
           provider,
           name: providerInfo?.name ?? a.toolName,
-          status: (a.isActive ? 'connected' : 'disconnected') as ConnectorStatus,
+          status: (a.isActive ? "connected" : "disconnected") as ConnectorStatus,
         };
       });
 
@@ -396,8 +396,8 @@ export function Integrations() {
       setIngestProvider(provider);
       setIngestSheetOpen(true);
     } catch (error) {
-      console.error('Failed to regenerate token:', error);
-      setRegenerateError(error instanceof Error ? error.message : 'Failed to regenerate token. Please try again.');
+      console.error("Failed to regenerate token:", error);
+      setRegenerateError(error instanceof Error ? error.message : "Failed to regenerate token. Please try again.");
     }
   };
 
