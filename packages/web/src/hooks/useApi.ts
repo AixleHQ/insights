@@ -33,6 +33,11 @@ import type {
   MemberRole,
   Issue,
   JiraProject,
+  ToolOverviewStats,
+  ToolModelStat,
+  ToolUserStat,
+  ToolDailyPoint,
+  ConnectorSyncStatus,
 } from '@/lib/types';
 
 // Query keys factory
@@ -64,6 +69,8 @@ export const queryKeys = {
       ['organizations', orgId, 'connectors', connectorId, 'available_repos'] as const,
     availableProjects: (orgId: string, connectorId: string) =>
       ['organizations', orgId, 'connectors', connectorId, 'available_projects'] as const,
+    syncStatus: (orgId: string, connectorId: string) =>
+      ['organizations', orgId, 'connectors', connectorId, 'sync_status'] as const,
   },
   issues: {
     all: (projectId: string, filters?: Record<string, unknown>) =>
@@ -92,6 +99,16 @@ export const queryKeys = {
       ['organizations', orgId, 'stats', 'daily', days] as const,
     hourly: (orgId: string, hours?: number) =>
       ['organizations', orgId, 'stats', 'hourly', hours] as const,
+    toolOverview: (orgId: string, tool: string) =>
+      ['organizations', orgId, 'stats', 'tools', tool, 'overview'] as const,
+    toolModels: (orgId: string, tool: string, days?: number) =>
+      ['organizations', orgId, 'stats', 'tools', tool, 'models', days] as const,
+    toolUsers: (orgId: string, tool: string, days?: number) =>
+      ['organizations', orgId, 'stats', 'tools', tool, 'users', days] as const,
+    toolDaily: (orgId: string, tool: string, days?: number) =>
+      ['organizations', orgId, 'stats', 'tools', tool, 'daily', days] as const,
+    toolEventTypes: (orgId: string, tool: string, days?: number) =>
+      ['organizations', orgId, 'stats', 'tools', tool, 'event_types', days] as const,
   },
   alerts: {
     all: (orgId: string) => ['organizations', orgId, 'alerts'] as const,
@@ -1145,6 +1162,69 @@ export function useDailyByTool(orgId: string, days = 30) {
     queryKey: ['organizations', orgId, 'stats', 'daily_by_tool', days],
     queryFn: () => api.get<DailyByToolResponse>(`/organizations/${orgId}/stats/daily_by_tool?days=${days}`),
     enabled: !!orgId,
+  });
+}
+
+// ============================================================================
+// Tool Analytics Hooks (shared by Cursor & OpenRouter pages)
+// ============================================================================
+
+export function useToolOverview(orgId: string, tool: string) {
+  return useQuery({
+    queryKey: queryKeys.stats.toolOverview(orgId, tool),
+    queryFn: () =>
+      api.get<ToolOverviewStats>(`/organizations/${orgId}/stats/tools/${tool}/overview`),
+    enabled: !!orgId && !!tool,
+    refetchInterval: 30000,
+  });
+}
+
+export function useToolModels(orgId: string, tool: string, days = 30) {
+  return useQuery({
+    queryKey: queryKeys.stats.toolModels(orgId, tool, days),
+    queryFn: () =>
+      api.get<ToolModelStat[]>(`/organizations/${orgId}/stats/tools/${tool}/models?days=${days}`),
+    enabled: !!orgId && !!tool,
+  });
+}
+
+export function useToolUsers(orgId: string, tool: string, days = 30) {
+  return useQuery({
+    queryKey: queryKeys.stats.toolUsers(orgId, tool, days),
+    queryFn: () =>
+      api.get<ToolUserStat[]>(`/organizations/${orgId}/stats/tools/${tool}/users?days=${days}`),
+    enabled: !!orgId && !!tool,
+  });
+}
+
+export function useToolDaily(orgId: string, tool: string, days = 30) {
+  return useQuery({
+    queryKey: queryKeys.stats.toolDaily(orgId, tool, days),
+    queryFn: () =>
+      api.get<ToolDailyPoint[]>(`/organizations/${orgId}/stats/tools/${tool}/daily?days=${days}`),
+    enabled: !!orgId && !!tool,
+  });
+}
+
+export function useToolEventTypes(orgId: string, tool: string, days = 30) {
+  return useQuery({
+    queryKey: queryKeys.stats.toolEventTypes(orgId, tool, days),
+    queryFn: () =>
+      api.get<Record<string, number>>(
+        `/organizations/${orgId}/stats/tools/${tool}/event_types?days=${days}`
+      ),
+    enabled: !!orgId && !!tool,
+  });
+}
+
+export function useConnectorSyncStatus(orgId: string, connectorId: string) {
+  return useQuery({
+    queryKey: queryKeys.connectors.syncStatus(orgId, connectorId),
+    queryFn: () =>
+      api.get<ConnectorSyncStatus>(
+        `/organizations/${orgId}/connectors/${connectorId}/sync_status`
+      ),
+    enabled: !!orgId && !!connectorId,
   });
 }
 
