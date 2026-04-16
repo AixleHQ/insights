@@ -272,6 +272,7 @@ export function Integrations() {
   const [ingestSheetOpen, setIngestSheetOpen] = useState(false);
   const [ingestProvider, setIngestProvider] = useState<ProviderInfo | null>(null);
   const [regeneratedToken, setRegeneratedToken] = useState<string | null>(null);
+  const [regenerateError, setRegenerateError] = useState<string | null>(null);
   const [testingConnectorId, setTestingConnectorId] = useState<string | null>(
     null,
   );
@@ -383,6 +384,7 @@ export function Integrations() {
 
   const handleRegenerateToken = async (id: string) => {
     if (!currentOrg) return;
+    setRegenerateError(null);
     try {
       const result = await regenerateIngestToken.mutateAsync({ orgId: currentOrg.id, accountId: id });
       const newToken = result.data.ingestToken ?? null;
@@ -395,6 +397,7 @@ export function Integrations() {
       setIngestSheetOpen(true);
     } catch (error) {
       console.error('Failed to regenerate token:', error);
+      setRegenerateError(error instanceof Error ? error.message : 'Failed to regenerate token. Please try again.');
     }
   };
 
@@ -446,6 +449,9 @@ export function Integrations() {
         </TabsList>
 
         <TabsContent value="connected" className="space-y-4">
+          {regenerateError && (
+            <p className="text-sm text-destructive">{regenerateError}</p>
+          )}
           {isLoading ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {Array.from({ length: 3 }).map((_, i) => (

@@ -25,13 +25,10 @@ module Api
         raw_key = store_raw_event(request.raw_post, org)
         workflow_result = start_ingestion_workflow(raw_key, event_params, org)
 
-        render json: {
-          data: {
-            accepted: true,
-            workflowId: workflow_result[:workflow_id],
-            rawEventKey: raw_key
-          }
-        }, status: :accepted
+        data = { accepted: true, rawEventKey: raw_key }
+        data[:workflowId] = workflow_result[:workflow_id] if workflow_result[:workflow_id]
+        data[:fallback] = true if workflow_result[:fallback]
+        render json: { data: data }, status: :accepted
       rescue StandardError => e
         Rails.logger.error "[Ingest] Failed: #{e.message}"
         render json: { error: "Processing failed", message: e.message }, status: :unprocessable_entity
@@ -106,8 +103,6 @@ module Api
         params.permit(
           :tool_name, :event_type, :model, :tokens_in, :tokens_out, :tokens_total,
           :cost_usd, :duration_ms, :occurred_at, :project_id, :user_id,
-          :prompt, :response, :system_prompt,
-          messages: [ :role, :content ],
           metadata: {}
         ).to_h.symbolize_keys
       end
@@ -119,33 +114,27 @@ module Api
       #   { session_id, stop_hook_active, usage?, total_cost_usd? }
       # Neither matches the standard ingest schema, so we map the fields here.
       def extract_claude_code_hook_params
-        raw = request.raw_post
-        return {} if raw.blank?
+        return {} unless params[:session_id].present?
 
-        payload = JSON.parse(raw)
-        return {} unless payload.is_a?(Hash) && payload.key?("session_id")
-
-        if payload.key?("tool_input") && payload.key?("tool_response")
+        if params.key?(:tool_input) && params.key?(:tool_response)
           # PostToolUse: record a tool_use event with session metadata
           {
             event_type: "tool_use",
-            metadata: { "session_id" => payload["session_id"], "hook_tool" => payload["tool_name"] }.compact
+            metadata: { "session_id" => params[:session_id], "hook_tool" => params[:tool_name] }.compact
           }
-        elsif payload.key?("stop_hook_active")
+        elsif params.key?(:stop_hook_active)
           # Stop: record a chat event and extract usage if Claude Code exposes it
-          usage = payload["usage"] || {}
+          usage = params[:usage]&.to_unsafe_h || {}
           {
             event_type: "chat",
             tokens_in: usage["input_tokens"],
             tokens_out: usage["output_tokens"],
-            cost_usd: payload["total_cost_usd"] || payload["total_cost"],
-            metadata: { "session_id" => payload["session_id"] }.compact
+            cost_usd: params[:total_cost_usd] || params[:total_cost],
+            metadata: { "session_id" => params[:session_id] }.compact
           }.compact
         else
           {}
         end
-      rescue JSON::ParserError
-        {}
       end
     end
   end

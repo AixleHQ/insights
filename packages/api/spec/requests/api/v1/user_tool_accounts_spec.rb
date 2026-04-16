@@ -88,7 +88,7 @@ RSpec.describe 'Api::V1::UserToolAccounts', type: :request do
     end
 
     context 'for ingest tools' do
-      it 'includes ingestToken in the response for claude_code' do
+      it 'includes ingestToken in the response for cursor' do
         authenticated_post "/api/v1/organizations/#{organization.id}/tool_accounts",
                            user: user,
                            organization: organization,
@@ -99,8 +99,8 @@ RSpec.describe 'Api::V1::UserToolAccounts', type: :request do
         expect(json_data[:ingestToken]).to start_with('db90_')
       end
 
-      it 'includes ingestToken in the response for cursor' do
-        tool_account.destroy! # remove the existing claude_code account
+      it 'includes ingestToken in the response for claude_code' do
+        tool_account.destroy! # remove the existing cursor account
 
         authenticated_post "/api/v1/organizations/#{organization.id}/tool_accounts",
                            user: user,

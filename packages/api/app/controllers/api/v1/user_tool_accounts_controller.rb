@@ -68,10 +68,9 @@ module Api
       # POST /api/v1/organizations/:organization_id/tool_accounts/:id/regenerate_token
       def regenerate_token
         authorize! @tool_account, to: :update?
-        raw = "db90_#{SecureRandom.hex(32)}"
-        @tool_account.update!(access_token: raw, token_hash: Digest::SHA256.hexdigest(raw))
+        @tool_account.rotate_ingest_token!
         data = UserToolAccountSerializer.new(@tool_account).serialize
-        render json: { data: data.merge(ingestToken: raw) }, status: :ok
+        render json: { data: data.merge(ingestToken: @tool_account.plaintext_token) }, status: :ok
       end
 
       private

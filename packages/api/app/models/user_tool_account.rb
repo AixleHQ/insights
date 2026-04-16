@@ -22,13 +22,22 @@ class UserToolAccount < ApplicationRecord
   scope :active, -> { where(is_active: true) }
   scope :by_tool, ->(tool) { where(tool_name: tool) }
 
+  validates :token_hash, presence: true, if: :ingest_tool?
+
   attr_reader :plaintext_token
 
-  before_create :generate_ingest_token, if: :ingest_tool?
+  before_validation :generate_ingest_token, if: -> { ingest_tool? && token_hash.blank? }, on: :create
 
   def self.find_by_ingest_token(raw_token)
     return nil if raw_token.blank?
     find_by(token_hash: Digest::SHA256.hexdigest(raw_token))
+  end
+
+  def rotate_ingest_token!
+    raw = "db90_#{SecureRandom.hex(32)}"
+    update!(access_token: raw, token_hash: Digest::SHA256.hexdigest(raw))
+    @plaintext_token = raw
+    self
   end
 
   def token_expired?
