@@ -42,6 +42,7 @@ async function restoreSessionStorage(page: import("@playwright/test").Page) {
 test.describe("Seeded Data Verification", () => {
   test.beforeEach(async ({ page }) => {
     await restoreSessionStorage(page);
+    await expect(page.getByRole("heading", { name: /dashboard/i })).toBeVisible({ timeout: 15000 });
   });
 
   test("user can see their organization", async ({ page }) => {
