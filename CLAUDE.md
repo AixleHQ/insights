@@ -83,6 +83,7 @@ Follow this decision hierarchy: standard Rails patterns first → existing codeb
 - When cleaning up worktrees, always `cd` to the main repo directory first to avoid CWD removal issues.
 - Before creating a PR, verify `gh auth status` succeeds. If not, inform the user instead of attempting and failing.
 - Worktree branch naming convention: `<ticket-id>` (e.g., `AIX-62`).
+- **Before every commit, run linters** via `make lint-api` (RuboCop) and/or `make lint-web` (ESLint) depending on what changed. Fix all errors before committing. Warnings are acceptable but errors must be resolved.
 
 ## Git Conventions
 
