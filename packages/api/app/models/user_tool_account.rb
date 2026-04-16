@@ -34,7 +34,7 @@ class UserToolAccount < ApplicationRecord
   end
 
   def rotate_ingest_token!
-    raw = "db90_#{SecureRandom.hex(32)}"
+    raw = new_raw_token
     update!(access_token: raw, token_hash: Digest::SHA256.hexdigest(raw))
     @plaintext_token = raw
     self
@@ -52,9 +52,13 @@ class UserToolAccount < ApplicationRecord
   end
 
   def generate_ingest_token
-    raw = "db90_#{SecureRandom.hex(32)}"
+    raw = new_raw_token
     self.access_token = raw
     self.token_hash = Digest::SHA256.hexdigest(raw)
     @plaintext_token = raw
+  end
+
+  def new_raw_token
+    "db90_#{SecureRandom.hex(32)}"
   end
 end

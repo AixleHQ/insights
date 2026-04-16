@@ -5,9 +5,9 @@ import {
   useConnectors,
   useSyncConnector,
   useDeleteConnector,
-  useTestConnector, 
-  useToolAccounts, 
-  useDeleteToolAccount, 
+  useTestConnector,
+  useToolAccounts,
+  useDeleteToolAccount,
   useRegenerateIngestToken,
 } from "@/hooks/useApi";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";

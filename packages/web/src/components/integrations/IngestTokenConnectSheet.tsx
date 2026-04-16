@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Check, Copy } from "lucide-react";
 import { useOrg } from "@/contexts/OrgContext";
 import { useCreateToolAccount } from "@/hooks/useApi";
@@ -78,6 +78,9 @@ function buildClaudeCodeSettingsSnippet(token: string): string {
 
 function SetupInstructions({ providerId, token }: { providerId: string; token: string }) {
   const [copiedSettings, setCopiedSettings] = useState(false);
+  const settingsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => { if (settingsTimerRef.current) clearTimeout(settingsTimerRef.current); }, []);
 
   if (providerId === "claude-code") {
     const settingsSnippet = buildClaudeCodeSettingsSnippet(token);
@@ -85,7 +88,7 @@ function SetupInstructions({ providerId, token }: { providerId: string; token: s
     const handleCopySettings = async () => {
       await navigator.clipboard.writeText(settingsSnippet);
       setCopiedSettings(true);
-      setTimeout(() => setCopiedSettings(false), 2000);
+      settingsTimerRef.current = setTimeout(() => setCopiedSettings(false), 2000);
     };
 
     return (
@@ -130,6 +133,9 @@ export function IngestTokenConnectSheet({
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => { if (copyTimerRef.current) clearTimeout(copyTimerRef.current); }, []);
 
   useEffect(() => {
     if (open && initialToken) {
@@ -188,7 +194,7 @@ export function IngestTokenConnectSheet({
     if (!token) return;
     await navigator.clipboard.writeText(token);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
   };
 
   const handleDone = () => {
