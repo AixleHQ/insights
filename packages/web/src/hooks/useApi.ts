@@ -962,7 +962,7 @@ export function useToolAccounts(orgId: string) {
     queryKey: queryKeys.toolAccounts.all(orgId),
     queryFn: async () => {
       const response = await api.get<{ data: ToolAccount[] }>(`/organizations/${orgId}/tool_accounts`);
-      return response.data.data;
+      return response.data;
     },
     enabled: !!orgId,
   });
