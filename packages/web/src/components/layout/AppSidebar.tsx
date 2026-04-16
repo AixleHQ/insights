@@ -104,7 +104,10 @@ function CreateOrgDialog({
     if (!name.trim()) return;
 
     try {
-      await createOrg.mutateAsync({ name: name.trim(), description: description.trim() || undefined });
+      await createOrg.mutateAsync({
+        name: name.trim(),
+        description: description.trim() || undefined,
+      });
       setName("");
       setDescription("");
       onOpenChange(false);
@@ -146,10 +149,17 @@ function CreateOrgDialog({
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={!name.trim() || createOrg.isPending}>
+            <Button
+              type="submit"
+              disabled={!name.trim() || createOrg.isPending}
+            >
               {createOrg.isPending ? "Creating..." : "Create Organization"}
             </Button>
           </DialogFooter>
@@ -160,13 +170,16 @@ function CreateOrgDialog({
 }
 
 function OrgSwitcher() {
-  const { currentOrg, memberships, setCurrentOrg, refreshOrganizations } = useOrg();
+  const { currentOrg, memberships, setCurrentOrg, refreshOrganizations } =
+    useOrg();
   const { state } = useSidebar();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   if (!currentOrg) return null;
 
-  const currentMembership = memberships.find((m) => m.organization.id === currentOrg.id);
+  const currentMembership = memberships.find(
+    (m) => m.organization.id === currentOrg.id,
+  );
   const currentRole = currentMembership?.role || "member";
   const RoleIcon = roleIcons[currentRole];
   const isCollapsed = state === "collapsed";
@@ -225,7 +238,9 @@ function OrgSwitcher() {
           sideOffset={4}
         >
           <DropdownMenuLabel className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Switch Organization</span>
+            <span className="text-xs font-medium text-muted-foreground">
+              Switch Organization
+            </span>
             <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
               {memberships.length} total
             </span>
@@ -242,13 +257,16 @@ function OrgSwitcher() {
                 onClick={() => setCurrentOrg(org)}
                 className={`gap-3 p-2.5 ${isSelected ? "bg-accent" : ""}`}
               >
-                <div className={`
+                <div
+                  className={`
                   flex size-9 shrink-0 items-center justify-center rounded-md text-xs font-bold
-                  ${isSelected
-                    ? "bg-gradient-to-br from-primary to-primary/70 text-primary-foreground"
-                    : "border border-border bg-muted text-muted-foreground"
+                  ${
+                    isSelected
+                      ? "bg-gradient-to-br from-primary to-primary/70 text-primary-foreground"
+                      : "border border-border bg-muted text-muted-foreground"
                   }
-                `}>
+                `}
+                >
                   {getOrgInitials(org.name)}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -261,22 +279,31 @@ function OrgSwitcher() {
                     )}
                   </div>
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <RoleIconItem className={`size-3 ${roleColors[membership.role]}`} />
+                    <RoleIconItem
+                      className={`size-3 ${roleColors[membership.role]}`}
+                    />
                     <span className="capitalize">{membership.role}</span>
                   </div>
                 </div>
-                {isSelected && <Check className="size-4 shrink-0 text-primary" />}
+                {isSelected && (
+                  <Check className="size-4 shrink-0 text-primary" />
+                )}
               </DropdownMenuItem>
             );
           })}
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setCreateDialogOpen(true)} className="gap-3 p-2.5">
+          <DropdownMenuItem
+            onClick={() => setCreateDialogOpen(true)}
+            className="gap-3 p-2.5"
+          >
             <div className="flex size-9 items-center justify-center rounded-md border-2 border-dashed border-muted-foreground/30">
               <Plus className="size-4 text-muted-foreground" />
             </div>
             <div className="flex-1">
               <span className="font-medium">Create Organization</span>
-              <p className="text-xs text-muted-foreground">Start a new workspace</p>
+              <p className="text-xs text-muted-foreground">
+                Start a new workspace
+              </p>
             </div>
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -389,7 +416,8 @@ export function AppSidebar() {
   };
 
   // Determine home link based on role
-  const homeLink = currentRole === "owner" || currentRole === "admin" ? "/" : "/profile";
+  const homeLink =
+    currentRole === "owner" || currentRole === "admin" ? "/" : "/profile";
 
   return (
     <Sidebar collapsible="icon" variant="sidebar">
@@ -404,7 +432,9 @@ export function AppSidebar() {
                   </span>
                 </div>
                 <div className="grid flex-1 text-left leading-tight">
-                  <span className="truncate font-semibold tracking-tight">DB90</span>
+                  <span className="truncate font-semibold tracking-tight">
+                    DB90
+                  </span>
                   <span className="truncate text-xs text-sidebar-foreground/60">
                     AI Tool Analytics
                   </span>

@@ -1,7 +1,12 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useOrg } from "@/contexts/OrgContext";
-import { useConnectors, useSyncConnector, useDeleteConnector, useTestConnector } from "@/hooks/useApi";
+import {
+  useConnectors,
+  useSyncConnector,
+  useDeleteConnector,
+  useTestConnector,
+} from "@/hooks/useApi";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -64,11 +69,7 @@ const availableProviders: ProviderInfo[] = [
     name: "Jira",
     description: "Connect issues and projects for context",
     category: "project",
-    features: [
-      "Issue tracking",
-      "Project context",
-      "Sprint monitoring",
-    ],
+    features: ["Issue tracking", "Project context", "Sprint monitoring"],
     available: true,
   },
   {
@@ -76,11 +77,7 @@ const availableProviders: ProviderInfo[] = [
     name: "Linear",
     description: "Connect issues and teams",
     category: "project",
-    features: [
-      "Issue tracking",
-      "Team context",
-      "Cycle monitoring",
-    ],
+    features: ["Issue tracking", "Team context", "Cycle monitoring"],
     available: true,
   },
 
@@ -115,7 +112,7 @@ const availableProviders: ProviderInfo[] = [
   {
     id: "anthropic",
     name: "Anthropic API",
-    description: "Direct Anthropic API integration",
+    description: "Direct Anthropic API integration 2",
     category: "ai",
     features: [
       "API key management",
@@ -214,11 +211,7 @@ const availableProviders: ProviderInfo[] = [
     name: "Slack",
     description: "Receive alerts and notifications",
     category: "communication",
-    features: [
-      "Alert notifications",
-      "Usage summaries",
-      "Bot commands",
-    ],
+    features: ["Alert notifications", "Usage summaries", "Bot commands"],
     available: true,
   },
 ];
@@ -250,19 +243,25 @@ function IntegrationSkeleton() {
 export function Integrations() {
   const { currentOrg } = useOrg();
   const navigate = useNavigate();
+  const { status } = useParams<{ status: string }>();
 
-  const { data: connectorsData, isLoading } = useConnectors(currentOrg?.id || "");
+  const { data: connectorsData, isLoading } = useConnectors(
+    currentOrg?.id || "",
+  );
   const syncConnector = useSyncConnector();
   const deleteConnector = useDeleteConnector();
   const testConnector = useTestConnector();
 
-  const [activeTab, setActiveTab] = useState("connected");
+  const activeTab = status === "available" ? "available" : "connected";
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [connectingProvider, setConnectingProvider] = useState<ProviderInfo | null>(null);
+  const [connectingProvider, setConnectingProvider] =
+    useState<ProviderInfo | null>(null);
   const [slackSheetOpen, setSlackSheetOpen] = useState(false);
-  const [testingConnectorId, setTestingConnectorId] = useState<string | null>(null);
+  const [testingConnectorId, setTestingConnectorId] = useState<string | null>(
+    null,
+  );
 
-  const handleConnectSuccess = () => setActiveTab("connected");
+  const handleConnectSuccess = () => navigate("/integrations/connected");
 
   // Transform API response to component format
   const integrations: IntegrationData[] = useMemo(() => {
@@ -270,7 +269,8 @@ export function Integrations() {
     return connectorsData.map((c) => {
       const connectorType = c.connectorType || c.connector_type || "github";
       const lastError = c.lastError || c.last_error;
-      const externalAccountName = c.externalAccountName || c.external_account_name;
+      const externalAccountName =
+        c.externalAccountName || c.external_account_name;
       const lastSyncAt = c.lastSyncAt || c.last_sync_at;
 
       const status: ConnectorStatus = c.status;
@@ -292,7 +292,8 @@ export function Integrations() {
 
   const handleConnect = (providerId: string) => {
     if (AI_PROVIDERS.has(providerId)) {
-      const provider = availableProviders.find((p) => p.id === providerId) ?? null;
+      const provider =
+        availableProviders.find((p) => p.id === providerId) ?? null;
       setConnectingProvider(provider);
       setSheetOpen(true);
     } else if (SLACK_PROVIDERS.has(providerId)) {
@@ -305,7 +306,10 @@ export function Integrations() {
   const handleSync = async (id: string) => {
     if (!currentOrg) return;
     try {
-      await syncConnector.mutateAsync({ orgId: currentOrg.id, connectorId: id });
+      await syncConnector.mutateAsync({
+        orgId: currentOrg.id,
+        connectorId: id,
+      });
     } catch (error) {
       console.error("Failed to sync integration:", error);
     }
@@ -313,9 +317,14 @@ export function Integrations() {
 
   const handleDisconnect = async (id: string) => {
     if (!currentOrg) return;
-    if (window.confirm("Are you sure you want to disconnect this integration?")) {
+    if (
+      window.confirm("Are you sure you want to disconnect this integration?")
+    ) {
       try {
-        await deleteConnector.mutateAsync({ orgId: currentOrg.id, connectorId: id });
+        await deleteConnector.mutateAsync({
+          orgId: currentOrg.id,
+          connectorId: id,
+        });
       } catch (error) {
         console.error("Failed to disconnect integration:", error);
       }
@@ -326,7 +335,10 @@ export function Integrations() {
     if (!currentOrg) return;
     setTestingConnectorId(id);
     try {
-      await testConnector.mutateAsync({ orgId: currentOrg.id, connectorId: id });
+      await testConnector.mutateAsync({
+        orgId: currentOrg.id,
+        connectorId: id,
+      });
     } catch (error) {
       console.error("Failed to test connector:", error);
     } finally {
@@ -339,7 +351,7 @@ export function Integrations() {
 
   // Filter available providers to show only those not connected
   const unconnectedProviders = availableProviders.filter(
-    (p) => !connectedProviders.has(p.id)
+    (p) => !connectedProviders.has(p.id),
   );
 
   // Group unconnected providers by category
@@ -362,11 +374,16 @@ export function Integrations() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Integrations</h1>
         <p className="text-sm text-muted-foreground">
-          Connect external services to sync repositories, track AI usage, and more
+          Connect external services to sync repositories, track AI usage, and
+          more
         </p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => navigate(`/integrations/${value}`)}
+        className="space-y-4"
+      >
         <TabsList>
           <TabsTrigger value="connected">
             Connected ({integrations.length})
@@ -385,7 +402,9 @@ export function Integrations() {
             </div>
           ) : integrations.length === 0 ? (
             <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12">
-              <p className="text-muted-foreground">No integrations configured</p>
+              <p className="text-muted-foreground">
+                No integrations configured
+              </p>
               <p className="mt-1 text-sm text-muted-foreground">
                 Connect a service to get started
               </p>
@@ -396,7 +415,9 @@ export function Integrations() {
                 <IntegrationCard
                   key={integration.id}
                   integration={integration}
-                  onSync={integration.provider === "slack" ? undefined : handleSync}
+                  onSync={
+                    integration.provider === "slack" ? undefined : handleSync
+                  }
                   onTest={handleTest}
                   onDisconnect={handleDisconnect}
                   isTesting={testingConnectorId === integration.id}

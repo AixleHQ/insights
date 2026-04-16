@@ -64,9 +64,10 @@ test.describe("Jira Integration — Issues Tab", () => {
   test('issues tab shows "Connect Jira Project" when no Jira link exists', async ({ page }) => {
     // Navigate to the projects list and open the first project
     await page.goto("/projects");
-    await expect(page.locator('a[href^="/projects/"]').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole("heading", { name: /projects/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('a[href^="/projects/"]:not([href="/projects/new"])').first()).toBeVisible({ timeout: 15000 });
 
-    const projectLink = page.locator('a[href^="/projects/"]').first();
+    const projectLink = page.locator('a[href^="/projects/"]:not([href="/projects/new"])').first();
     await projectLink.click();
 
     // Click the Issues tab
@@ -78,13 +79,14 @@ test.describe("Jira Integration — Issues Tab", () => {
     // (If the project IS linked, the issue list or filters appear instead — both are valid)
     const connectButton = page.getByRole("button", { name: /connect jira project/i });
     const issuesCard = page.getByText(/jira issues/i);
-    await expect(connectButton.or(issuesCard)).toBeVisible({ timeout: 10000 });
+    await expect(connectButton.or(issuesCard).first()).toBeVisible({ timeout: 10000 });
   });
 
   test('"Connect Jira Project" button opens the sheet', async ({ page }) => {
     await page.goto("/projects");
-    await expect(page.locator('a[href^="/projects/"]').first()).toBeVisible({ timeout: 10000 });
-    await page.locator('a[href^="/projects/"]').first().click();
+    await expect(page.getByRole("heading", { name: /projects/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('a[href^="/projects/"]:not([href="/projects/new"])').first()).toBeVisible({ timeout: 15000 });
+    await page.locator('a[href^="/projects/"]:not([href="/projects/new"])').first().click();
 
     const issuesTab = page.getByRole("tab", { name: /issues/i });
     await expect(issuesTab).toBeVisible({ timeout: 10000 });
@@ -110,8 +112,9 @@ test.describe("Jira Integration — Issues Tab", () => {
 
   test("issues tab shows filter controls when Jira project is linked", async ({ page }) => {
     await page.goto("/projects");
-    await expect(page.locator('a[href^="/projects/"]').first()).toBeVisible({ timeout: 10000 });
-    await page.locator('a[href^="/projects/"]').first().click();
+    await expect(page.getByRole("heading", { name: /projects/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('a[href^="/projects/"]:not([href="/projects/new"])').first()).toBeVisible({ timeout: 15000 });
+    await page.locator('a[href^="/projects/"]:not([href="/projects/new"])').first().click();
 
     const issuesTab = page.getByRole("tab", { name: /issues/i });
     await expect(issuesTab).toBeVisible({ timeout: 10000 });

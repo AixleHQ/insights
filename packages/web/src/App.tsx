@@ -108,8 +108,9 @@ function App() {
                   <Route path="/projects/:id" element={<ProjectDetail />} />
                   <Route path="/projects/:id/settings/*" element={<ProjectSettings />} />
                   <Route path="/projects/:id/edit" element={<EditProjectRedirect />} />
-                  <Route path="/integrations" element={<Integrations />} />
+                  <Route path="/integrations" element={<Navigate to="/integrations/connected" replace />} />
                   <Route path="/integrations/new/:provider" element={<IntegrationSetup />} />
+                  <Route path="/integrations/:status" element={<Integrations />} />
                   {/* /team/* redirects to /settings/members/* for backwards compatibility */}
                   <Route path="/team" element={<Navigate to="/settings/members" replace />} />
                   <Route path="/team/invite" element={<Navigate to="/settings/members/invite" replace />} />
