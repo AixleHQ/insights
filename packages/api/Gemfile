@@ -18,6 +18,7 @@ gem "image_processing", "~> 1.2"
 
 # Background jobs
 gem "sidekiq"
+gem "sidekiq-cron"
 gem "redis"
 
 # Authorization

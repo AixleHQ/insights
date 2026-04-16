@@ -75,7 +75,9 @@ const TOOL_NAME_MAP: Record<string, string> = {
   "gemini": "Gemini",
   "chatgpt": "ChatGPT",
   "openai": "OpenAI",
+  "openai_api": "OpenAI API",
   "anthropic": "Anthropic",
+  "anthropic_api": "Anthropic API",
 };
 
 /**
