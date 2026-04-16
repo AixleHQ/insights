@@ -122,8 +122,19 @@ class AiUsageSyncJob
   end
 
   def fetch_anthropic_usage(connector)
-    # Anthropic doesn't have a usage endpoint - we track during requests
-    nil
+    # Requires an Admin API key (sk-ant-admin...) stored in connector.access_token
+    provider = Oauth::AnthropicProvider.new(connector)
+    data = provider.fetch_usage(start_date: 7.days.ago.to_date, end_date: Date.today)
+    return nil unless data
+
+    data.map do |entry|
+      cost = ModelPricingService.calculate_cost(
+        tokens_in: entry[:tokens_in],
+        tokens_out: entry[:tokens_out],
+        model: entry[:model]
+      )
+      entry.merge(cost_usd: cost[:total_cost])
+    end
   end
 
   def fetch_openai_usage(connector)
