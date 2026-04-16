@@ -254,10 +254,11 @@ export function Integrations() {
   const navigate = useNavigate();
   const { status } = useParams<{ status: string }>();
 
-  const { data: connectorsData, isLoading } = useConnectors(
+  const { data: connectorsData, isLoading: connectorsLoading } = useConnectors(
     currentOrg?.id || "",
   );
-  const { data: toolAccountsData } = useToolAccounts(currentOrg?.id || "");
+  const { data: toolAccountsData, isLoading: toolAccountsLoading } = useToolAccounts(currentOrg?.id || "");
+  const isLoading = connectorsLoading || toolAccountsLoading;
   const syncConnector = useSyncConnector();
   const deleteConnector = useDeleteConnector();
   const deleteToolAccount = useDeleteToolAccount();
