@@ -23,6 +23,7 @@ const logoMap: Record<string, string> = {
   "github-copilot": "/logos/copilot.svg",
   "anthropic-api": "/logos/anthropic.svg",
   "openai-api": "/logos/openai.svg",
+  "openrouter-api": "/logos/openrouter.svg",
   "gemini-api": "/logos/google.svg",
 
   // Editors / IDEs
@@ -61,6 +62,7 @@ const providerColors: Record<string, string> = {
   "github-copilot": "bg-[#24292f]",
   "anthropic-api": "bg-[#d97757]",
   "openai-api": "bg-[#10a37f]",
+  "openrouter-api": "bg-[#6366f1]",
   "gemini-api": "bg-[#4285f4]",
   cursor: "bg-[#000000]",
   windsurf: "bg-[#0ea5e9]",

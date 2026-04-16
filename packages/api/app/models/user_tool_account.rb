@@ -2,7 +2,7 @@ class UserToolAccount < ApplicationRecord
   TOOL_NAMES = %w[
     claude_code cursor windsurf github_copilot
     aider continue cody tabnine amazon_q
-    openrouter anthropic_api openai_api gemini_api
+    openrouter_api anthropic_api openai_api gemini_api
     custom
   ].freeze
 

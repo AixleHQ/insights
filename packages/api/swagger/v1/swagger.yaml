@@ -849,7 +849,7 @@ paths:
           description: Filter by tool name
           schema:
             type: string
-            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter, anthropic_api, openai_api, gemini_api, custom]
+            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom]
         - name: active
           in: query
           schema:
@@ -884,7 +884,7 @@ paths:
               properties:
                 tool_name:
                   type: string
-                  enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter, anthropic_api, openai_api, gemini_api, custom]
+                  enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom]
                 access_token:
                   type: string
                 refresh_token:
@@ -979,6 +979,346 @@ paths:
       responses:
         '204':
           description: Tool account deleted
+
+  # ============================================
+  # STATS ENDPOINTS
+  # ============================================
+  /api/v1/organizations/{organization_id}/stats/overview:
+    get:
+      summary: Organization stats overview
+      description: Returns aggregate event count, cost, active users, and high-risk event count for the current month, with percentage change vs the previous month.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      responses:
+        '200':
+          description: Overview stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_events:
+                    type: integer
+                  total_cost_usd:
+                    type: number
+                    format: float
+                  high_risk_events:
+                    type: integer
+                  active_users:
+                    type: integer
+                  events_change_percent:
+                    type: number
+                    format: float
+                  cost_change_percent:
+                    type: number
+                    format: float
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/stats/hourly:
+    get:
+      summary: Hourly stats
+      description: Returns per-hour event counts, token totals, cost, and unique users. Defaults to the last 24 hours; override with start_date/end_date.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+      responses:
+        '200':
+          description: Hourly stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      timeRange:
+                        type: object
+                        properties:
+                          start:
+                            type: string
+                            format: date-time
+                          end:
+                            type: string
+                            format: date-time
+                      hourly:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            hour:
+                              type: string
+                              format: date-time
+                            eventCount:
+                              type: integer
+                            tokensIn:
+                              type: integer
+                            tokensOut:
+                              type: integer
+                            costUsd:
+                              type: number
+                              format: float
+                            uniqueUsers:
+                              type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/stats/daily:
+    get:
+      summary: Daily stats
+      description: Returns daily event counts and cost, plus a per-tool breakdown. Defaults to the last 30 days; pass `days` to override.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: days
+          in: query
+          description: Number of days to look back (default 30)
+          schema:
+            type: integer
+            default: 30
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+      responses:
+        '200':
+          description: Daily stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                        event_count:
+                          type: integer
+                        cost_usd:
+                          type: number
+                          format: float
+                  tool_breakdown:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        tool_name:
+                          type: string
+                        event_count:
+                          type: integer
+                        cost_usd:
+                          type: number
+                          format: float
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/stats/daily_by_tool:
+    get:
+      summary: Daily stats by tool
+      description: Returns daily event counts grouped by the top 3 tools plus an "Other" bucket — shaped for stacked bar charts. Defaults to the last 30 days.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: days
+          in: query
+          description: Number of days to look back (default 30)
+          schema:
+            type: integer
+            default: 30
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+      responses:
+        '200':
+          description: Daily stats by tool
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    description: One entry per day; keys are tool names + "Other"
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                      additionalProperties:
+                        type: integer
+                  tools:
+                    type: array
+                    description: Ordered list of tool names present in data (top 3 + "Other")
+                    items:
+                      type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/stats/heatmap:
+    get:
+      summary: Activity heatmap
+      description: Returns daily event counts for the past year, shaped for a calendar heatmap.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      responses:
+        '200':
+          description: Heatmap data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    date:
+                      type: string
+                      format: date
+                    count:
+                      type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/overview:
+    get:
+      summary: Tool overview stats
+      description: Returns aggregate usage stats (events, cost, tokens, active users) for a specific tool. Returns 422 if tool_name is not a recognised value.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: tool_name
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github]
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+      responses:
+        '200':
+          description: Tool overview stats (shape TBD — endpoint is a stub)
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/models:
+    get:
+      summary: Tool model breakdown
+      description: Returns event and cost breakdown by model for a specific tool.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: tool_name
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github]
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+      responses:
+        '200':
+          description: Model breakdown (shape TBD — endpoint is a stub)
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/users:
+    get:
+      summary: Tool user breakdown
+      description: Returns top users by token consumption for a specific tool.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: tool_name
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github]
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+      responses:
+        '200':
+          description: User breakdown (shape TBD — endpoint is a stub)
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/daily:
+    get:
+      summary: Tool daily stats
+      description: Returns daily event counts and cost for a specific tool.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: tool_name
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github]
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+      responses:
+        '200':
+          description: Daily stats (shape TBD — endpoint is a stub)
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/event_types:
+    get:
+      summary: Tool event type breakdown
+      description: Returns event count breakdown by event type for a specific tool.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: tool_name
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github]
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+      responses:
+        '200':
+          description: Event type breakdown (shape TBD — endpoint is a stub)
+        '422':
+          $ref: '#/components/responses/ValidationError'
 
   # ============================================
   # PROJECT ENDPOINTS
@@ -1583,6 +1923,20 @@ components:
         default: 25
         minimum: 1
         maximum: 100
+    start_date:
+      name: start_date
+      in: query
+      description: Start of the time range (ISO 8601 date, e.g. 2026-01-01)
+      schema:
+        type: string
+        format: date
+    end_date:
+      name: end_date
+      in: query
+      description: End of the time range (ISO 8601 date, e.g. 2026-01-31)
+      schema:
+        type: string
+        format: date
 
   responses:
     Unauthorized:
@@ -1882,7 +2236,7 @@ components:
           format: uuid
         toolName:
           type: string
-          enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter, anthropic_api, openai_api, gemini_api, custom]
+          enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom]
         isActive:
           type: boolean
         externalAccountId:

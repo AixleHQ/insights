@@ -148,6 +148,45 @@ RSpec.describe 'Api::V1::Stats', type: :request do
     end
   end
 
+  describe 'GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/*' do
+    describe 'set_tool_scope before_action' do
+      it 'returns 422 with error message for an unknown tool' do
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/invalid/overview",
+                          user: user,
+                          organization: organization
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(json_response[:error]).to eq('Unknown tool: invalid')
+      end
+
+      it 'reaches the action for a valid tool (cursor)' do
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/cursor/overview",
+                          user: user,
+                          organization: organization
+
+        expect_success
+      end
+
+      it 'reaches the action for a valid tool (openrouter_api)' do
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/openrouter_api/overview",
+                          user: user,
+                          organization: organization
+
+        expect_success
+      end
+    end
+
+    %w[models users daily event_types].each do |endpoint|
+      it "routes and authorizes GET .../tools/:tool_name/#{endpoint}" do
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/cursor/#{endpoint}",
+                          user: user,
+                          organization: organization
+
+        expect_success
+      end
+    end
+  end
+
   describe 'GET /api/v1/organizations/:organization_id/stats/heatmap' do
     before do
       # Create events across different days

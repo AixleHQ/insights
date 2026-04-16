@@ -45,7 +45,7 @@ class ModelPricingService
     "cody" => { input: 1.00, output: 4.00 },
     "tabnine" => { input: 0.50, output: 1.50 },
     "amazon_q" => { input: 1.00, output: 4.00 },
-    "openrouter" => { input: 2.00, output: 8.00 },
+    "openrouter_api" => { input: 2.00, output: 8.00 },
     "anthropic_api" => { input: 3.00, output: 15.00 },
     "openai_api" => { input: 2.50, output: 10.00 },
     "gemini_api" => { input: 0.50, output: 2.00 },

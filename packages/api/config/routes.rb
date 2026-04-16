@@ -101,6 +101,13 @@ Rails.application.routes.draw do
         get "stats/daily_by_tool", to: "stats#daily_by_tool"
         get "stats/heatmap", to: "stats#heatmap"
 
+        # Tool-scoped stats
+        get "stats/tools/:tool_name/overview",    to: "stats#tool_overview"
+        get "stats/tools/:tool_name/models",      to: "stats#tool_models"
+        get "stats/tools/:tool_name/users",       to: "stats#tool_users"
+        get "stats/tools/:tool_name/daily",       to: "stats#tool_daily"
+        get "stats/tools/:tool_name/event_types", to: "stats#tool_event_types"
+
         # AI Gateway
         scope "ai/:provider" do
           post "completions", to: "ai_gateway#completions"

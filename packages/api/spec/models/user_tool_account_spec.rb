@@ -6,7 +6,7 @@ RSpec.describe UserToolAccount, type: :model do
       expected = %w[
         claude_code cursor windsurf github_copilot
         aider continue cody tabnine amazon_q
-        openrouter anthropic_api openai_api gemini_api
+        openrouter_api anthropic_api openai_api gemini_api
         custom
       ]
       expect(UserToolAccount::TOOL_NAMES).to eq(expected)

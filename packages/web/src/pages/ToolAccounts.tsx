@@ -127,7 +127,7 @@ const toolProviders: ToolProvider[] = [
   },
   // AI APIs
   {
-    id: "openrouter",
+    id: "openrouter_api",
     name: "OpenRouter",
     description: "Link your OpenRouter account for multi-model AI gateway tracking",
     category: "ai-apis",

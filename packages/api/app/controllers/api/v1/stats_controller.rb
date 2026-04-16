@@ -3,7 +3,10 @@
 module Api
   module V1
     class StatsController < BaseController
+      TOOL_SCOPED_ACTIONS = %i[tool_overview tool_models tool_users tool_daily tool_event_types].freeze
+
       before_action :require_organization!
+      before_action :set_tool_scope, only: TOOL_SCOPED_ACTIONS
 
       # GET /api/v1/organizations/:organization_id/stats/overview
       # Frontend expects: { total_events, total_cost_usd, high_risk_events, active_users, events_change_percent, cost_change_percent }
@@ -210,7 +213,49 @@ module Api
         render json: heatmap_data
       end
 
+      # GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/overview
+      def tool_overview
+        authorize! current_organization, to: :show?
+        head :ok
+      end
+
+      # GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/models
+      def tool_models
+        authorize! current_organization, to: :show?
+        head :ok
+      end
+
+      # GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/users
+      def tool_users
+        authorize! current_organization, to: :show?
+        head :ok
+      end
+
+      # GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/daily
+      def tool_daily
+        authorize! current_organization, to: :show?
+        head :ok
+      end
+
+      # GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/event_types
+      def tool_event_types
+        authorize! current_organization, to: :show?
+        head :ok
+      end
+
       private
+
+      def set_tool_scope
+        tool = params[:tool_name]
+        unless ToolEvent::TOOL_NAMES.include?(tool)
+          return render json: { error: "Unknown tool: #{tool}" }, status: :unprocessable_entity
+        end
+
+        @tool_name = tool
+        # @tool_events is intentionally unbounded — always scope by time range before querying.
+        # Use: @tool_events.where(occurred_at: time_range[:start]..time_range[:end])
+        @tool_events = current_organization.tool_events.where(tool_name: tool)
+      end
 
       def parse_time_range(default_days: 7, default_hours: nil)
         if params[:start_date].present? && params[:end_date].present?
