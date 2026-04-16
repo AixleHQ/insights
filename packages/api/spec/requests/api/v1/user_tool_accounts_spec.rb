@@ -226,6 +226,7 @@ RSpec.describe 'Api::V1::UserToolAccounts', type: :request do
     end
 
     it 'new token authenticates on ingest endpoint after regeneration' do
+      allow(RawEventStore).to receive(:ensure_bucket_exists!).and_return(nil)
       allow(RawEventStore).to receive(:store).and_return('events/test-key.json')
       allow(Temporal::Client).to receive(:start_workflow).and_return({ workflow_id: 'test-id' })
 
