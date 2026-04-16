@@ -4,13 +4,31 @@ A CLI tool that reads Cursor IDE's local SQLite telemetry database and pushes AI
 
 ## Installation
 
+> **Note:** The package is not yet published to npm. Use the local development instructions below.
+
+### From the db90 repo (local development)
+
+Build and run directly:
+
 ```bash
-npm install -g db90-cursor
+cd packages/db90-cursor
+npm install
+npm run build
+node dist/cli.js --token <token> --host http://localhost:3000
 ```
 
-Or run directly with npx:
+Or install globally from the local path so `db90-cursor` works anywhere:
 
 ```bash
+npm install -g ./packages/db90-cursor
+db90-cursor --token <token> --host http://localhost:3000
+```
+
+### Once published to npm
+
+```bash
+npm install -g db90-cursor
+# or
 npx db90-cursor --token <token> --host <host>
 ```
 
