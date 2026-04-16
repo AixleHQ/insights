@@ -65,6 +65,92 @@ RSpec.describe 'Api::V1::Ingest', type: :request do
       end
     end
 
+    context 'with a raw Claude Code PostToolUse hook payload' do
+      let(:claude_code_post_tool_use_payload) do
+        {
+          session_id: 'session-abc123',
+          tool_name: 'Edit',
+          tool_input: { file_path: '/foo/bar.rb', old_string: 'x', new_string: 'y' },
+          tool_response: { success: true }
+        }
+      end
+
+      it 'maps event_type to "tool_use"' do
+        ingest_post(payload: claude_code_post_tool_use_payload)
+        expect(response).to have_http_status(:accepted)
+        expect(Temporal::Client).to have_received(:start_workflow) do |_workflow, **kwargs|
+          expect(kwargs[:args][:event][:event_type]).to eq('tool_use')
+        end
+      end
+
+      it 'stores session_id and hook_tool in metadata' do
+        ingest_post(payload: claude_code_post_tool_use_payload)
+        expect(Temporal::Client).to have_received(:start_workflow) do |_workflow, **kwargs|
+          metadata = kwargs[:args][:event][:metadata]
+          expect(metadata['session_id']).to eq('session-abc123')
+          expect(metadata['hook_tool']).to eq('Edit')
+        end
+      end
+
+      it 'always uses the account tool_name regardless of hook tool_name' do
+        ingest_post(payload: claude_code_post_tool_use_payload)
+        expect(Temporal::Client).to have_received(:start_workflow) do |_workflow, **kwargs|
+          expect(kwargs[:args][:event][:tool_name]).to eq('cursor')
+        end
+      end
+    end
+
+    context 'with a raw Claude Code Stop hook payload' do
+      let(:claude_code_stop_payload) do
+        {
+          session_id: 'session-xyz789',
+          stop_hook_active: false,
+          usage: { input_tokens: 1500, output_tokens: 300 },
+          total_cost_usd: 0.025
+        }
+      end
+
+      it 'maps event_type to "chat"' do
+        ingest_post(payload: claude_code_stop_payload)
+        expect(response).to have_http_status(:accepted)
+        expect(Temporal::Client).to have_received(:start_workflow) do |_workflow, **kwargs|
+          expect(kwargs[:args][:event][:event_type]).to eq('chat')
+        end
+      end
+
+      it 'extracts tokens_in, tokens_out, and cost_usd from usage' do
+        ingest_post(payload: claude_code_stop_payload)
+        expect(Temporal::Client).to have_received(:start_workflow) do |_workflow, **kwargs|
+          event = kwargs[:args][:event]
+          expect(event[:tokens_in]).to eq(1500)
+          expect(event[:tokens_out]).to eq(300)
+          expect(event[:cost_usd]).to eq(0.025)
+        end
+      end
+
+      it 'stores session_id in metadata' do
+        ingest_post(payload: claude_code_stop_payload)
+        expect(Temporal::Client).to have_received(:start_workflow) do |_workflow, **kwargs|
+          expect(kwargs[:args][:event][:metadata]['session_id']).to eq('session-xyz789')
+        end
+      end
+
+      context 'when usage data is absent' do
+        let(:minimal_stop_payload) { { session_id: 'session-min', stop_hook_active: false } }
+
+        it 'still maps event_type to "chat" with no token data' do
+          ingest_post(payload: minimal_stop_payload)
+          expect(response).to have_http_status(:accepted)
+          expect(Temporal::Client).to have_received(:start_workflow) do |_workflow, **kwargs|
+            event = kwargs[:args][:event]
+            expect(event[:event_type]).to eq('chat')
+            expect(event[:tokens_in]).to be_nil
+            expect(event[:tokens_out]).to be_nil
+          end
+        end
+      end
+    end
+
     context 'with authentication failures' do
       it 'returns 401 when Authorization header is missing' do
         post '/api/v1/ingest/events',

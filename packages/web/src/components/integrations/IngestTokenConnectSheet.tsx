@@ -44,7 +44,17 @@ function SetupInstructions({ providerId, token }: { providerId: string; token: s
         "hooks": [
           {
             "type": "command",
-            "command": "curl -s -X POST ${window.location.origin}/api/v1/ingest/events -H 'Authorization: Bearer ${token}' -H 'Content-Type: application/json' -d @-"
+            "command": "jq -c '{event_type:\\"tool_use\\",metadata:{session_id:.session_id,hook_tool:.tool_name}}' | curl -s -X POST ${window.location.origin}/api/v1/ingest/events -H 'Authorization: Bearer ${token}' -H 'Content-Type: application/json' -d @-"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -c '{event_type:\\"chat\\",tokens_in:(.usage.input_tokens//null),tokens_out:(.usage.output_tokens//null),cost_usd:(.total_cost_usd//.total_cost//null),metadata:{session_id:.session_id}}' | curl -s -X POST ${window.location.origin}/api/v1/ingest/events -H 'Authorization: Bearer ${token}' -H 'Content-Type: application/json' -d @-"
           }
         ]
       }
@@ -52,6 +62,7 @@ function SetupInstructions({ providerId, token }: { providerId: string; token: s
   }
 }`}
         </pre>
+        <p className="text-xs text-muted-foreground">Requires <code className="bg-muted px-1 rounded">jq</code> — install with <code className="bg-muted px-1 rounded">brew install jq</code> or your system package manager.</p>
       </div>
     );
   }

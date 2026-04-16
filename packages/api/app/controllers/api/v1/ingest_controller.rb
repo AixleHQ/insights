@@ -8,6 +8,14 @@ module Api
       # POST /api/v1/ingest/events
       def create
         event_params = permitted_params
+
+        # Back-compat: detect raw Claude Code hook payloads (no jq transform applied)
+        # and map them to structured fields before processing.
+        if event_params[:event_type].blank?
+          mapped = extract_claude_code_hook_params
+          event_params.merge!(mapped) if mapped.any?
+        end
+
         org = @tool_account.organization
         event_params[:organization_id] = org.id
         event_params[:user_id] = @tool_account.user.id
@@ -84,6 +92,7 @@ module Api
           model: event_params[:model],
           tokens_in: event_params[:tokens_in],
           tokens_out: event_params[:tokens_out],
+          tokens_total: event_params[:tokens_total],
           cost_usd: event_params[:cost_usd],
           duration_ms: event_params[:duration_ms],
           occurred_at: event_params[:occurred_at] || Time.current,
@@ -95,12 +104,48 @@ module Api
 
       def permitted_params
         params.permit(
-          :tool_name, :event_type, :model, :tokens_in, :tokens_out,
+          :tool_name, :event_type, :model, :tokens_in, :tokens_out, :tokens_total,
           :cost_usd, :duration_ms, :occurred_at, :project_id, :user_id,
           :prompt, :response, :system_prompt,
           messages: [ :role, :content ],
           metadata: {}
         ).to_h.symbolize_keys
+      end
+
+      # Detect and map raw Claude Code hook payloads.
+      # Claude Code sends PostToolUse events as:
+      #   { session_id, tool_name, tool_input, tool_response }
+      # and Stop events as:
+      #   { session_id, stop_hook_active, usage?, total_cost_usd? }
+      # Neither matches the standard ingest schema, so we map the fields here.
+      def extract_claude_code_hook_params
+        raw = request.raw_post
+        return {} if raw.blank?
+
+        payload = JSON.parse(raw)
+        return {} unless payload.is_a?(Hash) && payload.key?("session_id")
+
+        if payload.key?("tool_input") && payload.key?("tool_response")
+          # PostToolUse: record a tool_use event with session metadata
+          {
+            event_type: "tool_use",
+            metadata: { "session_id" => payload["session_id"], "hook_tool" => payload["tool_name"] }.compact
+          }
+        elsif payload.key?("stop_hook_active")
+          # Stop: record a chat event and extract usage if Claude Code exposes it
+          usage = payload["usage"] || {}
+          {
+            event_type: "chat",
+            tokens_in: usage["input_tokens"],
+            tokens_out: usage["output_tokens"],
+            cost_usd: payload["total_cost_usd"] || payload["total_cost"],
+            metadata: { "session_id" => payload["session_id"] }.compact
+          }.compact
+        else
+          {}
+        end
+      rescue JSON::ParserError
+        {}
       end
     end
   end
