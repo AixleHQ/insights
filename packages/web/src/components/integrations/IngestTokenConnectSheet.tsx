@@ -31,11 +31,19 @@ const TOOL_NAME_MAP: Record<string, string> = {
 };
 
 function ingestEndpointUrl(): string {
-  const apiBase = import.meta.env.VITE_API_URL ?? '/api/v1';
-  // apiBase may be relative ("/api/v1") or absolute ("https://api.example.com/v1")
-  if (apiBase.startsWith('http')) {
+  // VITE_INGEST_BASE_URL is the direct API base URL for shell hooks — these run
+  // outside the browser and bypass the Vite proxy, so they need the real API
+  // address (e.g. http://localhost:3000 in dev, https://api.example.com in prod).
+  const ingestBase = import.meta.env.VITE_INGEST_BASE_URL;
+  if (ingestBase) {
+    return `${ingestBase}/api/v1/ingest/events`;
+  }
+  // Fall back: if VITE_API_URL is already absolute (production), use it directly.
+  const apiBase = import.meta.env.VITE_API_URL ?? "/api/v1";
+  if (apiBase.startsWith("http")) {
     return `${apiBase}/ingest/events`;
   }
+  // Last resort: same origin (works in production where web and API share a domain).
   return `${window.location.origin}${apiBase}/ingest/events`;
 }
 
