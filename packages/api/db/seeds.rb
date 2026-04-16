@@ -91,7 +91,7 @@ if Rails.env.development? || Rails.env.staging?
   ]
 
   # Tool configurations with realistic usage patterns
-  # Valid tool_names: claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter, anthropic_api, openai_api, gemini_api, custom
+  # Valid tool_names: claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom
   # Valid event_types: chat, completion, edit, commit, review, test, debug, refactor, documentation, other
   TOOL_CONFIGS = {
     'github_copilot' => {

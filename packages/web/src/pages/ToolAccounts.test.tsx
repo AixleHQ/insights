@@ -175,7 +175,7 @@ describe("ToolAccounts", () => {
       // Mock all 14 toolProviders as connected by providing accounts for each
       const allToolNames = [
         "claude_code", "cursor", "windsurf", "github_copilot", "aider",
-        "continue", "cody", "tabnine", "amazon_q", "openrouter",
+        "continue", "cody", "tabnine", "amazon_q", "openrouter_api",
         "anthropic_api", "openai_api", "gemini_api", "custom",
       ];
       const accounts = allToolNames.map((toolName, i) =>
