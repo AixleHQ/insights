@@ -361,3 +361,50 @@ export interface JiraProject {
   name: string;
   avatarUrl?: string;
 }
+
+// Tool analytics types (shared by Cursor & OpenRouter pages)
+export interface ToolOverviewStats {
+  tool: string;
+  total_events: number;
+  total_cost_usd: number;
+  total_tokens_in: number;
+  total_tokens_out: number;
+  active_users: number;
+  events_change_pct: number;
+  cost_change_pct: number;
+}
+
+export interface ToolModelStat {
+  name: string;
+  eventCount: number;
+  tokensIn: number;
+  tokensOut: number;
+  costUsd: number;
+  price_per_million_input: number | null;
+  price_per_million_output: number | null;
+}
+
+export interface ToolUserStat {
+  userId: string;
+  name: string;
+  email: string;
+  eventCount: number;
+  totalTokens: number;
+  costUsd: number;
+}
+
+export interface ToolDailyPoint {
+  date: string;
+  eventCount: number;
+  tokensIn: number;
+  tokensOut: number;
+  costUsd: number;
+}
+
+export interface ConnectorSyncStatus {
+  connector_type: string;
+  status: string;
+  last_sync_at: string | null;
+  last_error: string | null;
+  total_events: number;
+}
