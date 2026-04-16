@@ -8,6 +8,7 @@ import {
   Unplug,
   FlaskConical,
   ChevronDown,
+  KeyRound,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -73,6 +74,7 @@ interface IntegrationCardProps {
   onSync?: (id: string) => void;
   onTest?: (id: string) => void;
   onDisconnect?: (id: string) => void;
+  onRegenerateToken?: (id: string) => void;
   onConnect?: (providerId: string) => void;
   isTesting?: boolean;
   className?: string;
@@ -137,6 +139,7 @@ export function IntegrationCard({
   onSync,
   onTest,
   onDisconnect,
+  onRegenerateToken,
   onConnect,
   isTesting = false,
   className,
@@ -234,7 +237,13 @@ export function IntegrationCard({
                   Test connection
                 </DropdownMenuItem>
               )}
-              {(onSync || onTest) && <DropdownMenuSeparator />}
+              {onRegenerateToken && (
+                <DropdownMenuItem onClick={() => onRegenerateToken(integration.id)}>
+                  <KeyRound className="mr-2 size-4" />
+                  Regenerate token
+                </DropdownMenuItem>
+              )}
+              {(onSync || onTest || onRegenerateToken) && <DropdownMenuSeparator />}
               <DropdownMenuItem
                 className="text-destructive"
                 onClick={() => onDisconnect?.(integration.id)}

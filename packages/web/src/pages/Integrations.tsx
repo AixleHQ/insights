@@ -7,7 +7,8 @@ import {
   useDeleteConnector,
   useTestConnector, 
   useToolAccounts, 
-  useDeleteToolAccount,
+  useDeleteToolAccount, 
+  useRegenerateIngestToken,
 } from "@/hooks/useApi";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -261,6 +262,7 @@ export function Integrations() {
   const deleteConnector = useDeleteConnector();
   const deleteToolAccount = useDeleteToolAccount();
   const testConnector = useTestConnector();
+  const regenerateIngestToken = useRegenerateIngestToken();
 
   const activeTab = status === "available" ? "available" : "connected";
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -269,6 +271,7 @@ export function Integrations() {
   const [slackSheetOpen, setSlackSheetOpen] = useState(false);
   const [ingestSheetOpen, setIngestSheetOpen] = useState(false);
   const [ingestProvider, setIngestProvider] = useState<ProviderInfo | null>(null);
+  const [regeneratedToken, setRegeneratedToken] = useState<string | null>(null);
   const [testingConnectorId, setTestingConnectorId] = useState<string | null>(
     null,
   );
@@ -378,6 +381,23 @@ export function Integrations() {
     }
   };
 
+  const handleRegenerateToken = async (id: string) => {
+    if (!currentOrg) return;
+    try {
+      const result = await regenerateIngestToken.mutateAsync({ orgId: currentOrg.id, accountId: id });
+      const newToken = result.data.ingestToken ?? null;
+      const integration = integrations.find((i) => i.id === id);
+      const provider = integration
+        ? availableProviders.find((p) => p.id === integration.provider) ?? null
+        : null;
+      setRegeneratedToken(newToken);
+      setIngestProvider(provider);
+      setIngestSheetOpen(true);
+    } catch (error) {
+      console.error('Failed to regenerate token:', error);
+    }
+  };
+
   // Get providers that are already connected
   const connectedProviders = new Set(integrations.map((c) => c.provider));
 
@@ -452,6 +472,7 @@ export function Integrations() {
                   }
                   onTest={ingestAccountIds.has(integration.id) ? undefined : handleTest}
                   onDisconnect={handleDisconnect}
+                  onRegenerateToken={ingestAccountIds.has(integration.id) ? handleRegenerateToken : undefined}
                   isTesting={testingConnectorId === integration.id}
                 />
               ))}
@@ -498,8 +519,12 @@ export function Integrations() {
       <IngestTokenConnectSheet
         provider={ingestProvider}
         open={ingestSheetOpen}
-        onOpenChange={setIngestSheetOpen}
+        onOpenChange={(open) => {
+          setIngestSheetOpen(open);
+          if (!open) setRegeneratedToken(null);
+        }}
         onSuccess={handleConnectSuccess}
+        initialToken={regeneratedToken ?? undefined}
       />
     </div>
   );

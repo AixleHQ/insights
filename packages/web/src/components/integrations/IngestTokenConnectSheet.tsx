@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { useOrg } from '@/contexts/OrgContext';
 import { useCreateToolAccount } from '@/hooks/useApi';
@@ -21,6 +21,8 @@ interface IngestTokenConnectSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  /** Pre-existing token — opens directly to the setup step (used after regeneration) */
+  initialToken?: string;
 }
 
 const TOOL_NAME_MAP: Record<string, string> = {
@@ -69,15 +71,25 @@ export function IngestTokenConnectSheet({
   open,
   onOpenChange,
   onSuccess,
+  initialToken,
 }: IngestTokenConnectSheetProps) {
   const { currentOrg } = useOrg();
   const createToolAccount = useCreateToolAccount();
 
-  const [step, setStep] = useState<'connect' | 'setup'>('connect');
-  const [token, setToken] = useState<string | null>(null);
+  const [step, setStep] = useState<'connect' | 'setup'>(initialToken ? 'setup' : 'connect');
+  const [token, setToken] = useState<string | null>(initialToken ?? null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (open && initialToken) {
+      setStep('setup');
+      setToken(initialToken);
+      setCopied(false);
+      setError(null);
+    }
+  }, [open, initialToken]);
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
