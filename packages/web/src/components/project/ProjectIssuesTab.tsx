@@ -1,37 +1,37 @@
-import { useMemo, useState } from 'react';
-import { Layers, Bug, BookOpen, CheckSquare, Zap, Circle, RefreshCw } from 'lucide-react';
-import { useProjectIssues, useSyncJiraIssues } from '@/hooks/useApi';
-import type { ProjectWithStats } from '@/lib/types';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+import { useMemo, useState } from "react";
+import { Layers, Bug, BookOpen, CheckSquare, Zap, Circle, RefreshCw } from "lucide-react";
+import { useProjectIssues, useSyncJiraIssues } from "@/hooks/useApi";
+import type { ProjectWithStats } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { ConnectJiraSheet } from './ConnectJiraSheet';
-import { formatDistanceToNow } from '@/lib/utils';
+} from "@/components/ui/card";
+import { ConnectJiraSheet } from "./ConnectJiraSheet";
+import { formatDistanceToNow } from "@/lib/utils";
 
 const STATUS_CATEGORY_LABELS: Record<string, string> = {
-  new: 'To Do',
-  indeterminate: 'In Progress',
-  done: 'Done',
+  new: "To Do",
+  indeterminate: "In Progress",
+  done: "Done",
 };
 
-const STATUS_CATEGORY_VARIANTS: Record<string, 'default' | 'secondary' | 'outline'> = {
-  new: 'outline',
-  indeterminate: 'default',
-  done: 'secondary',
+const STATUS_CATEGORY_VARIANTS: Record<string, "default" | "secondary" | "outline"> = {
+  new: "outline",
+  indeterminate: "default",
+  done: "secondary",
 };
 
 const ISSUE_TYPE_ICONS: Record<string, React.ElementType> = {
@@ -49,10 +49,10 @@ function IssueTypeIcon({ type }: { type?: string }) {
 function AssigneeAvatar({ name }: { name?: string }) {
   if (!name) return null;
   const initials = name
-    .split(' ')
+    .split(" ")
     .slice(0, 2)
     .map((w) => w[0])
-    .join('')
+    .join("")
     .toUpperCase();
   return (
     <span
@@ -71,9 +71,9 @@ interface ProjectIssuesTabProps {
 
 export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) {
   const [connectJiraOpen, setConnectJiraOpen] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string>('');
-  const [typeFilter, setTypeFilter] = useState<string>('');
-  const [assigneeFilter, setAssigneeFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [typeFilter, setTypeFilter] = useState<string>("");
+  const [assigneeFilter, setAssigneeFilter] = useState<string>("");
 
   const isLinked = !!project.jiraProjectKey;
   const syncJira = useSyncJiraIssues(projectId);
@@ -151,7 +151,7 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
                 disabled={syncJira.isPending}
                 onClick={() => syncJira.mutate()}
               >
-                <RefreshCw className={`mr-1.5 size-3.5 ${syncJira.isPending ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`mr-1.5 size-3.5 ${syncJira.isPending ? "animate-spin" : ""}`} />
                 Sync
               </Button>
               <Button variant="outline" size="sm" onClick={() => setConnectJiraOpen(true)}>
@@ -163,7 +163,7 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
 
         {/* Filters */}
         <div className="flex flex-wrap gap-2 px-6 pb-3">
-          <Select value={statusFilter || '__all__'} onValueChange={(v) => setStatusFilter(v === '__all__' ? '' : v)}>
+          <Select value={statusFilter || "__all__"} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
             <SelectTrigger className="h-8 w-[160px] text-sm">
               <SelectValue placeholder="All statuses" />
             </SelectTrigger>
@@ -175,7 +175,7 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
             </SelectContent>
           </Select>
 
-          <Select value={typeFilter || '__all__'} onValueChange={(v) => setTypeFilter(v === '__all__' ? '' : v)}>
+          <Select value={typeFilter || "__all__"} onValueChange={(v) => setTypeFilter(v === "__all__" ? "" : v)}>
             <SelectTrigger className="h-8 w-[140px] text-sm">
               <SelectValue placeholder="All types" />
             </SelectTrigger>
@@ -189,8 +189,8 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
           </Select>
 
           <Select
-            value={assigneeFilter || '__all__'}
-            onValueChange={(v) => setAssigneeFilter(v === '__all__' ? '' : v)}
+            value={assigneeFilter || "__all__"}
+            onValueChange={(v) => setAssigneeFilter(v === "__all__" ? "" : v)}
             disabled={uniqueAssignees.length === 0}
           >
             <SelectTrigger className="h-8 w-[160px] text-sm">
@@ -220,7 +220,7 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
             </div>
           ) : issues.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8 px-6">
-              No issues found{statusFilter || typeFilter || assigneeFilter ? ' matching the selected filters' : ''}.
+              No issues found{statusFilter || typeFilter || assigneeFilter ? " matching the selected filters" : ""}.
             </p>
           ) : (
             <div className="divide-y">
@@ -247,7 +247,7 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
                     )}
                     {issue.statusCategory && (
                       <Badge
-                        variant={STATUS_CATEGORY_VARIANTS[issue.statusCategory] ?? 'outline'}
+                        variant={STATUS_CATEGORY_VARIANTS[issue.statusCategory] ?? "outline"}
                         className="text-xs"
                       >
                         {STATUS_CATEGORY_LABELS[issue.statusCategory] ?? issue.status}

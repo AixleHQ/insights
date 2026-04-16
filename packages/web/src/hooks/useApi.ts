@@ -74,8 +74,8 @@ export const queryKeys = {
   },
   issues: {
     all: (projectId: string, filters?: Record<string, unknown>) =>
-      ['projects', projectId, 'issues', filters] as const,
-    detail: (projectId: string, id: string) => ['projects', projectId, 'issues', id] as const,
+      ["projects", projectId, "issues", filters] as const,
+    detail: (projectId: string, id: string) => ["projects", projectId, "issues", id] as const,
   },
   projectConnectors: {
     all: (projectId: string) => ["projects", projectId, "connectors"] as const,
@@ -1401,13 +1401,13 @@ export function useProjectIssues(projectId: string, filters?: IssueFilters) {
     queryKey: queryKeys.issues.all(projectId, filters as Record<string, unknown>),
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (filters?.status_category) params.set('status_category', filters.status_category);
-      if (filters?.type) params.set('type', filters.type);
-      if (filters?.assignee) params.set('assignee', filters.assignee);
-      if (filters?.page) params.set('page', String(filters.page));
+      if (filters?.status_category) params.set("status_category", filters.status_category);
+      if (filters?.type) params.set("type", filters.type);
+      if (filters?.assignee) params.set("assignee", filters.assignee);
+      if (filters?.page) params.set("page", String(filters.page));
       const query = params.toString();
       return api.get<PaginatedResponse<Issue>>(
-        `/projects/${projectId}/issues${query ? `?${query}` : ''}`
+        `/projects/${projectId}/issues${query ? `?${query}` : ""}`
       );
     },
     enabled: !!projectId,
@@ -1436,7 +1436,7 @@ export function useSyncJiraIssues(projectId: string) {
   return useMutation({
     mutationFn: () => api.post(`/projects/${projectId}/sync_issues`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'issues'] });
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "issues"] });
     },
   });
 }
@@ -1450,7 +1450,7 @@ export function useLinkJira(projectId: string) {
       api.post<{ data: { linked: boolean } }>(`/projects/${projectId}/link_jira`, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projects.detail(projectId) });
-      queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'issues'] });
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "issues"] });
     },
   });
 }

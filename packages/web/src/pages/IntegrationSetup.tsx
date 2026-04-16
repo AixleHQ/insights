@@ -26,14 +26,14 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Separator } from '@/components/ui/separator';
-import { useOrg } from '@/contexts/OrgContext';
-import { useProjects, useCreateConnector } from '@/hooks/useApi';
-import { api, ApiError } from '@/lib/api';
-import { ProviderLogo } from '@/components/icons';
-import type { IntegrationProvider } from '@/components/integrations';
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
+import { useOrg } from "@/contexts/OrgContext";
+import { useProjects, useCreateConnector } from "@/hooks/useApi";
+import { api, ApiError } from "@/lib/api";
+import { ProviderLogo } from "@/components/icons";
+import type { IntegrationProvider } from "@/components/integrations";
 
 interface ProviderConfig {
   id: IntegrationProvider;
@@ -260,11 +260,11 @@ export function IntegrationSetup() {
     } catch (err) {
       const isNotConfigured =
         err instanceof ApiError &&
-        (err.data as { code?: string })?.code === 'integration_not_configured';
+        (err.data as { code?: string })?.code === "integration_not_configured";
       setError(
         isNotConfigured
-          ? 'This integration is not available in this environment. Please contact your administrator.'
-          : 'Failed to start authorization. Please try again.'
+          ? "This integration is not available in this environment. Please contact your administrator."
+          : "Failed to start authorization. Please try again."
       );
       setIsAuthorizing(false);
     }

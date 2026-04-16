@@ -1,46 +1,46 @@
-import { BrowserRouter, Routes, Route, Navigate, useParams, useSearchParams } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
-import { ThemeProvider } from './contexts/ThemeContext';
-import { OrgProvider } from './contexts/OrgContext';
-import { NotificationsProvider } from './contexts/NotificationsContext';
-import { ImpersonationProvider } from './contexts/ImpersonationContext';
-import { ProtectedRoute } from './components/ProtectedRoute';
-import { ImpersonationBar } from './components/ImpersonationBar';
-import { AppLayout } from './components/layout';
-import { Login } from './pages/Login';
-import { AuthCallback } from './pages/AuthCallback';
-import { AuthIframeCallback } from './pages/AuthIframeCallback';
-import { AuthPopupCallback } from './pages/AuthPopupCallback';
-import { Dashboard } from './pages/Dashboard';
-import { Events } from './pages/Events';
-import { EventDetailPage } from './pages/EventDetailPage';
-import { Projects } from './pages/Projects';
-import { NewProject } from './pages/NewProject';
-import { ProjectDetail } from './pages/ProjectDetail';
-import { ProjectSettings } from './pages/ProjectSettings';
-import { Integrations } from './pages/Integrations';
-import { IntegrationSetup } from './pages/IntegrationSetup';
-import { IntegrationOAuthCallback } from './pages/IntegrationOAuthCallback';
-import { TeamInvite } from './pages/TeamInvite';
-import { MemberProfile } from './pages/MemberProfile';
-import { UserSettings } from './pages/UserSettings';
-import { Settings } from './pages/Settings';
-import { UnattributedEvents } from './pages/UnattributedEvents';
-import { Notifications } from './pages/Notifications';
-import { Onboarding } from './pages/Onboarding';
-import { InvitationAccept } from './pages/InvitationAccept';
-import { InvitationsManagement } from './pages/InvitationsManagement';
+import { BrowserRouter, Routes, Route, Navigate, useParams, useSearchParams } from "react-router-dom";
+import { AuthProvider } from "./contexts/AuthContext";
+import { ThemeProvider } from "./contexts/ThemeContext";
+import { OrgProvider } from "./contexts/OrgContext";
+import { NotificationsProvider } from "./contexts/NotificationsContext";
+import { ImpersonationProvider } from "./contexts/ImpersonationContext";
+import { ProtectedRoute } from "./components/ProtectedRoute";
+import { ImpersonationBar } from "./components/ImpersonationBar";
+import { AppLayout } from "./components/layout";
+import { Login } from "./pages/Login";
+import { AuthCallback } from "./pages/AuthCallback";
+import { AuthIframeCallback } from "./pages/AuthIframeCallback";
+import { AuthPopupCallback } from "./pages/AuthPopupCallback";
+import { Dashboard } from "./pages/Dashboard";
+import { Events } from "./pages/Events";
+import { EventDetailPage } from "./pages/EventDetailPage";
+import { Projects } from "./pages/Projects";
+import { NewProject } from "./pages/NewProject";
+import { ProjectDetail } from "./pages/ProjectDetail";
+import { ProjectSettings } from "./pages/ProjectSettings";
+import { Integrations } from "./pages/Integrations";
+import { IntegrationSetup } from "./pages/IntegrationSetup";
+import { IntegrationOAuthCallback } from "./pages/IntegrationOAuthCallback";
+import { TeamInvite } from "./pages/TeamInvite";
+import { MemberProfile } from "./pages/MemberProfile";
+import { UserSettings } from "./pages/UserSettings";
+import { Settings } from "./pages/Settings";
+import { UnattributedEvents } from "./pages/UnattributedEvents";
+import { Notifications } from "./pages/Notifications";
+import { Onboarding } from "./pages/Onboarding";
+import { InvitationAccept } from "./pages/InvitationAccept";
+import { InvitationsManagement } from "./pages/InvitationsManagement";
 import {
   AdminLayout,
   AdminOverview,
   AdminUsers,
   AdminOrganizations,
-} from './pages/admin';
+} from "./pages/admin";
 
 function TeamIdRedirect() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
-  const projectId = searchParams.get('projectId');
+  const projectId = searchParams.get("projectId");
   const to = projectId
     ? `/settings/members/${id}?projectId=${projectId}`
     : `/settings/members/${id}`;
@@ -58,7 +58,7 @@ function App() {
       <ImpersonationProvider>
         <AuthProvider>
           <ThemeProvider>
-          <OrgProvider apiBaseUrl={import.meta.env.VITE_API_URL || '/api/v1'}>
+          <OrgProvider apiBaseUrl={import.meta.env.VITE_API_URL || "/api/v1"}>
             <NotificationsProvider>
               <ImpersonationBar />
               <Routes>

@@ -256,7 +256,7 @@ export function ProjectDetail() {
             <StatCard
               icon={GitBranch}
               label="Last Activity"
-              value={project.last_event_at || project.lastEventAt ? formatDistanceToNow(project.last_event_at || project.lastEventAt!) : 'Never'}
+              value={project.last_event_at || project.lastEventAt ? formatDistanceToNow(project.last_event_at || project.lastEventAt!) : "Never"}
             />
           </div>
 
@@ -293,8 +293,8 @@ export function ProjectDetail() {
             {projectMembers && projectMembers.length > 0 && (
               <div className="flex flex-wrap items-center gap-2 px-6 pb-3">
                 <Select
-                  value={selectedUserId ?? '__all__'}
-                  onValueChange={(val) => setSelectedUserId(val === '__all__' ? undefined : val)}
+                  value={selectedUserId ?? "__all__"}
+                  onValueChange={(val) => setSelectedUserId(val === "__all__" ? undefined : val)}
                 >
                   <SelectTrigger className="h-8 w-[180px] text-sm">
                     <SelectValue placeholder="All members" />
@@ -352,7 +352,7 @@ export function ProjectDetail() {
         </TabsContent>
 
         <TabsContent value="issues" className="mt-4">
-          <ProjectIssuesTab projectId={id || ''} project={project} />
+          <ProjectIssuesTab projectId={id || ""} project={project} />
         </TabsContent>
       </Tabs>
     </div>
