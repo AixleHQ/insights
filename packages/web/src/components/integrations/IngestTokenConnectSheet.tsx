@@ -54,7 +54,7 @@ function SetupInstructions({ providerId, token }: { providerId: string; token: s
         "hooks": [
           {
             "type": "command",
-            "command": "jq -c '{event_type:\\"chat\\",tokens_in:(.usage.input_tokens//null),tokens_out:(.usage.output_tokens//null),cost_usd:(.total_cost_usd//.total_cost//null),metadata:{session_id:.session_id}}' | curl -s -X POST ${window.location.origin}/api/v1/ingest/events -H 'Authorization: Bearer ${token}' -H 'Content-Type: application/json' -d @-"
+            "command": "tee /tmp/cc_stop_payload.json | python3 -c \\"import sys,json,os,urllib.request as R,collections as C\\np=json.load(sys.stdin);s=p.get('session_id','');f=p.get('transcript_path','');ti=to=cw=cr=0;mc=C.Counter()\\nfor l in (open(f) if f and os.path.exists(f) else []):\\n try:e=json.loads(l)\\n except:continue\\n if e.get('type')!='assistant' or 'message' not in e:continue\\n msg=e['message'];mc[msg.get('model','')]+=1;u=msg.get('usage',{})\\n w=u.get('cache_creation_input_tokens',0);r2=u.get('cache_read_input_tokens',0)\\n ti+=u.get('input_tokens',0)+w+r2;to+=u.get('output_tokens',0);cw+=w;cr+=r2\\npm=mc.most_common(1)[0][0] if mc else None\\nev={k:v for k,v in {'event_type':'chat','tokens_in':ti or None,'tokens_out':to or None,'tokens_total':(ti+to) or None,'model':pm,'metadata':{k:v for k,v in {'session_id':s,'cache_write_tokens':cw or None,'cache_read_tokens':cr or None}.items() if v}}.items() if v is not None}\\nreq=R.Request('${window.location.origin}/api/v1/ingest/events',json.dumps(ev).encode(),{'Authorization':'Bearer ${token}','Content-Type':'application/json'},method='POST')\\ntry:R.urlopen(req,timeout=5)\\nexcept:pass\\""
           }
         ]
       }
@@ -62,7 +62,7 @@ function SetupInstructions({ providerId, token }: { providerId: string; token: s
   }
 }`}
         </pre>
-        <p className="text-xs text-muted-foreground">Requires <code className="bg-muted px-1 rounded">jq</code> — install with <code className="bg-muted px-1 rounded">brew install jq</code> or your system package manager.</p>
+        <p className="text-xs text-muted-foreground">The PostToolUse hook requires <code className="bg-muted px-1 rounded">jq</code> — install with <code className="bg-muted px-1 rounded">brew install jq</code>. The Stop hook uses <code className="bg-muted px-1 rounded">python3</code>, which ships with macOS.</p>
       </div>
     );
   }
