@@ -1,12 +1,12 @@
-import { useParams, useNavigate } from 'react-router-dom';
-import { useProject, useUpdateProject } from '@/hooks/useApi';
-import { ProjectForm, type ProjectFormData } from '@/components/projects';
-import { Skeleton } from '@/components/ui/skeleton';
+import { useParams, useNavigate } from "react-router-dom";
+import { useProject, useUpdateProject } from "@/hooks/useApi";
+import { ProjectForm, type ProjectFormData } from "@/components/projects";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function EditProject() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { data: project, isLoading } = useProject(id || '');
+  const { data: project, isLoading } = useProject(id || "");
   const updateProject = useUpdateProject();
 
   const handleSubmit = async (data: ProjectFormData) => {
@@ -53,8 +53,8 @@ export function EditProject() {
       isEditing
       initialData={{
         name: project.name,
-        description: project.description || '',
-        repository_url: project.repositoryUrl || '',
+        description: project.description || "",
+        repository_url: project.repositoryUrl || "",
         is_active: project.isActive ?? true,
       }}
       onSubmit={handleSubmit}

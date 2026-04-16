@@ -1,25 +1,25 @@
-import { useState } from 'react';
-import { Search, Layers } from 'lucide-react';
-import { useOrg } from '@/contexts/OrgContext';
-import { useConnectors, useAvailableJiraProjects, useLinkJira, useSyncJiraIssues } from '@/hooks/useApi';
+import { useState } from "react";
+import { Search, Layers } from "lucide-react";
+import { useOrg } from "@/contexts/OrgContext";
+import { useConnectors, useAvailableJiraProjects, useLinkJira, useSyncJiraIssues } from "@/hooks/useApi";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   SheetDescription,
-} from '@/components/ui/sheet';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+} from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface ConnectJiraSheetProps {
   projectId: string;
@@ -30,16 +30,16 @@ interface ConnectJiraSheetProps {
 
 export function ConnectJiraSheet({ projectId, open, onOpenChange, onSuccess }: ConnectJiraSheetProps) {
   const { currentOrg } = useOrg();
-  const [selectedConnectorId, setSelectedConnectorId] = useState('');
-  const [search, setSearch] = useState('');
+  const [selectedConnectorId, setSelectedConnectorId] = useState("");
+  const [search, setSearch] = useState("");
   const [connectingKey, setConnectingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const { data: connectors } = useConnectors(currentOrg?.id || '');
-  const jiraConnectors = (connectors || []).filter((c) => c.connectorType === 'jira');
+  const { data: connectors } = useConnectors(currentOrg?.id || "");
+  const jiraConnectors = (connectors || []).filter((c) => c.connectorType === "jira");
 
   const { data: jiraProjects, isLoading: isLoadingProjects } = useAvailableJiraProjects(
-    currentOrg?.id || '',
+    currentOrg?.id || "",
     selectedConnectorId
   );
 
@@ -52,8 +52,8 @@ export function ConnectJiraSheet({ projectId, open, onOpenChange, onSuccess }: C
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
-      setSelectedConnectorId('');
-      setSearch('');
+      setSelectedConnectorId("");
+      setSearch("");
       setError(null);
     }
     onOpenChange(nextOpen);
@@ -66,7 +66,7 @@ export function ConnectJiraSheet({ projectId, open, onOpenChange, onSuccess }: C
     try {
       await linkJira.mutateAsync({ connector_id: selectedConnectorId, jira_project_key: key });
     } catch {
-      setError('Failed to link Jira project. Please try again.');
+      setError("Failed to link Jira project. Please try again.");
       setConnectingKey(null);
       return;
     }
@@ -108,7 +108,7 @@ export function ConnectJiraSheet({ projectId, open, onOpenChange, onSuccess }: C
                 <SelectContent>
                   {jiraConnectors.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
-                      {c.externalAccountName || 'Jira'}
+                      {c.externalAccountName || "Jira"}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -135,7 +135,7 @@ export function ConnectJiraSheet({ projectId, open, onOpenChange, onSuccess }: C
                   ))
                 ) : filteredProjects.length === 0 ? (
                   <p className="text-sm text-muted-foreground py-4 text-center">
-                    {search ? 'No projects match your search.' : 'No Jira projects found.'}
+                    {search ? "No projects match your search." : "No Jira projects found."}
                   </p>
                 ) : (
                   filteredProjects.map((project) => (
@@ -161,7 +161,7 @@ export function ConnectJiraSheet({ projectId, open, onOpenChange, onSuccess }: C
                       </div>
                       {connectingKey === project.key && (
                         <span className="text-xs text-muted-foreground shrink-0 ml-2">
-                          {syncJira.isPending ? 'Syncing…' : 'Linking…'}
+                          {syncJira.isPending ? "Syncing…" : "Linking…"}
                         </span>
                       )}
                     </button>

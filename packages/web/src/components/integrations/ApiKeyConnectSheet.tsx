@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { useOrg } from '@/contexts/OrgContext';
-import { useConnectWithApiKey } from '@/hooks/useApi';
-import { ApiError } from '@/lib/api';
+import { useState } from "react";
+import { useOrg } from "@/contexts/OrgContext";
+import { useConnectWithApiKey } from "@/hooks/useApi";
+import { ApiError } from "@/lib/api";
 import {
   Sheet,
   SheetContent,
@@ -9,12 +9,12 @@ import {
   SheetTitle,
   SheetDescription,
   SheetFooter,
-} from '@/components/ui/sheet';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { ProviderLogo } from '@/components/icons';
-import type { ProviderInfo } from './IntegrationCard';
+} from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ProviderLogo } from "@/components/icons";
+import type { ProviderInfo } from "./IntegrationCard";
 
 interface ApiKeyConnectSheetProps {
   provider: ProviderInfo | null;
@@ -35,13 +35,13 @@ export function ApiKeyConnectSheet({
   const { currentOrg } = useOrg();
   const connectWithApiKey = useConnectWithApiKey();
 
-  const [apiKey, setApiKey] = useState('');
+  const [apiKey, setApiKey] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
-      setApiKey('');
+      setApiKey("");
       setError(null);
     }
     onOpenChange(nextOpen);
@@ -65,17 +65,17 @@ export function ApiKeyConnectSheet({
           apiKey,
         });
       }
-      setApiKey('');
+      setApiKey("");
       onOpenChange(false);
       onSuccess();
     } catch (err) {
       if (err instanceof ApiError && err.status === 422) {
         const data = err.data as { errors?: { access_token?: string[] } } | null;
-        setError(data?.errors?.access_token?.[0] ?? 'Invalid API key');
+        setError(data?.errors?.access_token?.[0] ?? "Invalid API key");
       } else if (err instanceof Error) {
         setError(err.message);
       } else {
-        setError('Something went wrong. Please try again.');
+        setError("Something went wrong. Please try again.");
       }
     } finally {
       setIsSubmitting(false);
@@ -99,11 +99,11 @@ export function ApiKeyConnectSheet({
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 px-4">
           <div className="space-y-2">
-            <Label htmlFor="api-key">{provider?.inputLabel ?? 'API Key'}</Label>
+            <Label htmlFor="api-key">{provider?.inputLabel ?? "API Key"}</Label>
             <Input
               id="api-key"
               type="password"
-              placeholder={provider?.inputPlaceholder ?? 'Enter your API key'}
+              placeholder={provider?.inputPlaceholder ?? "Enter your API key"}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               autoComplete="off"
@@ -126,7 +126,7 @@ export function ApiKeyConnectSheet({
             onClick={handleSubmit}
             disabled={isSubmitting || !apiKey.trim()}
           >
-            {isSubmitting ? 'Connecting…' : 'Connect'}
+            {isSubmitting ? "Connecting…" : "Connect"}
           </Button>
         </SheetFooter>
       </SheetContent>

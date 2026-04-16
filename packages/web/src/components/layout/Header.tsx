@@ -1,8 +1,8 @@
-import { useState, useEffect, type ComponentType } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Bell, Search, Command, Moon, Sun, Monitor } from 'lucide-react';
-import { useTheme, type Theme } from '@/contexts/ThemeContext';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect, type ComponentType } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Bell, Search, Command, Moon, Sun, Monitor } from "lucide-react";
+import { useTheme, type Theme } from "@/contexts/ThemeContext";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,17 +10,17 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { SidebarTrigger } from '@/components/ui/sidebar';
-import { Separator } from '@/components/ui/separator';
-import { Breadcrumbs } from './Breadcrumbs';
+} from "@/components/ui/dropdown-menu";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { Separator } from "@/components/ui/separator";
+import { Breadcrumbs } from "./Breadcrumbs";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
   Command as CommandPrimitive,
   CommandEmpty,
@@ -29,8 +29,8 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-} from '@/components/ui/command';
-import { useNotifications } from '@/contexts/NotificationsContext';
+} from "@/components/ui/command";
+import { useNotifications } from "@/contexts/NotificationsContext";
 
 function CommandPalette({
   open,
@@ -58,37 +58,37 @@ function CommandPalette({
           <CommandList>
             <CommandEmpty>No results found.</CommandEmpty>
             <CommandGroup heading="Quick Actions">
-              <CommandItem onSelect={() => runCommand(() => onNavigate('/events'))}>
+              <CommandItem onSelect={() => runCommand(() => onNavigate("/events"))}>
                 <Search className="mr-2 size-4" />
                 <span>Search events...</span>
               </CommandItem>
-              <CommandItem onSelect={() => runCommand(() => onNavigate('/projects/new'))}>
+              <CommandItem onSelect={() => runCommand(() => onNavigate("/projects/new"))}>
                 <span className="mr-2">+</span>
                 <span>New project</span>
               </CommandItem>
-              <CommandItem onSelect={() => runCommand(() => onNavigate('/integrations'))}>
+              <CommandItem onSelect={() => runCommand(() => onNavigate("/integrations"))}>
                 <span className="mr-2">+</span>
                 <span>Add integration</span>
               </CommandItem>
             </CommandGroup>
             <CommandSeparator />
             <CommandGroup heading="Navigation">
-              <CommandItem onSelect={() => runCommand(() => onNavigate('/'))}>
+              <CommandItem onSelect={() => runCommand(() => onNavigate("/"))}>
                 Dashboard
               </CommandItem>
-              <CommandItem onSelect={() => runCommand(() => onNavigate('/events'))}>
+              <CommandItem onSelect={() => runCommand(() => onNavigate("/events"))}>
                 Events
               </CommandItem>
-              <CommandItem onSelect={() => runCommand(() => onNavigate('/projects'))}>
+              <CommandItem onSelect={() => runCommand(() => onNavigate("/projects"))}>
                 Projects
               </CommandItem>
-              <CommandItem onSelect={() => runCommand(() => onNavigate('/integrations'))}>
+              <CommandItem onSelect={() => runCommand(() => onNavigate("/integrations"))}>
                 Integrations
               </CommandItem>
-              <CommandItem onSelect={() => runCommand(() => onNavigate('/team'))}>
+              <CommandItem onSelect={() => runCommand(() => onNavigate("/team"))}>
                 Team
               </CommandItem>
-              <CommandItem onSelect={() => runCommand(() => onNavigate('/settings'))}>
+              <CommandItem onSelect={() => runCommand(() => onNavigate("/settings"))}>
                 Settings
               </CommandItem>
             </CommandGroup>
@@ -103,7 +103,7 @@ function NotificationBadge({ count }: { count: number }) {
   if (count === 0) return null;
   return (
     <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">
-      {count > 9 ? '9+' : count}
+      {count > 9 ? "9+" : count}
     </span>
   );
 }
@@ -153,7 +153,7 @@ function Notifications() {
               <div className="flex w-full items-start justify-between gap-2">
                 <span
                   className={`text-sm font-medium ${
-                    !notification.read ? 'text-foreground' : 'text-muted-foreground'
+                    !notification.read ? "text-foreground" : "text-muted-foreground"
                   }`}
                 >
                   {notification.title}
@@ -183,14 +183,14 @@ function Notifications() {
 }
 
 const themeOptions: { value: Theme; label: string; icon: ComponentType<{ className?: string }> }[] = [
-  { value: 'light', label: 'Light', icon: Sun },
-  { value: 'dark', label: 'Dark', icon: Moon },
-  { value: 'system', label: 'System', icon: Monitor },
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
+  { value: "system", label: "System", icon: Monitor },
 ];
 
 function ThemeToggle() {
   const { theme, resolvedTheme, setTheme } = useTheme();
-  const CurrentIcon = theme === 'system' ? Monitor : resolvedTheme === 'dark' ? Moon : Sun;
+  const CurrentIcon = theme === "system" ? Monitor : resolvedTheme === "dark" ? Moon : Sun;
 
   return (
     <DropdownMenu>
@@ -205,7 +205,7 @@ function ThemeToggle() {
           <DropdownMenuItem
             key={value}
             onClick={() => setTheme(value)}
-            className={theme === value ? 'bg-accent' : ''}
+            className={theme === value ? "bg-accent" : ""}
           >
             <Icon className="mr-2 size-4" />
             {label}
@@ -223,14 +223,14 @@ export function Header() {
   // Keyboard shortcut for command palette
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setCommandOpen((open) => !open);
       }
     };
 
-    document.addEventListener('keydown', down);
-    return () => document.removeEventListener('keydown', down);
+    document.addEventListener("keydown", down);
+    return () => document.removeEventListener("keydown", down);
   }, []);
 
   return (

@@ -1,28 +1,28 @@
-import { useState } from 'react';
-import { Check, GitBranch, Lock, Search } from 'lucide-react';
-import { useOrg } from '@/contexts/OrgContext';
-import { useConnectors, useAvailableRepos, useConnectRepo } from '@/hooks/useApi';
+import { useState } from "react";
+import { Check, GitBranch, Lock, Search } from "lucide-react";
+import { useOrg } from "@/contexts/OrgContext";
+import { useConnectors, useAvailableRepos, useConnectRepo } from "@/hooks/useApi";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   SheetDescription,
-} from '@/components/ui/sheet';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+} from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 
-const SOURCE_CONTROL_TYPES = ['github', 'gitlab', 'bitbucket'];
+const SOURCE_CONTROL_TYPES = ["github", "gitlab", "bitbucket"];
 
 interface ConnectRepoSheetProps {
   projectId: string;
@@ -33,18 +33,18 @@ interface ConnectRepoSheetProps {
 
 export function ConnectRepoSheet({ projectId, open, onOpenChange, onSuccess }: ConnectRepoSheetProps) {
   const { currentOrg } = useOrg();
-  const [selectedConnectorId, setSelectedConnectorId] = useState('');
-  const [search, setSearch] = useState('');
+  const [selectedConnectorId, setSelectedConnectorId] = useState("");
+  const [search, setSearch] = useState("");
   const [connectingId, setConnectingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const { data: connectors } = useConnectors(currentOrg?.id || '');
+  const { data: connectors } = useConnectors(currentOrg?.id || "");
   const sourceControlConnectors = (connectors || []).filter((c) =>
     SOURCE_CONTROL_TYPES.includes(c.connectorType)
   );
 
   const { data: availableRepos, isLoading: isLoadingRepos } = useAvailableRepos(
-    currentOrg?.id || '',
+    currentOrg?.id || "",
     selectedConnectorId,
     !!selectedConnectorId
   );
@@ -57,8 +57,8 @@ export function ConnectRepoSheet({ projectId, open, onOpenChange, onSuccess }: C
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
-      setSelectedConnectorId('');
-      setSearch('');
+      setSelectedConnectorId("");
+      setSearch("");
       setError(null);
     }
     onOpenChange(nextOpen);
@@ -83,7 +83,7 @@ export function ConnectRepoSheet({ projectId, open, onOpenChange, onSuccess }: C
       handleOpenChange(false);
       onSuccess();
     } catch {
-      setError('Failed to connect repository. Please try again.');
+      setError("Failed to connect repository. Please try again.");
     } finally {
       setConnectingId(null);
     }
@@ -144,7 +144,7 @@ export function ConnectRepoSheet({ projectId, open, onOpenChange, onSuccess }: C
                   ))
                 ) : filteredRepos.length === 0 ? (
                   <p className="text-sm text-muted-foreground py-4 text-center">
-                    {search ? 'No repositories match your search.' : 'No repositories found.'}
+                    {search ? "No repositories match your search." : "No repositories found."}
                   </p>
                 ) : (
                   filteredRepos.map((repo) => (

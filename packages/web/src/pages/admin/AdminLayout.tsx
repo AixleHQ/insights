@@ -1,4 +1,4 @@
-import { NavLink, Outlet, Navigate } from 'react-router-dom';
+import { NavLink, Outlet, Navigate } from "react-router-dom";
 import {
   Users,
   Building2,
@@ -7,16 +7,16 @@ import {
   Activity,
   ShieldCheck,
   Loader2,
-} from 'lucide-react';
-import { useCurrentUser } from '@/hooks/useApi';
-import { cn } from '@/lib/utils';
+} from "lucide-react";
+import { useCurrentUser } from "@/hooks/useApi";
+import { cn } from "@/lib/utils";
 
 const adminNavItems = [
-  { to: '/admin', label: 'Overview', icon: LayoutDashboard, end: true },
-  { to: '/admin/users', label: 'Users', icon: Users },
-  { to: '/admin/organizations', label: 'Organizations', icon: Building2 },
-  { to: '/admin/activity', label: 'Activity Log', icon: Activity },
-  { to: '/admin/settings', label: 'Settings', icon: Settings },
+  { to: "/admin", label: "Overview", icon: LayoutDashboard, end: true },
+  { to: "/admin/users", label: "Users", icon: Users },
+  { to: "/admin/organizations", label: "Organizations", icon: Building2 },
+  { to: "/admin/activity", label: "Activity Log", icon: Activity },
+  { to: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
 export function AdminLayout() {
@@ -60,10 +60,10 @@ export function AdminLayout() {
             end={item.end}
             className={({ isActive }) =>
               cn(
-                'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                 isActive
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:bg-background/50 hover:text-foreground'
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-background/50 hover:text-foreground"
               )
             }
           >

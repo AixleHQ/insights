@@ -1,15 +1,15 @@
-import { useState, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Grid, List, Search } from 'lucide-react';
-import { useOrg } from '@/contexts/OrgContext';
-import { useProjects, useDeleteProject } from '@/hooks/useApi';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
-import { ProjectCard, type ProjectData } from '@/components/projects';
-import { cn } from '@/lib/utils';
+import { useState, useMemo } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Plus, Grid, List, Search } from "lucide-react";
+import { useOrg } from "@/contexts/OrgContext";
+import { useProjects, useDeleteProject } from "@/hooks/useApi";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ProjectCard, type ProjectData } from "@/components/projects";
+import { cn } from "@/lib/utils";
 
-type ViewMode = 'grid' | 'list';
+type ViewMode = "grid" | "list";
 
 function ProjectSkeleton() {
   return (
@@ -33,10 +33,10 @@ function ProjectSkeleton() {
 export function Projects() {
   const { currentOrg } = useOrg();
   const navigate = useNavigate();
-  const [search, setSearch] = useState('');
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [search, setSearch] = useState("");
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
 
-  const { data: projectsData, isLoading } = useProjects(currentOrg?.id || '');
+  const { data: projectsData, isLoading } = useProjects(currentOrg?.id || "");
   const deleteProject = useDeleteProject();
 
   // Transform API response to component format
@@ -67,11 +67,11 @@ export function Projects() {
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this project?')) {
+    if (window.confirm("Are you sure you want to delete this project?")) {
       try {
         await deleteProject.mutateAsync(id);
       } catch (error) {
-        console.error('Failed to delete project:', error);
+        console.error("Failed to delete project:", error);
       }
     }
   };
@@ -105,19 +105,19 @@ export function Projects() {
         </div>
         <div className="flex items-center rounded-md border self-start">
           <Button
-            variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+            variant={viewMode === "grid" ? "secondary" : "ghost"}
             size="icon"
             className="h-8 w-8 rounded-none rounded-l-md"
-            onClick={() => setViewMode('grid')}
+            onClick={() => setViewMode("grid")}
           >
             <Grid className="size-4" />
             <span className="sr-only">Grid view</span>
           </Button>
           <Button
-            variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+            variant={viewMode === "list" ? "secondary" : "ghost"}
             size="icon"
             className="h-8 w-8 rounded-none rounded-r-md"
-            onClick={() => setViewMode('list')}
+            onClick={() => setViewMode("list")}
           >
             <List className="size-4" />
             <span className="sr-only">List view</span>
@@ -128,10 +128,10 @@ export function Projects() {
       {isLoading ? (
         <div
           className={cn(
-            'gap-4',
-            viewMode === 'grid'
-              ? 'grid md:grid-cols-2 lg:grid-cols-3'
-              : 'flex flex-col'
+            "gap-4",
+            viewMode === "grid"
+              ? "grid md:grid-cols-2 lg:grid-cols-3"
+              : "flex flex-col"
           )}
         >
           {Array.from({ length: 6 }).map((_, i) => (
@@ -141,13 +141,13 @@ export function Projects() {
       ) : filteredProjects.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12">
           <p className="text-muted-foreground">
-            {search ? 'No projects found' : 'No projects yet'}
+            {search ? "No projects found" : "No projects yet"}
           </p>
           {search ? (
             <Button
               variant="link"
               className="mt-2"
-              onClick={() => setSearch('')}
+              onClick={() => setSearch("")}
             >
               Clear search
             </Button>
@@ -160,10 +160,10 @@ export function Projects() {
       ) : (
         <div
           className={cn(
-            'gap-4',
-            viewMode === 'grid'
-              ? 'grid md:grid-cols-2 lg:grid-cols-3'
-              : 'flex flex-col'
+            "gap-4",
+            viewMode === "grid"
+              ? "grid md:grid-cols-2 lg:grid-cols-3"
+              : "flex flex-col"
           )}
         >
           {filteredProjects.map((project) => (

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo } from "react";
 import {
   Bar,
   BarChart,
@@ -7,23 +7,23 @@ import {
   XAxis,
   YAxis,
   Legend,
-} from 'recharts';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+} from "recharts";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-} from '@/components/ui/chart';
-import type { ChartConfig } from '@/components/ui/chart';
-import { cn, humanizeToolName } from '@/lib/utils';
-import type { DailyToolData } from '@/hooks/useApi';
+} from "@/components/ui/chart";
+import type { ChartConfig } from "@/components/ui/chart";
+import { cn, humanizeToolName } from "@/lib/utils";
+import type { DailyToolData } from "@/hooks/useApi";
 
 interface ToolUsageByDayChartProps {
   data: DailyToolData[];
@@ -32,29 +32,29 @@ interface ToolUsageByDayChartProps {
   className?: string;
 }
 
-type TimeRange = '7d' | '30d' | '60d' | '90d' | '1y';
+type TimeRange = "7d" | "30d" | "60d" | "90d" | "1y";
 
 const TIME_RANGE_OPTIONS: { value: TimeRange; label: string; days: number }[] = [
-  { value: '7d', label: '7 days', days: 7 },
-  { value: '30d', label: '30 days', days: 30 },
-  { value: '60d', label: '60 days', days: 60 },
-  { value: '90d', label: '90 days', days: 90 },
-  { value: '1y', label: '1 year', days: 365 },
+  { value: "7d", label: "7 days", days: 7 },
+  { value: "30d", label: "30 days", days: 30 },
+  { value: "60d", label: "60 days", days: 60 },
+  { value: "90d", label: "90 days", days: 90 },
+  { value: "1y", label: "1 year", days: 365 },
 ];
 
 // Chart colors for tools (keys match API snake_case names)
 const TOOL_COLORS: Record<string, string> = {
-  claude_code: 'hsl(32 95% 55%)',       // amber
-  github_copilot: 'hsl(211 100% 50%)',  // blue
-  cursor: 'hsl(271 91% 65%)',           // purple
-  aider: 'hsl(142 71% 45%)',            // green
-  windsurf: 'hsl(199 89% 48%)',         // cyan
-  cody: 'hsl(339 90% 51%)',             // pink
-  Other: 'hsl(220 9% 46%)',             // gray
+  claude_code: "hsl(32 95% 55%)",       // amber
+  github_copilot: "hsl(211 100% 50%)",  // blue
+  cursor: "hsl(271 91% 65%)",           // purple
+  aider: "hsl(142 71% 45%)",            // green
+  windsurf: "hsl(199 89% 48%)",         // cyan
+  cody: "hsl(339 90% 51%)",             // pink
+  Other: "hsl(220 9% 46%)",             // gray
 };
 
 function getToolColor(tool: string): string {
-  return TOOL_COLORS[tool] || TOOL_COLORS['Other'];
+  return TOOL_COLORS[tool] || TOOL_COLORS["Other"];
 }
 
 function getToolDisplayName(tool: string): string {
@@ -63,13 +63,13 @@ function getToolDisplayName(tool: string): string {
 
 function formatDate(dateStr: string, range: TimeRange): string {
   const date = new Date(dateStr);
-  if (range === '7d') {
-    return date.toLocaleDateString('en-US', { weekday: 'short' });
+  if (range === "7d") {
+    return date.toLocaleDateString("en-US", { weekday: "short" });
   }
-  if (range === '1y') {
-    return date.toLocaleDateString('en-US', { month: 'short' });
+  if (range === "1y") {
+    return date.toLocaleDateString("en-US", { month: "short" });
   }
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 function getDaysForRange(range: TimeRange): number {
@@ -77,11 +77,11 @@ function getDaysForRange(range: TimeRange): number {
 }
 
 function getRangeLabel(range: TimeRange): string {
-  return TIME_RANGE_OPTIONS.find((opt) => opt.value === range)?.label || '30 days';
+  return TIME_RANGE_OPTIONS.find((opt) => opt.value === range)?.label || "30 days";
 }
 
 export function ToolUsageByDayChart({ data, tools, isLoading, className }: ToolUsageByDayChartProps) {
-  const [timeRange, setTimeRange] = useState<TimeRange>('7d');
+  const [timeRange, setTimeRange] = useState<TimeRange>("7d");
 
   const filteredData = useMemo(() => {
     const days = getDaysForRange(timeRange);
@@ -110,7 +110,7 @@ export function ToolUsageByDayChart({ data, tools, isLoading, className }: ToolU
   }, [filteredData, tools]);
 
   return (
-    <Card className={cn('col-span-full', className)}>
+    <Card className={cn("col-span-full", className)}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <div>
           <CardTitle className="text-base font-medium">Usage by Tool</CardTitle>
@@ -147,13 +147,13 @@ export function ToolUsageByDayChart({ data, tools, isLoading, className }: ToolU
                   axisLine={false}
                   tickMargin={8}
                   className="text-xs text-muted-foreground"
-                  tick={{ fill: 'currentColor', fontSize: 11 }}
+                  tick={{ fill: "currentColor", fontSize: 11 }}
                 />
                 <YAxis
                   tickLine={false}
                   axisLine={false}
                   className="text-xs text-muted-foreground"
-                  tick={{ fill: 'currentColor', fontSize: 11 }}
+                  tick={{ fill: "currentColor", fontSize: 11 }}
                   width={40}
                 />
                 <ChartTooltip
@@ -174,7 +174,7 @@ export function ToolUsageByDayChart({ data, tools, isLoading, className }: ToolU
                 <Legend
                   verticalAlign="top"
                   align="right"
-                  wrapperStyle={{ paddingBottom: '10px' }}
+                  wrapperStyle={{ paddingBottom: "10px" }}
                   iconType="circle"
                   iconSize={8}
                   formatter={(value) => (

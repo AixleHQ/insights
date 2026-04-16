@@ -5,7 +5,7 @@ import {
   useState,
   useCallback,
   type ReactNode,
-} from 'react';
+} from "react";
 import {
   getUserManager,
   login as authLogin,
@@ -16,7 +16,7 @@ import {
   directLogin as authDirectLogin,
   type User,
   type UserProfile,
-} from '../lib/auth';
+} from "../lib/auth";
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -76,7 +76,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           isLoading: false,
           user: null,
           profile: null,
-          error: error instanceof Error ? error : new Error('Auth initialization failed'),
+          error: error instanceof Error ? error : new Error("Auth initialization failed"),
         });
       }
     };
@@ -118,7 +118,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
 
     const handleSilentRenewError = (error: Error) => {
-      console.error('[AuthContext] Silent renew error:', error);
+      console.error("[AuthContext] Silent renew error:", error);
       setState((prev) => ({
         ...prev,
         error,
@@ -146,7 +146,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setState((prev) => ({
         ...prev,
         isLoading: false,
-        error: error instanceof Error ? error : new Error('Login failed'),
+        error: error instanceof Error ? error : new Error("Login failed"),
       }));
     }
   }, []);
@@ -159,7 +159,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setState((prev) => ({
         ...prev,
         isLoading: false,
-        error: error instanceof Error ? error : new Error('Logout failed'),
+        error: error instanceof Error ? error : new Error("Logout failed"),
       }));
     }
   }, []);
@@ -185,7 +185,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setState((prev) => ({
         ...prev,
         isLoading: false,
-        error: error instanceof Error ? error : new Error('Direct login failed'),
+        error: error instanceof Error ? error : new Error("Direct login failed"),
       }));
       throw error;
     }
@@ -206,7 +206,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 export function useAuth(): AuthContextValue {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 }

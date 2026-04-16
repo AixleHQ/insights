@@ -1,7 +1,7 @@
 {
   "name": "web",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,11 +10,11 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:e2e": "playwright test --project=chromium-no-setup",
-    "test:e2e:ui": "playwright test --ui",
-    "test:e2e:headed": "playwright test --headed",
-    "test:e2e:setup": "playwright test --project=setup --headed",
-    "test:e2e:full": "playwright test --project=chromium"
+    "test:e2e": "node --env-file=.env ./node_modules/.bin/playwright test --project=chromium-no-setup",
+    "test:e2e:ui": "node --env-file=.env ./node_modules/.bin/playwright test --ui",
+    "test:e2e:headed": "node --env-file=.env ./node_modules/.bin/playwright test --headed",
+    "test:e2e:setup": "node --env-file=.env ./node_modules/.bin/playwright test --project=setup --headed",
+    "test:e2e:full": "node --env-file=.env ./node_modules/.bin/playwright test --project=chromium"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.15",

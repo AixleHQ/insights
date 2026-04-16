@@ -1,11 +1,11 @@
-import { Link } from 'react-router-dom';
-import { formatDistanceToNow } from '@/lib/utils';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
+import { Link } from "react-router-dom";
+import { formatDistanceToNow } from "@/lib/utils";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import {
   AlertTriangle,
   DollarSign,
@@ -13,12 +13,12 @@ import {
   TrendingUp,
   Bell,
   X,
-} from 'lucide-react';
+} from "lucide-react";
 
 export interface Alert {
   id: string;
-  type: 'cost_threshold' | 'risk_detected' | 'usage_spike' | 'policy_violation';
-  severity: 'critical' | 'warning' | 'info';
+  type: "cost_threshold" | "risk_detected" | "usage_spike" | "policy_violation";
+  severity: "critical" | "warning" | "info";
   title: string;
   description: string;
   created_at: string;
@@ -41,19 +41,19 @@ const alertTypeIcons = {
 
 const severityColors = {
   critical: {
-    bg: 'bg-destructive/10',
-    border: 'border-destructive/30',
-    icon: 'text-destructive',
+    bg: "bg-destructive/10",
+    border: "border-destructive/30",
+    icon: "text-destructive",
   },
   warning: {
-    bg: 'bg-warning/10',
-    border: 'border-warning/30',
-    icon: 'text-warning',
+    bg: "bg-warning/10",
+    border: "border-warning/30",
+    icon: "text-warning",
   },
   info: {
-    bg: 'bg-primary/10',
-    border: 'border-primary/30',
-    icon: 'text-primary',
+    bg: "bg-primary/10",
+    border: "border-primary/30",
+    icon: "text-primary",
   },
 };
 
@@ -71,14 +71,14 @@ function AlertItem({
   return (
     <div
       className={cn(
-        'group relative rounded-lg border p-3 transition-colors',
+        "group relative rounded-lg border p-3 transition-colors",
         colors.bg,
         colors.border,
-        alert.acknowledged && 'opacity-60'
+        alert.acknowledged && "opacity-60"
       )}
     >
       <div className="flex items-start gap-3">
-        <div className={cn('mt-0.5', colors.icon)}>
+        <div className={cn("mt-0.5", colors.icon)}>
           <Icon className="size-4" />
         </div>
         <div className="min-w-0 flex-1 space-y-1">
@@ -87,10 +87,10 @@ function AlertItem({
             <Badge
               variant="outline"
               className={cn(
-                'font-mono-display text-[10px] uppercase',
-                alert.severity === 'critical' && 'border-destructive/50 text-destructive',
-                alert.severity === 'warning' && 'border-warning/50 text-warning',
-                alert.severity === 'info' && 'border-primary/50 text-primary'
+                "font-mono-display text-[10px] uppercase",
+                alert.severity === "critical" && "border-destructive/50 text-destructive",
+                alert.severity === "warning" && "border-warning/50 text-warning",
+                alert.severity === "info" && "border-primary/50 text-primary"
               )}
             >
               {alert.severity}
@@ -138,14 +138,14 @@ export function AlertsPanel({ alerts, isLoading, onDismiss, className }: AlertsP
   const hasAlerts = activeAlerts.length > 0;
 
   return (
-    <Card className={cn('', className)}>
+    <Card className={cn("", className)}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <div>
           <CardTitle className="text-base font-medium">Alerts</CardTitle>
           <CardDescription className="text-xs">
             {hasAlerts
-              ? `${activeAlerts.length} active alert${activeAlerts.length > 1 ? 's' : ''}`
-              : 'No active alerts'}
+              ? `${activeAlerts.length} active alert${activeAlerts.length > 1 ? "s" : ""}`
+              : "No active alerts"}
           </CardDescription>
         </div>
         {hasAlerts && (

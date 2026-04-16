@@ -9,8 +9,8 @@
  */
 
 // Must import act before React to ensure it's available
-import { act } from 'react'
-import * as ReactNamespace from 'react'
+import { act } from "react"
+import * as ReactNamespace from "react"
 
 // Declare global types
 declare global {
@@ -32,7 +32,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 // Also try to patch the React module directly if possible
 try {
-  Object.defineProperty(ReactNamespace, 'act', {
+  Object.defineProperty(ReactNamespace, "act", {
     value: act,
     writable: false,
     configurable: true,

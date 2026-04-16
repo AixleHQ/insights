@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
-import { cn } from '@/lib/utils';
-import { Link } from 'react-router-dom';
+import { useState, useMemo } from "react";
+import { cn } from "@/lib/utils";
+import { Link } from "react-router-dom";
 import {
   ArrowLeft,
   Plus,
@@ -8,26 +8,26 @@ import {
   Check,
   AlertCircle,
   AlertTriangle,
-} from 'lucide-react';
-import { useOrg } from '@/contexts/OrgContext';
-import { useToolAccounts, useDeleteToolAccount, useCreateToolAccount, useUpdateToolAccount, useUserOrganizations } from '@/hooks/useApi';
-import type { ToolAccount } from '@/lib/types';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+} from "lucide-react";
+import { useOrg } from "@/contexts/OrgContext";
+import { useToolAccounts, useDeleteToolAccount, useCreateToolAccount, useUpdateToolAccount, useUserOrganizations } from "@/hooks/useApi";
+import type { ToolAccount } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   Card,
   CardContent,
-} from '@/components/ui/card';
+} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -35,7 +35,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,11 +46,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ProviderLogo } from '@/components/icons';
+} from "@/components/ui/alert-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ProviderLogo } from "@/components/icons";
 
-type ToolCategory = 'ai-editors' | 'ai-apis' | 'other';
+type ToolCategory = "ai-editors" | "ai-apis" | "other";
 
 interface ToolProvider {
   id: string;
@@ -63,114 +63,114 @@ interface ToolProvider {
 const toolProviders: ToolProvider[] = [
   // AI Code Editors
   {
-    id: 'claude_code',
-    name: 'Claude Code',
-    description: 'Link your Anthropic account to attribute Claude Code usage',
-    category: 'ai-editors',
-    tokenLabel: 'Access Token',
+    id: "claude_code",
+    name: "Claude Code",
+    description: "Link your Anthropic account to attribute Claude Code usage",
+    category: "ai-editors",
+    tokenLabel: "Access Token",
   },
   {
-    id: 'cursor',
-    name: 'Cursor',
-    description: 'Link your Cursor account for AI code editor attribution',
-    category: 'ai-editors',
-    tokenLabel: 'API Key',
+    id: "cursor",
+    name: "Cursor",
+    description: "Link your Cursor account for AI code editor attribution",
+    category: "ai-editors",
+    tokenLabel: "API Key",
   },
   {
-    id: 'windsurf',
-    name: 'Windsurf',
-    description: 'Link your Windsurf account for AI-assisted coding attribution',
-    category: 'ai-editors',
-    tokenLabel: 'API Key',
+    id: "windsurf",
+    name: "Windsurf",
+    description: "Link your Windsurf account for AI-assisted coding attribution",
+    category: "ai-editors",
+    tokenLabel: "API Key",
   },
   {
-    id: 'github_copilot',
-    name: 'GitHub Copilot',
-    description: 'Link your GitHub account to attribute Copilot events',
-    category: 'ai-editors',
-    tokenLabel: 'Personal Access Token',
+    id: "github_copilot",
+    name: "GitHub Copilot",
+    description: "Link your GitHub account to attribute Copilot events",
+    category: "ai-editors",
+    tokenLabel: "Personal Access Token",
   },
   {
-    id: 'aider',
-    name: 'Aider',
-    description: 'Link your Aider account for AI pair programming attribution',
-    category: 'ai-editors',
-    tokenLabel: 'API Key',
+    id: "aider",
+    name: "Aider",
+    description: "Link your Aider account for AI pair programming attribution",
+    category: "ai-editors",
+    tokenLabel: "API Key",
   },
   {
-    id: 'continue',
-    name: 'Continue',
-    description: 'Link your Continue account for open-source AI code assistant attribution',
-    category: 'ai-editors',
-    tokenLabel: 'API Key',
+    id: "continue",
+    name: "Continue",
+    description: "Link your Continue account for open-source AI code assistant attribution",
+    category: "ai-editors",
+    tokenLabel: "API Key",
   },
   {
-    id: 'cody',
-    name: 'Cody',
-    description: 'Link your Sourcegraph Cody account for AI coding attribution',
-    category: 'ai-editors',
-    tokenLabel: 'API Key',
+    id: "cody",
+    name: "Cody",
+    description: "Link your Sourcegraph Cody account for AI coding attribution",
+    category: "ai-editors",
+    tokenLabel: "API Key",
   },
   {
-    id: 'tabnine',
-    name: 'Tabnine',
-    description: 'Link your Tabnine account for AI code completion attribution',
-    category: 'ai-editors',
-    tokenLabel: 'API Key',
+    id: "tabnine",
+    name: "Tabnine",
+    description: "Link your Tabnine account for AI code completion attribution",
+    category: "ai-editors",
+    tokenLabel: "API Key",
   },
   {
-    id: 'amazon_q',
-    name: 'Amazon Q',
-    description: 'Link your Amazon Q account for AI developer tool attribution',
-    category: 'ai-editors',
-    tokenLabel: 'API Key',
+    id: "amazon_q",
+    name: "Amazon Q",
+    description: "Link your Amazon Q account for AI developer tool attribution",
+    category: "ai-editors",
+    tokenLabel: "API Key",
   },
   // AI APIs
   {
-    id: 'openrouter',
-    name: 'OpenRouter',
-    description: 'Link your OpenRouter account for multi-model AI gateway tracking',
-    category: 'ai-apis',
-    tokenLabel: 'API Key',
+    id: "openrouter",
+    name: "OpenRouter",
+    description: "Link your OpenRouter account for multi-model AI gateway tracking",
+    category: "ai-apis",
+    tokenLabel: "API Key",
   },
   {
-    id: 'anthropic_api',
-    name: 'Anthropic API',
-    description: 'Link your Anthropic API account for direct API usage tracking',
-    category: 'ai-apis',
-    tokenLabel: 'API Key',
+    id: "anthropic_api",
+    name: "Anthropic API",
+    description: "Link your Anthropic API account for direct API usage tracking",
+    category: "ai-apis",
+    tokenLabel: "API Key",
   },
   {
-    id: 'openai_api',
-    name: 'OpenAI API',
-    description: 'Link your OpenAI account for ChatGPT / Codex tracking',
-    category: 'ai-apis',
-    tokenLabel: 'API Key',
+    id: "openai_api",
+    name: "OpenAI API",
+    description: "Link your OpenAI account for ChatGPT / Codex tracking",
+    category: "ai-apis",
+    tokenLabel: "API Key",
   },
   {
-    id: 'gemini_api',
-    name: 'Gemini API',
-    description: 'Link your Google account for Gemini API usage tracking',
-    category: 'ai-apis',
-    tokenLabel: 'API Key',
+    id: "gemini_api",
+    name: "Gemini API",
+    description: "Link your Google account for Gemini API usage tracking",
+    category: "ai-apis",
+    tokenLabel: "API Key",
   },
   // Other
   {
-    id: 'custom',
-    name: 'Custom Tool',
-    description: 'Link a custom or internal AI tool for usage attribution',
-    category: 'other',
-    tokenLabel: 'API Key',
+    id: "custom",
+    name: "Custom Tool",
+    description: "Link a custom or internal AI tool for usage attribution",
+    category: "other",
+    tokenLabel: "API Key",
   },
 ];
 
 const categoryLabels: Record<ToolCategory, string> = {
-  'ai-editors': 'AI Code Editors',
-  'ai-apis': 'AI APIs',
-  'other': 'Other',
+  "ai-editors": "AI Code Editors",
+  "ai-apis": "AI APIs",
+  "other": "Other",
 };
 
-const categoryOrder: ToolCategory[] = ['ai-editors', 'ai-apis', 'other'];
+const categoryOrder: ToolCategory[] = ["ai-editors", "ai-apis", "other"];
 
 function AccountSkeleton() {
   return (
@@ -203,16 +203,16 @@ interface ConnectDialogProps {
 }
 
 function ConnectDialog({ provider, open, onOpenChange, onSubmit, isSubmitting }: ConnectDialogProps) {
-  const [accountId, setAccountId] = useState('');
-  const [accountName, setAccountName] = useState('');
-  const [token, setToken] = useState('');
+  const [accountId, setAccountId] = useState("");
+  const [accountName, setAccountName] = useState("");
+  const [token, setToken] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const handleOpenChange = (next: boolean) => {
     if (!next) {
-      setAccountId('');
-      setAccountName('');
-      setToken('');
+      setAccountId("");
+      setAccountName("");
+      setToken("");
       setError(null);
     }
     onOpenChange(next);
@@ -226,7 +226,7 @@ function ConnectDialog({ provider, open, onOpenChange, onSubmit, isSubmitting }:
       await onSubmit({ providerId: provider.id, accountId: accountId.trim(), accountName: accountName.trim(), token: token.trim() });
       handleOpenChange(false);
     } catch {
-      setError('Failed to connect account. Please try again.');
+      setError("Failed to connect account. Please try again.");
     }
   };
 
@@ -283,7 +283,7 @@ function ConnectDialog({ provider, open, onOpenChange, onSubmit, isSubmitting }:
               Cancel
             </Button>
             <Button type="submit" disabled={!accountId.trim() || isSubmitting}>
-              {isSubmitting ? 'Connecting...' : 'Connect Account'}
+              {isSubmitting ? "Connecting..." : "Connect Account"}
             </Button>
           </DialogFooter>
         </form>
@@ -301,12 +301,12 @@ interface ReconnectDialogProps {
 }
 
 function ReconnectDialog({ provider, open, onOpenChange, onSubmit, isSubmitting }: ReconnectDialogProps) {
-  const [token, setToken] = useState('');
+  const [token, setToken] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const handleOpenChange = (next: boolean) => {
     if (!next) {
-      setToken('');
+      setToken("");
       setError(null);
     }
     onOpenChange(next);
@@ -320,7 +320,7 @@ function ReconnectDialog({ provider, open, onOpenChange, onSubmit, isSubmitting 
       await onSubmit(token.trim());
       handleOpenChange(false);
     } catch {
-      setError('Failed to reconnect. Please try again.');
+      setError("Failed to reconnect. Please try again.");
     }
   };
 
@@ -354,7 +354,7 @@ function ReconnectDialog({ provider, open, onOpenChange, onSubmit, isSubmitting 
               Cancel
             </Button>
             <Button type="submit" disabled={!token.trim() || isSubmitting}>
-              {isSubmitting ? 'Reconnecting...' : 'Reconnect'}
+              {isSubmitting ? "Reconnecting..." : "Reconnect"}
             </Button>
           </DialogFooter>
         </form>
@@ -383,7 +383,7 @@ function ToolCard({
   const isLinked = !!linkedAccount;
 
   return (
-    <Card className={cn(isLinked && !linkedAccount.isActive && 'opacity-60')}>
+    <Card className={cn(isLinked && !linkedAccount.isActive && "opacity-60")}>
       <CardContent className="flex flex-col gap-4 p-4">
         <div className="flex items-start gap-3">
           <ProviderLogo provider={provider.id} showBackground size="md" className="shrink-0" />
@@ -393,10 +393,10 @@ function ToolCard({
               {isLinked && (
                 <Badge
                   variant="outline"
-                  className={linkedAccount.isActive ? 'text-success' : 'text-muted-foreground'}
+                  className={linkedAccount.isActive ? "text-success" : "text-muted-foreground"}
                 >
                   <Check className="mr-1 size-3" />
-                  {linkedAccount.isActive ? 'Connected' : 'Disabled'}
+                  {linkedAccount.isActive ? "Connected" : "Disabled"}
                 </Badge>
               )}
               {isLinked && linkedAccount.tokenExpired && (
@@ -433,7 +433,7 @@ function ToolCard({
                 onClick={() => onToggleActive?.(linkedAccount.id, !linkedAccount.isActive)}
                 disabled={isToggling}
               >
-                {linkedAccount.isActive ? 'Disable' : 'Enable'}
+                {linkedAccount.isActive ? "Disable" : "Enable"}
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
@@ -477,7 +477,7 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
   const { currentOrg } = useOrg();
   const { data: orgs, isLoading: orgsLoading } = useUserOrganizations();
   const [userSelectedOrgId, setUserSelectedOrgId] = useState<string | null>(null);
-  const selectedOrgId = userSelectedOrgId ?? currentOrg?.id ?? '';
+  const selectedOrgId = userSelectedOrgId ?? currentOrg?.id ?? "";
   const [connectingProvider, setConnectingProvider] = useState<ToolProvider | null>(null);
   const [reconnectingAccountId, setReconnectingAccountId] = useState<string | null>(null);
 
@@ -500,9 +500,9 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
 
   const providersByCategory = useMemo(() => {
     const grouped: Record<ToolCategory, ToolProvider[]> = {
-      'ai-editors': [],
-      'ai-apis': [],
-      'other': [],
+      "ai-editors": [],
+      "ai-apis": [],
+      "other": [],
     };
     availableProviders.forEach((p) => {
       grouped[p.category].push(p);
@@ -526,7 +526,7 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
     try {
       await deleteAccount.mutateAsync({ orgId: selectedOrgId, accountId });
     } catch (error) {
-      console.error('Failed to disconnect account:', error);
+      console.error("Failed to disconnect account:", error);
     }
   };
 
@@ -535,7 +535,7 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
     try {
       await updateAccount.mutateAsync({ orgId: selectedOrgId, accountId, isActive });
     } catch (error) {
-      console.error('Failed to update account status:', error);
+      console.error("Failed to update account status:", error);
     }
   };
 
@@ -550,7 +550,7 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
   };
 
   return (
-    <div className={cn('space-y-6', !embedded && 'mx-auto max-w-4xl')}>
+    <div className={cn("space-y-6", !embedded && "mx-auto max-w-4xl")}>
       {!embedded && (
         <div className="flex items-center gap-4">
           <Button asChild variant="ghost" size="icon" aria-label="Back to settings">
@@ -592,7 +592,7 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
           ))}
         </div>
       ) : (
-        <Tabs defaultValue={connectedProviders.length > 0 ? 'connected' : 'available'}>
+        <Tabs defaultValue={connectedProviders.length > 0 ? "connected" : "available"}>
           <TabsList>
             <TabsTrigger value="connected">
               Connected ({connectedProviders.length})

@@ -10,7 +10,7 @@ export interface User {
   email: string;
   name: string | null;
   avatarUrl: string | null;
-  role: 'admin' | 'member' | 'viewer';
+  role: "admin" | "member" | "viewer";
   super_admin: boolean;
   created_at: string;
   updated_at: string;
@@ -46,7 +46,7 @@ export interface OrganizationMember {
   id: string;
   user_id: string;
   organization_id: string;
-  role: 'owner' | 'admin' | 'member' | 'viewer';
+  role: "owner" | "admin" | "member" | "viewer";
   user: User;
   created_at: string;
   updated_at: string;
@@ -84,8 +84,8 @@ export interface ProjectWithStats extends Project {
 }
 
 // Connector types
-export type ConnectorProvider = 'github' | 'gitlab' | 'bitbucket' | 'jira' | 'linear' | 'anthropic' | 'openai' | 'openrouter' | 'gemini' | 'slack';
-export type ConnectorStatus = 'connected' | 'testing' | 'error' | 'disconnected';
+export type ConnectorProvider = "github" | "gitlab" | "bitbucket" | "jira" | "linear" | "anthropic" | "openai" | "openrouter" | "gemini" | "slack";
+export type ConnectorStatus = "connected" | "testing" | "error" | "disconnected";
 
 export interface Connector {
   id: string;
@@ -113,7 +113,7 @@ export interface Connector {
 }
 
 // Project connector types
-export type ProjectConnectorProvider = 'anthropic' | 'openai' | 'openrouter' | 'gemini' | 'slack';
+export type ProjectConnectorProvider = "anthropic" | "openai" | "openrouter" | "gemini" | "slack";
 
 export interface ProjectConnector {
   id: string;
@@ -156,8 +156,8 @@ export interface ToolAccount {
 }
 
 // Event types
-export type RiskLevel = 'none' | 'low' | 'medium' | 'high' | 'critical';
-export type EventType = 'completion' | 'prompt' | 'chat' | 'edit' | 'generation';
+export type RiskLevel = "none" | "low" | "medium" | "high" | "critical";
+export type EventType = "completion" | "prompt" | "chat" | "edit" | "generation";
 
 export interface ToolEvent {
   id: string;
@@ -230,7 +230,7 @@ export interface ToolUsageStats {
 }
 
 // Alert types
-export type AlertSeverity = 'info' | 'warning' | 'error' | 'critical';
+export type AlertSeverity = "info" | "warning" | "error" | "critical";
 
 export interface Alert {
   id: string;
@@ -270,10 +270,10 @@ export interface PaginatedResponse<T> {
 }
 
 // Retention policy types — values match backend model constants
-export type RawEventTtl = '6_hours' | '12_hours' | '24_hours' | '48_hours' | '72_hours';
-export type ToolEventsRetention = '30_days' | '60_days' | '90_days' | '180_days' | '365_days' | '730_days';
-export type HourlyAggregateRetention = '90_days' | '180_days' | '365_days' | '730_days';
-export type DailyAggregateRetention = '365_days' | '730_days' | '1095_days' | 'forever';
+export type RawEventTtl = "6_hours" | "12_hours" | "24_hours" | "48_hours" | "72_hours";
+export type ToolEventsRetention = "30_days" | "60_days" | "90_days" | "180_days" | "365_days" | "730_days";
+export type HourlyAggregateRetention = "90_days" | "180_days" | "365_days" | "730_days";
+export type DailyAggregateRetention = "365_days" | "730_days" | "1095_days" | "forever";
 
 export interface RetentionPolicy {
   rawEventTtl: RawEventTtl;
@@ -296,8 +296,8 @@ export interface ProjectRetentionPolicy {
 }
 
 // Invitation types
-export type InvitationStatus = 'pending' | 'accepted' | 'revoked' | 'expired';
-export type MemberRole = 'owner' | 'admin' | 'member' | 'viewer';
+export type InvitationStatus = "pending" | "accepted" | "revoked" | "expired";
+export type MemberRole = "owner" | "admin" | "member" | "viewer";
 
 export interface Invitation {
   id: string;

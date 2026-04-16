@@ -1,6 +1,6 @@
-import { UserManager, User, Log } from 'oidc-client-ts';
-import type { UserManagerSettings } from 'oidc-client-ts';
-import { config } from './config';
+import { UserManager, User, Log } from "oidc-client-ts";
+import type { UserManagerSettings } from "oidc-client-ts";
+import { config } from "./config";
 
 if (import.meta.env.DEV) {
   Log.setLogger(console);
@@ -19,8 +19,8 @@ const settings: UserManagerSettings = {
   client_id: keycloakConfig.clientId,
   redirect_uri: `${window.location.origin}/auth/callback`,
   post_logout_redirect_uri: `${window.location.origin}`,
-  response_type: 'code',
-  scope: 'openid profile email',
+  response_type: "code",
+  scope: "openid profile email",
   automaticSilentRenew: true,
   silentRequestTimeoutInSeconds: 10,
   accessTokenExpiringNotificationTimeInSeconds: 60,
@@ -38,27 +38,27 @@ export function getUserManager(): UserManager {
 
     // Set up event handlers
     userManager.events.addAccessTokenExpiring(() => {
-      console.log('[Auth] Access token expiring...');
+      console.log("[Auth] Access token expiring...");
     });
 
     userManager.events.addAccessTokenExpired(() => {
-      console.log('[Auth] Access token expired');
+      console.log("[Auth] Access token expired");
     });
 
     userManager.events.addSilentRenewError((error) => {
-      console.error('[Auth] Silent renew error:', error);
+      console.error("[Auth] Silent renew error:", error);
     });
 
     userManager.events.addUserLoaded((user) => {
-      console.log('[Auth] User loaded:', user.profile.email);
+      console.log("[Auth] User loaded:", user.profile.email);
     });
 
     userManager.events.addUserUnloaded(() => {
-      console.log('[Auth] User unloaded');
+      console.log("[Auth] User unloaded");
     });
 
     userManager.events.addUserSignedOut(() => {
-      console.log('[Auth] User signed out');
+      console.log("[Auth] User signed out");
     });
   }
 
@@ -98,11 +98,11 @@ export async function getAccessToken(): Promise<string | null> {
     const expiresIn = expiresAt - now;
 
     if (user.expired || expiresIn < 30) {
-      console.log('[Auth] Token expired or expiring soon, attempting silent renew...');
+      console.log("[Auth] Token expired or expiring soon, attempting silent renew...");
       try {
         user = await manager.signinSilent();
       } catch (error) {
-        console.error('[Auth] Silent renew failed in getAccessToken:', error);
+        console.error("[Auth] Silent renew failed in getAccessToken:", error);
         // Return the existing token anyway - it might still work
       }
     }
@@ -116,7 +116,7 @@ export async function silentRenew(): Promise<User | null> {
   try {
     return await manager.signinSilent();
   } catch (error) {
-    console.error('[Auth] Silent renew failed:', error);
+    console.error("[Auth] Silent renew failed:", error);
     return null;
   }
 }
@@ -138,7 +138,7 @@ export interface UserProfile {
 export function getUserProfile(user: User): UserProfile {
   return {
     sub: user.profile.sub,
-    email: user.profile.email ?? '',
+    email: user.profile.email ?? "",
     name: user.profile.name,
     picture: user.profile.picture,
     email_verified: user.profile.email_verified,
@@ -154,7 +154,7 @@ export async function authFetch(
 
   const headers = new Headers(options.headers);
   if (token) {
-    headers.set('Authorization', `Bearer ${token}`);
+    headers.set("Authorization", `Bearer ${token}`);
   }
 
   return fetch(url, {
@@ -171,25 +171,25 @@ export async function directLogin(username: string, password: string): Promise<U
   const tokenUrl = `${keycloakConfig.url}/realms/${keycloakConfig.realm}/protocol/openid-connect/token`;
 
   const response = await fetch(tokenUrl, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
+      "Content-Type": "application/x-www-form-urlencoded",
     },
     body: new URLSearchParams({
-      grant_type: 'password',
+      grant_type: "password",
       client_id: keycloakConfig.clientId,
       username,
       password,
-      scope: 'openid profile email',
+      scope: "openid profile email",
     }),
   });
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    if (errorData.error === 'invalid_grant') {
-      throw new Error('Invalid email or password');
+    if (errorData.error === "invalid_grant") {
+      throw new Error("Invalid email or password");
     }
-    throw new Error(errorData.error_description || 'Authentication failed');
+    throw new Error(errorData.error_description || "Authentication failed");
   }
 
   const tokenResponse = await response.json();
@@ -198,12 +198,12 @@ export async function directLogin(username: string, password: string): Promise<U
   const manager = getUserManager();
 
   // Parse the ID token to get user info
-  const idTokenParts = tokenResponse.id_token.split('.');
+  const idTokenParts = tokenResponse.id_token.split(".");
   const idTokenPayload = JSON.parse(atob(idTokenParts[1]));
 
   const user = new User({
     access_token: tokenResponse.access_token,
-    token_type: tokenResponse.token_type || 'Bearer',
+    token_type: tokenResponse.token_type || "Bearer",
     id_token: tokenResponse.id_token,
     refresh_token: tokenResponse.refresh_token,
     profile: {

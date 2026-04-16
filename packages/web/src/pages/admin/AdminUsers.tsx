@@ -1,21 +1,21 @@
-import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import { Search, Users, Shield, ShieldCheck, Mail, MoreVertical, X } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { SortButton, type SortDirection } from '@/components/ui/sort-button';
+import { useState, useMemo } from "react";
+import { Link } from "react-router-dom";
+import { Search, Users, Shield, ShieldCheck, Mail, MoreVertical, X } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { SortButton, type SortDirection } from "@/components/ui/sort-button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -23,17 +23,17 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { formatDistanceToNow } from '@/lib/utils';
+} from "@/components/ui/dropdown-menu";
+import { formatDistanceToNow } from "@/lib/utils";
 
-type UserSortField = 'name' | 'organizations_count' | 'events_count' | 'created_at' | 'last_active_at';
+type UserSortField = "name" | "organizations_count" | "events_count" | "created_at" | "last_active_at";
 
 interface AdminUser {
   id: string;
@@ -82,31 +82,31 @@ function UserSkeleton() {
 }
 
 export function AdminUsers() {
-  const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState<string>('all');
-  const [sortField, setSortField] = useState<UserSortField>('created_at');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [sortField, setSortField] = useState<UserSortField>("created_at");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   const { data: users, isLoading } = useQuery({
-    queryKey: ['admin', 'users'],
-    queryFn: () => api.get<AdminUser[]>('/admin/users'),
+    queryKey: ["admin", "users"],
+    queryFn: () => api.get<AdminUser[]>("/admin/users"),
   });
 
   const handleSort = (field: UserSortField) => {
     if (sortField === field) {
-      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
     } else {
       setSortField(field);
-      setSortDirection('desc');
+      setSortDirection("desc");
     }
   };
 
   const clearFilters = () => {
-    setSearch('');
-    setRoleFilter('all');
+    setSearch("");
+    setRoleFilter("all");
   };
 
-  const hasActiveFilters = search || roleFilter !== 'all';
+  const hasActiveFilters = search || roleFilter !== "all";
 
   const filteredUsers = useMemo(() => {
     if (!users) return [];
@@ -124,10 +124,10 @@ export function AdminUsers() {
     }
 
     // Apply role filter
-    if (roleFilter !== 'all') {
-      if (roleFilter === 'super_admin') {
+    if (roleFilter !== "all") {
+      if (roleFilter === "super_admin") {
         result = result.filter((user) => user.super_admin);
-      } else if (roleFilter === 'user') {
+      } else if (roleFilter === "user") {
         result = result.filter((user) => !user.super_admin);
       }
     }
@@ -136,26 +136,26 @@ export function AdminUsers() {
     result.sort((a, b) => {
       let comparison = 0;
       switch (sortField) {
-        case 'name':
+        case "name":
           comparison = (a.name || a.email).localeCompare(b.name || b.email);
           break;
-        case 'organizations_count':
+        case "organizations_count":
           comparison = a.organizations_count - b.organizations_count;
           break;
-        case 'events_count':
+        case "events_count":
           comparison = a.events_count - b.events_count;
           break;
-        case 'created_at':
+        case "created_at":
           comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
           break;
-        case 'last_active_at': {
+        case "last_active_at": {
           const aTime = a.last_active_at ? new Date(a.last_active_at).getTime() : 0;
           const bTime = b.last_active_at ? new Date(b.last_active_at).getTime() : 0;
           comparison = aTime - bTime;
           break;
         }
       }
-      return sortDirection === 'asc' ? comparison : -comparison;
+      return sortDirection === "asc" ? comparison : -comparison;
     });
 
     return result;
@@ -164,9 +164,9 @@ export function AdminUsers() {
   const getInitials = (name: string | null, email: string) => {
     if (name) {
       return name
-        .split(' ')
+        .split(" ")
         .map((n) => n[0])
-        .join('')
+        .join("")
         .toUpperCase()
         .slice(0, 2);
     }
@@ -285,7 +285,7 @@ export function AdminUsers() {
                   <div className="flex flex-col items-center gap-2">
                     <Users className="size-8 text-muted-foreground" />
                     <p className="text-muted-foreground">
-                      {search ? 'No users found' : 'No users yet'}
+                      {search ? "No users found" : "No users yet"}
                     </p>
                   </div>
                 </TableCell>
@@ -303,7 +303,7 @@ export function AdminUsers() {
                       </Avatar>
                       <div>
                         <p className="font-medium">
-                          {user.name || user.email.split('@')[0]}
+                          {user.name || user.email.split("@")[0]}
                         </p>
                         <p className="text-xs text-muted-foreground">{user.email}</p>
                       </div>
@@ -334,7 +334,7 @@ export function AdminUsers() {
                   <TableCell className="text-sm text-muted-foreground">
                     {user.last_active_at
                       ? formatDistanceToNow(user.last_active_at)
-                      : 'Never'}
+                      : "Never"}
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -353,7 +353,7 @@ export function AdminUsers() {
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem>
-                          {user.super_admin ? 'Revoke Super Admin' : 'Make Super Admin'}
+                          {user.super_admin ? "Revoke Super Admin" : "Make Super Admin"}
                         </DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive">
                           Disable Account

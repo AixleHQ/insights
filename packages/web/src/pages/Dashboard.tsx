@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Activity, DollarSign, AlertTriangle, Users, Coins } from 'lucide-react';
-import { useOrg } from '@/contexts/OrgContext';
-import { useOverviewStats, useDailyStats, useEvents, useDailyByTool } from '@/hooks/useApi';
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import { Activity, DollarSign, AlertTriangle, Users, Coins } from "lucide-react";
+import { useOrg } from "@/contexts/OrgContext";
+import { useOverviewStats, useDailyStats, useEvents, useDailyByTool } from "@/hooks/useApi";
 import {
   MetricCard,
   MetricGrid,
@@ -15,8 +15,8 @@ import {
   type ActivityEvent,
   type ToolUsageData,
   type Alert,
-} from '@/components/dashboard';
-import { EventDrawer } from '@/components/events';
+} from "@/components/dashboard";
+import { EventDrawer } from "@/components/events";
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -24,8 +24,8 @@ export function Dashboard() {
 
   // Role-based redirect: members and viewers go to profile
   useEffect(() => {
-    if (currentRole && (currentRole === 'member' || currentRole === 'viewer')) {
-      navigate('/profile', { replace: true });
+    if (currentRole && (currentRole === "member" || currentRole === "viewer")) {
+      navigate("/profile", { replace: true });
     }
   }, [currentRole, navigate]);
 
@@ -33,22 +33,22 @@ export function Dashboard() {
   const {
     data: stats,
     isLoading: isLoadingStats,
-  } = useOverviewStats(currentOrg?.id || '');
+  } = useOverviewStats(currentOrg?.id || "");
 
   const {
     data: dailyData,
     isLoading: isLoadingDaily,
-  } = useDailyStats(currentOrg?.id || '', 30);
+  } = useDailyStats(currentOrg?.id || "", 30);
 
   const {
     data: eventsResponse,
     isLoading: isLoadingEvents,
-  } = useEvents(currentOrg?.id || '', { per_page: 10 });
+  } = useEvents(currentOrg?.id || "", { per_page: 10 });
 
   const {
     data: toolByDayData,
     isLoading: isLoadingToolByDay,
-  } = useDailyByTool(currentOrg?.id || '', 365);
+  } = useDailyByTool(currentOrg?.id || "", 365);
 
   // Transform API responses to component formats
   const chartData: DailyCostData[] = dailyData?.data?.map((d) => ({
@@ -96,13 +96,13 @@ export function Dashboard() {
   const alerts: Alert[] = stats?.high_risk_events && stats.high_risk_events > 0
     ? [
         {
-          id: 'high-risk-events',
-          type: 'risk_detected',
-          severity: 'warning',
-          title: 'High-risk events detected',
+          id: "high-risk-events",
+          type: "risk_detected",
+          severity: "warning",
+          title: "High-risk events detected",
           description: `${stats.high_risk_events} high-risk event(s) require attention`,
           created_at: new Date().toISOString(),
-          acknowledged: dismissedAlerts.has('high-risk-events'),
+          acknowledged: dismissedAlerts.has("high-risk-events"),
         },
       ]
     : [];
@@ -120,12 +120,12 @@ export function Dashboard() {
     setDrawerOpen(true);
   }, []);
 
-  const handleNavigate = useCallback((direction: 'prev' | 'next') => {
+  const handleNavigate = useCallback((direction: "prev" | "next") => {
     if (!selectedEventId) return;
     const currentIndex = events.findIndex((e) => e.id === selectedEventId);
     if (currentIndex === -1) return;
 
-    const newIndex = direction === 'prev' ? currentIndex - 1 : currentIndex + 1;
+    const newIndex = direction === "prev" ? currentIndex - 1 : currentIndex + 1;
     if (newIndex >= 0 && newIndex < events.length) {
       setSelectedEventId(events[newIndex].id);
     }
@@ -140,7 +140,7 @@ export function Dashboard() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         <p className="text-sm text-muted-foreground">
-          AI tool usage and cost overview for {currentOrg?.name || 'your organization'}
+          AI tool usage and cost overview for {currentOrg?.name || "your organization"}
         </p>
       </div>
 
@@ -159,9 +159,9 @@ export function Dashboard() {
           trend={
             stats?.events_change_percent
               ? stats.events_change_percent > 0
-                ? 'up'
-                : 'down'
-              : 'neutral'
+                ? "up"
+                : "down"
+              : "neutral"
           }
           trendValue={
             stats?.events_change_percent
@@ -178,9 +178,9 @@ export function Dashboard() {
           trend={
             stats?.cost_change_percent
               ? stats.cost_change_percent > 0
-                ? 'up'
-                : 'down'
-              : 'neutral'
+                ? "up"
+                : "down"
+              : "neutral"
           }
           trendValue={
             stats?.cost_change_percent

@@ -1,40 +1,40 @@
-import { useMemo, useState } from 'react';
-import { Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
-import { User, Settings2, Bell, Shield, Wrench, Loader2 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useOrg } from '@/contexts/OrgContext';
-import { useTheme, type Theme } from '@/contexts/ThemeContext';
-import { useOrganizationMembers, useCurrentUser, useUpdateCurrentUser, useUserOrganizations, useUpdateUserSetting } from '@/hooks/useApi';
-import { MemberProfileView } from './MemberProfile';
-import { cn } from '@/lib/utils';
+import { useMemo, useState } from "react";
+import { Routes, Route, Link, Navigate, useLocation } from "react-router-dom";
+import { User, Settings2, Bell, Shield, Wrench, Loader2 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useOrg } from "@/contexts/OrgContext";
+import { useTheme, type Theme } from "@/contexts/ThemeContext";
+import { useOrganizationMembers, useCurrentUser, useUpdateCurrentUser, useUserOrganizations, useUpdateUserSetting } from "@/hooks/useApi";
+import { MemberProfileView } from "./MemberProfile";
+import { cn } from "@/lib/utils";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+} from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { ToolAccounts } from './ToolAccounts';
+} from "@/components/ui/select";
+import { ToolAccounts } from "./ToolAccounts";
 
 const navItems = [
-  { title: 'Profile', href: '/profile', icon: User },
-  { title: 'Preferences', href: '/profile/settings', icon: Settings2 },
-  { title: 'Notifications', href: '/profile/settings/notifications', icon: Bell },
-  { title: 'Security', href: '/profile/settings/security', icon: Shield },
-  { title: 'Tools', href: '/profile/tools', icon: Wrench },
+  { title: "Profile", href: "/profile", icon: User },
+  { title: "Preferences", href: "/profile/settings", icon: Settings2 },
+  { title: "Notifications", href: "/profile/settings/notifications", icon: Bell },
+  { title: "Security", href: "/profile/settings/security", icon: Shield },
+  { title: "Tools", href: "/profile/tools", icon: Wrench },
 ];
 
 function UserSettingsNav() {
@@ -49,10 +49,10 @@ function UserSettingsNav() {
             key={item.href}
             to={item.href}
             className={cn(
-              'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+              "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
               isActive
-                ? 'bg-primary/10 text-primary'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
             )}
           >
             <item.icon className="size-4" />
@@ -67,13 +67,13 @@ function UserSettingsNav() {
 function ProfileSection() {
   const { profile } = useAuth();
   const { currentOrg } = useOrg();
-  const { data: members, isLoading: membersLoading } = useOrganizationMembers(currentOrg?.id || '');
+  const { data: members, isLoading: membersLoading } = useOrganizationMembers(currentOrg?.id || "");
   const { data: currentUser } = useCurrentUser();
   const updateUser = useUpdateCurrentUser();
 
   const [isEditing, setIsEditing] = useState(false);
-  const [name, setName] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState('');
+  const [name, setName] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const myMemberId = useMemo(
@@ -82,15 +82,15 @@ function ProfileSection() {
   );
 
   function handleEdit() {
-    setName(currentUser?.name ?? '');
-    setAvatarUrl(currentUser?.avatarUrl ?? '');
+    setName(currentUser?.name ?? "");
+    setAvatarUrl(currentUser?.avatarUrl ?? "");
     setError(null);
     setIsEditing(true);
   }
 
   function handleCancel() {
-    setName(currentUser?.name ?? '');
-    setAvatarUrl(currentUser?.avatarUrl ?? '');
+    setName(currentUser?.name ?? "");
+    setAvatarUrl(currentUser?.avatarUrl ?? "");
     setError(null);
     setIsEditing(false);
   }
@@ -105,17 +105,17 @@ function ProfileSection() {
           const apiError = err as { response?: { data?: { errors?: Record<string, string[]> } } };
           const errors = apiError?.response?.data?.errors;
           if (errors) {
-            setError(Object.values(errors).flat().join(', '));
+            setError(Object.values(errors).flat().join(", "));
           } else {
-            setError('Failed to save changes. Please try again.');
+            setError("Failed to save changes. Please try again.");
           }
         },
       }
     );
   }
 
-  const displayName = currentUser?.name || profile?.name || '—';
-  const initials = displayName !== '—' ? displayName.slice(0, 2).toUpperCase() : '?';
+  const displayName = currentUser?.name || profile?.name || "—";
+  const initials = displayName !== "—" ? displayName.slice(0, 2).toUpperCase() : "?";
 
   return (
     <div className="space-y-6">
@@ -161,7 +161,7 @@ function ProfileSection() {
               </div>
               <div className="space-y-1">
                 <p className="text-sm font-medium">Email</p>
-                <p className="text-sm text-muted-foreground">{profile?.email || '—'}</p>
+                <p className="text-sm text-muted-foreground">{profile?.email || "—"}</p>
               </div>
               {error && <p className="text-sm text-destructive">{error}</p>}
               <div className="flex gap-2">
@@ -188,7 +188,7 @@ function ProfileSection() {
               </div>
               <div className="space-y-1">
                 <p className="text-sm font-medium">Email</p>
-                <p className="text-sm text-muted-foreground">{profile?.email || '—'}</p>
+                <p className="text-sm text-muted-foreground">{profile?.email || "—"}</p>
               </div>
             </>
           )}
@@ -204,9 +204,9 @@ function ProfileSection() {
 }
 
 const themeOptions: { value: Theme; label: string }[] = [
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' },
-  { value: 'system', label: 'System' },
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+  { value: "system", label: "System" },
 ];
 
 function PreferencesSection() {
@@ -215,7 +215,7 @@ function PreferencesSection() {
   const { data: orgs, isLoading: orgsLoading } = useUserOrganizations();
   const updateSetting = useUpdateUserSetting();
 
-  const savedDefaultOrgId = currentUser?.settings?.default_org_id ?? '';
+  const savedDefaultOrgId = currentUser?.settings?.default_org_id ?? "";
 
   return (
     <div className="space-y-6">
@@ -252,7 +252,7 @@ function PreferencesSection() {
               <Select
                 value={savedDefaultOrgId}
                 onValueChange={(v) =>
-                  updateSetting.mutate({ key: 'default_org_id', value: v })
+                  updateSetting.mutate({ key: "default_org_id", value: v })
                 }
               >
                 <SelectTrigger id="default-org-select" className="w-48">
@@ -278,10 +278,10 @@ function PreferencesSection() {
 }
 
 const NOTIFICATION_TOGGLES = [
-  { key: 'notify_in_app_risk',  label: 'In-app risk alerts',  description: 'Show alerts in-app when a risk is detected.' },
-  { key: 'notify_in_app_cost',  label: 'In-app cost alerts',  description: 'Show alerts in-app when cost thresholds are exceeded.' },
-  { key: 'notify_email_digest', label: 'Weekly email digest', description: 'Receive a weekly summary of usage and costs by email.' },
-  { key: 'notify_email_alerts', label: 'Alert emails',        description: 'Receive email notifications for risk and cost alerts.' },
+  { key: "notify_in_app_risk",  label: "In-app risk alerts",  description: "Show alerts in-app when a risk is detected." },
+  { key: "notify_in_app_cost",  label: "In-app cost alerts",  description: "Show alerts in-app when cost thresholds are exceeded." },
+  { key: "notify_email_digest", label: "Weekly email digest", description: "Receive a weekly summary of usage and costs by email." },
+  { key: "notify_email_alerts", label: "Alert emails",        description: "Receive email notifications for risk and cost alerts." },
 ] as const;
 
 function NotificationsSection() {
@@ -308,7 +308,7 @@ function NotificationsSection() {
             </div>
           ) : (
             NOTIFICATION_TOGGLES.map(({ key, label, description }) => {
-              const enabled = currentUser?.settings?.[key] === 'true';
+              const enabled = currentUser?.settings?.[key] === "true";
               return (
                 <div key={key} className="flex items-center justify-between gap-4">
                   <div className="space-y-0.5">
@@ -359,7 +359,7 @@ function SecuritySection() {
               <p className="text-sm text-muted-foreground">
                 {currentUser?.lastSignInAt
                   ? new Date(currentUser.lastSignInAt).toLocaleString()
-                  : 'No sign-in recorded'}
+                  : "No sign-in recorded"}
               </p>
             )}
           </div>

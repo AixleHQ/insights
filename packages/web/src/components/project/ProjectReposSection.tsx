@@ -1,9 +1,9 @@
-import { useState } from 'react';
-import { GitBranch, Github, ExternalLink, Plus, Unlink } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
+import { useState } from "react";
+import { GitBranch, Github, ExternalLink, Plus, Unlink } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,9 +13,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { formatDistanceToNow } from '@/lib/utils';
-import type { ProjectRepository } from '@/hooks/useApi';
+} from "@/components/ui/alert-dialog";
+import { formatDistanceToNow } from "@/lib/utils";
+import type { ProjectRepository } from "@/hooks/useApi";
 
 interface ProjectReposSectionProps {
   repositories: ProjectRepository[] | undefined;
@@ -27,7 +27,7 @@ interface ProjectReposSectionProps {
 
 function getProviderIcon(provider: string) {
   switch (provider.toLowerCase()) {
-    case 'github':
+    case "github":
       return Github;
     default:
       return GitBranch;
@@ -76,7 +76,7 @@ export function ProjectReposSection({ repositories, isLoading, className, onConn
           )}
         </div>
         <CardDescription>
-          {repoCount} {repoCount === 1 ? 'repository' : 'repositories'} linked
+          {repoCount} {repoCount === 1 ? "repository" : "repositories"} linked
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -110,8 +110,8 @@ export function ProjectReposSection({ repositories, isLoading, className, onConn
                     </div>
                   </a>
                   <div className="flex items-center gap-2 shrink-0 ml-2">
-                    <Badge variant={repo.isActive ? 'default' : 'secondary'} className="text-xs">
-                      {repo.isActive ? 'Active' : 'Inactive'}
+                    <Badge variant={repo.isActive ? "default" : "secondary"} className="text-xs">
+                      {repo.isActive ? "Active" : "Inactive"}
                     </Badge>
                     <ExternalLink className="size-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
                     {onDisconnect && (

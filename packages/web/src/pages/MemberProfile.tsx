@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { useMemo, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   Mail,
@@ -20,15 +20,15 @@ import {
   ArrowUpFromLine,
   Layers,
   GitCommitHorizontal,
-} from 'lucide-react';
-import { useOrg } from '@/contexts/OrgContext';
-import { useMember, useMemberEvents, useMemberStats, useProject, useEvents } from '@/hooks/useApi';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Separator } from '@/components/ui/separator';
+} from "lucide-react";
+import { useOrg } from "@/contexts/OrgContext";
+import { useMember, useMemberEvents, useMemberStats, useProject, useEvents } from "@/hooks/useApi";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -36,32 +36,32 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { EventsTable, type EventRow } from '@/components/events';
-import { ActivityHeatmap } from '@/components/dashboard';
-import { SortButton, type SortDirection } from '@/components/ui/sort-button';
-import { TooltipProvider } from '@/components/ui/tooltip';
-import { cn, humanizeToolName, toEventRow } from '@/lib/utils';
+} from "@/components/ui/table";
+import { EventsTable, type EventRow } from "@/components/events";
+import { ActivityHeatmap } from "@/components/dashboard";
+import { SortButton, type SortDirection } from "@/components/ui/sort-button";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { cn, humanizeToolName, toEventRow } from "@/lib/utils";
 
-type MemberRole = 'owner' | 'admin' | 'member' | 'viewer';
+type MemberRole = "owner" | "admin" | "member" | "viewer";
 
 const roleConfig: Record<MemberRole, { label: string; icon: typeof Shield; color: string; bg: string }> = {
-  owner: { label: 'Owner', icon: ShieldCheck, color: 'text-violet-400', bg: 'bg-violet-500/10' },
-  admin: { label: 'Admin', icon: Shield, color: 'text-amber-400', bg: 'bg-amber-500/10' },
-  member: { label: 'Member', icon: User, color: 'text-blue-400', bg: 'bg-blue-500/10' },
-  viewer: { label: 'Viewer', icon: Eye, color: 'text-slate-400', bg: 'bg-slate-500/10' },
+  owner: { label: "Owner", icon: ShieldCheck, color: "text-violet-400", bg: "bg-violet-500/10" },
+  admin: { label: "Admin", icon: Shield, color: "text-amber-400", bg: "bg-amber-500/10" },
+  member: { label: "Member", icon: User, color: "text-blue-400", bg: "bg-blue-500/10" },
+  viewer: { label: "Viewer", icon: Eye, color: "text-slate-400", bg: "bg-slate-500/10" },
 };
 
 function getInitials(name?: string | null, email?: string): string {
   if (name) {
     return name
-      .split(' ')
+      .split(" ")
       .map((word) => word[0])
-      .join('')
+      .join("")
       .toUpperCase()
       .slice(0, 2);
   }
-  return email?.slice(0, 2).toUpperCase() || 'U';
+  return email?.slice(0, 2).toUpperCase() || "U";
 }
 
 function formatTokens(tokens: number): string {
@@ -88,7 +88,7 @@ function StatCard({
   className?: string;
 }) {
   return (
-    <Card className={cn('relative overflow-hidden', className)}>
+    <Card className={cn("relative overflow-hidden", className)}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
         <div className="flex size-8 items-center justify-center rounded-md bg-muted">
@@ -126,8 +126,8 @@ function ProfileSkeleton() {
   );
 }
 
-type ToolSortField = 'tool' | 'count' | 'tokens' | 'cost';
-type ModelSortField = 'model' | 'tokens' | 'cost';
+type ToolSortField = "tool" | "count" | "tokens" | "cost";
+type ModelSortField = "model" | "tokens" | "cost";
 
 export interface MemberProfileViewProps {
   memberId: string;
@@ -141,27 +141,27 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
   const { currentOrg } = useOrg();
 
   // Tool usage sorting state
-  const [toolSortField, setToolSortField] = useState<ToolSortField>('count');
-  const [toolSortDirection, setToolSortDirection] = useState<SortDirection>('desc');
+  const [toolSortField, setToolSortField] = useState<ToolSortField>("count");
+  const [toolSortDirection, setToolSortDirection] = useState<SortDirection>("desc");
 
   // Model usage sorting state
-  const [modelSortField, setModelSortField] = useState<ModelSortField>('tokens');
-  const [modelSortDirection, setModelSortDirection] = useState<SortDirection>('desc');
+  const [modelSortField, setModelSortField] = useState<ModelSortField>("tokens");
+  const [modelSortDirection, setModelSortDirection] = useState<SortDirection>("desc");
 
-  const { data: member, isLoading: memberLoading } = useMember(currentOrg?.id || '', memberId);
-  const { data: statsData } = useMemberStats(currentOrg?.id || '', memberId);
+  const { data: member, isLoading: memberLoading } = useMember(currentOrg?.id || "", memberId);
+  const { data: statsData } = useMemberStats(currentOrg?.id || "", memberId);
   const { data: eventsResponse, isLoading: eventsLoading } = useMemberEvents(
-    currentOrg?.id || '',
+    currentOrg?.id || "",
     memberId,
     { per_page: 10 }
   );
 
   const [projectCommitsPage, setProjectCommitsPage] = useState(1);
 
-  const { data: projectData } = useProject(projectId || '');
+  const { data: projectData } = useProject(projectId || "");
   const { data: projectCommitsResponse, isLoading: projectCommitsLoading } = useEvents(
-    currentOrg?.id || '',
-    { user_id: member?.user_id, project_id: projectId, event_type: 'commit', per_page: 20, page: projectCommitsPage },
+    currentOrg?.id || "",
+    { user_id: member?.user_id, project_id: projectId, event_type: "commit", per_page: 20, page: projectCommitsPage },
     { enabled: !!projectId && !!member?.user_id }
   );
 
@@ -177,19 +177,19 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
 
   const handleToolSort = (field: ToolSortField) => {
     if (toolSortField === field) {
-      setToolSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+      setToolSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
     } else {
       setToolSortField(field);
-      setToolSortDirection('desc');
+      setToolSortDirection("desc");
     }
   };
 
   const handleModelSort = (field: ModelSortField) => {
     if (modelSortField === field) {
-      setModelSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+      setModelSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
     } else {
       setModelSortField(field);
-      setModelSortDirection('desc');
+      setModelSortDirection("desc");
     }
   };
 
@@ -216,20 +216,20 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
     return [...stats.tool_breakdown].sort((a, b) => {
       let comparison = 0;
       switch (toolSortField) {
-        case 'tool':
-          comparison = (a.tool || '').localeCompare(b.tool || '');
+        case "tool":
+          comparison = (a.tool || "").localeCompare(b.tool || "");
           break;
-        case 'count':
+        case "count":
           comparison = (a.count || 0) - (b.count || 0);
           break;
-        case 'tokens':
+        case "tokens":
           comparison = (a.tokens_total || 0) - (b.tokens_total || 0);
           break;
-        case 'cost':
+        case "cost":
           comparison = (Number(a.cost) || 0) - (Number(b.cost) || 0);
           break;
       }
-      return toolSortDirection === 'asc' ? comparison : -comparison;
+      return toolSortDirection === "asc" ? comparison : -comparison;
     });
   }, [stats.tool_breakdown, toolSortField, toolSortDirection]);
 
@@ -239,17 +239,17 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
     return [...stats.model_breakdown].sort((a, b) => {
       let comparison = 0;
       switch (modelSortField) {
-        case 'model':
-          comparison = (a.model || '').localeCompare(b.model || '');
+        case "model":
+          comparison = (a.model || "").localeCompare(b.model || "");
           break;
-        case 'tokens':
+        case "tokens":
           comparison = (a.tokens_total || 0) - (b.tokens_total || 0);
           break;
-        case 'cost':
+        case "cost":
           comparison = (Number(a.cost) || 0) - (Number(b.cost) || 0);
           break;
       }
-      return modelSortDirection === 'asc' ? comparison : -comparison;
+      return modelSortDirection === "asc" ? comparison : -comparison;
     });
   }, [stats.model_breakdown, modelSortField, modelSortDirection]);
 
@@ -272,16 +272,16 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
     );
   }
 
-  const role = roleConfig[(member.role as MemberRole) || 'member'];
+  const role = roleConfig[(member.role as MemberRole) || "member"];
   const RoleIcon = role.icon;
 
   const formattedJoinDate = member.created_at
-    ? new Date(member.created_at).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
+    ? new Date(member.created_at).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
       })
-    : 'Unknown';
+    : "Unknown";
 
   return (
     <div className="space-y-6">
@@ -296,7 +296,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
             </Button>
             <Avatar className="size-12 sm:size-16 border-2 border-muted shrink-0">
               {member.user?.avatarUrl && (
-                <AvatarImage src={member.user.avatarUrl} alt={member.user?.name || member.user?.email || 'User'} />
+                <AvatarImage src={member.user.avatarUrl} alt={member.user?.name || member.user?.email || "User"} />
               )}
               <AvatarFallback className="text-base sm:text-lg font-semibold bg-gradient-to-br from-primary/20 to-primary/5">
                 {getInitials(member.user?.name, member.user?.email)}
@@ -305,9 +305,9 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                 <h1 className="text-lg sm:text-xl font-semibold truncate">
-                  {member.user?.name || member.user?.email?.split('@')[0] || 'Unknown User'}
+                  {member.user?.name || member.user?.email?.split("@")[0] || "Unknown User"}
                 </h1>
-                <Badge variant="outline" className={cn('gap-1 shrink-0', role.bg, role.color)}>
+                <Badge variant="outline" className={cn("gap-1 shrink-0", role.bg, role.color)}>
                   <RoleIcon className="size-3" />
                   {role.label}
                 </Badge>
@@ -357,7 +357,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
         />
         <StatCard
           title="Most Used Tool"
-          value={stats.most_used_tool ? humanizeToolName(stats.most_used_tool) : 'None'}
+          value={stats.most_used_tool ? humanizeToolName(stats.most_used_tool) : "None"}
           subtitle="Primary tool"
           icon={Code2}
         />
@@ -606,8 +606,8 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
                   <div
                     key={org.id}
                     className={cn(
-                      'flex items-center justify-between rounded-md border p-2',
-                      org.is_current && 'border-primary/50 bg-primary/5'
+                      "flex items-center justify-between rounded-md border p-2",
+                      org.is_current && "border-primary/50 bg-primary/5"
                     )}
                   >
                     <span className="font-medium text-sm">{org.name}</span>
@@ -644,8 +644,8 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
                         <div className="text-xs text-muted-foreground">@{account.external_username}</div>
                       )}
                     </div>
-                    <Badge variant={account.is_active ? 'default' : 'secondary'} className="text-xs">
-                      {account.is_active ? 'Active' : 'Inactive'}
+                    <Badge variant={account.is_active ? "default" : "secondary"} className="text-xs">
+                      {account.is_active ? "Active" : "Inactive"}
                     </Badge>
                   </div>
                 ))}
@@ -682,7 +682,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <GitCommitHorizontal className="size-4" />
-              Commits in {projectData?.name ?? 'Project'}
+              Commits in {projectData?.name ?? "Project"}
             </CardTitle>
             <CardDescription>
               Commit history for this member scoped to the project
@@ -727,6 +727,6 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
 export function MemberProfile() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
-  const projectId = searchParams.get('projectId') ?? undefined;
-  return <MemberProfileView key={projectId ?? ''} memberId={id ?? ''} projectId={projectId} />;
+  const projectId = searchParams.get("projectId") ?? undefined;
+  return <MemberProfileView key={projectId ?? ""} memberId={id ?? ""} projectId={projectId} />;
 }

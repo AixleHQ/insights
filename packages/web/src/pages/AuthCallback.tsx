@@ -1,6 +1,6 @@
-import { useEffect, useState, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { loginCallback } from '../lib/auth';
+import { useEffect, useState, useRef } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { loginCallback } from "../lib/auth";
 
 export function AuthCallback() {
   const navigate = useNavigate();
@@ -21,12 +21,12 @@ export function AuthCallback() {
 
         // Get the original destination from state, or default to home
         const state = location.state as { from?: { pathname: string } } | null;
-        const destination = state?.from?.pathname || '/';
+        const destination = state?.from?.pathname || "/";
 
         navigate(destination, { replace: true });
       } catch (err) {
-        console.error('[AuthCallback] Error:', err);
-        setError(err instanceof Error ? err.message : 'Authentication failed');
+        console.error("[AuthCallback] Error:", err);
+        setError(err instanceof Error ? err.message : "Authentication failed");
       }
     };
 
@@ -42,7 +42,7 @@ export function AuthCallback() {
           </h1>
           <p className="text-red-600 mb-4">{error}</p>
           <button
-            onClick={() => navigate('/login')}
+            onClick={() => navigate("/login")}
             className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
           >
             Try Again

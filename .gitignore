@@ -2,6 +2,9 @@
 node_modules/
 vendor/bundle/
 
+.playwright-mcp/
+settings.local.json
+
 # Build outputs
 dist/
 build/

@@ -6,16 +6,16 @@ import {
   useCallback,
   useRef,
   type ReactNode,
-} from 'react';
-import { api } from '../lib/api';
-import { queryClient } from '../lib/queryClient';
-import { queryKeys, useCurrentUser } from '../hooks/useApi';
+} from "react";
+import { api } from "../lib/api";
+import { queryClient } from "../lib/queryClient";
+import { queryKeys, useCurrentUser } from "../hooks/useApi";
 
-export type Theme = 'light' | 'dark' | 'system';
-export type ResolvedTheme = 'light' | 'dark';
+export type Theme = "light" | "dark" | "system";
+export type ResolvedTheme = "light" | "dark";
 
-const THEME_STORAGE_KEY = 'db90_theme';
-const VALID_THEMES: readonly Theme[] = ['light', 'dark', 'system'];
+const THEME_STORAGE_KEY = "db90_theme";
+const VALID_THEMES: readonly Theme[] = ["light", "dark", "system"];
 
 function isValidTheme(value: string | null): value is Theme {
   return VALID_THEMES.includes(value as Theme);
@@ -23,7 +23,7 @@ function isValidTheme(value: string | null): value is Theme {
 
 function readStoredTheme(): Theme {
   const stored = localStorage.getItem(THEME_STORAGE_KEY);
-  return isValidTheme(stored) ? stored : 'system';
+  return isValidTheme(stored) ? stored : "system";
 }
 
 interface ThemeContextValue {
@@ -35,15 +35,15 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 function getSystemTheme(): ResolvedTheme {
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
 function resolveTheme(theme: Theme): ResolvedTheme {
-  return theme === 'system' ? getSystemTheme() : theme;
+  return theme === "system" ? getSystemTheme() : theme;
 }
 
 function applyTheme(resolved: ResolvedTheme) {
-  document.documentElement.classList.toggle('dark', resolved === 'dark');
+  document.documentElement.classList.toggle("dark", resolved === "dark");
 }
 
 interface ThemeProviderProps {
@@ -87,14 +87,14 @@ export function ThemeProvider({ children, initialTheme }: ThemeProviderProps) {
 
   // Listen to system preference changes when theme is 'system'
   useEffect(() => {
-    if (theme !== 'system') return;
+    if (theme !== "system") return;
 
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     const handler = (e: MediaQueryListEvent) => {
-      setResolvedTheme(e.matches ? 'dark' : 'light');
+      setResolvedTheme(e.matches ? "dark" : "light");
     };
-    mediaQuery.addEventListener('change', handler);
-    return () => mediaQuery.removeEventListener('change', handler);
+    mediaQuery.addEventListener("change", handler);
+    return () => mediaQuery.removeEventListener("change", handler);
   }, [theme]);
 
   const setTheme = useCallback((newTheme: Theme) => {
@@ -104,7 +104,7 @@ export function ThemeProvider({ children, initialTheme }: ThemeProviderProps) {
     localStorage.setItem(THEME_STORAGE_KEY, newTheme);
     // Persist to API (fire-and-forget). Silently ignored if unauthenticated.
     api
-      .put(`/users/me/settings/theme`, { value: newTheme })
+      .put("/users/me/settings/theme", { value: newTheme })
       .then(() => {
         queryClient.invalidateQueries({ queryKey: queryKeys.user.current });
       })
@@ -125,7 +125,7 @@ export function ThemeProvider({ children, initialTheme }: ThemeProviderProps) {
 export function useTheme(): ThemeContextValue {
   const context = useContext(ThemeContext);
   if (!context) {
-    throw new Error('useTheme must be used within a ThemeProvider');
+    throw new Error("useTheme must be used within a ThemeProvider");
   }
   return context;
 }

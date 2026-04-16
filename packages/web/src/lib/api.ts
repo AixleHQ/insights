@@ -7,7 +7,7 @@
  * - Handles common response scenarios (401, 403, etc.)
  */
 
-import { getAccessToken } from './auth';
+import { getAccessToken } from "./auth";
 
 export interface ApiClientOptions {
   baseUrl?: string;
@@ -19,8 +19,8 @@ export interface RequestOptions extends RequestInit {
   skipOrgHeader?: boolean;
 }
 
-const DEFAULT_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
-const IMPERSONATION_STORAGE_KEY = 'impersonation_token';
+const DEFAULT_BASE_URL = import.meta.env.VITE_API_URL || "/api/v1";
+const IMPERSONATION_STORAGE_KEY = "impersonation_token";
 
 // Global state for current organization ID
 let currentOrgId: string | null = null;
@@ -34,7 +34,7 @@ async function getAuthToken(): Promise<string | null> {
   if (impersonationToken) {
     // Verify token isn't expired
     try {
-      const parts = impersonationToken.split('.');
+      const parts = impersonationToken.split(".");
       if (parts.length === 3) {
         const payload = JSON.parse(atob(parts[1]));
         if (payload.exp && payload.exp > Date.now() / 1000) {
@@ -77,7 +77,7 @@ export async function apiRequest<T = unknown>(
   const { skipAuth = false, skipOrgHeader = false, headers = {}, ...fetchOptions } = options;
 
   const requestHeaders: HeadersInit = {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
     ...headers,
   };
 
@@ -85,16 +85,16 @@ export async function apiRequest<T = unknown>(
   if (!skipAuth) {
     const token = await getAuthToken();
     if (token) {
-      (requestHeaders as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+      (requestHeaders as Record<string, string>)["Authorization"] = `Bearer ${token}`;
     }
   }
 
   // Add X-Organization-ID header
   if (!skipOrgHeader && currentOrgId) {
-    (requestHeaders as Record<string, string>)['X-Organization-ID'] = currentOrgId;
+    (requestHeaders as Record<string, string>)["X-Organization-ID"] = currentOrgId;
   }
 
-  const url = endpoint.startsWith('http') ? endpoint : `${DEFAULT_BASE_URL}${endpoint}`;
+  const url = endpoint.startsWith("http") ? endpoint : `${DEFAULT_BASE_URL}${endpoint}`;
 
   const response = await fetch(url, {
     ...fetchOptions,
@@ -104,17 +104,17 @@ export async function apiRequest<T = unknown>(
   // Handle common error responses
   if (!response.ok) {
     if (response.status === 401) {
-      throw new ApiError('Unauthorized', response.status, await response.json().catch(() => null));
+      throw new ApiError("Unauthorized", response.status, await response.json().catch(() => null));
     }
     if (response.status === 403) {
-      throw new ApiError('Forbidden', response.status, await response.json().catch(() => null));
+      throw new ApiError("Forbidden", response.status, await response.json().catch(() => null));
     }
     if (response.status === 404) {
-      throw new ApiError('Not found', response.status, await response.json().catch(() => null));
+      throw new ApiError("Not found", response.status, await response.json().catch(() => null));
     }
     if (response.status === 422) {
       const data = await response.json().catch(() => null);
-      throw new ApiError('Validation error', response.status, data);
+      throw new ApiError("Validation error", response.status, data);
     }
 
     const errorData = await response.json().catch(() => null);
@@ -142,7 +142,7 @@ export class ApiError extends Error {
 
   constructor(message: string, status: number, data: unknown = null) {
     super(message);
-    this.name = 'ApiError';
+    this.name = "ApiError";
     this.status = status;
     this.data = data;
   }
@@ -151,31 +151,31 @@ export class ApiError extends Error {
 // Convenience methods
 export const api = {
   get: <T = unknown>(endpoint: string, options?: RequestOptions) =>
-    apiRequest<T>(endpoint, { ...options, method: 'GET' }),
+    apiRequest<T>(endpoint, { ...options, method: "GET" }),
 
   post: <T = unknown>(endpoint: string, body?: unknown, options?: RequestOptions) =>
     apiRequest<T>(endpoint, {
       ...options,
-      method: 'POST',
+      method: "POST",
       body: body ? JSON.stringify(body) : undefined,
     }),
 
   put: <T = unknown>(endpoint: string, body?: unknown, options?: RequestOptions) =>
     apiRequest<T>(endpoint, {
       ...options,
-      method: 'PUT',
+      method: "PUT",
       body: body ? JSON.stringify(body) : undefined,
     }),
 
   patch: <T = unknown>(endpoint: string, body?: unknown, options?: RequestOptions) =>
     apiRequest<T>(endpoint, {
       ...options,
-      method: 'PATCH',
+      method: "PATCH",
       body: body ? JSON.stringify(body) : undefined,
     }),
 
   delete: <T = unknown>(endpoint: string, options?: RequestOptions) =>
-    apiRequest<T>(endpoint, { ...options, method: 'DELETE' }),
+    apiRequest<T>(endpoint, { ...options, method: "DELETE" }),
 };
 
 export default api;

@@ -1,19 +1,19 @@
-import { Link } from 'react-router-dom';
-import { ArrowLeft, Clock, User, Folder, DollarSign, FileText, Shield } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { RiskBadge } from '@/components/dashboard/ActivityFeed';
-import { cn, humanizeToolName } from '@/lib/utils';
+import { Link } from "react-router-dom";
+import { ArrowLeft, Clock, User, Folder, DollarSign, FileText, Shield } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RiskBadge } from "@/components/dashboard/ActivityFeed";
+import { cn, humanizeToolName } from "@/lib/utils";
 
 export interface EventDetailData {
   id: string;
   tool_name?: string;
   event_type?: string;
-  risk_level?: 'critical' | 'high' | 'medium' | 'low' | 'none';
+  risk_level?: "critical" | "high" | "medium" | "low" | "none";
   cost_usd?: number;
   token_count?: number;
   created_at: string;
@@ -57,7 +57,7 @@ function DetailRow({
   className?: string;
 }) {
   return (
-    <div className={cn('flex items-start gap-3', className)}>
+    <div className={cn("flex items-start gap-3", className)}>
       <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
         <Icon className="size-4 text-muted-foreground" />
       </div>
@@ -74,7 +74,7 @@ function ContentPanel({ title, content }: { title: string; content?: string }) {
     <div className="space-y-2">
       <h4 className="text-sm font-medium">{title}</h4>
       <pre className="max-h-96 overflow-auto rounded-md bg-muted p-4 text-xs">
-        <code>{content || 'No content available'}</code>
+        <code>{content || "No content available"}</code>
       </pre>
     </div>
   );
@@ -83,7 +83,7 @@ function ContentPanel({ title, content }: { title: string; content?: string }) {
 export function EventDetail({ event, isLoading, className }: EventDetailProps) {
   if (isLoading) {
     return (
-      <div className={cn('space-y-6', className)}>
+      <div className={cn("space-y-6", className)}>
         <div className="flex items-center gap-4">
           <Skeleton className="h-9 w-9" />
           <div className="space-y-2">
@@ -101,7 +101,7 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
 
   if (!event) {
     return (
-      <div className={cn('flex flex-col items-center justify-center py-12', className)}>
+      <div className={cn("flex flex-col items-center justify-center py-12", className)}>
         <p className="text-muted-foreground">Event not found</p>
         <Button asChild variant="link" className="mt-2">
           <Link to="/events">
@@ -113,13 +113,13 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
     );
   }
 
-  const formattedDate = new Date(event.created_at).toLocaleString('en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
+  const formattedDate = new Date(event.created_at).toLocaleString("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
   });
 
   return (
-    <div className={cn('space-y-6', className)}>
+    <div className={cn("space-y-6", className)}>
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-4">
           <Button asChild variant="ghost" size="icon">
@@ -130,10 +130,10 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-xl font-semibold">{humanizeToolName(event.tool_name)}</h1>
-              <RiskBadge level={event.risk_level || 'none'} />
+              <RiskBadge level={event.risk_level || "none"} />
             </div>
             <p className="text-sm text-muted-foreground">
-              {(event.event_type || 'unknown').replace('_', ' ')} · {formattedDate}
+              {(event.event_type || "unknown").replace("_", " ")} · {formattedDate}
             </p>
           </div>
         </div>
@@ -205,7 +205,7 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
             <DetailRow
               icon={Shield}
               label="Risk Level"
-              value={<RiskBadge level={event.risk_level || 'none'} />}
+              value={<RiskBadge level={event.risk_level || "none"} />}
             />
           </CardContent>
         </Card>
@@ -262,15 +262,15 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
                 <div
                   key={index}
                   className={cn(
-                    'rounded-lg border p-3',
-                    finding.severity === 'critical' &&
-                      'border-risk-critical/30 bg-risk-critical/10',
-                    finding.severity === 'high' &&
-                      'border-risk-high/30 bg-risk-high/10',
-                    finding.severity === 'medium' &&
-                      'border-risk-medium/30 bg-risk-medium/10',
-                    finding.severity === 'low' &&
-                      'border-risk-low/30 bg-risk-low/10'
+                    "rounded-lg border p-3",
+                    finding.severity === "critical" &&
+                      "border-risk-critical/30 bg-risk-critical/10",
+                    finding.severity === "high" &&
+                      "border-risk-high/30 bg-risk-high/10",
+                    finding.severity === "medium" &&
+                      "border-risk-medium/30 bg-risk-medium/10",
+                    finding.severity === "low" &&
+                      "border-risk-low/30 bg-risk-low/10"
                   )}
                 >
                   <div className="flex items-center gap-2">
@@ -283,11 +283,11 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
                     <Badge
                       variant="outline"
                       className={cn(
-                        'font-mono-display text-[10px] uppercase',
-                        finding.severity === 'critical' && 'text-risk-critical',
-                        finding.severity === 'high' && 'text-risk-high',
-                        finding.severity === 'medium' && 'text-risk-medium',
-                        finding.severity === 'low' && 'text-risk-low'
+                        "font-mono-display text-[10px] uppercase",
+                        finding.severity === "critical" && "text-risk-critical",
+                        finding.severity === "high" && "text-risk-high",
+                        finding.severity === "medium" && "text-risk-medium",
+                        finding.severity === "low" && "text-risk-low"
                       )}
                     >
                       {finding.severity}

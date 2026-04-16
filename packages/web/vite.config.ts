@@ -1,47 +1,47 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
-import { VitePWA } from 'vite-plugin-pwa'
-import path from 'path'
+import { defineConfig } from "vite"
+import react from "@vitejs/plugin-react"
+import tailwindcss from "@tailwindcss/vite"
+import { VitePWA } from "vite-plugin-pwa"
+import path from "path"
 
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'icon-192.svg', 'icon-512.svg', 'icon-maskable.svg'],
+      registerType: "autoUpdate",
+      includeAssets: ["favicon.svg", "icon-192.svg", "icon-512.svg", "icon-maskable.svg"],
       manifest: {
-        name: 'DB90 - AI Tool Analytics',
-        short_name: 'DB90',
-        description: 'Monitor and manage AI coding tool usage across your organization',
-        theme_color: '#10b981',
-        background_color: '#0a0a0a',
-        display: 'standalone',
-        orientation: 'portrait',
-        scope: '/',
-        start_url: '/',
+        name: "DB90 - AI Tool Analytics",
+        short_name: "DB90",
+        description: "Monitor and manage AI coding tool usage across your organization",
+        theme_color: "#10b981",
+        background_color: "#0a0a0a",
+        display: "standalone",
+        orientation: "portrait",
+        scope: "/",
+        start_url: "/",
         icons: [
           {
-            src: '/icon-192.svg',
-            sizes: '192x192',
-            type: 'image/svg+xml',
+            src: "/icon-192.svg",
+            sizes: "192x192",
+            type: "image/svg+xml",
           },
           {
-            src: '/icon-512.svg',
-            sizes: '512x512',
-            type: 'image/svg+xml',
+            src: "/icon-512.svg",
+            sizes: "512x512",
+            type: "image/svg+xml",
           },
           {
-            src: '/icon-maskable.svg',
-            sizes: '512x512',
-            type: 'image/svg+xml',
-            purpose: 'maskable',
+            src: "/icon-maskable.svg",
+            sizes: "512x512",
+            type: "image/svg+xml",
+            purpose: "maskable",
           },
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2}"],
         navigateFallbackDenylist: [/^\/admin/, /^\/cable/],
         // API requests must never be served from the service worker cache —
         // TanStack Query owns freshness. Pass them straight through.
@@ -49,9 +49,9 @@ export default defineConfig({
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-            handler: 'CacheFirst',
+            handler: "CacheFirst",
             options: {
-              cacheName: 'google-fonts-cache',
+              cacheName: "google-fonts-cache",
               expiration: {
                 maxEntries: 10,
                 maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
@@ -63,9 +63,9 @@ export default defineConfig({
           },
           {
             urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
-            handler: 'CacheFirst',
+            handler: "CacheFirst",
             options: {
-              cacheName: 'gstatic-fonts-cache',
+              cacheName: "gstatic-fonts-cache",
               expiration: {
                 maxEntries: 10,
                 maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
@@ -84,22 +84,22 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      "@": path.resolve(__dirname, "./src"),
     },
   },
   server: {
-    host: '0.0.0.0',
+    host: "0.0.0.0",
     port: 5173,
     proxy: {
-      '/api': {
-        target: process.env.API_PROXY_TARGET || 'http://localhost:3000',
+      "/api": {
+        target: process.env.API_PROXY_TARGET || "http://localhost:3000",
         changeOrigin: true,
       },
-      '/admin': {
-        target: process.env.API_PROXY_TARGET || 'http://localhost:3000',
+      "/admin": {
+        target: process.env.API_PROXY_TARGET || "http://localhost:3000",
       },
-      '/cable': {
-        target: process.env.API_PROXY_TARGET || 'http://localhost:3000',
+      "/cable": {
+        target: process.env.API_PROXY_TARGET || "http://localhost:3000",
         changeOrigin: true,
         ws: true,
       },

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Routes, Route, Link, useLocation, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { useState } from "react";
+import { Routes, Route, Link, useLocation, Navigate, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   AlertCircle,
@@ -12,38 +12,38 @@ import {
   Loader2,
   Save,
   Trash2,
-} from 'lucide-react';
+} from "lucide-react";
 import {
   useProject,
   useUpdateProject,
   useDeleteProject,
   useProjectMembers,
   useProjectCommitStats,
-} from '@/hooks/useApi';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
+} from "@/hooks/useApi";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { ProjectTeamSection, ProjectConnectorsTab, ProjectSecurityTab, ProjectSettingsSection, ProjectNotFound, ProjectRetentionPolicySection, ProjectAlertsSection } from '@/components/project';
-import { cn } from '@/lib/utils';
+} from "@/components/ui/card";
+import { ProjectTeamSection, ProjectConnectorsTab, ProjectSecurityTab, ProjectSettingsSection, ProjectNotFound, ProjectRetentionPolicySection, ProjectAlertsSection } from "@/components/project";
+import { cn } from "@/lib/utils";
 
 const getNavItems = (id: string) => [
-  { title: 'General', href: `/projects/${id}/settings`, icon: Building2 },
-  { title: 'Members', href: `/projects/${id}/settings/members`, icon: Users },
-  { title: 'Integrations', href: `/projects/${id}/settings/integrations`, icon: Plug },
-  { title: 'Security & Audit', href: `/projects/${id}/settings/security`, icon: FileSearch },
-  { title: 'Policies', href: `/projects/${id}/settings/policies`, icon: Shield },
-  { title: 'Alerts', href: `/projects/${id}/settings/alerts`, icon: Bell },
+  { title: "General", href: `/projects/${id}/settings`, icon: Building2 },
+  { title: "Members", href: `/projects/${id}/settings/members`, icon: Users },
+  { title: "Integrations", href: `/projects/${id}/settings/integrations`, icon: Plug },
+  { title: "Security & Audit", href: `/projects/${id}/settings/security`, icon: FileSearch },
+  { title: "Policies", href: `/projects/${id}/settings/policies`, icon: Shield },
+  { title: "Alerts", href: `/projects/${id}/settings/alerts`, icon: Bell },
 ];
 
 function ProjectSettingsNav({ projectId }: { projectId: string }) {
@@ -61,10 +61,10 @@ function ProjectSettingsNav({ projectId }: { projectId: string }) {
             key={item.href}
             to={item.href}
             className={cn(
-              'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+              "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
               isActive
-                ? 'bg-primary/10 text-primary'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
             )}
           >
             <item.icon className="size-4" />
@@ -110,18 +110,18 @@ function ProjectGeneralSettingsForm({
       await updateProject.mutateAsync({ id: projectId, data: formData });
       setHasChanges(false);
     } catch {
-      setSaveError('Failed to save changes. Please try again.');
+      setSaveError("Failed to save changes. Please try again.");
     }
   };
 
   const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete this project? This cannot be undone.')) {
+    if (window.confirm("Are you sure you want to delete this project? This cannot be undone.")) {
       setDeleteError(null);
       try {
         await deleteProject.mutateAsync(projectId);
-        navigate('/projects');
+        navigate("/projects");
       } catch {
-        setDeleteError('Failed to delete project. Please try again.');
+        setDeleteError("Failed to delete project. Please try again.");
       }
     }
   };
@@ -145,7 +145,7 @@ function ProjectGeneralSettingsForm({
             <Input
               id="proj-name"
               value={formData.name}
-              onChange={(e) => handleChange('name', e.target.value)}
+              onChange={(e) => handleChange("name", e.target.value)}
             />
           </div>
           <div className="space-y-2">
@@ -153,7 +153,7 @@ function ProjectGeneralSettingsForm({
             <Input
               id="proj-description"
               value={formData.description}
-              onChange={(e) => handleChange('description', e.target.value)}
+              onChange={(e) => handleChange("description", e.target.value)}
               placeholder="A brief description of this project"
             />
           </div>
@@ -162,7 +162,7 @@ function ProjectGeneralSettingsForm({
             <Input
               id="proj-repo"
               value={formData.repository_url}
-              onChange={(e) => handleChange('repository_url', e.target.value)}
+              onChange={(e) => handleChange("repository_url", e.target.value)}
               placeholder="https://github.com/org/repo"
             />
           </div>
@@ -170,7 +170,7 @@ function ProjectGeneralSettingsForm({
             <Switch
               id="proj-active"
               checked={formData.is_active}
-              onCheckedChange={(checked) => handleChange('is_active', checked)}
+              onCheckedChange={(checked) => handleChange("is_active", checked)}
             />
             <Label htmlFor="proj-active">Active</Label>
           </div>
@@ -235,7 +235,7 @@ function ProjectGeneralSettings({
   isLoading,
 }: {
   projectId: string;
-  project: ReturnType<typeof useProject>['data'];
+  project: ReturnType<typeof useProject>["data"];
   isLoading: boolean;
 }) {
   if (isLoading) {
@@ -252,9 +252,9 @@ function ProjectGeneralSettings({
   }
 
   const defaultValues: GeneralFormData = {
-    name: project.name || '',
-    description: project.description || '',
-    repository_url: project.repositoryUrl ?? project.repository_url ?? '',
+    name: project.name || "",
+    description: project.description || "",
+    repository_url: project.repositoryUrl ?? project.repository_url ?? "",
     is_active: project.isActive ?? project.is_active,
   };
 
@@ -285,7 +285,7 @@ function ProjectIntegrationsSettings({ projectId }: { projectId: string }) {
 
 export function ProjectSettings() {
   const { id } = useParams<{ id: string }>();
-  const { data: project, isLoading: isLoadingProject } = useProject(id || '');
+  const { data: project, isLoading: isLoadingProject } = useProject(id || "");
 
   if (!id) return null;
 
@@ -302,7 +302,7 @@ export function ProjectSettings() {
             <Skeleton className="h-7 w-48" />
           ) : (
             <h1 className="text-2xl font-semibold tracking-tight">
-              {project ? `${project.name} — Settings` : 'Settings'}
+              {project ? `${project.name} — Settings` : "Settings"}
             </h1>
           )}
           <p className="text-sm text-muted-foreground">
@@ -327,7 +327,7 @@ export function ProjectSettings() {
               element={
                 <ProjectAlertsSection
                   projectId={id}
-                  orgId={project?.organization_id ?? ''}
+                  orgId={project?.organization_id ?? ""}
                 />
               }
             />

@@ -1,6 +1,6 @@
-import { AlertTriangle, X } from 'lucide-react';
-import { useImpersonation } from '../contexts/ImpersonationContext';
-import { Button } from '@/components/ui/button';
+import { AlertTriangle, X } from "lucide-react";
+import { useImpersonation } from "../contexts/ImpersonationContext";
+import { Button } from "@/components/ui/button";
 
 export function ImpersonationBar() {
   const { isImpersonating, impersonatorEmail, stopImpersonation } = useImpersonation();

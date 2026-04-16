@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link } from "react-router-dom";
 import {
   Users,
   Building2,
@@ -6,13 +6,13 @@ import {
   DollarSign,
   TrendingUp,
   ArrowRight,
-} from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { formatCurrency, formatNumber, formatDistanceToNow } from '@/lib/utils';
+} from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { formatCurrency, formatNumber, formatDistanceToNow } from "@/lib/utils";
 
 interface PlatformStats {
   total_users: number;
@@ -27,7 +27,7 @@ interface PlatformStats {
 
 interface RecentActivity {
   id: string;
-  type: 'user_created' | 'org_created' | 'high_risk_event' | 'threshold_exceeded';
+  type: "user_created" | "org_created" | "high_risk_event" | "threshold_exceeded";
   description: string;
   created_at: string;
 }
@@ -37,14 +37,14 @@ function StatCard({
   value,
   subValue,
   icon: Icon,
-  format = 'number',
+  format = "number",
   isLoading,
 }: {
   title: string;
   value: number;
   subValue?: string;
   icon: React.ElementType;
-  format?: 'number' | 'currency';
+  format?: "number" | "currency";
   isLoading: boolean;
 }) {
   return (
@@ -64,7 +64,7 @@ function StatCard({
         ) : (
           <>
             <div className="text-2xl font-bold">
-              {format === 'currency' ? formatCurrency(value) : formatNumber(value)}
+              {format === "currency" ? formatCurrency(value) : formatNumber(value)}
             </div>
             {subValue && (
               <p className="text-xs text-muted-foreground">{subValue}</p>
@@ -78,13 +78,13 @@ function StatCard({
 
 export function AdminOverview() {
   const { data: stats, isLoading: isLoadingStats } = useQuery({
-    queryKey: ['admin', 'stats'],
-    queryFn: () => api.get<PlatformStats>('/admin/stats'),
+    queryKey: ["admin", "stats"],
+    queryFn: () => api.get<PlatformStats>("/admin/stats"),
   });
 
   const { data: recentActivity, isLoading: isLoadingActivity } = useQuery({
-    queryKey: ['admin', 'activity', 'recent'],
-    queryFn: () => api.get<RecentActivity[]>('/admin/activity?limit=5'),
+    queryKey: ["admin", "activity", "recent"],
+    queryFn: () => api.get<RecentActivity[]>("/admin/activity?limit=5"),
   });
 
   return (
@@ -193,10 +193,10 @@ export function AdminOverview() {
                   >
                     <div
                       className={`size-2 rounded-full ${
-                        activity.type === 'high_risk_event' ||
-                        activity.type === 'threshold_exceeded'
-                          ? 'bg-destructive'
-                          : 'bg-primary'
+                        activity.type === "high_risk_event" ||
+                        activity.type === "threshold_exceeded"
+                          ? "bg-destructive"
+                          : "bg-primary"
                       }`}
                     />
                     <span className="flex-1 truncate">{activity.description}</span>

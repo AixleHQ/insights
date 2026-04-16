@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { EventFilters, type EventFiltersState } from './EventFilters';
+import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { EventFilters, type EventFiltersState } from "./EventFilters";
 
-describe('EventFilters', () => {
-  const defaultTools = ['Claude', 'Cursor', 'GitHub Copilot', 'Windsurf'];
+describe("EventFilters", () => {
+  const defaultTools = ["Claude", "Cursor", "GitHub Copilot", "Windsurf"];
   let mockOnFiltersChange: Mock<(filters: EventFiltersState) => void>;
   let defaultFilters: EventFiltersState;
 
@@ -26,244 +26,244 @@ describe('EventFilters', () => {
     );
   };
 
-  describe('Initial Render', () => {
-    it('renders the search input', () => {
+  describe("Initial Render", () => {
+    it("renders the search input", () => {
       renderFilters();
-      expect(screen.getByPlaceholderText('Search events...')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Search events...")).toBeInTheDocument();
     });
 
-    it('renders tool filter dropdown', () => {
+    it("renders tool filter dropdown", () => {
       renderFilters();
-      expect(screen.getByText('All tools')).toBeInTheDocument();
+      expect(screen.getByText("All tools")).toBeInTheDocument();
     });
 
-    it('renders risk level filter dropdown', () => {
+    it("renders risk level filter dropdown", () => {
       renderFilters();
-      expect(screen.getByText('All risks')).toBeInTheDocument();
+      expect(screen.getByText("All risks")).toBeInTheDocument();
     });
 
-    it('renders event type filter dropdown', () => {
+    it("renders event type filter dropdown", () => {
       renderFilters();
-      expect(screen.getByText('All types')).toBeInTheDocument();
+      expect(screen.getByText("All types")).toBeInTheDocument();
     });
 
-    it('renders date range picker button', () => {
+    it("renders date range picker button", () => {
       renderFilters();
-      expect(screen.getByText('Date range')).toBeInTheDocument();
+      expect(screen.getByText("Date range")).toBeInTheDocument();
     });
 
-    it('does not show clear all button when no filters active', () => {
+    it("does not show clear all button when no filters active", () => {
       renderFilters();
-      expect(screen.queryByText('Clear all')).not.toBeInTheDocument();
+      expect(screen.queryByText("Clear all")).not.toBeInTheDocument();
     });
 
-    it('does not show active filters section when no filters', () => {
+    it("does not show active filters section when no filters", () => {
       renderFilters();
-      expect(screen.queryByText('Active filters:')).not.toBeInTheDocument();
+      expect(screen.queryByText("Active filters:")).not.toBeInTheDocument();
     });
 
-    it('renders three comboboxes', () => {
+    it("renders three comboboxes", () => {
       renderFilters();
-      const comboboxes = screen.getAllByRole('combobox');
+      const comboboxes = screen.getAllByRole("combobox");
       expect(comboboxes.length).toBe(3);
     });
   });
 
-  describe('Search Input', () => {
-    it('calls onFiltersChange when typing', async () => {
+  describe("Search Input", () => {
+    it("calls onFiltersChange when typing", async () => {
       const user = userEvent.setup();
       renderFilters();
 
-      const searchInput = screen.getByPlaceholderText('Search events...');
-      await user.type(searchInput, 'a');
+      const searchInput = screen.getByPlaceholderText("Search events...");
+      await user.type(searchInput, "a");
 
       expect(mockOnFiltersChange).toHaveBeenCalled();
       // The last call should include the search value
       const calls = mockOnFiltersChange.mock.calls;
-      expect(calls[calls.length - 1][0]).toHaveProperty('search');
+      expect(calls[calls.length - 1][0]).toHaveProperty("search");
     });
 
-    it('displays the current search value', () => {
-      renderFilters({ search: 'existing search' });
+    it("displays the current search value", () => {
+      renderFilters({ search: "existing search" });
 
-      const searchInput = screen.getByPlaceholderText('Search events...') as HTMLInputElement;
-      expect(searchInput.value).toBe('existing search');
+      const searchInput = screen.getByPlaceholderText("Search events...") as HTMLInputElement;
+      expect(searchInput.value).toBe("existing search");
     });
 
-    it('shows clear all when search has value', () => {
-      renderFilters({ search: 'test' });
-      expect(screen.getByText('Clear all')).toBeInTheDocument();
+    it("shows clear all when search has value", () => {
+      renderFilters({ search: "test" });
+      expect(screen.getByText("Clear all")).toBeInTheDocument();
     });
 
-    it('clears search when clear all is clicked', async () => {
+    it("clears search when clear all is clicked", async () => {
       const user = userEvent.setup();
-      renderFilters({ search: 'test' });
+      renderFilters({ search: "test" });
 
-      await user.click(screen.getByText('Clear all'));
+      await user.click(screen.getByText("Clear all"));
       expect(mockOnFiltersChange).toHaveBeenCalledWith({});
     });
   });
 
-  describe('Tool Filter', () => {
-    it('shows selected tool name in trigger when tool is selected', () => {
-      renderFilters({ tool: 'Claude' });
+  describe("Tool Filter", () => {
+    it("shows selected tool name in trigger when tool is selected", () => {
+      renderFilters({ tool: "Claude" });
       // When a tool is selected, "All tools" should not be visible
-      expect(screen.queryByText('All tools')).not.toBeInTheDocument();
+      expect(screen.queryByText("All tools")).not.toBeInTheDocument();
     });
 
-    it('displays tool filter chip when tool is selected', () => {
-      renderFilters({ tool: 'Claude' });
-      expect(screen.getByText('Tool:')).toBeInTheDocument();
+    it("displays tool filter chip when tool is selected", () => {
+      renderFilters({ tool: "Claude" });
+      expect(screen.getByText("Tool:")).toBeInTheDocument();
     });
   });
 
-  describe('Risk Level Filter', () => {
-    it('displays risk filter chip when risk is selected', () => {
-      renderFilters({ riskLevel: 'critical' });
-      expect(screen.getByText('Risk:')).toBeInTheDocument();
+  describe("Risk Level Filter", () => {
+    it("displays risk filter chip when risk is selected", () => {
+      renderFilters({ riskLevel: "critical" });
+      expect(screen.getByText("Risk:")).toBeInTheDocument();
       // Critical appears twice - in chip and in select value
-      const criticalElements = screen.getAllByText('Critical');
+      const criticalElements = screen.getAllByText("Critical");
       expect(criticalElements.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('shows risk filter chip label', () => {
-      renderFilters({ riskLevel: 'high' });
-      expect(screen.getByText('Risk:')).toBeInTheDocument();
+    it("shows risk filter chip label", () => {
+      renderFilters({ riskLevel: "high" });
+      expect(screen.getByText("Risk:")).toBeInTheDocument();
       // High appears in chip and in select value
-      const highElements = screen.getAllByText('High');
+      const highElements = screen.getAllByText("High");
       expect(highElements.length).toBeGreaterThanOrEqual(1);
     });
   });
 
-  describe('Event Type Filter', () => {
-    it('displays type filter chip when type is selected', () => {
-      renderFilters({ eventType: 'completion' });
-      expect(screen.getByText('Type:')).toBeInTheDocument();
+  describe("Event Type Filter", () => {
+    it("displays type filter chip when type is selected", () => {
+      renderFilters({ eventType: "completion" });
+      expect(screen.getByText("Type:")).toBeInTheDocument();
       // Completion appears in chip and select
-      const elements = screen.getAllByText('Completion');
+      const elements = screen.getAllByText("Completion");
       expect(elements.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('displays human-readable label for function_call event type', () => {
-      renderFilters({ eventType: 'function_call' });
+    it("displays human-readable label for function_call event type", () => {
+      renderFilters({ eventType: "function_call" });
       // Function Call appears in chip and possibly in select
-      const elements = screen.getAllByText('Function Call');
+      const elements = screen.getAllByText("Function Call");
       expect(elements.length).toBeGreaterThanOrEqual(1);
     });
   });
 
-  describe('Date Range Picker', () => {
-    it('opens popover when clicked', async () => {
+  describe("Date Range Picker", () => {
+    it("opens popover when clicked", async () => {
       const user = userEvent.setup();
       renderFilters();
 
-      await user.click(screen.getByText('Date range'));
+      await user.click(screen.getByText("Date range"));
 
       await waitFor(() => {
-        expect(screen.getByText('Date Range')).toBeInTheDocument();
-        expect(screen.getByText('From')).toBeInTheDocument();
-        expect(screen.getByText('To')).toBeInTheDocument();
+        expect(screen.getByText("Date Range")).toBeInTheDocument();
+        expect(screen.getByText("From")).toBeInTheDocument();
+        expect(screen.getByText("To")).toBeInTheDocument();
       });
     });
 
-    it('displays formatted date range when both dates selected', () => {
+    it("displays formatted date range when both dates selected", () => {
       renderFilters({
-        dateFrom: '2024-01-15',
-        dateTo: '2024-01-20',
+        dateFrom: "2024-01-15",
+        dateTo: "2024-01-20",
       });
 
       // Should contain the date info in a button
-      const dateButton = screen.getByRole('button', { name: /jan/i });
+      const dateButton = screen.getByRole("button", { name: /jan/i });
       expect(dateButton).toBeInTheDocument();
     });
 
-    it('shows visual indicator when date filter is active', () => {
-      renderFilters({ dateFrom: '2024-01-15' });
+    it("shows visual indicator when date filter is active", () => {
+      renderFilters({ dateFrom: "2024-01-15" });
 
       // The date button should exist and have the date displayed
-      const buttons = screen.getAllByRole('button');
-      const dateButton = buttons.find(btn => btn.textContent?.includes('Jan'));
+      const buttons = screen.getAllByRole("button");
+      const dateButton = buttons.find(btn => btn.textContent?.includes("Jan"));
       expect(dateButton).toBeTruthy();
     });
 
-    it('shows clear dates button when dates are set', async () => {
+    it("shows clear dates button when dates are set", async () => {
       const user = userEvent.setup();
-      renderFilters({ dateFrom: '2024-01-15' });
+      renderFilters({ dateFrom: "2024-01-15" });
 
-      const buttons = screen.getAllByRole('button');
-      const dateButton = buttons.find(btn => btn.textContent?.includes('Jan'));
+      const buttons = screen.getAllByRole("button");
+      const dateButton = buttons.find(btn => btn.textContent?.includes("Jan"));
 
       if (dateButton) {
         await user.click(dateButton);
         await waitFor(() => {
-          expect(screen.getByText('Clear dates')).toBeInTheDocument();
+          expect(screen.getByText("Clear dates")).toBeInTheDocument();
         });
       }
     });
 
-    it('clears dates when clear button clicked', async () => {
+    it("clears dates when clear button clicked", async () => {
       const user = userEvent.setup();
-      renderFilters({ dateFrom: '2024-01-15', dateTo: '2024-01-20' });
+      renderFilters({ dateFrom: "2024-01-15", dateTo: "2024-01-20" });
 
-      const buttons = screen.getAllByRole('button');
-      const dateButton = buttons.find(btn => btn.textContent?.includes('Jan'));
+      const buttons = screen.getAllByRole("button");
+      const dateButton = buttons.find(btn => btn.textContent?.includes("Jan"));
 
       if (dateButton) {
         await user.click(dateButton);
         await waitFor(() => {
-          expect(screen.getByText('Clear dates')).toBeInTheDocument();
+          expect(screen.getByText("Clear dates")).toBeInTheDocument();
         });
 
-        await user.click(screen.getByText('Clear dates'));
+        await user.click(screen.getByText("Clear dates"));
         expect(mockOnFiltersChange).toHaveBeenCalled();
       }
     });
   });
 
-  describe('Active Filter Chips', () => {
-    it('shows active filters section when filters are set', () => {
-      renderFilters({ tool: 'Claude' });
-      expect(screen.getByText('Active filters:')).toBeInTheDocument();
+  describe("Active Filter Chips", () => {
+    it("shows active filters section when filters are set", () => {
+      renderFilters({ tool: "Claude" });
+      expect(screen.getByText("Active filters:")).toBeInTheDocument();
     });
 
-    it('shows filter chip for tool filter', () => {
-      renderFilters({ tool: 'Claude' });
-      expect(screen.getByText('Tool:')).toBeInTheDocument();
+    it("shows filter chip for tool filter", () => {
+      renderFilters({ tool: "Claude" });
+      expect(screen.getByText("Tool:")).toBeInTheDocument();
     });
 
-    it('shows filter chip for risk level', () => {
-      renderFilters({ riskLevel: 'critical' });
-      expect(screen.getByText('Risk:')).toBeInTheDocument();
+    it("shows filter chip for risk level", () => {
+      renderFilters({ riskLevel: "critical" });
+      expect(screen.getByText("Risk:")).toBeInTheDocument();
       // Critical appears in both chip and select
-      const elements = screen.getAllByText('Critical');
+      const elements = screen.getAllByText("Critical");
       expect(elements.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('shows filter chip for event type', () => {
-      renderFilters({ eventType: 'completion' });
-      expect(screen.getByText('Type:')).toBeInTheDocument();
+    it("shows filter chip for event type", () => {
+      renderFilters({ eventType: "completion" });
+      expect(screen.getByText("Type:")).toBeInTheDocument();
       // Completion appears in both chip and select
-      const elements = screen.getAllByText('Completion');
+      const elements = screen.getAllByText("Completion");
       expect(elements.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('shows filter chips for date filters', () => {
+    it("shows filter chips for date filters", () => {
       renderFilters({
-        dateFrom: '2024-01-15',
-        dateTo: '2024-01-20',
+        dateFrom: "2024-01-15",
+        dateTo: "2024-01-20",
       });
 
-      expect(screen.getByText('From:')).toBeInTheDocument();
-      expect(screen.getByText('To:')).toBeInTheDocument();
+      expect(screen.getByText("From:")).toBeInTheDocument();
+      expect(screen.getByText("To:")).toBeInTheDocument();
     });
 
-    it('removes filter when chip remove button clicked', async () => {
+    it("removes filter when chip remove button clicked", async () => {
       const user = userEvent.setup();
-      renderFilters({ tool: 'Claude' });
+      renderFilters({ tool: "Claude" });
 
       // Find buttons in the active filters section
-      const activeFiltersSection = screen.getByText('Active filters:').parentElement;
-      const removeButtons = activeFiltersSection?.querySelectorAll('button');
+      const activeFiltersSection = screen.getByText("Active filters:").parentElement;
+      const removeButtons = activeFiltersSection?.querySelectorAll("button");
 
       if (removeButtons && removeButtons.length > 0) {
         await user.click(removeButtons[0]);
@@ -273,63 +273,63 @@ describe('EventFilters', () => {
       }
     });
 
-    it('shows multiple filter chips when multiple filters active', () => {
+    it("shows multiple filter chips when multiple filters active", () => {
       renderFilters({
-        tool: 'Claude',
-        riskLevel: 'high',
-        eventType: 'completion',
+        tool: "Claude",
+        riskLevel: "high",
+        eventType: "completion",
       });
 
-      expect(screen.getByText('Tool:')).toBeInTheDocument();
-      expect(screen.getByText('Risk:')).toBeInTheDocument();
-      expect(screen.getByText('Type:')).toBeInTheDocument();
+      expect(screen.getByText("Tool:")).toBeInTheDocument();
+      expect(screen.getByText("Risk:")).toBeInTheDocument();
+      expect(screen.getByText("Type:")).toBeInTheDocument();
     });
   });
 
-  describe('Clear All Filters', () => {
-    it('shows clear all button when search filter is active', () => {
-      renderFilters({ search: 'test' });
-      expect(screen.getByText('Clear all')).toBeInTheDocument();
+  describe("Clear All Filters", () => {
+    it("shows clear all button when search filter is active", () => {
+      renderFilters({ search: "test" });
+      expect(screen.getByText("Clear all")).toBeInTheDocument();
     });
 
-    it('shows clear all button when dropdown filters are active', () => {
-      renderFilters({ tool: 'Claude' });
-      expect(screen.getByText('Clear all')).toBeInTheDocument();
+    it("shows clear all button when dropdown filters are active", () => {
+      renderFilters({ tool: "Claude" });
+      expect(screen.getByText("Clear all")).toBeInTheDocument();
     });
 
-    it('clears all filters when clear all clicked', async () => {
+    it("clears all filters when clear all clicked", async () => {
       const user = userEvent.setup();
       renderFilters({
-        search: 'test',
-        tool: 'Claude',
-        riskLevel: 'high',
-        eventType: 'completion',
-        dateFrom: '2024-01-15',
-        dateTo: '2024-01-20',
+        search: "test",
+        tool: "Claude",
+        riskLevel: "high",
+        eventType: "completion",
+        dateFrom: "2024-01-15",
+        dateTo: "2024-01-20",
       });
 
-      await user.click(screen.getByText('Clear all'));
+      await user.click(screen.getByText("Clear all"));
       expect(mockOnFiltersChange).toHaveBeenCalledWith({});
     });
   });
 
-  describe('Filter State Management', () => {
-    it('preserves other filters when updating one', async () => {
+  describe("Filter State Management", () => {
+    it("preserves other filters when updating one", async () => {
       const user = userEvent.setup();
-      renderFilters({ tool: 'Claude', riskLevel: 'high' });
+      renderFilters({ tool: "Claude", riskLevel: "high" });
 
-      const searchInput = screen.getByPlaceholderText('Search events...');
-      await user.type(searchInput, 'x');
+      const searchInput = screen.getByPlaceholderText("Search events...");
+      await user.type(searchInput, "x");
 
       // Last call should have all filters
       const lastCall = mockOnFiltersChange.mock.calls[mockOnFiltersChange.mock.calls.length - 1][0];
-      expect(lastCall.tool).toBe('Claude');
-      expect(lastCall.riskLevel).toBe('high');
+      expect(lastCall.tool).toBe("Claude");
+      expect(lastCall.riskLevel).toBe("high");
     });
   });
 
-  describe('Custom className', () => {
-    it('applies custom className to container', () => {
+  describe("Custom className", () => {
+    it("applies custom className to container", () => {
       const { container } = render(
         <EventFilters
           filters={{}}
@@ -339,25 +339,25 @@ describe('EventFilters', () => {
         />
       );
 
-      expect(container.firstChild).toHaveClass('custom-class');
+      expect(container.firstChild).toHaveClass("custom-class");
     });
   });
 
-  describe('Empty tools list', () => {
-    it('renders with empty tools array', () => {
+  describe("Empty tools list", () => {
+    it("renders with empty tools array", () => {
       renderFilters({}, []);
-      expect(screen.getByText('All tools')).toBeInTheDocument();
+      expect(screen.getByText("All tools")).toBeInTheDocument();
     });
   });
 
-  describe('Filter value display', () => {
-    it('displays all risk level labels correctly', () => {
+  describe("Filter value display", () => {
+    it("displays all risk level labels correctly", () => {
       const riskLevels = [
-        { value: 'critical', label: 'Critical' },
-        { value: 'high', label: 'High' },
-        { value: 'medium', label: 'Medium' },
-        { value: 'low', label: 'Low' },
-        { value: 'none', label: 'None' },
+        { value: "critical", label: "Critical" },
+        { value: "high", label: "High" },
+        { value: "medium", label: "Medium" },
+        { value: "low", label: "Low" },
+        { value: "none", label: "None" },
       ];
 
       riskLevels.forEach(({ value, label }) => {
@@ -369,12 +369,12 @@ describe('EventFilters', () => {
       });
     });
 
-    it('displays all event type labels correctly', () => {
+    it("displays all event type labels correctly", () => {
       const eventTypes = [
-        { value: 'prompt', label: 'Prompt' },
-        { value: 'completion', label: 'Completion' },
-        { value: 'function_call', label: 'Function Call' },
-        { value: 'file_operation', label: 'File Operation' },
+        { value: "prompt", label: "Prompt" },
+        { value: "completion", label: "Completion" },
+        { value: "function_call", label: "Function Call" },
+        { value: "file_operation", label: "File Operation" },
       ];
 
       eventTypes.forEach(({ value, label }) => {

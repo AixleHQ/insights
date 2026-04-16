@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Loader2, Shield, Activity, Lock, Mail, KeyRound } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { Loader2, Shield, Activity, Lock, Mail, KeyRound } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 
 function FeatureItem({ icon: Icon, title, description }: { icon: typeof Shield; title: string; description: string }) {
   return (
@@ -38,15 +38,15 @@ export function Login() {
   const navigate = useNavigate();
   const { isAuthenticated, isLoading, login, directLogin } = useAuth();
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/', { replace: true });
+      navigate("/", { replace: true });
     }
   }, [isAuthenticated, navigate]);
 
@@ -58,9 +58,9 @@ export function Login() {
 
     try {
       await directLogin(email, password);
-      navigate('/', { replace: true });
+      navigate("/", { replace: true });
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Login failed');
+      setFormError(err instanceof Error ? err.message : "Login failed");
     } finally {
       setIsSubmitting(false);
     }
@@ -220,7 +220,7 @@ export function Login() {
                     Signing in...
                   </>
                 ) : (
-                  'Sign in'
+                  "Sign in"
                 )}
               </Button>
             </form>

@@ -1,27 +1,27 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { MoreHorizontal, Shield, ShieldCheck, User, Eye, Trash2 } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { MoreHorizontal, Shield, ShieldCheck, User, Eye, Trash2 } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { TableCell, TableRow } from '@/components/ui/table';
-import { cn } from '@/lib/utils';
-import { formatDistanceToNow } from '@/lib/utils';
+} from "@/components/ui/select";
+import { TableCell, TableRow } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
+import { formatDistanceToNow } from "@/lib/utils";
 
-export type MemberRole = 'owner' | 'admin' | 'member' | 'viewer';
+export type MemberRole = "owner" | "admin" | "member" | "viewer";
 
 export interface MemberData {
   id: string;
@@ -29,7 +29,7 @@ export interface MemberData {
   name?: string;
   avatar_url?: string | null;
   role: MemberRole;
-  status: 'active' | 'pending' | 'inactive';
+  status: "active" | "pending" | "inactive";
   joined_at?: string;
   last_active_at?: string;
   total_tokens?: number;
@@ -47,22 +47,22 @@ const roleConfig: Record<
   MemberRole,
   { label: string; icon: typeof Shield; color: string }
 > = {
-  owner: { label: 'Owner', icon: ShieldCheck, color: 'text-primary' },
-  admin: { label: 'Admin', icon: Shield, color: 'text-warning' },
-  member: { label: 'Member', icon: User, color: 'text-muted-foreground' },
-  viewer: { label: 'Viewer', icon: Eye, color: 'text-muted-foreground' },
+  owner: { label: "Owner", icon: ShieldCheck, color: "text-primary" },
+  admin: { label: "Admin", icon: Shield, color: "text-warning" },
+  member: { label: "Member", icon: User, color: "text-muted-foreground" },
+  viewer: { label: "Viewer", icon: Eye, color: "text-muted-foreground" },
 };
 
 function getInitials(name?: string, email?: string): string {
   if (name) {
     return name
-      .split(' ')
+      .split(" ")
       .map((word) => word[0])
-      .join('')
+      .join("")
       .toUpperCase()
       .slice(0, 2);
   }
-  return email?.slice(0, 2).toUpperCase() || 'U';
+  return email?.slice(0, 2).toUpperCase() || "U";
 }
 
 function formatTokens(tokens: number): string {
@@ -87,11 +87,11 @@ export function MemberRow({
   const RoleIcon = role.icon;
 
   const canManageMembers =
-    currentUserRole === 'owner' || currentUserRole === 'admin';
+    currentUserRole === "owner" || currentUserRole === "admin";
   const canEditRole =
     canManageMembers &&
-    member.role !== 'owner' &&
-    (currentUserRole === 'owner' || member.role !== 'admin');
+    member.role !== "owner" &&
+    (currentUserRole === "owner" || member.role !== "admin");
   const canRemove = canEditRole;
 
   const handleRoleChange = (newRole: MemberRole) => {
@@ -101,7 +101,7 @@ export function MemberRow({
   };
 
   return (
-    <TableRow className={cn('group', className)}>
+    <TableRow className={cn("group", className)}>
       <TableCell>
         <Link
           to={`/team/${member.id}`}
@@ -115,7 +115,7 @@ export function MemberRow({
           </Avatar>
           <div className="min-w-0">
             <p className="truncate font-medium hover:underline">
-              {member.name || member.email.split('@')[0]}
+              {member.name || member.email.split("@")[0]}
             </p>
             <p className="truncate text-xs text-muted-foreground">
               {member.email}
@@ -141,31 +141,31 @@ export function MemberRow({
           </Select>
         ) : (
           <div className="flex items-center gap-1.5">
-            <RoleIcon className={cn('size-4', role.color)} />
+            <RoleIcon className={cn("size-4", role.color)} />
             <span className="text-sm">{role.label}</span>
           </div>
         )}
       </TableCell>
       <TableCell className="hidden sm:table-cell">
         <Badge
-          variant={member.status === 'active' ? 'default' : 'secondary'}
+          variant={member.status === "active" ? "default" : "secondary"}
           className="text-xs"
         >
-          {member.status === 'pending' ? 'Pending' : member.status}
+          {member.status === "pending" ? "Pending" : member.status}
         </Badge>
       </TableCell>
       <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-        {member.joined_at ? formatDistanceToNow(member.joined_at) : '-'}
+        {member.joined_at ? formatDistanceToNow(member.joined_at) : "-"}
       </TableCell>
       <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
         {member.last_active_at
           ? formatDistanceToNow(member.last_active_at)
-          : '-'}
+          : "-"}
       </TableCell>
       <TableCell className="hidden sm:table-cell font-mono-display text-sm">
         {member.total_tokens !== undefined && member.total_tokens > 0
           ? formatTokens(member.total_tokens)
-          : '-'}
+          : "-"}
       </TableCell>
       <TableCell>
         {canRemove && (

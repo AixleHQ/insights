@@ -1,31 +1,31 @@
-import { useState } from 'react';
+import { useState } from "react";
 import {
   Shield,
   Search,
   X,
   ChevronLeft,
   ChevronRight,
-} from 'lucide-react';
-import { useProjectAuditLogs, type AuditLogFilters } from '@/hooks/useApi';
-import { AUDIT_ACTION_LABELS, AUDIT_ACTION_OPTIONS } from '@/lib/audit-actions';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
+} from "lucide-react";
+import { useProjectAuditLogs, type AuditLogFilters } from "@/hooks/useApi";
+import { AUDIT_ACTION_LABELS, AUDIT_ACTION_OPTIONS } from "@/lib/audit-actions";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
+} from "@/components/ui/card";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -33,14 +33,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 
 export function ProjectSecurityTab({ projectId }: { projectId: string }) {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<AuditLogFilters>({});
-  const [actionFilter, setActionFilter] = useState('all');
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
+  const [actionFilter, setActionFilter] = useState("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
   const activeFilters: AuditLogFilters = {
     page,
@@ -58,16 +58,16 @@ export function ProjectSecurityTab({ projectId }: { projectId: string }) {
   const applyFilters = () => {
     setPage(1);
     setFilters({
-      log_action: actionFilter !== 'all' ? actionFilter : undefined,
+      log_action: actionFilter !== "all" ? actionFilter : undefined,
       from_date: fromDate || undefined,
       to_date: toDate || undefined,
     });
   };
 
   const clearFilters = () => {
-    setActionFilter('all');
-    setFromDate('');
-    setToDate('');
+    setActionFilter("all");
+    setFromDate("");
+    setToDate("");
     setPage(1);
     setFilters({});
   };
@@ -182,13 +182,13 @@ export function ProjectSecurityTab({ projectId }: { projectId: string }) {
                     <TableCell>
                       <Badge
                         variant={
-                          log.action.startsWith('impersonation') ? 'destructive' : 'secondary'
+                          log.action.startsWith("impersonation") ? "destructive" : "secondary"
                         }
                         className="text-xs"
                       >
                         {AUDIT_ACTION_LABELS[log.action] ?? log.action}
                       </Badge>
-                      {log.action.startsWith('impersonation') && typeof log.metadata?.impersonator_email === 'string' && (
+                      {log.action.startsWith("impersonation") && typeof log.metadata?.impersonator_email === "string" && (
                         <p className="mt-0.5 text-xs text-muted-foreground">
                           by {log.metadata.impersonator_email}
                         </p>
@@ -209,7 +209,7 @@ export function ProjectSecurityTab({ projectId }: { projectId: string }) {
                       )}
                     </TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">
-                      {log.ipAddress ?? '—'}
+                      {log.ipAddress ?? "—"}
                     </TableCell>
                   </TableRow>
                 ))}

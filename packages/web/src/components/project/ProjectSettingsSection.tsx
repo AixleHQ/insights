@@ -1,37 +1,37 @@
-import { useState, useEffect } from 'react';
-import { Loader2, Save, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { Loader2, Save, AlertCircle, CheckCircle2 } from "lucide-react";
 import {
   useProjectSettings,
   useUpdateProjectSetting,
   useDeleteProjectSetting,
-} from '@/hooks/useApi';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+} from "@/hooks/useApi";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
+} from "@/components/ui/card";
 
 const DOMAIN_RE = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z]{2,})+$/;
 
-type FeedbackState = { type: 'error' | 'success'; message: string } | null;
+type FeedbackState = { type: "error" | "success"; message: string } | null;
 
 export function ProjectSettingsSection({ projectId }: { projectId: string }) {
   const { data: settings, isLoading } = useProjectSettings(projectId);
   const updateSetting = useUpdateProjectSetting();
   const deleteSetting = useDeleteProjectSetting();
 
-  const [emailDomain, setEmailDomain] = useState('');
+  const [emailDomain, setEmailDomain] = useState("");
   const [feedback, setFeedback] = useState<FeedbackState>(null);
 
   const savedEmailDomain =
-    settings?.data.find((s) => s.key === 'allowed_email_domain')?.value ?? '';
+    settings?.data.find((s) => s.key === "allowed_email_domain")?.value ?? "";
 
   useEffect(() => {
     setEmailDomain(savedEmailDomain);
@@ -41,7 +41,7 @@ export function ProjectSettingsSection({ projectId }: { projectId: string }) {
     const trimmed = emailDomain.trim().toLowerCase();
 
     if (trimmed && !DOMAIN_RE.test(trimmed)) {
-      setFeedback({ type: 'error', message: 'Enter a valid domain like example.com' });
+      setFeedback({ type: "error", message: "Enter a valid domain like example.com" });
       return;
     }
 
@@ -49,18 +49,18 @@ export function ProjectSettingsSection({ projectId }: { projectId: string }) {
 
     try {
       if (!trimmed && savedEmailDomain) {
-        await deleteSetting.mutateAsync({ projectId, key: 'allowed_email_domain' });
+        await deleteSetting.mutateAsync({ projectId, key: "allowed_email_domain" });
       } else if (trimmed) {
         await updateSetting.mutateAsync({
           projectId,
-          key: 'allowed_email_domain',
+          key: "allowed_email_domain",
           value: trimmed,
         });
       }
-      setFeedback({ type: 'success', message: 'Settings saved' });
+      setFeedback({ type: "success", message: "Settings saved" });
     } catch (error) {
-      console.error('Failed to save email domain:', error);
-      setFeedback({ type: 'error', message: 'Failed to save. Please try again.' });
+      console.error("Failed to save email domain:", error);
+      setFeedback({ type: "error", message: "Failed to save. Please try again." });
     }
   };
 
@@ -115,8 +115,8 @@ export function ProjectSettingsSection({ projectId }: { projectId: string }) {
         </div>
 
         {feedback && (
-          <Alert variant={feedback.type === 'error' ? 'destructive' : 'default'}>
-            {feedback.type === 'error' ? (
+          <Alert variant={feedback.type === "error" ? "destructive" : "default"}>
+            {feedback.type === "error" ? (
               <AlertCircle className="size-4" />
             ) : (
               <CheckCircle2 className="size-4" />

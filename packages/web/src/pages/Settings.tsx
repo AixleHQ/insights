@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { validateCostInput as validateCostInputLib } from '@/lib/validation';
-import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
-import { Team } from './Team';
+import { useState, useEffect } from "react";
+import { validateCostInput as validateCostInputLib } from "@/lib/validation";
+import { Routes, Route, Link, useLocation, Navigate } from "react-router-dom";
+import { Team } from "./Team";
 import {
   Building2,
   Shield,
@@ -15,9 +15,9 @@ import {
   X,
   FileSearch,
   Users,
-} from 'lucide-react';
-import { retentionOrder, formatRetentionLabel } from '@/lib/retention-utils';
-import { useOrg } from '@/contexts/OrgContext';
+} from "lucide-react";
+import { retentionOrder, formatRetentionLabel } from "@/lib/retention-utils";
+import { useOrg } from "@/contexts/OrgContext";
 import {
   useOrganization,
   useUpdateOrganization,
@@ -31,30 +31,30 @@ import {
   useOrganizationAuditLogs,
   useConnectors,
   type AuditLogFilters,
-} from '@/hooks/useApi';
-import { AUDIT_ACTION_LABELS, AUDIT_ACTION_OPTIONS } from '@/lib/audit-actions';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
+} from "@/hooks/useApi";
+import { AUDIT_ACTION_LABELS, AUDIT_ACTION_OPTIONS } from "@/lib/audit-actions";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
+} from "@/components/ui/card";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -64,7 +64,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+} from "@/components/ui/alert-dialog";
 import {
   Table,
   TableBody,
@@ -72,16 +72,16 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { cn } from '@/lib/utils';
+} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 const navItems = [
-  { title: 'General', href: '/settings', icon: Building2 },
-  { title: 'Members', href: '/settings/members', icon: Users },
-  { title: 'Policies', href: '/settings/policies', icon: Shield },
-  { title: 'Alerts', href: '/settings/alerts', icon: Bell },
-  { title: 'Billing', href: '/settings/billing', icon: CreditCard },
-  { title: 'Security & Audit', href: '/settings/security', icon: FileSearch },
+  { title: "General", href: "/settings", icon: Building2 },
+  { title: "Members", href: "/settings/members", icon: Users },
+  { title: "Policies", href: "/settings/policies", icon: Shield },
+  { title: "Alerts", href: "/settings/alerts", icon: Bell },
+  { title: "Billing", href: "/settings/billing", icon: CreditCard },
+  { title: "Security & Audit", href: "/settings/security", icon: FileSearch },
 ];
 
 function SettingsNav() {
@@ -96,10 +96,10 @@ function SettingsNav() {
             key={item.href}
             to={item.href}
             className={cn(
-              'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+              "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
               isActive
-                ? 'bg-primary/10 text-primary'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
             )}
           >
             <item.icon className="size-4" />
@@ -113,33 +113,33 @@ function SettingsNav() {
 
 function GeneralSettings() {
   const { currentOrg } = useOrg();
-  const { data: org, isLoading } = useOrganization(currentOrg?.id || '');
-  const { data: settings, isLoading: isLoadingSettings } = useOrganizationSettings(currentOrg?.id || '');
+  const { data: org, isLoading } = useOrganization(currentOrg?.id || "");
+  const { data: settings, isLoading: isLoadingSettings } = useOrganizationSettings(currentOrg?.id || "");
   const updateOrg = useUpdateOrganization();
   const updateSetting = useUpdateOrganizationSetting();
   const deleteSetting = useDeleteOrganizationSetting();
 
   const [formData, setFormData] = useState({
-    name: '',
-    slug: '',
-    description: '',
+    name: "",
+    slug: "",
+    description: "",
   });
   const [hasChanges, setHasChanges] = useState(false);
-  const [emailDomain, setEmailDomain] = useState('');
+  const [emailDomain, setEmailDomain] = useState("");
 
   const savedEmailDomain =
     (settings as { data: Array<{ key: string; value: string }> })?.data?.find(
-      (s) => s.key === 'allowed_email_domain'
-    )?.value ?? '';
+      (s) => s.key === "allowed_email_domain"
+    )?.value ?? "";
 
   // Update form when org data loads
   useEffect(() => {
     if (org) {
       setFormData((prev) => {
         const newData = {
-          name: org.name || '',
-          slug: org.slug || '',
-          description: org.description || '',
+          name: org.name || "",
+          slug: org.slug || "",
+          description: org.description || "",
         };
         // Only update if data actually changed
         if (prev.name !== newData.name || prev.slug !== newData.slug || prev.description !== newData.description) {
@@ -165,7 +165,7 @@ function GeneralSettings() {
       await updateOrg.mutateAsync({ id: currentOrg.id, data: formData });
       setHasChanges(false);
     } catch (error) {
-      console.error('Failed to save:', error);
+      console.error("Failed to save:", error);
     }
   };
 
@@ -174,16 +174,16 @@ function GeneralSettings() {
     try {
       const trimmed = emailDomain.trim().toLowerCase();
       if (!trimmed && savedEmailDomain) {
-        await deleteSetting.mutateAsync({ orgId: currentOrg.id, key: 'allowed_email_domain' });
+        await deleteSetting.mutateAsync({ orgId: currentOrg.id, key: "allowed_email_domain" });
       } else if (trimmed) {
         await updateSetting.mutateAsync({
           orgId: currentOrg.id,
-          key: 'allowed_email_domain',
+          key: "allowed_email_domain",
           value: trimmed,
         });
       }
     } catch (error) {
-      console.error('Failed to save email domain:', error);
+      console.error("Failed to save email domain:", error);
     }
   };
 
@@ -214,16 +214,16 @@ function GeneralSettings() {
             <Label htmlFor="name">Organization Name</Label>
             <Input
               id="name"
-              value={formData.name || org?.name || ''}
-              onChange={(e) => handleChange('name', e.target.value)}
+              value={formData.name || org?.name || ""}
+              onChange={(e) => handleChange("name", e.target.value)}
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="slug">URL Slug</Label>
             <Input
               id="slug"
-              value={formData.slug || org?.slug || ''}
-              onChange={(e) => handleChange('slug', e.target.value)}
+              value={formData.slug || org?.slug || ""}
+              onChange={(e) => handleChange("slug", e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
               This is used in URLs and cannot be easily changed
@@ -234,7 +234,7 @@ function GeneralSettings() {
             <Input
               id="description"
               value={formData.description}
-              onChange={(e) => handleChange('description', e.target.value)}
+              onChange={(e) => handleChange("description", e.target.value)}
               placeholder="A brief description of your organization"
             />
           </div>
@@ -291,8 +291,8 @@ function GeneralSettings() {
 
 function PolicySettings() {
   const { currentOrg } = useOrg();
-  const { data: retentionPolicy, isLoading: isLoadingRetention } = useRetentionPolicy(currentOrg?.id || '');
-  const { data: settings, isLoading: isLoadingSettings } = useOrganizationSettings(currentOrg?.id || '');
+  const { data: retentionPolicy, isLoading: isLoadingRetention } = useRetentionPolicy(currentOrg?.id || "");
+  const { data: settings, isLoading: isLoadingSettings } = useOrganizationSettings(currentOrg?.id || "");
   const updateRetention = useUpdateRetentionPolicy();
   const updateSetting = useUpdateOrganizationSetting();
 
@@ -317,7 +317,7 @@ function PolicySettings() {
 
   const togglePolicy = async (key: keyof typeof policies) => {
     if (!currentOrg) return;
-    const settingKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+    const settingKey = key.replace(/([A-Z])/g, "_$1").toLowerCase();
     try {
       await updateSetting.mutateAsync({
         orgId: currentOrg.id,
@@ -325,7 +325,7 @@ function PolicySettings() {
         value: !policies[key],
       });
     } catch (error) {
-      console.error('Failed to update setting:', error);
+      console.error("Failed to update setting:", error);
     }
   };
 
@@ -334,7 +334,7 @@ function PolicySettings() {
     try {
       await updateRetention.mutateAsync({ orgId: currentOrg.id, data: { [field]: value } });
     } catch (error) {
-      console.error('Failed to update retention:', error);
+      console.error("Failed to update retention:", error);
     }
   };
 
@@ -386,7 +386,7 @@ function PolicySettings() {
             </div>
             <Switch
               checked={policies.sanitizeApiKeys}
-              onCheckedChange={() => togglePolicy('sanitizeApiKeys')}
+              onCheckedChange={() => togglePolicy("sanitizeApiKeys")}
             />
           </div>
           <div className="flex items-center justify-between rounded-lg border p-3">
@@ -398,7 +398,7 @@ function PolicySettings() {
             </div>
             <Switch
               checked={policies.sanitizeSecrets}
-              onCheckedChange={() => togglePolicy('sanitizeSecrets')}
+              onCheckedChange={() => togglePolicy("sanitizeSecrets")}
             />
           </div>
           <div className="flex items-center justify-between rounded-lg border p-3">
@@ -410,7 +410,7 @@ function PolicySettings() {
             </div>
             <Switch
               checked={policies.sanitizeEmails}
-              onCheckedChange={() => togglePolicy('sanitizeEmails')}
+              onCheckedChange={() => togglePolicy("sanitizeEmails")}
             />
           </div>
           <div className="flex items-center justify-between rounded-lg border p-3">
@@ -422,7 +422,7 @@ function PolicySettings() {
             </div>
             <Switch
               checked={policies.sanitizeIps}
-              onCheckedChange={() => togglePolicy('sanitizeIps')}
+              onCheckedChange={() => togglePolicy("sanitizeIps")}
             />
           </div>
         </CardContent>
@@ -440,9 +440,9 @@ function PolicySettings() {
             <div className="space-y-2">
               <Label>Raw Event TTL</Label>
               <Select
-                value={retentionPolicy?.rawEventTtl || '24_hours'}
+                value={retentionPolicy?.rawEventTtl || "24_hours"}
                 onValueChange={(value) =>
-                  handleRetentionChange('raw_event_ttl', retentionPolicy?.rawEventTtl || '24_hours', value)
+                  handleRetentionChange("raw_event_ttl", retentionPolicy?.rawEventTtl || "24_hours", value)
                 }
               >
                 <SelectTrigger>
@@ -460,9 +460,9 @@ function PolicySettings() {
             <div className="space-y-2">
               <Label>Tool Events</Label>
               <Select
-                value={retentionPolicy?.toolEventsRetention || '90_days'}
+                value={retentionPolicy?.toolEventsRetention || "90_days"}
                 onValueChange={(value) =>
-                  handleRetentionChange('tool_events_retention', retentionPolicy?.toolEventsRetention || '90_days', value)
+                  handleRetentionChange("tool_events_retention", retentionPolicy?.toolEventsRetention || "90_days", value)
                 }
               >
                 <SelectTrigger>
@@ -481,9 +481,9 @@ function PolicySettings() {
             <div className="space-y-2">
               <Label>Hourly Aggregates</Label>
               <Select
-                value={retentionPolicy?.hourlyAggregateRetention || '365_days'}
+                value={retentionPolicy?.hourlyAggregateRetention || "365_days"}
                 onValueChange={(value) =>
-                  handleRetentionChange('hourly_aggregate_retention', retentionPolicy?.hourlyAggregateRetention || '365_days', value)
+                  handleRetentionChange("hourly_aggregate_retention", retentionPolicy?.hourlyAggregateRetention || "365_days", value)
                 }
               >
                 <SelectTrigger>
@@ -500,9 +500,9 @@ function PolicySettings() {
             <div className="space-y-2">
               <Label>Daily Aggregates</Label>
               <Select
-                value={retentionPolicy?.dailyAggregateRetention || 'forever'}
+                value={retentionPolicy?.dailyAggregateRetention || "forever"}
                 onValueChange={(value) =>
-                  handleRetentionChange('daily_aggregate_retention', retentionPolicy?.dailyAggregateRetention || 'forever', value)
+                  handleRetentionChange("daily_aggregate_retention", retentionPolicy?.dailyAggregateRetention || "forever", value)
                 }
               >
                 <SelectTrigger>
@@ -525,8 +525,8 @@ function PolicySettings() {
           <AlertDialogHeader>
             <AlertDialogTitle>Reduce retention period?</AlertDialogTitle>
             <AlertDialogDescription>
-              You are reducing the retention from{' '}
-              <strong>{pendingChange?.currentLabel}</strong> to{' '}
+              You are reducing the retention from{" "}
+              <strong>{pendingChange?.currentLabel}</strong> to{" "}
               <strong>{pendingChange?.newLabel}</strong>. Data older than the
               new limit may be permanently deleted. This action cannot be undone.
             </AlertDialogDescription>
@@ -565,7 +565,7 @@ function PolicySettings() {
             </div>
             <Switch
               checked={policies.blockHighRisk}
-              onCheckedChange={() => togglePolicy('blockHighRisk')}
+              onCheckedChange={() => togglePolicy("blockHighRisk")}
             />
           </div>
           <div className="flex items-center justify-between rounded-lg border p-3">
@@ -577,7 +577,7 @@ function PolicySettings() {
             </div>
             <Switch
               checked={policies.requireReview}
-              onCheckedChange={() => togglePolicy('requireReview')}
+              onCheckedChange={() => togglePolicy("requireReview")}
             />
           </div>
         </CardContent>
@@ -588,8 +588,8 @@ function PolicySettings() {
 
 export function AlertSettings() {
   const { currentOrg } = useOrg();
-  const { data: settings, isLoading } = useOrganizationSettings(currentOrg?.id || '');
-  const { data: connectors } = useConnectors(currentOrg?.id || '');
+  const { data: settings, isLoading } = useOrganizationSettings(currentOrg?.id || "");
+  const { data: connectors } = useConnectors(currentOrg?.id || "");
   const updateSetting = useUpdateOrganizationSetting();
 
   const getSetting = (key: string) =>
@@ -598,34 +598,34 @@ export function AlertSettings() {
     )?.value;
 
   const hasSlackConnector = connectors?.some(
-    (c) => (c.connectorType === 'slack' || c.connector_type === 'slack') && (c.isActive || c.is_active)
+    (c) => (c.connectorType === "slack" || c.connector_type === "slack") && (c.isActive || c.is_active)
   ) ?? false;
 
   // Parse boolean/numeric settings
-  const riskCritical = getSetting('alert_risk_critical') !== 'false' && getSetting('alert_risk_critical') !== undefined ? getSetting('alert_risk_critical') !== 'false' : true;
-  const riskHigh = getSetting('alert_risk_high') !== 'false' && getSetting('alert_risk_high') !== undefined ? getSetting('alert_risk_high') !== 'false' : true;
-  const usageSpike = getSetting('alert_usage_spike') !== 'false' && getSetting('alert_usage_spike') !== undefined ? getSetting('alert_usage_spike') !== 'false' : true;
-  const emailNotifications = getSetting('alert_email') !== 'false' && getSetting('alert_email') !== undefined ? getSetting('alert_email') !== 'false' : true;
-  const slackNotifications = getSetting('alert_slack') === 'true';
+  const riskCritical = getSetting("alert_risk_critical") !== "false" && getSetting("alert_risk_critical") !== undefined ? getSetting("alert_risk_critical") !== "false" : true;
+  const riskHigh = getSetting("alert_risk_high") !== "false" && getSetting("alert_risk_high") !== undefined ? getSetting("alert_risk_high") !== "false" : true;
+  const usageSpike = getSetting("alert_usage_spike") !== "false" && getSetting("alert_usage_spike") !== undefined ? getSetting("alert_usage_spike") !== "false" : true;
+  const emailNotifications = getSetting("alert_email") !== "false" && getSetting("alert_email") !== undefined ? getSetting("alert_email") !== "false" : true;
+  const slackNotifications = getSetting("alert_slack") === "true";
 
   // Controlled state for cost threshold inputs
-  const [costDaily, setCostDaily] = useState('');
-  const [costMonthly, setCostMonthly] = useState('');
-  const [costDailyError, setCostDailyError] = useState('');
-  const [costMonthlyError, setCostMonthlyError] = useState('');
+  const [costDaily, setCostDaily] = useState("");
+  const [costMonthly, setCostMonthly] = useState("");
+  const [costDailyError, setCostDailyError] = useState("");
+  const [costMonthlyError, setCostMonthlyError] = useState("");
 
   // Sync controlled inputs when settings load
   useEffect(() => {
-    const daily = getSetting('alert_cost_daily');
+    const daily = getSetting("alert_cost_daily");
     if (daily !== undefined) setCostDaily(daily);
-    else setCostDaily('500');
+    else setCostDaily("500");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings]);
 
   useEffect(() => {
-    const monthly = getSetting('alert_cost_monthly');
+    const monthly = getSetting("alert_cost_monthly");
     if (monthly !== undefined) setCostMonthly(monthly);
-    else setCostMonthly('5000');
+    else setCostMonthly("5000");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings]);
 
@@ -645,7 +645,7 @@ export function AlertSettings() {
     const error = validateCostInput(costDaily);
     setCostDailyError(error);
     if (!error && currentOrg) {
-      updateSetting.mutate({ orgId: currentOrg.id, key: 'alert_cost_daily', value: costDaily });
+      updateSetting.mutate({ orgId: currentOrg.id, key: "alert_cost_daily", value: costDaily });
     }
   };
 
@@ -653,7 +653,7 @@ export function AlertSettings() {
     const error = validateCostInput(costMonthly);
     setCostMonthlyError(error);
     if (!error && currentOrg) {
-      updateSetting.mutate({ orgId: currentOrg.id, key: 'alert_cost_monthly', value: costMonthly });
+      updateSetting.mutate({ orgId: currentOrg.id, key: "alert_cost_monthly", value: costMonthly });
     }
   };
 
@@ -662,7 +662,7 @@ export function AlertSettings() {
     try {
       await updateSetting.mutateAsync({ orgId: currentOrg.id, key, value });
     } catch (error) {
-      console.error('Failed to update setting:', error);
+      console.error("Failed to update setting:", error);
     }
   };
 
@@ -699,7 +699,7 @@ export function AlertSettings() {
               value={costDaily}
               onChange={(e) => handleCostDailyChange(e.target.value)}
               onBlur={handleCostDailyBlur}
-              className={cn(costDailyError && 'border-destructive focus-visible:ring-destructive')}
+              className={cn(costDailyError && "border-destructive focus-visible:ring-destructive")}
             />
             {costDailyError && (
               <p className="text-xs text-destructive">{costDailyError}</p>
@@ -714,7 +714,7 @@ export function AlertSettings() {
               value={costMonthly}
               onChange={(e) => handleCostMonthlyChange(e.target.value)}
               onBlur={handleCostMonthlyBlur}
-              className={cn(costMonthlyError && 'border-destructive focus-visible:ring-destructive')}
+              className={cn(costMonthlyError && "border-destructive focus-visible:ring-destructive")}
             />
             {costMonthlyError && (
               <p className="text-xs text-destructive">{costMonthlyError}</p>
@@ -742,7 +742,7 @@ export function AlertSettings() {
               aria-label="Critical Risk Events"
               checked={riskCritical}
               onCheckedChange={(checked) =>
-                updateAlertSetting('alert_risk_critical', checked)
+                updateAlertSetting("alert_risk_critical", checked)
               }
             />
           </div>
@@ -757,7 +757,7 @@ export function AlertSettings() {
               aria-label="High Risk Events"
               checked={riskHigh}
               onCheckedChange={(checked) =>
-                updateAlertSetting('alert_risk_high', checked)
+                updateAlertSetting("alert_risk_high", checked)
               }
             />
           </div>
@@ -772,7 +772,7 @@ export function AlertSettings() {
               aria-label="Usage Spikes"
               checked={usageSpike}
               onCheckedChange={(checked) =>
-                updateAlertSetting('alert_usage_spike', checked)
+                updateAlertSetting("alert_usage_spike", checked)
               }
             />
           </div>
@@ -796,17 +796,17 @@ export function AlertSettings() {
               aria-label="Email Notifications"
               checked={emailNotifications}
               onCheckedChange={(checked) =>
-                updateAlertSetting('alert_email', checked)
+                updateAlertSetting("alert_email", checked)
               }
             />
           </div>
-          <div className={cn('flex items-center justify-between rounded-lg border p-3', !hasSlackConnector && 'opacity-60')}>
+          <div className={cn("flex items-center justify-between rounded-lg border p-3", !hasSlackConnector && "opacity-60")}>
             <div>
               <Label>Slack Notifications</Label>
               <p className="text-xs text-muted-foreground">
                 {hasSlackConnector
-                  ? 'Post alerts to a Slack channel'
-                  : 'Connect a Slack integration to enable this'}
+                  ? "Post alerts to a Slack channel"
+                  : "Connect a Slack integration to enable this"}
               </p>
             </div>
             <Switch
@@ -814,7 +814,7 @@ export function AlertSettings() {
               checked={slackNotifications}
               disabled={!hasSlackConnector}
               onCheckedChange={(checked) =>
-                updateAlertSetting('alert_slack', checked)
+                updateAlertSetting("alert_slack", checked)
               }
             />
           </div>
@@ -826,8 +826,8 @@ export function AlertSettings() {
 
 function BillingSettings() {
   const { currentOrg } = useOrg();
-  const { data: stats, isLoading: isLoadingStats } = useOverviewStats(currentOrg?.id || '');
-  const { data: dailyStats, isLoading: isLoadingDaily } = useDailyStats(currentOrg?.id || '', 30);
+  const { data: stats, isLoading: isLoadingStats } = useOverviewStats(currentOrg?.id || "");
+  const { data: dailyStats, isLoading: isLoadingDaily } = useDailyStats(currentOrg?.id || "", 30);
 
   // Calculate month-to-date usage from daily stats
   const monthlyEvents = dailyStats?.data?.reduce((sum, d) => sum + d.event_count, 0) ?? 0;
@@ -859,7 +859,7 @@ function BillingSettings() {
   }
 
   // Get current month name
-  const currentMonth = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const currentMonth = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
   return (
     <div className="space-y-6">
@@ -937,9 +937,9 @@ function SecuritySettings() {
   const { currentOrg } = useOrg();
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<AuditLogFilters>({});
-  const [actionFilter, setActionFilter] = useState('all');
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
+  const [actionFilter, setActionFilter] = useState("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
   const activeFilters: AuditLogFilters = {
     page,
@@ -949,7 +949,7 @@ function SecuritySettings() {
     ...(filters.to_date ? { to_date: filters.to_date } : {}),
   };
 
-  const { data, isLoading } = useOrganizationAuditLogs(currentOrg?.id || '', activeFilters);
+  const { data, isLoading } = useOrganizationAuditLogs(currentOrg?.id || "", activeFilters);
 
   const logs = data?.data ?? [];
   const meta = data?.meta;
@@ -957,16 +957,16 @@ function SecuritySettings() {
   const applyFilters = () => {
     setPage(1);
     setFilters({
-      log_action: actionFilter !== 'all' ? actionFilter : undefined,
+      log_action: actionFilter !== "all" ? actionFilter : undefined,
       from_date: fromDate || undefined,
       to_date: toDate || undefined,
     });
   };
 
   const clearFilters = () => {
-    setActionFilter('all');
-    setFromDate('');
-    setToDate('');
+    setActionFilter("all");
+    setFromDate("");
+    setToDate("");
     setPage(1);
     setFilters({});
   };
@@ -1081,13 +1081,13 @@ function SecuritySettings() {
                     <TableCell>
                       <Badge
                         variant={
-                          log.action.startsWith('impersonation') ? 'destructive' : 'secondary'
+                          log.action.startsWith("impersonation") ? "destructive" : "secondary"
                         }
                         className="text-xs"
                       >
                         {AUDIT_ACTION_LABELS[log.action] ?? log.action}
                       </Badge>
-                      {log.action.startsWith('impersonation') && typeof log.metadata?.impersonator_email === 'string' && (
+                      {log.action.startsWith("impersonation") && typeof log.metadata?.impersonator_email === "string" && (
                         <p className="mt-0.5 text-xs text-muted-foreground">
                           by {log.metadata.impersonator_email}
                         </p>
@@ -1108,7 +1108,7 @@ function SecuritySettings() {
                       )}
                     </TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">
-                      {log.ipAddress ?? '—'}
+                      {log.ipAddress ?? "—"}
                     </TableCell>
                   </TableRow>
                 ))}

@@ -1,85 +1,85 @@
-import { useMemo, useState } from 'react';
-import { AlertCircle } from 'lucide-react';
-import { useProjectConnectors, useProjectConnectWithApiKey, useProjectDeleteConnector, useProjectTestConnector } from '@/hooks/useApi';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useMemo, useState } from "react";
+import { AlertCircle } from "lucide-react";
+import { useProjectConnectors, useProjectConnectWithApiKey, useProjectDeleteConnector, useProjectTestConnector } from "@/hooks/useApi";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   IntegrationCard,
   type IntegrationData,
   type IntegrationProvider,
   type ProviderInfo,
-} from '@/components/integrations';
-import type { ConnectorStatus } from '@/lib/types';
-import { ApiKeyConnectSheet } from '@/components/integrations/ApiKeyConnectSheet';
-import { SlackConnectSheet } from '@/components/integrations/SlackConnectSheet';
+} from "@/components/integrations";
+import type { ConnectorStatus } from "@/lib/types";
+import { ApiKeyConnectSheet } from "@/components/integrations/ApiKeyConnectSheet";
+import { SlackConnectSheet } from "@/components/integrations/SlackConnectSheet";
 
 const PROVIDERS: ProviderInfo[] = [
   {
-    id: 'anthropic',
-    name: 'Anthropic API',
-    description: 'Direct Anthropic API integration',
-    category: 'ai',
+    id: "anthropic",
+    name: "Anthropic API",
+    description: "Direct Anthropic API integration",
+    category: "ai",
     features: [
-      'API key management',
-      'Usage monitoring',
-      'Cost tracking',
-      'Rate limit visibility',
+      "API key management",
+      "Usage monitoring",
+      "Cost tracking",
+      "Rate limit visibility",
     ],
     available: true,
   },
   {
-    id: 'openai',
-    name: 'OpenAI',
-    description: 'Track OpenAI API usage and costs',
-    category: 'ai',
+    id: "openai",
+    name: "OpenAI",
+    description: "Track OpenAI API usage and costs",
+    category: "ai",
     features: [
-      'API usage tracking',
-      'GPT model analytics',
-      'Token consumption',
-      'Cost breakdown',
+      "API usage tracking",
+      "GPT model analytics",
+      "Token consumption",
+      "Cost breakdown",
     ],
     available: true,
   },
   {
-    id: 'openrouter',
-    name: 'OpenRouter',
-    description: 'Multi-model AI gateway tracking',
-    category: 'ai',
+    id: "openrouter",
+    name: "OpenRouter",
+    description: "Multi-model AI gateway tracking",
+    category: "ai",
     features: [
-      'Multi-provider analytics',
-      'Model comparison',
-      'Cost optimization',
-      'Usage patterns',
+      "Multi-provider analytics",
+      "Model comparison",
+      "Cost optimization",
+      "Usage patterns",
     ],
     available: true,
   },
   {
-    id: 'gemini',
-    name: 'Gemini',
-    description: 'Track Google Gemini API usage and costs',
-    category: 'ai',
+    id: "gemini",
+    name: "Gemini",
+    description: "Track Google Gemini API usage and costs",
+    category: "ai",
     features: [
-      'API usage tracking',
-      'Model analytics',
-      'Token consumption',
-      'Cost breakdown',
+      "API usage tracking",
+      "Model analytics",
+      "Token consumption",
+      "Cost breakdown",
     ],
     available: true,
   },
   {
-    id: 'slack',
-    name: 'Slack',
-    description: 'Send project alerts and notifications to Slack',
-    category: 'communication',
+    id: "slack",
+    name: "Slack",
+    description: "Send project alerts and notifications to Slack",
+    category: "communication",
     features: [
-      'Cost alerts',
-      'Usage notifications',
-      'Custom channel routing',
-      'Webhook-based delivery',
+      "Cost alerts",
+      "Usage notifications",
+      "Custom channel routing",
+      "Webhook-based delivery",
     ],
     available: true,
-    connectSheet: 'webhook',
+    connectSheet: "webhook",
   },
 ];
 
@@ -109,7 +109,7 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
   const deleteConnector = useProjectDeleteConnector();
   const testConnector = useProjectTestConnector();
 
-  const [activeTab, setActiveTab] = useState('connected');
+  const [activeTab, setActiveTab] = useState("connected");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [slackSheetOpen, setSlackSheetOpen] = useState(false);
   const [connectingProvider, setConnectingProvider] = useState<ProviderInfo | null>(null);
@@ -119,7 +119,7 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
   const integrations: IntegrationData[] = useMemo(() => {
     if (!connectorsData) return [];
     return connectorsData.map((c) => {
-      const connectorType = c.connectorType || c.connector_type || 'anthropic';
+      const connectorType = c.connectorType || c.connector_type || "anthropic";
       const lastError = c.lastError || c.last_error;
       const externalAccountName = c.externalAccountName || c.external_account_name;
       const lastSyncAt = c.lastSyncAt || c.last_sync_at;
@@ -133,7 +133,7 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
         last_sync_at: lastSyncAt || undefined,
         sync_error: lastError || undefined,
         metadata: {
-          account_name: externalAccountName || '',
+          account_name: externalAccountName || "",
           resources_count: 0,
         },
       };
@@ -145,7 +145,7 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
 
   const handleConnect = (providerId: string) => {
     const provider = PROVIDERS.find((p) => p.id === providerId) ?? null;
-    if (provider?.connectSheet === 'webhook') {
+    if (provider?.connectSheet === "webhook") {
       setSlackSheetOpen(true);
       return;
     }
@@ -163,12 +163,12 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
   };
 
   const handleDisconnect = async (id: string) => {
-    if (window.confirm('Are you sure you want to disconnect this integration?')) {
+    if (window.confirm("Are you sure you want to disconnect this integration?")) {
       setActionError(null);
       try {
         await deleteConnector.mutateAsync({ projectId, connectorId: id });
       } catch {
-        setActionError('Failed to disconnect. Please try again.');
+        setActionError("Failed to disconnect. Please try again.");
       }
     }
   };
@@ -179,7 +179,7 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
     try {
       await testConnector.mutateAsync({ projectId, connectorId: id });
     } catch {
-      setActionError('Failed to run connection test. Please try again.');
+      setActionError("Failed to run connection test. Please try again.");
     } finally {
       setTestingConnectorId(null);
     }
@@ -255,7 +255,7 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
         provider={connectingProvider}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
-        onSuccess={() => setActiveTab('connected')}
+        onSuccess={() => setActiveTab("connected")}
         onConnect={handleConnectWithApiKey}
       />
 
@@ -263,7 +263,7 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
         projectId={projectId}
         open={slackSheetOpen}
         onOpenChange={setSlackSheetOpen}
-        onSuccess={() => setActiveTab('connected')}
+        onSuccess={() => setActiveTab("connected")}
       />
     </>
   );

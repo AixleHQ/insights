@@ -5,10 +5,10 @@
  * a working implementation that uses React 19's act correctly.
  */
 
-import { act } from 'react'
+import { act } from "react"
 
 // Re-export everything from the actual react-dom/test-utils
-export * from 'react-dom/test-utils'
+export * from "react-dom/test-utils"
 
 // Override act with React 19's version
 export { act }

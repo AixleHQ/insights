@@ -1,8 +1,8 @@
-import { test, expect } from '@playwright/test';
-import * as fs from 'fs';
-import * as path from 'path';
+import { test, expect } from "@playwright/test";
+import * as fs from "fs";
+import * as path from "path";
 
-const authFile = './e2e/.auth/user.json';
+const authFile = "./e2e/.auth/user.json";
 
 /**
  * E2E tests to verify seeded development data is correctly linked
@@ -15,19 +15,19 @@ const authFile = './e2e/.auth/user.json';
  */
 
 // Helper to restore sessionStorage from auth file
-async function restoreSessionStorage(page: import('@playwright/test').Page) {
+async function restoreSessionStorage(page: import("@playwright/test").Page) {
   const authPath = path.resolve(authFile);
   if (!fs.existsSync(authPath)) {
-    throw new Error('Auth file not found. Run npm run test:e2e:setup first.');
+    throw new Error("Auth file not found. Run npm run test:e2e:setup first.");
   }
 
-  const authData = JSON.parse(fs.readFileSync(authPath, 'utf-8'));
+  const authData = JSON.parse(fs.readFileSync(authPath, "utf-8"));
 
   // Navigate to page first
-  await page.goto('/');
+  await page.goto("/");
 
   // Find sessionStorage data for localhost:5173
-  const origin = authData.origins?.find((o: { origin: string }) => o.origin === 'http://localhost:5173');
+  const origin = authData.origins?.find((o: { origin: string }) => o.origin === "http://localhost:5173");
   if (origin?.sessionStorage) {
     for (const item of origin.sessionStorage) {
       await page.evaluate(({ key, value }) => {
@@ -39,23 +39,23 @@ async function restoreSessionStorage(page: import('@playwright/test').Page) {
   }
 }
 
-test.describe('Seeded Data Verification', () => {
+test.describe("Seeded Data Verification", () => {
   test.beforeEach(async ({ page }) => {
     await restoreSessionStorage(page);
   });
 
-  test('user can see their organization', async ({ page }) => {
+  test("user can see their organization", async ({ page }) => {
     // Wait for dashboard to load
-    await expect(page.getByRole('heading', { name: /dashboard/i })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("heading", { name: /dashboard/i })).toBeVisible({ timeout: 15000 });
 
     // Check that organization name is visible in sidebar or header
     // The seeded org is "Acme Corp"
     await expect(page.getByText(/dual boot partners/i).first()).toBeVisible({ timeout: 10000 });
   });
 
-  test('dashboard shows seeded event data', async ({ page }) => {
+  test("dashboard shows seeded event data", async ({ page }) => {
     // Wait for dashboard to load
-    await expect(page.getByRole('heading', { name: /dashboard/i })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("heading", { name: /dashboard/i })).toBeVisible({ timeout: 15000 });
 
     // Check for metric cards with non-zero values
     // The seed creates ~41,000 events for the org
@@ -63,14 +63,14 @@ test.describe('Seeded Data Verification', () => {
     await expect(page.getByText(/[1-9][0-9,]+/).first()).toBeVisible({ timeout: 15000 });
   });
 
-  test('user can access events page with data', async ({ page }) => {
-    await page.goto('/events');
+  test("user can access events page with data", async ({ page }) => {
+    await page.goto("/events");
 
     // Wait for events table to load
-    await expect(page.getByRole('table')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("table")).toBeVisible({ timeout: 15000 });
 
     // Should have event rows (seeded user has 1500 events)
-    const rows = page.locator('tbody tr');
+    const rows = page.locator("tbody tr");
     await expect(rows.first()).toBeVisible();
 
     // Verify some events are displayed
@@ -78,72 +78,72 @@ test.describe('Seeded Data Verification', () => {
     expect(rowCount).toBeGreaterThan(0);
   });
 
-  test('user can access team page', async ({ page }) => {
-    await page.goto('/team');
+  test("user can access team page", async ({ page }) => {
+    await page.goto("/team");
 
     // Should see team members list
-    await expect(page.getByRole('heading', { name: /team/i })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("heading", { name: /team/i })).toBeVisible({ timeout: 15000 });
 
     // The seed creates 101 users (1 owner + 100 engineers)
     // At minimum, we should see the logged-in user
     await expect(page.getByText(/billy\.boozer@dualbootpartners\.com/i)).toBeVisible({ timeout: 10000 });
   });
 
-  test('user profile shows user settings page', async ({ page }) => {
-    await page.goto('/profile');
+  test("user profile shows user settings page", async ({ page }) => {
+    await page.goto("/profile");
 
     // Should show the User Settings layout with heading and sidebar navigation
-    await expect(page.getByRole('heading', { name: /user settings/i })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("heading", { name: /user settings/i })).toBeVisible({ timeout: 15000 });
 
     // Sidebar nav links should all be present — scoped to the settings nav to avoid
     // matching the app sidebar's "Profile" link which also appears on this page
-    const settingsNav = page.getByRole('navigation').filter({ hasText: 'Preferences' });
-    await expect(settingsNav.getByRole('link', { name: /profile/i })).toBeVisible();
-    await expect(settingsNav.getByRole('link', { name: /preferences/i })).toBeVisible();
-    await expect(settingsNav.getByRole('link', { name: /notifications/i })).toBeVisible();
-    await expect(settingsNav.getByRole('link', { name: /security/i })).toBeVisible();
-    await expect(settingsNav.getByRole('link', { name: /tools/i })).toBeVisible();
+    const settingsNav = page.getByRole("navigation").filter({ hasText: "Preferences" });
+    await expect(settingsNav.getByRole("link", { name: /profile/i })).toBeVisible();
+    await expect(settingsNav.getByRole("link", { name: /preferences/i })).toBeVisible();
+    await expect(settingsNav.getByRole("link", { name: /notifications/i })).toBeVisible();
+    await expect(settingsNav.getByRole("link", { name: /security/i })).toBeVisible();
+    await expect(settingsNav.getByRole("link", { name: /tools/i })).toBeVisible();
 
     // Profile section shows the authenticated user's email
     await expect(page.getByText(/billy\.boozer@dualbootpartners\.com/i)).toBeVisible();
   });
 
-  test('user can see projects', async ({ page }) => {
-    await page.goto('/projects');
+  test("user can see projects", async ({ page }) => {
+    await page.goto("/projects");
 
     // Should see projects list
-    await expect(page.getByRole('heading', { name: /projects/i })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("heading", { name: /projects/i })).toBeVisible({ timeout: 15000 });
 
     // The seed creates 7 projects
     // Wait for projects to load
     await page.waitForTimeout(2000);
 
     // Should have at least one project visible
-    await expect(page.getByRole('link', { name: /view|details/i }).or(page.locator('a[href^="/projects/"]')).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole("link", { name: /view|details/i }).or(page.locator('a[href^="/projects/"]')).first()).toBeVisible({ timeout: 10000 });
   });
 });
 
-test.describe('API Integration', () => {
+test.describe("API Integration", () => {
   test.beforeEach(async ({ page }) => {
     await restoreSessionStorage(page);
   });
 
-  test('organizations endpoint returns user orgs', async ({ page, request }) => {
+  test("organizations endpoint returns user orgs", async ({ page, request }) => {
     // Wait for dashboard to load (confirms auth is working)
-    await expect(page.getByRole('heading', { name: /dashboard/i })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("heading", { name: /dashboard/i })).toBeVisible({ timeout: 15000 });
 
     // Get the auth token from sessionStorage
     const token = await page.evaluate(() => {
-      const storageKey = Object.keys(sessionStorage).find(k => k.includes('oidc'));
+      const storageKey = Object.keys(sessionStorage).find(k => k.includes("oidc"));
       if (storageKey) {
-        const data = JSON.parse(sessionStorage.getItem(storageKey) || '{}');
+        const data = JSON.parse(sessionStorage.getItem(storageKey) || "{}");
         return data.access_token;
       }
       return null;
     });
 
     // Make API request
-    const response = await request.get('/api/v1/users/me/organizations', {
+    const response = await request.get("/api/v1/users/me/organizations", {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
 
@@ -155,22 +155,22 @@ test.describe('API Integration', () => {
     expect(data.data.length).toBeGreaterThan(0);
 
     // First org should be Acme Corp
-    expect(data.data[0].name).toBe('Acme Corp');
+    expect(data.data[0].name).toBe("Acme Corp");
   });
 
-  test('user me endpoint returns correct user', async ({ page, request }) => {
-    await expect(page.getByRole('heading', { name: /dashboard/i })).toBeVisible({ timeout: 15000 });
+  test("user me endpoint returns correct user", async ({ page, request }) => {
+    await expect(page.getByRole("heading", { name: /dashboard/i })).toBeVisible({ timeout: 15000 });
 
     const token = await page.evaluate(() => {
-      const storageKey = Object.keys(sessionStorage).find(k => k.includes('oidc'));
+      const storageKey = Object.keys(sessionStorage).find(k => k.includes("oidc"));
       if (storageKey) {
-        const data = JSON.parse(sessionStorage.getItem(storageKey) || '{}');
+        const data = JSON.parse(sessionStorage.getItem(storageKey) || "{}");
         return data.access_token;
       }
       return null;
     });
 
-    const response = await request.get('/api/v1/users/me', {
+    const response = await request.get("/api/v1/users/me", {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
 
@@ -178,7 +178,7 @@ test.describe('API Integration', () => {
     const data = await response.json();
 
     // User should be ada.lovelace
-    expect(data.data.email).toBe('ada.lovelace@example.com');
+    expect(data.data.email).toBe("ada.lovelace@example.com");
 
     // Debug info should show events count (in development)
     if (data.data._debug) {

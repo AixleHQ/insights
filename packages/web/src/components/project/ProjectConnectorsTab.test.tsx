@@ -1,11 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within, act } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { BrowserRouter } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ProjectConnectorsTab } from './ProjectConnectorsTab';
-import { ApiError } from '@/lib/api';
-import type { ProjectConnector } from '@/lib/types';
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, waitFor, within, act } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { BrowserRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ProjectConnectorsTab } from "./ProjectConnectorsTab";
+import { ApiError } from "@/lib/api";
+import type { ProjectConnector } from "@/lib/types";
 
 const mockProjectConnectors = vi.fn();
 const mockConnectWithApiKey = vi.fn();
@@ -14,14 +14,14 @@ const mockConnectWithWebhook = vi.fn();
 const mockDeleteConnector = vi.fn();
 const mockTestConnector = vi.fn();
 
-vi.mock('@/contexts/OrgContext', () => ({
+vi.mock("@/contexts/OrgContext", () => ({
   useOrg: () => ({
-    currentOrg: { id: 'test-org-id', name: 'Test Org', slug: 'test-org' },
+    currentOrg: { id: "test-org-id", name: "Test Org", slug: "test-org" },
     isLoading: false,
   }),
 }));
 
-vi.mock('@/hooks/useApi', () => ({
+vi.mock("@/hooks/useApi", () => ({
   useProjectConnectors: () => mockProjectConnectors(),
   useProjectConnectWithApiKey: () => ({ mutateAsync: mockConnectWithApiKey }),
   useProjectConnectWithSlack: () => ({ mutateAsync: mockConnectWithSlack }),
@@ -30,14 +30,14 @@ vi.mock('@/hooks/useApi', () => ({
   useConnectWithApiKey: () => ({ mutateAsync: vi.fn() }),
 }));
 
-const PROJECT_ID = 'test-project-id';
+const PROJECT_ID = "test-project-id";
 
 const connectedAnthropicConnector: ProjectConnector = {
-  id: 'connector-1',
+  id: "connector-1",
   project_id: PROJECT_ID,
-  connectorType: 'anthropic',
+  connectorType: "anthropic",
   isActive: true,
-  status: 'connected',
+  status: "connected",
   externalAccountName: null,
   lastSyncAt: null,
   lastError: null,
@@ -54,7 +54,7 @@ function renderComponent() {
   );
 }
 
-describe('ProjectConnectorsTab', () => {
+describe("ProjectConnectorsTab", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockConnectWithApiKey.mockResolvedValue({});
@@ -63,199 +63,199 @@ describe('ProjectConnectorsTab', () => {
     mockTestConnector.mockResolvedValue({ data: { success: true } });
   });
 
-  describe('Loading state', () => {
-    it('shows skeleton loaders while fetching', () => {
+  describe("Loading state", () => {
+    it("shows skeleton loaders while fetching", () => {
       mockProjectConnectors.mockReturnValue({ data: undefined, isLoading: true });
       renderComponent();
       // Tab labels still render while loading
-      expect(screen.getByRole('tab', { name: /connected/i })).toBeInTheDocument();
-      expect(screen.getByRole('tab', { name: /available/i })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /connected/i })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /available/i })).toBeInTheDocument();
     });
   });
 
-  describe('Connected tab', () => {
-    it('shows empty state when no connectors are connected', () => {
+  describe("Connected tab", () => {
+    it("shows empty state when no connectors are connected", () => {
       mockProjectConnectors.mockReturnValue({ data: [], isLoading: false });
       renderComponent();
-      expect(screen.getByText('No providers connected')).toBeInTheDocument();
+      expect(screen.getByText("No providers connected")).toBeInTheDocument();
     });
 
-    it('displays connected connector count in tab label', () => {
+    it("displays connected connector count in tab label", () => {
       mockProjectConnectors.mockReturnValue({ data: [connectedAnthropicConnector], isLoading: false });
       renderComponent();
-      expect(screen.getByRole('tab', { name: /connected \(1\)/i })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /connected \(1\)/i })).toBeInTheDocument();
     });
 
-    it('renders connected connector as card with provider name', () => {
+    it("renders connected connector as card with provider name", () => {
       mockProjectConnectors.mockReturnValue({ data: [connectedAnthropicConnector], isLoading: false });
       renderComponent();
       // IntegrationCard for connected connector shows integration.name (connectorType when no external name)
       // appears in both title and description — use getAllByText
-      expect(screen.getAllByText('anthropic').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("anthropic").length).toBeGreaterThanOrEqual(1);
     });
 
-    it('shows Connected status badge for a connected connector', () => {
+    it("shows Connected status badge for a connected connector", () => {
       mockProjectConnectors.mockReturnValue({ data: [connectedAnthropicConnector], isLoading: false });
       renderComponent();
-      expect(screen.getByText('Connected')).toBeInTheDocument();
+      expect(screen.getByText("Connected")).toBeInTheDocument();
     });
 
-    it('shows Error status badge for a connector with an error', () => {
+    it("shows Error status badge for a connector with an error", () => {
       const errorConnector: ProjectConnector = {
         ...connectedAnthropicConnector,
-        status: 'error',
-        lastError: 'API key expired',
+        status: "error",
+        lastError: "API key expired",
       };
       mockProjectConnectors.mockReturnValue({ data: [errorConnector], isLoading: false });
       renderComponent();
-      expect(screen.getByText('Error')).toBeInTheDocument();
+      expect(screen.getByText("Error")).toBeInTheDocument();
     });
   });
 
-  describe('Available tab', () => {
-    it('shows all 5 providers when none are connected', () => {
+  describe("Available tab", () => {
+    it("shows all 5 providers when none are connected", () => {
       mockProjectConnectors.mockReturnValue({ data: [], isLoading: false });
       renderComponent();
-      expect(screen.getByRole('tab', { name: /available \(5\)/i })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /available \(5\)/i })).toBeInTheDocument();
     });
 
-    it('excludes already-connected providers from the Available tab count', () => {
+    it("excludes already-connected providers from the Available tab count", () => {
       mockProjectConnectors.mockReturnValue({ data: [connectedAnthropicConnector], isLoading: false });
       renderComponent();
-      expect(screen.getByRole('tab', { name: /available \(4\)/i })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /available \(4\)/i })).toBeInTheDocument();
     });
 
-    it('shows all provider names in the Available tab', async () => {
+    it("shows all provider names in the Available tab", async () => {
       mockProjectConnectors.mockReturnValue({ data: [], isLoading: false });
       const user = userEvent.setup();
       renderComponent();
 
-      await user.click(screen.getByRole('tab', { name: /available/i }));
+      await user.click(screen.getByRole("tab", { name: /available/i }));
 
-      expect(screen.getByText('Anthropic API')).toBeInTheDocument();
-      expect(screen.getByText('OpenAI')).toBeInTheDocument();
-      expect(screen.getByText('OpenRouter')).toBeInTheDocument();
-      expect(screen.getByText('Gemini')).toBeInTheDocument();
-      expect(screen.getByText('Slack')).toBeInTheDocument();
+      expect(screen.getByText("Anthropic API")).toBeInTheDocument();
+      expect(screen.getByText("OpenAI")).toBeInTheDocument();
+      expect(screen.getByText("OpenRouter")).toBeInTheDocument();
+      expect(screen.getByText("Gemini")).toBeInTheDocument();
+      expect(screen.getByText("Slack")).toBeInTheDocument();
     });
 
-    it('shows empty state when all providers are connected', async () => {
+    it("shows empty state when all providers are connected", async () => {
       const allConnected: ProjectConnector[] = [
-        { ...connectedAnthropicConnector, id: '1', connectorType: 'anthropic' },
-        { ...connectedAnthropicConnector, id: '2', connectorType: 'openai' },
-        { ...connectedAnthropicConnector, id: '3', connectorType: 'openrouter' },
-        { ...connectedAnthropicConnector, id: '4', connectorType: 'gemini' },
-        { ...connectedAnthropicConnector, id: '5', connectorType: 'slack' },
+        { ...connectedAnthropicConnector, id: "1", connectorType: "anthropic" },
+        { ...connectedAnthropicConnector, id: "2", connectorType: "openai" },
+        { ...connectedAnthropicConnector, id: "3", connectorType: "openrouter" },
+        { ...connectedAnthropicConnector, id: "4", connectorType: "gemini" },
+        { ...connectedAnthropicConnector, id: "5", connectorType: "slack" },
       ];
       mockProjectConnectors.mockReturnValue({ data: allConnected, isLoading: false });
       const user = userEvent.setup();
       renderComponent();
 
-      await user.click(screen.getByRole('tab', { name: /available \(0\)/i }));
+      await user.click(screen.getByRole("tab", { name: /available \(0\)/i }));
 
-      expect(screen.getByText('All providers are connected')).toBeInTheDocument();
+      expect(screen.getByText("All providers are connected")).toBeInTheDocument();
     });
   });
 
-  describe('Connect flow', () => {
-    it('opens the API key sheet when clicking Connect on an available provider', async () => {
+  describe("Connect flow", () => {
+    it("opens the API key sheet when clicking Connect on an available provider", async () => {
       mockProjectConnectors.mockReturnValue({ data: [], isLoading: false });
       const user = userEvent.setup();
       renderComponent();
 
-      await user.click(screen.getByRole('tab', { name: /available/i }));
-      const connectButtons = screen.getAllByRole('button', { name: /^connect$/i });
+      await user.click(screen.getByRole("tab", { name: /available/i }));
+      const connectButtons = screen.getAllByRole("button", { name: /^connect$/i });
       await user.click(connectButtons[0]);
 
-      expect(screen.getByLabelText('API Key')).toBeInTheDocument();
+      expect(screen.getByLabelText("API Key")).toBeInTheDocument();
     });
 
-    it('calls useProjectConnectWithApiKey with projectId and connectorType on submit', async () => {
+    it("calls useProjectConnectWithApiKey with projectId and connectorType on submit", async () => {
       mockProjectConnectors.mockReturnValue({ data: [], isLoading: false });
       const user = userEvent.setup();
       renderComponent();
 
-      await user.click(screen.getByRole('tab', { name: /available/i }));
-      const connectButtons = screen.getAllByRole('button', { name: /^connect$/i });
+      await user.click(screen.getByRole("tab", { name: /available/i }));
+      const connectButtons = screen.getAllByRole("button", { name: /^connect$/i });
       await user.click(connectButtons[0]);
 
-      await user.type(screen.getByLabelText('API Key'), 'sk-ant-test-key');
-      await user.click(screen.getByRole('button', { name: /^connect$/i }));
+      await user.type(screen.getByLabelText("API Key"), "sk-ant-test-key");
+      await user.click(screen.getByRole("button", { name: /^connect$/i }));
 
       await waitFor(() => {
         expect(mockConnectWithApiKey).toHaveBeenCalledWith(
           expect.objectContaining({
             projectId: PROJECT_ID,
-            apiKey: 'sk-ant-test-key',
+            apiKey: "sk-ant-test-key",
           })
         );
       });
     });
 
-    it('opens SlackConnectSheet with Webhook URL and Channel label when connecting Slack', async () => {
+    it("opens SlackConnectSheet with Webhook URL and Channel label when connecting Slack", async () => {
       mockProjectConnectors.mockReturnValue({ data: [], isLoading: false });
       const user = userEvent.setup();
       renderComponent();
 
-      await user.click(screen.getByRole('tab', { name: /available/i }));
-      const slackCard = screen.getByTestId('provider-card-slack');
-      await user.click(within(slackCard).getByRole('button', { name: /^connect$/i }));
+      await user.click(screen.getByRole("tab", { name: /available/i }));
+      const slackCard = screen.getByTestId("provider-card-slack");
+      await user.click(within(slackCard).getByRole("button", { name: /^connect$/i }));
 
       expect(screen.getByLabelText(/webhook url/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/channel label/i)).toBeInTheDocument();
     });
 
-    it('calls useProjectConnectWithSlack with projectId, webhookUrl, and channelLabel on submit', async () => {
+    it("calls useProjectConnectWithSlack with projectId, webhookUrl, and channelLabel on submit", async () => {
       mockProjectConnectors.mockReturnValue({ data: [], isLoading: false });
       const user = userEvent.setup();
       renderComponent();
 
-      await user.click(screen.getByRole('tab', { name: /available/i }));
-      const slackCard = screen.getByTestId('provider-card-slack');
-      await user.click(within(slackCard).getByRole('button', { name: /^connect$/i }));
+      await user.click(screen.getByRole("tab", { name: /available/i }));
+      const slackCard = screen.getByTestId("provider-card-slack");
+      await user.click(within(slackCard).getByRole("button", { name: /^connect$/i }));
 
-      await user.type(screen.getByLabelText(/webhook url/i), 'https://hooks.slack.com/services/T00/B00/xxx');
-      await user.type(screen.getByLabelText(/channel label/i), '#alerts');
-      await user.click(screen.getByRole('button', { name: /^connect$/i }));
+      await user.type(screen.getByLabelText(/webhook url/i), "https://hooks.slack.com/services/T00/B00/xxx");
+      await user.type(screen.getByLabelText(/channel label/i), "#alerts");
+      await user.click(screen.getByRole("button", { name: /^connect$/i }));
 
       await waitFor(() => {
         expect(mockConnectWithSlack).toHaveBeenCalledWith({
           projectId: PROJECT_ID,
-          webhookUrl: 'https://hooks.slack.com/services/T00/B00/xxx',
-          channelLabel: '#alerts',
+          webhookUrl: "https://hooks.slack.com/services/T00/B00/xxx",
+          channelLabel: "#alerts",
         });
         expect(mockConnectWithWebhook).not.toHaveBeenCalled();
       });
     });
 
-    it('calls useProjectConnectWithSlack without channelLabel when channel is empty', async () => {
+    it("calls useProjectConnectWithSlack without channelLabel when channel is empty", async () => {
       mockProjectConnectors.mockReturnValue({ data: [], isLoading: false });
       const user = userEvent.setup();
       renderComponent();
 
-      await user.click(screen.getByRole('tab', { name: /available/i }));
-      const slackCard = screen.getByTestId('provider-card-slack');
-      await user.click(within(slackCard).getByRole('button', { name: /^connect$/i }));
+      await user.click(screen.getByRole("tab", { name: /available/i }));
+      const slackCard = screen.getByTestId("provider-card-slack");
+      await user.click(within(slackCard).getByRole("button", { name: /^connect$/i }));
 
-      await user.type(screen.getByLabelText(/webhook url/i), 'https://hooks.slack.com/services/T00/B00/xxx');
-      await user.click(screen.getByRole('button', { name: /^connect$/i }));
+      await user.type(screen.getByLabelText(/webhook url/i), "https://hooks.slack.com/services/T00/B00/xxx");
+      await user.click(screen.getByRole("button", { name: /^connect$/i }));
 
       await waitFor(() => {
         expect(mockConnectWithSlack).toHaveBeenCalledWith({
           projectId: PROJECT_ID,
-          webhookUrl: 'https://hooks.slack.com/services/T00/B00/xxx',
+          webhookUrl: "https://hooks.slack.com/services/T00/B00/xxx",
           channelLabel: undefined,
         });
       });
     });
 
-    it('switches to Connected tab and shows Slack connector after connecting', async () => {
+    it("switches to Connected tab and shows Slack connector after connecting", async () => {
       const connectedSlack: ProjectConnector = {
-        id: 'slack-1',
+        id: "slack-1",
         project_id: PROJECT_ID,
-        connectorType: 'slack',
+        connectorType: "slack",
         isActive: true,
-        status: 'connected',
+        status: "connected",
         externalAccountName: null,
         lastSyncAt: null,
         lastError: null,
@@ -265,79 +265,79 @@ describe('ProjectConnectorsTab', () => {
       const user = userEvent.setup();
       renderComponent();
 
-      await user.click(screen.getByRole('tab', { name: /available/i }));
-      const slackCard = screen.getByTestId('provider-card-slack');
-      await user.click(within(slackCard).getByRole('button', { name: /^connect$/i }));
+      await user.click(screen.getByRole("tab", { name: /available/i }));
+      const slackCard = screen.getByTestId("provider-card-slack");
+      await user.click(within(slackCard).getByRole("button", { name: /^connect$/i }));
 
       // Update mock before submit so re-render after onSuccess sees the new connector
       mockProjectConnectors.mockReturnValue({ data: [connectedSlack], isLoading: false });
 
-      await user.type(screen.getByLabelText(/webhook url/i), 'https://hooks.slack.com/services/T00/B00/xxx');
-      await user.click(screen.getByRole('button', { name: /^connect$/i }));
+      await user.type(screen.getByLabelText(/webhook url/i), "https://hooks.slack.com/services/T00/B00/xxx");
+      await user.click(screen.getByRole("button", { name: /^connect$/i }));
 
       await waitFor(() => {
-        expect(screen.getByRole('tab', { name: /connected \(1\)/i })).toBeInTheDocument();
+        expect(screen.getByRole("tab", { name: /connected \(1\)/i })).toBeInTheDocument();
       });
 
       // Slack no longer in Available
-      expect(screen.getByRole('tab', { name: /available \(4\)/i })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /available \(4\)/i })).toBeInTheDocument();
     });
 
-    it('shows inline error when Slack webhook URL is invalid', async () => {
+    it("shows inline error when Slack webhook URL is invalid", async () => {
       mockConnectWithSlack.mockRejectedValue(
-        new ApiError('Validation error', 422, {
-          errors: { access_token: ['Invalid Slack webhook URL format'] },
+        new ApiError("Validation error", 422, {
+          errors: { access_token: ["Invalid Slack webhook URL format"] },
         })
       );
       mockProjectConnectors.mockReturnValue({ data: [], isLoading: false });
       const user = userEvent.setup();
       renderComponent();
 
-      await user.click(screen.getByRole('tab', { name: /available/i }));
-      const slackCard = screen.getByTestId('provider-card-slack');
-      await user.click(within(slackCard).getByRole('button', { name: /^connect$/i }));
+      await user.click(screen.getByRole("tab", { name: /available/i }));
+      const slackCard = screen.getByTestId("provider-card-slack");
+      await user.click(within(slackCard).getByRole("button", { name: /^connect$/i }));
 
-      await user.type(screen.getByLabelText(/webhook url/i), 'not-a-valid-url');
-      await user.click(screen.getByRole('button', { name: /^connect$/i }));
+      await user.type(screen.getByLabelText(/webhook url/i), "not-a-valid-url");
+      await user.click(screen.getByRole("button", { name: /^connect$/i }));
 
       await waitFor(() => {
-        expect(screen.getByText('Invalid Slack webhook URL format')).toBeInTheDocument();
+        expect(screen.getByText("Invalid Slack webhook URL format")).toBeInTheDocument();
       });
     });
 
-    it('shows inline error when API key is invalid', async () => {
+    it("shows inline error when API key is invalid", async () => {
       mockConnectWithApiKey.mockRejectedValue(
-        new ApiError('Validation error', 422, {
-          errors: { access_token: ['Invalid API key'] },
+        new ApiError("Validation error", 422, {
+          errors: { access_token: ["Invalid API key"] },
         })
       );
       mockProjectConnectors.mockReturnValue({ data: [], isLoading: false });
       const user = userEvent.setup();
       renderComponent();
 
-      await user.click(screen.getByRole('tab', { name: /available/i }));
-      const connectButtons = screen.getAllByRole('button', { name: /^connect$/i });
+      await user.click(screen.getByRole("tab", { name: /available/i }));
+      const connectButtons = screen.getAllByRole("button", { name: /^connect$/i });
       await user.click(connectButtons[0]);
 
-      await user.type(screen.getByLabelText('API Key'), 'bad-key');
-      await user.click(screen.getByRole('button', { name: /^connect$/i }));
+      await user.type(screen.getByLabelText("API Key"), "bad-key");
+      await user.click(screen.getByRole("button", { name: /^connect$/i }));
 
       await waitFor(() => {
-        expect(screen.getByText('Invalid API key')).toBeInTheDocument();
+        expect(screen.getByText("Invalid API key")).toBeInTheDocument();
       });
     });
   });
 
-  describe('Disconnect flow', () => {
-    it('calls deleteConnector with projectId and connectorId on confirm', async () => {
-      vi.spyOn(window, 'confirm').mockReturnValue(true);
+  describe("Disconnect flow", () => {
+    it("calls deleteConnector with projectId and connectorId on confirm", async () => {
+      vi.spyOn(window, "confirm").mockReturnValue(true);
       mockProjectConnectors.mockReturnValue({ data: [connectedAnthropicConnector], isLoading: false });
       const user = userEvent.setup();
       renderComponent();
 
       // Open the actions dropdown (sr-only label: "Actions")
-      await user.click(screen.getByRole('button', { name: /actions/i }));
-      await user.click(screen.getByRole('menuitem', { name: /disconnect/i }));
+      await user.click(screen.getByRole("button", { name: /actions/i }));
+      await user.click(screen.getByRole("menuitem", { name: /disconnect/i }));
 
       await waitFor(() => {
         expect(mockDeleteConnector).toHaveBeenCalledWith({
@@ -347,43 +347,43 @@ describe('ProjectConnectorsTab', () => {
       });
     });
 
-    it('does not call deleteConnector when confirm is cancelled', async () => {
-      vi.spyOn(window, 'confirm').mockReturnValue(false);
+    it("does not call deleteConnector when confirm is cancelled", async () => {
+      vi.spyOn(window, "confirm").mockReturnValue(false);
       mockProjectConnectors.mockReturnValue({ data: [connectedAnthropicConnector], isLoading: false });
       const user = userEvent.setup();
       renderComponent();
 
-      await user.click(screen.getByRole('button', { name: /actions/i }));
-      await user.click(screen.getByRole('menuitem', { name: /disconnect/i }));
+      await user.click(screen.getByRole("button", { name: /actions/i }));
+      await user.click(screen.getByRole("menuitem", { name: /disconnect/i }));
 
       expect(mockDeleteConnector).not.toHaveBeenCalled();
     });
 
-    it('shows inline error alert when disconnect mutation fails', async () => {
-      vi.spyOn(window, 'confirm').mockReturnValue(true);
-      mockDeleteConnector.mockRejectedValue(new Error('Network error'));
+    it("shows inline error alert when disconnect mutation fails", async () => {
+      vi.spyOn(window, "confirm").mockReturnValue(true);
+      mockDeleteConnector.mockRejectedValue(new Error("Network error"));
       mockProjectConnectors.mockReturnValue({ data: [connectedAnthropicConnector], isLoading: false });
       const user = userEvent.setup();
       renderComponent();
 
-      await user.click(screen.getByRole('button', { name: /actions/i }));
-      await user.click(screen.getByRole('menuitem', { name: /disconnect/i }));
+      await user.click(screen.getByRole("button", { name: /actions/i }));
+      await user.click(screen.getByRole("menuitem", { name: /disconnect/i }));
 
       await waitFor(() => {
-        expect(screen.getByText('Failed to disconnect. Please try again.')).toBeInTheDocument();
+        expect(screen.getByText("Failed to disconnect. Please try again.")).toBeInTheDocument();
       });
     });
 
   });
 
-  describe('Test connection flow', () => {
-    it('calls testConnector with projectId and connectorId', async () => {
+  describe("Test connection flow", () => {
+    it("calls testConnector with projectId and connectorId", async () => {
       mockProjectConnectors.mockReturnValue({ data: [connectedAnthropicConnector], isLoading: false });
       const user = userEvent.setup();
       renderComponent();
 
-      await user.click(screen.getByRole('button', { name: /actions/i }));
-      await user.click(screen.getByRole('menuitem', { name: /test connection/i }));
+      await user.click(screen.getByRole("button", { name: /actions/i }));
+      await user.click(screen.getByRole("menuitem", { name: /test connection/i }));
 
       await waitFor(() => {
         expect(mockTestConnector).toHaveBeenCalledWith({
@@ -393,7 +393,7 @@ describe('ProjectConnectorsTab', () => {
       });
     });
 
-    it('shows Testing… badge during active test', async () => {
+    it("shows Testing… badge during active test", async () => {
       let resolveTest!: () => void;
       mockTestConnector.mockReturnValue(
         new Promise<void>((resolve) => { resolveTest = resolve; })
@@ -402,57 +402,57 @@ describe('ProjectConnectorsTab', () => {
       const user = userEvent.setup();
       renderComponent();
 
-      await user.click(screen.getByRole('button', { name: /actions/i }));
-      await user.click(screen.getByRole('menuitem', { name: /test connection/i }));
+      await user.click(screen.getByRole("button", { name: /actions/i }));
+      await user.click(screen.getByRole("menuitem", { name: /test connection/i }));
 
       await waitFor(() => {
-        expect(screen.getByText('Testing…')).toBeInTheDocument();
+        expect(screen.getByText("Testing…")).toBeInTheDocument();
       });
 
       // Resolve inside act so the resulting state update (setTestingConnectorId(null)) is flushed cleanly
       await act(async () => { resolveTest(); });
     });
 
-    it('shows inline error alert when test mutation fails', async () => {
-      mockTestConnector.mockRejectedValue(new Error('Network error'));
+    it("shows inline error alert when test mutation fails", async () => {
+      mockTestConnector.mockRejectedValue(new Error("Network error"));
       mockProjectConnectors.mockReturnValue({ data: [connectedAnthropicConnector], isLoading: false });
       const user = userEvent.setup();
       renderComponent();
 
-      await user.click(screen.getByRole('button', { name: /actions/i }));
-      await user.click(screen.getByRole('menuitem', { name: /test connection/i }));
+      await user.click(screen.getByRole("button", { name: /actions/i }));
+      await user.click(screen.getByRole("menuitem", { name: /test connection/i }));
 
       await waitFor(() => {
-        expect(screen.getByText('Failed to run connection test. Please try again.')).toBeInTheDocument();
+        expect(screen.getByText("Failed to run connection test. Please try again.")).toBeInTheDocument();
       });
     });
 
-    it('clears the error alert when a subsequent test is triggered', async () => {
-      mockTestConnector.mockRejectedValueOnce(new Error('Network error'));
+    it("clears the error alert when a subsequent test is triggered", async () => {
+      mockTestConnector.mockRejectedValueOnce(new Error("Network error"));
       mockProjectConnectors.mockReturnValue({ data: [connectedAnthropicConnector], isLoading: false });
       const user = userEvent.setup();
       renderComponent();
 
-      await user.click(screen.getByRole('button', { name: /actions/i }));
-      await user.click(screen.getByRole('menuitem', { name: /test connection/i }));
+      await user.click(screen.getByRole("button", { name: /actions/i }));
+      await user.click(screen.getByRole("menuitem", { name: /test connection/i }));
       await waitFor(() => {
-        expect(screen.getByText('Failed to run connection test. Please try again.')).toBeInTheDocument();
+        expect(screen.getByText("Failed to run connection test. Please try again.")).toBeInTheDocument();
       });
 
       mockTestConnector.mockResolvedValue({ data: { success: true } });
-      await user.click(screen.getByRole('button', { name: /actions/i }));
-      await user.click(screen.getByRole('menuitem', { name: /test connection/i }));
+      await user.click(screen.getByRole("button", { name: /actions/i }));
+      await user.click(screen.getByRole("menuitem", { name: /test connection/i }));
 
       await waitFor(() => {
-        expect(screen.queryByText('Failed to run connection test. Please try again.')).not.toBeInTheDocument();
+        expect(screen.queryByText("Failed to run connection test. Please try again.")).not.toBeInTheDocument();
       });
     });
 
-    it('shows updated status badge after test completes and query refreshes', async () => {
+    it("shows updated status badge after test completes and query refreshes", async () => {
       const errorConnector: ProjectConnector = {
         ...connectedAnthropicConnector,
-        status: 'error',
-        lastError: 'Invalid API key',
+        status: "error",
+        lastError: "Invalid API key",
       };
 
       // First render: connector is in error state
@@ -460,28 +460,28 @@ describe('ProjectConnectorsTab', () => {
       const user = userEvent.setup();
       renderComponent();
 
-      expect(screen.getByText('Error')).toBeInTheDocument();
+      expect(screen.getByText("Error")).toBeInTheDocument();
 
       // Simulate test fixing the connector: query returns connected state after test
       mockTestConnector.mockImplementation(async () => {
         mockProjectConnectors.mockReturnValue({
-          data: [{ ...connectedAnthropicConnector, status: 'connected', lastError: null }],
+          data: [{ ...connectedAnthropicConnector, status: "connected", lastError: null }],
           isLoading: false,
         });
         return { data: { success: true } };
       });
 
-      await user.click(screen.getByRole('button', { name: /actions/i }));
-      await user.click(screen.getByRole('menuitem', { name: /test connection/i }));
+      await user.click(screen.getByRole("button", { name: /actions/i }));
+      await user.click(screen.getByRole("menuitem", { name: /test connection/i }));
 
       await waitFor(() => {
-        expect(screen.getByText('Connected')).toBeInTheDocument();
+        expect(screen.getByText("Connected")).toBeInTheDocument();
       });
     });
   });
 
-  describe('Connector health display', () => {
-    it('shows last sync time when connector has lastSyncAt', () => {
+  describe("Connector health display", () => {
+    it("shows last sync time when connector has lastSyncAt", () => {
       const syncedConnector: ProjectConnector = {
         ...connectedAnthropicConnector,
         lastSyncAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
@@ -492,45 +492,45 @@ describe('ProjectConnectorsTab', () => {
       expect(screen.getByText(/last synced/i)).toBeInTheDocument();
     });
 
-    it('does not show last sync row when lastSyncAt is null', () => {
+    it("does not show last sync row when lastSyncAt is null", () => {
       mockProjectConnectors.mockReturnValue({ data: [connectedAnthropicConnector], isLoading: false });
       renderComponent();
 
       expect(screen.queryByText(/last synced/i)).not.toBeInTheDocument();
     });
 
-    it('shows error panel when connector has lastError', () => {
+    it("shows error panel when connector has lastError", () => {
       const errorConnector: ProjectConnector = {
         ...connectedAnthropicConnector,
-        status: 'error',
-        lastError: 'Unauthorized: invalid API key',
+        status: "error",
+        lastError: "Unauthorized: invalid API key",
       };
       mockProjectConnectors.mockReturnValue({ data: [errorConnector], isLoading: false });
       renderComponent();
 
-      expect(screen.getByRole('button', { name: /last error/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /last error/i })).toBeInTheDocument();
     });
 
-    it('does not show error panel when connector has no lastError', () => {
+    it("does not show error panel when connector has no lastError", () => {
       mockProjectConnectors.mockReturnValue({ data: [connectedAnthropicConnector], isLoading: false });
       renderComponent();
 
-      expect(screen.queryByRole('button', { name: /last error/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /last error/i })).not.toBeInTheDocument();
     });
 
-    it('expands error panel to show error message detail', async () => {
+    it("expands error panel to show error message detail", async () => {
       const user = userEvent.setup();
       const errorConnector: ProjectConnector = {
         ...connectedAnthropicConnector,
-        status: 'error',
-        lastError: 'Connection timeout after 30s',
+        status: "error",
+        lastError: "Connection timeout after 30s",
       };
       mockProjectConnectors.mockReturnValue({ data: [errorConnector], isLoading: false });
       renderComponent();
 
-      await user.click(screen.getByRole('button', { name: /last error/i }));
+      await user.click(screen.getByRole("button", { name: /last error/i }));
 
-      expect(screen.getByText('Connection timeout after 30s')).toBeInTheDocument();
+      expect(screen.getByText("Connection timeout after 30s")).toBeInTheDocument();
     });
   });
 });
