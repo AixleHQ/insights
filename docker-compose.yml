@@ -143,6 +143,9 @@ services:
       ATLASSIAN_CLIENT_SECRET: ${ATLASSIAN_CLIENT_SECRET}
       LINEAR_CLIENT_ID: ${LINEAR_CLIENT_ID}
       LINEAR_CLIENT_SECRET: ${LINEAR_CLIENT_SECRET}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
     depends_on:
       postgres:
         condition: service_healthy
@@ -171,6 +174,9 @@ services:
       TEMPORAL_HOST: temporal:7233
       KEYCLOAK_ISSUER: http://localhost:8080/realms/db90
       KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/db90/protocol/openid-connect/certs
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
     command: bundle exec sidekiq -C config/sidekiq.yml
     depends_on:
       postgres:

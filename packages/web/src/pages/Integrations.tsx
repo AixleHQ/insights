@@ -6,6 +6,9 @@ import {
   useSyncConnector,
   useDeleteConnector,
   useTestConnector,
+  useToolAccounts,
+  useDeleteToolAccount,
+  useRegenerateIngestToken,
 } from "@/hooks/useApi";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,9 +21,16 @@ import {
 import type { ConnectorStatus } from "@/lib/types";
 import { ApiKeyConnectSheet } from "@/components/integrations/ApiKeyConnectSheet";
 import { OrgSlackConnectSheet } from "@/components/integrations/OrgSlackConnectSheet";
+import { IngestTokenConnectSheet } from "@/components/integrations/IngestTokenConnectSheet";
 
 const AI_PROVIDERS = new Set(["anthropic", "openai", "openrouter", "gemini"]);
 const SLACK_PROVIDERS = new Set(["slack"]);
+const INGEST_PROVIDERS = new Set(["cursor", "claude-code"]);
+
+const TOOL_NAME_TO_PROVIDER: Record<string, IntegrationProvider> = {
+  cursor: "cursor",
+  claude_code: "claude-code",
+};
 
 const availableProviders: ProviderInfo[] = [
   // Code Hosting / Version Control
@@ -186,8 +196,7 @@ const availableProviders: ProviderInfo[] = [
       "Token consumption",
       "Session insights",
     ],
-    available: false,
-    comingSoon: true,
+    available: true,
   },
 
   // Design
@@ -245,18 +254,26 @@ export function Integrations() {
   const navigate = useNavigate();
   const { status } = useParams<{ status: string }>();
 
-  const { data: connectorsData, isLoading } = useConnectors(
+  const { data: connectorsData, isLoading: connectorsLoading } = useConnectors(
     currentOrg?.id || "",
   );
+  const { data: toolAccountsData, isLoading: toolAccountsLoading } = useToolAccounts(currentOrg?.id || "");
+  const isLoading = connectorsLoading || toolAccountsLoading;
   const syncConnector = useSyncConnector();
   const deleteConnector = useDeleteConnector();
+  const deleteToolAccount = useDeleteToolAccount();
   const testConnector = useTestConnector();
+  const regenerateIngestToken = useRegenerateIngestToken();
 
   const activeTab = status === "available" ? "available" : "connected";
   const [sheetOpen, setSheetOpen] = useState(false);
   const [connectingProvider, setConnectingProvider] =
     useState<ProviderInfo | null>(null);
   const [slackSheetOpen, setSlackSheetOpen] = useState(false);
+  const [ingestSheetOpen, setIngestSheetOpen] = useState(false);
+  const [ingestProvider, setIngestProvider] = useState<ProviderInfo | null>(null);
+  const [regeneratedToken, setRegeneratedToken] = useState<string | null>(null);
+  const [regenerateError, setRegenerateError] = useState<string | null>(null);
   const [testingConnectorId, setTestingConnectorId] = useState<string | null>(
     null,
   );
@@ -264,22 +281,19 @@ export function Integrations() {
   const handleConnectSuccess = () => navigate("/integrations/connected");
 
   // Transform API response to component format
-  const integrations: IntegrationData[] = useMemo(() => {
-    if (!connectorsData) return [];
-    return connectorsData.map((c) => {
+  const { integrations, ingestAccountIds } = useMemo(() => {
+    const connectorIntegrations: IntegrationData[] = (connectorsData ?? []).map((c) => {
       const connectorType = c.connectorType || c.connector_type || "github";
       const lastError = c.lastError || c.last_error;
       const externalAccountName =
         c.externalAccountName || c.external_account_name;
       const lastSyncAt = c.lastSyncAt || c.last_sync_at;
 
-      const status: ConnectorStatus = c.status;
-
       return {
         id: c.id,
         provider: connectorType as IntegrationProvider,
         name: externalAccountName || connectorType,
-        status,
+        status: c.status as ConnectorStatus,
         last_sync_at: lastSyncAt || undefined,
         sync_error: lastError || undefined,
         metadata: {
@@ -288,12 +302,34 @@ export function Integrations() {
         },
       };
     });
-  }, [connectorsData]);
+
+    const ingestIds = new Set<string>();
+    const ingestIntegrations: IntegrationData[] = (toolAccountsData ?? [])
+      .filter((a) => TOOL_NAME_TO_PROVIDER[a.toolName])
+      .map((a) => {
+        ingestIds.add(a.id);
+        const provider = TOOL_NAME_TO_PROVIDER[a.toolName];
+        const providerInfo = availableProviders.find((p) => p.id === provider);
+        return {
+          id: a.id,
+          provider,
+          name: providerInfo?.name ?? a.toolName,
+          status: (a.isActive ? "connected" : "disconnected") as ConnectorStatus,
+        };
+      });
+
+    return {
+      integrations: [...connectorIntegrations, ...ingestIntegrations],
+      ingestAccountIds: ingestIds,
+    };
+  }, [connectorsData, toolAccountsData]);
 
   const handleConnect = (providerId: string) => {
-    if (AI_PROVIDERS.has(providerId)) {
-      const provider =
-        availableProviders.find((p) => p.id === providerId) ?? null;
+    if (INGEST_PROVIDERS.has(providerId)) {
+      setIngestProvider(availableProviders.find((p) => p.id === providerId) ?? null);
+      setIngestSheetOpen(true);
+    } else if (AI_PROVIDERS.has(providerId)) {
+      const provider = availableProviders.find((p) => p.id === providerId) ?? null;
       setConnectingProvider(provider);
       setSheetOpen(true);
     } else if (SLACK_PROVIDERS.has(providerId)) {
@@ -321,10 +357,11 @@ export function Integrations() {
       window.confirm("Are you sure you want to disconnect this integration?")
     ) {
       try {
-        await deleteConnector.mutateAsync({
-          orgId: currentOrg.id,
-          connectorId: id,
-        });
+        if (ingestAccountIds.has(id)) {
+          await deleteToolAccount.mutateAsync({ orgId: currentOrg.id, accountId: id });
+        } else {
+          await deleteConnector.mutateAsync({ orgId: currentOrg.id, connectorId: id });
+        }
       } catch (error) {
         console.error("Failed to disconnect integration:", error);
       }
@@ -343,6 +380,25 @@ export function Integrations() {
       console.error("Failed to test connector:", error);
     } finally {
       setTestingConnectorId(null);
+    }
+  };
+
+  const handleRegenerateToken = async (id: string) => {
+    if (!currentOrg) return;
+    setRegenerateError(null);
+    try {
+      const result = await regenerateIngestToken.mutateAsync({ orgId: currentOrg.id, accountId: id });
+      const newToken = result.data.ingestToken ?? null;
+      const integration = integrations.find((i) => i.id === id);
+      const provider = integration
+        ? availableProviders.find((p) => p.id === integration.provider) ?? null
+        : null;
+      setRegeneratedToken(newToken);
+      setIngestProvider(provider);
+      setIngestSheetOpen(true);
+    } catch (error) {
+      console.error("Failed to regenerate token:", error);
+      setRegenerateError(error instanceof Error ? error.message : "Failed to regenerate token. Please try again.");
     }
   };
 
@@ -394,6 +450,9 @@ export function Integrations() {
         </TabsList>
 
         <TabsContent value="connected" className="space-y-4">
+          {regenerateError && (
+            <p className="text-sm text-destructive">{regenerateError}</p>
+          )}
           {isLoading ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {Array.from({ length: 3 }).map((_, i) => (
@@ -415,11 +474,12 @@ export function Integrations() {
                 <IntegrationCard
                   key={integration.id}
                   integration={integration}
-                  onSync={
+                  onSync={ingestAccountIds.has(integration.id) || 
                     integration.provider === "slack" ? undefined : handleSync
                   }
-                  onTest={handleTest}
+                  onTest={ingestAccountIds.has(integration.id) ? undefined : handleTest}
                   onDisconnect={handleDisconnect}
+                  onRegenerateToken={ingestAccountIds.has(integration.id) ? handleRegenerateToken : undefined}
                   isTesting={testingConnectorId === integration.id}
                 />
               ))}
@@ -461,6 +521,17 @@ export function Integrations() {
         open={slackSheetOpen}
         onOpenChange={setSlackSheetOpen}
         onSuccess={handleConnectSuccess}
+      />
+
+      <IngestTokenConnectSheet
+        provider={ingestProvider}
+        open={ingestSheetOpen}
+        onOpenChange={(open) => {
+          setIngestSheetOpen(open);
+          if (!open) setRegeneratedToken(null);
+        }}
+        onSuccess={handleConnectSuccess}
+        initialToken={regeneratedToken ?? undefined}
       />
     </div>
   );

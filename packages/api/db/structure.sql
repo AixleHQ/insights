@@ -4039,7 +4039,8 @@ CREATE TABLE public.user_tool_accounts (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     external_account_id character varying,
-    external_account_name character varying
+    external_account_name character varying,
+    token_hash character varying
 );
 
 
@@ -9476,6 +9477,13 @@ CREATE INDEX index_user_tool_accounts_on_organization_membership_id ON public.us
 
 
 --
+-- Name: index_user_tool_accounts_on_token_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_user_tool_accounts_on_token_hash ON public.user_tool_accounts USING btree (token_hash);
+
+
+--
 -- Name: index_users_on_email; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -11283,6 +11291,7 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260415000001'),
 ('20260414000001'),
 ('20260413165455'),
 ('20260413165431'),

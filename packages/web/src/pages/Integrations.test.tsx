@@ -20,6 +20,10 @@ vi.mock("@/hooks/useApi", () => ({
   useTestConnector: () => ({ mutateAsync: mockMutateAsync }),
   useConnectWithApiKey: () => ({ mutateAsync: mockMutateAsync }),
   useConnectSlack: () => ({ mutateAsync: mockMutateAsync }),
+  useToolAccounts: vi.fn(() => ({ data: [], isLoading: false })),
+  useCreateToolAccount: () => ({ mutateAsync: mockMutateAsync }),
+  useDeleteToolAccount: () => ({ mutateAsync: mockMutateAsync }),
+  useRegenerateIngestToken: () => ({ mutateAsync: mockMutateAsync }),
 }));
 
 vi.mock("@/components/integrations/OrgSlackConnectSheet", () => ({

@@ -153,6 +153,7 @@ export interface ToolAccount {
   tokenExpiresAt: string | null;
   createdAt: string;
   updatedAt: string;
+  ingestToken?: string; // one-time, only present immediately after create/regenerate
 }
 
 // Event types

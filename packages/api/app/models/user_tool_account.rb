@@ -17,11 +17,48 @@ class UserToolAccount < ApplicationRecord
   encrypts :access_token
   encrypts :refresh_token
 
+  INGEST_TOOLS = %w[claude_code cursor].freeze
+
   scope :active, -> { where(is_active: true) }
   scope :by_tool, ->(tool) { where(tool_name: tool) }
+
+  validates :token_hash, presence: true, if: :ingest_tool?
+
+  attr_reader :plaintext_token
+
+  before_validation :generate_ingest_token, if: -> { ingest_tool? && token_hash.blank? }, on: :create
+
+  def self.find_by_ingest_token(raw_token)
+    return nil if raw_token.blank?
+    find_by(token_hash: Digest::SHA256.hexdigest(raw_token))
+  end
+
+  def rotate_ingest_token!
+    raw = new_raw_token
+    update!(access_token: raw, token_hash: Digest::SHA256.hexdigest(raw))
+    @plaintext_token = raw
+    self
+  end
 
   def token_expired?
     return false if token_expires_at.nil?
     token_expires_at < Time.current
+  end
+
+  private
+
+  def ingest_tool?
+    INGEST_TOOLS.include?(tool_name)
+  end
+
+  def generate_ingest_token
+    raw = new_raw_token
+    self.access_token = raw
+    self.token_hash = Digest::SHA256.hexdigest(raw)
+    @plaintext_token = raw
+  end
+
+  def new_raw_token
+    "db90_#{SecureRandom.hex(32)}"
   end
 end
