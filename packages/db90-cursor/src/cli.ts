@@ -33,6 +33,7 @@ function parseArgs(argv: string[]): {
   host?: string;
   dryRun: boolean;
   since?: string;
+  verbose: boolean;
   help: boolean;
 } {
   const args = argv.slice(2);
@@ -41,8 +42,9 @@ function parseArgs(argv: string[]): {
     host?: string;
     dryRun: boolean;
     since?: string;
+    verbose: boolean;
     help: boolean;
-  } = { dryRun: false, help: false };
+  } = { dryRun: false, verbose: false, help: false };
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -55,6 +57,10 @@ function parseArgs(argv: string[]): {
         break;
       case "--dry-run":
         result.dryRun = true;
+        break;
+      case "--verbose":
+      case "-v":
+        result.verbose = true;
         break;
       case "--since":
         result.since = args[++i];
@@ -86,6 +92,7 @@ Options:
   --host <host>     db90 host URL (or DB90_HOST env var)
   --dry-run         Print events without posting or updating state
   --since <date>    Process events since this ISO date (overrides saved state)
+  --verbose, -v     Print Cursor DB paths, table names, and event counts
   --help, -h        Show this help message
 
 Config file: ~/.db90-cursor/config.json
@@ -139,13 +146,12 @@ async function main(): Promise<void> {
 
   const { since, sinceFromState } = resolveSinceDate(cliArgs.since);
 
-  const rawEvents = readEvents(since);
+  const rawEvents = readEvents(since, undefined, cliArgs.verbose);
 
   if (rawEvents.length === 0) {
     console.log("No new Cursor events found.");
-    if (!cliArgs.dryRun && sinceFromState) {
-      writeState({ lastProcessedAt: new Date().toISOString() });
-    }
+    // Do NOT advance state when there are no events — clock-skew or
+    // backfilled rows with older timestamps would be silently skipped.
     return;
   }
 
@@ -171,11 +177,17 @@ async function main(): Promise<void> {
 
   if (result.failed > 0) {
     console.error(`${result.failed} event(s) failed to send.`);
+    // Still save progress for any events that did succeed so we don't re-send them.
+    if (result.lastSentAt !== null && sinceFromState) {
+      writeState({ lastProcessedAt: result.lastSentAt });
+    }
     process.exit(1);
   }
 
-  if (sinceFromState) {
-    writeState({ lastProcessedAt: new Date().toISOString() });
+  // Advance watermark to the max occurred_at of sent events, not wall-clock "now".
+  // This avoids skipping rows with timestamps earlier than "now" (backfills, clock skew).
+  if (sinceFromState && result.lastSentAt !== null) {
+    writeState({ lastProcessedAt: result.lastSentAt });
   }
 }
 

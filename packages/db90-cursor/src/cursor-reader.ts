@@ -6,7 +6,15 @@ import { toEpochMs } from "./mapper.js";
 import type { CursorRow } from "./mapper.js";
 
 function defaultCursorDir(): string {
-  return join(homedir(), ".cursor", "User", "workspaceStorage");
+  switch (process.platform) {
+    case "darwin":
+      return join(homedir(), "Library", "Application Support", "Cursor", "User", "workspaceStorage");
+    case "win32":
+      return join(process.env.APPDATA ?? homedir(), "Cursor", "User", "workspaceStorage");
+    default:
+      // Linux / other
+      return join(process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config"), "Cursor", "User", "workspaceStorage");
+  }
 }
 
 export function findCursorDbs(cursorDir?: string): string[] {
@@ -22,6 +30,12 @@ interface TableInfo {
   name: string;
 }
 
+function getTableNames(db: Database.Database): string[] {
+  return (
+    db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as TableInfo[]
+  ).map((r) => r.name);
+}
+
 function tableExists(db: Database.Database, tableName: string): boolean {
   const row = db
     .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?")
@@ -32,11 +46,18 @@ function tableExists(db: Database.Database, tableName: string): boolean {
 function readEventsFromDb(
   dbPath: string,
   since: Date | null,
-  workspacePath: string
+  workspacePath: string,
+  verbose: boolean
 ): CursorRow[] {
   let db: Database.Database | null = null;
   try {
     db = new Database(dbPath, { readonly: true });
+
+    if (verbose) {
+      const tables = getTableNames(db);
+      console.log(`  ${dbPath}`);
+      console.log(`  tables: ${tables.length > 0 ? tables.join(", ") : "(none)"}`);
+    }
 
     if (!tableExists(db, "CursorRequestFeedback")) return [];
 
@@ -76,14 +97,22 @@ function readEventsFromDb(
 
 export function readEvents(
   since: Date | null,
-  cursorDir?: string
+  cursorDir?: string,
+  verbose = false
 ): Array<{ row: CursorRow; workspacePath: string }> {
+  const searchDir = cursorDir ?? defaultCursorDir();
   const dbPaths = findCursorDbs(cursorDir);
+
+  if (verbose) {
+    console.log(`Searching: ${searchDir}`);
+    console.log(`Found ${dbPaths.length} cursor.db file(s)`);
+  }
+
   const results: Array<{ row: CursorRow; workspacePath: string }> = [];
 
   for (const dbPath of dbPaths) {
     const workspacePath = dbPath.replace(/[\\/]cursor\.db$/, "");
-    const rows = readEventsFromDb(dbPath, since, workspacePath);
+    const rows = readEventsFromDb(dbPath, since, workspacePath, verbose);
     for (const row of rows) {
       results.push({ row, workspacePath });
     }

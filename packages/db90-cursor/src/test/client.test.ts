@@ -24,9 +24,9 @@ describe("postEvents", () => {
     vi.unstubAllGlobals();
   });
 
-  it("returns sent=0, failed=0 for empty events array", async () => {
+  it("returns sent=0, failed=0, lastSentAt=null for empty events array", async () => {
     const result = await postEvents([], "https://app.db90.io", "token-abc");
-    expect(result).toEqual({ sent: 0, failed: 0 });
+    expect(result).toEqual({ sent: 0, failed: 0, lastSentAt: null });
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -43,6 +43,7 @@ describe("postEvents", () => {
 
     expect(result.sent).toBe(2);
     expect(result.failed).toBe(0);
+    expect(result.lastSentAt).toBe(events[1].occurred_at);
     expect(mockFetch).toHaveBeenCalledTimes(2);
 
     const [url, opts] = mockFetch.mock.calls[0] as [string, RequestInit];
@@ -74,6 +75,7 @@ describe("postEvents", () => {
     const result = await postEvents([sampleEvent], "https://app.db90.io", "bad-token");
     expect(result.sent).toBe(0);
     expect(result.failed).toBe(1);
+    expect(result.lastSentAt).toBeNull();
   });
 
   it("counts network errors as failed", async () => {
@@ -105,5 +107,6 @@ describe("postEvents", () => {
     const result = await postEvents(events, "https://app.db90.io", "token");
     expect(result.sent).toBe(1);
     expect(result.failed).toBe(1);
+    expect(result.lastSentAt).toBe(sampleEvent.occurred_at);
   });
 });
