@@ -50,6 +50,7 @@ All commands run from the repo root via `Makefile`.
 - **Authorization**: ActionPolicy (not Pundit or CanCan). Policies live in `app/policies/` and inherit from `ApplicationPolicy`. Always call `authorize!` at the start of controller actions.
 - **Background jobs**: Sidekiq for standard async jobs (`app/jobs/`). Temporal.io for long-running, multi-step, or durable workflows — use Temporal when a job needs retries with state, human-in-the-loop steps, or orchestration across services.
 - **API-only**: No views or assets in the Rails app. All rendering is JSON.
+- **Swagger is mandatory**: Whenever you add or modify a controller action or route, update `packages/api/swagger/v1/swagger.yaml` in the same commit. The spec lives at that path and must stay in sync with the implementation at all times. This applies to new endpoints, changed response shapes, new query parameters, and removed endpoints.
 
 ### Application Layer Conventions
 

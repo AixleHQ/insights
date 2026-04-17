@@ -710,6 +710,105 @@ RSpec.describe 'Api::V1::Stats', type: :request do
     end
   end
 
+  describe 'GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/event_types' do
+    let(:frozen_time) { Time.zone.parse("2026-04-15 12:00:00") }
+    let(:path) { "/api/v1/organizations/#{organization.id}/stats/tools/cursor/event_types" }
+
+    before do
+      travel_to(frozen_time) do
+        # Two chat events
+        create(:tool_event, organization: organization, user: user,
+               tool_name: "cursor", event_type: "chat",
+               tokens_in: 100, tokens_out: 200, cost_usd: 1.0,
+               occurred_at: Time.current)
+        create(:tool_event, organization: organization, user: user,
+               tool_name: "cursor", event_type: "chat",
+               tokens_in: 50, tokens_out: 100, cost_usd: 0.5,
+               occurred_at: 1.day.ago)
+
+        # One completion event (fewer events — should sort second)
+        create(:tool_event, organization: organization, user: user,
+               tool_name: "cursor", event_type: "completion",
+               tokens_in: 300, tokens_out: 600, cost_usd: 2.0,
+               occurred_at: Time.current)
+
+        # Different tool — must not appear
+        create(:tool_event, organization: organization, user: user,
+               tool_name: "claude_code", event_type: "chat",
+               tokens_in: 999, tokens_out: 999, cost_usd: 99.0,
+               occurred_at: Time.current)
+      end
+    end
+
+    it "returns correct top-level shape" do
+      travel_to(frozen_time) { authenticated_get path, user: user, organization: organization }
+
+      expect_success
+      expect(json_response[:tool]).to eq("cursor")
+      expect(json_response[:timeRange]).to have_key(:start)
+      expect(json_response[:timeRange]).to have_key(:end)
+      expect(json_response[:eventTypes]).to be_an(Array)
+    end
+
+    it "returns event type entries sorted by eventCount descending" do
+      travel_to(frozen_time) { authenticated_get path, user: user, organization: organization }
+
+      expect_success
+      counts = json_response[:eventTypes].map { |e| e[:eventCount] }
+      expect(counts).to eq(counts.sort.reverse)
+      expect(json_response[:eventTypes].first[:name]).to eq("chat")
+    end
+
+    it "returns aggregated token and cost fields per event type" do
+      travel_to(frozen_time) { authenticated_get path, user: user, organization: organization }
+
+      expect_success
+      chat = json_response[:eventTypes].find { |e| e[:name] == "chat" }
+      expect(chat[:eventCount]).to eq(2)
+      expect(chat[:tokensIn]).to eq(150)
+      expect(chat[:tokensOut]).to eq(300)
+      expect(chat[:costUsd].to_f).to be_within(0.001).of(1.5)
+    end
+
+    it "scopes results to the requested tool only" do
+      travel_to(frozen_time) { authenticated_get path, user: user, organization: organization }
+
+      expect_success
+      chat = json_response[:eventTypes].find { |e| e[:name] == "chat" }
+      # cursor chat only: 2 events, not inflated by claude_code
+      expect(chat[:eventCount]).to eq(2)
+    end
+
+    it "supports ?days= param" do
+      travel_to(frozen_time) do
+        authenticated_get path, user: user, organization: organization, params: { days: 7 }
+      end
+
+      expect_success
+      expect(json_response[:eventTypes]).to be_an(Array)
+    end
+
+    it "supports ?start_date= / ?end_date= params" do
+      travel_to(frozen_time) do
+        authenticated_get path, user: user, organization: organization,
+                          params: { start_date: 7.days.ago.iso8601, end_date: Time.current.iso8601 }
+      end
+
+      expect_success
+      expect(json_response[:eventTypes]).to be_an(Array)
+    end
+
+    it "returns 403 for non-members" do
+      non_member = create(:user)
+
+      travel_to(frozen_time) do
+        authenticated_get path, user: non_member, organization: organization
+      end
+
+      expect_forbidden
+    end
+  end
+
   describe 'GET /api/v1/organizations/:organization_id/stats/heatmap' do
     before do
       # Create events across different days

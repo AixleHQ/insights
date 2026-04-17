@@ -105,6 +105,7 @@ When evaluating solutions, follow this hierarchy:
 - [ ] Correct layer for the logic (controller vs service vs model vs domain)
 - [ ] Naming clarity — classes, methods, variables communicate intent
 - [ ] Test coverage — edge cases and failure paths tested with RSpec
+- [ ] **Swagger sync** — if controller actions or routes were added/modified, `packages/api/swagger/v1/swagger.yaml` must reflect the change. Run `git diff develop..HEAD --name-only | grep swagger` to verify. Flag as CRITICAL if missing.
 
 #### Ruby & Rails Internals
 - [ ] Metaprogramming implications — dynamic method definitions, `method_missing` abuse
