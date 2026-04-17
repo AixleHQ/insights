@@ -216,7 +216,29 @@ module Api
       # GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/overview
       def tool_overview
         authorize! current_organization, to: :show?
-        head :ok
+
+        current_start = Time.current.beginning_of_month
+        prev_start    = 1.month.ago.beginning_of_month
+        prev_end      = 1.month.ago.end_of_month
+
+        current = @tool_events.where(occurred_at: current_start..Time.current)
+        prev    = @tool_events.where(occurred_at: prev_start..prev_end)
+
+        current_count = current.count
+        prev_count    = prev.count
+        current_cost  = current.sum(:cost_usd).to_f
+        prev_cost     = prev.sum(:cost_usd).to_f
+
+        render json: {
+          tool:              @tool_name,
+          total_events:      current_count,
+          total_cost_usd:    current_cost,
+          total_tokens_in:   current.sum(:tokens_in).to_i,
+          total_tokens_out:  current.sum(:tokens_out).to_i,
+          active_users:      current.where.not(user_id: nil).distinct.count(:user_id),
+          events_change_pct: prev_count > 0 ? ((current_count - prev_count).to_f / prev_count * 100).round(1) : 0,
+          cost_change_pct:   prev_cost  > 0 ? ((current_cost  - prev_cost).to_f / prev_cost  * 100).round(1) : 0
+        }
       end
 
       # GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/models

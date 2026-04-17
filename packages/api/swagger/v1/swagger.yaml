@@ -1224,7 +1224,43 @@ paths:
         - $ref: '#/components/parameters/end_date'
       responses:
         '200':
-          description: Tool overview stats (shape TBD — endpoint is a stub)
+          description: Tool overview stats for the current month vs previous month
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tool:
+                    type: string
+                    example: cursor
+                  total_events:
+                    type: integer
+                    description: Event count for the current month
+                  total_cost_usd:
+                    type: number
+                    format: float
+                    description: Total cost in USD for the current month
+                  total_tokens_in:
+                    type: integer
+                    description: Total input tokens for the current month
+                  total_tokens_out:
+                    type: integer
+                    description: Total output tokens for the current month
+                  active_users:
+                    type: integer
+                    description: Distinct non-null user IDs with events this month
+                  events_change_pct:
+                    type: number
+                    format: float
+                    description: Percentage change in events vs previous month (0 if no prior data)
+                  cost_change_pct:
+                    type: number
+                    format: float
+                    description: Percentage change in cost vs previous month (0 if no prior data)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '422':
           $ref: '#/components/responses/ValidationError'
 
