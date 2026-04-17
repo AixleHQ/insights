@@ -28,7 +28,7 @@ function loadConfig(): Config {
   return {};
 }
 
-interface Args {
+export interface Args {
   token?: string;
   host?: string;
   dryRun: boolean;
@@ -37,7 +37,7 @@ interface Args {
   help: boolean;
 }
 
-function parseArgs(argv: string[]): Args {
+export function parseArgs(argv: string[]): Args {
   const args = argv.slice(2);
   const result: Args = { dryRun: false, verbose: false, help: false };
 
@@ -185,7 +185,11 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((err) => {
-  console.error("Unexpected error:", err instanceof Error ? err.message : String(err));
-  process.exit(1);
-});
+// Only execute when run directly (not when imported by tests)
+import { fileURLToPath } from "node:url";
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((err) => {
+    console.error("Unexpected error:", err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  });
+}
