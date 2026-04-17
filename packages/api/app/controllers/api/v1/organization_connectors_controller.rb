@@ -4,7 +4,7 @@ module Api
   module V1
     class OrganizationConnectorsController < BaseController
       before_action :require_organization!
-      before_action :set_connector, only: %i[show update destroy test sync available_repos available_projects]
+      before_action :set_connector, only: %i[show update destroy test sync available_repos available_projects sync_status]
 
       # GET /api/v1/organizations/:organization_id/connectors
       def index
@@ -196,6 +196,25 @@ module Api
           request: request
         )
         render_resource(@connector, OrganizationConnectorSerializer)
+      end
+
+      # GET /api/v1/organizations/:organization_id/connectors/:id/sync_status
+      def sync_status
+        authorize! @connector, to: :sync_status?
+
+        event_count = if (name = @connector.tool_event_name)
+          current_organization.tool_events.by_tool(name).count
+        else
+          0
+        end
+
+        render json: {
+          connector_type: @connector.connector_type,
+          status:         @connector.status,
+          last_sync_at:   @connector.last_sync_at&.iso8601,
+          last_error:     @connector.last_error,
+          total_events:   event_count
+        }
       end
 
       # GET /api/v1/organizations/:organization_id/connectors/authorize/:type

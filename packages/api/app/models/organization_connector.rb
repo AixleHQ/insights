@@ -57,4 +57,11 @@ class OrganizationConnector < ApplicationRecord
   def mark_disconnected!
     update!(status: "disconnected", is_active: false)
   end
+
+  # Returns the tool_name used in ToolEvent for this connector, or nil if not applicable.
+  # Only AI provider connectors produce tool events (e.g. openrouter → openrouter_api).
+  # Source control and project management connectors do not generate tool events.
+  def tool_event_name
+    "#{connector_type}_api" if ai_provider?
+  end
 end

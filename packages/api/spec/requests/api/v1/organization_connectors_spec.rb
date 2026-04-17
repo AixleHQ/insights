@@ -336,6 +336,91 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
     end
   end
 
+  describe 'GET /api/v1/organizations/:organization_id/connectors/:id/sync_status' do
+    let!(:openrouter_connector) do
+      create(:organization_connector, organization: organization, connector_type: 'openrouter',
+             status: 'connected', last_sync_at: 1.hour.ago, last_error: nil)
+    end
+
+    it 'returns sync status for org admin' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{openrouter_connector.id}/sync_status",
+                        user: admin,
+                        organization: organization
+
+      expect_success
+      expect(json_response[:connector_type]).to eq('openrouter')
+      expect(json_response[:status]).to eq('connected')
+      expect(json_response[:last_sync_at]).to be_present
+      expect(json_response[:last_error]).to be_nil
+      expect(json_response[:total_events]).to eq(0)
+    end
+
+    it 'returns sync status for org member' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{openrouter_connector.id}/sync_status",
+                        user: member,
+                        organization: organization
+
+      expect_success
+      expect(json_response[:connector_type]).to eq('openrouter')
+    end
+
+    it 'counts only tool_events with matching tool_name' do
+      user_in_org = create(:user)
+      create(:organization_membership, user: user_in_org, organization: organization, role: 'member')
+
+      create(:tool_event, organization: organization, tool_name: 'openrouter_api', user: user_in_org)
+      create(:tool_event, organization: organization, tool_name: 'openrouter_api', user: user_in_org)
+      create(:tool_event, organization: organization, tool_name: 'claude_code', user: user_in_org)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{openrouter_connector.id}/sync_status",
+                        user: admin,
+                        organization: organization
+
+      expect_success
+      expect(json_response[:total_events]).to eq(2)
+    end
+
+    it 'returns null last_error when connection is healthy' do
+      openrouter_connector.update!(last_error: nil)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{openrouter_connector.id}/sync_status",
+                        user: admin,
+                        organization: organization
+
+      expect_success
+      expect(json_response[:last_error]).to be_nil
+    end
+
+    it 'returns last_error when connector has an error' do
+      openrouter_connector.mark_error!('Rate limit exceeded')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{openrouter_connector.id}/sync_status",
+                        user: admin,
+                        organization: organization
+
+      expect_success
+      expect(json_response[:last_error]).to eq('Rate limit exceeded')
+    end
+
+    it 'returns 404 when connector does not belong to org' do
+      other_org = create(:organization)
+      other_connector = create(:organization_connector, organization: other_org, connector_type: 'openrouter')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{other_connector.id}/sync_status",
+                        user: admin,
+                        organization: organization
+
+      expect_not_found
+    end
+
+    it 'returns 401 without authentication' do
+      get "/api/v1/organizations/#{organization.id}/connectors/#{openrouter_connector.id}/sync_status",
+          headers: { 'X-Organization-ID' => organization.id }
+
+      expect_unauthorized
+    end
+  end
+
   describe 'GET /api/v1/organizations/:organization_id/connectors/:id/available_repos' do
     let(:available_repos) do
       [
