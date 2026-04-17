@@ -10,7 +10,7 @@ class ToolEvent < ApplicationRecord
   ].freeze
 
   EVENT_TYPES = %w[chat completion edit commit review test debug refactor documentation other
-                   issue comment sprint].freeze
+                   issue comment sprint tool_use].freeze
 
   belongs_to :user, optional: true
   belongs_to :organization
