@@ -244,7 +244,23 @@ module Api
       # GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/models
       def tool_models
         authorize! current_organization, to: :show?
-        head :ok
+
+        time_range = parse_time_range(default_days: (params[:days] || 30).to_i)
+        events = @tool_events.where(occurred_at: time_range[:start]..time_range[:end])
+
+        models = aggregate_by_column(events, :model).map do |row|
+          pricing = ModelPricingService.pricing_for_model(row[:name])
+          row.merge(
+            price_per_million_input: pricing&.dig(:input),
+            price_per_million_output: pricing&.dig(:output)
+          )
+        end
+
+        render json: {
+          tool: @tool_name,
+          timeRange: { start: time_range[:start].iso8601, end: time_range[:end].iso8601 },
+          models: models
+        }
       end
 
       # GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/users
