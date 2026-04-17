@@ -35,6 +35,11 @@ class OrganizationConnectorPolicy < ApplicationPolicy
     org_admin?(record.organization) || global_admin?
   end
 
+  # Members can view sync status
+  def sync_status?
+    org_member?(record.organization) || global_admin?
+  end
+
   # Only admins can list available repositories from the provider
   def available_repos?
     org_admin?(record.organization) || global_admin?

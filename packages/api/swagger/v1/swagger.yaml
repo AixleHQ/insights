@@ -760,6 +760,45 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /api/v1/organizations/{organization_id}/connectors/{id}/sync_status:
+    get:
+      summary: Get connector sync status
+      description: Returns the connector's current status, last sync time, last error, and total synced event count
+      tags:
+        - Organization Connectors
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Sync status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  connector_type:
+                    type: string
+                  status:
+                    type: string
+                    enum: [connected, testing, error, disconnected]
+                  last_sync_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  last_error:
+                    type: string
+                    nullable: true
+                  total_events:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /api/v1/organizations/{organization_id}/connectors/authorize/{type}:
     get:
       summary: Get OAuth authorization URL

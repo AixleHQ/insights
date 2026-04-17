@@ -62,6 +62,7 @@ Rails.application.routes.draw do
             post :sync
             get  :available_repos
             get  :available_projects
+            get  :sync_status
           end
           collection do
             get "authorize/:type", action: :authorize_url
