@@ -36,13 +36,92 @@ npx db90-cursor --token <token> --host <host>
 
 1. Obtain an ingest token from your db90 dashboard (Settings → Integrations → Cursor).
 
-2. Run the CLI:
+2. Create a config file (recommended — avoids pasting the token on every run):
 
 ```bash
-db90-cursor --token <your-ingest-token> --host https://app.db90.io
+mkdir -p ~/.db90-cursor
+echo '{"token":"your-ingest-token","host":"https://app.db90.io"}' > ~/.db90-cursor/config.json
 ```
 
-3. (Recommended) Schedule it to run automatically — see [Scheduling](#scheduling) below.
+3. Run the CLI:
+
+```bash
+node dist/cli.js
+# or, once published: db90-cursor
+```
+
+4. (Recommended) Schedule it to run automatically — see [Scheduling](#scheduling) below.
+
+## First-Run Setup Walkthrough
+
+This section documents the real-world setup process, including schema discovery and history backfill.
+
+### Step 1 — Build the package
+
+```bash
+cd packages/db90-cursor
+npm install
+npm run build
+```
+
+### Step 2 — Diagnose what Cursor data is available
+
+Run with `--verbose` and `--dry-run` to see which database files are found and what data they contain — without sending anything:
+
+```bash
+node dist/cli.js --token <token> --host <host> --verbose --dry-run
+```
+
+Expected output shows paths like:
+
+```
+Found 0 legacy cursor.db file(s)
+Searching: /Users/<you>/Library/Application Support/Cursor/User
+Found 22 state.vscdb file(s)
+  [state.vscdb] /Users/<you>/Library/Application Support/Cursor/User/globalStorage/state.vscdb
+  tables: ItemTable, ...
+  aiCodeTracking keys (20):
+    aiCodeTracking.dailyStats.v1.5.2026-02-09 → {"date":"2026-02-09","tabSuggestedLines":6,...}
+    aiCodeTracking.dailyStats.v1.5.2026-03-01 → {"tabSuggestedLines":0,"tabAcceptedLines":0,...}
+    …
+```
+
+If you see `aiCodeTracking` keys — you have data. If all counts are zero for a particular date, that day had no Cursor activity.
+
+### Step 3 — Backfill historical events
+
+On the very first run, there is no saved watermark, so the CLI processes all available history. If you have already run the CLI once (or the state file exists with a recent timestamp), use `--since` to backfill:
+
+```bash
+node dist/cli.js --token <token> --host <host> --since 2026-01-01 --dry-run
+```
+
+Review the output, then remove `--dry-run` to send:
+
+```bash
+node dist/cli.js --token <token> --host <host> --since 2026-01-01
+# Sent: 28, Failed: 0
+```
+
+### Step 4 — Create the config file
+
+To avoid passing `--token` and `--host` on every run:
+
+```bash
+mkdir -p ~/.db90-cursor
+echo '{"token":"your-ingest-token","host":"https://app.db90.io"}' > ~/.db90-cursor/config.json
+```
+
+Verify it works:
+
+```bash
+node dist/cli.js
+# Sent: 1, Failed: 0   (or "No new Cursor events found." if nothing new today)
+```
+
+### Step 5 — Schedule automatic runs
+
+See [Scheduling](#scheduling) below. After the first successful run, subsequent runs only send events newer than the last processed timestamp.
 
 ## Configuration
 
@@ -67,14 +146,17 @@ Create `~/.db90-cursor/config.json`:
 | db90 host | `--host <url>` | `DB90_HOST` | `host` | db90 host URL (required) |
 | Dry run | `--dry-run` | — | — | Print events without posting |
 | Since date | `--since <ISO date>` | — | — | Override saved state; process events since this date |
+| Verbose | `--verbose`, `-v` | — | — | Print DB paths, table names, and event counts |
 
 ### State file
 
 The CLI stores the timestamp of the last processed event in `~/.db90-cursor/state.json` to avoid re-sending events on subsequent runs. This file is managed automatically.
 
+The watermark is set to the maximum `occurred_at` of all successfully sent events — not the current wall-clock time. This means backfilled or clock-skewed events are never silently skipped.
+
 ## Scheduling
 
-### macOS — launchd
+### macOS — launchd (recommended)
 
 Create `~/Library/LaunchAgents/io.db90.cursor.plist`:
 
@@ -88,11 +170,8 @@ Create `~/Library/LaunchAgents/io.db90.cursor.plist`:
   <string>io.db90.cursor</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/local/bin/db90-cursor</string>
-    <string>--token</string>
-    <string>your-ingest-token</string>
-    <string>--host</string>
-    <string>https://app.db90.io</string>
+    <string>/usr/local/bin/node</string>
+    <string>/path/to/db90-cursor/dist/cli.js</string>
   </array>
   <key>StartInterval</key>
   <integer>3600</integer>
@@ -114,25 +193,58 @@ launchctl load ~/Library/LaunchAgents/io.db90.cursor.plist
 
 ### Linux/macOS — cron
 
-Run every hour:
+Run every hour using the config file (no credentials in crontab):
 
 ```cron
-0 * * * * DB90_TOKEN=your-token DB90_HOST=https://app.db90.io /usr/local/bin/db90-cursor >> /var/log/db90-cursor.log 2>&1
+0 * * * * /usr/local/bin/node /path/to/db90-cursor/dist/cli.js >> /tmp/db90-cursor.log 2>&1
 ```
 
-Or using the config file (no env vars needed):
+Or pass credentials inline:
 
 ```cron
-0 * * * * /usr/local/bin/db90-cursor >> /var/log/db90-cursor.log 2>&1
+0 * * * * DB90_TOKEN=your-token DB90_HOST=https://app.db90.io /usr/local/bin/node /path/to/db90-cursor/dist/cli.js >> /tmp/db90-cursor.log 2>&1
 ```
 
 ## How It Works
 
-1. Finds all Cursor SQLite databases at `~/.cursor/User/workspaceStorage/**/cursor.db`
-2. Queries events newer than the last processed timestamp (from `~/.db90-cursor/state.json`)
-3. Maps each event to the db90 ingest payload format
-4. POSTs each event to `{host}/api/v1/ingest/events` with your token
-5. On success, updates the saved state to avoid re-sending
+Cursor IDE stores AI usage data in SQLite databases on your local machine. `db90-cursor` reads two schemas:
+
+### Current Cursor (v1.5+) — `state.vscdb` / `ItemTable`
+
+Located at:
+- **macOS**: `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb`
+- **Linux**: `~/.config/Cursor/User/globalStorage/state.vscdb`
+- **Windows**: `%APPDATA%\Cursor\User\globalStorage\state.vscdb`
+
+Cursor writes daily aggregate line counts under keys like `aiCodeTracking.dailyStats.v1.5.YYYY-MM-DD`:
+
+```json
+{
+  "date": "2026-02-09",
+  "tabSuggestedLines": 6,
+  "tabAcceptedLines": 2,
+  "composerSuggestedLines": 43,
+  "composerAcceptedLines": 50
+}
+```
+
+These are mapped as:
+- `tabSuggestedLines` / `tabAcceptedLines` → `event_type: "completion"` (tab autocomplete)
+- `composerSuggestedLines` / `composerAcceptedLines` → `event_type: "chat"` (Composer/chat)
+
+Because Cursor tracks **line counts, not token counts**, the `tokens_in` / `tokens_out` fields in db90 contain line counts for Cursor events.
+
+### Legacy Cursor — `cursor.db` / `CursorRequestFeedback`
+
+Older Cursor versions stored per-request data in `workspaceStorage/**/cursor.db`. This schema is still read for backward compatibility.
+
+### Pipeline
+
+1. Find all `state.vscdb` and `cursor.db` files matching the above paths
+2. Filter entries newer than the last processed timestamp (from `~/.db90-cursor/state.json`)
+3. Map each entry to the db90 ingest payload format
+4. POST each event to `{host}/api/v1/ingest/events` with your Bearer token
+5. On success, update the watermark to `max(occurred_at)` of sent events
 
 ## Requirements
 

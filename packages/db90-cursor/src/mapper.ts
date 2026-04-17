@@ -45,7 +45,6 @@ function toIsoString(timestamp: number | string | null | undefined): string | nu
 
 import type { DailyStatsEntry } from "./cursor-reader.js";
 
-// Attempts to extract a number from an unknown value at a given key path.
 function pick(obj: unknown, ...keys: string[]): number | null {
   let cur: unknown = obj;
   for (const k of keys) {
@@ -53,6 +52,25 @@ function pick(obj: unknown, ...keys: string[]): number | null {
     cur = (cur as Record<string, unknown>)[k];
   }
   return typeof cur === "number" ? cur : null;
+}
+
+function buildPayload(
+  eventType: "completion" | "chat",
+  tokensIn: number,
+  tokensOut: number,
+  occurredAt: string,
+  dbPath: string,
+  model = "unknown"
+): Db90Payload {
+  return {
+    tool_name: "cursor",
+    event_type: eventType,
+    model,
+    tokens_in: tokensIn,
+    tokens_out: tokensOut,
+    occurred_at: occurredAt,
+    metadata: { cursor_session_id: null, workspace: dbPath },
+  };
 }
 
 /**
@@ -76,55 +94,29 @@ export function mapDailyStats(entry: DailyStatsEntry): Db90Payload[] {
 
   const obj = value as Record<string, unknown>;
 
-  // Current Cursor layout (v1.5): flat line-count fields
-  const tabSuggested    = pick(obj, "tabSuggestedLines") ?? 0;
-  const tabAccepted     = pick(obj, "tabAcceptedLines") ?? 0;
+  const tabSuggested      = pick(obj, "tabSuggestedLines") ?? 0;
+  const tabAccepted       = pick(obj, "tabAcceptedLines") ?? 0;
   const composerSuggested = pick(obj, "composerSuggestedLines") ?? 0;
   const composerAccepted  = pick(obj, "composerAcceptedLines") ?? 0;
 
-  if (tabSuggested > 0 || tabAccepted > 0) {
-    results.push({
-      tool_name: "cursor",
-      event_type: "completion",
-      model: "unknown",
-      tokens_in: tabSuggested,
-      tokens_out: tabAccepted,
-      occurred_at: occurredAt,
-      metadata: { cursor_session_id: null, workspace: dbPath },
-    });
-  }
+  if (tabSuggested > 0 || tabAccepted > 0)
+    results.push(buildPayload("completion", tabSuggested, tabAccepted, occurredAt, dbPath));
 
-  if (composerSuggested > 0 || composerAccepted > 0) {
-    results.push({
-      tool_name: "cursor",
-      event_type: "chat",
-      model: "unknown",
-      tokens_in: composerSuggested,
-      tokens_out: composerAccepted,
-      occurred_at: occurredAt,
-      metadata: { cursor_session_id: null, workspace: dbPath },
-    });
-  }
+  if (composerSuggested > 0 || composerAccepted > 0)
+    results.push(buildPayload("chat", composerSuggested, composerAccepted, occurredAt, dbPath));
 
   if (results.length > 0) return results;
 
   // Fallback: model-keyed token counts (possible future/other Cursor layouts)
   // e.g. { "claude-3-5-sonnet": { inputTokens: 5000, outputTokens: 1200 } }
-  const STAT_NAMES = new Set(["tab", "composer", "chat", "date", "inputTokens", "outputTokens"]);
+  // Keys like "tab", "composer", "date" are Cursor metadata fields, not model names.
+  const KNOWN_NON_MODEL_KEYS = new Set(["tab", "composer", "chat", "date", "inputTokens", "outputTokens"]);
   for (const [model, stats] of Object.entries(obj)) {
-    if (STAT_NAMES.has(model) || typeof stats !== "object" || stats === null) continue;
+    if (KNOWN_NON_MODEL_KEYS.has(model) || typeof stats !== "object" || stats === null) continue;
     const tokensIn  = pick(stats, "inputTokens") ?? pick(stats, "promptTokens") ?? 0;
     const tokensOut = pick(stats, "outputTokens") ?? pick(stats, "generatedTokens") ?? 0;
     if (tokensIn === 0 && tokensOut === 0) continue;
-    results.push({
-      tool_name: "cursor",
-      event_type: "chat",
-      model,
-      tokens_in: tokensIn,
-      tokens_out: tokensOut,
-      occurred_at: occurredAt,
-      metadata: { cursor_session_id: null, workspace: dbPath },
-    });
+    results.push(buildPayload("chat", tokensIn, tokensOut, occurredAt, dbPath, model));
   }
 
   return results;

@@ -28,23 +28,18 @@ function loadConfig(): Config {
   return {};
 }
 
-function parseArgs(argv: string[]): {
+interface Args {
   token?: string;
   host?: string;
   dryRun: boolean;
   since?: string;
   verbose: boolean;
   help: boolean;
-} {
+}
+
+function parseArgs(argv: string[]): Args {
   const args = argv.slice(2);
-  const result: {
-    token?: string;
-    host?: string;
-    dryRun: boolean;
-    since?: string;
-    verbose: boolean;
-    help: boolean;
-  } = { dryRun: false, verbose: false, help: false };
+  const result: Args = { dryRun: false, verbose: false, help: false };
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -130,7 +125,6 @@ async function main(): Promise<void> {
 
   const fileConfig = loadConfig();
 
-  // Priority: CLI args > env vars > config file
   const token = cliArgs.token ?? process.env.DB90_TOKEN ?? fileConfig.token;
   const host = cliArgs.host ?? process.env.DB90_HOST ?? fileConfig.host;
 
@@ -146,7 +140,6 @@ async function main(): Promise<void> {
 
   const { since, sinceFromState } = resolveSinceDate(cliArgs.since);
 
-  // Try both the legacy cursor.db schema and the current state.vscdb schema.
   const rawEvents = readEvents(since, undefined, cliArgs.verbose);
   const dailyStats = readDailyStats(since, undefined, cliArgs.verbose);
 

@@ -1,12 +1,9 @@
-import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { glob } from "glob";
 import Database from "better-sqlite3";
 import { toEpochMs } from "./mapper.js";
 import type { CursorRow } from "./mapper.js";
-
-// ─── Platform-aware paths ────────────────────────────────────────────────────
 
 function cursorUserDir(): string {
   switch (process.platform) {
@@ -23,6 +20,9 @@ function cursorUserDir(): string {
 
 interface TableInfo { name: string; }
 
+const LEGACY_TABLE = "CursorRequestFeedback";
+const STATE_TABLE = "ItemTable";
+
 function getTableNames(db: Database.Database): string[] {
   return (
     db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as TableInfo[]
@@ -34,6 +34,12 @@ function tableExists(db: Database.Database, tableName: string): boolean {
     .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?")
     .get(tableName) as TableInfo | undefined;
   return row !== undefined;
+}
+
+function logDbTables(db: Database.Database, dbPath: string, label: string): void {
+  const tables = getTableNames(db);
+  console.log(`  [${label}] ${dbPath}`);
+  console.log(`  tables: ${tables.join(", ") || "(none)"}`);
 }
 
 // ─── Legacy: cursor.db / CursorRequestFeedback ───────────────────────────────
@@ -57,17 +63,15 @@ function readLegacyFromDb(
   try {
     db = new Database(dbPath, { readonly: true });
 
-    if (verbose) {
-      const tables = getTableNames(db);
-      console.log(`  [cursor.db] ${dbPath}`);
-      console.log(`  tables: ${tables.join(", ") || "(none)"}`);
-    }
+    if (verbose) logDbTables(db, dbPath, "cursor.db");
 
-    if (!tableExists(db, "CursorRequestFeedback")) return [];
+    if (!tableExists(db, LEGACY_TABLE)) return [];
 
     const params: unknown[] = [workspacePath];
-    let query = "SELECT *, ? as _workspacePath FROM CursorRequestFeedback";
+    let query = `SELECT *, ? as _workspacePath FROM ${LEGACY_TABLE}`;
     if (since != null) {
+      // SQL uses a 1-second looser bound because Cursor timestamps can be stored
+      // as seconds or milliseconds. The in-memory filter below is authoritative.
       query += " WHERE timestamp > ?";
       params.push(since.getTime() / 1000 - 1);
     }
@@ -124,11 +128,9 @@ export function findStateVscDbs(baseDir?: string): string[] {
   const userDir = baseDir ?? cursorUserDir();
   const results: string[] = [];
 
-  // Global storage — aggregate stats across all workspaces
-  const globalDb = join(userDir, "globalStorage", "state.vscdb");
-  if (existsSync(globalDb)) results.push(globalDb);
+  // Global storage holds aggregate stats across all workspaces — check first.
+  results.push(join(userDir, "globalStorage", "state.vscdb"));
 
-  // Per-workspace storage
   try {
     results.push(
       ...glob.sync(join(userDir, "workspaceStorage", "**", "state.vscdb"))
@@ -147,16 +149,12 @@ function readDailyStatsFromDb(
   try {
     db = new Database(dbPath, { readonly: true });
 
-    if (verbose) {
-      const tables = getTableNames(db);
-      console.log(`  [state.vscdb] ${dbPath}`);
-      console.log(`  tables: ${tables.join(", ") || "(none)"}`);
-    }
+    if (verbose) logDbTables(db, dbPath, "state.vscdb");
 
-    if (!tableExists(db, "ItemTable")) return [];
+    if (!tableExists(db, STATE_TABLE)) return [];
 
     const rows = db
-      .prepare("SELECT key, value FROM ItemTable WHERE key LIKE 'aiCodeTracking.%'")
+      .prepare(`SELECT key, value FROM ${STATE_TABLE} WHERE key LIKE 'aiCodeTracking.%'`)
       .all() as { key: string; value: string }[];
 
     if (verbose && rows.length > 0) {
@@ -212,8 +210,6 @@ export function readDailyStats(
   }
   return results;
 }
-
-// ─── Unified entry point (tries both schemas) ─────────────────────────────────
 
 export function readEvents(
   since: Date | null,
