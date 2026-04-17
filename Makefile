@@ -1,4 +1,4 @@
-.PHONY: help setup up down logs api web worker sidekiq db-create db-migrate db-seed db-reset test test-api test-web test-cursor lint lint-api lint-web generate-types clean build build-cursor console remote-build remote-shell toolbox-shell staging-exec-api staging-exec-web staging-exec-keycloak staging-exec-temporal staging-exec-sidekiq staging-logs-api staging-logs-web staging-logs-keycloak staging-logs-temporal staging-logs-sidekiq watch-staging-logs-api watch-staging-logs-web watch-staging-logs-keycloak watch-staging-logs-temporal watch-staging-logs-sidekiq staging-build staging-build-api staging-build-keycloak staging-deploy staging-deploy-api staging-deploy-web staging-deploy-sidekiq staging-deploy-keycloak staging-deploy-temporal-worker prod-exec-api prod-exec-web prod-exec-keycloak prod-logs-api prod-logs-web prod-logs-keycloak prod-logs-temporal prod-logs-sidekiq watch-prod-logs-api watch-prod-logs-web watch-prod-logs-keycloak watch-prod-logs-temporal watch-prod-logs-sidekiq prod-build prod-deploy prod-deploy-api prod-deploy-web prod-deploy-sidekiq prod-deploy-keycloak prod-deploy-temporal-worker
+.PHONY: help setup up down logs api web worker sidekiq db-create db-migrate db-seed db-reset test test-api test-web test-cursor test-claude lint lint-api lint-web generate-types clean build build-cursor build-claude console remote-build remote-shell toolbox-shell staging-exec-api staging-exec-web staging-exec-keycloak staging-exec-temporal staging-exec-sidekiq staging-logs-api staging-logs-web staging-logs-keycloak staging-logs-temporal staging-logs-sidekiq watch-staging-logs-api watch-staging-logs-web watch-staging-logs-keycloak watch-staging-logs-temporal watch-staging-logs-sidekiq staging-build staging-build-api staging-build-keycloak staging-deploy staging-deploy-api staging-deploy-web staging-deploy-sidekiq staging-deploy-keycloak staging-deploy-temporal-worker prod-exec-api prod-exec-web prod-exec-keycloak prod-logs-api prod-logs-web prod-logs-keycloak prod-logs-temporal prod-logs-sidekiq watch-prod-logs-api watch-prod-logs-web watch-prod-logs-keycloak watch-prod-logs-temporal watch-prod-logs-sidekiq prod-build prod-deploy prod-deploy-api prod-deploy-web prod-deploy-sidekiq prod-deploy-keycloak prod-deploy-temporal-worker
 
 help:
 	@echo "DB90 Development Commands"
@@ -28,7 +28,9 @@ help:
 	@echo "  make test-api       - Run Rails API tests (RSpec)"
 	@echo "  make test-web       - Run frontend tests (Vitest)"
 	@echo "  make test-cursor    - Run db90-cursor tests (Vitest)"
+	@echo "  make test-claude    - Run db90-claude tests (Vitest)"
 	@echo "  make build-cursor   - Build db90-cursor package (TypeScript)"
+	@echo "  make build-claude   - Build db90-claude package (TypeScript)"
 	@echo ""
 	@echo "Code Quality:"
 	@echo "  make lint           - Run all linters"
@@ -157,7 +159,7 @@ db-reset:
 # Testing
 # ============================================================================
 
-test: test-api test-web test-cursor
+test: test-api test-web test-cursor test-claude
 
 test-api:
 	docker compose exec api bundle exec rspec
@@ -168,8 +170,14 @@ test-web:
 test-cursor:
 	cd packages/db90-cursor && npm test
 
+test-claude:
+	cd packages/db90-claude && npm test
+
 build-cursor:
 	cd packages/db90-cursor && npm run build
+
+build-claude:
+	cd packages/db90-claude && npm run build
 
 # ============================================================================
 # Linting

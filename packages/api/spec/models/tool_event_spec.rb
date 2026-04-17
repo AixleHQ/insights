@@ -13,8 +13,12 @@ RSpec.describe ToolEvent, type: :model do
     end
 
     it 'defines valid event types' do
-      expected = %w[chat completion edit commit review test debug refactor documentation other issue comment sprint]
+      expected = %w[chat completion edit commit review test debug refactor documentation other issue comment sprint tool_use]
       expect(ToolEvent::EVENT_TYPES).to eq(expected)
+    end
+
+    it 'includes tool_use for PostToolUse hook events' do
+      expect(ToolEvent::EVENT_TYPES).to include('tool_use')
     end
   end
 

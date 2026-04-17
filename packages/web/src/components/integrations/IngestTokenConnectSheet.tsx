@@ -47,6 +47,17 @@ function ingestEndpointUrl(): string {
   return `${window.location.origin}${apiBase}/ingest/events`;
 }
 
+/** Returns just the host origin for CLI --host flag (no /api/v1 path). */
+function ingestHostUrl(): string {
+  const ingestBase = import.meta.env.VITE_INGEST_BASE_URL;
+  if (ingestBase) return String(ingestBase);
+  const apiBase = import.meta.env.VITE_API_URL ?? "/api/v1";
+  if (apiBase.startsWith("http")) {
+    return String(apiBase).replace(/\/api\/v1\/?$/, "");
+  }
+  return window.location.origin;
+}
+
 function buildClaudeCodeSettingsSnippet(token: string): string {
   const ingestUrl = ingestEndpointUrl();
   return `{
@@ -76,36 +87,76 @@ function buildClaudeCodeSettingsSnippet(token: string): string {
 }`;
 }
 
-function SetupInstructions({ providerId, token }: { providerId: string; token: string }) {
+function ClaudeCodeSetupInstructions({ token }: { token: string }) {
+  const [copiedNpx, setCopiedNpx] = useState(false);
   const [copiedSettings, setCopiedSettings] = useState(false);
+  const npxTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const settingsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => () => { if (settingsTimerRef.current) clearTimeout(settingsTimerRef.current); }, []);
+  useEffect(() => () => {
+    if (npxTimerRef.current) clearTimeout(npxTimerRef.current);
+    if (settingsTimerRef.current) clearTimeout(settingsTimerRef.current);
+  }, []);
 
-  if (providerId === "claude-code") {
-    const settingsSnippet = buildClaudeCodeSettingsSnippet(token);
+  const host = ingestHostUrl();
+  const npxCommand = `npx db90-claude --token ${token} --host ${host}`;
+  const settingsSnippet = buildClaudeCodeSettingsSnippet(token);
 
-    const handleCopySettings = async () => {
-      await navigator.clipboard.writeText(settingsSnippet);
-      setCopiedSettings(true);
-      settingsTimerRef.current = setTimeout(() => setCopiedSettings(false), 2000);
-    };
+  const handleCopyNpx = async () => {
+    await navigator.clipboard.writeText(npxCommand);
+    setCopiedNpx(true);
+    npxTimerRef.current = setTimeout(() => setCopiedNpx(false), 2000);
+  };
 
-    return (
+  const handleCopySettings = async () => {
+    await navigator.clipboard.writeText(settingsSnippet);
+    setCopiedSettings(true);
+    settingsTimerRef.current = setTimeout(() => setCopiedSettings(false), 2000);
+  };
+
+  return (
+    <div className="space-y-4">
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium">Add to <code className="text-xs bg-muted px-1 py-0.5 rounded">~/.claude/settings.json</code></p>
-          <Button variant="outline" size="sm" onClick={handleCopySettings} aria-label={copiedSettings ? "Copied" : "Copy settings"}>
-            {copiedSettings ? <Check className="size-3.5 mr-1" /> : <Copy className="size-3.5 mr-1" />}
-            {copiedSettings ? "Copied" : "Copy"}
+        <p className="text-sm font-medium">Run the db90 Claude reporter</p>
+        <div className="flex items-start gap-2">
+          <pre className="text-xs bg-muted rounded p-3 overflow-x-auto flex-1 whitespace-pre-wrap break-all">
+            {npxCommand}
+          </pre>
+          <Button variant="outline" size="sm" onClick={handleCopyNpx} aria-label={copiedNpx ? "Copied" : "Copy command"} className="shrink-0 mt-0.5">
+            {copiedNpx ? <Check className="size-3.5 mr-1" /> : <Copy className="size-3.5 mr-1" />}
+            {copiedNpx ? "Copied" : "Copy"}
           </Button>
         </div>
-        <pre className="text-xs bg-muted rounded p-3 overflow-x-auto whitespace-pre-wrap break-all">
-          {settingsSnippet}
-        </pre>
-        <p className="text-xs text-muted-foreground">The PostToolUse hook requires <code className="bg-muted px-1 rounded">jq</code> — install with <code className="bg-muted px-1 rounded">brew install jq</code>. The Stop hook uses <code className="bg-muted px-1 rounded">python3</code>, which ships with macOS.</p>
+        <p className="text-xs text-muted-foreground">
+          Reads Claude Code transcripts from <code className="bg-muted px-1 rounded">~/.config/claude/projects/</code> and <code className="bg-muted px-1 rounded">~/.claude/projects/</code>, then posts aggregated token usage. Add <code className="bg-muted px-1 rounded">--watch</code> to poll continuously.
+        </p>
       </div>
-    );
+
+      <details className="text-sm">
+        <summary className="cursor-pointer text-muted-foreground hover:text-foreground select-none">
+          Advanced: PostToolUse hook (optional, requires jq)
+        </summary>
+        <div className="mt-2 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium">Add to <code className="text-xs bg-muted px-1 py-0.5 rounded">~/.claude/settings.json</code></p>
+            <Button variant="outline" size="sm" onClick={handleCopySettings} aria-label={copiedSettings ? "Copied" : "Copy settings"}>
+              {copiedSettings ? <Check className="size-3.5 mr-1" /> : <Copy className="size-3.5 mr-1" />}
+              {copiedSettings ? "Copied" : "Copy"}
+            </Button>
+          </div>
+          <pre className="text-xs bg-muted rounded p-3 overflow-x-auto whitespace-pre-wrap break-all">
+            {settingsSnippet}
+          </pre>
+          <p className="text-xs text-muted-foreground">The PostToolUse hook requires <code className="bg-muted px-1 rounded">jq</code> — install with <code className="bg-muted px-1 rounded">brew install jq</code>. The Stop hook uses <code className="bg-muted px-1 rounded">python3</code>, which ships with macOS.</p>
+        </div>
+      </details>
+    </div>
+  );
+}
+
+function SetupInstructions({ providerId, token }: { providerId: string; token: string }) {
+  if (providerId === "claude-code") {
+    return <ClaudeCodeSetupInstructions token={token} />;
   }
 
   return (
