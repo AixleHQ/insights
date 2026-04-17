@@ -1503,7 +1503,7 @@ paths:
   /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/event_types:
     get:
       summary: Tool event type breakdown
-      description: Returns event count breakdown by event type for a specific tool.
+      description: Returns per-event-type usage aggregates (event count, tokens, cost) for a specific tool. Sorted by eventCount descending. Defaults to the last 30 days; pass days or start_date/end_date to override.
       tags:
         - Stats
       parameters:
@@ -1517,9 +1517,60 @@ paths:
             enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github]
         - $ref: '#/components/parameters/start_date'
         - $ref: '#/components/parameters/end_date'
+        - name: days
+          in: query
+          required: false
+          description: Number of past days to include (ignored when start_date/end_date are provided). Defaults to 30.
+          schema:
+            type: integer
+            default: 30
       responses:
         '200':
-          description: Event type breakdown (shape TBD — endpoint is a stub)
+          description: Event type breakdown sorted by eventCount descending
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tool:
+                    type: string
+                    example: cursor
+                  timeRange:
+                    type: object
+                    properties:
+                      start:
+                        type: string
+                        format: date-time
+                      end:
+                        type: string
+                        format: date-time
+                  eventTypes:
+                    type: array
+                    description: Per-event-type aggregates sorted by eventCount descending
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                          enum: [chat, completion, edit, commit, review, test, debug, refactor, documentation, other, issue, comment, sprint]
+                          example: chat
+                        eventCount:
+                          type: integer
+                          example: 580
+                        tokensIn:
+                          type: integer
+                          example: 72000
+                        tokensOut:
+                          type: integer
+                          example: 31000
+                        costUsd:
+                          type: number
+                          format: float
+                          example: 14.85
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '422':
           $ref: '#/components/responses/ValidationError'
 
