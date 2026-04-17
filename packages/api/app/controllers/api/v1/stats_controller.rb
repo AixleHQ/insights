@@ -281,7 +281,40 @@ module Api
       # GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/daily
       def tool_daily
         authorize! current_organization, to: :show?
-        head :ok
+
+        days       = (params[:days] || 30).to_i
+        time_range = parse_time_range(default_days: days)
+        events     = @tool_events.where(occurred_at: time_range[:start]..time_range[:end])
+
+        rows = events
+          .group("DATE_TRUNC('day', occurred_at)")
+          .select(
+            "DATE_TRUNC('day', occurred_at) as day",
+            "COUNT(*) as event_count",
+            "SUM(tokens_in) as tokens_in",
+            "SUM(tokens_out) as tokens_out",
+            "SUM(cost_usd) as cost_usd"
+          )
+          .order(Arel.sql("day"))
+          .each_with_object({}) do |row, h|
+            h[row.day.to_date.iso8601] = {
+              date:       row.day.to_date.iso8601,
+              eventCount: row.event_count,
+              tokensIn:   row.tokens_in  || 0,
+              tokensOut:  row.tokens_out || 0,
+              costUsd:    (row.cost_usd  || 0).to_f
+            }
+          end
+
+        daily = (time_range[:start].to_date..time_range[:end].to_date).map do |date|
+          rows[date.iso8601] || { date: date.iso8601, eventCount: 0, tokensIn: 0, tokensOut: 0, costUsd: 0.0 }
+        end
+
+        render json: {
+          tool:      @tool_name,
+          timeRange: { start: time_range[:start].iso8601, end: time_range[:end].iso8601 },
+          daily:     daily
+        }
       end
 
       # GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/event_types

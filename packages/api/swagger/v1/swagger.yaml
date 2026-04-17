@@ -1430,7 +1430,7 @@ paths:
   /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/daily:
     get:
       summary: Tool daily stats
-      description: Returns daily event counts and cost for a specific tool.
+      description: Returns day-by-day event counts, tokens, and cost for a specific tool. Every day in the range has an entry — days with no events are zero-filled.
       tags:
         - Stats
       parameters:
@@ -1444,9 +1444,59 @@ paths:
             enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github]
         - $ref: '#/components/parameters/start_date'
         - $ref: '#/components/parameters/end_date'
+        - name: days
+          in: query
+          required: false
+          description: Number of past days to include (ignored when start_date/end_date are provided). Defaults to 30.
+          schema:
+            type: integer
+            default: 30
       responses:
         '200':
-          description: Daily stats (shape TBD — endpoint is a stub)
+          description: Daily trend data with zero-filled gaps
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tool:
+                    type: string
+                    example: claude_code
+                  timeRange:
+                    type: object
+                    properties:
+                      start:
+                        type: string
+                        format: date-time
+                      end:
+                        type: string
+                        format: date-time
+                  daily:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                          example: '2026-04-10'
+                        eventCount:
+                          type: integer
+                          example: 42
+                        tokensIn:
+                          type: integer
+                          example: 15000
+                        tokensOut:
+                          type: integer
+                          example: 32000
+                        costUsd:
+                          type: number
+                          format: float
+                          example: 0.87
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '422':
           $ref: '#/components/responses/ValidationError'
 
