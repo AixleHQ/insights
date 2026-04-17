@@ -1267,7 +1267,7 @@ paths:
   /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/models:
     get:
       summary: Tool model breakdown
-      description: Returns event and cost breakdown by model for a specific tool.
+      description: Returns per-model usage aggregates (event count, tokens, cost) enriched with pricing data. Sorted by eventCount descending. Null-model events are excluded. Defaults to the last 30 days; pass days or start_date/end_date to override.
       tags:
         - Stats
       parameters:
@@ -1279,11 +1279,66 @@ paths:
           schema:
             type: string
             enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github]
+        - name: days
+          in: query
+          description: Number of days to look back (default 30)
+          schema:
+            type: integer
+            default: 30
         - $ref: '#/components/parameters/start_date'
         - $ref: '#/components/parameters/end_date'
       responses:
         '200':
-          description: Model breakdown (shape TBD — endpoint is a stub)
+          description: Model breakdown for the tool
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tool:
+                    type: string
+                    example: openrouter_api
+                  timeRange:
+                    type: object
+                    properties:
+                      start:
+                        type: string
+                        format: date-time
+                      end:
+                        type: string
+                        format: date-time
+                  models:
+                    type: array
+                    description: Per-model aggregates sorted by eventCount descending
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                          example: claude-3-5-sonnet-20241022
+                        eventCount:
+                          type: integer
+                        tokensIn:
+                          type: integer
+                        tokensOut:
+                          type: integer
+                        costUsd:
+                          type: number
+                          format: float
+                        price_per_million_input:
+                          type: number
+                          format: float
+                          nullable: true
+                          description: Input price per million tokens; null if model not in pricing table
+                        price_per_million_output:
+                          type: number
+                          format: float
+                          nullable: true
+                          description: Output price per million tokens; null if model not in pricing table
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '422':
           $ref: '#/components/responses/ValidationError'
 

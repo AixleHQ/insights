@@ -245,6 +245,154 @@ RSpec.describe 'Api::V1::Stats', type: :request do
     end
   end
 
+  describe 'GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/models' do
+    let(:frozen_time) { Time.zone.parse("2026-04-15 12:00:00") }
+
+    before do
+      travel_to(frozen_time) do
+        # Two events with a known model
+        create(:tool_event, organization: organization, user: user,
+               tool_name: "openrouter_api", model: "claude-3-5-sonnet-20241022",
+               tokens_in: 100, tokens_out: 200, cost_usd: 1.0,
+               occurred_at: Time.current)
+        create(:tool_event, organization: organization, user: user,
+               tool_name: "openrouter_api", model: "claude-3-5-sonnet-20241022",
+               tokens_in: 50, tokens_out: 100, cost_usd: 0.5,
+               occurred_at: 1.day.ago)
+
+        # One event with a different model (fewer events — should sort second)
+        create(:tool_event, organization: organization, user: user,
+               tool_name: "openrouter_api", model: "gpt-4o",
+               tokens_in: 300, tokens_out: 600, cost_usd: 2.0,
+               occurred_at: Time.current)
+
+        # Event with null model — must be excluded
+        create(:tool_event, organization: organization, user: user,
+               tool_name: "openrouter_api", model: nil,
+               tokens_in: 10, tokens_out: 20, cost_usd: 0.1,
+               occurred_at: Time.current)
+
+        # Event for a different tool — must not appear
+        create(:tool_event, organization: organization, user: user,
+               tool_name: "cursor", model: "gpt-4o",
+               tokens_in: 999, tokens_out: 999, cost_usd: 99.0,
+               occurred_at: Time.current)
+      end
+    end
+
+    it "returns correct top-level shape" do
+      travel_to(frozen_time) do
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/openrouter_api/models",
+                          user: user, organization: organization
+      end
+
+      expect_success
+      expect(json_response[:tool]).to eq("openrouter_api")
+      expect(json_response[:timeRange]).to have_key(:start)
+      expect(json_response[:timeRange]).to have_key(:end)
+      expect(json_response[:models]).to be_an(Array)
+    end
+
+    it "returns model entries sorted by eventCount descending" do
+      travel_to(frozen_time) do
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/openrouter_api/models",
+                          user: user, organization: organization
+      end
+
+      expect_success
+      counts = json_response[:models].map { |m| m[:eventCount] }
+      expect(counts).to eq(counts.sort.reverse)
+      expect(json_response[:models].first[:name]).to eq("claude-3-5-sonnet-20241022")
+    end
+
+    it "excludes null model entries" do
+      travel_to(frozen_time) do
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/openrouter_api/models",
+                          user: user, organization: organization
+      end
+
+      expect_success
+      names = json_response[:models].map { |m| m[:name] }
+      expect(names).not_to include(nil)
+    end
+
+    it "returns aggregated token and cost fields per model" do
+      travel_to(frozen_time) do
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/openrouter_api/models",
+                          user: user, organization: organization
+      end
+
+      expect_success
+      sonnet = json_response[:models].find { |m| m[:name] == "claude-3-5-sonnet-20241022" }
+      expect(sonnet[:eventCount]).to eq(2)
+      expect(sonnet[:tokensIn]).to eq(150)
+      expect(sonnet[:tokensOut]).to eq(300)
+      expect(sonnet[:costUsd].to_f).to be_within(0.001).of(1.5)
+    end
+
+    it "includes pricing fields for known models" do
+      travel_to(frozen_time) do
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/openrouter_api/models",
+                          user: user, organization: organization
+      end
+
+      expect_success
+      sonnet = json_response[:models].find { |m| m[:name] == "claude-3-5-sonnet-20241022" }
+      expect(sonnet[:price_per_million_input]).to be_a(Numeric)
+      expect(sonnet[:price_per_million_output]).to be_a(Numeric)
+    end
+
+    it "scopes results to the requested tool only" do
+      travel_to(frozen_time) do
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/openrouter_api/models",
+                          user: user, organization: organization
+      end
+
+      expect_success
+      # cursor's gpt-4o event must not inflate openrouter_api counts
+      gpt4o = json_response[:models].find { |m| m[:name] == "gpt-4o" }
+      expect(gpt4o[:eventCount]).to eq(1)
+    end
+
+    it "supports ?days= param" do
+      travel_to(frozen_time) do
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/openrouter_api/models",
+                          user: user, organization: organization,
+                          params: { days: 1 }
+      end
+
+      expect_success
+      # Only events from the last 1 day — the 1.day.ago event may fall outside
+      sonnet = json_response[:models].find { |m| m[:name] == "claude-3-5-sonnet-20241022" }
+      expect(sonnet[:eventCount]).to be >= 1
+    end
+
+    it "supports ?start_date= / ?end_date= params" do
+      travel_to(frozen_time) do
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/openrouter_api/models",
+                          user: user, organization: organization,
+                          params: {
+                            start_date: 7.days.ago.iso8601,
+                            end_date: Time.current.iso8601
+                          }
+      end
+
+      expect_success
+      expect(json_response[:models]).to be_an(Array)
+    end
+
+    it "returns 403 for non-members" do
+      non_member = create(:user)
+
+      travel_to(frozen_time) do
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/openrouter_api/models",
+                          user: non_member, organization: organization
+      end
+
+      expect_forbidden
+    end
+  end
+
   describe 'GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/*' do
     describe 'set_tool_scope before_action' do
       it 'returns 422 with error message for an unknown tool' do
