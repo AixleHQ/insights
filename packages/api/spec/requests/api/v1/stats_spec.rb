@@ -581,6 +581,135 @@ RSpec.describe 'Api::V1::Stats', type: :request do
     end
   end
 
+  describe 'GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/daily' do
+    let(:frozen_time) { Time.zone.parse("2026-04-15 12:00:00") }
+    let(:path) { "/api/v1/organizations/#{organization.id}/stats/tools/claude_code/daily" }
+
+    before do
+      travel_to(frozen_time) do
+        # Two events on Apr 10
+        create(:tool_event, organization: organization, user: user,
+               tool_name: "claude_code", tokens_in: 100, tokens_out: 200,
+               cost_usd: 0.05, occurred_at: Time.zone.parse("2026-04-10 10:00:00"))
+        create(:tool_event, organization: organization, user: user,
+               tool_name: "claude_code", tokens_in: 50, tokens_out: 100,
+               cost_usd: 0.02, occurred_at: Time.zone.parse("2026-04-10 14:00:00"))
+
+        # One event on Apr 13
+        create(:tool_event, organization: organization, user: user,
+               tool_name: "claude_code", tokens_in: 200, tokens_out: 400,
+               cost_usd: 0.10, occurred_at: Time.zone.parse("2026-04-13 09:00:00"))
+
+        # Event from a different tool (should not appear)
+        create(:tool_event, organization: organization, user: user,
+               tool_name: "cursor", tokens_in: 999, tokens_out: 999,
+               cost_usd: 9.99, occurred_at: Time.zone.parse("2026-04-10 10:00:00"))
+      end
+    end
+
+    it "returns tool, timeRange, and daily keys" do
+      travel_to(frozen_time) do
+        authenticated_get path, user: user, organization: organization
+      end
+
+      expect_success
+      expect(json_response).to have_key(:tool)
+      expect(json_response).to have_key(:timeRange)
+      expect(json_response).to have_key(:daily)
+    end
+
+    it "returns the tool name" do
+      travel_to(frozen_time) do
+        authenticated_get path, user: user, organization: organization
+      end
+
+      expect_success
+      expect(json_response[:tool]).to eq("claude_code")
+    end
+
+    it "returns 31 entries for the default 30-day range" do
+      travel_to(frozen_time) do
+        authenticated_get path, user: user, organization: organization
+      end
+
+      expect_success
+      # 30.days.ago.beginning_of_day (Mar 16) to Time.current (Apr 15) inclusive = 31 days
+      expect(json_response[:daily].length).to eq(31)
+    end
+
+    it "supports ?start_date= / ?end_date= params" do
+      travel_to(frozen_time) do
+        authenticated_get path,
+                          user: user,
+                          organization: organization,
+                          params: { start_date: "2026-04-08", end_date: "2026-04-13" }
+      end
+
+      expect_success
+      # Apr 8 to Apr 13 inclusive = 6 entries, bounded by end_date not today
+      expect(json_response[:daily].length).to eq(6)
+      expect(json_response[:daily].first[:date]).to eq("2026-04-08")
+      expect(json_response[:daily].last[:date]).to eq("2026-04-13")
+    end
+
+    it "zero-fills days with no events" do
+      travel_to(frozen_time) do
+        authenticated_get path, user: user, organization: organization
+      end
+
+      expect_success
+      zero_day = json_response[:daily].find { |d| d[:date] == "2026-04-11" }
+      expect(zero_day[:eventCount]).to eq(0)
+      expect(zero_day[:tokensIn]).to eq(0)
+      expect(zero_day[:tokensOut]).to eq(0)
+      expect(zero_day[:costUsd]).to eq(0.0)
+    end
+
+    it "aggregates events correctly for days with data" do
+      travel_to(frozen_time) do
+        authenticated_get path, user: user, organization: organization
+      end
+
+      expect_success
+      apr10 = json_response[:daily].find { |d| d[:date] == "2026-04-10" }
+      expect(apr10[:eventCount]).to eq(2)
+      expect(apr10[:tokensIn]).to eq(150)
+      expect(apr10[:tokensOut]).to eq(300)
+      expect(apr10[:costUsd].to_f).to be_within(0.001).of(0.07)
+    end
+
+    it "excludes events from other tools" do
+      travel_to(frozen_time) do
+        authenticated_get path, user: user, organization: organization
+      end
+
+      expect_success
+      total_events = json_response[:daily].sum { |d| d[:eventCount] }
+      # Only 3 claude_code events, not the cursor one
+      expect(total_events).to eq(3)
+    end
+
+    it "respects the ?days=7 param" do
+      travel_to(frozen_time) do
+        authenticated_get path, user: user, organization: organization, params: { days: 7 }
+      end
+
+      expect_success
+      # 7 days back from Apr 8 to Apr 15 inclusive = 8 entries
+      expect(json_response[:daily].length).to eq(8)
+    end
+
+    it "returns 403 for non-members" do
+      non_member = create(:user)
+
+      travel_to(frozen_time) do
+        authenticated_get path, user: non_member, organization: organization
+      end
+
+      expect_forbidden
+    end
+  end
+
   describe 'GET /api/v1/organizations/:organization_id/stats/heatmap' do
     before do
       # Create events across different days
