@@ -320,7 +320,16 @@ module Api
       # GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/event_types
       def tool_event_types
         authorize! current_organization, to: :show?
-        head :ok
+
+        time_range  = parse_time_range(default_days: (params[:days] || 30).to_i)
+        events      = @tool_events.where(occurred_at: time_range[:start]..time_range[:end])
+        event_types = aggregate_by_column(events, :event_type)
+
+        render json: {
+          tool:       @tool_name,
+          timeRange:  { start: time_range[:start].iso8601, end: time_range[:end].iso8601 },
+          eventTypes: event_types
+        }
       end
 
       private
