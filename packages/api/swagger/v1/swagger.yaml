@@ -1345,7 +1345,7 @@ paths:
   /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/users:
     get:
       summary: Tool user breakdown
-      description: Returns top users by token consumption for a specific tool.
+      description: Returns top users by token consumption for a specific tool, sorted by totalTokens descending. Events without a user_id are excluded.
       tags:
         - Stats
       parameters:
@@ -1359,9 +1359,71 @@ paths:
             enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github]
         - $ref: '#/components/parameters/start_date'
         - $ref: '#/components/parameters/end_date'
+        - name: days
+          in: query
+          required: false
+          description: Number of past days to include (ignored when start_date/end_date are provided). Defaults to 30.
+          schema:
+            type: integer
+            default: 30
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of users to return. Clamped between 1 and 100. Defaults to 20.
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
       responses:
         '200':
-          description: User breakdown (shape TBD — endpoint is a stub)
+          description: User breakdown sorted by totalTokens descending
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tool:
+                    type: string
+                    example: cursor
+                  timeRange:
+                    type: object
+                    properties:
+                      start:
+                        type: string
+                        format: date-time
+                      end:
+                        type: string
+                        format: date-time
+                  users:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        userId:
+                          type: string
+                          format: uuid
+                        name:
+                          type: string
+                          example: Alice Chen
+                        email:
+                          type: string
+                          format: email
+                          example: alice@company.com
+                        eventCount:
+                          type: integer
+                          example: 214
+                        totalTokens:
+                          type: integer
+                          example: 380000
+                        costUsd:
+                          type: number
+                          format: float
+                          example: 6.12
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '422':
           $ref: '#/components/responses/ValidationError'
 

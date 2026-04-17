@@ -393,6 +393,155 @@ RSpec.describe 'Api::V1::Stats', type: :request do
     end
   end
 
+  describe 'GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/users' do
+    let(:frozen_time) { Time.zone.parse("2026-04-15 12:00:00") }
+    let(:user2) { create(:user) }
+
+    before do
+      travel_to(frozen_time) do
+        # user — higher token count (should rank first)
+        create(:tool_event, organization: organization, user: user,
+               tool_name: "cursor", tokens_in: 300, tokens_out: 700,
+               cost_usd: 5.0, occurred_at: Time.current)
+        # user2 — lower token count (should rank second)
+        create(:tool_event, organization: organization, user: user2,
+               tool_name: "cursor", tokens_in: 50, tokens_out: 100,
+               cost_usd: 1.0, occurred_at: Time.current)
+        # unattributed — must be excluded from results
+        create(:tool_event, organization: organization, user: nil,
+               tool_name: "cursor", tokens_in: 999, tokens_out: 999,
+               cost_usd: 99.0, occurred_at: Time.current)
+        # different tool — must be excluded from results
+        create(:tool_event, organization: organization, user: user,
+               tool_name: "openrouter_api", tokens_in: 999, tokens_out: 999,
+               cost_usd: 99.0, occurred_at: Time.current)
+      end
+    end
+
+    it "returns correct top-level shape" do
+      travel_to(frozen_time) do
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/cursor/users",
+                          user: user, organization: organization
+      end
+
+      expect_success
+      expect(json_response[:tool]).to eq("cursor")
+      expect(json_response[:timeRange]).to have_key(:start)
+      expect(json_response[:timeRange]).to have_key(:end)
+      expect(json_response[:users]).to be_an(Array)
+    end
+
+    it "returns correct per-user fields" do
+      travel_to(frozen_time) do
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/cursor/users",
+                          user: user, organization: organization
+      end
+
+      expect_success
+      entry = json_response[:users].first
+      expect(entry).to have_key(:userId)
+      expect(entry).to have_key(:name)
+      expect(entry).to have_key(:email)
+      expect(entry).to have_key(:eventCount)
+      expect(entry).to have_key(:totalTokens)
+      expect(entry).to have_key(:costUsd)
+    end
+
+    it "sorts users by totalTokens descending" do
+      travel_to(frozen_time) do
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/cursor/users",
+                          user: user, organization: organization
+      end
+
+      expect_success
+      tokens = json_response[:users].map { |u| u[:totalTokens] }
+      expect(tokens).to eq(tokens.sort.reverse)
+      expect(json_response[:users].first[:userId]).to eq(user.id)
+    end
+
+    it "excludes events with null user_id" do
+      travel_to(frozen_time) do
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/cursor/users",
+                          user: user, organization: organization
+      end
+
+      expect_success
+      user_ids = json_response[:users].map { |u| u[:userId] }
+      expect(user_ids).not_to include(nil)
+      expect(json_response[:users].length).to eq(2)
+    end
+
+    it "scopes results to the requested tool only" do
+      travel_to(frozen_time) do
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/cursor/users",
+                          user: user, organization: organization
+      end
+
+      expect_success
+      top = json_response[:users].find { |u| u[:userId] == user.id }
+      # cursor events only: 300+700 = 1000 tokens, not inflated by openrouter_api
+      expect(top[:totalTokens]).to eq(1000)
+    end
+
+    it "respects ?limit param" do
+      travel_to(frozen_time) do
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/cursor/users",
+                          user: user, organization: organization,
+                          params: { limit: 1 }
+      end
+
+      expect_success
+      expect(json_response[:users].length).to eq(1)
+    end
+
+    it "clamps ?limit to a maximum of 100" do
+      travel_to(frozen_time) do
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/cursor/users",
+                          user: user, organization: organization,
+                          params: { limit: 999 }
+      end
+
+      expect_success
+      expect(json_response[:users].length).to be <= 100
+    end
+
+    it "supports ?days param" do
+      travel_to(frozen_time) do
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/cursor/users",
+                          user: user, organization: organization,
+                          params: { days: 7 }
+      end
+
+      expect_success
+      expect(json_response[:users]).to be_an(Array)
+    end
+
+    it "supports ?start_date= / ?end_date= params" do
+      travel_to(frozen_time) do
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/cursor/users",
+                          user: user, organization: organization,
+                          params: {
+                            start_date: 7.days.ago.iso8601,
+                            end_date: Time.current.iso8601
+                          }
+      end
+
+      expect_success
+      expect(json_response[:users]).to be_an(Array)
+    end
+
+    it "returns 403 for non-members" do
+      non_member = create(:user)
+
+      travel_to(frozen_time) do
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/cursor/users",
+                          user: non_member, organization: organization
+      end
+
+      expect_forbidden
+    end
+  end
+
   describe 'GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/*' do
     describe 'set_tool_scope before_action' do
       it 'returns 422 with error message for an unknown tool' do
