@@ -120,13 +120,35 @@ jobs:
         run: npm test
         working-directory: packages/db90-cursor
 
+  # --- db90-claude package checks ---
+
+  claude_check:
+    name: db90-claude (build + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: packages/db90-claude/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+        working-directory: packages/db90-claude
+      - name: Build
+        run: npm run build
+        working-directory: packages/db90-claude
+      - name: Test
+        run: npm test
+        working-directory: packages/db90-claude
+
   # --- Deploy pipeline (staging and main only) ---
 
   migrate:
     name: Run DB Migrations
     runs-on: ubuntu-latest
     container: ghcr.io/artempartos/ecs_toolbox:latest
-    needs: [build, api_test, api_lint, api_security, web_test, web_lint, web_typecheck, cursor_check]
+    needs: [build, api_test, api_lint, api_security, web_test, web_lint, web_typecheck, cursor_check, claude_check]
     if: github.ref_name == 'staging' || github.ref_name == 'main'
     env:
       ENVIRONMENT: ${{ github.ref_name == 'main' && 'prod' || 'staging' }}
