@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { mapEvent } from "../mapper.js";
+import { mapEvent, mapDailyStats } from "../mapper.js";
 import type { CursorRow } from "../mapper.js";
+import type { DailyStatsEntry } from "../cursor-reader.js";
 
 describe("mapEvent", () => {
   const workspace = "/home/user/projects/myapp";
@@ -134,5 +135,77 @@ describe("mapEvent", () => {
     const result = mapEvent(row, workspace);
     expect(result).not.toBeNull();
     expect(result!.event_type).toBe("completion");
+  });
+});
+
+describe("mapDailyStats", () => {
+  const dbPath = "/path/to/state.vscdb";
+
+  it("maps current Cursor v1.5 line-count layout (tab + composer)", () => {
+    const entry: DailyStatsEntry = {
+      date: "2026-02-09",
+      dbPath,
+      value: { date: "2026-02-09", tabSuggestedLines: 6, tabAcceptedLines: 2, composerSuggestedLines: 43, composerAcceptedLines: 50 },
+    };
+    const results = mapDailyStats(entry);
+    expect(results).toHaveLength(2);
+
+    const tab = results.find((r) => r.event_type === "completion")!;
+    expect(tab.tokens_in).toBe(6);
+    expect(tab.tokens_out).toBe(2);
+    expect(tab.occurred_at).toBe("2026-02-09T00:00:00.000Z");
+
+    const composer = results.find((r) => r.event_type === "chat")!;
+    expect(composer.tokens_in).toBe(43);
+    expect(composer.tokens_out).toBe(50);
+  });
+
+  it("emits only tab event when composer counts are zero", () => {
+    const entry: DailyStatsEntry = {
+      date: "2026-03-03",
+      dbPath,
+      value: { tabSuggestedLines: 12, tabAcceptedLines: 10, composerSuggestedLines: 0, composerAcceptedLines: 0 },
+    };
+    const results = mapDailyStats(entry);
+    expect(results).toHaveLength(1);
+    expect(results[0].event_type).toBe("completion");
+  });
+
+  it("emits only composer event when tab counts are zero", () => {
+    const entry: DailyStatsEntry = {
+      date: "2026-02-19",
+      dbPath,
+      value: { tabSuggestedLines: 0, tabAcceptedLines: 0, composerSuggestedLines: 63, composerAcceptedLines: 0 },
+    };
+    const results = mapDailyStats(entry);
+    expect(results).toHaveLength(1);
+    expect(results[0].event_type).toBe("chat");
+  });
+
+  it("returns empty array when all counts are zero", () => {
+    const entry: DailyStatsEntry = {
+      date: "2026-01-01",
+      dbPath,
+      value: { tabSuggestedLines: 0, tabAcceptedLines: 0, composerSuggestedLines: 0, composerAcceptedLines: 0 },
+    };
+    expect(mapDailyStats(entry)).toHaveLength(0);
+  });
+
+  it("falls back to model-keyed token layout", () => {
+    const entry: DailyStatsEntry = {
+      date: "2026-01-01",
+      dbPath,
+      value: { "claude-3-5-sonnet": { inputTokens: 5000, outputTokens: 1200 } },
+    };
+    const results = mapDailyStats(entry);
+    expect(results).toHaveLength(1);
+    expect(results[0].model).toBe("claude-3-5-sonnet");
+    expect(results[0].tokens_in).toBe(5000);
+    expect(results[0].tokens_out).toBe(1200);
+  });
+
+  it("returns empty array for unknown shape", () => {
+    const entry: DailyStatsEntry = { date: "2026-01-01", dbPath, value: { foo: "bar" } };
+    expect(mapDailyStats(entry)).toHaveLength(0);
   });
 });

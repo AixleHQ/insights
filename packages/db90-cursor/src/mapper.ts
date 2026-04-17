@@ -58,16 +58,14 @@ function pick(obj: unknown, ...keys: string[]): number | null {
 /**
  * Maps a Cursor dailyStats ItemTable entry to one or more db90 payloads.
  *
- * The JSON shape varies by Cursor version. We handle two known layouts:
+ * Cursor tracks line counts, not token counts. We map:
+ *   tabSuggestedLines  → tokens_in  (lines offered by tab completion)
+ *   tabAcceptedLines   → tokens_out (lines the user kept)
+ *   composerSuggestedLines → tokens_in  (lines composed/suggested)
+ *   composerAcceptedLines  → tokens_out (lines the user accepted)
  *
- * Layout A — model-keyed (newer Cursor):
- *   { "<model>": { inputTokens, outputTokens, requests, … }, … }
- *
- * Layout B — type-keyed (older Cursor):
- *   { tab: { completionCount, … }, composer: { messageCount, … } }
- *
- * Unknown layouts fall back to a single aggregated event with whatever
- * numeric token fields are found at the top level.
+ * Older or future Cursor versions may use model-keyed token counts instead;
+ * that layout is handled as a fallback.
  */
 export function mapDailyStats(entry: DailyStatsEntry): Db90Payload[] {
   const { date, value, dbPath } = entry;
@@ -78,56 +76,52 @@ export function mapDailyStats(entry: DailyStatsEntry): Db90Payload[] {
 
   const obj = value as Record<string, unknown>;
 
-  // Layout A: model-keyed stats
-  // e.g. { "claude-3-5-sonnet-20241022": { inputTokens: 5000, outputTokens: 1200, requests: 12 } }
-  const MODEL_KEY_RE = /^[a-z][\w.-]+$/; // looks like a model name, not a stat name
-  const STAT_NAMES = new Set(["tab", "composer", "chat", "inputTokens", "outputTokens", "requests", "total"]);
-  const modelKeys = Object.keys(obj).filter(
-    (k) => MODEL_KEY_RE.test(k) && !STAT_NAMES.has(k) && typeof obj[k] === "object"
-  );
+  // Current Cursor layout (v1.5): flat line-count fields
+  const tabSuggested    = pick(obj, "tabSuggestedLines") ?? 0;
+  const tabAccepted     = pick(obj, "tabAcceptedLines") ?? 0;
+  const composerSuggested = pick(obj, "composerSuggestedLines") ?? 0;
+  const composerAccepted  = pick(obj, "composerAcceptedLines") ?? 0;
 
-  if (modelKeys.length > 0) {
-    for (const model of modelKeys) {
-      const stats = obj[model] as Record<string, unknown>;
-      const tokensIn = pick(stats, "inputTokens") ?? pick(stats, "promptTokens") ?? 0;
-      const tokensOut = pick(stats, "outputTokens") ?? pick(stats, "generatedTokens") ?? 0;
-      if (tokensIn === 0 && tokensOut === 0) continue;
-      results.push({
-        tool_name: "cursor",
-        event_type: "chat",
-        model,
-        tokens_in: tokensIn,
-        tokens_out: tokensOut,
-        occurred_at: occurredAt,
-        metadata: { cursor_session_id: null, workspace: dbPath },
-      });
-    }
-    if (results.length > 0) return results;
-  }
-
-  // Layout B: type-keyed stats
-  const tabCompletions = pick(obj, "tab", "completionCount") ?? pick(obj, "tabCompletionCount") ?? 0;
-  const composerTokensIn = pick(obj, "composer", "inputTokens") ?? pick(obj, "composerInputTokens") ?? 0;
-  const composerTokensOut = pick(obj, "composer", "outputTokens") ?? pick(obj, "composerOutputTokens") ?? 0;
-
-  if (tabCompletions > 0) {
+  if (tabSuggested > 0 || tabAccepted > 0) {
     results.push({
       tool_name: "cursor",
       event_type: "completion",
       model: "unknown",
-      tokens_in: 0,
-      tokens_out: tabCompletions, // count as "output" proxy for completions
+      tokens_in: tabSuggested,
+      tokens_out: tabAccepted,
       occurred_at: occurredAt,
       metadata: { cursor_session_id: null, workspace: dbPath },
     });
   }
-  if (composerTokensIn > 0 || composerTokensOut > 0) {
+
+  if (composerSuggested > 0 || composerAccepted > 0) {
     results.push({
       tool_name: "cursor",
       event_type: "chat",
       model: "unknown",
-      tokens_in: composerTokensIn,
-      tokens_out: composerTokensOut,
+      tokens_in: composerSuggested,
+      tokens_out: composerAccepted,
+      occurred_at: occurredAt,
+      metadata: { cursor_session_id: null, workspace: dbPath },
+    });
+  }
+
+  if (results.length > 0) return results;
+
+  // Fallback: model-keyed token counts (possible future/other Cursor layouts)
+  // e.g. { "claude-3-5-sonnet": { inputTokens: 5000, outputTokens: 1200 } }
+  const STAT_NAMES = new Set(["tab", "composer", "chat", "date", "inputTokens", "outputTokens"]);
+  for (const [model, stats] of Object.entries(obj)) {
+    if (STAT_NAMES.has(model) || typeof stats !== "object" || stats === null) continue;
+    const tokensIn  = pick(stats, "inputTokens") ?? pick(stats, "promptTokens") ?? 0;
+    const tokensOut = pick(stats, "outputTokens") ?? pick(stats, "generatedTokens") ?? 0;
+    if (tokensIn === 0 && tokensOut === 0) continue;
+    results.push({
+      tool_name: "cursor",
+      event_type: "chat",
+      model,
+      tokens_in: tokensIn,
+      tokens_out: tokensOut,
       occurred_at: occurredAt,
       metadata: { cursor_session_id: null, workspace: dbPath },
     });
