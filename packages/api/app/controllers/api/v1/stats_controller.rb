@@ -237,7 +237,7 @@ module Api
           total_tokens_out:  current.sum(:tokens_out).to_i,
           active_users:      current.where.not(user_id: nil).distinct.count(:user_id),
           events_change_pct: prev_count > 0 ? ((current_count - prev_count).to_f / prev_count * 100).round(1) : 0,
-          cost_change_pct:   prev_cost  > 0 ? ((current_cost  - prev_cost ).to_f / prev_cost  * 100).round(1) : 0
+          cost_change_pct:   prev_cost  > 0 ? ((current_cost  - prev_cost).to_f / prev_cost  * 100).round(1) : 0
         }
       end
 
