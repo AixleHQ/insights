@@ -148,6 +148,103 @@ RSpec.describe 'Api::V1::Stats', type: :request do
     end
   end
 
+  describe 'GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/overview' do
+    let(:frozen_time) { Time.zone.parse("2026-04-15 12:00:00") }
+    let(:user2) { create(:user) }
+
+    before do
+      travel_to(frozen_time) do
+        # Current month — cursor events (2 attributed users + 1 nil user)
+        create(:tool_event, organization: organization, user: user,
+               tool_name: "cursor", tokens_in: 100, tokens_out: 200,
+               cost_usd: 10.0, occurred_at: Time.current)
+        create(:tool_event, organization: organization, user: user2,
+               tool_name: "cursor", tokens_in: 50, tokens_out: 100,
+               cost_usd: 5.0, occurred_at: 1.day.ago)
+        create(:tool_event, organization: organization, user: nil,
+               tool_name: "cursor", tokens_in: 0, tokens_out: 0,
+               cost_usd: 1.0, occurred_at: Time.current)
+
+        # Previous month — cursor (1 event)
+        create(:tool_event, organization: organization, user: user,
+               tool_name: "cursor", tokens_in: 80, tokens_out: 160,
+               cost_usd: 6.0, occurred_at: 1.month.ago.beginning_of_month + 1.day)
+
+        # Different tool — must NOT appear in cursor results
+        create(:tool_event, organization: organization, user: user,
+               tool_name: "openrouter_api", tokens_in: 999, tokens_out: 999,
+               cost_usd: 99.0, occurred_at: Time.current)
+      end
+    end
+
+    it "returns 200 with correct shape for cursor" do
+      travel_to(frozen_time) do
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/cursor/overview",
+                          user: user, organization: organization
+      end
+
+      expect_success
+      expect(json_response[:tool]).to eq("cursor")
+      expect(json_response[:total_events]).to eq(3)
+      expect(json_response[:total_cost_usd]).to eq(16.0)
+      expect(json_response[:total_tokens_in]).to eq(150)
+      expect(json_response[:total_tokens_out]).to eq(300)
+      expect(json_response[:active_users]).to eq(2)
+      expect(json_response[:events_change_pct]).to eq(200.0)
+      expect(json_response[:cost_change_pct]).to be_a(Numeric)
+    end
+
+    it "returns 200 with correct shape for openrouter_api" do
+      travel_to(frozen_time) do
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/openrouter_api/overview",
+                          user: user, organization: organization
+      end
+
+      expect_success
+      expect(json_response[:tool]).to eq("openrouter_api")
+      expect(json_response[:total_events]).to eq(1)
+      expect(json_response[:total_cost_usd]).to eq(99.0)
+    end
+
+    it "excludes null user_ids from active_users" do
+      travel_to(frozen_time) do
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/cursor/overview",
+                          user: user, organization: organization
+      end
+
+      expect_success
+      expect(json_response[:active_users]).to eq(2)
+    end
+
+    it "returns 0 for change percentages when no prior-month data exists" do
+      new_org = create(:organization)
+      create(:organization_membership, user: user, organization: new_org, role: "member")
+
+      travel_to(frozen_time) do
+        create(:tool_event, organization: new_org, user: user,
+               tool_name: "cursor", occurred_at: Time.current)
+
+        authenticated_get "/api/v1/organizations/#{new_org.id}/stats/tools/cursor/overview",
+                          user: user, organization: new_org
+      end
+
+      expect_success
+      expect(json_response[:events_change_pct]).to eq(0)
+      expect(json_response[:cost_change_pct]).to eq(0)
+    end
+
+    it "returns 403 for non-members" do
+      non_member = create(:user)
+
+      travel_to(frozen_time) do
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/cursor/overview",
+                          user: non_member, organization: organization
+      end
+
+      expect_forbidden
+    end
+  end
+
   describe 'GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/*' do
     describe 'set_tool_scope before_action' do
       it 'returns 422 with error message for an unknown tool' do
