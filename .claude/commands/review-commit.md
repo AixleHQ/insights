@@ -76,6 +76,7 @@ Review both diffs and check for:
 3. **Security** — SQL injection, mass assignment, sensitive data exposure, unsafe redirects
 4. **Logic bugs** — nil handling, missing validations, incorrect associations, off-by-one errors
 5. **Test coverage** — are changes adequately tested? Edge cases covered?
+6. **Swagger sync** — if any controller actions or routes were added or modified, verify that `packages/api/swagger/v1/swagger.yaml` was also updated in this branch. Check with: `git diff develop..HEAD --name-only | grep swagger`. If controllers changed but swagger did not, flag this as a BLOCK.
 
 **JavaScript / TypeScript:**
 1. **Type safety** — improper use of `any`, missing types, unsafe type assertions
