@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { glob } from "glob";
@@ -5,30 +6,22 @@ import Database from "better-sqlite3";
 import { toEpochMs } from "./mapper.js";
 import type { CursorRow } from "./mapper.js";
 
-function defaultCursorDir(): string {
+// ─── Platform-aware paths ────────────────────────────────────────────────────
+
+function cursorUserDir(): string {
   switch (process.platform) {
     case "darwin":
-      return join(homedir(), "Library", "Application Support", "Cursor", "User", "workspaceStorage");
+      return join(homedir(), "Library", "Application Support", "Cursor", "User");
     case "win32":
-      return join(process.env.APPDATA ?? homedir(), "Cursor", "User", "workspaceStorage");
+      return join(process.env.APPDATA ?? homedir(), "Cursor", "User");
     default:
-      // Linux / other
-      return join(process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config"), "Cursor", "User", "workspaceStorage");
+      return join(process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config"), "Cursor", "User");
   }
 }
 
-export function findCursorDbs(cursorDir?: string): string[] {
-  const searchDir = cursorDir ?? defaultCursorDir();
-  try {
-    return glob.sync(join(searchDir, "**", "cursor.db"));
-  } catch {
-    return [];
-  }
-}
+// ─── Shared SQLite helpers ────────────────────────────────────────────────────
 
-interface TableInfo {
-  name: string;
-}
+interface TableInfo { name: string; }
 
 function getTableNames(db: Database.Database): string[] {
   return (
@@ -43,7 +36,18 @@ function tableExists(db: Database.Database, tableName: string): boolean {
   return row !== undefined;
 }
 
-function readEventsFromDb(
+// ─── Legacy: cursor.db / CursorRequestFeedback ───────────────────────────────
+
+export function findCursorDbs(baseDir?: string): string[] {
+  const dir = join(baseDir ?? cursorUserDir(), "workspaceStorage");
+  try {
+    return glob.sync(join(dir, "**", "cursor.db"));
+  } catch {
+    return [];
+  }
+}
+
+function readLegacyFromDb(
   dbPath: string,
   since: Date | null,
   workspacePath: string,
@@ -55,27 +59,19 @@ function readEventsFromDb(
 
     if (verbose) {
       const tables = getTableNames(db);
-      console.log(`  ${dbPath}`);
-      console.log(`  tables: ${tables.length > 0 ? tables.join(", ") : "(none)"}`);
+      console.log(`  [cursor.db] ${dbPath}`);
+      console.log(`  tables: ${tables.join(", ") || "(none)"}`);
     }
 
     if (!tableExists(db, "CursorRequestFeedback")) return [];
 
-    let query: string;
-    let params: unknown[];
-
+    const params: unknown[] = [workspacePath];
+    let query = "SELECT *, ? as _workspacePath FROM CursorRequestFeedback";
     if (since != null) {
-      // Use the seconds-based bound (always smaller than ms bound) as a
-      // generous SQL pre-filter; the JS post-filter below is authoritative.
-      const sinceSec = since.getTime() / 1000;
-      query =
-        "SELECT *, ? as _workspacePath FROM CursorRequestFeedback WHERE timestamp > ? ORDER BY timestamp ASC";
-      params = [workspacePath, sinceSec - 1];
-    } else {
-      query =
-        "SELECT *, ? as _workspacePath FROM CursorRequestFeedback ORDER BY timestamp ASC";
-      params = [workspacePath];
+      query += " WHERE timestamp > ?";
+      params.push(since.getTime() / 1000 - 1);
     }
+    query += " ORDER BY timestamp ASC";
 
     const rows = db.prepare(query).all(...params) as CursorRow[];
 
@@ -86,7 +82,6 @@ function readEventsFromDb(
         return ms !== null && ms > sinceMs;
       });
     }
-
     return rows;
   } catch {
     return [];
@@ -95,28 +90,135 @@ function readEventsFromDb(
   }
 }
 
-export function readEvents(
+export function readLegacyEvents(
   since: Date | null,
-  cursorDir?: string,
+  baseDir?: string,
   verbose = false
 ): Array<{ row: CursorRow; workspacePath: string }> {
-  const searchDir = cursorDir ?? defaultCursorDir();
-  const dbPaths = findCursorDbs(cursorDir);
+  const dbPaths = findCursorDbs(baseDir);
 
-  if (verbose) {
-    console.log(`Searching: ${searchDir}`);
-    console.log(`Found ${dbPaths.length} cursor.db file(s)`);
-  }
+  if (verbose) console.log(`Found ${dbPaths.length} legacy cursor.db file(s)`);
 
   const results: Array<{ row: CursorRow; workspacePath: string }> = [];
-
   for (const dbPath of dbPaths) {
     const workspacePath = dbPath.replace(/[\\/]cursor\.db$/, "");
-    const rows = readEventsFromDb(dbPath, since, workspacePath, verbose);
-    for (const row of rows) {
+    for (const row of readLegacyFromDb(dbPath, since, workspacePath, verbose)) {
       results.push({ row, workspacePath });
     }
   }
+  return results;
+}
+
+// ─── Current: state.vscdb / ItemTable / aiCodeTracking keys ──────────────────
+
+export interface DailyStatsEntry {
+  /** YYYY-MM-DD from the ItemTable key */
+  date: string;
+  /** Raw parsed JSON value — shape varies by Cursor version */
+  value: unknown;
+  /** Path to the state.vscdb file this entry came from */
+  dbPath: string;
+}
+
+export function findStateVscDbs(baseDir?: string): string[] {
+  const userDir = baseDir ?? cursorUserDir();
+  const results: string[] = [];
+
+  // Global storage — aggregate stats across all workspaces
+  const globalDb = join(userDir, "globalStorage", "state.vscdb");
+  if (existsSync(globalDb)) results.push(globalDb);
+
+  // Per-workspace storage
+  try {
+    results.push(
+      ...glob.sync(join(userDir, "workspaceStorage", "**", "state.vscdb"))
+    );
+  } catch { /* ignore */ }
 
   return results;
+}
+
+function readDailyStatsFromDb(
+  dbPath: string,
+  since: Date | null,
+  verbose: boolean
+): DailyStatsEntry[] {
+  let db: Database.Database | null = null;
+  try {
+    db = new Database(dbPath, { readonly: true });
+
+    if (verbose) {
+      const tables = getTableNames(db);
+      console.log(`  [state.vscdb] ${dbPath}`);
+      console.log(`  tables: ${tables.join(", ") || "(none)"}`);
+    }
+
+    if (!tableExists(db, "ItemTable")) return [];
+
+    const rows = db
+      .prepare("SELECT key, value FROM ItemTable WHERE key LIKE 'aiCodeTracking.%'")
+      .all() as { key: string; value: string }[];
+
+    if (verbose && rows.length > 0) {
+      console.log(`  aiCodeTracking keys (${rows.length}):`);
+      for (const r of rows.slice(0, 10)) {
+        console.log(`    ${r.key} → ${r.value}`);
+      }
+      if (rows.length > 10) console.log(`    … and ${rows.length - 10} more`);
+    }
+
+    const entries: DailyStatsEntry[] = [];
+    for (const { key, value: rawValue } of rows) {
+      // Keys like: aiCodeTracking.dailyStats.v1.5.2024-01-15
+      const dateMatch = key.match(/(\d{4}-\d{2}-\d{2})$/);
+      if (!dateMatch) continue;
+
+      const date = dateMatch[1];
+      if (since && date <= since.toISOString().slice(0, 10)) continue;
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(rawValue);
+      } catch {
+        continue;
+      }
+
+      entries.push({ date, value: parsed, dbPath });
+    }
+
+    return entries;
+  } catch {
+    return [];
+  } finally {
+    db?.close();
+  }
+}
+
+export function readDailyStats(
+  since: Date | null,
+  baseDir?: string,
+  verbose = false
+): DailyStatsEntry[] {
+  const dbPaths = findStateVscDbs(baseDir);
+
+  if (verbose) {
+    console.log(`Searching: ${baseDir ?? cursorUserDir()}`);
+    console.log(`Found ${dbPaths.length} state.vscdb file(s)`);
+  }
+
+  const results: DailyStatsEntry[] = [];
+  for (const dbPath of dbPaths) {
+    results.push(...readDailyStatsFromDb(dbPath, since, verbose));
+  }
+  return results;
+}
+
+// ─── Unified entry point (tries both schemas) ─────────────────────────────────
+
+export function readEvents(
+  since: Date | null,
+  baseDir?: string,
+  verbose = false
+): Array<{ row: CursorRow; workspacePath: string }> {
+  return readLegacyEvents(since, baseDir, verbose);
 }
