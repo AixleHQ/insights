@@ -402,6 +402,38 @@ export interface ToolDailyPoint {
   costUsd: number;
 }
 
+export interface ToolEventTypeStat {
+  name: string;
+  eventCount: number;
+  tokensIn: number;
+  tokensOut: number;
+  costUsd: number;
+}
+
+export interface ToolModelsResponse {
+  tool: string;
+  timeRange: { start: string; end: string };
+  models: ToolModelStat[];
+}
+
+export interface ToolUsersResponse {
+  tool: string;
+  timeRange: { start: string; end: string };
+  users: ToolUserStat[];
+}
+
+export interface ToolDailyResponse {
+  tool: string;
+  timeRange: { start: string; end: string };
+  daily: ToolDailyPoint[];
+}
+
+export interface ToolEventTypesResponse {
+  tool: string;
+  timeRange: { start: string; end: string };
+  eventTypes: ToolEventTypeStat[];
+}
+
 export interface ConnectorSyncStatus {
   connector_type: string;
   status: string;
