@@ -34,9 +34,10 @@ import type {
   Issue,
   JiraProject,
   ToolOverviewStats,
-  ToolModelStat,
-  ToolUserStat,
-  ToolDailyPoint,
+  ToolModelsResponse,
+  ToolUsersResponse,
+  ToolDailyResponse,
+  ToolEventTypesResponse,
   ConnectorSyncStatus,
 } from "@/lib/types";
 
@@ -1195,7 +1196,7 @@ export function useToolModels(orgId: string, tool: string, days = 30) {
   return useQuery({
     queryKey: queryKeys.stats.toolModels(orgId, tool, days),
     queryFn: () =>
-      api.get<ToolModelStat[]>(`/organizations/${orgId}/stats/tools/${tool}/models?days=${days}`),
+      api.get<ToolModelsResponse>(`/organizations/${orgId}/stats/tools/${tool}/models?days=${days}`),
     enabled: !!orgId && !!tool,
   });
 }
@@ -1204,7 +1205,7 @@ export function useToolUsers(orgId: string, tool: string, days = 30) {
   return useQuery({
     queryKey: queryKeys.stats.toolUsers(orgId, tool, days),
     queryFn: () =>
-      api.get<ToolUserStat[]>(`/organizations/${orgId}/stats/tools/${tool}/users?days=${days}`),
+      api.get<ToolUsersResponse>(`/organizations/${orgId}/stats/tools/${tool}/users?days=${days}`),
     enabled: !!orgId && !!tool,
   });
 }
@@ -1213,7 +1214,7 @@ export function useToolDaily(orgId: string, tool: string, days = 30) {
   return useQuery({
     queryKey: queryKeys.stats.toolDaily(orgId, tool, days),
     queryFn: () =>
-      api.get<ToolDailyPoint[]>(`/organizations/${orgId}/stats/tools/${tool}/daily?days=${days}`),
+      api.get<ToolDailyResponse>(`/organizations/${orgId}/stats/tools/${tool}/daily?days=${days}`),
     enabled: !!orgId && !!tool,
   });
 }
@@ -1222,7 +1223,7 @@ export function useToolEventTypes(orgId: string, tool: string, days = 30) {
   return useQuery({
     queryKey: queryKeys.stats.toolEventTypes(orgId, tool, days),
     queryFn: () =>
-      api.get<Record<string, number>>(
+      api.get<ToolEventTypesResponse>(
         `/organizations/${orgId}/stats/tools/${tool}/event_types?days=${days}`
       ),
     enabled: !!orgId && !!tool,

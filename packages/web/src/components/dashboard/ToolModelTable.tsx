@@ -1,0 +1,181 @@
+import { useState } from "react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import type { ToolModelStat } from "@/lib/types";
+
+interface ToolModelTableProps {
+  models: ToolModelStat[];
+  isLoading: boolean;
+}
+
+type SortKey = "eventCount" | "costUsd";
+type SortDir = "asc" | "desc";
+
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
+}
+
+function formatCost(n: number): string {
+  if (n === 0) return "$0.00";
+  if (n < 0.001) return `$${n.toFixed(6)}`;
+  if (n < 0.01) return `$${n.toFixed(4)}`;
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n);
+}
+
+function formatPerMillion(n: number | null): string {
+  if (n === null || n === undefined) return "—";
+  return `$${n.toFixed(2)}`;
+}
+
+function SortButton({
+  label,
+  sortKey,
+  current,
+  dir,
+  onSort,
+}: {
+  label: string;
+  sortKey: SortKey;
+  current: SortKey;
+  dir: SortDir;
+  onSort: (key: SortKey) => void;
+}) {
+  const isActive = current === sortKey;
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="-ml-3 h-8 text-xs font-medium"
+      onClick={() => onSort(sortKey)}
+    >
+      {label}
+      {isActive ? (
+        dir === "desc" ? (
+          <ArrowDown className="ml-1 size-3" />
+        ) : (
+          <ArrowUp className="ml-1 size-3" />
+        )
+      ) : (
+        <ArrowUpDown className="ml-1 size-3 text-muted-foreground" />
+      )}
+    </Button>
+  );
+}
+
+function SkeletonRow() {
+  return (
+    <TableRow>
+      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+      <TableCell className="text-right"><Skeleton className="h-4 w-12 ml-auto" /></TableCell>
+      <TableCell className="hidden md:table-cell text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
+      <TableCell className="hidden md:table-cell text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
+      <TableCell className="text-right"><Skeleton className="h-4 w-14 ml-auto" /></TableCell>
+      <TableCell className="hidden lg:table-cell text-right"><Skeleton className="h-4 w-12 ml-auto" /></TableCell>
+      <TableCell className="hidden lg:table-cell text-right"><Skeleton className="h-4 w-12 ml-auto" /></TableCell>
+    </TableRow>
+  );
+}
+
+export function ToolModelTable({ models, isLoading }: ToolModelTableProps) {
+  const [sortKey, setSortKey] = useState<SortKey>("costUsd");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  function handleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "desc" ? "asc" : "desc"));
+    } else {
+      setSortKey(key);
+      setSortDir("desc");
+    }
+  }
+
+  const sorted = [...models].sort((a, b) => {
+    const diff = a[sortKey] - b[sortKey];
+    return sortDir === "desc" ? -diff : diff;
+  });
+
+  return (
+    <div className="rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Model</TableHead>
+            <TableHead className="text-right">
+              <SortButton
+                label="Requests"
+                sortKey="eventCount"
+                current={sortKey}
+                dir={sortDir}
+                onSort={handleSort}
+              />
+            </TableHead>
+            <TableHead className="hidden md:table-cell text-right">Tokens In</TableHead>
+            <TableHead className="hidden md:table-cell text-right">Tokens Out</TableHead>
+            <TableHead className="text-right">
+              <SortButton
+                label="Cost"
+                sortKey="costUsd"
+                current={sortKey}
+                dir={sortDir}
+                onSort={handleSort}
+              />
+            </TableHead>
+            <TableHead className="hidden lg:table-cell text-right">$/M input</TableHead>
+            <TableHead className="hidden lg:table-cell text-right">$/M output</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {isLoading ? (
+            Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} />)
+          ) : sorted.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={7} className="h-24 text-center text-sm text-muted-foreground">
+                No model data for this period.
+              </TableCell>
+            </TableRow>
+          ) : (
+            sorted.map((row) => (
+              <TableRow key={row.name}>
+                <TableCell className="font-medium font-mono text-sm">{row.name}</TableCell>
+                <TableCell className="text-right font-mono text-sm">
+                  {row.eventCount.toLocaleString()}
+                </TableCell>
+                <TableCell className="hidden md:table-cell text-right font-mono text-sm text-muted-foreground">
+                  {formatTokens(row.tokensIn)}
+                </TableCell>
+                <TableCell className="hidden md:table-cell text-right font-mono text-sm text-muted-foreground">
+                  {formatTokens(row.tokensOut)}
+                </TableCell>
+                <TableCell className="text-right font-mono text-sm">
+                  {formatCost(row.costUsd)}
+                </TableCell>
+                <TableCell className="hidden lg:table-cell text-right font-mono text-sm text-muted-foreground">
+                  {formatPerMillion(row.price_per_million_input)}
+                </TableCell>
+                <TableCell className="hidden lg:table-cell text-right font-mono text-sm text-muted-foreground">
+                  {formatPerMillion(row.price_per_million_output)}
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}

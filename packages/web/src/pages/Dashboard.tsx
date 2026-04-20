@@ -11,6 +11,7 @@ import {
   TopToolsChart,
   AlertsPanel,
   ToolUsageByDayChart,
+  ToolInsightsSection,
   type DailyCostData,
   type ActivityEvent,
   type ToolUsageData,
@@ -110,6 +111,9 @@ export function Dashboard() {
   const handleDismissAlert = (id: string) => {
     setDismissedAlerts((prev) => new Set([...prev, id]));
   };
+
+  // Tool insights day range state
+  const [toolInsightsDays, setToolInsightsDays] = useState(30);
 
   // Event drawer state
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -230,6 +234,12 @@ export function Dashboard() {
           onDismiss={handleDismissAlert}
         />
       </div>
+
+      <ToolInsightsSection
+        orgId={currentOrg?.id || ""}
+        days={toolInsightsDays}
+        onDaysChange={setToolInsightsDays}
+      />
 
       <EventDrawer
         eventId={selectedEventId}
