@@ -250,8 +250,9 @@ export function ToolInsightsSection({ orgId, days, onDaysChange }: ToolInsightsS
   const cursorHasData = (cursorOverview?.total_events ?? 0) > 0;
   const openrouterHasData = (openrouterOverview?.total_events ?? 0) > 0;
 
-  // Don't render until we've checked availability
-  if (isLoadingCursor && isLoadingOpenrouter) {
+  // Don't render until both overviews have resolved — avoids a flash where
+  // one finishes with 0 events before the other has returned any data.
+  if (isLoadingCursor || isLoadingOpenrouter) {
     return null;
   }
 
@@ -281,7 +282,7 @@ export function ToolInsightsSection({ orgId, days, onDaysChange }: ToolInsightsS
         </div>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue={defaultTab}>
+        <Tabs key={`${orgId}-${defaultTab}`} defaultValue={defaultTab}>
           <TabsList>
             {cursorHasData && <TabsTrigger value="cursor">Cursor</TabsTrigger>}
             {openrouterHasData && (

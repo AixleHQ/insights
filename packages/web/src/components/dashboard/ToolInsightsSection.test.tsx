@@ -138,6 +138,22 @@ describe("ToolInsightsSection", () => {
     expect(container.firstChild).toBeNull();
   });
 
+  it("renders nothing while only one overview is still loading (loading race)", () => {
+    // Cursor resolved with 0 events; OpenRouter still pending.
+    // The section must not flash-hide before OpenRouter returns data.
+    mockUseToolOverview.mockImplementation((_, tool) => {
+      if (tool === "cursor") return makeOverview(0) as never;
+      return { data: undefined, isLoading: true } as never;
+    });
+    mockUseToolModels.mockReturnValue(emptyModels as never);
+    mockUseToolUsers.mockReturnValue(emptyUsers as never);
+    mockUseToolDaily.mockReturnValue(emptyDaily as never);
+    mockUseToolEventTypes.mockReturnValue(emptyEventTypes as never);
+
+    const { container } = render(<ToolInsightsSection {...defaultProps} />);
+    expect(container.firstChild).toBeNull();
+  });
+
   it("renders nothing when both tools have zero events", () => {
     setupNoData();
     const { container } = render(<ToolInsightsSection {...defaultProps} />);
@@ -221,6 +237,22 @@ describe("ToolInsightsSection", () => {
     render(<ToolInsightsSection {...defaultProps} />);
     // Active Users card should show 2
     expect(screen.getByText("2")).toBeInTheDocument();
+  });
+
+  it("shows only OpenRouter tab and no Cursor tab when only openrouter has events", () => {
+    mockUseToolOverview.mockImplementation((_, tool) => {
+      if (tool === "openrouter_api") return makeOverview(15) as never;
+      return makeOverview(0) as never;
+    });
+    mockUseToolModels.mockReturnValue(emptyModels as never);
+    mockUseToolUsers.mockReturnValue(emptyUsers as never);
+    mockUseToolDaily.mockReturnValue(emptyDaily as never);
+    mockUseToolEventTypes.mockReturnValue(emptyEventTypes as never);
+
+    render(<ToolInsightsSection {...defaultProps} />);
+    expect(screen.getByRole("tab", { name: "OpenRouter" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Cursor" })).not.toBeInTheDocument();
+    expect(screen.getByText("OpenRouter insights coming soon.")).toBeInTheDocument();
   });
 
   it("shows empty state inside Cursor tab when daily data has no events", () => {
