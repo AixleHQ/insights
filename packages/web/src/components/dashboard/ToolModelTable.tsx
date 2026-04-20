@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import type { ToolModelStat } from "@/lib/types";
+import { formatCost, formatTokens } from "@/lib/formatters";
 
 interface ToolModelTableProps {
   models: ToolModelStat[];
@@ -19,24 +20,6 @@ interface ToolModelTableProps {
 
 type SortKey = "eventCount" | "costUsd";
 type SortDir = "asc" | "desc";
-
-function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return String(n);
-}
-
-function formatCost(n: number): string {
-  if (n === 0) return "$0.00";
-  if (n < 0.001) return `$${n.toFixed(6)}`;
-  if (n < 0.01) return `$${n.toFixed(4)}`;
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(n);
-}
 
 function formatPerMillion(n: number | null): string {
   if (n === null || n === undefined) return "—";

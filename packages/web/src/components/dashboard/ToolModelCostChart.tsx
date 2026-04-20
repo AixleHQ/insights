@@ -8,6 +8,7 @@ import {
 import type { ChartConfig } from "@/components/ui/chart";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ToolModelStat } from "@/lib/types";
+import { formatCost } from "@/lib/formatters";
 
 interface ToolModelCostChartProps {
   models: ToolModelStat[];
@@ -20,18 +21,6 @@ const chartConfig = {
     color: "var(--chart-2)",
   },
 } satisfies ChartConfig;
-
-function formatCost(n: number): string {
-  if (n === 0) return "$0.00";
-  if (n < 0.001) return `$${n.toFixed(6)}`;
-  if (n < 0.01) return `$${n.toFixed(4)}`;
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(n);
-}
 
 function truncateName(name: string): string {
   return name.length > 30 ? `${name.slice(0, 30)}…` : name;
@@ -67,6 +56,7 @@ export function ToolModelCostChart({ models, isLoading }: ToolModelCostChartProp
             No model data for this period.
           </div>
         ) : (
+          // height is data-driven — can't use a static Tailwind class here
           <ChartContainer config={chartConfig} className="w-full" style={{ height: chartHeight }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart

@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/chart";
 import type { ChartConfig } from "@/components/ui/chart";
 import { Activity, DollarSign, Coins, Users, RefreshCw, LayoutGrid } from "lucide-react";
+import { formatCost, formatTokens } from "@/lib/formatters";
+import type { Connector } from "@/lib/types";
 import {
   useToolOverview,
   useToolModels,
@@ -46,24 +48,6 @@ const trendChartConfig = {
     color: "var(--chart-1)",
   },
 } satisfies ChartConfig;
-
-function formatCost(n: number): string {
-  if (n === 0) return "$0.00";
-  if (n < 0.001) return `$${n.toFixed(6)}`;
-  if (n < 0.01) return `$${n.toFixed(4)}`;
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(n);
-}
-
-function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return String(n);
-}
 
 function formatSyncTime(dateStr: string | null): string {
   if (!dateStr) return "Never";
@@ -114,8 +98,14 @@ function StatCard({
   );
 }
 
+function isActiveOpenRouterConnector(c: Connector): boolean {
+  const type = c.connectorType ?? c.connector_type;
+  const active = c.isActive ?? c.is_active;
+  return type === "openrouter" && !!active;
+}
+
 function SyncStatusSubsection({ orgId, connectorId }: { orgId: string; connectorId: string }) {
-  const { data: syncStatus, isLoading: isLoadingSync } = useConnectorSyncStatus(orgId, connectorId);
+  const { data: syncStatus, isLoading: isLoadingSync, isError: isSyncError } = useConnectorSyncStatus(orgId, connectorId);
   const { mutate: syncConnector, isPending: isSyncing } = useSyncConnector();
 
   function handleSyncNow() {
@@ -134,12 +124,16 @@ function SyncStatusSubsection({ orgId, connectorId }: { orgId: string; connector
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/40 px-4 py-3">
       <div className="space-y-0.5">
         <p className="text-sm font-medium">Data Sync</p>
-        <p className="text-xs text-muted-foreground">
-          Last synced: {formatSyncTime(syncStatus?.last_sync_at ?? null)}
-          {syncStatus?.status === "error" && syncStatus.last_error && (
-            <span className="ml-2 text-destructive">— {syncStatus.last_error}</span>
-          )}
-        </p>
+        {isSyncError ? (
+          <p className="text-xs text-destructive">Unable to fetch sync status.</p>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Last synced: {formatSyncTime(syncStatus?.last_sync_at ?? null)}
+            {syncStatus?.status === "error" && syncStatus.last_error && (
+              <span className="ml-2 text-destructive">— {syncStatus.last_error}</span>
+            )}
+          </p>
+        )}
       </div>
       <Button
         size="sm"
@@ -161,11 +155,7 @@ function OpenRouterTabContent({ orgId, days }: { orgId: string; days: number }) 
   const { data: modelsResp, isLoading: isLoadingModels } = useToolModels(orgId, "openrouter_api", days);
   const { data: usersResp, isLoading: isLoadingUsers } = useToolUsers(orgId, "openrouter_api", days);
 
-  const activeOpenRouterConnector = connectorsResp?.find(
-    (c) =>
-      (c.connectorType === "openrouter" || c.connector_type === "openrouter") &&
-      (c.isActive || c.is_active),
-  );
+  const activeOpenRouterConnector = connectorsResp?.find(isActiveOpenRouterConnector);
 
   const daily = dailyResp?.daily ?? [];
   const models = modelsResp?.models ?? [];

@@ -107,7 +107,12 @@ const emptyEventTypes: { data: ToolEventTypesResponse; isLoading: false } = {
 
 const noConnectors = { data: [], isLoading: false };
 const noSyncStatus = { data: undefined, isLoading: false };
-const noMutate = { mutate: vi.fn(), isPending: false };
+
+// noMutate is recreated per-test (not module-level) to prevent mock call
+// counts from leaking between tests when asserted on.
+function makeNoMutate() {
+  return { mutate: vi.fn(), isPending: false };
+}
 
 function setupLoadingState() {
   mockUseToolOverview.mockReturnValue({ data: undefined, isLoading: true } as never);
@@ -117,7 +122,7 @@ function setupLoadingState() {
   mockUseToolEventTypes.mockReturnValue({ data: undefined, isLoading: true } as never);
   mockUseConnectors.mockReturnValue(noConnectors as never);
   mockUseConnectorSyncStatus.mockReturnValue(noSyncStatus as never);
-  mockUseSyncConnector.mockReturnValue(noMutate as never);
+  mockUseSyncConnector.mockReturnValue(makeNoMutate() as never);
 }
 
 function setupCursorOnlyData() {
@@ -131,7 +136,7 @@ function setupCursorOnlyData() {
   mockUseToolEventTypes.mockReturnValue(emptyEventTypes as never);
   mockUseConnectors.mockReturnValue(noConnectors as never);
   mockUseConnectorSyncStatus.mockReturnValue(noSyncStatus as never);
-  mockUseSyncConnector.mockReturnValue(noMutate as never);
+  mockUseSyncConnector.mockReturnValue(makeNoMutate() as never);
 }
 
 function setupNoData() {
@@ -142,7 +147,7 @@ function setupNoData() {
   mockUseToolEventTypes.mockReturnValue(emptyEventTypes as never);
   mockUseConnectors.mockReturnValue(noConnectors as never);
   mockUseConnectorSyncStatus.mockReturnValue(noSyncStatus as never);
-  mockUseSyncConnector.mockReturnValue(noMutate as never);
+  mockUseSyncConnector.mockReturnValue(makeNoMutate() as never);
 }
 
 describe("ToolInsightsSection", () => {
@@ -210,7 +215,7 @@ describe("ToolInsightsSection", () => {
     mockUseToolEventTypes.mockReturnValue(emptyEventTypes as never);
     mockUseConnectors.mockReturnValue(noConnectors as never);
     mockUseConnectorSyncStatus.mockReturnValue(noSyncStatus as never);
-    mockUseSyncConnector.mockReturnValue(noMutate as never);
+    mockUseSyncConnector.mockReturnValue(makeNoMutate() as never);
 
     render(<ToolInsightsSection {...defaultProps} />);
     expect(screen.getByRole("tab", { name: "Cursor" })).toBeInTheDocument();
@@ -262,7 +267,7 @@ describe("ToolInsightsSection", () => {
     mockUseToolEventTypes.mockReturnValue(emptyEventTypes as never);
     mockUseConnectors.mockReturnValue(noConnectors as never);
     mockUseConnectorSyncStatus.mockReturnValue(noSyncStatus as never);
-    mockUseSyncConnector.mockReturnValue(noMutate as never);
+    mockUseSyncConnector.mockReturnValue(makeNoMutate() as never);
 
     render(<ToolInsightsSection {...defaultProps} />);
     // Active Users card should show 2
@@ -289,7 +294,7 @@ describe("ToolInsightsSection", () => {
     mockUseToolEventTypes.mockReturnValue(emptyEventTypes as never);
     mockUseConnectors.mockReturnValue(noConnectors as never);
     mockUseConnectorSyncStatus.mockReturnValue(noSyncStatus as never);
-    mockUseSyncConnector.mockReturnValue(noMutate as never);
+    mockUseSyncConnector.mockReturnValue(makeNoMutate() as never);
 
     render(<ToolInsightsSection {...defaultProps} />);
     expect(screen.getByRole("tab", { name: "OpenRouter" })).toBeInTheDocument();
@@ -313,7 +318,7 @@ describe("ToolInsightsSection", () => {
     mockUseToolEventTypes.mockReturnValue(emptyEventTypes as never);
     mockUseConnectors.mockReturnValue(noConnectors as never);
     mockUseConnectorSyncStatus.mockReturnValue(noSyncStatus as never);
-    mockUseSyncConnector.mockReturnValue(noMutate as never);
+    mockUseSyncConnector.mockReturnValue(makeNoMutate() as never);
 
     render(<ToolInsightsSection {...defaultProps} />);
     expect(screen.getByText(/No Cursor events in the last 30 days/i)).toBeInTheDocument();
@@ -343,7 +348,7 @@ describe("ToolInsightsSection", () => {
       data: { connector_type: "openrouter", status: "connected", last_sync_at: null, last_error: null, total_events: 10 },
       isLoading: false,
     } as never);
-    mockUseSyncConnector.mockReturnValue(noMutate as never);
+    mockUseSyncConnector.mockReturnValue(makeNoMutate() as never);
 
     render(<ToolInsightsSection {...defaultProps} />);
     expect(screen.getByText("Data Sync")).toBeInTheDocument();
@@ -368,7 +373,7 @@ describe("ToolInsightsSection", () => {
     mockUseToolEventTypes.mockReturnValue(emptyEventTypes as never);
     mockUseConnectors.mockReturnValue(noConnectors as never);
     mockUseConnectorSyncStatus.mockReturnValue(noSyncStatus as never);
-    mockUseSyncConnector.mockReturnValue(noMutate as never);
+    mockUseSyncConnector.mockReturnValue(makeNoMutate() as never);
 
     render(<ToolInsightsSection {...defaultProps} />);
     expect(screen.queryByText("Data Sync")).not.toBeInTheDocument();
@@ -402,7 +407,7 @@ describe("ToolInsightsSection", () => {
     mockUseToolEventTypes.mockReturnValue(emptyEventTypes as never);
     mockUseConnectors.mockReturnValue(noConnectors as never);
     mockUseConnectorSyncStatus.mockReturnValue(noSyncStatus as never);
-    mockUseSyncConnector.mockReturnValue(noMutate as never);
+    mockUseSyncConnector.mockReturnValue(makeNoMutate() as never);
 
     render(<ToolInsightsSection {...defaultProps} />);
     expect(screen.getByText("Models Used")).toBeInTheDocument();
