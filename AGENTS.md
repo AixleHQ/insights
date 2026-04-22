@@ -2,7 +2,7 @@
 
 Welcome! This doc explains the Claude tooling you have access to in this project: commands you can type, agents the model can spawn, skills that auto-load when you're editing certain files, and hooks that run automation for you.
 
-> **Structure note.** The second half of this file (the `## MCP Tools: code-review-graph` section) is the existing knowledge-graph reference — keep using those tools to explore the codebase before reaching for Grep/Glob.
+> Use Grep, Glob, and Read to explore the codebase. For directed searches use those tools directly. For broader exploration use the Explore subagent.
 
 **Who this is for:** every engineer on DB90, whether day-one or day-1000. The tooling teaches itself — if you forget how something works, just ask.
 
@@ -109,7 +109,7 @@ Type `/` in Claude Code to see them all autocomplete. Not sure which to use? Jus
 | `/onboard` | *"I'm new, walk me through this"* | — (guided) |
 | `/review-architecture` | Before a big PR — deep architectural review | Reviewer agents |
 | `/review-commit` | Pre-push sanity check | Reviewer agents |
-| `/review-changes` | Risk-scored review via knowledge graph | Reviewer agents |
+| `/review-changes` | Structured review using git diff and grep-based impact tracing | Reviewer agents |
 | `/debug-issue` | Hunting a specific bug | — |
 | `/explore-codebase` | Onboarding to an unfamiliar area | — |
 | `/refactor-plan` | Planning a rename/extract before you touch code | — |
@@ -235,17 +235,14 @@ sequenceDiagram
 sequenceDiagram
     participant Dev
     participant Claude
-    participant Graph as code-review-graph MCP
 
     Dev->>Claude: "/explore-codebase useApi.ts"
-    Claude->>Graph: semantic_search_nodes
-    Graph-->>Claude: hooks inventory
+    Claude->>Claude: Grep/Glob for useApi.ts and its usages
     Claude-->>Dev: hook list + usage map
     Dev->>Claude: "wire useToolOverview to Cursor tab"
     Claude->>Claude: implements via TanStack Query patterns
     Dev->>Claude: "/review-changes"
-    Claude->>Graph: detect_changes
-    Graph-->>Claude: risk-scored diff
+    Claude->>Claude: git diff + Read changed files
     Claude-->>Dev: green / findings
 ```
 
@@ -380,24 +377,24 @@ claude
 3. Claude edits the page; TanStack Query handles fetching.
 4. `on-edit-lint` hook runs ESLint automatically.
 5. Manually verify in browser at `http://localhost:5173`.
-6. `/review-changes` before pushing — risk-scored review via knowledge graph.
+6. `/review-changes` before pushing — structured review of changes.
 
 ### D. Debug a bug
 
-1. `/debug-issue` — graph-powered trace.
-2. Uses `semantic_search_nodes` → `query_graph` (callers/callees) → `detect_changes` to see if a recent edit caused it.
+1. `/debug-issue` — systematic trace using native search tools.
+2. Greps for symbols → traces call sites → checks recent commits to see if a recent edit caused it.
 3. Reports root cause with specific file:line refs.
 
 ### E. Plan a refactor before touching anything
 
 1. `/refactor-plan` — previews blast radius before any code changes.
-2. Uses `refactor_tool` (knowledge graph MCP) to list all affected locations.
+2. Greps for all usages to list all affected locations.
 3. Review the plan, then explicitly ask Claude to apply it.
 
 ### F. Pre-PR architecture review
 
 1. `/review-architecture` — deep dive on maintainability, security, performance.
-2. `/review-changes` — risk-scored by knowledge graph.
+2. `/review-changes` — structured review of changes.
 3. `/review-commit` — lint + test context.
 4. All three together before a non-trivial PR.
 
@@ -458,41 +455,6 @@ By default, non-trivial commands end with a one-line trailer explaining *why* th
 
 ---
 
-<!-- code-review-graph MCP tools -->
-## MCP Tools: code-review-graph
+## Codebase Exploration
 
-**IMPORTANT: This project has a knowledge graph. ALWAYS use the
-code-review-graph MCP tools BEFORE using Grep/Glob/Read to explore
-the codebase.** The graph is faster, cheaper (fewer tokens), and gives
-you structural context (callers, dependents, test coverage) that file
-scanning cannot.
-
-### When to use graph tools FIRST
-
-- **Exploring code**: `semantic_search_nodes` or `query_graph` instead of Grep
-- **Understanding impact**: `get_impact_radius` instead of manually tracing imports
-- **Code review**: `detect_changes` + `get_review_context` instead of reading entire files
-- **Finding relationships**: `query_graph` with callers_of/callees_of/imports_of/tests_for
-- **Architecture questions**: `get_architecture_overview` + `list_communities`
-
-Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
-
-### Key Tools
-
-| Tool | Use when |
-|------|----------|
-| `detect_changes` | Reviewing code changes — gives risk-scored analysis |
-| `get_review_context` | Need source snippets for review — token-efficient |
-| `get_impact_radius` | Understanding blast radius of a change |
-| `get_affected_flows` | Finding which execution paths are impacted |
-| `query_graph` | Tracing callers, callees, imports, tests, dependencies |
-| `semantic_search_nodes` | Finding functions/classes by name or keyword |
-| `get_architecture_overview` | Understanding high-level codebase structure |
-| `refactor_tool` | Planning renames, finding dead code |
-
-### Workflow
-
-1. The graph auto-updates on file changes (via hooks).
-2. Use `detect_changes` for code review.
-3. Use `get_affected_flows` to understand impact.
-4. Use `query_graph` pattern="tests_for" to check coverage.
+Use Grep, Glob, and Read to explore the codebase. For directed searches (a known file, class, or function) use those tools directly. For broader open-ended exploration, use the Explore subagent.

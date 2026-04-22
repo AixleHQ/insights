@@ -49,10 +49,10 @@ The `component-builder` agent is the clearest example of this pattern in action 
 | `/tailwind-v4-shadcn` | Command | `/tailwind-v4-shadcn` | Reference guide for Tailwind v4 + shadcn/ui setup and v4 migration pitfalls |
 | `/review-architecture` | Command | `/review-architecture` | Deep architectural review (Staff Engineer lens): maintainability, security, performance across backend and frontend |
 | `/review-commit` | Command | `/review-commit` | Pre-push gate: runs linters, tests, spawns swagger-auditor and ui-visual-reviewer as needed; reports READY TO PUSH or BLOCK |
-| `/review-changes` | Command | `/review-changes` | Structured review using knowledge graph change detection and impact analysis |
+| `/review-changes` | Command | `/review-changes` | Structured review using git diff, file reading, and grep-based impact tracing |
 | `/typescript-react-reviewer` | Command | `/typescript-react-reviewer` | TypeScript + React 19 specific review: critical bugs, anti-patterns, strict TS, React 19 pitfalls |
-| `/debug-issue` | Command | `/debug-issue` | Systematic debugging via knowledge graph: semantic search → call chains → execution paths → recent changes → impact radius |
-| `/explore-codebase` | Command | `/explore-codebase` | Knowledge-graph-first codebase navigation: architecture overview, communities, semantic search, flow listing |
+| `/debug-issue` | Command | `/debug-issue` | Systematic debugging: grep for symbols → trace call sites → read files → check recent commits → find test coverage |
+| `/explore-codebase` | Command | `/explore-codebase` | Codebase navigation using Glob for file discovery, Grep for symbols, Read for file content |
 | `/playwright-cli` | Command | `/playwright-cli` | CLI reference for 40+ Playwright browser automation commands |
 | `/playwright-best-practices` | Command | `/playwright-best-practices` | 50+ Playwright testing patterns: E2E, component, API, auth, mobile, CI/CD |
 | `/postgresql-table-design` | Command | `/postgresql-table-design` | Schema design reference: data types, constraints, indexing, partitioning, TimescaleDB, JSONB, safe evolution |
@@ -121,7 +121,7 @@ Max 15 bullets total. Every finding cites file and line.
 **What it does:**
 1. Reads Figma design context (variants, props, tokens, slot structure, light/dark differences) via Figma MCP
 2. Reads the current implementation from `packages/web/src/components/ui/<ComponentName>.tsx`
-3. Lists all consumers using `query_graph` or grep
+3. Lists all consumers using Grep
 4. Checks hard-coded escalation tripwires — stops and calls `component-reviewer` before writing if any fire
 5. Writes the component following shadcn/Radix patterns
 6. Checks tripwires again before declaring done
@@ -264,9 +264,9 @@ Deep architectural review of all changes since `develop`, through the lens of ma
 **Deliverable:** CRITICAL/HIGH/MEDIUM/LOW findings with Verdict. More thorough than `/review-commit` — use before significant PRs.
 
 **`/review-changes`**  
-Structured review using the knowledge graph's change detection and impact analysis.  
-**Steps:** `detect_changes` → `get_affected_flows` → coverage check → `get_impact_radius` → test case suggestions  
-**Deliverable:** Risk-scored change analysis with affected flows and test coverage gaps.
+Structured review using git diff, file reading, and grep-based impact tracing.  
+**Steps:** `git diff` → Read changed files → Grep for callers → coverage check → test case suggestions  
+**Deliverable:** Risk-scored change analysis with blast radius and test coverage gaps.
 
 **`/typescript-react-reviewer`**  
 TypeScript + React 19 specific review: critical bugs, anti-patterns, strict TS violations.  
@@ -278,14 +278,14 @@ TypeScript + React 19 specific review: critical bugs, anti-patterns, strict TS v
 ### Debugging & Exploration
 
 **`/debug-issue`**  
-Systematic debugging using the knowledge graph — faster than manual grep/read.  
-**Steps:** Semantic search → trace callers/callees → execution paths → recent changes → impact radius  
+Systematic debugging using native search tools.  
+**Steps:** Grep for symbols → trace call sites → Read files → check recent commits → find test coverage  
 **Deliverable:** Root cause hypothesis with specific file/line references and suggested fix.
 
 **`/explore-codebase`**  
-Navigate codebase structure using the knowledge graph (architecture overview, communities, flows).  
-**Steps:** `get_minimal_context` → `get_architecture_overview` → `list_communities` → semantic search → `query_graph`  
-**Deliverable:** Structural map or targeted answer — typically ≤5 tool calls.
+Navigate codebase structure using Glob, Grep, and Read.  
+**Steps:** Glob for file layout → Grep for symbols → Read key files → trace imports  
+**Deliverable:** Structural map or targeted answer.
 
 **`/playwright-cli`**  
 CLI reference for 40+ Playwright browser automation commands (navigation, interaction, screenshots, tabs, cookies, network mocking, DevTools).  
@@ -317,7 +317,7 @@ Create, navigate, list, and clean up git worktrees for parallel ticket developme
 
 **`/refactor-plan`**  
 Plan and execute safe refactoring using dependency analysis.  
-**Steps:** `refactor_tool` suggest → dead code → rename → apply → `detect_changes`. Always previews before applying; checks impact radius.  
+**Steps:** Grep for all usages → Glob affected module → Read implementation → list call sites → verify with Grep after changes.  
 **Deliverable:** Refactor plan with risk assessment; optionally applied changes.
 
 **`/onboard`**  
@@ -441,10 +441,9 @@ The primitives compose. These examples show which primitives fire, in what order
 ### D. Debug an issue
 
 ```
-1. /debug-issue → knowledge graph navigation:
-   semantic_search_nodes → trace callers/callees → execution paths
-   → recent changes (most common root cause)
-   → impact radius of suspected culprit
+1. /debug-issue → grep for symbols → trace call sites → read files
+   → recent commits (most common root cause)
+   → find test coverage gaps
 
 2. If UI regression: /review-commit detects UI diffs → ui-visual-reviewer
    captures before/after screenshots

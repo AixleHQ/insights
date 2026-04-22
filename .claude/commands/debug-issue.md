@@ -1,26 +1,22 @@
 ---
-description: Systematically debug issues using graph-powered code navigation
+description: Systematically debug issues using code navigation
 ---
 
 ## Debug Issue
 
-Use the knowledge graph to systematically trace and debug issues.
+Trace and debug issues systematically using search and read tools.
 
 ### Steps
 
-1. Use `semantic_search_nodes` to find code related to the issue.
-2. Use `query_graph` with `callers_of` and `callees_of` to trace call chains.
-3. Use `get_flow` to see full execution paths through suspected areas.
-4. Run `detect_changes` to check if recent changes caused the issue.
-5. Use `get_impact_radius` on suspected files to see what else is affected.
+1. Use Grep to find code related to the issue by class name, method, or error string.
+2. Grep for all call sites of the suspect function to trace where it is invoked.
+3. Use Read to examine files at relevant line numbers.
+4. Run `git log --oneline -20 -- <file>` to check if recent commits touch the affected area.
+5. Use Glob to find related test files and check what is covered.
 
 ### Tips
 
-- Check both callers and callees to understand the full context.
-- Look at affected flows to find the entry point that triggers the bug.
-- Recent changes are the most common source of new issues.
-
-## Token Efficiency Rules
-- ALWAYS start with `get_minimal_context(task="<your task>")` before any other graph tool.
-- Use `detail_level="minimal"` on all calls. Only escalate to "standard" when minimal is insufficient.
-- Target: complete any review/debug/refactor task in ≤5 tool calls and ≤800 total output tokens.
+- Search for the error message or exception class first — it often points directly to the source.
+- Check both the method definition and all its call sites.
+- Recent commits are the most common source of regressions.
+- Narrow your grep path to the relevant package (`packages/api/` or `packages/web/`) to reduce noise.

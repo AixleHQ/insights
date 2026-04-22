@@ -41,7 +41,7 @@ Do not proceed past a tripwire without reviewer confirmation.
 
 1. **Read the Figma design context** — use Figma MCP to get the component's node. Extract: variants, props, design tokens used (via Figma variables), slot structure, light/dark mode differences.
 2. **Read the current implementation** — `packages/web/src/components/ui/<component>.tsx` (if it exists).
-3. **List consumers** — use `query_graph` with `importers_of` (or grep) to find all files importing the component. Note if any consumer will break.
+3. **List consumers** — use Grep to find all files importing the component. Note if any consumer will break.
 4. **Check tripwires** — before writing, enumerate the five tripwire conditions. If any fire, call `component-reviewer` now.
 5. **Write the component** — follow shadcn/Radix patterns, use `cva` for variants, use only design tokens from `index.css`, no raw hex, no arbitrary Tailwind values.
 6. **Check tripwires again** — at completion, before declaring done.

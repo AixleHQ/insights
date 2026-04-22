@@ -1,27 +1,21 @@
 ---
-description: Navigate and understand codebase structure using the knowledge graph
+description: Navigate and understand codebase structure
 ---
 
 ## Explore Codebase
 
-Use the code-review-graph MCP tools to explore and understand the codebase.
+Navigate and understand the codebase using native search tools.
 
 ### Steps
 
-1. Run `list_graph_stats` to see overall codebase metrics.
-2. Run `get_architecture_overview` for high-level community structure.
-3. Use `list_communities` to find major modules, then `get_community` for details.
-4. Use `semantic_search_nodes` to find specific functions or classes.
-5. Use `query_graph` with patterns like `callers_of`, `callees_of`, `imports_of` to trace relationships.
-6. Use `list_flows` and `get_flow` to understand execution paths.
+1. Use Glob to discover file structure — start broad, then narrow by directory or pattern.
+2. Use Grep to find symbols, classes, or patterns by name or keyword.
+3. Use Read to examine specific files in detail.
+4. Trace relationships by grepping for import statements or callers of a function.
 
 ### Tips
 
-- Start broad (stats, architecture) then narrow down to specific areas.
-- Use `children_of` on a file to see all its functions and classes.
-- Use `find_large_functions` to identify complex code.
-
-## Token Efficiency Rules
-- ALWAYS start with `get_minimal_context(task="<your task>")` before any other graph tool.
-- Use `detail_level="minimal"` on all calls. Only escalate to "standard" when minimal is insufficient.
-- Target: complete any review/debug/refactor task in ≤5 tool calls and ≤800 total output tokens.
+- Start with Glob to get oriented (e.g., `packages/api/app/**/*.rb`, `packages/web/src/**/*.tsx`).
+- Use Grep with `output_mode: "content"` and context lines to understand usage in context.
+- For a high-level overview, read key entry points: routes, schema, main controllers, top-level components.
+- Use Grep with `output_mode: "files_with_matches"` to quickly identify which files are relevant before reading them.

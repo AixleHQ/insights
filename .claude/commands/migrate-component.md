@@ -1,6 +1,6 @@
 ---
 allowed-tools: Bash(git diff:*), Bash(git log:*), Bash(git status:*), Bash(npx playwright:*), Bash(cd packages/web*), Read, Glob, Grep
-description: Orchestrate a full Figma → code component migration. Reads the Figma design context, diffs the current implementation, lists consumers via the knowledge graph, then delegates to component-builder (executor), component-reviewer (token/a11y gate), and ui-visual-reviewer (screenshot regression).
+description: Orchestrate a full Figma → code component migration. Reads the Figma design context, diffs the current implementation, lists consumers via Grep, then delegates to component-builder (executor), component-reviewer (token/a11y gate), and ui-visual-reviewer (screenshot regression).
 ---
 
 # /migrate-component
@@ -35,13 +35,8 @@ If Figma Desktop MCP is unavailable, fall back to Figma Web MCP. Note which was 
 
 ## Step 3 — List consumers
 
-Use the knowledge graph to find every file importing the component:
+Use Grep to find every file importing the component:
 
-```
-query_graph: importers_of("packages/web/src/components/ui/<ComponentName>.tsx")
-```
-
-Or fall back to grep:
 ```bash
 grep -r "from.*components/ui/<ComponentName>" packages/web/src --include="*.ts" --include="*.tsx" -l
 ```
