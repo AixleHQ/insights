@@ -73,6 +73,7 @@ async function main(): Promise<void> {
       } catch { /* fall through */ }
     }
   }
+
   printBanner(model, false /* stderr — hook output path */);
 }
 

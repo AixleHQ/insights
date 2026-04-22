@@ -5,10 +5,12 @@
  * per changed file, and outputs a structured RiskReport JSON to stdout.
  *
  * Signals used (in order of weight):
- *   1. File-path tier  (0–40 pts) — where in the architecture the file lives
- *   2. Caller count    (0–30 pts) — direct callers via `git grep`
- *   3. Churn rate      (0–15 pts) — commits in last 90 days
- *   4. Test coverage   (0–15 pts) — spec file presence + method match heuristic
+ *   1. File-path tier    (0–40 pts) — where in the architecture the file lives
+ *   2. Blast radius      (0–30 pts) — max(call-site count, 2-hop unique callers) via `git grep`
+ *   3. Churn rate        (0–15 pts) — commits in last 90 days
+ *   4. Method coverage   (0–15 pts) — diff-parsed method names checked against spec content
+ *
+ * Aggregation: max(file_scores) + volume bonus (up to +10 for multiple MEDIUM+ files).
  *
  * Hard flags bypass the score and force a minimum risk level:
  *   - db/migrate/ file              → CRITICAL (≥90)
@@ -41,13 +43,15 @@ interface FileRisk {
   tier: string;
   tier_score: number;
   diff: { lines_added: number; lines_removed: number };
-  direct_callers: number;
+  direct_call_sites: number;
+  two_hop_callers: number;
   caller_score: number;
   churn_90d: number;
   churn_score: number;
   has_spec: boolean;
   spec_path: string | null;
-  spec_has_method_match: boolean;
+  methods_changed: string[];
+  methods_covered: string[];
   coverage_score: number;
   hard_flags: string[];
   total_score: number;
@@ -110,12 +114,6 @@ function churnScore(commits: number): number {
   return 0;
 }
 
-function coverageScore(hasSpec: boolean, hasMethodMatch: boolean): number {
-  if (!hasSpec)         return 15;
-  if (!hasMethodMatch)  return 7;
-  return 0;
-}
-
 function toRiskLevel(score: number): RiskLevel {
   if (score >= 90) return "CRITICAL";
   if (score >= 70) return "HIGH";
@@ -158,28 +156,92 @@ function fileDiff(file: string, refRange: string): string {
 }
 
 /**
- * Count files in the codebase that reference the given symbol name.
- * Uses `git grep -l` which is cross-platform (no grep/rg dependency).
- * Excludes the defining file itself.
+ * Resolve the search path and glob for a file based on its extension.
  */
-function callerCount(file: string): number {
+function searchContext(file: string): { searchPath: string; glob: string; symbol: string } {
   const ext = path.extname(file);
   const symbol = path.basename(file, ext);
   const isRuby = ext === ".rb";
+  return {
+    symbol,
+    searchPath: isRuby ? "packages/api/app" : "packages/web/src",
+    glob: isRuby ? "*.rb" : "*.{ts,tsx}",
+  };
+}
 
-  const searchPath = isRuby ? "packages/api/app" : "packages/web/src";
-  const glob = isRuby ? "*.rb" : "*.{ts,tsx}";
+/**
+ * Count actual call sites (not just files) that reference the given symbol.
+ * Uses `git grep -c` which returns `filepath:count` per matching file.
+ * Excludes the defining file itself.
+ */
+function callSiteCount(file: string): number {
+  const { symbol, searchPath, glob } = searchContext(file);
 
   const r = spawnSync(
+    "git",
+    ["grep", "-c", "--", symbol, `${searchPath}/**/${glob}`],
+    { cwd: projectDir, encoding: "utf8" }
+  );
+
+  let total = 0;
+  for (const line of (r.stdout ?? "").split("\n").filter(Boolean)) {
+    // Format: "filepath:count"
+    const colonIdx = line.lastIndexOf(":");
+    if (colonIdx < 0) continue;
+    const matchFile = line.slice(0, colonIdx);
+    const count = parseInt(line.slice(colonIdx + 1), 10) || 0;
+    // Exclude the defining file itself
+    if (matchFile.endsWith(file)) continue;
+    total += count;
+  }
+  return total;
+}
+
+/**
+ * Count unique files reachable within 2 hops of the given file.
+ * Hop 1: files that reference this file's symbol (direct callers).
+ * Hop 2: for each direct caller, files that reference the caller's symbol.
+ * Returns the total unique file count across both hops (excluding self and specs).
+ */
+function twoHopCallerCount(file: string): number {
+  const { symbol, searchPath, glob } = searchContext(file);
+
+  // Hop 1: direct callers
+  const r1 = spawnSync(
     "git",
     ["grep", "-l", "--", symbol, `${searchPath}/**/${glob}`],
     { cwd: projectDir, encoding: "utf8" }
   );
 
-  const matches = (r.stdout ?? "").split("\n").filter(Boolean);
-  // Subtract 1 if the file itself appears (it defines the symbol)
-  const selfCount = matches.filter((m) => m.endsWith(file)).length;
-  return Math.max(0, matches.length - selfCount);
+  const directCallers = (r1.stdout ?? "").split("\n").filter(Boolean)
+    .filter((f) => !f.endsWith(file));  // exclude self
+
+  if (directCallers.length === 0) return 0;
+
+  // Hop 2: callers of callers
+  const allFiles = new Set(directCallers);
+
+  for (const caller of directCallers) {
+    // Skip spec files — they don't propagate risk
+    if (caller.includes("/spec/") || caller.includes("/test/") || caller.includes(".test.") || caller.includes("_spec.")) continue;
+
+    const callerSymbol = path.basename(caller, path.extname(caller));
+    const r2 = spawnSync(
+      "git",
+      ["grep", "-l", "--", callerSymbol, `${searchPath}/**/${glob}`],
+      { cwd: projectDir, encoding: "utf8" }
+    );
+
+    for (const hop2File of (r2.stdout ?? "").split("\n").filter(Boolean)) {
+      if (!hop2File.endsWith(caller)) {  // exclude the hop-1 file itself
+        allFiles.add(hop2File);
+      }
+    }
+  }
+
+  // Remove self from the union
+  allFiles.delete(file);
+  return allFiles.size;
 }
 
 // ─── Spec lookup ──────────────────────────────────────────────────────────────
@@ -224,15 +286,82 @@ function findFirst(dir: string, filename: string): string | null {
   return null;
 }
 
-/** Heuristic: does the spec reference the module/class name at least once? */
-function specCoversFile(specPath: string, file: string): boolean {
-  const basename = path.basename(file, path.extname(file));
+/**
+ * Extract method/function names from a unified diff.
+ * Ruby:  lines starting with `+` followed by `def method_name`
+ * TS/JS: lines starting with `+` followed by `export function/const name` or `function name`
+ */
+function extractChangedMethods(diff: string, file: string): string[] {
+  const methods: string[] = [];
+  const isRuby = file.endsWith(".rb");
+
+  for (const line of diff.split("\n")) {
+    if (!line.startsWith("+") || line.startsWith("+++")) continue;
+
+    if (isRuby) {
+      // Match: def method_name  or  def self.method_name
+      const m = line.match(/^\+\s*def\s+(?:self\.)?(\w+)/);
+      if (m) methods.push(m[1]);
+    } else {
+      // Match: export function name  /  export const name  /  function name
+      const m = line.match(/^\+\s*(?:export\s+)?(?:function|const|let)\s+(\w+)/);
+      if (m) methods.push(m[1]);
+    }
+  }
+  return [...new Set(methods)];
+}
+
+/**
+ * Check which changed methods are covered by the spec file.
+ * For Ruby specs: looks for `describe '#method_name'`, `describe '.method_name'`,
+ *   or bare method name references in the spec content.
+ * For TS/JS tests: looks for import statements, describe blocks, or bare name references.
+ * Returns the list of methods that ARE covered.
+ */
+function specCoveredMethods(specPath: string, methods: string[]): string[] {
+  if (methods.length === 0) return [];
   try {
     const content = fs.readFileSync(specPath, "utf8");
-    return content.includes(basename);
+    return methods.filter((m) => {
+      // RSpec patterns: describe '#method' or describe '.method' or bare reference
+      // Vitest patterns: import { method }, describe('method'), test('method'), or bare reference
+      return content.includes(m);
+    });
   } catch {
-    return false;
+    return [];
   }
+}
+
+/**
+ * Compute coverage score based on changed methods and spec coverage.
+ *   no spec file       → 15 pts (maximum penalty)
+ *   spec exists, no methods changed → 0 pts (nothing to check)
+ *   all methods covered → 0 pts
+ *   some methods covered → 4 pts
+ *   no methods covered  → 7 pts
+ *   spec exists but doesn't reference file at all → 10 pts
+ */
+function methodCoverageScore(
+  hasSpec: boolean,
+  specPath: string | null,
+  methodsChanged: string[],
+  methodsCovered: string[],
+  file: string,
+): number {
+  if (!hasSpec) return 15;
+  if (methodsChanged.length === 0) {
+    // No methods extracted from the diff — fall back to filename heuristic
+    const basename = path.basename(file, path.extname(file));
+    try {
+      const content = fs.readFileSync(specPath!, "utf8");
+      return content.includes(basename) ? 0 : 10;
+    } catch {
+      return 10;
+    }
+  }
+  if (methodsCovered.length === methodsChanged.length) return 0;
+  if (methodsCovered.length > 0) return 4;
+  return 7;
 }
 
 // ─── Hard flag detection ──────────────────────────────────────────────────────
@@ -283,20 +412,24 @@ function main(): void {
   const allFlags: string[] = [];
 
   for (const file of files) {
-    const tier     = resolveTier(file);
-    const stats    = numstat.get(file) ?? { added: 0, removed: 0 };
-    const churn    = churnIn90Days(file);
-    const callers  = callerCount(file);
-    const specPath = findSpec(file);
-    const hasSpec  = specPath !== null;
-    const hasMatch = hasSpec ? specCoversFile(specPath!, file) : false;
-    const diff     = fileDiff(file, refRange);
-    const flags    = hardFlags(file, diff, hasSpec);
+    const tier       = resolveTier(file);
+    const stats      = numstat.get(file) ?? { added: 0, removed: 0 };
+    const churn      = churnIn90Days(file);
+    const callSites  = callSiteCount(file);
+    const twoHop     = twoHopCallerCount(file);
+    const specPath   = findSpec(file);
+    const hasSpec    = specPath !== null;
+    const diff       = fileDiff(file, refRange);
+    const methods    = extractChangedMethods(diff, file);
+    const covered    = hasSpec ? specCoveredMethods(specPath!, methods) : [];
+    const flags      = hardFlags(file, diff, hasSpec);
 
     const tScore   = tier.weight;
-    const cScore   = callerScore(callers);
+    // Use the higher signal: actual call sites or 2-hop unique file count
+    const effectiveCallers = Math.max(callSites, twoHop);
+    const cScore   = callerScore(effectiveCallers);
     const chScore  = churnScore(churn);
-    const covScore = coverageScore(hasSpec, hasMatch);
+    const covScore = methodCoverageScore(hasSpec, specPath, methods, covered, file);
 
     let score = Math.min(100, tScore + cScore + chScore + covScore);
 
@@ -311,19 +444,23 @@ function main(): void {
     fileRisks.push({
       file, tier: tier.name, tier_score: tScore,
       diff: { lines_added: stats.added, lines_removed: stats.removed },
-      direct_callers: callers, caller_score: cScore,
+      direct_call_sites: callSites, two_hop_callers: twoHop, caller_score: cScore,
       churn_90d: churn, churn_score: chScore,
       has_spec: hasSpec, spec_path: specPath,
-      spec_has_method_match: hasMatch, coverage_score: covScore,
+      methods_changed: methods, methods_covered: covered, coverage_score: covScore,
       hard_flags: flags, total_score: score, risk_level: toRiskLevel(score),
     });
   }
 
   fileRisks.sort((a, b) => b.total_score - a.total_score);
 
-  const topScore    = fileRisks[0]?.total_score ?? 0;
-  const overallRisk = toRiskLevel(topScore);
-  const uniqueFlags = [...new Set(allFlags)];
+  // Volume-aware aggregation: max file score + bonus for breadth of risk
+  const topScore       = fileRisks[0]?.total_score ?? 0;
+  const mediumOrAbove  = fileRisks.filter((f) => f.total_score >= 40).length;
+  const volumeBonus    = Math.min(10, mediumOrAbove * 2);
+  const aggregateScore = Math.min(100, topScore + volumeBonus);
+  const overallRisk    = toRiskLevel(aggregateScore);
+  const uniqueFlags    = [...new Set(allFlags)];
   const shouldEscalate = overallRisk === "HIGH" || overallRisk === "CRITICAL" || uniqueFlags.length > 0;
 
   const reasons: string[] = [];
@@ -331,12 +468,12 @@ function main(): void {
   if (uniqueFlags.includes("authorize_changed"))   reasons.push("Authorization boundary (authorize!) changed");
   if (uniqueFlags.includes("destructive_bulk_op")) reasons.push("Destructive bulk operation (destroy_all/delete_all)");
   if (uniqueFlags.includes("policy_no_spec"))      reasons.push("Policy file changed without spec coverage");
-  if (reasons.length === 0 && shouldEscalate)      reasons.push(`Overall score ${topScore} ≥ ${overallRisk === "CRITICAL" ? 90 : 70}`);
+  if (reasons.length === 0 && shouldEscalate)      reasons.push(`Overall score ${aggregateScore} ≥ ${overallRisk === "CRITICAL" ? 90 : 70}`);
 
   const report: RiskReport = {
     ref_range: refRange,
     files_changed: files.length,
-    overall_score: topScore,
+    overall_score: aggregateScore,
     overall_risk: overallRisk,
     escalate_to_advisor: shouldEscalate,
     escalation_reason: reasons.length > 0 ? reasons.join("; ") : null,
