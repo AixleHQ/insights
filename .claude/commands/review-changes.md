@@ -25,7 +25,13 @@ Parse the JSON output. It contains:
 
 ### Step 2 — Advisor escalation (tripwire)
 
-**If `escalate_to_advisor` is true**, spawn an Opus advisor BEFORE writing the report:
+**If `escalate_to_advisor` is true**, print the Opus banner first, then spawn the advisor:
+
+```bash
+node --experimental-strip-types --no-warnings ${CLAUDE_PROJECT_DIR}/.claude/hooks/model-indicator.ts opus
+```
+
+Then spawn the advisor:
 
 ```
 Spawn Agent(model=opus):

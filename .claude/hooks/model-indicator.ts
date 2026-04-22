@@ -1,14 +1,23 @@
 /**
- * model-indicator.ts — PreToolUse hook for Claude Code
+ * model-indicator.ts — PreToolUse hook + direct banner printer
  *
- * Fires before every Agent tool call and prints a colored model indicator
- * directly in the Claude Code execution steps, making model switches visible.
+ * Two usage modes:
+ *
+ * 1. Hook mode (Claude Code PreToolUse on Agent):
+ *    Reads tool_input.model from stdin JSON and prints banner to stderr.
+ *    Registered in settings.json — fires automatically before every Agent spawn.
+ *
+ * 2. Direct mode (called explicitly from commands via Bash):
+ *    node --experimental-strip-types --no-warnings model-indicator.ts opus
+ *    Reads model from argv[2] and prints banner to stdout (visible in execution steps).
+ *
+ * Use direct mode in commands where the Opus escalation step should be visible:
+ *    node --experimental-strip-types --no-warnings ${CLAUDE_PROJECT_DIR}/.claude/hooks/model-indicator.ts opus
  *
  *   red    ⚑  OPUS ADVISOR      — model: opus
  *   orange ⚑  SONNET EXECUTOR   — model: sonnet (or unspecified)
  *   green  ⚑  HAIKU EXECUTOR    — model: haiku
  *
- * Input (stdin): { tool_name: "Agent", tool_input: { model?: string, ... } }
  * Runtime: Node.js 22+ with --experimental-strip-types (no dependencies).
  */
 
@@ -18,15 +27,37 @@ const GREEN  = "\x1b[1;32m";
 const DIM    = "\x1b[2;37m";
 const X      = "\x1b[0m";
 
-const MODELS: Record<string, { color: string; label: string }> = {
-  opus:   { color: RED,    label: "OPUS ADVISOR"    },
-  sonnet: { color: ORANGE, label: "SONNET EXECUTOR" },
-  haiku:  { color: GREEN,  label: "HAIKU EXECUTOR"  },
+const MODELS: Record<string, { color: string; label: string; detail: string }> = {
+  opus:   { color: RED,    label: "OPUS ADVISOR",    detail: "advisor escalation · risk HIGH/CRITICAL or hard flag" },
+  sonnet: { color: ORANGE, label: "SONNET EXECUTOR", detail: "standard executor"  },
+  haiku:  { color: GREEN,  label: "HAIKU EXECUTOR",  detail: "lightweight task"   },
 };
 
-async function main(): Promise<void> {
-  let model = "sonnet";
+function normalize(raw: string): string {
+  if (raw.includes("opus"))  return "opus";
+  if (raw.includes("haiku")) return "haiku";
+  return "sonnet";
+}
 
+function printBanner(model: string, toStdout: boolean): void {
+  const key = normalize(model);
+  const { color, label, detail } = MODELS[key];
+  const out = toStdout ? process.stdout : process.stderr;
+  out.write("\n");
+  out.write(`${color}⚑  ${label}${X}\n`);
+  out.write(`${DIM}   ${detail}${X}\n`);
+  out.write("\n");
+}
+
+async function main(): Promise<void> {
+  // Direct mode: argv[2] provided — called explicitly from a command/script
+  if (process.argv[2]) {
+    printBanner(process.argv[2], true /* stdout — visible in execution steps */);
+    return;
+  }
+
+  // Hook mode: read stdin JSON payload from Claude Code PreToolUse event
+  let model = "sonnet";
   if (!process.stdin.isTTY) {
     const chunks: Buffer[] = [];
     for await (const chunk of process.stdin as AsyncIterable<Buffer>) {
@@ -36,25 +67,13 @@ async function main(): Promise<void> {
     if (raw) {
       try {
         const payload = JSON.parse(raw) as {
-          tool_input?: { model?: string; description?: string };
+          tool_input?: { model?: string };
         };
         model = payload?.tool_input?.model ?? "sonnet";
       } catch { /* fall through */ }
     }
   }
-
-  // Normalize: strip version suffixes (e.g. "claude-opus-4-6" → "opus")
-  const key = model.includes("opus")
-    ? "opus"
-    : model.includes("haiku")
-    ? "haiku"
-    : "sonnet";
-
-  const { color, label } = MODELS[key];
-
-  process.stderr.write("\n");
-  process.stderr.write(`${color}⚑  ${label}${X}\n`);
-  process.stderr.write("\n");
+  printBanner(model, false /* stderr — hook output path */);
 }
 
 main().catch(() => process.exit(0));
