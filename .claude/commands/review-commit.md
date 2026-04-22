@@ -66,6 +66,21 @@ Skip if no JS/TS files changed.
 
 ---
 
+### Step 2.5 — Visual review (UI changes only)
+
+If any `.tsx` files under `packages/web/src/` are in the diff (components, pages, or UI hooks), spawn `ui-visual-reviewer` as a subagent before proceeding to Step 3.
+
+`ui-visual-reviewer` will:
+- Run Playwright if configured, or fall back to Claude_Preview.
+- Verify visual accuracy in light and dark themes.
+- Check feature behavior for key interactions.
+
+If `ui-visual-reviewer` returns failures, report them alongside the Step 3 findings — do not block Step 3.
+
+Skip this step if no `.tsx` files changed.
+
+---
+
 ### Step 3 — Code review of the diff
 
 Review both diffs and check for:

@@ -2,7 +2,7 @@
 description: Plan and execute safe refactoring using dependency analysis
 ---
 
-## Refactor Safely
+## Refactor Plan
 
 Use the knowledge graph to plan and execute refactoring with confidence.
 

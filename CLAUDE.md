@@ -1,5 +1,32 @@
 # DB90 Rails — Claude Code Guide
 
+> For a full guide to the Claude tooling (commands, agents, skills, hooks, workflows), see [AGENTS.md](AGENTS.md).
+
+## Executor / Advisor Pattern
+
+This project uses the [Advisor Strategy](https://claude.com/blog/the-advisor-strategy): Sonnet executes, Opus advises. This is the default behavior for all substantive work — it does not need to be wired per-command.
+
+**Escalate to Opus before proceeding when:**
+- Writing or modifying source files that others depend on (components, controllers, migrations, services, policies)
+- Making an architectural decision (new pattern, new abstraction, data model change, choosing between approaches)
+- A single task touches more than 3 files
+- You are uncertain which approach is correct
+
+**How to escalate:**
+```
+Spawn Agent(model=opus):
+  - What you are about to do
+  - The key decision point(s)
+  - Your proposed approach and any alternatives considered
+→ Execute within the guidance returned. Do not deviate without re-escalating.
+```
+
+**Do not escalate for:**
+- Reference lookups, explanations, or reading files
+- Single-file edits that follow an established pattern already in the codebase
+- Lint fixes, typo corrections, test additions matching existing patterns
+- Commands explicitly marked as reference-only (no file writes)
+
 ## Stack
 
 - Backend: Ruby (RSpec for tests)
@@ -47,10 +74,10 @@ All commands run from the repo root via `Makefile`.
   - Run tests with `make test-api` or `bundle exec rspec` from `packages/api/`.
   - Do not mock the database in integration/request specs — use real DB with transactions.
 - **Serializers**: Alba (not ActiveModelSerializers or Blueprinter).
-- **Authorization**: ActionPolicy (not Pundit or CanCan). Policies live in `app/policies/` and inherit from `ApplicationPolicy`. Always call `authorize!` at the start of controller actions.
+- **Authorization**: ActionPolicy (not Pundit or CanCan). Policies live in `app/policies/` and inherit from `ApplicationPolicy`. Always call `authorize!` at the start of controller actions. Enforced by the `actionpolicy-check` skill.
 - **Background jobs**: Sidekiq for standard async jobs (`app/jobs/`). Temporal.io for long-running, multi-step, or durable workflows — use Temporal when a job needs retries with state, human-in-the-loop steps, or orchestration across services.
 - **API-only**: No views or assets in the Rails app. All rendering is JSON.
-- **Swagger is mandatory**: Whenever you add or modify a controller action or route, update `packages/api/swagger/v1/swagger.yaml` in the same commit. The spec lives at that path and must stay in sync with the implementation at all times. This applies to new endpoints, changed response shapes, new query parameters, and removed endpoints.
+- **Swagger is mandatory**: Whenever you add or modify a controller action or route, update `packages/api/swagger/v1/swagger.yaml` in the same commit. The spec lives at that path and must stay in sync with the implementation at all times. This applies to new endpoints, changed response shapes, new query parameters, and removed endpoints. Enforced by the `swagger-sync` skill + `swagger-auditor` agent.
 
 ### Application Layer Conventions
 
@@ -126,15 +153,15 @@ Never branch from `staging` or `main`.
 
 Each ticket gets its own git worktree — a separate directory on its own branch, sharing the same repo history. This lets you work on multiple tickets simultaneously without switching branches.
 
-### Commands (use `/worktrees` skill)
+### Commands (use `/manage-worktrees` skill)
 
-| Step        | Command                                      | Where            |
-| ----------- | -------------------------------------------- | ---------------- |
-| 1. Create   | `/worktrees create a worktree for AIX-XX` | main repo        |
-| 2. Navigate | `/worktrees open worktree AIX-XX`         | main repo        |
-| 3. Open     | `cd <worktree-path> && claude`               | terminal         |
-| 4. Work     | commit + push normally                       | worktree session |
-| 5. Clean up | `/worktrees clean up worktree AIX-XX`     | main repo        |
+| Step        | Command                                             | Where            |
+| ----------- | --------------------------------------------------- | ---------------- |
+| 1. Create   | `/manage-worktrees create a worktree for AIX-XX` | main repo        |
+| 2. Navigate | `/manage-worktrees open worktree AIX-XX`         | main repo        |
+| 3. Open     | `cd <worktree-path> && claude`                      | terminal         |
+| 4. Work     | commit + push normally                              | worktree session |
+| 5. Clean up | `/manage-worktrees clean up worktree AIX-XX`     | main repo        |
 
 ### Directory structure
 
