@@ -6,6 +6,7 @@ export { AlertsPanel, type Alert } from "./AlertsPanel";
 export { ActivityHeatmap } from "./ActivityHeatmap";
 export { ToolUsageByDayChart } from "./ToolUsageByDayChart";
 export { ToolInsightsSection } from "./ToolInsightsSection";
+export { ToolModelCostChart } from "./ToolModelCostChart";
 export { ToolModelTable } from "./ToolModelTable";
 export { ToolUsersTable } from "./ToolUsersTable";
 export { ToolEventTypesTable } from "./ToolEventTypesTable";

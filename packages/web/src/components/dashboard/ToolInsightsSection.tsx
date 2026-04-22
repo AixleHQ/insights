@@ -16,17 +16,23 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import type { ChartConfig } from "@/components/ui/chart";
-import { Activity, DollarSign, Coins, Users } from "lucide-react";
+import { Activity, DollarSign, Coins, Users, RefreshCw, LayoutGrid } from "lucide-react";
+import { formatCost, formatTokens } from "@/lib/formatters";
+import type { Connector } from "@/lib/types";
 import {
   useToolOverview,
   useToolModels,
   useToolUsers,
   useToolDaily,
   useToolEventTypes,
+  useConnectors,
+  useConnectorSyncStatus,
+  useSyncConnector,
 } from "@/hooks/useApi";
 import { ToolModelTable } from "./ToolModelTable";
 import { ToolUsersTable } from "./ToolUsersTable";
 import { ToolEventTypesTable } from "./ToolEventTypesTable";
+import { ToolModelCostChart } from "./ToolModelCostChart";
 
 interface ToolInsightsSectionProps {
   orgId: string;
@@ -43,22 +49,15 @@ const trendChartConfig = {
   },
 } satisfies ChartConfig;
 
-function formatCost(n: number): string {
-  if (n === 0) return "$0.00";
-  if (n < 0.001) return `$${n.toFixed(6)}`;
-  if (n < 0.01) return `$${n.toFixed(4)}`;
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(n);
-}
-
-function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return String(n);
+function formatSyncTime(dateStr: string | null): string {
+  if (!dateStr) return "Never";
+  const d = new Date(dateStr);
+  return d.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 function formatDate(dateStr: string): string {
@@ -96,6 +95,135 @@ function StatCard({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function isActiveOpenRouterConnector(c: Connector): boolean {
+  const type = c.connectorType ?? c.connector_type;
+  const active = c.isActive ?? c.is_active;
+  return type === "openrouter" && !!active;
+}
+
+function SyncStatusSubsection({ orgId, connectorId }: { orgId: string; connectorId: string }) {
+  const { data: syncStatus, isLoading: isLoadingSync, isError: isSyncError } = useConnectorSyncStatus(orgId, connectorId);
+  const { mutate: syncConnector, isPending: isSyncing } = useSyncConnector();
+
+  function handleSyncNow() {
+    syncConnector({ orgId, connectorId });
+  }
+
+  if (isLoadingSync) {
+    return (
+      <div className="flex items-center gap-3 rounded-lg border bg-muted/40 px-4 py-3">
+        <Skeleton className="h-4 w-48" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/40 px-4 py-3">
+      <div className="space-y-0.5">
+        <p className="text-sm font-medium">Data Sync</p>
+        {isSyncError ? (
+          <p className="text-xs text-destructive">Unable to fetch sync status.</p>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Last synced: {formatSyncTime(syncStatus?.last_sync_at ?? null)}
+            {syncStatus?.status === "error" && syncStatus.last_error && (
+              <span className="ml-2 text-destructive">— {syncStatus.last_error}</span>
+            )}
+          </p>
+        )}
+      </div>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={handleSyncNow}
+        disabled={isSyncing}
+        className="h-8 gap-1.5"
+      >
+        <RefreshCw className={`size-3.5 ${isSyncing ? "animate-spin" : ""}`} />
+        {isSyncing ? "Syncing…" : "Sync Now"}
+      </Button>
+    </div>
+  );
+}
+
+function OpenRouterTabContent({ orgId, days }: { orgId: string; days: number }) {
+  const { data: connectorsResp } = useConnectors(orgId);
+  const { data: dailyResp, isLoading: isLoadingDaily } = useToolDaily(orgId, "openrouter_api", days);
+  const { data: modelsResp, isLoading: isLoadingModels } = useToolModels(orgId, "openrouter_api", days);
+  const { data: usersResp, isLoading: isLoadingUsers } = useToolUsers(orgId, "openrouter_api", days);
+
+  const activeOpenRouterConnector = connectorsResp?.find(isActiveOpenRouterConnector);
+
+  const daily = dailyResp?.daily ?? [];
+  const models = modelsResp?.models ?? [];
+  const users = usersResp?.users ?? [];
+
+  const totalEvents = daily.reduce((s, d) => s + d.eventCount, 0);
+  const totalCost = daily.reduce((s, d) => s + d.costUsd, 0);
+  const activeUsers = users.length;
+  const modelsUsed = models.length;
+
+  if (!isLoadingDaily && totalEvents === 0) {
+    return (
+      <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
+        No OpenRouter events in the last {days} days.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 mt-4">
+      {/* Sync status — only shown when an active OpenRouter connector exists */}
+      {activeOpenRouterConnector && (
+        <SyncStatusSubsection orgId={orgId} connectorId={activeOpenRouterConnector.id} />
+      )}
+
+      {/* Overview metric cards */}
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
+        <StatCard
+          title="Total Events"
+          value={totalEvents.toLocaleString()}
+          icon={Activity}
+          isLoading={isLoadingDaily}
+        />
+        <StatCard
+          title="Total Cost"
+          value={formatCost(totalCost)}
+          icon={DollarSign}
+          isLoading={isLoadingDaily}
+        />
+        <StatCard
+          title="Models Used"
+          value={String(modelsUsed)}
+          icon={LayoutGrid}
+          isLoading={isLoadingModels}
+        />
+        <StatCard
+          title="Active Users"
+          value={String(activeUsers)}
+          icon={Users}
+          isLoading={isLoadingUsers}
+        />
+      </div>
+
+      {/* Cost by model chart */}
+      <ToolModelCostChart models={models} isLoading={isLoadingModels} />
+
+      {/* Full model table */}
+      <div className="space-y-2">
+        <h4 className="text-sm font-medium text-muted-foreground">Model Breakdown</h4>
+        <ToolModelTable models={models} isLoading={isLoadingModels} />
+      </div>
+
+      {/* Users table */}
+      <div className="space-y-2">
+        <h4 className="text-sm font-medium text-muted-foreground">Top Users</h4>
+        <ToolUsersTable users={users} isLoading={isLoadingUsers} />
+      </div>
+    </div>
   );
 }
 
@@ -298,9 +426,7 @@ export function ToolInsightsSection({ orgId, days, onDaysChange }: ToolInsightsS
 
           {openrouterHasData && (
             <TabsContent value="openrouter_api">
-              <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-                OpenRouter insights coming soon.
-              </div>
+              <OpenRouterTabContent orgId={orgId} days={days} />
             </TabsContent>
           )}
         </Tabs>
