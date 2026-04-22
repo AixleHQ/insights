@@ -15,3 +15,7 @@ export function formatTokens(n: number): string {
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return String(n);
 }
+
+export function truncateModelName(name: string): string {
+  return name.length > 30 ? `${name.slice(0, 30)}…` : name;
+}

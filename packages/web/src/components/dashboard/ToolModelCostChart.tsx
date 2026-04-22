@@ -8,7 +8,7 @@ import {
 import type { ChartConfig } from "@/components/ui/chart";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ToolModelStat } from "@/lib/types";
-import { formatCost } from "@/lib/formatters";
+import { formatCost, truncateModelName } from "@/lib/formatters";
 
 interface ToolModelCostChartProps {
   models: ToolModelStat[];
@@ -22,16 +22,12 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-function truncateName(name: string): string {
-  return name.length > 30 ? `${name.slice(0, 30)}…` : name;
-}
-
 export function ToolModelCostChart({ models, isLoading }: ToolModelCostChartProps) {
   const chartData = [...models]
     .sort((a, b) => b.costUsd - a.costUsd)
     .slice(0, 10)
     .map((m) => ({
-      name: truncateName(m.name),
+      name: truncateModelName(m.name),
       costUsd: m.costUsd,
     }));
 

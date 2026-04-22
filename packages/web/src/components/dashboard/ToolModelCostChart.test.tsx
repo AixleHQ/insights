@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@/test/utils";
 import { ToolModelCostChart } from "./ToolModelCostChart";
+import { truncateModelName } from "@/lib/formatters";
 import type { ToolModelStat } from "@/lib/types";
 
 vi.mock("recharts", () => ({
@@ -69,11 +70,27 @@ describe("ToolModelCostChart", () => {
   });
 
   it("truncates model names longer than 30 chars", () => {
-    // We test the internal truncate logic via exported helper indirectly
-    // by passing a long name and verifying the component renders
     const longName = "a".repeat(35);
     const models = [makeModel(longName, 1.0)];
     render(<ToolModelCostChart models={models} isLoading={false} />);
     expect(screen.getByTestId("chart")).toBeInTheDocument();
+  });
+});
+
+describe("truncateModelName", () => {
+  it("returns the name unchanged when 30 chars or fewer", () => {
+    expect(truncateModelName("gpt-4o")).toBe("gpt-4o");
+    expect(truncateModelName("a".repeat(30))).toBe("a".repeat(30));
+  });
+
+  it("truncates to 30 chars + ellipsis when longer than 30 chars", () => {
+    const long = "a".repeat(35);
+    expect(truncateModelName(long)).toBe("a".repeat(30) + "…");
+  });
+
+  it("truncates a realistic long model name", () => {
+    const name = "anthropic/claude-3-5-sonnet-20241022";
+    expect(truncateModelName(name)).toBe("anthropic/claude-3-5-sonnet-20" + "…");
+    expect(truncateModelName(name).length).toBe(31); // 30 chars + ellipsis char
   });
 });
