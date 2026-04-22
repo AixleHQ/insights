@@ -241,7 +241,7 @@ function hardFlags(file: string, diff: string, hasSpec: boolean): string[] {
   const flags: string[] = [];
   if (file.includes("db/migrate/"))                            flags.push("migration_file");
   if (file.endsWith(".rb") && /authorize!/.test(diff))         flags.push("authorize_changed");
-  if (/destroy_all|delete_all/.test(diff))                     flags.push("destructive_bulk_op");
+  if (file.endsWith(".rb") && /destroy_all|delete_all/.test(diff)) flags.push("destructive_bulk_op");
   if (file.includes("app/policies/") && !hasSpec)              flags.push("policy_no_spec");
   return flags;
 }
