@@ -90,7 +90,11 @@ Anthropic's Advisor Strategy (Sonnet executor + Opus advisor) promises Opus qual
 │   ├── design-system-guide/SKILL.md # auto-triggered — components/ui/**
 │   └── swagger-sync/SKILL.md        # auto-triggered — controllers/routes
 ├── hooks/
-│   └── on-edit-lint.ts           # PostToolUse: ESLint/RuboCop on edited file (Node.js, cross-platform)
+│   ├── on-edit-lint.ts           # PostToolUse: ESLint/RuboCop on edited file + Haiku banner (Node.js, cross-platform)
+│   └── model-indicator.ts        # PreToolUse(Agent): colored model banner (Opus=red, Sonnet=orange, Haiku=green)
+├── scripts/
+│   ├── risk-score.ts             # Deterministic risk scorer — tier + callers + churn + spec → JSON
+│   └── convention-check.ts       # Branch name + commit message format checker (Haiku task)
 ├── settings.json                 # committed, portable (DB90_COACHING=true default)
 └── settings.local.json           # gitignored, per-dev overrides
 ```
@@ -109,7 +113,7 @@ Type `/` in Claude Code to see them all autocomplete. Not sure which to use? Jus
 | `/onboard` | *"I'm new, walk me through this"* | — (guided) |
 | `/review-architecture` | Before a big PR — deep architectural review | Reviewer agents |
 | `/review-commit` | Pre-push sanity check | Reviewer agents |
-| `/review-changes` | Structured review using git diff and grep-based impact tracing | Reviewer agents |
+| `/review-changes` | Risk-scored review: runs `risk-score.ts` (tier + callers + churn + spec) → escalates HIGH/CRITICAL to Opus advisor | Reviewer agents |
 | `/debug-issue` | Hunting a specific bug | — |
 | `/explore-codebase` | Onboarding to an unfamiliar area | — |
 | `/refactor-plan` | Planning a rename/extract before you touch code | — |
@@ -174,7 +178,8 @@ flowchart LR
 
 Triggered by Claude Code events, not the model. Run shell commands; output is visible to Claude but side effects (e.g. RuboCop auto-correct) apply immediately.
 
-- `PostToolUse` on `Edit|Write` → `on-edit-lint.ts` runs ESLint/RuboCop on just the edited file (Node.js, cross-platform — works on Windows, macOS, and Linux).
+- `PostToolUse` on `Edit|Write` → `on-edit-lint.ts` runs ESLint/RuboCop on just the edited file and prints a **green Haiku banner** to stderr so you can see the lightweight executor is active (Node.js, cross-platform — works on Windows, macOS, and Linux).
+- `PreToolUse` on `Agent` → `model-indicator.ts` prints a colored model banner before every agent spawn: **red = Opus advisor**, **orange = Sonnet executor**, **green = Haiku executor**. Makes model switches visible directly in the Claude Code execution steps.
 - Pre-approved Bash permissions remove prompt fatigue for safe commands.
 
 ---
@@ -377,7 +382,7 @@ claude
 3. Claude edits the page; TanStack Query handles fetching.
 4. `on-edit-lint` hook runs ESLint automatically.
 5. Manually verify in browser at `http://localhost:5173`.
-6. `/review-changes` before pushing — structured review of changes.
+6. `/review-changes` before pushing — risk-scored review (runs `risk-score.ts`, escalates to Opus if HIGH/CRITICAL).
 
 ### D. Debug a bug
 
@@ -394,7 +399,7 @@ claude
 ### F. Pre-PR architecture review
 
 1. `/review-architecture` — deep dive on maintainability, security, performance.
-2. `/review-changes` — structured review of changes.
+2. `/review-changes` — risk-scored review (runs `risk-score.ts`, escalates to Opus if HIGH/CRITICAL).
 3. `/review-commit` — lint + test context.
 4. All three together before a non-trivial PR.
 

@@ -17,6 +17,17 @@
     ]
   },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node --experimental-strip-types --no-warnings ${CLAUDE_PROJECT_DIR}/.claude/hooks/model-indicator.ts"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write",

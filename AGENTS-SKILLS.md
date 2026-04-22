@@ -48,8 +48,8 @@ The `component-builder` agent is the clearest example of this pattern in action 
 | `/implement-design` | Command | `/implement-design <figma-url>` | 7-step workflow: fetch Figma design → download assets → implement in project conventions → validate visual parity |
 | `/tailwind-v4-shadcn` | Command | `/tailwind-v4-shadcn` | Reference guide for Tailwind v4 + shadcn/ui setup and v4 migration pitfalls |
 | `/review-architecture` | Command | `/review-architecture` | Deep architectural review (Staff Engineer lens): maintainability, security, performance across backend and frontend |
-| `/review-commit` | Command | `/review-commit` | Pre-push gate: runs linters, tests, spawns swagger-auditor and ui-visual-reviewer as needed; reports READY TO PUSH or BLOCK |
-| `/review-changes` | Command | `/review-changes` | Structured review using git diff, file reading, and grep-based impact tracing |
+| `/review-commit` | Command | `/review-commit` | Pre-push gate: Step 0 runs `convention-check.ts` (branch + commit format); then linters, tests, swagger-auditor, ui-visual-reviewer; reports READY TO PUSH or BLOCK |
+| `/review-changes` | Command | `/review-changes` | Risk-scored review via `risk-score.ts`: weighted score per file (tier + callers + churn + spec) → Opus advisor if HIGH/CRITICAL |
 | `/typescript-react-reviewer` | Command | `/typescript-react-reviewer` | TypeScript + React 19 specific review: critical bugs, anti-patterns, strict TS, React 19 pitfalls |
 | `/debug-issue` | Command | `/debug-issue` | Systematic debugging: grep for symbols → trace call sites → read files → check recent commits → find test coverage |
 | `/explore-codebase` | Command | `/explore-codebase` | Codebase navigation using Glob for file discovery, Grep for symbols, Read for file content |
@@ -66,7 +66,8 @@ The `component-builder` agent is the clearest example of this pattern in action 
 | `swagger-sync` | Skill | Edit `controllers/**` or `routes.rb` | Injects the Swagger hard-rule: update `swagger.yaml` in the same commit |
 | `actionpolicy-check` | Skill | Edit any `*_controller.rb` | Injects the `authorize!` requirement at the top of every controller action |
 | `design-system-guide` | Skill | Edit `packages/web/src/components/ui/**` | Injects token rules (no raw hex), dark mode parity, a11y requirements, Figma MCP hooks |
-| `on-edit-lint` | Hook | Every `Edit` or `Write` tool call | Runs `bundle exec rubocop` on `.rb` files; `npx eslint` on `.ts/.tsx` files — advisory, always exits 0 |
+| `on-edit-lint` | Hook | Every `Edit` or `Write` tool call | Prints green Haiku banner; runs `bundle exec rubocop` on `.rb` files; `npx eslint` on `.ts/.tsx` files — advisory, always exits 0 |
+| `model-indicator` | Hook | Every `Agent` tool call (PreToolUse) | Prints colored model banner to stderr: red = Opus advisor, orange = Sonnet executor, green = Haiku executor |
 
 ---
 
@@ -264,9 +265,10 @@ Deep architectural review of all changes since `develop`, through the lens of ma
 **Deliverable:** CRITICAL/HIGH/MEDIUM/LOW findings with Verdict. More thorough than `/review-commit` — use before significant PRs.
 
 **`/review-changes`**  
-Structured review using git diff, file reading, and grep-based impact tracing.  
-**Steps:** `git diff` → Read changed files → Grep for callers → coverage check → test case suggestions  
-**Deliverable:** Risk-scored change analysis with blast radius and test coverage gaps.
+Deterministic risk-scored review powered by `.claude/scripts/risk-score.ts`.  
+**Steps:** run scorer (tier + caller count + 90d churn + spec coverage) → escalate to Opus if HIGH/CRITICAL or hard flag fires → read diff → write report  
+**Hard flags:** migration file, authorize! change, destroy_all/delete_all, policy with no spec — always force HIGH or CRITICAL regardless of score.  
+**Deliverable:** Per-file score breakdown + grouped findings (CRITICAL/HIGH/MEDIUM/LOW) + merge verdict.
 
 **`/typescript-react-reviewer`**  
 TypeScript + React 19 specific review: critical bugs, anti-patterns, strict TS violations.  
@@ -355,15 +357,18 @@ Skills are context fragments loaded automatically by the harness when you edit s
 
 ## Hooks
 
-Hooks run silently via the harness `PostToolUse` event. They are registered in `.claude/settings.json` and run outside Claude's context.
+Hooks run silently via the harness events. They are registered in `.claude/settings.json` and run outside Claude's context.
 
 | Hook | Event | Trigger | What it runs | Blocking? |
 |------|-------|---------|-------------|-----------|
-| `on-edit-lint` | `PostToolUse` | Any `Edit` or `Write` tool call | `bundle exec rubocop --parallel <file>` for `.rb`; `npx eslint <file>` for `.ts/.tsx/.js/.jsx`; no-op for other types | No — always exits 0. Errors surface in Claude's context as findings. |
+| `on-edit-lint` | `PostToolUse` | Any `Edit` or `Write` tool call | Prints green Haiku banner to stderr; then `bundle exec rubocop --parallel <file>` for `.rb`; `npx eslint <file>` for `.ts/.tsx/.js/.jsx`; no-op for other types | No — always exits 0. Errors surface in Claude's context as findings. |
+| `model-indicator` | `PreToolUse` | Any `Agent` tool call | Reads `tool_input.model`, normalizes version suffix, prints colored banner to stderr: `⚑  OPUS ADVISOR` (red), `⚑  SONNET EXECUTOR` (orange), `⚑  HAIKU EXECUTOR` (green) | No — always exits 0. |
 
-**Implementation:** Node.js 22+ TypeScript (`.claude/hooks/on-edit-lint.ts`), no external dependencies, cross-platform (Windows/macOS/Linux).
+**Implementation:** All hooks are Node.js 22+ TypeScript (`.claude/hooks/*.ts`), no external dependencies, cross-platform (Windows/macOS/Linux).
 
-**Why it matters:** Catches lint errors immediately after each file save, before the full `/review-commit` run — tighter feedback loop with no extra steps.
+**Why `on-edit-lint` matters:** Catches lint errors immediately after each file save, before the full `/review-commit` run — tighter feedback loop with no extra steps.
+
+**Why `model-indicator` matters:** Makes model switches visible in the Claude Code execution steps without requiring any manual action. You always know when Opus is advising vs. Sonnet or Haiku executing.
 
 ---
 
@@ -509,6 +514,10 @@ To silence: add `"DB90_COACHING": "false"` to `.claude/settings.local.json` (git
 │   ├── discover-skills.md       # /discover-skills
 │   └── help-tooling.md          # /help-tooling
 ├── hooks/
-│   └── on-edit-lint.ts           # PostToolUse: lint on every file save
+│   ├── on-edit-lint.ts           # PostToolUse: Haiku banner + lint on every file save
+│   └── model-indicator.ts        # PreToolUse(Agent): colored model banner (Opus/Sonnet/Haiku)
+├── scripts/
+│   ├── risk-score.ts             # Deterministic risk scorer used by /review-changes
+│   └── convention-check.ts       # Branch + commit format checker used by /review-commit (Step 0)
 └── settings.json                 # Hook registration, permissions, DB90_COACHING
 ```

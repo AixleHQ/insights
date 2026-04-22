@@ -19,6 +19,16 @@ Review all changes on this branch before they are pushed. Run all steps in order
 
 ---
 
+### Step 0 — Convention check (Haiku)
+
+```bash
+node --experimental-strip-types --no-warnings ${CLAUDE_PROJECT_DIR}/.claude/scripts/convention-check.ts
+```
+
+Checks branch name and commit message format against DB90 conventions. Any failures appear in the final report as WARN — they do not block Steps 1–4.
+
+---
+
 ### Step 1 — Automated checks (run all in parallel)
 
 1. **RuboCop** — lint changed Ruby files:
