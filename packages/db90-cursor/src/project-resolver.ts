@@ -2,7 +2,7 @@ import { execSync } from "node:child_process";
 
 export interface ProjectResolution {
   projectId: string | null;
-  source: "flag" | "config" | "auto-detect" | "none";
+  source: "flag" | "config" | "auto-detect" | "auto-detect-not-found" | "none";
 }
 
 export interface LookupResult {
@@ -32,9 +32,9 @@ export async function resolveProjectId(
   if (gitRemote === null) return { projectId: null, source: "none" };
 
   const result = await lookupProjectByRemote(gitRemote, host, token, verbose);
-  return result !== null
-    ? { projectId: result.project_id, source: "auto-detect" }
-    : { projectId: null, source: "none" };
+  if (result === "not-found") return { projectId: null, source: "auto-detect-not-found" };
+  if (result !== null) return { projectId: result.project_id, source: "auto-detect" };
+  return { projectId: null, source: "none" };
 }
 
 export function getGitRemote(verbose: boolean): string | null {
@@ -56,13 +56,13 @@ export async function lookupProjectByRemote(
   host: string,
   token: string,
   verbose: boolean
-): Promise<LookupResult | null> {
+): Promise<LookupResult | "not-found" | null> {
   const url = `${host.replace(/\/$/, "")}/api/v1/projects/lookup?git_remote=${encodeURIComponent(gitRemote)}`;
   try {
     const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
     if (res.status === 404) {
       if (verbose) console.log(`[verbose] No project found for git remote: ${gitRemote}`);
-      return null;
+      return "not-found";
     }
     if (!res.ok) {
       if (verbose) console.log(`[verbose] Project lookup failed: HTTP ${res.status}`);

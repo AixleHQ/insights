@@ -77,7 +77,7 @@ describe("resolveProjectId", () => {
     expect(result.source).toBe("auto-detect");
   });
 
-  it("returns none when git remote resolves but API returns 404", async () => {
+  it("returns auto-detect-not-found when git remote resolves but API returns 404", async () => {
     mockExecSync.mockReturnValue("git@github.com:org/unknown.git\n" as unknown as Buffer);
     const mockFetch = vi.fn().mockResolvedValue({
       ok: false,
@@ -87,7 +87,7 @@ describe("resolveProjectId", () => {
 
     const result = await resolveProjectId(undefined, undefined, host, token, false);
     expect(result.projectId).toBeNull();
-    expect(result.source).toBe("none");
+    expect(result.source).toBe("auto-detect-not-found");
   });
 
   it("returns none when execSync throws (not a git repo)", async () => {
@@ -157,12 +157,12 @@ describe("lookupProjectByRemote", () => {
     expect(result).toEqual({ project_id: "proj-uuid", name: "Test Project" });
   });
 
-  it("returns null on 404", async () => {
+  it("returns not-found on 404", async () => {
     const mockFetch = vi.fn().mockResolvedValue({ ok: false, status: 404 });
     vi.stubGlobal("fetch", mockFetch);
 
     const result = await lookupProjectByRemote("git@github.com:org/repo.git", host, token, false);
-    expect(result).toBeNull();
+    expect(result).toBe("not-found");
   });
 
   it("returns null on non-ok non-404 response", async () => {

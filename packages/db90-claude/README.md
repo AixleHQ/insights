@@ -313,6 +313,15 @@ Add `project_id` to `~/.db90-claude/config.json`:
 
 If no flag or config value is set, the CLI runs `git remote get-url origin` in the current directory and calls `GET /api/v1/projects/lookup` to find a matching project. This requires the project to have a `git_remote_url` set in db90 that matches the repo's remote exactly (same protocol — SSH or HTTPS).
 
+If the git remote is found but no matching project exists in db90, the CLI exits with an error:
+
+```
+Error: No project found matching the git remote for this repository.
+Create one at https://app.db90.io/projects or pass --project-id <uuid> explicitly.
+```
+
+If there is no git remote at all (not in a git repo, or no `origin` configured), attribution is silently skipped and events are sent without a project ID.
+
 Use `--verbose` to see which source was used:
 
 ```

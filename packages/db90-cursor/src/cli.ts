@@ -154,6 +154,14 @@ async function main(): Promise<void> {
     token,
     cliArgs.verbose
   );
+  if (resolution.source === "auto-detect-not-found") {
+    console.error(
+      `Error: No project found matching the git remote for this repository.\n` +
+      `Create one at ${host}/projects or pass --project-id <uuid> explicitly.`
+    );
+    process.exit(1);
+  }
+
   if (cliArgs.verbose) {
     console.log(
       `[verbose] Project attribution: ${resolution.projectId ?? "none"} (source: ${resolution.source})`
