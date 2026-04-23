@@ -14,12 +14,15 @@ class Project < ApplicationRecord
   validates :name, presence: true
   validates :slug, presence: true, format: { with: /\A[a-z0-9]+(?:-[a-z0-9]+)*\z/, message: "must be lowercase alphanumeric with hyphens" }
   validates :is_active, inclusion: { in: [ true, false ] }
+  validates :git_remote_url, uniqueness: { scope: :organization_id, allow_nil: true }, if: -> { organization_id.present? }
+  validates :git_remote_url, uniqueness: { scope: :owner_id, allow_nil: true }, if: -> { owner_id.present? }
   validate :must_belong_to_org_or_owner
 
   after_create :create_default_retention_policy
 
   before_destroy :flag_as_being_destroyed, prepend: true
   before_validation :generate_slug, on: :create
+  before_validation :normalize_git_remote_url_field
 
   attr_reader :being_destroyed
 
@@ -35,7 +38,16 @@ class Project < ApplicationRecord
     organization_id.present?
   end
 
+  def self.normalize_git_remote(url)
+    return nil if url.blank?
+    url.strip.downcase.delete_suffix(".git")
+  end
+
   private
+
+  def normalize_git_remote_url_field
+    self.git_remote_url = self.class.normalize_git_remote(git_remote_url)
+  end
 
   def create_default_retention_policy
     create_retention_policy!

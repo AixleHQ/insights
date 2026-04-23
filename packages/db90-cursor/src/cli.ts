@@ -5,10 +5,12 @@ import { readState, writeState, APP_DIR } from "./state.js";
 import { readEvents, readDailyStats } from "./cursor-reader.js";
 import { mapEvent, mapDailyStats } from "./mapper.js";
 import { postEvents } from "./client.js";
+import { resolveProjectId } from "./project-resolver.js";
 
 interface Config {
   token?: string;
   host?: string;
+  project_id?: string;
 }
 
 function loadConfig(): Config {
@@ -20,6 +22,7 @@ function loadConfig(): Config {
       return {
         token: typeof obj.token === "string" ? obj.token : undefined,
         host: typeof obj.host === "string" ? obj.host : undefined,
+        project_id: typeof obj.project_id === "string" ? obj.project_id : undefined,
       };
     }
   } catch {
@@ -31,6 +34,7 @@ function loadConfig(): Config {
 export interface Args {
   token?: string;
   host?: string;
+  projectId?: string;
   dryRun: boolean;
   since?: string;
   verbose: boolean;
@@ -50,6 +54,9 @@ export function parseArgs(argv: string[]): Args {
       case "--host":
         result.host = args[++i];
         break;
+      case "--project-id":
+        result.projectId = args[++i];
+        break;
       case "--dry-run":
         result.dryRun = true;
         break;
@@ -67,6 +74,7 @@ export function parseArgs(argv: string[]): Args {
       default:
         if (arg.startsWith("--token=")) result.token = arg.slice(8);
         else if (arg.startsWith("--host=")) result.host = arg.slice(7);
+        else if (arg.startsWith("--project-id=")) result.projectId = arg.slice(13);
         else if (arg.startsWith("--since=")) result.since = arg.slice(8);
         break;
     }
@@ -83,15 +91,16 @@ Usage:
   db90-cursor --token <ingest-token> --host <db90-host> [options]
 
 Options:
-  --token <token>   db90 ingest token (or DB90_TOKEN env var)
-  --host <host>     db90 host URL (or DB90_HOST env var)
-  --dry-run         Print events without posting or updating state
-  --since <date>    Process events since this ISO date (overrides saved state)
-  --verbose, -v     Print Cursor DB paths, table names, and event counts
-  --help, -h        Show this help message
+  --token <token>      db90 ingest token (or DB90_TOKEN env var)
+  --host <host>        db90 host URL (or DB90_HOST env var)
+  --project-id <uuid>  Associate events with this project UUID
+  --dry-run            Print events without posting or updating state
+  --since <date>       Process events since this ISO date (overrides saved state)
+  --verbose, -v        Print Cursor DB paths, table names, and event counts
+  --help, -h           Show this help message
 
 Config file: ~/.db90-cursor/config.json
-  { "token": "...", "host": "https://app.db90.io" }
+  { "token": "...", "host": "https://app.db90.io", "project_id": "..." }
 `);
 }
 
@@ -138,16 +147,32 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  const resolution = await resolveProjectId(
+    cliArgs.projectId,
+    fileConfig.project_id,
+    host,
+    token,
+    cliArgs.verbose
+  );
+
+  if (cliArgs.verbose) {
+    console.log(
+      `[verbose] Project attribution: ${resolution.projectId ?? "none"} (source: ${resolution.source})`
+    );
+  }
+
   const { since, sinceFromState } = resolveSinceDate(cliArgs.since);
 
   const rawEvents = readEvents(since, undefined, cliArgs.verbose);
   const dailyStats = readDailyStats(since, undefined, cliArgs.verbose);
 
+  const projectId = resolution.projectId ?? undefined;
+
   const mappedFromEvents = rawEvents
-    .map(({ row, workspacePath }) => mapEvent(row, workspacePath))
+    .map(({ row, workspacePath }) => mapEvent(row, workspacePath, projectId))
     .filter((e): e is NonNullable<typeof e> => e !== null);
 
-  const mappedFromStats = dailyStats.flatMap((entry) => mapDailyStats(entry));
+  const mappedFromStats = dailyStats.flatMap((entry) => mapDailyStats(entry, projectId));
 
   const mappedEvents = [...mappedFromEvents, ...mappedFromStats];
 

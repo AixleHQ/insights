@@ -3,7 +3,7 @@
 module Api
   module V1
     class IngestController < ActionController::API
-      before_action :authenticate_by_token!
+      include IngestTokenAuthentication
 
       # POST /api/v1/ingest/events
       def create
@@ -22,6 +22,10 @@ module Api
         event_params[:tool_name] = @tool_account.tool_name
         event_params[:event_type] = event_params[:event_type].presence || "other"
 
+        # Strip project_id that is invalid or inaccessible — attribution is additive,
+        # never blocking.
+        strip_inaccessible_project_id!(event_params)
+
         raw_key = store_raw_event(request.raw_post, org)
         workflow_result = start_ingestion_workflow(raw_key, event_params, org)
 
@@ -36,13 +40,21 @@ module Api
 
       private
 
-      def authenticate_by_token!
-        auth_header = request.headers["Authorization"]
-        raw = auth_header&.start_with?("Bearer ") ? auth_header.delete_prefix("Bearer ").strip : nil
-        @tool_account = raw.present? ? UserToolAccount.find_by_ingest_token(raw) : nil
+      # Validate project_id belongs to the token's org or user's personal projects.
+      # Strips silently rather than rejecting — attribution is additive, never blocking.
+      def strip_inaccessible_project_id!(event_params)
+        pid = event_params[:project_id]
+        return unless pid.present?
 
-        unless @tool_account&.is_active? && @tool_account.organization.present?
-          render json: { error: "Unauthorized" }, status: :unauthorized
+        if pid !~ /\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/i
+          event_params.delete(:project_id)
+          Rails.logger.warn("[Ingest] project_id #{pid.inspect} is not a valid UUID — stripped")
+          return
+        end
+
+        unless accessible_projects.exists?(id: pid)
+          event_params.delete(:project_id)
+          Rails.logger.warn("[Ingest] project_id #{pid} not accessible — stripped")
         end
       end
 

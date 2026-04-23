@@ -134,7 +134,8 @@ Create `~/.db90-cursor/config.json`:
 ```json
 {
   "token": "your-ingest-token",
-  "host": "https://app.db90.io"
+  "host": "https://app.db90.io",
+  "project_id": "optional-project-uuid"
 }
 ```
 
@@ -144,6 +145,7 @@ Create `~/.db90-cursor/config.json`:
 |---|---|---|---|---|
 | Ingest token | `--token <token>` | `DB90_TOKEN` | `token` | db90 ingest token (required) |
 | db90 host | `--host <url>` | `DB90_HOST` | `host` | db90 host URL (required) |
+| Project ID | `--project-id <uuid>` | — | `project_id` | Associate events with a project (see [Project Attribution](#project-attribution)) |
 | Dry run | `--dry-run` | — | — | Print events without posting |
 | Since date | `--since <ISO date>` | — | — | Override saved state; process events since this date |
 | Verbose | `--verbose`, `-v` | — | — | Print DB paths, table names, and event counts |
@@ -245,6 +247,71 @@ Older Cursor versions stored per-request data in `workspaceStorage/**/cursor.db`
 3. Map each entry to the db90 ingest payload format
 4. POST each event to `{host}/api/v1/ingest/events` with your Bearer token
 5. On success, update the watermark to `max(occurred_at)` of sent events
+
+## Project Attribution
+
+Events can be attributed to a db90 project so they appear in project-scoped analytics. Resolution follows this priority order: **CLI flag > config file > git-remote auto-detect**.
+
+### Option 1 — CLI flag
+
+```bash
+db90-cursor --token <token> --host <host> --project-id <project-uuid>
+```
+
+### Option 2 — Config file
+
+Add `project_id` to `~/.db90-cursor/config.json`:
+
+```json
+{
+  "token": "your-ingest-token",
+  "host": "https://app.db90.io",
+  "project_id": "your-project-uuid"
+}
+```
+
+### Option 3 — Auto-detect from git remote
+
+If no flag or config value is set, the CLI runs `git remote get-url origin` in the current directory and calls `GET /api/v1/projects/lookup` to find a matching project. This requires the project to have a **Git Remote URL** set in db90 (via Project Settings) that matches the repo's remote. The `.git` suffix and casing are normalized automatically, so `git@github.com:org/repo.git` and `git@github.com:org/repo` both match.
+
+All lookup failures are non-blocking — events are always sent, just without project attribution:
+
+| Situation | Behavior |
+|---|---|
+| Git remote matches a db90 project | Events attributed to that project |
+| Git remote found but no matching project in db90 | Events sent without project attribution |
+| Not in a git repo or no `origin` remote | Events sent without project attribution |
+| Network error during lookup | Events sent without project attribution |
+
+Use `--verbose` to see which source was used:
+
+```
+[verbose] Project attribution: 3f2a1b... (source: auto-detect)
+[verbose] Project attribution: none (source: auto-detect-not-found)
+[verbose] Project attribution: none (source: none)
+```
+
+### Setup
+
+1. In the db90 app, open the project and go to **Settings → General**.
+2. Set the **Git Remote URL** field to the exact output of `git remote get-url origin` from your repo (e.g. `git@github.com:org/repo.git`).
+3. Save changes.
+4. Run the CLI from that repo — no extra flags needed:
+
+```bash
+cd ~/your-repo
+db90-cursor --token <token> --host <host> --dry-run --verbose
+# [verbose] Project attribution: <uuid> (source: auto-detect)
+```
+
+If the remote is found but no project matches, the CLI exits with:
+
+```
+Error: No project found matching the git remote for this repository.
+Create one at <host>/projects or pass --project-id <uuid> explicitly.
+```
+
+If you are not in a git repo (or there is no `origin` remote), attribution is skipped silently and events are sent without a project ID.
 
 ## Requirements
 

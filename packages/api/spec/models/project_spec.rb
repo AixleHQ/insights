@@ -34,6 +34,38 @@ RSpec.describe Project, type: :model do
     it { should allow_value(true).for(:is_active) }
     it { should allow_value(false).for(:is_active) }
 
+    context 'git_remote_url uniqueness' do
+      it 'allows the same git_remote_url in different organizations' do
+        url = 'git@github.com:org/repo.git'
+        create(:project, git_remote_url: url)
+        duplicate = build(:project, git_remote_url: url, organization: create(:organization))
+        expect(duplicate).to be_valid
+      end
+
+      it 'rejects duplicate git_remote_url within the same organization' do
+        org = create(:organization)
+        create(:project, organization: org, git_remote_url: 'git@github.com:org/repo.git')
+        duplicate = build(:project, organization: org, git_remote_url: 'git@github.com:org/repo.git')
+        expect(duplicate).not_to be_valid
+        expect(duplicate.errors[:git_remote_url]).to be_present
+      end
+
+      it 'rejects duplicate git_remote_url for the same personal owner' do
+        user = create(:user)
+        create(:project, :personal, owner: user, git_remote_url: 'git@github.com:user/repo.git')
+        duplicate = build(:project, :personal, owner: user, git_remote_url: 'git@github.com:user/repo.git')
+        expect(duplicate).not_to be_valid
+        expect(duplicate.errors[:git_remote_url]).to be_present
+      end
+
+      it 'allows nil git_remote_url in the same organization' do
+        org = create(:organization)
+        create(:project, organization: org, git_remote_url: nil)
+        second = build(:project, organization: org, git_remote_url: nil)
+        expect(second).to be_valid
+      end
+    end
+
     context 'organization or owner validation' do
       it 'is invalid without organization or owner' do
         project = build(:project, organization: nil, owner: nil)

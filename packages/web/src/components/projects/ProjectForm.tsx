@@ -12,6 +12,7 @@ export interface ProjectFormData {
   name: string;
   description?: string;
   repository_url?: string;
+  git_remote_url?: string;
   is_active: boolean;
 }
 
@@ -35,6 +36,7 @@ export function ProjectForm({
       name: "",
       description: "",
       repository_url: "",
+      git_remote_url: "",
       is_active: true,
     }
   );
@@ -157,6 +159,21 @@ export function ProjectForm({
               {errors.repository_url && (
                 <p className="text-xs text-destructive">{errors.repository_url}</p>
               )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="git_remote_url">Git Remote URL</Label>
+              <Input
+                id="git_remote_url"
+                placeholder="git@github.com:org/repo.git"
+                value={formData.git_remote_url || ""}
+                onChange={(e) => updateField("git_remote_url", e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Used by db90-claude and db90-cursor to auto-detect this project. Paste the output of{" "}
+                <code className="font-mono">git remote get-url origin</code>
+                {" "}— the <code className="font-mono">.git</code> suffix and casing are normalized automatically.
+              </p>
             </div>
 
             <div className="flex items-center justify-between rounded-lg border p-3">

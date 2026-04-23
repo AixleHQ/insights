@@ -1614,6 +1614,56 @@ paths:
           $ref: '#/components/responses/ValidationError'
 
   # ============================================
+  # PROJECT LOOKUP (ingest token auth)
+  # ============================================
+  /api/v1/projects/lookup:
+    get:
+      summary: Look up project by git remote URL
+      description: >
+        Returns a project matching the given git remote URL, scoped to projects
+        accessible by the ingest token's user (org projects + personal projects).
+        URL is normalized (lowercased, `.git` suffix stripped, whitespace trimmed)
+        before lookup. SSH and HTTPS variants are not interchangeable — the stored
+        value must match the exact protocol form of `git remote get-url origin`.
+        Used by CLI connectors for automatic project attribution.
+      tags:
+        - Projects
+      security:
+        - ingest_token_auth: []
+      parameters:
+        - name: git_remote
+          in: query
+          required: true
+          description: Git remote URL (e.g. git@github.com:org/repo.git)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Project found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      project_id:
+                        type: string
+                        format: uuid
+                      name:
+                        type: string
+                    required:
+                      - project_id
+                      - name
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================
   # PROJECT ENDPOINTS
   # ============================================
   /api/v1/projects:
@@ -1668,6 +1718,10 @@ paths:
                   type: string
                 description:
                   type: string
+                git_remote_url:
+                  type: string
+                  nullable: true
+                  description: Git remote URL used by CLI connectors for auto-detection (e.g. git@github.com:org/repo.git)
               required:
                 - name
       responses:
@@ -1733,6 +1787,10 @@ paths:
                   type: string
                 description:
                   type: string
+                git_remote_url:
+                  type: string
+                  nullable: true
+                  description: Git remote URL used by CLI connectors for auto-detection (e.g. git@github.com:org/repo.git)
               required:
                 - name
       responses:
@@ -1785,6 +1843,10 @@ paths:
                   type: string
                 is_active:
                   type: boolean
+                git_remote_url:
+                  type: string
+                  nullable: true
+                  description: Git remote URL used by CLI connectors for auto-detection (e.g. git@github.com:org/repo.git)
       responses:
         '200':
           description: Project updated
@@ -2168,6 +2230,10 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: JWT token from Keycloak authentication
+    ingest_token_auth:
+      type: http
+      scheme: bearer
+      description: Opaque ingest token issued per UserToolAccount (CLI connectors only)
 
   parameters:
     id:
@@ -2573,6 +2639,15 @@ components:
           nullable: true
         isActive:
           type: boolean
+        repositoryUrl:
+          type: string
+          nullable: true
+        gitRemoteUrl:
+          type: string
+          nullable: true
+          description: >
+            Git remote URL used for automatic project attribution by CLI connectors.
+            Stored in normalized form (lowercased, .git suffix stripped).
         organizationId:
           type: string
           format: uuid

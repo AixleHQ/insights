@@ -16,6 +16,7 @@ export interface Db90Payload {
   tokens_in: number;
   tokens_out: number;
   occurred_at: string;
+  project_id?: string;
   metadata: {
     cursor_session_id: string | null;
     workspace: string;
@@ -60,9 +61,10 @@ function buildPayload(
   tokensOut: number,
   occurredAt: string,
   dbPath: string,
-  model = "unknown"
+  model = "unknown",
+  projectId?: string
 ): Db90Payload {
-  return {
+  const payload: Db90Payload = {
     tool_name: "cursor",
     event_type: eventType,
     model,
@@ -71,6 +73,8 @@ function buildPayload(
     occurred_at: occurredAt,
     metadata: { cursor_session_id: null, workspace: dbPath },
   };
+  if (projectId) payload.project_id = projectId;
+  return payload;
 }
 
 /**
@@ -85,7 +89,7 @@ function buildPayload(
  * Older or future Cursor versions may use model-keyed token counts instead;
  * that layout is handled as a fallback.
  */
-export function mapDailyStats(entry: DailyStatsEntry): Db90Payload[] {
+export function mapDailyStats(entry: DailyStatsEntry, projectId?: string): Db90Payload[] {
   const { date, value, dbPath } = entry;
   const occurredAt = `${date}T00:00:00.000Z`;
   const results: Db90Payload[] = [];
@@ -100,10 +104,10 @@ export function mapDailyStats(entry: DailyStatsEntry): Db90Payload[] {
   const composerAccepted  = pick(obj, "composerAcceptedLines") ?? 0;
 
   if (tabSuggested > 0 || tabAccepted > 0)
-    results.push(buildPayload("completion", tabSuggested, tabAccepted, occurredAt, dbPath));
+    results.push(buildPayload("completion", tabSuggested, tabAccepted, occurredAt, dbPath, "unknown", projectId));
 
   if (composerSuggested > 0 || composerAccepted > 0)
-    results.push(buildPayload("chat", composerSuggested, composerAccepted, occurredAt, dbPath));
+    results.push(buildPayload("chat", composerSuggested, composerAccepted, occurredAt, dbPath, "unknown", projectId));
 
   if (results.length > 0) return results;
 
@@ -116,13 +120,13 @@ export function mapDailyStats(entry: DailyStatsEntry): Db90Payload[] {
     const tokensIn  = pick(stats, "inputTokens") ?? pick(stats, "promptTokens") ?? 0;
     const tokensOut = pick(stats, "outputTokens") ?? pick(stats, "generatedTokens") ?? 0;
     if (tokensIn === 0 && tokensOut === 0) continue;
-    results.push(buildPayload("chat", tokensIn, tokensOut, occurredAt, dbPath, model));
+    results.push(buildPayload("chat", tokensIn, tokensOut, occurredAt, dbPath, model, projectId));
   }
 
   return results;
 }
 
-export function mapEvent(row: CursorRow, workspacePath: string): Db90Payload | null {
+export function mapEvent(row: CursorRow, workspacePath: string, projectId?: string): Db90Payload | null {
   const occurredAt = toIsoString(row.timestamp);
   if (!occurredAt) return null;
 
@@ -131,7 +135,7 @@ export function mapEvent(row: CursorRow, workspacePath: string): Db90Payload | n
 
   const eventType: "completion" | "chat" = row.type === 1 ? "chat" : "completion";
 
-  return {
+  const payload: Db90Payload = {
     tool_name: "cursor",
     event_type: eventType,
     model,
@@ -143,4 +147,6 @@ export function mapEvent(row: CursorRow, workspacePath: string): Db90Payload | n
       workspace: workspacePath,
     },
   };
+  if (projectId) payload.project_id = projectId;
+  return payload;
 }

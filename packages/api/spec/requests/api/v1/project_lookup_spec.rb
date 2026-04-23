@@ -1,0 +1,121 @@
+# frozen_string_literal: true
+
+require 'rails_helper'
+
+RSpec.describe 'Api::V1::ProjectLookup', type: :request do
+  let(:organization) { create(:organization) }
+  let(:user) { create(:user) }
+  let!(:membership) { create(:organization_membership, user: user, organization: organization) }
+  let!(:tool_account) { create(:user_tool_account, organization_membership: membership, tool_name: 'cursor') }
+  let(:raw_token) { tool_account.plaintext_token }
+
+  # raw_url ends in .git; after normalization both sides match
+  let(:raw_url) { 'git@github.com:org/my-repo.git' }
+  let(:normalized_url) { Project.normalize_git_remote(raw_url) }
+
+  let!(:matched_project) do
+    create(:project, organization: organization, owner: nil,
+           git_remote_url: normalized_url)
+  end
+
+  def lookup_get(git_remote:, token: raw_token)
+    headers = {}
+    headers['Authorization'] = "Bearer #{token}" if token
+    get '/api/v1/projects/lookup', params: { git_remote: git_remote }, headers: headers
+  end
+
+  describe 'GET /api/v1/projects/lookup' do
+    context 'with a matching org project' do
+      it 'returns 200 with project_id and name' do
+        lookup_get(git_remote: raw_url)
+        expect(response).to have_http_status(:ok)
+        expect(json_data[:project_id]).to eq(matched_project.id)
+        expect(json_data[:name]).to eq(matched_project.name)
+      end
+    end
+
+    context 'with .git suffix difference (normalization)' do
+      it 'returns 200 when stored URL has no .git but query has .git' do
+        # matched_project already stored without .git (normalized).
+        # Query with the raw URL containing .git — normalization should unify them.
+        lookup_get(git_remote: raw_url)
+        expect(response).to have_http_status(:ok)
+        expect(json_data[:project_id]).to eq(matched_project.id)
+      end
+    end
+
+    context 'with a matching personal project' do
+      let!(:personal_project) do
+        create(:project, :personal, owner: user, organization: nil,
+               git_remote_url: Project.normalize_git_remote('git@github.com:user/personal.git'))
+      end
+
+      it 'returns 200' do
+        lookup_get(git_remote: 'git@github.com:user/personal.git')
+        expect(response).to have_http_status(:ok)
+        expect(json_data[:project_id]).to eq(personal_project.id)
+      end
+    end
+
+    context 'when no project matches' do
+      it 'returns 404' do
+        lookup_get(git_remote: 'git@github.com:org/unknown.git')
+        expect(response).to have_http_status(:not_found)
+      end
+    end
+
+    context 'when the matched project is inactive' do
+      let!(:inactive_project) do
+        create(:project, :inactive, organization: organization, owner: nil,
+               git_remote_url: Project.normalize_git_remote('git@github.com:org/inactive.git'))
+      end
+
+      it 'returns 404' do
+        lookup_get(git_remote: 'git@github.com:org/inactive.git')
+        expect(response).to have_http_status(:not_found)
+      end
+    end
+
+    context 'when git_remote param is missing' do
+      it 'returns 400' do
+        headers = { 'Authorization' => "Bearer #{raw_token}" }
+        get '/api/v1/projects/lookup', headers: headers
+        expect(response).to have_http_status(:bad_request)
+      end
+    end
+
+    context 'when git_remote param is blank' do
+      it 'returns 400' do
+        lookup_get(git_remote: '')
+        expect(response).to have_http_status(:bad_request)
+      end
+    end
+
+    context 'with no Authorization header' do
+      it 'returns 401' do
+        lookup_get(git_remote: raw_url, token: nil)
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    context 'with an invalid token' do
+      it 'returns 401' do
+        lookup_get(git_remote: raw_url, token: 'invalid-token')
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    context 'when project belongs to a different organization' do
+      let(:other_org) { create(:organization) }
+      let!(:other_project) do
+        create(:project, organization: other_org, owner: nil,
+               git_remote_url: Project.normalize_git_remote('git@github.com:other/repo.git'))
+      end
+
+      it 'returns 404 for cross-org project' do
+        lookup_get(git_remote: 'git@github.com:other/repo.git')
+        expect(response).to have_http_status(:not_found)
+      end
+    end
+  end
+end

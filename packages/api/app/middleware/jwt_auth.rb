@@ -14,7 +14,8 @@ class JwtAuth
     "/up",
     "/admin",
     "/api/internal",
-    "/api/v1/ingest"
+    "/api/v1/ingest",
+    "/api/v1/projects/lookup"
   ].freeze
 
   EXCLUDED_PATTERNS = [

@@ -229,5 +229,48 @@ RSpec.describe 'Api::V1::Ingest', type: :request do
         expect(event.tool_name).to eq('cursor')
       end
     end
+
+    context 'with project_id guard' do
+      let!(:accessible_project) do
+        create(:project, organization: organization, owner: nil)
+      end
+      let(:other_organization) { create(:organization) }
+      let!(:other_project) do
+        create(:project, organization: other_organization, owner: nil)
+      end
+
+      it 'passes project_id through when it belongs to the token org' do
+        ingest_post(payload: valid_payload.merge(project_id: accessible_project.id))
+        expect(response).to have_http_status(:accepted)
+        expect(Temporal::Client).to have_received(:start_workflow) do |_workflow, **kwargs|
+          expect(kwargs[:args][:event][:project_id]).to eq(accessible_project.id)
+        end
+      end
+
+      it 'strips project_id from workflow payload when it belongs to a different org' do
+        ingest_post(payload: valid_payload.merge(project_id: other_project.id))
+        expect(response).to have_http_status(:accepted)
+        expect(Temporal::Client).to have_received(:start_workflow) do |_workflow, **kwargs|
+          expect(kwargs[:args][:event][:project_id]).to be_nil
+        end
+      end
+
+      it 'strips malformed (non-UUID) project_id from workflow payload' do
+        ingest_post(payload: valid_payload.merge(project_id: 'not-a-uuid'))
+        expect(response).to have_http_status(:accepted)
+        expect(Temporal::Client).to have_received(:start_workflow) do |_workflow, **kwargs|
+          expect(kwargs[:args][:event][:project_id]).to be_nil
+        end
+      end
+
+      it 'passes project_id through when it belongs to the token user as a personal project' do
+        personal_project = create(:project, :personal, owner: user, organization: nil)
+        ingest_post(payload: valid_payload.merge(project_id: personal_project.id))
+        expect(response).to have_http_status(:accepted)
+        expect(Temporal::Client).to have_received(:start_workflow) do |_workflow, **kwargs|
+          expect(kwargs[:args][:event][:project_id]).to eq(personal_project.id)
+        end
+      end
+    end
   end
 end
