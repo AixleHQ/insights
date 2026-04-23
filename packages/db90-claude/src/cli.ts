@@ -222,7 +222,6 @@ async function main(): Promise<void> {
     cliArgs.verbose
   );
 
-
   if (cliArgs.verbose) {
     console.log(
       `[verbose] Project attribution: ${resolution.projectId ?? "none"} (source: ${resolution.source})`
