@@ -9689,6 +9689,13 @@ CREATE INDEX index_projects_on_git_remote_url ON public.projects USING btree (gi
 
 
 --
+-- Name: index_projects_on_org_and_git_remote_url; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_projects_on_org_and_git_remote_url ON public.projects USING btree (organization_id, git_remote_url) WHERE ((organization_id IS NOT NULL) AND (git_remote_url IS NOT NULL));
+
+
+--
 -- Name: index_projects_on_organization_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -9700,6 +9707,13 @@ CREATE INDEX index_projects_on_organization_id ON public.projects USING btree (o
 --
 
 CREATE UNIQUE INDEX index_projects_on_organization_id_and_slug ON public.projects USING btree (organization_id, slug) WHERE (organization_id IS NOT NULL);
+
+
+--
+-- Name: index_projects_on_owner_and_git_remote_url; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_projects_on_owner_and_git_remote_url ON public.projects USING btree (owner_id, git_remote_url) WHERE ((owner_id IS NOT NULL) AND (git_remote_url IS NOT NULL));
 
 
 --
@@ -11772,6 +11786,7 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260424000002'),
 ('20260424000001'),
 ('20260416000001'),
 ('20260415000001'),
