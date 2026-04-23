@@ -16,7 +16,7 @@ FactoryBot.define do
     end
 
     trait :with_git_remote do
-      git_remote_url { "git@github.com:org/#{slug}.git" }
+      git_remote_url { "git@github.com:org/#{slug}" }
     end
   end
 end

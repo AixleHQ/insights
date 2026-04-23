@@ -170,8 +170,9 @@ export function ProjectForm({
                 onChange={(e) => updateField("git_remote_url", e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                Used by db90-claude and db90-cursor to auto-detect this project. Must match the output of{" "}
-                <code className="font-mono">git remote get-url origin</code> exactly.
+                Used by db90-claude and db90-cursor to auto-detect this project. Paste the output of{" "}
+                <code className="font-mono">git remote get-url origin</code>
+                {" "}— the <code className="font-mono">.git</code> suffix and casing are normalized automatically.
               </p>
             </div>
 

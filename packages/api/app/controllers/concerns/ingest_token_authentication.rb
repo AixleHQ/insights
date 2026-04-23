@@ -20,8 +20,8 @@ module IngestTokenAuthentication
   end
 
   def accessible_projects
-    Project.active
-           .where(organization_id: @tool_account.organization.id)
-           .or(Project.active.where(owner_id: @tool_account.user.id))
+    @accessible_projects ||= Project.active
+                                    .where(organization_id: @tool_account.organization.id)
+                                    .or(Project.active.where(owner_id: @tool_account.user.id))
   end
 end
