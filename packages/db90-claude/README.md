@@ -133,7 +133,8 @@ Create `~/.db90-claude/config.json`:
 ```json
 {
   "token": "your-ingest-token",
-  "host": "https://app.db90.io"
+  "host": "https://app.db90.io",
+  "project_id": "optional-project-uuid"
 }
 ```
 
@@ -143,6 +144,7 @@ Create `~/.db90-claude/config.json`:
 |---|---|---|---|---|
 | Ingest token | `--token <token>` | `DB90_TOKEN` | `token` | db90 ingest token (required) |
 | db90 host | `--host <url>` | `DB90_HOST` | `host` | db90 host URL (required) |
+| Project ID | `--project-id <uuid>` | — | `project_id` | Associate events with a project (see [Project Attribution](#project-attribution)) |
 | Dry run | `--dry-run` | — | — | Print events without posting or updating state |
 | Watch mode | `--watch` | — | — | Poll for new transcripts on an interval |
 | Watch interval | `--watch-interval <secs>` | — | — | Poll interval in seconds (default: 30) |
@@ -283,6 +285,75 @@ All four usage fields are summed across every assistant message in a session. `t
     "cache_read_tokens": 8300
   }
 }
+```
+
+## Project Attribution
+
+Events can be attributed to a db90 project so they appear in project-scoped analytics. Resolution follows this priority order: **CLI flag > config file > git-remote auto-detect**.
+
+### Option 1 — CLI flag
+
+```bash
+db90-claude --token <token> --host <host> --project-id <project-uuid>
+```
+
+### Option 2 — Config file
+
+Add `project_id` to `~/.db90-claude/config.json`:
+
+```json
+{
+  "token": "your-ingest-token",
+  "host": "https://app.db90.io",
+  "project_id": "your-project-uuid"
+}
+```
+
+### Option 3 — Auto-detect from git remote
+
+If no flag or config value is set, the CLI runs `git remote get-url origin` in the current directory and calls `GET /api/v1/projects/lookup` to find a matching project. This requires the project to have a `git_remote_url` set in db90 that matches the repo's remote exactly (same protocol — SSH or HTTPS).
+
+Use `--verbose` to see which source was used:
+
+```
+[verbose] Project attribution: 3f2a1b... (source: auto-detect)
+[verbose] Project attribution: none (source: none)
+```
+
+### Testing project attribution locally
+
+1. Set `git_remote_url` on a project via the Rails console:
+
+```ruby
+# docker compose exec api rails console
+project = Project.active.first
+project.update!(git_remote_url: "git@github.com:your-org/your-repo.git")
+```
+
+2. Verify the lookup endpoint works:
+
+```bash
+curl "http://localhost:3000/api/v1/projects/lookup?git_remote=git@github.com:your-org/your-repo.git" \
+  -H "Authorization: Bearer <ingest-token>"
+# → {"data":{"project_id":"...","name":"..."}}
+```
+
+3. Run the CLI from the matching repo with `--dry-run --verbose`:
+
+```bash
+cd ~/your-repo
+db90-claude --token <token> --host http://localhost:3000 --dry-run --verbose
+# [verbose] Project attribution: <uuid> (source: auto-detect)
+# dry-run JSON includes "project_id": "<uuid>"
+```
+
+4. Test from a non-git directory — attribution should be skipped gracefully:
+
+```bash
+cd /tmp
+db90-claude --token <token> --host http://localhost:3000 --dry-run --verbose
+# [verbose] Could not determine git remote
+# no project_id in payload
 ```
 
 ## Requirements
