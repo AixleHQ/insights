@@ -1718,6 +1718,10 @@ paths:
                   type: string
                 description:
                   type: string
+                git_remote_url:
+                  type: string
+                  nullable: true
+                  description: Git remote URL used by CLI connectors for auto-detection (e.g. git@github.com:org/repo.git)
               required:
                 - name
       responses:
@@ -1783,6 +1787,10 @@ paths:
                   type: string
                 description:
                   type: string
+                git_remote_url:
+                  type: string
+                  nullable: true
+                  description: Git remote URL used by CLI connectors for auto-detection (e.g. git@github.com:org/repo.git)
               required:
                 - name
       responses:
@@ -1835,6 +1843,10 @@ paths:
                   type: string
                 is_active:
                   type: boolean
+                git_remote_url:
+                  type: string
+                  nullable: true
+                  description: Git remote URL used by CLI connectors for auto-detection (e.g. git@github.com:org/repo.git)
       responses:
         '200':
           description: Project updated
