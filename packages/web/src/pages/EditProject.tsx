@@ -18,6 +18,7 @@ export function EditProject() {
         name: data.name,
         description: data.description || null,
         repository_url: data.repository_url || null,
+        git_remote_url: data.git_remote_url || null,
         is_active: data.is_active,
       },
     });
@@ -54,7 +55,8 @@ export function EditProject() {
       initialData={{
         name: project.name,
         description: project.description || "",
-        repository_url: project.repositoryUrl || "",
+        repository_url: project.repositoryUrl ?? project.repository_url ?? "",
+        git_remote_url: project.gitRemoteUrl ?? project.git_remote_url ?? "",
         is_active: project.isActive ?? true,
       }}
       onSubmit={handleSubmit}

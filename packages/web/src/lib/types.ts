@@ -63,6 +63,8 @@ export interface Project {
   organizationId?: string | null;
   repository_url: string | null;
   repositoryUrl?: string | null;
+  git_remote_url: string | null;
+  gitRemoteUrl?: string | null;
   is_active: boolean;
   isActive?: boolean;
   created_at: string;

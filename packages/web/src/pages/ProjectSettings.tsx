@@ -80,6 +80,7 @@ interface GeneralFormData {
   name: string;
   description: string;
   repository_url: string;
+  git_remote_url: string;
   is_active: boolean;
 }
 
@@ -165,6 +166,19 @@ function ProjectGeneralSettingsForm({
               onChange={(e) => handleChange("repository_url", e.target.value)}
               placeholder="https://github.com/org/repo"
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="proj-git-remote">Git Remote URL</Label>
+            <Input
+              id="proj-git-remote"
+              value={formData.git_remote_url}
+              onChange={(e) => handleChange("git_remote_url", e.target.value)}
+              placeholder="git@github.com:org/repo.git"
+            />
+            <p className="text-xs text-muted-foreground">
+              Used by db90-claude and db90-cursor to auto-detect this project. Must match the output of{" "}
+              <code className="font-mono">git remote get-url origin</code> exactly.
+            </p>
           </div>
           <div className="flex items-center gap-3">
             <Switch
@@ -255,6 +269,7 @@ function ProjectGeneralSettings({
     name: project.name || "",
     description: project.description || "",
     repository_url: project.repositoryUrl ?? project.repository_url ?? "",
+    git_remote_url: project.gitRemoteUrl ?? project.git_remote_url ?? "",
     is_active: project.isActive ?? project.is_active,
   };
 
