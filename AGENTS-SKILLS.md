@@ -49,7 +49,7 @@ The `component-builder` agent is the clearest example of this pattern in action 
 | `/tailwind-v4-shadcn` | Command | `/tailwind-v4-shadcn` | Reference guide for Tailwind v4 + shadcn/ui setup and v4 migration pitfalls |
 | `/review-architecture` | Command | `/review-architecture` | Deep architectural review (Staff Engineer lens): maintainability, security, performance across backend and frontend |
 | `/review-commit` | Command | `/review-commit` | Pre-push gate: Step 0 runs `convention-check.ts` (branch + commit format); then linters, tests, swagger-auditor, ui-visual-reviewer; reports READY TO PUSH or BLOCK |
-| `/review-changes` | Command | `/review-changes` | Risk-scored review via `risk-score.ts`: weighted score per file (tier + callers + churn + spec) → Opus advisor if HIGH/CRITICAL |
+| `/review-changes` | Command | `/review-changes` | Risk-scored review via `risk-score.ts`: weighted score per file (tier + 2-hop callers + churn + method coverage) → Opus advisor if HIGH/CRITICAL |
 | `/typescript-react-reviewer` | Command | `/typescript-react-reviewer` | TypeScript + React 19 specific review: critical bugs, anti-patterns, strict TS, React 19 pitfalls |
 | `/debug-issue` | Command | `/debug-issue` | Systematic debugging: grep for symbols → trace call sites → read files → check recent commits → find test coverage |
 | `/explore-codebase` | Command | `/explore-codebase` | Codebase navigation using Glob for file discovery, Grep for symbols, Read for file content |
@@ -67,7 +67,7 @@ The `component-builder` agent is the clearest example of this pattern in action 
 | `actionpolicy-check` | Skill | Edit any `*_controller.rb` | Injects the `authorize!` requirement at the top of every controller action |
 | `design-system-guide` | Skill | Edit `packages/web/src/components/ui/**` | Injects token rules (no raw hex), dark mode parity, a11y requirements, Figma MCP hooks |
 | `on-edit-lint` | Hook | Every `Edit` or `Write` tool call | Prints green Haiku banner; runs `bundle exec rubocop` on `.rb` files; `npx eslint` on `.ts/.tsx` files — advisory, always exits 0 |
-| `model-indicator` | Hook | Every `Agent` tool call (PreToolUse) | Prints colored model banner to stderr: red = Opus advisor, orange = Sonnet executor, green = Haiku executor |
+| `model-indicator` | Hook | Every `Agent` tool call (PreToolUse) | Prints colored model banner: red = Opus, yellow = Sonnet, green = Haiku. Dual mode: stderr (hook) + stdout (direct Bash) |
 
 ---
 
@@ -266,7 +266,7 @@ Deep architectural review of all changes since `develop`, through the lens of ma
 
 **`/review-changes`**  
 Deterministic risk-scored review powered by `.claude/scripts/risk-score.ts`.  
-**Steps:** run scorer (tier + caller count + 90d churn + spec coverage) → escalate to Opus if HIGH/CRITICAL or hard flag fires → read diff → write report  
+**Steps:** run scorer (tier + 2-hop blast radius + 90d churn + diff-parsed method coverage + volume bonus) → escalate to Opus if HIGH/CRITICAL or hard flag fires → read diff → write report  
 **Hard flags:** migration file, authorize! change, destroy_all/delete_all, policy with no spec — always force HIGH or CRITICAL regardless of score.  
 **Deliverable:** Per-file score breakdown + grouped findings (CRITICAL/HIGH/MEDIUM/LOW) + merge verdict.
 
@@ -362,13 +362,13 @@ Hooks run silently via the harness events. They are registered in `.claude/setti
 | Hook | Event | Trigger | What it runs | Blocking? |
 |------|-------|---------|-------------|-----------|
 | `on-edit-lint` | `PostToolUse` | Any `Edit` or `Write` tool call | Prints green Haiku banner to stderr; then `bundle exec rubocop --parallel <file>` for `.rb`; `npx eslint <file>` for `.ts/.tsx/.js/.jsx`; no-op for other types | No — always exits 0. Errors surface in Claude's context as findings. |
-| `model-indicator` | `PreToolUse` | Any `Agent` tool call | Reads `tool_input.model`, normalizes version suffix, prints colored banner to stderr: `⚑  OPUS ADVISOR` (red), `⚑  SONNET EXECUTOR` (orange), `⚑  HAIKU EXECUTOR` (green) | No — always exits 0. |
+| `model-indicator` | `PreToolUse` | Any `Agent` tool call | Dual mode: (1) Hook — reads `tool_input.model` from stdin, prints to stderr. (2) Direct — `node model-indicator.ts opus` prints to stdout (visible in execution steps). Colors: `⚑  OPUS ADVISOR` (red), `⚑  SONNET EXECUTOR` (yellow), `⚑  HAIKU EXECUTOR` (green). | No — always exits 0. |
 
 **Implementation:** All hooks are Node.js 22+ TypeScript (`.claude/hooks/*.ts`), no external dependencies, cross-platform (Windows/macOS/Linux).
 
 **Why `on-edit-lint` matters:** Catches lint errors immediately after each file save, before the full `/review-commit` run — tighter feedback loop with no extra steps.
 
-**Why `model-indicator` matters:** Makes model switches visible in the Claude Code execution steps without requiring any manual action. You always know when Opus is advising vs. Sonnet or Haiku executing.
+**Why `model-indicator` matters:** Makes model switches visible. The PreToolUse hook fires automatically (stderr); for guaranteed visibility in the execution steps panel, commands call it directly via Bash (stdout). Each model owns its full color block — header bold, detail dim — in its assigned color (red/yellow/green).
 
 ---
 
@@ -515,9 +515,9 @@ To silence: add `"DB90_COACHING": "false"` to `.claude/settings.local.json` (git
 │   └── help-tooling.md          # /help-tooling
 ├── hooks/
 │   ├── on-edit-lint.ts           # PostToolUse: Haiku banner + lint on every file save
-│   └── model-indicator.ts        # PreToolUse(Agent): colored model banner (Opus/Sonnet/Haiku)
+│   └── model-indicator.ts        # PreToolUse(Agent) + direct Bash: colored model banner (Opus=red, Sonnet=yellow, Haiku=green)
 ├── scripts/
-│   ├── risk-score.ts             # Deterministic risk scorer used by /review-changes
+│   ├── risk-score.ts             # Risk scorer: tier + 2-hop callers + churn + method coverage → JSON
 │   └── convention-check.ts       # Branch + commit format checker used by /review-commit (Step 0)
 └── settings.json                 # Hook registration, permissions, DB90_COACHING
 ```
