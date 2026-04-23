@@ -21,16 +21,20 @@
  * Runtime: Node.js 22+ with --experimental-strip-types (no dependencies).
  */
 
-const RED    = "\x1b[1;31m";
-const ORANGE = "\x1b[1;33m";
-const GREEN  = "\x1b[1;32m";
-const DIM    = "\x1b[2;37m";
-const X      = "\x1b[0m";
+// Model → color mapping (single source of truth)
+// opus = red, sonnet = yellow, haiku = green
+const BOLD_RED    = "\x1b[1;31m";
+const BOLD_YELLOW = "\x1b[1;33m";
+const BOLD_GREEN  = "\x1b[1;32m";
+const DIM_RED     = "\x1b[2;31m";
+const DIM_YELLOW  = "\x1b[2;33m";
+const DIM_GREEN   = "\x1b[2;32m";
+const X           = "\x1b[0m";
 
-const MODELS: Record<string, { color: string; label: string; detail: string }> = {
-  opus:   { color: RED,    label: "OPUS ADVISOR",    detail: "advisor escalation · risk HIGH/CRITICAL or hard flag" },
-  sonnet: { color: ORANGE, label: "SONNET EXECUTOR", detail: "standard executor"  },
-  haiku:  { color: GREEN,  label: "HAIKU EXECUTOR",  detail: "lightweight task"   },
+const MODELS: Record<string, { bold: string; dim: string; label: string; detail: string }> = {
+  opus:   { bold: BOLD_RED,    dim: DIM_RED,    label: "OPUS ADVISOR",    detail: "advisor escalation · risk HIGH/CRITICAL or hard flag" },
+  sonnet: { bold: BOLD_YELLOW, dim: DIM_YELLOW, label: "SONNET EXECUTOR", detail: "standard executor"  },
+  haiku:  { bold: BOLD_GREEN,  dim: DIM_GREEN,  label: "HAIKU EXECUTOR",  detail: "lightweight task"   },
 };
 
 function normalize(raw: string): string {
@@ -41,11 +45,11 @@ function normalize(raw: string): string {
 
 function printBanner(model: string, toStdout: boolean): void {
   const key = normalize(model);
-  const { color, label, detail } = MODELS[key];
+  const { bold, dim, label, detail } = MODELS[key];
   const out = toStdout ? process.stdout : process.stderr;
   out.write("\n");
-  out.write(`${color}⚑  ${label}${X}\n`);
-  out.write(`${DIM}   ${detail}${X}\n`);
+  out.write(`${bold}⚑  ${label}${X}\n`);
+  out.write(`${dim}   ${detail}${X}\n`);
   out.write("\n");
 }
 

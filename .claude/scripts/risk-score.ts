@@ -488,30 +488,33 @@ function main(): void {
 
 // ─── Model indicator banners ──────────────────────────────────────────────────
 
-const RED    = "\x1b[1;31m";   // bold red    — opus
-const ORANGE = "\x1b[1;33m";   // bold yellow — sonnet (closest ANSI to orange)
-const GREEN  = "\x1b[1;32m";   // bold green  — haiku
-const DIM    = "\x1b[2;37m";   // dim white
-const RESET  = "\x1b[0m";
+// Model → color mapping (must match model-indicator.ts and convention-check.ts)
+// opus = red, sonnet = yellow, haiku = green
+const BOLD_RED    = "\x1b[1;31m";   // opus   — bold
+const BOLD_YELLOW = "\x1b[1;33m";   // sonnet — bold
+const BOLD_GREEN  = "\x1b[1;32m";   // haiku  — bold
+const DIM_RED     = "\x1b[2;31m";   // opus   — dim
+const DIM_YELLOW  = "\x1b[2;33m";   // sonnet — dim
+const DIM_GREEN   = "\x1b[2;32m";   // haiku  — dim
+const RESET       = "\x1b[0m";
 
 function printSonnetBanner(refRange: string): void {
   process.stderr.write("\n");
-  process.stderr.write(`${ORANGE}⚑  SONNET EXECUTOR ACTIVE${RESET}\n`);
-  process.stderr.write(`${DIM}   running risk-score · ref: ${refRange}${RESET}\n`);
+  process.stderr.write(`${BOLD_YELLOW}⚑  SONNET EXECUTOR ACTIVE${RESET}\n`);
+  process.stderr.write(`${DIM_YELLOW}   running risk-score · ref: ${refRange}${RESET}\n`);
   process.stderr.write("\n");
 }
 
 function printAdvisorBanner(report: RiskReport): void {
-  process.stderr.write(`${RED}⚑  OPUS ADVISOR ESCALATION TRIGGERED${RESET}\n`);
-  process.stderr.write(`${DIM}   ${report.overall_risk} (score ${report.overall_score}/100) · ${report.files_changed} files · ${report.escalation_reason}${RESET}\n`);
+  process.stderr.write(`${BOLD_RED}⚑  OPUS ADVISOR ESCALATION TRIGGERED${RESET}\n`);
+  process.stderr.write(`${DIM_RED}   ${report.overall_risk} (score ${report.overall_score}/100) · ${report.files_changed} files · ${report.escalation_reason}${RESET}\n`);
   process.stderr.write("\n");
 }
 
-// haiku indicator — not yet wired to a task; available for lightweight commands
 export function printHaikuBanner(task: string): void {
   process.stderr.write("\n");
-  process.stderr.write(`${GREEN}⚑  HAIKU EXECUTOR ACTIVE${RESET}\n`);
-  process.stderr.write(`${DIM}   ${task}${RESET}\n`);
+  process.stderr.write(`${BOLD_GREEN}⚑  HAIKU EXECUTOR ACTIVE${RESET}\n`);
+  process.stderr.write(`${DIM_GREEN}   ${task}${RESET}\n`);
   process.stderr.write("\n");
 }
 

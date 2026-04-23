@@ -13,11 +13,13 @@
 
 import { spawnSync } from "node:child_process";
 
-const GREEN  = "\x1b[1;32m";
-const RED    = "\x1b[1;31m";
-const YELLOW = "\x1b[1;33m";
-const DIM    = "\x1b[2;37m";
-const X      = "\x1b[0m";
+// Model color: haiku = green (this is a Haiku task)
+const BOLD_GREEN = "\x1b[1;32m";
+const DIM_GREEN  = "\x1b[2;32m";
+// Neutral colors for check results (avoid red/yellow — those are Opus/Sonnet model colors)
+const BOLD_WHITE = "\x1b[1;37m";
+const DIM_WHITE  = "\x1b[2;37m";
+const X          = "\x1b[0m";
 
 const BRANCH_RE  = /^(feature|hotfix|chore|fix)\/AIX-\d+-[\w-]+$/;
 const COMMIT_RE  = /^\[AIX-\d+\] .+/;
@@ -28,23 +30,23 @@ function git(args: string[]): string {
 }
 
 function check(label: string, pass: boolean, detail: string): void {
-  const icon  = pass ? `${GREEN}✓${X}` : `${RED}✗${X}`;
-  const color = pass ? DIM : YELLOW;
+  const icon  = pass ? `${BOLD_GREEN}✓${X}` : `${BOLD_WHITE}✗${X}`;
+  const color = pass ? DIM_GREEN : DIM_WHITE;
   process.stdout.write(`  ${icon}  ${label}\n`);
   process.stdout.write(`     ${color}${detail}${X}\n`);
 }
 
 function main(): void {
-  // Haiku banner
+  // Haiku banner — green (model color)
   process.stderr.write("\n");
-  process.stderr.write(`${GREEN}⚑  HAIKU EXECUTOR ACTIVE${X}\n`);
-  process.stderr.write(`${DIM}   convention-check · branch + commit format${X}\n`);
+  process.stderr.write(`${BOLD_GREEN}⚑  HAIKU EXECUTOR ACTIVE${X}\n`);
+  process.stderr.write(`${DIM_GREEN}   convention-check · branch + commit format${X}\n`);
   process.stderr.write("\n");
 
   const branch  = git(["branch", "--show-current"]);
   const commits = git(["log", "develop..HEAD", "--format=%s"]).split("\n").filter(Boolean);
 
-  process.stdout.write(`\n${DIM}Convention check${X}\n\n`);
+  process.stdout.write(`\n${DIM_WHITE}Convention check${X}\n\n`);
 
   // Branch name
   const branchOk = BRANCH_RE.test(branch);
@@ -58,7 +60,7 @@ function main(): void {
 
   // Commit messages
   if (commits.length === 0) {
-    process.stdout.write(`  ${DIM}–  No commits ahead of develop${X}\n\n`);
+    process.stdout.write(`  ${DIM_WHITE}–  No commits ahead of develop${X}\n\n`);
     return;
   }
 
@@ -78,8 +80,8 @@ function main(): void {
   const overall = branchOk && allOk;
   process.stdout.write(
     overall
-      ? `${GREEN}  PASS${X}${DIM} — branch and commits follow DB90 conventions${X}\n\n`
-      : `${YELLOW}  WARN${X}${DIM} — fix the items above before pushing${X}\n\n`
+      ? `${BOLD_GREEN}  PASS${X}${DIM_GREEN} — branch and commits follow DB90 conventions${X}\n\n`
+      : `${BOLD_WHITE}  WARN${X}${DIM_WHITE} — fix the items above before pushing${X}\n\n`
   );
 }
 

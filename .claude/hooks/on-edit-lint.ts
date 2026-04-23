@@ -20,12 +20,12 @@ import path from "node:path";
 const projectDir: string = process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
 
 function printHaikuBanner(file: string): void {
-  const GREEN = "\x1b[1;32m";
-  const DIM   = "\x1b[2;37m";
-  const X     = "\x1b[0m";
+  const BOLD_GREEN = "\x1b[1;32m";
+  const DIM_GREEN  = "\x1b[2;32m";
+  const X          = "\x1b[0m";
   process.stderr.write("\n");
-  process.stderr.write(`${GREEN}⚑  HAIKU EXECUTOR ACTIVE${X}\n`);
-  process.stderr.write(`${DIM}   linting · ${file}${X}\n`);
+  process.stderr.write(`${BOLD_GREEN}⚑  HAIKU EXECUTOR ACTIVE${X}\n`);
+  process.stderr.write(`${DIM_GREEN}   linting · ${file}${X}\n`);
   process.stderr.write("\n");
 }
 
