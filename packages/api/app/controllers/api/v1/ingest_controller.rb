@@ -22,6 +22,24 @@ module Api
         event_params[:tool_name] = @tool_account.tool_name
         event_params[:event_type] = event_params[:event_type].presence || "other"
 
+        # Validate project_id belongs to the token's org or user's personal projects.
+        # Strip silently rather than reject — attribution is additive, never blocking.
+        if event_params[:project_id].present?
+          pid = event_params[:project_id]
+          if pid !~ /\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/i
+            event_params.delete(:project_id)
+            Rails.logger.warn("[Ingest] project_id #{pid.inspect} is not a valid UUID — stripped")
+          else
+            accessible = Project.active
+                                .where(organization_id: org.id)
+                                .or(Project.active.where(owner_id: @tool_account.user.id))
+            unless accessible.exists?(id: pid)
+              event_params.delete(:project_id)
+              Rails.logger.warn("[Ingest] project_id #{pid} not accessible — stripped")
+            end
+          end
+        end
+
         raw_key = store_raw_event(request.raw_post, org)
         workflow_result = start_ingestion_workflow(raw_key, event_params, org)
 

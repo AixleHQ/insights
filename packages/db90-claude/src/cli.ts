@@ -4,10 +4,12 @@ import { readFileSync } from "node:fs";
 import { readState, writeState, markSessionSent, APP_DIR } from "./state.js";
 import { findTranscriptFiles, parseTranscriptFile, toDb90Payload } from "./claude-reader.js";
 import { postEvent } from "./client.js";
+import { resolveProjectId } from "./project-resolver.js";
 
 interface Config {
   token?: string;
   host?: string;
+  project_id?: string;
 }
 
 function loadConfig(): Config {
@@ -19,6 +21,7 @@ function loadConfig(): Config {
       return {
         token: typeof obj.token === "string" ? obj.token : undefined,
         host: typeof obj.host === "string" ? obj.host : undefined,
+        project_id: typeof obj.project_id === "string" ? obj.project_id : undefined,
       };
     }
   } catch {
@@ -30,6 +33,7 @@ function loadConfig(): Config {
 export interface Args {
   token?: string;
   host?: string;
+  projectId?: string;
   dryRun: boolean;
   watch: boolean;
   watchInterval: number;
@@ -45,6 +49,7 @@ export function parseArgs(argv: string[]): Args {
     watchInterval: 30,
     verbose: false,
     help: false,
+    projectId: undefined,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -55,6 +60,9 @@ export function parseArgs(argv: string[]): Args {
         break;
       case "--host":
         result.host = args[++i];
+        break;
+      case "--project-id":
+        result.projectId = args[++i];
         break;
       case "--dry-run":
         result.dryRun = true;
@@ -76,6 +84,7 @@ export function parseArgs(argv: string[]): Args {
       default:
         if (arg.startsWith("--token=")) result.token = arg.slice(8);
         else if (arg.startsWith("--host=")) result.host = arg.slice(7);
+        else if (arg.startsWith("--project-id=")) result.projectId = arg.slice(13);
         else if (arg.startsWith("--watch-interval=")) {
           result.watchInterval = parseInt(arg.slice(17), 10);
         }
@@ -96,6 +105,7 @@ Usage:
 Options:
   --token <token>            db90 ingest token (or DB90_TOKEN env var)
   --host <host>              db90 host URL (or DB90_HOST env var)
+  --project-id <uuid>        Associate events with this project UUID
   --dry-run                  Print events without posting or updating state
   --watch                    Poll for new transcripts on an interval
   --watch-interval <secs>    Poll interval in seconds (default: 30)
@@ -103,7 +113,7 @@ Options:
   --help, -h                 Show this help message
 
 Config file: ~/.db90-claude/config.json
-  { "token": "...", "host": "https://app.db90.io" }
+  { "token": "...", "host": "https://app.db90.io", "project_id": "..." }
 
 Reads transcripts from:
   ~/.config/claude/projects/  (Claude Code v1.0.30+)
@@ -121,7 +131,8 @@ async function syncOnce(
   token: string,
   host: string,
   dryRun: boolean,
-  verbose: boolean
+  verbose: boolean,
+  projectId: string | null
 ): Promise<SyncResult> {
   const files = findTranscriptFiles();
 
@@ -149,7 +160,7 @@ async function syncOnce(
         continue;
       }
 
-      const payload = toDb90Payload(agg);
+      const payload = toDb90Payload(agg, projectId ?? undefined);
 
       if (dryRun) {
         console.log(`[dry-run] Would send session ${sessionId}:`);
@@ -203,13 +214,26 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  const resolution = await resolveProjectId(
+    cliArgs.projectId,
+    fileConfig.project_id,
+    host,
+    token,
+    cliArgs.verbose
+  );
+  if (cliArgs.verbose) {
+    console.log(
+      `[verbose] Project attribution: ${resolution.projectId ?? "none"} (source: ${resolution.source})`
+    );
+  }
+
   if (cliArgs.watch) {
     console.log(
       `Watching for Claude transcripts every ${cliArgs.watchInterval}s… (Ctrl+C to stop)`
     );
 
     const runSync = async () => {
-      const result = await syncOnce(token, host, cliArgs.dryRun, cliArgs.verbose);
+      const result = await syncOnce(token, host, cliArgs.dryRun, cliArgs.verbose, resolution.projectId);
       if (result.sent > 0 || result.failed > 0) {
         console.log(
           `Sent: ${result.sent}, Failed: ${result.failed}, Skipped: ${result.skipped}`
@@ -238,7 +262,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const result = await syncOnce(token, host, cliArgs.dryRun, cliArgs.verbose);
+  const result = await syncOnce(token, host, cliArgs.dryRun, cliArgs.verbose, resolution.projectId);
   console.log(`Sent: ${result.sent}, Failed: ${result.failed}, Skipped: ${result.skipped}`);
 
   if (result.failed > 0) {

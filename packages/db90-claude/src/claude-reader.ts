@@ -49,6 +49,7 @@ export interface Db90Payload {
   tokens_out?: number;
   tokens_total?: number;
   occurred_at: string;
+  project_id?: string;
   metadata: {
     session_id: string;
     cache_write_tokens?: number;
@@ -170,7 +171,7 @@ export async function parseTranscriptFile(
 }
 
 /** Converts a SessionAggregate to a db90 ingest payload. */
-export function toDb90Payload(agg: SessionAggregate): Db90Payload {
+export function toDb90Payload(agg: SessionAggregate, projectId?: string): Db90Payload {
   const payload: Db90Payload = {
     tool_name: "claude_code",
     event_type: "chat",
@@ -192,6 +193,7 @@ export function toDb90Payload(agg: SessionAggregate): Db90Payload {
   if (agg.cacheReadTokens > 0) {
     payload.metadata.cache_read_tokens = agg.cacheReadTokens;
   }
+  if (projectId) payload.project_id = projectId;
 
   return payload;
 }

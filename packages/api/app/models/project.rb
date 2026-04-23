@@ -20,6 +20,7 @@ class Project < ApplicationRecord
 
   before_destroy :flag_as_being_destroyed, prepend: true
   before_validation :generate_slug, on: :create
+  before_save :normalize_git_remote_url_field
 
   attr_reader :being_destroyed
 
@@ -35,7 +36,16 @@ class Project < ApplicationRecord
     organization_id.present?
   end
 
+  def self.normalize_git_remote(url)
+    return nil if url.blank?
+    url.strip.downcase.delete_suffix(".git")
+  end
+
   private
+
+  def normalize_git_remote_url_field
+    self.git_remote_url = self.class.normalize_git_remote(git_remote_url)
+  end
 
   def create_default_retention_policy
     create_retention_policy!

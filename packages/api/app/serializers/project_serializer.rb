@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class ProjectSerializer < BaseSerializer
-  attributes :id, :name, :slug, :description, :repository_url, :is_active
+  attributes :id, :name, :slug, :description, :repository_url, :git_remote_url, :is_active
   timestamps
 
   attribute :organization_id do |project|

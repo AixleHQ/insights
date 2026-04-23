@@ -89,4 +89,19 @@ describe("parseArgs", () => {
     expect(args.dryRun).toBe(true);
     expect(args.verbose).toBe(true);
   });
+
+  it("parses --project-id", () => {
+    const args = parseArgs(["node", "cli.js", "--project-id", "abc123"]);
+    expect(args.projectId).toBe("abc123");
+  });
+
+  it("parses --project-id=value", () => {
+    const args = parseArgs(["node", "cli.js", "--project-id=abc123"]);
+    expect(args.projectId).toBe("abc123");
+  });
+
+  it("leaves projectId undefined when not provided", () => {
+    const args = parseArgs(["node", "cli.js"]);
+    expect(args.projectId).toBeUndefined();
+  });
 });

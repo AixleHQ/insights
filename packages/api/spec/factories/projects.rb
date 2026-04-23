@@ -14,5 +14,9 @@ FactoryBot.define do
     trait :inactive do
       is_active { false }
     end
+
+    trait :with_git_remote do
+      git_remote_url { "git@github.com:org/#{slug}.git" }
+    end
   end
 end

@@ -6,6 +6,8 @@ Rails.application.configure do
   # Allow Docker service hostnames in development
   config.hosts << "api"
   config.hosts << /.*\.local/
+  # Allow the default RSpec request spec host (tests run with RAILS_ENV=development in Docker)
+  config.hosts << "www.example.com"
 
   # Make code changes take effect immediately without server restart.
   config.enable_reloading = true
