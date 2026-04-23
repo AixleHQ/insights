@@ -175,10 +175,25 @@ GITLAB_CLIENT_SECRET: "${GITLAB_CLIENT_SECRET}"
 
 ### Bitbucket
 
-1. Go to **Personal settings → OAuth → Add consumer**
-2. Set **Callback URL** to `http://localhost:5173/integrations/callback`
-3. Enable permissions: `Account: Read`, `Repositories: Read`
-4. Copy the **Key** (client ID) and **Secret**
+> **Note:** Bitbucket OAuth consumers are workspace-level
+
+1. Log into [Bitbucket.org](https://bitbucket.org)
+2. Select your **Workspace** (bottom-left corner)
+3. Click **Settings** (gear icon) on the left sidebar
+4. Under **Apps and Features**, click **OAuth consumers**
+5. Click **Add consumer**
+6. Set **Callback URL** to `http://localhost:5173/integrations/callback`
+7. Enable the following permissions:
+
+| Scope | Permission | Purpose |
+|---|---|---|
+| Account | Read | Retrieve user identity (email/profile) |
+| Repositories | Read | Access repository metadata |
+| Pull Requests | Read | Read pull request data |
+| Issues | Read | Read issues (if using Bitbucket-native issue tracker) |
+| Webhooks | Read and Write | Listen for code push events |
+
+8. Copy the **Key** (client ID) and **Secret**
 
 ```env
 BITBUCKET_CLIENT_ID=your-key
