@@ -311,21 +311,22 @@ Add `project_id` to `~/.db90-claude/config.json`:
 
 ### Option 3 — Auto-detect from git remote
 
-If no flag or config value is set, the CLI runs `git remote get-url origin` in the current directory and calls `GET /api/v1/projects/lookup` to find a matching project. This requires the project to have a `git_remote_url` set in db90 that matches the repo's remote exactly (same protocol — SSH or HTTPS).
+If no flag or config value is set, the CLI runs `git remote get-url origin` in the current directory and calls `GET /api/v1/projects/lookup` to find a matching project. This requires the project to have a **Git Remote URL** set in db90 (via Project Settings) that matches the repo's remote. The `.git` suffix and casing are normalized automatically, so `git@github.com:org/repo.git` and `git@github.com:org/repo` both match.
 
-If the git remote is found but no matching project exists in db90, the CLI exits with an error:
+All lookup failures are non-blocking — events are always sent, just without project attribution:
 
-```
-Error: No project found matching the git remote for this repository.
-Create one at https://app.db90.io/projects or pass --project-id <uuid> explicitly.
-```
-
-If there is no git remote at all (not in a git repo, or no `origin` configured), attribution is silently skipped and events are sent without a project ID.
+| Situation | Behavior |
+|---|---|
+| Git remote matches a db90 project | Events attributed to that project |
+| Git remote found but no matching project in db90 | Events sent without project attribution |
+| Not in a git repo or no `origin` remote | Events sent without project attribution |
+| Network error during lookup | Events sent without project attribution |
 
 Use `--verbose` to see which source was used:
 
 ```
 [verbose] Project attribution: 3f2a1b... (source: auto-detect)
+[verbose] Project attribution: none (source: auto-detect-not-found)
 [verbose] Project attribution: none (source: none)
 ```
 
