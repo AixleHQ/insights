@@ -1,0 +1,43 @@
+{
+  "env": {
+    "DB90_COACHING": "true"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(make lint-api)",
+      "Bash(make lint-web)",
+      "Bash(make test-api)",
+      "Bash(make test-web)",
+      "Bash(bundle exec rspec:*)",
+      "Bash(bundle exec rubocop:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git status:*)",
+      "Bash(npx playwright:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node --experimental-strip-types --no-warnings ${CLAUDE_PROJECT_DIR}/.claude/hooks/model-indicator.ts"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node --experimental-strip-types --no-warnings ${CLAUDE_PROJECT_DIR}/.claude/hooks/on-edit-lint.ts"
+          }
+        ]
+      }
+    ]
+  }
+}

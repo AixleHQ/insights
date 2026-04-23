@@ -19,6 +19,16 @@ Review all changes on this branch before they are pushed. Run all steps in order
 
 ---
 
+### Step 0 — Convention check (Haiku)
+
+```bash
+node --experimental-strip-types --no-warnings ${CLAUDE_PROJECT_DIR}/.claude/scripts/convention-check.ts
+```
+
+Checks branch name and commit message format against DB90 conventions. Any failures appear in the final report as WARN — they do not block Steps 1–4.
+
+---
+
 ### Step 1 — Automated checks (run all in parallel)
 
 1. **RuboCop** — lint changed Ruby files:
@@ -63,6 +73,21 @@ Review all changes on this branch before they are pushed. Run all steps in order
 cd packages/web && npx vitest related $(git diff develop..HEAD --name-only -- '*.ts' '*.tsx' '*.js' '*.jsx' | sed 's|packages/web/||' | tr '\n' ' ') --run
 ```
 Skip if no JS/TS files changed.
+
+---
+
+### Step 2.5 — Visual review (UI changes only)
+
+If any `.tsx` files under `packages/web/src/` are in the diff (components, pages, or UI hooks), spawn `ui-visual-reviewer` as a subagent before proceeding to Step 3.
+
+`ui-visual-reviewer` will:
+- Run Playwright if configured, or fall back to Claude_Preview.
+- Verify visual accuracy in light and dark themes.
+- Check feature behavior for key interactions.
+
+If `ui-visual-reviewer` returns failures, report them alongside the Step 3 findings — do not block Step 3.
+
+Skip this step if no `.tsx` files changed.
 
 ---
 
