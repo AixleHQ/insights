@@ -123,7 +123,8 @@ Rails.application.routes.draw do
       # Public ingest endpoint — Bearer token auth, no JWT/org context
       post "ingest/events", to: "ingest#create"
 
-      # Project lookup by git remote — Bearer ingest token auth, no JWT
+      # Project lookup by git remote — Bearer ingest token auth, no JWT.
+      # Must be declared before `resources :projects` so "lookup" isn't matched as an :id.
       get "projects/lookup", to: "project_lookup#show"
 
       # Project routes (can be accessed outside org context for personal projects)

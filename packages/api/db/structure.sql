@@ -9681,12 +9681,6 @@ CREATE INDEX index_project_settings_on_project_id ON public.project_settings USI
 CREATE UNIQUE INDEX index_project_settings_on_project_id_and_key ON public.project_settings USING btree (project_id, key);
 
 
---
--- Name: index_projects_on_git_remote_url; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX index_projects_on_git_remote_url ON public.projects USING btree (git_remote_url);
-
 
 --
 -- Name: index_projects_on_org_and_git_remote_url; Type: INDEX; Schema: public; Owner: -

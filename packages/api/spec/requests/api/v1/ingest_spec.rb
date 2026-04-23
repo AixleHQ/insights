@@ -262,6 +262,15 @@ RSpec.describe 'Api::V1::Ingest', type: :request do
           expect(kwargs[:args][:event][:project_id]).to be_nil
         end
       end
+
+      it 'passes project_id through when it belongs to the token user as a personal project' do
+        personal_project = create(:project, :personal, owner: user, organization: nil)
+        ingest_post(payload: valid_payload.merge(project_id: personal_project.id))
+        expect(response).to have_http_status(:accepted)
+        expect(Temporal::Client).to have_received(:start_workflow) do |_workflow, **kwargs|
+          expect(kwargs[:args][:event][:project_id]).to eq(personal_project.id)
+        end
+      end
     end
   end
 end

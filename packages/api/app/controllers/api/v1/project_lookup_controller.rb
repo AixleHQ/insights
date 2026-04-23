@@ -3,7 +3,7 @@
 module Api
   module V1
     class ProjectLookupController < ActionController::API
-      before_action :authenticate_by_token!
+      include IngestTokenAuthentication
 
       # GET /api/v1/projects/lookup?git_remote=<encoded_url>
       def show
@@ -21,26 +21,6 @@ module Api
         else
           render json: { error: "Not Found" }, status: :not_found
         end
-      end
-
-      private
-
-      def authenticate_by_token!
-        auth_header = request.headers["Authorization"]
-        raw = auth_header&.start_with?("Bearer ") ? auth_header.delete_prefix("Bearer ").strip : nil
-        @tool_account = raw.present? ? UserToolAccount.find_by_ingest_token(raw) : nil
-
-        unless @tool_account&.is_active? && @tool_account.organization.present?
-          render json: { error: "Unauthorized" }, status: :unauthorized
-        end
-      end
-
-      def accessible_projects
-        user = @tool_account.user
-        org  = @tool_account.organization
-        Project.active
-               .where(organization_id: org.id)
-               .or(Project.active.where(owner_id: user.id))
       end
     end
   end

@@ -51,6 +51,14 @@ export function getGitRemote(verbose: boolean): string | null {
   }
 }
 
+function isLookupResponse(body: unknown): body is { data: LookupResult } {
+  if (typeof body !== "object" || body === null) return false;
+  const d = (body as Record<string, unknown>).data;
+  if (typeof d !== "object" || d === null) return false;
+  const data = d as Record<string, unknown>;
+  return typeof data.project_id === "string" && typeof data.name === "string";
+}
+
 export async function lookupProjectByRemote(
   gitRemote: string,
   host: string,
@@ -68,7 +76,11 @@ export async function lookupProjectByRemote(
       if (verbose) console.log(`[verbose] Project lookup failed: HTTP ${res.status}`);
       return null;
     }
-    const body = (await res.json()) as { data: LookupResult };
+    const body: unknown = await res.json();
+    if (!isLookupResponse(body)) {
+      if (verbose) console.log("[verbose] Unexpected response shape from project lookup");
+      return null;
+    }
     return body.data;
   } catch {
     if (verbose)
