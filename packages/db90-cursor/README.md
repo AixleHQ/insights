@@ -290,41 +290,27 @@ Use `--verbose` to see which source was used:
 [verbose] Project attribution: none (source: none)
 ```
 
-### Testing project attribution locally
+### Setup
 
-1. Set `git_remote_url` on a project via the Rails console:
-
-```ruby
-# docker compose exec api rails console
-project = Project.active.first
-project.update!(git_remote_url: "git@github.com:your-org/your-repo.git")
-```
-
-2. Verify the lookup endpoint works:
-
-```bash
-curl "http://localhost:3000/api/v1/projects/lookup?git_remote=git@github.com:your-org/your-repo.git" \
-  -H "Authorization: Bearer <ingest-token>"
-# → {"data":{"project_id":"...","name":"..."}}
-```
-
-3. Run the CLI from the matching repo with `--dry-run --verbose`:
+1. In the db90 app, open the project and go to **Settings → General**.
+2. Set the **Git Remote URL** field to the exact output of `git remote get-url origin` from your repo (e.g. `git@github.com:org/repo.git`).
+3. Save changes.
+4. Run the CLI from that repo — no extra flags needed:
 
 ```bash
 cd ~/your-repo
-db90-cursor --token <token> --host http://localhost:3000 --dry-run --verbose
+db90-cursor --token <token> --host <host> --dry-run --verbose
 # [verbose] Project attribution: <uuid> (source: auto-detect)
-# dry-run JSON includes "project_id": "<uuid>"
 ```
 
-4. Test from a non-git directory — attribution should be skipped gracefully:
+If the remote is found but no project matches, the CLI exits with:
 
-```bash
-cd /tmp
-db90-cursor --token <token> --host http://localhost:3000 --dry-run --verbose
-# [verbose] Could not determine git remote
-# no project_id in payload
 ```
+Error: No project found matching the git remote for this repository.
+Create one at <host>/projects or pass --project-id <uuid> explicitly.
+```
+
+If you are not in a git repo (or there is no `origin` remote), attribution is skipped silently and events are sent without a project ID.
 
 ## Requirements
 
