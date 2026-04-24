@@ -1,9 +1,7 @@
 # frozen_string_literal: true
 
-class AiUsageSyncJob
-  include Sidekiq::Job
-
-  sidekiq_options queue: "ai", retry: 3
+class AiUsageSyncJob < ApplicationJob
+  queue_as :ai
 
   SUPPORTED_PROVIDERS = %w[openrouter anthropic openai gemini].freeze
 
@@ -127,7 +125,9 @@ class AiUsageSyncJob
     data = provider.fetch_usage(start_date: 7.days.ago.to_date, end_date: Date.today)
     return nil unless data
 
-    data.map do |entry|
+    Rails.logger.info("[Anthropic API] Raw usage data (#{data.size} entries): #{JSON.pretty_generate(data)}")
+
+    enriched = data.map do |entry|
       cost = ModelPricingService.calculate_cost(
         tokens_in: entry[:tokens_in],
         tokens_out: entry[:tokens_out],
@@ -135,6 +135,10 @@ class AiUsageSyncJob
       )
       entry.merge(cost_usd: cost[:total_cost])
     end
+
+    Rails.logger.info("[Anthropic API] Enriched with cost (#{enriched.size} entries): #{JSON.pretty_generate(enriched)}")
+
+    enriched
   end
 
   def fetch_openai_usage(connector)
@@ -165,6 +169,9 @@ class AiUsageSyncJob
   end
 
   def create_event_from_usage(org, provider, usage)
+    metadata = { external_id: usage[:external_id], reconciled: true }
+    metadata[:workspace_name] = usage[:workspace_name] if usage[:workspace_name].present?
+
     ToolEvent.create!(
       organization_id: org.id,
       tool_name: "#{provider}_api",
@@ -174,10 +181,7 @@ class AiUsageSyncJob
       tokens_out: usage[:tokens_out],
       cost_usd: usage[:cost_usd],
       occurred_at: usage[:occurred_at],
-      metadata: {
-        external_id: usage[:external_id],
-        reconciled: true
-      }
+      metadata: metadata
     )
   end
 end

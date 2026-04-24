@@ -73,8 +73,8 @@ RSpec.describe 'Api::V1::Events', type: :request do
 
       expect_success
       expect(json_data[:id]).to eq(tool_event.id)
-      expect(json_data[:tokensIn]).to eq(100)
-      expect(json_data[:tokensOut]).to eq(500)
+      expect(json_data[:inputTokens]).to eq(100)
+      expect(json_data[:outputTokens]).to eq(500)
     end
 
     it 'returns 404 for non-existent event' do
