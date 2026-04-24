@@ -277,16 +277,10 @@ export function EventDrawer({
                       <TabsTrigger value="metadata">Metadata</TabsTrigger>
                     </TabsList>
                     <TabsContent value="sanitized" className="mt-4">
-                      <ContentPanel
-                        title="Sanitized Content"
-                        content={event.sanitizedContent || undefined}
-                      />
+                      <ContentPanel title="Sanitized Content" />
                     </TabsContent>
                     <TabsContent value="raw" className="mt-4">
-                      <ContentPanel
-                        title="Raw Content"
-                        content={event.sanitizedContent || undefined}
-                      />
+                      <ContentPanel title="Raw Content" />
                     </TabsContent>
                     <TabsContent value="metadata" className="mt-4">
                       <ContentPanel
