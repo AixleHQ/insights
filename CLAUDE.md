@@ -64,6 +64,8 @@ make db-seed       # Seed the database
 
 All commands run from the repo root via `Makefile`.
 
+**Important:** For direct Ruby/Rails commands (`bundle exec`, `rails runner`, `rspec`, etc.), always run from `packages/api/` — the Gemfile lives there, not the repo root. Prefix with `cd packages/api &&` or ensure your working directory is correct.
+
 ## Ruby / Rails Guidelines
 
 - **Ruby version**: 3.4.8 (managed via asdf, see `.tool-versions`)
@@ -98,6 +100,11 @@ Follow this decision hierarchy: standard Rails patterns first → existing codeb
 - **State / data fetching**: TanStack Query (React Query). Do not use raw `fetch` or `axios` in components.
 - **Routing**: React Router 7.
 - **Testing**: Vitest + React Testing Library. Tests live in `packages/web/src/test/` and colocated with components.
+- **Formatting** — mandatory, no exceptions:
+  - All numeric display must go through `packages/web/src/lib/formatters.ts`. Never use inline `toFixed()`, `toLocaleString()`, or `Intl.NumberFormat` directly in components or pages.
+  - `formatCost(n)` — money/USD. Output: `$0.00` for zero; `$0.0012` (4 dp) for micro-costs < $0.01; `$1,234.56` (2 dp, US locale) for normal values.
+  - `formatTokens(n)` — token counts. Output: exact integer for < 1 000; `125.0K` for thousands; `1.2M` for millions.
+  - If a new numeric type needs display (percentages, durations, etc.), add a named export to `formatters.ts` — do not inline it at the call site.
 
 ## Database
 
