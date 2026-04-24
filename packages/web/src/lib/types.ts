@@ -178,6 +178,7 @@ export interface ToolEvent {
   createdAt: string;
   occurredAt: string;
   // Detail-only fields (returned by the show endpoint, not the list endpoint)
+  sanitizedContent?: string | null;
   metadata?: Record<string, unknown> | null;
   durationMs?: number | null;
   auditLog?: AuditLog | null;
