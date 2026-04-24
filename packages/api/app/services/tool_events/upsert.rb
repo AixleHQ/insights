@@ -54,7 +54,11 @@ module ToolEvents
         # Serialises concurrent requests for the same session_id so the
         # find-then-insert below has no TOCTOU window.
         lock_key = Zlib.crc32(@session_id)
-        ToolEvent.connection.execute("SELECT pg_advisory_xact_lock(#{lock_key})")
+        ToolEvent.connection.exec_query(
+          "SELECT pg_advisory_xact_lock($1)",
+          "advisory_lock",
+          [ lock_key ]
+        )
 
         existing = ToolEvent
           .where(organization_id: @attributes[:organization_id])
