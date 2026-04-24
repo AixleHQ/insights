@@ -10,11 +10,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { SortButton, type SortDirection } from "@/components/ui/sort-button";
 import { RiskBadge } from "@/components/dashboard/ActivityFeed";
 import { formatDistanceToNow, humanizeToolName, cn } from "@/lib/utils";
+import { formatCost as formatCostValue, getEventActorLabel } from "@/lib/formatters";
 
 export interface EventRow {
   id: string;
   tool_name?: string;
   event_type?: string;
+  attribution?: string;
   risk_level?: "critical" | "high" | "medium" | "low" | "none";
   cost_usd?: number;
   created_at?: string;
@@ -71,7 +73,7 @@ function formatCost(cost: unknown): string {
   if (cost === undefined || cost === null) return "-";
   const numCost = Number(cost);
   if (isNaN(numCost)) return "-";
-  return `$${numCost.toFixed(3)}`;
+  return formatCostValue(numCost);
 }
 
 function formatTokens(tokens: number | undefined): string {
@@ -123,7 +125,7 @@ export function EventsTable({
             </TableHead>
             <TableHead className="hidden md:table-cell">User</TableHead>
             <TableHead className="hidden lg:table-cell">Project</TableHead>
-            <TableHead className="w-[80px] sm:w-[100px]">
+            <TableHead className="w-[80px] sm:w-[100px] text-right">
               <SortButton
                 field="cost_usd"
                 currentField={sortField}
@@ -133,7 +135,7 @@ export function EventsTable({
                 Cost
               </SortButton>
             </TableHead>
-            <TableHead className="hidden sm:table-cell w-[80px]">Tokens</TableHead>
+            <TableHead className="hidden sm:table-cell w-[80px] text-right">Tokens</TableHead>
             <TableHead className="w-[100px] sm:w-[120px]">
               <SortButton
                 field="created_at"
@@ -180,7 +182,7 @@ export function EventsTable({
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
                   <span className="text-sm text-muted-foreground truncate max-w-[150px] block">
-                    {event.user?.email || "-"}
+                    {getEventActorLabel(event)}
                   </span>
                 </TableCell>
                 <TableCell className="hidden lg:table-cell">
@@ -188,12 +190,12 @@ export function EventsTable({
                     {event.project?.name || "-"}
                   </span>
                 </TableCell>
-                <TableCell>
+                <TableCell className="text-right">
                   <span className="font-mono-display text-sm">
                     {formatCost(event.cost_usd)}
                   </span>
                 </TableCell>
-                <TableCell className="hidden sm:table-cell">
+                <TableCell className="hidden sm:table-cell text-right">
                   <span className="font-mono-display text-sm text-muted-foreground">
                     {formatTokens(event.token_count)}
                   </span>

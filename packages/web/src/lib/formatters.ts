@@ -19,3 +19,30 @@ export function formatTokens(n: number): string {
 export function truncateModelName(name: string): string {
   return name.length > 30 ? `${name.slice(0, 30)}…` : name;
 }
+
+// Event attribution — classifies who performed an event.
+// The backend serializer sets `attribution` on each event; this maps it to a display label.
+export const EventAttribution = {
+  USER: "user",
+  ORGANIZATION: "organization",
+  SERVICE: "service",
+  UNKNOWN: "unknown",
+} as const;
+
+export type EventAttributionType = (typeof EventAttribution)[keyof typeof EventAttribution];
+
+const ATTRIBUTION_LABELS: Record<EventAttributionType, string> = {
+  [EventAttribution.USER]: "User",
+  [EventAttribution.ORGANIZATION]: "Organization",
+  [EventAttribution.SERVICE]: "Service",
+  [EventAttribution.UNKNOWN]: "-",
+};
+
+export function getEventActorLabel(event: {
+  user?: { email?: string } | null;
+  attribution?: string;
+}): string {
+  if (event.user?.email) return event.user.email;
+  const key = (event.attribution || "unknown") as EventAttributionType;
+  return ATTRIBUTION_LABELS[key] || ATTRIBUTION_LABELS[EventAttribution.UNKNOWN];
+}
