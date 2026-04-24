@@ -1,7 +1,9 @@
 # frozen_string_literal: true
 
-class AiUsageSyncJob < ApplicationJob
-  queue_as :ai
+class AiUsageSyncJob
+  include Sidekiq::Job
+
+  sidekiq_options queue: "ai", retry: 3
 
   SUPPORTED_PROVIDERS = %w[openrouter anthropic openai gemini].freeze
 
