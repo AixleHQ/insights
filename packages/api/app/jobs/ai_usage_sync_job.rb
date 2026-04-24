@@ -121,10 +121,15 @@ class AiUsageSyncJob
     end
   end
 
+  # How far back to sync on the first pull vs recurring syncs.
+  ANTHROPIC_INITIAL_SYNC_DAYS = 90
+  ANTHROPIC_RECURRING_SYNC_DAYS = 7
+
   def fetch_anthropic_usage(connector)
     # Requires an Admin API key (sk-ant-admin...) stored in connector.access_token
+    days_back = connector.last_sync_at ? ANTHROPIC_RECURRING_SYNC_DAYS : ANTHROPIC_INITIAL_SYNC_DAYS
     provider = Oauth::AnthropicProvider.new(connector)
-    data = provider.fetch_usage(start_date: 7.days.ago.to_date, end_date: Date.today)
+    data = provider.fetch_usage(start_date: days_back.days.ago.to_date, end_date: Date.today)
     return nil unless data
 
     Rails.logger.info("[Anthropic API] Raw usage data (#{data.size} entries): #{JSON.pretty_generate(data)}")
@@ -164,10 +169,19 @@ class AiUsageSyncJob
   end
 
   def find_matching_event(org, provider, usage)
-    org.tool_events
-       .where(tool_name: "#{provider}_api")
-       .where("metadata->>'external_id' = ?", usage[:external_id])
-       .first
+    scope = org.tool_events.where(tool_name: "#{provider}_api")
+
+    # Exact match on external_id (handles both old and new format)
+    match = scope.where("metadata->>'external_id' = ?", usage[:external_id]).first
+    return match if match
+
+    # Transition guard: if this entry has a workspace, also check the old
+    # aggregated format (without workspace in the ID) to prevent duplicates
+    # during the first sync after workspace support is deployed.
+    if usage[:workspace_name].present?
+      old_id = [ provider, usage[:model], usage[:occurred_at].to_date ].join("-")
+      scope.where("metadata->>'external_id' = ?", old_id).first
+    end
   end
 
   def create_event_from_usage(org, provider, usage)
