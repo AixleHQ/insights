@@ -5,15 +5,27 @@ import { readState, writeState, markSessionSent, APP_DIR } from "./state.js";
 import { findTranscriptFiles, parseTranscriptFile, toDb90Payload } from "./claude-reader.js";
 import { postEvent } from "./client.js";
 import { resolveProjectId } from "./project-resolver.js";
+import { type PricingTable, DEFAULT_PRICING, mergePricing, getCostWarning } from "./pricing.js";
 
 interface Config {
   token?: string;
   host?: string;
   project_id?: string;
+  pricing?: PricingTable;
 }
 
-function loadConfig(): Config {
-  const configPath = join(APP_DIR, "config.json");
+/** Minimal structural check: is this an object whose values are all objects? */
+function isPricingTable(value: unknown): value is PricingTable {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.values(value).every((v) => typeof v === "object" && v !== null && !Array.isArray(v))
+  );
+}
+
+export function loadConfig(dir?: string): Config {
+  const configPath = join(dir ?? APP_DIR, "config.json");
   try {
     const parsed = JSON.parse(readFileSync(configPath, "utf-8")) as unknown;
     if (typeof parsed === "object" && parsed !== null) {
@@ -22,6 +34,7 @@ function loadConfig(): Config {
         token: typeof obj.token === "string" ? obj.token : undefined,
         host: typeof obj.host === "string" ? obj.host : undefined,
         project_id: typeof obj.project_id === "string" ? obj.project_id : undefined,
+        pricing: isPricingTable(obj.pricing) ? (obj.pricing as PricingTable) : undefined,
       };
     }
   } catch {
@@ -113,7 +126,11 @@ Options:
   --help, -h                 Show this help message
 
 Config file: ~/.db90-claude/config.json
-  { "token": "...", "host": "https://app.db90.io", "project_id": "..." }
+  { "token": "...", "host": "https://app.db90.io", "project_id": "...",
+    "pricing": { "<model-id>": { "input_per_mtok": 3.00, "output_per_mtok": 15.00,
+                                  "cache_write_per_mtok": 3.75, "cache_read_per_mtok": 0.30 } } }
+  The "pricing" key overrides per-model rates used for cost_usd estimation.
+  For models not in the default table, supply all four *_per_mtok fields.
 
 Reads transcripts from:
   ~/.config/claude/projects/  (Claude Code v1.0.30+)
@@ -132,7 +149,8 @@ async function syncOnce(
   host: string,
   dryRun: boolean,
   verbose: boolean,
-  projectId: string | null
+  projectId: string | null,
+  pricing: PricingTable
 ): Promise<SyncResult> {
   const files = findTranscriptFiles();
 
@@ -160,7 +178,18 @@ async function syncOnce(
         continue;
       }
 
-      const payload = toDb90Payload(agg, projectId ?? undefined);
+      const payload = toDb90Payload(agg, { projectId: projectId ?? undefined, pricing });
+
+      if (verbose && payload.cost_usd === null) {
+        if (!agg.model) {
+          if (agg.tokensIn > 0 || agg.tokensOut > 0) {
+            console.warn(`[warn] Session ${sessionId} has usage but no model — cost_usd will be null`);
+          }
+        } else {
+          const warning = getCostWarning(agg.model, pricing);
+          if (warning) console.warn(`[warn] ${warning}`);
+        }
+      }
 
       if (dryRun) {
         console.log(`[dry-run] Would send session ${sessionId}:`);
@@ -199,6 +228,7 @@ async function main(): Promise<void> {
 
   const token = cliArgs.token ?? process.env["DB90_TOKEN"] ?? fileConfig.token;
   const host = cliArgs.host ?? process.env["DB90_HOST"] ?? fileConfig.host;
+  const pricing = mergePricing(DEFAULT_PRICING, fileConfig.pricing ?? {});
 
   if (!token) {
     console.error(
@@ -234,7 +264,7 @@ async function main(): Promise<void> {
     );
 
     const runSync = async () => {
-      const result = await syncOnce(token, host, cliArgs.dryRun, cliArgs.verbose, resolution.projectId);
+      const result = await syncOnce(token, host, cliArgs.dryRun, cliArgs.verbose, resolution.projectId, pricing);
       if (result.sent > 0 || result.failed > 0) {
         console.log(
           `Sent: ${result.sent}, Failed: ${result.failed}, Skipped: ${result.skipped}`
@@ -263,7 +293,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const result = await syncOnce(token, host, cliArgs.dryRun, cliArgs.verbose, resolution.projectId);
+  const result = await syncOnce(token, host, cliArgs.dryRun, cliArgs.verbose, resolution.projectId, pricing);
   console.log(`Sent: ${result.sent}, Failed: ${result.failed}, Skipped: ${result.skipped}`);
 
   if (result.failed > 0) {

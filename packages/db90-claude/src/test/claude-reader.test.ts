@@ -3,6 +3,16 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { findTranscriptFiles, parseTranscriptFile, toDb90Payload } from "../claude-reader.js";
+import { type PricingTable } from "../pricing.js";
+
+const TEST_PRICING: PricingTable = {
+  "claude-opus-4-5": {
+    input_per_mtok: 15.0,
+    output_per_mtok: 75.0,
+    cache_write_per_mtok: 18.75,
+    cache_read_per_mtok: 1.5,
+  },
+};
 
 let testDir: string;
 
@@ -196,6 +206,7 @@ describe("toDb90Payload", () => {
     expect(payload.tokens_in).toBe(100);
     expect(payload.tokens_out).toBe(50);
     expect(payload.tokens_total).toBe(150);
+    expect(payload.cost_usd).toBeNull(); // no pricing provided
     expect(payload.occurred_at).toBe("2024-01-01T00:00:00.000Z");
     expect(payload.metadata.session_id).toBe("sess-abc");
     expect(payload.metadata.cache_write_tokens).toBe(10);
@@ -220,7 +231,93 @@ describe("toDb90Payload", () => {
     expect(payload.tokens_out).toBeUndefined();
     expect(payload.tokens_total).toBeUndefined();
     expect(payload.model).toBeUndefined();
+    expect(payload.cost_usd).toBeNull();
     expect(payload.metadata.cache_write_tokens).toBeUndefined();
     expect(payload.metadata.cache_read_tokens).toBeUndefined();
+  });
+
+  it("computes cost_usd when pricing is provided and model is known", () => {
+    // tokensIn=115 (input=100, cache_write=10, cache_read=5)
+    // baseInput = 115 - 10 - 5 = 100
+    // cost = (100*15 + 50*75 + 10*18.75 + 5*1.50) / 1_000_000
+    //      = (1500 + 3750 + 187.5 + 7.5) / 1_000_000
+    //      = 5445 / 1_000_000 = 0.005445
+    const agg = {
+      sessionId: "sess-abc",
+      filePath: "/path/to/file.jsonl",
+      fileSize: 1234,
+      model: "claude-opus-4-5",
+      tokensIn: 115,
+      tokensOut: 50,
+      cacheWriteTokens: 10,
+      cacheReadTokens: 5,
+      occurredAt: "2024-01-01T00:00:00.000Z",
+    };
+    const payload = toDb90Payload(agg, { pricing: TEST_PRICING });
+    expect(payload.cost_usd).toBe(0.005445);
+  });
+
+  it("sets cost_usd to 0 when all tokens are zero but model is known", () => {
+    const agg = {
+      sessionId: "sess-abc",
+      filePath: "/path/to/file.jsonl",
+      fileSize: 100,
+      model: "claude-opus-4-5",
+      tokensIn: 0,
+      tokensOut: 0,
+      cacheWriteTokens: 0,
+      cacheReadTokens: 0,
+      occurredAt: "2024-01-01T00:00:00.000Z",
+    };
+    const payload = toDb90Payload(agg, { pricing: TEST_PRICING });
+    expect(payload.cost_usd).toBe(0);
+  });
+
+  it("sets cost_usd to null when model is null even with pricing", () => {
+    const agg = {
+      sessionId: "sess-abc",
+      filePath: "/path/to/file.jsonl",
+      fileSize: 100,
+      model: null,
+      tokensIn: 100,
+      tokensOut: 50,
+      cacheWriteTokens: 0,
+      cacheReadTokens: 0,
+      occurredAt: "2024-01-01T00:00:00.000Z",
+    };
+    const payload = toDb90Payload(agg, { pricing: TEST_PRICING });
+    expect(payload.cost_usd).toBeNull();
+  });
+
+  it("sets cost_usd to null when model is unknown", () => {
+    const agg = {
+      sessionId: "sess-abc",
+      filePath: "/path/to/file.jsonl",
+      fileSize: 100,
+      model: "claude-unknown-model",
+      tokensIn: 100,
+      tokensOut: 50,
+      cacheWriteTokens: 0,
+      cacheReadTokens: 0,
+      occurredAt: "2024-01-01T00:00:00.000Z",
+    };
+    const payload = toDb90Payload(agg, { pricing: TEST_PRICING });
+    expect(payload.cost_usd).toBeNull();
+  });
+
+  it("includes projectId in payload when provided via options", () => {
+    const agg = {
+      sessionId: "sess-abc",
+      filePath: "/path/to/file.jsonl",
+      fileSize: 100,
+      model: null,
+      tokensIn: 0,
+      tokensOut: 0,
+      cacheWriteTokens: 0,
+      cacheReadTokens: 0,
+      occurredAt: "2024-01-01T00:00:00.000Z",
+    };
+    const payload = toDb90Payload(agg, { projectId: "proj-uuid-123" });
+    expect(payload.project_id).toBe("proj-uuid-123");
   });
 });

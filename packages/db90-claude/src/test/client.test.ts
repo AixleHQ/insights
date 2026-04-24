@@ -9,6 +9,7 @@ const samplePayload: Db90Payload = {
   tokens_in: 100,
   tokens_out: 50,
   tokens_total: 150,
+  cost_usd: null,
   occurred_at: "2024-01-01T00:00:00.000Z",
   metadata: { session_id: "abc123" },
 };
