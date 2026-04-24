@@ -158,7 +158,7 @@ async function syncOnce(
     console.log(`[verbose] Found ${files.length} transcript file(s)`);
   }
 
-  let state = readState();
+  let state = readState(APP_DIR, host, token);
   let totalSent = 0;
   let totalFailed = 0;
   let totalSkipped = 0;
@@ -205,7 +205,7 @@ async function syncOnce(
       const ok = await postEvent(payload, host, token);
       if (ok) {
         state = markSessionSent(state, sessionId, agg.fileSize);
-        writeState(state);
+        writeState(state, APP_DIR, host, token);
         totalSent++;
       } else {
         totalFailed++;

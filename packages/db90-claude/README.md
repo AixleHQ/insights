@@ -154,11 +154,23 @@ Create `~/.db90-claude/config.json`:
 
 ### State file
 
-The CLI stores per-session progress in `~/.db90-claude/state.json` to prevent duplicate posts. Each session is tracked by its Claude session ID and the file size of its `.jsonl` transcript at the time it was last successfully sent.
+The CLI stores per-session progress in `~/.db90-claude/` to prevent duplicate posts. Each session is tracked by its Claude session ID and the file size of its `.jsonl` transcript at the time it was last successfully sent.
+
+**One state file per host + token.** The state file is named `state-<hostname>-<token-hash>.json` (e.g. `state-app.db90.io-a1b2c3d4.json`). This means switching organisations or hosts automatically starts with a clean slate — sessions posted to org A are never skipped when you start posting to org B.
 
 **Idempotency rule:** a session is skipped if its transcript file size matches the checkpoint stored from the last successful POST. When a session grows (new messages), it is re-processed and re-sent with the updated aggregated totals.
 
 State is only updated after a successful HTTP 2xx response — a failed POST leaves the session eligible for retry on the next run.
+
+**To force a full re-send** (e.g. after switching tokens or recovering from a corrupted state), delete the relevant state file:
+
+```bash
+# List all state files
+ls ~/.db90-claude/state-*.json
+
+# Delete a specific one, or all of them
+rm ~/.db90-claude/state-app.db90.io-a1b2c3d4.json
+```
 
 ## Cost Estimation
 
