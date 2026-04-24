@@ -104,7 +104,7 @@ module Api
         events = current_organization.tool_events
                                      .where(occurred_at: time_range[:start]..time_range[:end])
 
-        daily_data = events
+        rows_by_date = events
           .group("DATE_TRUNC('day', occurred_at)")
           .select(
             "DATE_TRUNC('day', occurred_at) as day",
@@ -112,13 +112,19 @@ module Api
             "SUM(cost_usd) as cost_usd"
           )
           .order("day")
-          .map do |row|
-            {
-              date: row.day&.to_date&.iso8601,
+          .each_with_object({}) do |row, h|
+            h[row.day.to_date.iso8601] = {
+              date: row.day.to_date.iso8601,
               event_count: row.event_count,
               cost_usd: (row.cost_usd || 0).to_f
             }
           end
+
+        # Zero-fill every calendar day in the range so the chart always shows
+        # the correct window (e.g. "7 days" = last 7 calendar days, not last 7 active days).
+        daily_data = (time_range[:start].to_date..time_range[:end].to_date).map do |date|
+          rows_by_date[date.iso8601] || { date: date.iso8601, event_count: 0, cost_usd: 0.0 }
+        end
 
         tool_breakdown = events
           .group(:tool_name)
