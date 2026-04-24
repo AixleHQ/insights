@@ -77,6 +77,62 @@ RSpec.describe 'Api::V1::Events', type: :request do
       expect(json_data[:outputTokens]).to eq(500)
     end
 
+    it "returns attribution 'user' for user-generated events" do
+      authenticated_get "/api/v1/organizations/#{organization.id}/events/#{tool_event.id}",
+                        user: user,
+                        organization: organization
+
+      expect_success
+      expect(json_data[:attribution]).to eq("user")
+    end
+
+    it "returns attribution 'organization' for reconciled events" do
+      org_event = create(:tool_event,
+                         organization: organization,
+                         user: nil,
+                         metadata: { "reconciled" => true })
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/events/#{org_event.id}",
+                        user: user,
+                        organization: organization
+
+      expect_success
+      expect(json_data[:attribution]).to eq("organization")
+    end
+
+    it "falls back to workspace_name for project when no project is assigned" do
+      ws_event = create(:tool_event,
+                        organization: organization,
+                        user: user,
+                        project: nil,
+                        metadata: { "workspace_name" => "engineering-team" })
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/events/#{ws_event.id}",
+                        user: user,
+                        organization: organization
+
+      expect_success
+      expect(json_data[:project][:name]).to eq("engineering-team")
+      expect(json_data[:project][:id]).to be_nil
+    end
+
+    it "returns project with id and slug when project is assigned" do
+      project = create(:project, organization: organization)
+      project_event = create(:tool_event,
+                             organization: organization,
+                             user: user,
+                             project: project)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/events/#{project_event.id}",
+                        user: user,
+                        organization: organization
+
+      expect_success
+      expect(json_data[:project][:id]).to eq(project.id)
+      expect(json_data[:project][:name]).to eq(project.name)
+      expect(json_data[:project][:slug]).to eq(project.slug)
+    end
+
     it 'returns 404 for non-existent event' do
       authenticated_get "/api/v1/organizations/#{organization.id}/events/nonexistent",
                         user: user,
