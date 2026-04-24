@@ -2,7 +2,7 @@
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
 import { readState, writeState, markSessionSent, APP_DIR } from "./state.js";
-import { findTranscriptFiles, parseTranscriptFile, toDb90Payload } from "./claude-reader.js";
+import { findTranscriptFiles, parseTranscriptFile, toDb90Payload, type SessionAggregate } from "./claude-reader.js";
 import { postEvent } from "./client.js";
 import { resolveProjectId } from "./project-resolver.js";
 import { type PricingTable, DEFAULT_PRICING, mergePricing, getCostWarning } from "./pricing.js";
@@ -158,58 +158,81 @@ async function syncOnce(
     console.log(`[verbose] Found ${files.length} transcript file(s)`);
   }
 
+  // Phase 1: collect all session aggregates across every transcript file.
+  // The same session ID can appear in multiple files (e.g. both the legacy
+  // ~/.claude/projects/ path and the newer ~/.config/claude/projects/ path
+  // may contain copies of the same session at different stages). Keep only
+  // the most-complete aggregate for each session — the one with the highest
+  // combined token count — so we always send the best available data and
+  // never accidentally overwrite a large aggregate with a smaller stale copy.
+  const bestAggs = new Map<string, SessionAggregate>();
+
+  for (const filePath of files) {
+    const fileSessions = await parseTranscriptFile(filePath, verbose);
+    for (const [sessionId, agg] of fileSessions) {
+      const existing = bestAggs.get(sessionId);
+      if (!existing || agg.tokensIn + agg.tokensOut > existing.tokensIn + existing.tokensOut) {
+        bestAggs.set(sessionId, agg);
+      }
+    }
+  }
+
+  if (verbose) {
+    const raw = files.length;
+    const deduped = bestAggs.size;
+    if (raw !== deduped) {
+      console.log(`[verbose] Deduplicated ${raw} file(s) → ${deduped} unique session(s)`);
+    }
+  }
+
   let state = readState(APP_DIR, host, token);
   let totalSent = 0;
   let totalFailed = 0;
   let totalSkipped = 0;
 
-  for (const filePath of files) {
-    const sessions = await parseTranscriptFile(filePath, verbose);
+  for (const [sessionId, agg] of bestAggs) {
+    const known = state.sessions[sessionId];
 
-    for (const [sessionId, agg] of sessions) {
-      const known = state.sessions[sessionId];
-
-      // Skip if file size hasn't changed since last successful send
-      if (known && known.fileSize === agg.fileSize) {
-        totalSkipped++;
-        if (verbose) {
-          console.log(`[verbose] Skipping unchanged session ${sessionId}`);
-        }
-        continue;
-      }
-
-      const payload = toDb90Payload(agg, { projectId: projectId ?? undefined, pricing });
-
-      if (verbose && payload.cost_usd === null) {
-        if (!agg.model) {
-          if (agg.tokensIn > 0 || agg.tokensOut > 0) {
-            console.warn(`[warn] Session ${sessionId} has usage but no model — cost_usd will be null`);
-          }
-        } else {
-          const warning = getCostWarning(agg.model, pricing);
-          if (warning) console.warn(`[warn] ${warning}`);
-        }
-      }
-
-      if (dryRun) {
-        console.log(`[dry-run] Would send session ${sessionId}:`);
-        console.log(JSON.stringify(payload, null, 2));
-        totalSent++;
-        continue;
-      }
-
+    // Skip if file size hasn't changed since last successful send
+    if (known && known.fileSize === agg.fileSize) {
+      totalSkipped++;
       if (verbose) {
-        console.log(`[verbose] Sending session ${sessionId} (${agg.tokensIn + agg.tokensOut} tokens)`);
+        console.log(`[verbose] Skipping unchanged session ${sessionId}`);
       }
+      continue;
+    }
 
-      const ok = await postEvent(payload, host, token);
-      if (ok) {
-        state = markSessionSent(state, sessionId, agg.fileSize);
-        writeState(state, APP_DIR, host, token);
-        totalSent++;
+    const payload = toDb90Payload(agg, { projectId: projectId ?? undefined, pricing });
+
+    if (verbose && payload.cost_usd === null) {
+      if (!agg.model) {
+        if (agg.tokensIn > 0 || agg.tokensOut > 0) {
+          console.warn(`[warn] Session ${sessionId} has usage but no model — cost_usd will be null`);
+        }
       } else {
-        totalFailed++;
+        const warning = getCostWarning(agg.model, pricing);
+        if (warning) console.warn(`[warn] ${warning}`);
       }
+    }
+
+    if (dryRun) {
+      console.log(`[dry-run] Would send session ${sessionId}:`);
+      console.log(JSON.stringify(payload, null, 2));
+      totalSent++;
+      continue;
+    }
+
+    if (verbose) {
+      console.log(`[verbose] Sending session ${sessionId} (${agg.tokensIn + agg.tokensOut} tokens)`);
+    }
+
+    const ok = await postEvent(payload, host, token);
+    if (ok) {
+      state = markSessionSent(state, sessionId, agg.fileSize);
+      writeState(state, APP_DIR, host, token);
+      totalSent++;
+    } else {
+      totalFailed++;
     }
   }
 
