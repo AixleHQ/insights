@@ -82,7 +82,7 @@ Expected output:
   "tokens_in": 18420,
   "tokens_out": 3210,
   "tokens_total": 21630,
-  "cost_usd": 0.412875,
+  "cost_usd": 0.137625,
   "occurred_at": "2026-04-10T14:23:11.000Z",
   "metadata": {
     "session_id": "abc123def",
@@ -341,7 +341,7 @@ All four usage fields are summed across every assistant message in a session. `t
   "tokens_in": 18420,
   "tokens_out": 3210,
   "tokens_total": 21630,
-  "cost_usd": 0.412875,
+  "cost_usd": 0.137625,
   "occurred_at": "2026-04-10T14:23:11.000Z",
   "metadata": {
     "session_id": "abc123def",

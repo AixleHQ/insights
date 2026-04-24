@@ -74,11 +74,11 @@ describe("calculateCost", () => {
 
   it("uses the real README example values correctly", () => {
     // Existing README: 18420 tokensIn, 3210 out, 2100 cache-write, 8300 cache-read
-    // model: claude-opus-4-5 ($15/$75/$18.75/$1.50)
+    // model: claude-opus-4-5 ($5/$25/$6.25/$0.50 — verified 2026-04-25)
     // baseInput = 18420 - 2100 - 8300 = 8020
-    // cost = (8020*15 + 3210*75 + 2100*18.75 + 8300*1.50) / 1_000_000
-    //      = (120300 + 240750 + 39375 + 12450) / 1_000_000
-    //      = 412875 / 1_000_000 = 0.412875
+    // cost = (8020*5 + 3210*25 + 2100*6.25 + 8300*0.50) / 1_000_000
+    //      = (40100 + 80250 + 13125 + 4150) / 1_000_000
+    //      = 137625 / 1_000_000 = 0.137625
     const cost = calculateCost(
       "claude-opus-4-5",
       8020,
@@ -87,7 +87,7 @@ describe("calculateCost", () => {
       8300,
       DEFAULT_PRICING
     );
-    expect(cost).toBe(0.412875);
+    expect(cost).toBe(0.137625);
   });
 });
 
