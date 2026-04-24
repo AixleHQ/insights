@@ -1,8 +1,12 @@
 /**
  * Model pricing table and cost calculation for db90-claude.
  *
- * Default rates source: https://www.anthropic.com/pricing
- * Verify against the pricing page when updating rates.
+ * Default rates source: https://platform.claude.com/docs/en/about-claude/pricing
+ * Rates last verified: 2026-04-24
+ *
+ * When Anthropic updates prices, a GitHub Actions workflow opens an issue
+ * automatically (see .github/workflows/check-claude-pricing.yml).
+ * Update DEFAULT_PRICING below and bump the "Rates last verified" date above.
  *
  * Users can override or add per-model rates in ~/.db90-claude/config.json
  * under a "pricing" key without reinstalling the package.
