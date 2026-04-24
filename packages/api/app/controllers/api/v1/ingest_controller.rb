@@ -93,7 +93,8 @@ module Api
       end
 
       def fallback_direct_insert(event_params, org)
-        event = org.tool_events.create!(
+        attributes = {
+          organization_id: org.id,
           user_id: event_params[:user_id],
           project_id: event_params[:project_id],
           tool_name: event_params[:tool_name],
@@ -106,9 +107,10 @@ module Api
           duration_ms: event_params[:duration_ms],
           occurred_at: event_params[:occurred_at] || Time.current,
           metadata: event_params[:metadata] || {}
-        )
+        }
+        result = ToolEvents::Upsert.call(attributes)
 
-        { workflow_id: nil, tool_event_id: event.id, fallback: true }
+        { workflow_id: nil, tool_event_id: result[:tool_event].id, fallback: true }
       end
 
       def permitted_params

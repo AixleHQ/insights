@@ -33,8 +33,7 @@ class ToolEventDetailSerializer < BaseSerializer
   end
 
   attribute :audit_log do |event|
-    if event.audit_log
-      AuditLogSerializer.new(event.audit_log).serialize
-    end
+    latest = event.audit_logs.order(created_at: :desc).first
+    AuditLogSerializer.new(latest).serialize if latest
   end
 end

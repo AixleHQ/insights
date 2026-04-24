@@ -16,7 +16,7 @@ class ToolEvent < ApplicationRecord
   belongs_to :organization
   belongs_to :project, optional: true
   belongs_to :repository, optional: true
-  has_one :audit_log, dependent: :nullify
+  has_many :audit_logs, dependent: :nullify
 
   validates :tool_name, presence: true, inclusion: { in: TOOL_NAMES }
   validates :event_type, presence: true, inclusion: { in: EVENT_TYPES }

@@ -8,8 +8,8 @@ module Api
 
     # POST /api/internal/tool_events
     def create_tool_event
-      event = ToolEvent.create!(tool_event_params)
-      render json: { data: { id: event.id } }, status: :created
+      result = ToolEvents::Upsert.call(tool_event_params.to_h.symbolize_keys)
+      render json: { data: { id: result[:tool_event].id } }, status: :created
     rescue ActiveRecord::RecordInvalid => e
       render json: { error: "Validation failed", errors: e.record.errors.to_hash }, status: :unprocessable_entity
     end

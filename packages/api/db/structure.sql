@@ -9681,7 +9681,6 @@ CREATE INDEX index_project_settings_on_project_id ON public.project_settings USI
 CREATE UNIQUE INDEX index_project_settings_on_project_id_and_key ON public.project_settings USING btree (project_id, key);
 
 
-
 --
 -- Name: index_projects_on_org_and_git_remote_url; Type: INDEX; Schema: public; Owner: -
 --
@@ -9806,6 +9805,13 @@ CREATE INDEX idx_tool_events_org_occurred ON timeseries.tool_events USING btree 
 --
 
 CREATE INDEX idx_tool_events_project_occurred ON timeseries.tool_events USING btree (project_id, occurred_at DESC);
+
+
+--
+-- Name: idx_tool_events_session_id; Type: INDEX; Schema: timeseries; Owner: -
+--
+
+CREATE INDEX idx_tool_events_session_id ON timeseries.tool_events USING btree (((metadata ->> 'session_id'::text))) WHERE ((metadata ->> 'session_id'::text) IS NOT NULL);
 
 
 --
@@ -11780,6 +11786,7 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260424000003'),
 ('20260424000002'),
 ('20260424000001'),
 ('20260416000001'),
