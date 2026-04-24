@@ -35,6 +35,7 @@ export function EventDetailPage() {
             name: apiEvent.project.name,
           }
         : undefined,
+      sanitized_content: apiEvent.sanitizedContent || undefined,
       metadata: apiEvent.metadata
         ? { ...(apiEvent.model ? { model: apiEvent.model } : {}), ...apiEvent.metadata }
         : apiEvent.model
