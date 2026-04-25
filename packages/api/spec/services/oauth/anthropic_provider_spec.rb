@@ -6,6 +6,20 @@ RSpec.describe Oauth::AnthropicProvider, type: :service do
   let(:connector) { instance_double('OrganizationConnector', access_token: 'sk-ant-test123') }
   let(:provider) { described_class.new(connector) }
 
+  describe "GET-only constraint" do
+    it "does not use any mutating HTTP verb anywhere in the file" do
+      source = File.read(Rails.root.join("app/services/oauth/anthropic_provider.rb"))
+      expect(source).not_to match(/Faraday\.(post|put|patch|delete)/)
+      expect(source).not_to match(/Net::HTTP::(Post|Put|Patch|Delete)/)
+    end
+
+    it "READ_ONLY_CONNECTION is a frozen Faraday connection" do
+      connection = described_class.send(:const_get, :READ_ONLY_CONNECTION)
+      expect(connection).to be_a(Faraday::Connection)
+      expect(connection).to be_frozen
+    end
+  end
+
   describe "#fetch_usage" do
     let(:usage_url) { "https://api.anthropic.com/v1/organizations/usage_report/messages" }
     let(:start_date) { Date.new(2026, 4, 8) }
@@ -221,11 +235,17 @@ RSpec.describe Oauth::AnthropicProvider, type: :service do
   end
 
   describe '#test_connection' do
-    context 'when the API key is valid' do
+    let(:usage_url) { 'https://api.anthropic.com/v1/organizations/usage_report/messages' }
+
+    def stub_test_connection(status:, body: '{}')
+      stub_request(:get, usage_url)
+        .with(query: hash_including('bucket_width' => '1d'))
+        .to_return(status: status, body: body, headers: { 'Content-Type' => 'application/json' })
+    end
+
+    context 'when the admin API key is valid' do
       it 'returns success' do
-        stub_request(:get, 'https://api.anthropic.com/v1/models')
-          .with(headers: { 'x-api-key' => 'sk-ant-test123', 'anthropic-version' => '2023-06-01' })
-          .to_return(status: 200, body: '{"data":[]}', headers: { 'Content-Type' => 'application/json' })
+        stub_test_connection(status: 200, body: '{"data":[],"has_more":false}')
 
         result = provider.test_connection
 
@@ -234,33 +254,30 @@ RSpec.describe Oauth::AnthropicProvider, type: :service do
     end
 
     context 'when the API key is invalid (401)' do
-      it 'returns failure with error message' do
-        stub_request(:get, 'https://api.anthropic.com/v1/models')
-          .to_return(status: 401, body: '{"error":"unauthorized"}')
+      it 'returns failure with admin key guidance' do
+        stub_test_connection(status: 401, body: '{"error":"unauthorized"}')
 
         result = provider.test_connection
 
         expect(result[:success]).to be false
-        expect(result[:error]).to eq('Invalid API key')
+        expect(result[:error]).to include('Admin API key')
       end
     end
 
     context 'when the API key is forbidden (403)' do
-      it 'returns failure with error message' do
-        stub_request(:get, 'https://api.anthropic.com/v1/models')
-          .to_return(status: 403, body: '{"error":"forbidden"}')
+      it 'returns failure with admin key guidance' do
+        stub_test_connection(status: 403, body: '{"error":"forbidden"}')
 
         result = provider.test_connection
 
         expect(result[:success]).to be false
-        expect(result[:error]).to eq('Invalid API key')
+        expect(result[:error]).to include('Admin API key')
       end
     end
 
     context 'when the API returns another error status' do
       it 'returns failure with status code in message' do
-        stub_request(:get, 'https://api.anthropic.com/v1/models')
-          .to_return(status: 500, body: '{}')
+        stub_test_connection(status: 500)
 
         result = provider.test_connection
 
@@ -271,7 +288,8 @@ RSpec.describe Oauth::AnthropicProvider, type: :service do
 
     context 'when a network error occurs' do
       it 'returns failure with connection error message' do
-        stub_request(:get, 'https://api.anthropic.com/v1/models')
+        stub_request(:get, usage_url)
+          .with(query: hash_including('bucket_width' => '1d'))
           .to_raise(Faraday::ConnectionFailed.new('connection refused'))
 
         result = provider.test_connection

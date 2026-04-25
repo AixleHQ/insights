@@ -2220,6 +2220,419 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  # ============================================
+  # EVENTS
+  # ============================================
+  /api/v1/organizations/{organization_id}/events:
+    get:
+      summary: List events
+      description: Returns a paginated list of tool events for the organization. Supports filtering by tool, event type, risk level, user, project, model, and date range.
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+        - name: tool_name
+          in: query
+          schema:
+            type: string
+        - name: event_type
+          in: query
+          schema:
+            type: string
+        - name: risk_level
+          in: query
+          schema:
+            type: string
+            enum: [critical, high, medium, low, none]
+        - name: user_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: project_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: model
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated list of events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ToolEvent'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/events/{id}:
+    get:
+      summary: Get event details
+      description: Returns full details for a single tool event, including metadata, audit log, and associations.
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Event details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ToolEventDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/organizations/{organization_id}/events/summary:
+    get:
+      summary: Event summary statistics
+      description: Returns aggregate counts (events, tokens, cost) grouped by tool, event type, and user.
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+      responses:
+        '200':
+          description: Summary statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      totalEvents:
+                        type: integer
+                      totalTokensIn:
+                        type: integer
+                      totalTokensOut:
+                        type: integer
+                      totalCostUsd:
+                        type: number
+                        format: float
+                      byTool:
+                        type: object
+                        additionalProperties:
+                          type: integer
+                      byEventType:
+                        type: object
+                        additionalProperties:
+                          type: integer
+                      byUser:
+                        type: object
+                        additionalProperties:
+                          type: integer
+                      timeRange:
+                        type: object
+                        properties:
+                          start:
+                            type: string
+                            format: date-time
+                            nullable: true
+                          end:
+                            type: string
+                            format: date-time
+                            nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/events/unattributed:
+    get:
+      summary: List unattributed events
+      description: Returns events with no assigned user (user_id is null). Used for the attribution assignment UI.
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+        - name: tool_name
+          in: query
+          schema:
+            type: string
+        - name: event_type
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated list of unattributed events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ToolEvent'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/events/{id}/audit_trail:
+    get:
+      summary: Get event audit trail
+      description: Returns the audit log entry for a specific event, if one exists.
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Audit log for the event (or null if none exists)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AuditLog'
+                  - type: object
+                    properties:
+                      data:
+                        type: 'null'
+                      message:
+                        type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================
+  # AI GATEWAY
+  # ============================================
+  /api/v1/organizations/{organization_id}/ai/{provider}/completions:
+    post:
+      summary: AI completion
+      description: |
+        Proxies a completion request to the specified AI provider.
+        Polling-only providers (e.g. `anthropic`) return 403 — they are connected for usage data only, not chat/completion.
+      tags:
+        - AI Gateway
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                prompt:
+                  type: string
+                model:
+                  type: string
+                temperature:
+                  type: number
+                max_tokens:
+                  type: integer
+                top_p:
+                  type: number
+              required:
+                - prompt
+      responses:
+        '200':
+          description: Completion result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiCompletionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Forbidden — provider is polling-only or access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          description: Rate limited
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          description: Upstream AI provider error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/organizations/{organization_id}/ai/{provider}/chat:
+    post:
+      summary: AI chat
+      description: |
+        Proxies a chat request to the specified AI provider.
+        Polling-only providers (e.g. `anthropic`) return 403 — they are connected for usage data only, not chat/completion.
+      tags:
+        - AI Gateway
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                messages:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      role:
+                        type: string
+                        enum: [system, user, assistant]
+                      content:
+                        type: string
+                    required:
+                      - role
+                      - content
+                model:
+                  type: string
+                temperature:
+                  type: number
+                max_tokens:
+                  type: integer
+                top_p:
+                  type: number
+                stream:
+                  type: boolean
+              required:
+                - messages
+      responses:
+        '200':
+          description: Chat result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiChatResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Forbidden — provider is polling-only or access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          description: Rate limited
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          description: Upstream AI provider error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/organizations/{organization_id}/ai/{provider}/models:
+    get:
+      summary: List AI models
+      description: |
+        Returns available models for the specified AI provider.
+        Polling-only providers (e.g. `anthropic`) return 403.
+      tags:
+        - AI Gateway
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of available models
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Forbidden — provider is polling-only or access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          description: Upstream AI provider error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
 # ============================================
 # COMPONENTS
 # ============================================
@@ -2810,3 +3223,233 @@ components:
         - value
         - createdAt
         - updatedAt
+
+    ToolEvent:
+      type: object
+      description: Tool event as returned by the list endpoint
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+          nullable: true
+        projectId:
+          type: string
+          format: uuid
+          nullable: true
+        toolName:
+          type: string
+        eventType:
+          type: string
+        model:
+          type: string
+          nullable: true
+        costUsd:
+          type: number
+          format: float
+          nullable: true
+        durationMs:
+          type: integer
+          nullable: true
+        inputTokens:
+          type: integer
+          nullable: true
+        outputTokens:
+          type: integer
+          nullable: true
+        costCents:
+          type: integer
+          nullable: true
+        riskLevel:
+          type: string
+          enum: [critical, high, medium, low, none]
+        attribution:
+          type: string
+          enum: [user, organization, unknown]
+        securityFindings:
+          type: array
+          items:
+            type: object
+        occurredAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        user:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            email:
+              type: string
+              format: email
+            name:
+              type: string
+              nullable: true
+        project:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+      required:
+        - id
+        - organizationId
+        - toolName
+        - eventType
+        - riskLevel
+        - attribution
+        - occurredAt
+        - createdAt
+
+    ToolEventDetail:
+      description: Tool event as returned by the detail endpoint (includes metadata and audit log)
+      allOf:
+        - $ref: '#/components/schemas/ToolEvent'
+        - type: object
+          properties:
+            metadata:
+              type: object
+              nullable: true
+              additionalProperties: true
+            project:
+              type: object
+              nullable: true
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                name:
+                  type: string
+                slug:
+                  type: string
+            auditLog:
+              nullable: true
+              $ref: '#/components/schemas/AuditLog'
+
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        toolEventId:
+          type: string
+          format: uuid
+        riskLevel:
+          type: string
+          nullable: true
+        temporalWorkflowId:
+          type: string
+          nullable: true
+        rawEventKey:
+          type: string
+          nullable: true
+        confidenceScore:
+          type: number
+          format: float
+          nullable: true
+        classificationLabels:
+          type: array
+          nullable: true
+          items:
+            type: string
+        sanitizationActions:
+          type: array
+          nullable: true
+          items:
+            type: string
+        highRisk:
+          type: boolean
+        detectionSummary:
+          type: object
+          nullable: true
+        sanitizationChanges:
+          type: object
+          nullable: true
+        riskScore:
+          type: number
+          format: float
+          nullable: true
+        policyVersion:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            version:
+              type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - organizationId
+        - toolEventId
+        - highRisk
+        - createdAt
+
+    AiCompletionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        model:
+          type: string
+        content:
+          type: string
+        finishReason:
+          type: string
+        usage:
+          type: object
+          properties:
+            promptTokens:
+              type: integer
+            completionTokens:
+              type: integer
+            totalTokens:
+              type: integer
+
+    AiChatResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        model:
+          type: string
+        message:
+          type: object
+          properties:
+            role:
+              type: string
+              enum: [assistant]
+            content:
+              type: string
+        finishReason:
+          type: string
+        usage:
+          type: object
+          properties:
+            promptTokens:
+              type: integer
+            completionTokens:
+              type: integer
+            totalTokens:
+              type: integer

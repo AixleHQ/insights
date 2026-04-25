@@ -166,17 +166,22 @@ export interface ToolEvent {
   id: string;
   toolName: string;
   eventType: EventType;
+  attribution: string;
   riskLevel: RiskLevel;
   costUsd: number;
   inputTokens: number | null;
   outputTokens: number | null;
   model: string | null;
-  sanitizedContent: string | null;
   securityFindings: SecurityFinding[];
   user: { id: string; email: string; name: string | null } | null;
   project: { id: string; name: string } | null;
   createdAt: string;
   occurredAt: string;
+  // Detail-only fields (returned by the show endpoint, not the list endpoint)
+  sanitizedContent?: string | null;
+  metadata?: Record<string, unknown> | null;
+  durationMs?: number | null;
+  auditLog?: AuditLog | null;
 }
 
 export interface SecurityFinding {

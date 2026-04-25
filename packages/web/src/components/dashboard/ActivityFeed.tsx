@@ -5,20 +5,15 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import {
-  Code2,
-  Terminal,
-  FileSearch,
-  MessageSquare,
-  Bot,
-  Sparkles,
-  ArrowRight,
-} from "lucide-react";
+import { formatCost, getEventActorLabel } from "@/lib/formatters";
+import { ProviderLogo } from "@/components/icons/ProviderLogo";
+import { ArrowRight } from "lucide-react";
 
 export interface ActivityEvent {
   id: string;
   tool_name?: string;
   event_type?: string;
+  attribution?: string;
   risk_level?: "critical" | "high" | "medium" | "low" | "none";
   cost_usd?: number;
   created_at: string;
@@ -36,21 +31,6 @@ interface ActivityFeedProps {
   className?: string;
   onEventClick?: (eventId: string) => void;
   selectedEventId?: string | null;
-}
-
-const toolIcons: Record<string, typeof Code2> = {
-  "github-copilot": Code2,
-  "cursor": Terminal,
-  "claude-code": Bot,
-  "aider": MessageSquare,
-  "codeium": Sparkles,
-  "default": FileSearch,
-};
-
-function getToolIcon(toolName: string | undefined | null) {
-  if (!toolName) return toolIcons.default;
-  const normalizedName = toolName.toLowerCase().replace(/[\s_-]/g, "-");
-  return toolIcons[normalizedName] || toolIcons.default;
 }
 
 const riskColors: Record<string, { bg: string; text: string; border: string }> = {
@@ -106,7 +86,6 @@ export function RiskBadge({
   );
 }
 
-/* eslint-disable react-hooks/static-components */
 function ActivityItem({
   event,
   onClick,
@@ -116,28 +95,25 @@ function ActivityItem({
   onClick?: () => void;
   isSelected?: boolean;
 }) {
-  const Icon = getToolIcon(event.tool_name);
   const timeAgo = formatDistanceToNow(event.created_at);
 
   const content = (
     <>
-      <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-        <Icon className="size-4" />
-      </div>
+      <ProviderLogo provider={event.tool_name || "unknown"} size="sm" showBackground className="shrink-0 !size-8" />
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex items-center gap-2">
           <span className="truncate text-sm font-medium">{humanizeToolName(event.tool_name)}</span>
           <RiskBadge level={event.risk_level || "none"} />
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="truncate">{event.user?.email || "Unknown user"}</span>
+          <span className="truncate">{getEventActorLabel(event)}</span>
           <span>·</span>
           <span>{timeAgo}</span>
           {event.cost_usd !== undefined && Number(event.cost_usd) > 0 && (
             <>
               <span>·</span>
               <span className="font-mono-display">
-                ${Number(event.cost_usd).toFixed(3)}
+                {formatCost(Number(event.cost_usd))}
               </span>
             </>
           )}

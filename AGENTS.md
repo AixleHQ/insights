@@ -293,11 +293,10 @@ For any UI-related work, use this combo:
 |---|---|---|
 | **Figma Desktop MCP** | Build time — source of truth | Full API: code connect, variables, screenshots |
 | **Claude_Preview** | Build time — inline render check | Fast feedback loop |
-| **Playwright** | Review + CI — visual regression | Deterministic, headless, PR gate |
-| **Claude_in_Chrome** | Manual investigation only | Stateful flows, auth-required pages |
+| **Playwright MCP** (`@playwright/mcp --extension`) | Review — screenshots, interaction, auth-required pages | Connects to running Chrome, preserves Keycloak sessions |
 | **Figma Web MCP** | Fallback only | Desktop unavailable |
 
-Never use Claude_in_Chrome as the enforcement layer — it's non-deterministic and needs a user's open window. Enforcement lives in Playwright.
+Playwright MCP connects to the developer's already-running Chrome via the Playwright MCP Bridge extension. It does not open a blank browser window. See `packages/web/README.md` for setup.
 
 ---
 
@@ -334,14 +333,15 @@ cp .claude/settings.local.json.example .claude/settings.local.json
 2. Open the DB90 design system file (ask lead for link).
 3. In Claude Code, the Figma MCP is auto-detected when Desktop is running. Verify with: "list Figma libraries".
 
-### Playwright visual regression setup (first time)
+### Browser automation setup (first time)
 
-```bash
-cd packages/web
-npx playwright install chromium
-```
+Install the **Playwright MCP Bridge** Chrome extension (search `Playwright MCP Bridge` by Microsoft on the Chrome Web Store) — that's all. The MCP server is already configured in `.mcp.json`.
 
-`ui-visual-reviewer` will use Playwright to verify visual accuracy and feature behavior when invoked. Baseline snapshot storage and historical diff artifacts are out of scope for now — the reviewer verifies current state only.
+Claude Code connects to your already-running Chrome (with existing Keycloak sessions) via `npx @playwright/mcp@latest --extension`. No blank browser window, no port to configure.
+
+See **`packages/web/README.md → Browser Automation & UI Review`** for full details.
+
+`ui-visual-reviewer` will use Playwright MCP to verify visual accuracy and feature behavior when invoked. Baseline snapshot storage and historical diff artifacts are out of scope for now — the reviewer verifies current state only.
 
 ### Worktree setup (for parallel tickets)
 
@@ -411,7 +411,7 @@ claude
 - Hook scripts live in-repo at `.claude/hooks/*.ts` — Node.js, cross-platform (Windows, macOS, Linux), no shell dependency. Invoked via `node --experimental-strip-types` (Node.js 22+ required, already pinned in `.tool-versions`).
 - Per-machine overrides belong in `.claude/settings.local.json` (gitignored).
 
-After `git pull`, every contributor gets commands + agents + skills + hooks with zero setup. Playwright needs one-time `npx playwright install chromium`.
+After `git pull`, every contributor gets commands + agents + skills + hooks with zero setup. Browser automation needs one one-time step: install the Playwright MCP Bridge Chrome extension (see `packages/web/README.md`).
 
 ---
 

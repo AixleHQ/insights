@@ -1,17 +1,14 @@
 # frozen_string_literal: true
 
 class ToolEventDetailSerializer < BaseSerializer
+  include ToolEventAttributes
+
   attributes :id, :organization_id, :user_id, :project_id,
              :tool_name, :event_type, :model,
-             :tokens_in, :tokens_out, :tokens_total,
              :cost_usd, :duration_ms, :metadata
 
   datetime_attribute :occurred_at
   datetime_attribute :created_at
-
-  attribute :cost_cents do |event|
-    event.cost_usd ? (event.cost_usd * 100).round : nil
-  end
 
   attribute :user do |event|
     if event.user
@@ -30,6 +27,8 @@ class ToolEventDetailSerializer < BaseSerializer
         name: event.project.name,
         slug: event.project.slug
       }
+    elsif event.metadata&.dig("workspace_name").present?
+      { name: event.metadata["workspace_name"] }
     end
   end
 

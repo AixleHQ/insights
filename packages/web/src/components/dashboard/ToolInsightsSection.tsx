@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Area,
   AreaChart,
@@ -16,6 +17,7 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import type { ChartConfig } from "@/components/ui/chart";
+import { useQueryClient } from "@tanstack/react-query";
 import { Activity, DollarSign, Coins, Users, RefreshCw, LayoutGrid } from "lucide-react";
 import { formatCost, formatTokens } from "@/lib/formatters";
 import type { Connector } from "@/lib/types";
@@ -371,50 +373,147 @@ function CursorTabContent({ orgId, days }: { orgId: string; days: number }) {
   );
 }
 
+function AnthropicTabContent({ orgId, days }: { orgId: string; days: number }) {
+  const { data: dailyResp, isLoading: isLoadingDaily } = useToolDaily(orgId, "anthropic_api", days);
+  const { data: modelsResp, isLoading: isLoadingModels } = useToolModels(orgId, "anthropic_api", days);
+  const { data: usersResp, isLoading: isLoadingUsers } = useToolUsers(orgId, "anthropic_api", days);
+
+  const daily = dailyResp?.daily ?? [];
+  const models = modelsResp?.models ?? [];
+  const users = usersResp?.users ?? [];
+
+  const totalEvents = daily.reduce((s, d) => s + d.eventCount, 0);
+  const totalCost = daily.reduce((s, d) => s + d.costUsd, 0);
+  const totalTokensIn = daily.reduce((s, d) => s + d.tokensIn, 0);
+  const totalTokensOut = daily.reduce((s, d) => s + d.tokensOut, 0);
+
+  if (!isLoadingDaily && totalEvents === 0) {
+    return (
+      <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
+        No Anthropic API events in the last {days} days.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 mt-4">
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
+        <StatCard title="Total Events" value={totalEvents.toLocaleString()} icon={Activity} isLoading={isLoadingDaily} />
+        <StatCard title="Total Cost" value={formatCost(totalCost)} icon={DollarSign} isLoading={isLoadingDaily} />
+        <StatCard title="Tokens In" value={formatTokens(totalTokensIn)} icon={Coins} isLoading={isLoadingDaily} />
+        <StatCard title="Tokens Out" value={formatTokens(totalTokensOut)} icon={Coins} isLoading={isLoadingDaily} />
+      </div>
+
+      <div className="space-y-2">
+        <h4 className="text-sm font-medium text-muted-foreground">Model Breakdown</h4>
+        <ToolModelTable models={models} isLoading={isLoadingModels} />
+      </div>
+
+      <div className="space-y-2">
+        <h4 className="text-sm font-medium text-muted-foreground">Top Users</h4>
+        <ToolUsersTable users={users} isLoading={isLoadingUsers} />
+      </div>
+    </div>
+  );
+}
+
+// Maps tab value → connector_type used to find the right connector for sync
+const TAB_TO_CONNECTOR: Record<string, string> = {
+  cursor: "cursor",
+  openrouter_api: "openrouter",
+  anthropic_api: "anthropic",
+};
+
 export function ToolInsightsSection({ orgId, days, onDaysChange }: ToolInsightsSectionProps) {
+  const queryClient = useQueryClient();
   const { data: cursorOverview, isLoading: isLoadingCursor } = useToolOverview(orgId, "cursor");
   const { data: openrouterOverview, isLoading: isLoadingOpenrouter } = useToolOverview(orgId, "openrouter_api");
+  const { data: anthropicOverview, isLoading: isLoadingAnthropic } = useToolOverview(orgId, "anthropic_api");
+  const { data: connectors } = useConnectors(orgId);
+  const { mutateAsync: syncConnector } = useSyncConnector();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<string | null>(null);
 
   const cursorHasData = (cursorOverview?.total_events ?? 0) > 0;
   const openrouterHasData = (openrouterOverview?.total_events ?? 0) > 0;
+  const anthropicHasData = (anthropicOverview?.total_events ?? 0) > 0;
 
-  // Don't render until both overviews have resolved — avoids a flash where
-  // one finishes with 0 events before the other has returned any data.
-  if (isLoadingCursor || isLoadingOpenrouter) {
+  const resolvedTab = activeTab ?? (cursorHasData ? "cursor" : openrouterHasData ? "openrouter_api" : "anthropic_api");
+
+  async function handleRefreshNow() {
+    const connectorType = TAB_TO_CONNECTOR[resolvedTab];
+    if (!connectorType) return;
+
+    const connector = (connectors ?? []).find((c) => {
+      const type = c.connectorType ?? c.connector_type;
+      const active = c.isActive ?? c.is_active;
+      return type === connectorType && active;
+    });
+
+    setIsRefreshing(true);
+    try {
+      if (connector) {
+        await syncConnector({ orgId, connectorId: connector.id });
+      }
+      // Invalidate only the stats for the active tool
+      queryClient.invalidateQueries({
+        queryKey: ["organizations", orgId, "stats", "tools", resolvedTab],
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
+
+  // Don't render until all overviews have resolved — avoids a flash where
+  // one finishes with 0 events before the others have returned any data.
+  if (isLoadingCursor || isLoadingOpenrouter || isLoadingAnthropic) {
     return null;
   }
 
   // Only render if at least one tool has data
-  if (!cursorHasData && !openrouterHasData) {
+  if (!cursorHasData && !openrouterHasData && !anthropicHasData) {
     return null;
   }
-
-  const defaultTab = cursorHasData ? "cursor" : "openrouter_api";
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-lg font-semibold">Tool Insights</CardTitle>
-        <div className="flex gap-1">
-          {DAY_OPTIONS.map((d) => (
-            <Button
-              key={d}
-              variant={days === d ? "secondary" : "ghost"}
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => onDaysChange(d)}
-            >
-              {d}d
-            </Button>
-          ))}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1.5 text-xs"
+            onClick={handleRefreshNow}
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={`size-3 ${isRefreshing ? "animate-spin" : ""}`} />
+            {isRefreshing ? "Syncing..." : "Refresh Now"}
+          </Button>
+          <div className="flex gap-1">
+            {DAY_OPTIONS.map((d) => (
+              <Button
+                key={d}
+                variant={days === d ? "secondary" : "ghost"}
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => onDaysChange(d)}
+              >
+                {d}d
+              </Button>
+            ))}
+          </div>
         </div>
       </CardHeader>
       <CardContent>
-        <Tabs key={`${orgId}-${defaultTab}`} defaultValue={defaultTab}>
+        <Tabs value={resolvedTab} onValueChange={setActiveTab}>
           <TabsList>
             {cursorHasData && <TabsTrigger value="cursor">Cursor</TabsTrigger>}
             {openrouterHasData && (
               <TabsTrigger value="openrouter_api">OpenRouter</TabsTrigger>
+            )}
+            {anthropicHasData && (
+              <TabsTrigger value="anthropic_api">Anthropic API</TabsTrigger>
             )}
           </TabsList>
 
@@ -427,6 +526,12 @@ export function ToolInsightsSection({ orgId, days, onDaysChange }: ToolInsightsS
           {openrouterHasData && (
             <TabsContent value="openrouter_api">
               <OpenRouterTabContent orgId={orgId} days={days} />
+            </TabsContent>
+          )}
+
+          {anthropicHasData && (
+            <TabsContent value="anthropic_api">
+              <AnthropicTabContent orgId={orgId} days={days} />
             </TabsContent>
           )}
         </Tabs>

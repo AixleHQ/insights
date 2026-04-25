@@ -88,6 +88,7 @@ export function toEventRow(e: ToolEvent) {
     id: e.id,
     tool_name: e.toolName,
     event_type: e.eventType,
+    attribution: e.attribution,
     risk_level: e.riskLevel,
     cost_usd: e.costUsd,
     token_count: (e.inputTokens || 0) + (e.outputTokens || 0),

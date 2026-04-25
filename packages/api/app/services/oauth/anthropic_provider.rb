@@ -7,8 +7,16 @@ module Oauth
     USAGE_URL = "#{API_URL}/v1/organizations/usage_report/messages"
     MAX_PAGES = 100
 
-    # Fetches org-level usage aggregated by model per day.
-    # Returns one entry per model/day combination — not per-request granularity.
+    # Structural GET-only constraint: all outbound requests must go through this
+    # connection. It exposes only #get — accidental write verbs in this file
+    # would not be usable via READ_ONLY_CONNECTION.
+    READ_ONLY_CONNECTION = Faraday.new(url: API_URL) do |f|
+      f.headers["anthropic-version"] = API_VERSION
+    end.freeze
+    private_constant :READ_ONLY_CONNECTION
+
+    # Fetches org-level usage aggregated by model and workspace per day.
+    # Returns one entry per model/workspace/day combination — not per-request granularity.
     # Requires an Admin API key (sk-ant-admin...) stored in connector.access_token.
     def fetch_usage(start_date:, end_date:)
       results = []
@@ -16,13 +24,12 @@ module Oauth
       pages_fetched = 0
 
       loop do
-        response = Faraday.get(USAGE_URL) do |req|
+        response = READ_ONLY_CONNECTION.get(USAGE_URL) do |req|
           req.headers["x-api-key"] = connector.access_token
-          req.headers["anthropic-version"] = API_VERSION
           req.params["starting_at"] = start_date.beginning_of_day.utc.iso8601
           req.params["ending_at"] = end_date.end_of_day.utc.iso8601
           req.params["bucket_width"] = "1d"
-          req.params["group_by[]"] = "model"
+          req.params["group_by"] = %w[model workspace_name]
           req.params["page"] = page if page
         end
 
@@ -44,9 +51,13 @@ module Oauth
               entry["cache_read_input_tokens"].to_i +
               cache_tokens
 
+            workspace = entry["workspace_name"].presence
+            id_parts = [ "anthropic", workspace, entry["model"], date.to_date ].compact
+
             results << {
-              external_id: "anthropic-#{entry["model"]}-#{date.to_date}",
+              external_id: id_parts.join("-"),
               model: entry["model"],
+              workspace_name: workspace,
               tokens_in: tokens_in,
               tokens_out: entry["output_tokens"].to_i,
               occurred_at: date
@@ -67,16 +78,19 @@ module Oauth
     end
 
     def test_connection
-      response = Faraday.get("#{API_URL}/v1/models") do |req|
+      # Admin keys are scoped to usage-reporting endpoints, not /v1/models.
+      # Validate by hitting the usage report endpoint with a minimal date range.
+      response = READ_ONLY_CONNECTION.get(USAGE_URL) do |req|
         req.headers["x-api-key"] = connector.access_token
-        req.headers["anthropic-version"] = API_VERSION
-        req.headers["Accept"] = "application/json"
+        req.params["starting_at"] = 1.day.ago.beginning_of_day.utc.iso8601
+        req.params["ending_at"] = 1.day.ago.end_of_day.utc.iso8601
+        req.params["bucket_width"] = "1d"
       end
 
       if response.success?
         { success: true }
       elsif response.status == 401 || response.status == 403
-        { success: false, error: "Invalid API key" }
+        { success: false, error: "Invalid API key — ensure you are using an Admin API key (sk-ant-admin-...)" }
       else
         { success: false, error: "Anthropic API error: #{response.status}" }
       end

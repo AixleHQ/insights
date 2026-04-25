@@ -288,11 +288,12 @@ export function Integrations() {
       const externalAccountName =
         c.externalAccountName || c.external_account_name;
       const lastSyncAt = c.lastSyncAt || c.last_sync_at;
+      const providerInfo = availableProviders.find((p) => p.id === connectorType);
 
       return {
         id: c.id,
         provider: connectorType as IntegrationProvider,
-        name: externalAccountName || connectorType,
+        name: externalAccountName || providerInfo?.name || connectorType,
         status: c.status as ConnectorStatus,
         last_sync_at: lastSyncAt || undefined,
         sync_error: lastError || undefined,

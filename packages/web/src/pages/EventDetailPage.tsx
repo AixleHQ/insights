@@ -36,7 +36,11 @@ export function EventDetailPage() {
           }
         : undefined,
       sanitized_content: apiEvent.sanitizedContent || undefined,
-      metadata: apiEvent.model ? { model: apiEvent.model } : undefined,
+      metadata: apiEvent.metadata
+        ? { ...(apiEvent.model ? { model: apiEvent.model } : {}), ...apiEvent.metadata }
+        : apiEvent.model
+          ? { model: apiEvent.model }
+          : undefined,
       findings: apiEvent.securityFindings?.map((f) => ({
         type: f.type,
         severity: f.severity,

@@ -71,8 +71,20 @@ module Api
 
       private
 
+      # Providers that are connected for usage polling only — chat/completion
+      # via the gateway is not permitted for these, regardless of authorization.
+      POLLING_ONLY_PROVIDERS = %w[anthropic].freeze
+
       def set_connector
         provider = params[:provider]
+
+        if POLLING_ONLY_PROVIDERS.include?(provider)
+          return render json: {
+            error: "Forbidden",
+            message: "Provider '#{provider}' is configured for usage polling only. " \
+                     "Chat/completion via this provider is not permitted."
+          }, status: :forbidden
+        end
 
         unless Ai::ProxyService.supported_providers.include?(provider)
           return render json: {

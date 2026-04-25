@@ -72,7 +72,9 @@ module Api
       private
 
       def set_event
-        @event = current_organization.tool_events.find(params[:id])
+        @event = current_organization.tool_events
+                                     .includes(:user, :project, :audit_log)
+                                     .find(params[:id])
       end
 
       def apply_filters(scope)

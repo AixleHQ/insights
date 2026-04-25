@@ -71,7 +71,22 @@ RSpec.describe AiUsageSyncJob, type: :job do
       expect(find_synced_event.cost_usd).to be > 0
     end
 
-    it "calls fetch_usage with the last 7 days date range" do
+    it "uses 90-day window on initial sync (no last_sync_at)" do
+      connector.update!(last_sync_at: nil)
+      provider = instance_double(Oauth::AnthropicProvider)
+      allow(provider).to receive(:fetch_usage).and_return(sample_usage)
+      allow(Oauth::AnthropicProvider).to receive(:new).and_return(provider)
+
+      travel_to Time.zone.now do
+        described_class.new.perform(organization.id, "anthropic")
+
+        expect(provider).to have_received(:fetch_usage)
+          .with(start_date: 90.days.ago.to_date, end_date: Date.today)
+      end
+    end
+
+    it "uses 7-day window on recurring sync (has last_sync_at)" do
+      connector.update!(last_sync_at: 1.hour.ago)
       provider = instance_double(Oauth::AnthropicProvider)
       allow(provider).to receive(:fetch_usage).and_return(sample_usage)
       allow(Oauth::AnthropicProvider).to receive(:new).and_return(provider)

@@ -68,6 +68,7 @@ export function Dashboard() {
     id: e.id,
     tool_name: e.toolName,
     event_type: e.eventType,
+    attribution: e.attribution,
     risk_level: e.riskLevel,
     cost_usd: e.costUsd,
     created_at: e.occurredAt || e.createdAt,
