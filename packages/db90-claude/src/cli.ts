@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
-import { readState, writeState, markSessionSent, APP_DIR } from "./state.js";
+import { readState, writeState, markSessionSent, migrateLegacyState, APP_DIR } from "./state.js";
 import { findTranscriptFiles, parseTranscriptFile, toDb90Payload, type SessionAggregate } from "./claude-reader.js";
 import { postEvent } from "./client.js";
 import { resolveProjectId } from "./project-resolver.js";
@@ -185,6 +185,8 @@ async function syncOnce(
     }
   }
 
+  // Migrate legacy state.json → per-credential filename on first upgrade run.
+  migrateLegacyState(APP_DIR, host, token);
   let state = readState(APP_DIR, host, token);
   let totalSent = 0;
   let totalFailed = 0;

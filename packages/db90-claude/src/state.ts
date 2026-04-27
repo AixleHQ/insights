@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir, tmpdir } from "node:os";
 import { createHash, randomBytes } from "node:crypto";
@@ -45,6 +45,20 @@ export function stateKey(host: string, token: string): string {
 function stateFilePath(dir: string, host?: string, token?: string): string {
   const filename = host && token ? `${stateKey(host, token)}.json` : "state.json";
   return join(dir, filename);
+}
+
+/**
+ * One-time migration: if a legacy `state.json` exists but no credential-scoped
+ * file does, rename it to the new name so existing sessions are not re-sent on
+ * the first upgrade run. No-op when the new file already exists or no legacy
+ * file is present.
+ */
+export function migrateLegacyState(dir: string, host: string, token: string): void {
+  const legacyPath = join(dir, "state.json");
+  const newPath = stateFilePath(dir, host, token);
+  if (existsSync(legacyPath) && !existsSync(newPath)) {
+    renameSync(legacyPath, newPath);
+  }
 }
 
 export function readState(dir?: string, host?: string, token?: string): State {

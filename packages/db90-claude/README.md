@@ -231,7 +231,7 @@ You can update rates or add new model IDs without reinstalling by adding a `pric
 ### Known limitations
 
 - **Multi-model sessions:** Claude Code may use different models within the same conversation. `db90-claude` records only the last-seen model per session and computes cost as if all tokens used that model. This is a session-level approximation and may over- or under-count costs for sessions that mixed Opus and Sonnet turns.
-- **Estimates only:** `cost_usd` values are estimates based on public Anthropic list prices. Authoritative billing figures come from the Anthropic dashboard. Rate source: <https://www.anthropic.com/pricing> (verify when updating rates).
+- **Estimates only:** `cost_usd` values are estimates based on public Anthropic list prices. Authoritative billing figures come from the Anthropic dashboard. Rate source: <https://platform.claude.com/docs/en/about-claude/pricing> (verify when updating rates).
 
 ## Scheduling
 

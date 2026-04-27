@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { readState, writeState, markSessionSent, stateKey } from "../state.js";
+import { readState, writeState, markSessionSent, stateKey, migrateLegacyState } from "../state.js";
 
 let testDir: string;
 
@@ -139,6 +139,41 @@ describe("per-credential state scoping", () => {
     writeState({ version: 1, sessions: { s: { fileSize: 1, sentAt: "2024-01-01T00:00:00.000Z" } } }, testDir, "https://a.io", "tok-a");
     const fresh = readState(testDir, "https://b.io", "tok-b");
     expect(fresh.sessions).toEqual({});
+  });
+});
+
+describe("migrateLegacyState", () => {
+  it("renames state.json to the credential-scoped filename when it exists", () => {
+    const legacyData = { version: 1, sessions: { old: { fileSize: 42, sentAt: "2024-01-01T00:00:00.000Z" } } };
+    writeFileSync(join(testDir, "state.json"), JSON.stringify(legacyData), "utf-8");
+
+    migrateLegacyState(testDir, "https://app.db90.io", "my-token");
+
+    const newPath = join(testDir, `${stateKey("https://app.db90.io", "my-token")}.json`);
+    expect(existsSync(newPath)).toBe(true);
+    expect(existsSync(join(testDir, "state.json"))).toBe(false);
+
+    const migrated = readState(testDir, "https://app.db90.io", "my-token");
+    expect(migrated.sessions["old"]).toBeDefined();
+  });
+
+  it("does not overwrite an existing credential-scoped file", () => {
+    const legacyData = { version: 1, sessions: { legacy: { fileSize: 1, sentAt: "2024-01-01T00:00:00.000Z" } } };
+    const newData = { version: 1, sessions: { current: { fileSize: 2, sentAt: "2024-01-01T00:00:00.000Z" } } };
+    writeFileSync(join(testDir, "state.json"), JSON.stringify(legacyData), "utf-8");
+    writeState(newData, testDir, "https://app.db90.io", "my-token");
+
+    migrateLegacyState(testDir, "https://app.db90.io", "my-token");
+
+    const state = readState(testDir, "https://app.db90.io", "my-token");
+    expect(state.sessions["current"]).toBeDefined();
+    expect(state.sessions["legacy"]).toBeUndefined();
+  });
+
+  it("is a no-op when no legacy state.json exists", () => {
+    expect(() => migrateLegacyState(testDir, "https://app.db90.io", "my-token")).not.toThrow();
+    const state = readState(testDir, "https://app.db90.io", "my-token");
+    expect(state.sessions).toEqual({});
   });
 });
 

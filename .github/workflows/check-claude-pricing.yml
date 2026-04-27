@@ -33,9 +33,9 @@ jobs:
           # Keep this list in sync with DEFAULT_PRICING in
           # packages/db90-claude/src/pricing.ts.
           declare -A RATES=(
-            ["Opus output (\$75/MTok)"]="75"
-            ["Opus/Haiku cache-write (\$18.75/MTok)"]="18.75"
-            ["Sonnet cache-write (\$3.75/MTok)"]="3.75"
+            ["Opus output (\$75/MTok)"]="75\.00"
+            ["Opus/Haiku cache-write (\$18.75/MTok)"]="18\.75"
+            ["Sonnet cache-write (\$3.75/MTok)"]="3\.75"
             ["Sonnet input (\$3/MTok)"]="3\.00"
             ["Haiku input (\$0.80/MTok)"]="0\.80"
           )

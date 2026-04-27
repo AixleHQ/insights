@@ -104,7 +104,12 @@ export const DEFAULT_PRICING: PricingTable = {
 export function mergePricing(base: PricingTable, overrides: PricingTable): PricingTable {
   const result: PricingTable = { ...base };
   for (const [model, rates] of Object.entries(overrides)) {
-    result[model] = { ...(base[model] ?? {}), ...rates } as ModelPricing;
+    // Merge per-model: base fields first, then user overrides on top.
+    // The intermediate type is Partial<ModelPricing> because base[model] may be
+    // absent for new model IDs. calculateCost guards against incomplete entries
+    // at runtime via Number.isFinite checks on each rate field.
+    const merged: Partial<ModelPricing> = { ...(base[model] ?? {}), ...rates };
+    result[model] = merged as ModelPricing;
   }
   return result;
 }
