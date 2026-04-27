@@ -1,6 +1,6 @@
 ---
 allowed-tools: Bash(git diff:*), Bash(git log:*), Bash(git branch:*), Bash(git blame:*), Bash(bundle exec rubocop:*), Bash(bundle exec brakeman:*), Bash(npm run:*), Bash(npx tsc:*), Read, Grep, Glob
-description: Architectural code review — deep analysis of Ruby/Rails and React/TypeScript code through the lenses of maintainability, security, and performance. Use when you want a thorough architectural review of your changes before opening a PR.
+description: Architectural code review — maintainability, security, performance lenses across Ruby and TypeScript.
 ---
 
 ## Context

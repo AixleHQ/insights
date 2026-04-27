@@ -1,6 +1,6 @@
 ---
 allowed-tools: Bash(git worktree:*), Bash(git branch:*), Bash(git status:*), Bash(git log:*), Bash(git fetch:*), Bash(ln:*), Bash(ls:*), Bash(mkdir:*), Bash(rm -rf ../db90-rails-*:*)
-description: Manage git worktrees for parallel development on multiple tickets. Use when the user wants to create a new worktree, set up a worktree for a ticket, switch between worktrees, clean up worktrees, or work on multiple branches simultaneously. Handles dependency symlinking for Rails (vendor/bundle) and Node (node_modules) to avoid redundant installs.
+description: Create, switch, or clean up git worktrees per ticket; symlinks vendor/ and node_modules/ to skip reinstall.
 ---
 
 ## Context

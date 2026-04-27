@@ -1,5 +1,5 @@
 ---
-description: Translate a Figma URL into production-ready code using the Figma MCP server — 7-step workflow with visual validation. Use when implementing any Figma design node.
+description: Translate a Figma URL into production code via the Figma MCP server (7-step workflow).
 ---
 
 # Implement Design

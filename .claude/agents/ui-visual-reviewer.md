@@ -1,6 +1,6 @@
 ---
 name: ui-visual-reviewer
-description: Reviewer that takes screenshots of UI components in both light and dark themes and verifies visual accuracy and feature behavior. Uses Playwright headless or Claude_Preview. Runs after component-reviewer passes, or when /review-commit detects UI file changes. Never modifies code.
+description: Screenshots UI components in light + dark themes and verifies visual accuracy and feature behavior.
 tools: Read, Bash, Glob
 model: sonnet
 ---

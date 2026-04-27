@@ -1,6 +1,6 @@
 ---
 name: swagger-sync
-description: Loads when editing Rails controllers or routes.rb. Reminds to update packages/api/swagger/v1/swagger.yaml in the same commit, per CLAUDE.md. Use whenever the user edits packages/api/app/controllers/** or packages/api/config/routes.rb.
+description: Reminds to update packages/api/swagger/v1/swagger.yaml in the same commit when editing controllers or routes.rb.
 ---
 
 # swagger-sync

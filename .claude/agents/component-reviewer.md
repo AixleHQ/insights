@@ -1,6 +1,6 @@
 ---
 name: component-reviewer
-description: Reviews UI components for DB90 design-system conventions. Enforces design token usage (no raw hex, no arbitrary Tailwind), dark mode parity, and a11y primitives. Soft gate — reports findings, does not modify code. Use after component-builder runs, or any time a component in packages/web/src/components/ui/ is edited.
+description: Reviews UI components for DB90 design-system conventions — design tokens, dark mode parity, a11y primitives.
 tools: Read, Grep, Glob, Bash
 model: sonnet
 ---
