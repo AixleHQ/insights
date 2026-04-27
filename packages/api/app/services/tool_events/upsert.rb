@@ -16,9 +16,6 @@ module ToolEvents
   # for the same session_id, eliminating the TOCTOU window in the naive
   # find-then-insert approach.
   class Upsert
-    # Fields that represent a session's identity — never changed on update.
-    IMMUTABLE_FIELDS = %i[id occurred_at organization_id user_id tool_name event_type].freeze
-
     # Fields that change as a session grows.
     MUTABLE_FIELDS = %i[
       tokens_in tokens_out tokens_total cost_usd

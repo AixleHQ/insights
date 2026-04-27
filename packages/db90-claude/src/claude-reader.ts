@@ -61,7 +61,7 @@ export interface Db90Payload {
 
 /** Options for toDb90Payload. */
 export interface ToDb90PayloadOptions {
-  projectId?: string;
+  projectId?: string | null;
   pricing?: PricingTable;
 }
 

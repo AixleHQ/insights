@@ -131,6 +131,16 @@ export function mergePricing(base: PricingTable, overrides: PricingTable): Prici
  *   baseInputTokens = tokensIn - cacheWriteTokens - cacheReadTokens
  * (tokensIn already bundles all three input token types in SessionAggregate)
  */
+/** Returns true only when all four rate fields are finite numbers. */
+function hasValidRates(rates: ModelPricing): boolean {
+  return (
+    Number.isFinite(rates.input_per_mtok) &&
+    Number.isFinite(rates.output_per_mtok) &&
+    Number.isFinite(rates.cache_write_per_mtok) &&
+    Number.isFinite(rates.cache_read_per_mtok)
+  );
+}
+
 export function calculateCost(
   model: string | null,
   baseInputTokens: number,
@@ -141,17 +151,7 @@ export function calculateCost(
 ): number | null {
   if (!model) return null;
   const rates = pricing[model];
-  if (!rates) return null;
-
-  // Guard against partial overrides for new model IDs where some rates are undefined/NaN
-  if (
-    !Number.isFinite(rates.input_per_mtok) ||
-    !Number.isFinite(rates.output_per_mtok) ||
-    !Number.isFinite(rates.cache_write_per_mtok) ||
-    !Number.isFinite(rates.cache_read_per_mtok)
-  ) {
-    return null;
-  }
+  if (!rates || !hasValidRates(rates)) return null;
 
   const raw =
     (baseInputTokens * rates.input_per_mtok +
@@ -178,12 +178,7 @@ export function getCostWarning(model: string | null, pricing: PricingTable): str
   if (!rates) {
     return `Model "${model}" not in pricing table — cost_usd will be null. Add it to ~/.db90-claude/config.json under "pricing" to enable cost tracking.`;
   }
-  if (
-    !Number.isFinite(rates.input_per_mtok) ||
-    !Number.isFinite(rates.output_per_mtok) ||
-    !Number.isFinite(rates.cache_write_per_mtok) ||
-    !Number.isFinite(rates.cache_read_per_mtok)
-  ) {
+  if (!hasValidRates(rates)) {
     return `Incomplete pricing for "${model}" — all four *_per_mtok fields are required for new model IDs. cost_usd will be null.`;
   }
   return null;

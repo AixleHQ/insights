@@ -144,31 +144,30 @@ interface SyncResult {
   skipped: number;
 }
 
-async function syncOnce(
-  token: string,
-  host: string,
-  dryRun: boolean,
-  verbose: boolean,
-  projectId: string | null,
-  pricing: PricingTable
-): Promise<SyncResult> {
+interface SyncOptions {
+  token: string;
+  host: string;
+  dryRun: boolean;
+  verbose: boolean;
+  projectId: string | null;
+  pricing: PricingTable;
+}
+
+async function syncOnce(options: SyncOptions): Promise<SyncResult> {
+  const { token, host, dryRun, verbose, projectId, pricing } = options;
   const files = findTranscriptFiles();
 
   if (verbose) {
     console.log(`[verbose] Found ${files.length} transcript file(s)`);
   }
 
-  // Phase 1: collect all session aggregates across every transcript file.
-  // The same session ID can appear in multiple files (e.g. both the legacy
-  // ~/.claude/projects/ path and the newer ~/.config/claude/projects/ path
-  // may contain copies of the same session at different stages). Keep only
-  // the most-complete aggregate for each session — the one with the highest
-  // combined token count — so we always send the best available data and
-  // never accidentally overwrite a large aggregate with a smaller stale copy.
+  // Phase 1: parse all transcript files in parallel, then keep only the most-complete
+  // aggregate per session (highest combined token count). The same session ID can appear
+  // in multiple files (e.g. both ~/.claude/projects/ and ~/.config/claude/projects/ may
+  // have copies at different stages). Parallelising the reads cuts wall-time proportionally.
+  const allFileSessions = await Promise.all(files.map((f) => parseTranscriptFile(f, verbose)));
   const bestAggs = new Map<string, SessionAggregate>();
-
-  for (const filePath of files) {
-    const fileSessions = await parseTranscriptFile(filePath, verbose);
+  for (const fileSessions of allFileSessions) {
     for (const [sessionId, agg] of fileSessions) {
       const existing = bestAggs.get(sessionId);
       if (!existing || agg.tokensIn + agg.tokensOut > existing.tokensIn + existing.tokensOut) {
@@ -178,15 +177,13 @@ async function syncOnce(
   }
 
   if (verbose) {
-    const raw = files.length;
-    const deduped = bestAggs.size;
-    if (raw !== deduped) {
-      console.log(`[verbose] Deduplicated ${raw} file(s) → ${deduped} unique session(s)`);
+    const fileCount = files.length;
+    const sessionCount = bestAggs.size;
+    if (fileCount !== sessionCount) {
+      console.log(`[verbose] Deduplicated ${fileCount} file(s) → ${sessionCount} unique session(s)`);
     }
   }
 
-  // Migrate legacy state.json → per-credential filename on first upgrade run.
-  migrateLegacyState(APP_DIR, host, token);
   let state = readState(APP_DIR, host, token);
   let totalSent = 0;
   let totalFailed = 0;
@@ -204,7 +201,7 @@ async function syncOnce(
       continue;
     }
 
-    const payload = toDb90Payload(agg, { projectId: projectId ?? undefined, pricing });
+    const payload = toDb90Payload(agg, { projectId, pricing });
 
     if (verbose && payload.cost_usd === null) {
       if (!agg.model) {
@@ -269,6 +266,10 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  // Run once at startup — renames legacy state.json to the per-credential filename
+  // if it exists and the new file does not. No-op on all subsequent runs.
+  migrateLegacyState(APP_DIR, host, token);
+
   const resolution = await resolveProjectId(
     cliArgs.projectId,
     fileConfig.project_id,
@@ -283,13 +284,22 @@ async function main(): Promise<void> {
     );
   }
 
+  const syncOptions: SyncOptions = {
+    token,
+    host,
+    dryRun: cliArgs.dryRun,
+    verbose: cliArgs.verbose,
+    projectId: resolution.projectId,
+    pricing,
+  };
+
   if (cliArgs.watch) {
     console.log(
       `Watching for Claude transcripts every ${cliArgs.watchInterval}s… (Ctrl+C to stop)`
     );
 
     const runSync = async () => {
-      const result = await syncOnce(token, host, cliArgs.dryRun, cliArgs.verbose, resolution.projectId, pricing);
+      const result = await syncOnce(syncOptions);
       if (result.sent > 0 || result.failed > 0) {
         console.log(
           `Sent: ${result.sent}, Failed: ${result.failed}, Skipped: ${result.skipped}`
@@ -318,7 +328,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const result = await syncOnce(token, host, cliArgs.dryRun, cliArgs.verbose, resolution.projectId, pricing);
+  const result = await syncOnce(syncOptions);
   console.log(`Sent: ${result.sent}, Failed: ${result.failed}, Skipped: ${result.skipped}`);
 
   if (result.failed > 0) {
