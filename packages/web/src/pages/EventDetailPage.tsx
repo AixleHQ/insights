@@ -20,7 +20,9 @@ export function EventDetailPage() {
       event_type: apiEvent.eventType,
       risk_level: apiEvent.riskLevel,
       cost_usd: apiEvent.costUsd,
-      token_count: (apiEvent.inputTokens || 0) + (apiEvent.outputTokens || 0),
+      token_count:
+        apiEvent.tokensTotal ??
+        (apiEvent.inputTokens || 0) + (apiEvent.outputTokens || 0),
       created_at: apiEvent.occurredAt || apiEvent.createdAt,
       user: apiEvent.user
         ? {
@@ -36,11 +38,7 @@ export function EventDetailPage() {
           }
         : undefined,
       sanitized_content: apiEvent.sanitizedContent || undefined,
-      metadata: apiEvent.metadata
-        ? { ...(apiEvent.model ? { model: apiEvent.model } : {}), ...apiEvent.metadata }
-        : apiEvent.model
-          ? { model: apiEvent.model }
-          : undefined,
+      metadata: apiEvent.metadata,
       findings: apiEvent.securityFindings?.map((f) => ({
         type: f.type,
         severity: f.severity,

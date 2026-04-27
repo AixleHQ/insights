@@ -171,8 +171,13 @@ export interface ToolEvent {
   costUsd: number;
   inputTokens: number | null;
   outputTokens: number | null;
+  // Detail endpoint returns these instead of inputTokens/outputTokens
+  tokensIn?: number | null;
+  tokensOut?: number | null;
+  tokensTotal?: number | null;
   model: string | null;
   securityFindings: SecurityFinding[];
+  metadata?: Record<string, unknown>;
   user: { id: string; email: string; name: string | null } | null;
   project: { id: string; name: string } | null;
   createdAt: string;

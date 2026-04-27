@@ -28,6 +28,7 @@ import { RiskBadge } from "@/components/dashboard/ActivityFeed";
 import { useOrg } from "@/contexts/OrgContext";
 import { useEvent } from "@/hooks/useApi";
 import { cn, humanizeToolName } from "@/lib/utils";
+import { formatTokens } from "@/lib/formatters";
 
 interface EventDrawerProps {
   eventId: string | null;
@@ -114,7 +115,9 @@ export function EventDrawer({
       })
     : "";
 
-  const tokenCount = (event?.inputTokens || 0) + (event?.outputTokens || 0);
+  const tokenCount =
+    event?.tokensTotal ??
+    (event?.inputTokens || 0) + (event?.outputTokens || 0);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -250,10 +253,7 @@ export function EventDrawer({
                       value={
                         tokenCount > 0 ? (
                           <span className="font-mono-display">
-                            {tokenCount.toLocaleString()}
-                            <span className="text-muted-foreground text-xs ml-1">
-                              ({event.inputTokens?.toLocaleString() || 0} in / {event.outputTokens?.toLocaleString() || 0} out)
-                            </span>
+                            {formatTokens(tokenCount)}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">-</span>
@@ -292,8 +292,8 @@ export function EventDrawer({
                       <ContentPanel
                         title="Event Metadata"
                         content={
-                          event.model
-                            ? JSON.stringify({ model: event.model }, null, 2)
+                          event.metadata
+                            ? JSON.stringify(event.metadata, null, 2)
                             : undefined
                         }
                       />

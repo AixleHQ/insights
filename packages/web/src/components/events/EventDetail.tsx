@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RiskBadge } from "@/components/dashboard/ActivityFeed";
 import { cn, humanizeToolName } from "@/lib/utils";
+import { formatTokens } from "@/lib/formatters";
 
 export interface EventDetailData {
   id: string;
@@ -196,7 +197,7 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
               value={
                 event.token_count !== undefined ? (
                   <span className="font-mono-display">
-                    {event.token_count.toLocaleString()}
+                    {formatTokens(event.token_count)}
                   </span>
                 ) : (
                   <span className="text-muted-foreground">-</span>
