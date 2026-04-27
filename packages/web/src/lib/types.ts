@@ -177,7 +177,6 @@ export interface ToolEvent {
   tokensTotal?: number | null;
   model: string | null;
   securityFindings: SecurityFinding[];
-  metadata?: Record<string, unknown>;
   user: { id: string; email: string; name: string | null } | null;
   project: { id: string; name: string } | null;
   createdAt: string;
