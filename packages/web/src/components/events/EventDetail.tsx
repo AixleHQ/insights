@@ -32,7 +32,7 @@ export interface EventDetailData {
   };
   raw_content?: string;
   sanitized_content?: string;
-  metadata?: Record<string, unknown>;
+  metadata?: Record<string, unknown> | null;
   findings?: Array<{
     type: string;
     severity: string;
