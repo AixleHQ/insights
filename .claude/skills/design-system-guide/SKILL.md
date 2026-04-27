@@ -1,6 +1,6 @@
 ---
 name: design-system-guide
-description: Loads when editing or creating UI components under packages/web/src/components/ui. Injects design-token rules, shadcn/Radix composition patterns, dark mode requirements, and a11y primitives. Use whenever touching components/ui/** or any new shadcn component.
+description: Enforces design tokens, dark mode parity, Radix composition, and a11y primitives in shadcn/ui components.
 ---
 
 # design-system-guide

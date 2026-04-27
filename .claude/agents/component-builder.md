@@ -1,6 +1,6 @@
 ---
 name: component-builder
-description: Executor that builds Figma-driven shadcn/Radix UI components for DB90. Reads Figma design context, diffs against the current implementation, then writes the component. Uses hard-coded escalation tripwires to call the Opus advisor before substantive decisions. Use via /migrate-component; do not invoke directly for routine edits.
+description: Executor that builds Figma-driven shadcn/Radix UI components for DB90 — reads Figma context, diffs current code, writes the component.
 tools: Read, Write, Edit, Bash, Glob, Grep
 model: sonnet
 ---

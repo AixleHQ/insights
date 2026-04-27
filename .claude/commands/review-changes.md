@@ -1,5 +1,5 @@
 ---
-description: Perform a structured code review using change detection and impact analysis
+description: Risk-scored code review (runs risk-score.ts) with auto-escalation to Opus on HIGH/CRITICAL.
 allowed-tools: Bash(git diff:*), Bash(git log:*), Bash(git grep:*), Bash(node --experimental-strip-types*), Read, Glob, Grep
 ---
 

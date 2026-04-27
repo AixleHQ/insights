@@ -1,6 +1,6 @@
 ---
 name: actionpolicy-check
-description: Loads when editing Rails controller actions. Ensures authorize! is called at the start of each action, following DB90's ActionPolicy (not Pundit or CanCan) convention. Use whenever editing a *_controller.rb file.
+description: Ensures authorize! is called at the start of each Rails controller action (DB90 uses ActionPolicy, not Pundit/CanCan).
 ---
 
 # actionpolicy-check
@@ -41,5 +41,5 @@ end
 If the user asks "how does actionpolicy-check work?" or "when does this trigger?":
 - Trigger: edits to `packages/api/app/controllers/**/*_controller.rb`.
 - What I inject: the `authorize!` rule + anti-patterns to avoid.
-- I don't block anything — I remind. Enforcement is at `backend-reviewer` agent (PR time) and optionally a RuboCop cop.
+- I don't block anything — I remind. Enforcement is at PR review time (`/review-architecture`, `/review-commit`) and optionally a RuboCop cop.
 - Cap: 200 words.

@@ -60,31 +60,20 @@ Anthropic's Advisor Strategy (Sonnet executor + Opus advisor) promises Opus qual
 ```
 .claude/
 ├── agents/
-│   ├── backend-reviewer.md       # reviewer — Alba/ActionPolicy/layering
 │   ├── component-builder.md      # executor — Figma-driven UI build
 │   ├── component-reviewer.md     # reviewer — token/a11y gate
 │   ├── swagger-auditor.md        # auditor — swagger-sync compliance
 │   └── ui-visual-reviewer.md     # reviewer — screenshot regression
 ├── commands/
 │   ├── debug-issue.md
-│   ├── discover-skills.md        # scan project stack → install skills from skills.sh
-│   ├── explore-codebase.md
 │   ├── help-tooling.md
 │   ├── implement-design.md       # Figma URL → production code (7-step MCP workflow)
 │   ├── manage-worktrees.md
 │   ├── migrate-component.md      # orchestrated component migration
 │   ├── onboard.md
-│   ├── playwright-best-practices.md  # E2E/component/auth/CI patterns reference
-│   ├── playwright-cli.md         # 40+ CLI commands reference
-│   ├── postgresql-optimization.md    # EXPLAIN ANALYZE, indexes, window functions
-│   ├── postgresql-table-design.md    # schema design, partitioning, TimescaleDB
-│   ├── refactor-plan.md
 │   ├── review-architecture.md
 │   ├── review-changes.md
-│   ├── review-commit.md
-│   ├── tailwind-v4-shadcn.md     # v4 setup, migration pitfalls, shadcn/Radix
-│   ├── tanstack-query-best-practices.md  # 32 TanStack Query v5 rules
-│   └── typescript-react-reviewer.md  # React 19 + TS review: bugs, anti-patterns
+│   └── review-commit.md
 ├── skills/
 │   ├── actionpolicy-check/SKILL.md  # auto-triggered — controller actions
 │   ├── design-system-guide/SKILL.md # auto-triggered — components/ui/**
@@ -115,19 +104,9 @@ Type `/` in Claude Code to see them all autocomplete. Not sure which to use? Jus
 | `/review-commit` | Pre-push sanity check | Reviewer agents |
 | `/review-changes` | Risk-scored review: runs `risk-score.ts` (tier + 2-hop callers + churn + method coverage) → escalates HIGH/CRITICAL to Opus advisor | Reviewer agents |
 | `/debug-issue` | Hunting a specific bug | — |
-| `/explore-codebase` | Onboarding to an unfamiliar area | — |
-| `/refactor-plan` | Planning a rename/extract before you touch code | — |
 | `/migrate-component` | Migrating one component to new design system | component-builder + component-reviewer + ui-visual-reviewer |
 | `/manage-worktrees` | Creating/opening/cleaning worktrees | — |
-| `/discover-skills` | Scan project stack and install relevant skills from skills.sh safely | — (self-contained) |
 | `/implement-design` | Implement a Figma node URL into code — 7-step MCP workflow | Figma MCP |
-| `/playwright-best-practices` | Playwright patterns reference — E2E, auth, debugging, CI/CD | — |
-| `/playwright-cli` | Browser automation CLI command reference | — |
-| `/postgresql-table-design` | Schema design — data types, indexing, partitioning, TimescaleDB | — |
-| `/postgresql-optimization` | Query optimization — EXPLAIN ANALYZE, indexes, window functions | — |
-| `/tanstack-query-best-practices` | TanStack Query v5 rules — keys, caching, mutations, error handling | — |
-| `/tailwind-v4-shadcn` | Tailwind v4 setup, migration pitfalls, shadcn/Radix integration | — |
-| `/typescript-react-reviewer` | React 19 + TS code review — bugs, anti-patterns, strict config | — |
 
 ### Agents — model invokes (specialists, isolated context)
 
@@ -139,7 +118,6 @@ flowchart TB
       CB[component-builder\nSonnet + Opus advisor]
     end
     subgraph Reviewers
-      RR[backend-reviewer\nSonnet]
       SA[swagger-auditor\nHaiku]
       CR[component-reviewer\nSonnet]
       VC[ui-visual-reviewer\nSonnet]
@@ -147,17 +125,17 @@ flowchart TB
 
     CB --> CR
     CB --> VC
-    API[backend edit] --> RR
-    API --> SA
+    API[backend edit] --> SA
 ```
 
 | Agent | Role | Scope | Model |
 |---|---|---|---|
-| `backend-reviewer` | Reviewer | Backend diff — enforces Alba, ActionPolicy, layered architecture | Sonnet |
 | `swagger-auditor` | Auditor (hard gate) | Controller diff + swagger.yaml diff | Haiku |
 | `component-builder` | Executor | Figma node → shadcn/Radix component | Sonnet + Opus advisor |
 | `component-reviewer` | Reviewer | Token usage, dark mode, a11y | Sonnet |
 | `ui-visual-reviewer` | Reviewer | Screenshots in both themes, visual regression | Sonnet |
+
+Backend review work is covered by `/review-architecture`, `/review-changes`, and `/review-commit` (no dedicated reviewer agent).
 
 ### Skills — auto-triggered (silent domain knowledge)
 
@@ -241,7 +219,7 @@ sequenceDiagram
     participant Dev
     participant Claude
 
-    Dev->>Claude: "/explore-codebase useApi.ts"
+    Dev->>Claude: "find useApi.ts and where it's used"
     Claude->>Claude: Grep/Glob for useApi.ts and its usages
     Claude-->>Dev: hook list + usage map
     Dev->>Claude: "wire useToolOverview to Cursor tab"
@@ -364,7 +342,7 @@ claude
 3. Claude writes controller + policy + `swagger.yaml` + spec.
 4. `on-edit-lint` hook runs RuboCop automatically — fix anything it flags.
 5. Run `make test-api` to confirm specs pass.
-6. Invoke `/review-commit` before pushing — spawns `swagger-auditor` and `backend-reviewer`.
+6. Invoke `/review-commit` before pushing — spawns `swagger-auditor`.
 7. Push. CI runs full RuboCop + Brakeman + RSpec.
 
 ### B. Migrate a design-system component from new Figma
@@ -377,8 +355,8 @@ claude
 
 ### C. Wire a mocked UI to a real endpoint
 
-1. `/explore-codebase` to find the existing hook.
-2. In Claude: "Wire the Cursor tab to use `useToolOverview` instead of mock data."
+1. Ask Claude to find the existing hook (it'll Grep/Glob directly).
+2. "Wire the Cursor tab to use `useToolOverview` instead of mock data."
 3. Claude edits the page; TanStack Query handles fetching.
 4. `on-edit-lint` hook runs ESLint automatically.
 5. Manually verify in browser at `http://localhost:5173`.
@@ -390,18 +368,61 @@ claude
 2. Greps for symbols → traces call sites → checks recent commits to see if a recent edit caused it.
 3. Reports root cause with specific file:line refs.
 
-### E. Plan a refactor before touching anything
-
-1. `/refactor-plan` — previews blast radius before any code changes.
-2. Greps for all usages to list all affected locations.
-3. Review the plan, then explicitly ask Claude to apply it.
-
-### F. Pre-PR architecture review
+### E. Pre-PR architecture review
 
 1. `/review-architecture` — deep dive on maintainability, security, performance.
 2. `/review-changes` — risk-scored review (runs `risk-score.ts`, escalates to Opus if HIGH/CRITICAL).
 3. `/review-commit` — lint + test context.
 4. All three together before a non-trivial PR.
+
+---
+
+## Reference
+
+### Make commands
+
+```bash
+make up            # Start all Docker services
+make api           # Run Rails API (port 3000)
+make web           # Run Vite dev server (port 5173)
+make test          # Run all tests (RSpec + Vitest)
+make test-api      # RSpec only
+make test-web      # Vitest only
+make lint          # Run all linters (RuboCop + ESLint)
+make lint-api      # RuboCop
+make lint-web      # ESLint
+make db-migrate    # Run pending migrations
+make db-seed       # Seed the database
+```
+
+For direct Ruby commands (`bundle exec`, `rails runner`, `rspec`), run from `packages/api/` (where the Gemfile lives), not the repo root.
+
+### Git conventions
+
+**Branch naming.** Branch from `develop` (never `staging` or `main`):
+
+```
+feature/AIX-XX-short-description
+```
+
+- `AIX-XX` — Linear ticket ID
+- `short-description` — kebab-case, 2–4 words
+- Examples: `feature/AIX-61-user-auth`, `feature/AIX-72-slack-alerts`
+
+**Commit messages.**
+
+```
+[AIX-XX] Short imperative description
+```
+
+- Always prefix with the ticket ID in brackets
+- Imperative mood: "Add", "Fix", "Update", "Remove" — not "Added"
+- Subject line under 72 characters
+- Examples:
+  - `[AIX-58] Add connector health display`
+  - `[AIX-61] Fix N+1 query in usage report`
+
+**Flow.** Feature branches merge to `develop` via PR. `staging` deploys to staging (auto via CI). `main` deploys to production. CI runs: RSpec, RuboCop, Brakeman, Vitest, ESLint, TypeScript typecheck.
 
 ---
 
@@ -424,7 +445,7 @@ Every primitive in `.claude/` is **self-teaching**. You never need to memorize a
 **1. Ask the primitive directly.**
 ```
 "How does swagger-auditor work?"
-"When should I use /refactor-plan vs /review-changes?"
+"When should I use /review-architecture vs /review-changes?"
 "What does the actionpolicy-check skill actually do?"
 ```
 Any agent/skill/command switches to Tutor Mode and explains itself in under 200 words.

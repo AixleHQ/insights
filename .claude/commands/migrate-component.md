@@ -1,6 +1,6 @@
 ---
 allowed-tools: Bash(git diff:*), Bash(git log:*), Bash(git status:*), Bash(npx playwright:*), Bash(cd packages/web*), Read, Glob, Grep
-description: Orchestrate a full Figma → code component migration. Reads the Figma design context, diffs the current implementation, lists consumers via Grep, then delegates to component-builder (executor), component-reviewer (token/a11y gate), and ui-visual-reviewer (screenshot regression).
+description: Orchestrate Figma → code component migration — design context, diff, consumers, builder/reviewer/visual chain.
 ---
 
 # /migrate-component

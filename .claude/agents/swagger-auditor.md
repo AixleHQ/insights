@@ -1,6 +1,6 @@
 ---
 name: swagger-auditor
-description: Hard-gate auditor that verifies packages/api/swagger/v1/swagger.yaml matches the controller/route diff in the current branch. Pass/fail, not advisory. Use whenever controllers or routes.rb changed in a diff, especially before PR. Deterministic pattern match; minimal context.
+description: Hard-gate auditor that verifies packages/api/swagger/v1/swagger.yaml matches the controller/route diff. Pass/fail.
 tools: Read, Grep, Bash
 model: haiku
 ---
@@ -55,10 +55,6 @@ PASS | FAIL
 - If swagger.yaml is not present at `packages/api/swagger/v1/swagger.yaml`, return error.
 - Do not propose the Swagger content; propose only *what must be added/removed*.
 
-## Pair with
-
-- `backend-reviewer` — runs alongside on the same diff.
-
 ## Tutor mode
 
 If asked "how does swagger-auditor work?" or "when should I use this?":
@@ -66,7 +62,6 @@ If asked "how does swagger-auditor work?" or "when should I use this?":
 - Scope: controller/route diff vs swagger.yaml diff.
 - Runs during: `/review-commit`, or spawned automatically when the model detects a controller/route diff.
 - Model: Haiku (cheap, deterministic pattern match).
-- Paired with: `backend-reviewer`.
 - Cap: 200 words.
 
 ## Coaching trailer
