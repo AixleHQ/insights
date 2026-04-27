@@ -211,6 +211,7 @@ describe("toDb90Payload", () => {
     expect(payload.metadata.session_id).toBe("sess-abc");
     expect(payload.metadata.model).toBe("claude-opus-4-5");
     expect(payload.metadata.base_input_tokens).toBe(85); // 100 - 10 - 5
+    expect(payload.metadata.output_tokens).toBe(50);
     expect(payload.metadata.cache_write_tokens).toBe(10);
     expect(payload.metadata.cache_read_tokens).toBe(5);
   });
@@ -236,6 +237,7 @@ describe("toDb90Payload", () => {
     expect(payload.cost_usd).toBeNull();
     expect(payload.metadata.model).toBeNull();
     expect(payload.metadata.base_input_tokens).toBe(0);
+    expect(payload.metadata.output_tokens).toBe(0);
     expect(payload.metadata.cache_write_tokens).toBe(0);
     expect(payload.metadata.cache_read_tokens).toBe(0);
   });

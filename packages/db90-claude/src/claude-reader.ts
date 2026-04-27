@@ -56,6 +56,7 @@ export interface Db90Payload {
     session_id: string;
     model: string | null;
     base_input_tokens: number;
+    output_tokens: number;
     cache_write_tokens: number;
     cache_read_tokens: number;
   };
@@ -200,6 +201,7 @@ export function toDb90Payload(agg: SessionAggregate, options?: ToDb90PayloadOpti
       session_id: agg.sessionId,
       model: agg.model,
       base_input_tokens: baseInputTokens,
+      output_tokens: agg.tokensOut,
       cache_write_tokens: agg.cacheWriteTokens,
       cache_read_tokens: agg.cacheReadTokens,
     },
