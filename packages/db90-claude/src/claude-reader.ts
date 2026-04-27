@@ -54,8 +54,10 @@ export interface Db90Payload {
   project_id?: string;
   metadata: {
     session_id: string;
-    cache_write_tokens?: number;
-    cache_read_tokens?: number;
+    model: string | null;
+    base_input_tokens: number;
+    cache_write_tokens: number;
+    cache_read_tokens: number;
   };
 }
 
@@ -196,6 +198,10 @@ export function toDb90Payload(agg: SessionAggregate, options?: ToDb90PayloadOpti
     occurred_at: agg.occurredAt,
     metadata: {
       session_id: agg.sessionId,
+      model: agg.model,
+      base_input_tokens: baseInputTokens,
+      cache_write_tokens: agg.cacheWriteTokens,
+      cache_read_tokens: agg.cacheReadTokens,
     },
   };
 
@@ -204,12 +210,6 @@ export function toDb90Payload(agg: SessionAggregate, options?: ToDb90PayloadOpti
   if (agg.tokensOut > 0) payload.tokens_out = agg.tokensOut;
   if (agg.tokensIn > 0 || agg.tokensOut > 0) {
     payload.tokens_total = agg.tokensIn + agg.tokensOut;
-  }
-  if (agg.cacheWriteTokens > 0) {
-    payload.metadata.cache_write_tokens = agg.cacheWriteTokens;
-  }
-  if (agg.cacheReadTokens > 0) {
-    payload.metadata.cache_read_tokens = agg.cacheReadTokens;
   }
   if (projectId) payload.project_id = projectId;
 

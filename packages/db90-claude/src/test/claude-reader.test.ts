@@ -209,6 +209,8 @@ describe("toDb90Payload", () => {
     expect(payload.cost_usd).toBeNull(); // no pricing provided
     expect(payload.occurred_at).toBe("2024-01-01T00:00:00.000Z");
     expect(payload.metadata.session_id).toBe("sess-abc");
+    expect(payload.metadata.model).toBe("claude-opus-4-5");
+    expect(payload.metadata.base_input_tokens).toBe(85); // 100 - 10 - 5
     expect(payload.metadata.cache_write_tokens).toBe(10);
     expect(payload.metadata.cache_read_tokens).toBe(5);
   });
@@ -232,8 +234,10 @@ describe("toDb90Payload", () => {
     expect(payload.tokens_total).toBeUndefined();
     expect(payload.model).toBeUndefined();
     expect(payload.cost_usd).toBeNull();
-    expect(payload.metadata.cache_write_tokens).toBeUndefined();
-    expect(payload.metadata.cache_read_tokens).toBeUndefined();
+    expect(payload.metadata.model).toBeNull();
+    expect(payload.metadata.base_input_tokens).toBe(0);
+    expect(payload.metadata.cache_write_tokens).toBe(0);
+    expect(payload.metadata.cache_read_tokens).toBe(0);
   });
 
   it("computes cost_usd when pricing is provided and model is known", () => {
