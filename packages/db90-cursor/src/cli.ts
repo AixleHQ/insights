@@ -3,7 +3,8 @@ import { join } from "node:path";
 import { readFileSync } from "node:fs";
 import { readState, writeState, APP_DIR } from "./state.js";
 import { readEvents, readDailyStats } from "./cursor-reader.js";
-import { mapEvent, mapDailyStats } from "./mapper.js";
+import { mapEvent, mapDailyStats, DEFAULT_PRICING } from "./mapper.js";
+import type { PricingConfig } from "./mapper.js";
 import { postEvents } from "./client.js";
 import { resolveProjectId } from "./project-resolver.js";
 
@@ -11,6 +12,7 @@ interface Config {
   token?: string;
   host?: string;
   project_id?: string;
+  pricing?: Partial<PricingConfig>;
 }
 
 function loadConfig(): Config {
@@ -19,10 +21,28 @@ function loadConfig(): Config {
     const parsed = JSON.parse(readFileSync(configPath, "utf-8")) as unknown;
     if (typeof parsed === "object" && parsed !== null) {
       const obj = parsed as Record<string, unknown>;
+      const pricing: Partial<PricingConfig> = {};
+      const rawPricing =
+        typeof obj.pricing === "object" && obj.pricing !== null
+          ? (obj.pricing as Record<string, unknown>)
+          : {};
+      for (const key of [
+        "tokens_per_line",
+        "completion_output_per_mtok",
+        "chat_input_per_mtok",
+        "chat_output_per_mtok",
+      ] as const) {
+        const raw = rawPricing[key];
+        // Guard empty string before Number(): Number("") === 0 would silently zero out a rate.
+        if (raw == null || raw === "" || typeof raw === "boolean") continue;
+        const v = Number(raw);
+        if (!isNaN(v) && v >= 0) pricing[key] = v;
+      }
       return {
         token: typeof obj.token === "string" ? obj.token : undefined,
         host: typeof obj.host === "string" ? obj.host : undefined,
         project_id: typeof obj.project_id === "string" ? obj.project_id : undefined,
+        pricing: Object.keys(pricing).length > 0 ? pricing : undefined,
       };
     }
   } catch {
@@ -100,7 +120,19 @@ Options:
   --help, -h           Show this help message
 
 Config file: ~/.db90-cursor/config.json
-  { "token": "...", "host": "https://app.db90.io", "project_id": "..." }
+  {
+    "token": "...",
+    "host": "https://app.db90.io",
+    "project_id": "...",
+    "pricing": {
+      "tokens_per_line": 15,
+      "completion_output_per_mtok": 0.60,
+      "chat_input_per_mtok": 3.00,
+      "chat_output_per_mtok": 15.00
+    }
+  }
+  All pricing values must be non-negative numbers; invalid or negative values
+  are ignored and the default is used for that field.
 `);
 }
 
@@ -147,6 +179,8 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  const pricing: PricingConfig = { ...DEFAULT_PRICING, ...fileConfig.pricing };
+
   const resolution = await resolveProjectId(
     cliArgs.projectId,
     fileConfig.project_id,
@@ -169,10 +203,10 @@ async function main(): Promise<void> {
   const projectId = resolution.projectId ?? undefined;
 
   const mappedFromEvents = rawEvents
-    .map(({ row, workspacePath }) => mapEvent(row, workspacePath, projectId))
+    .map(({ row, workspacePath }) => mapEvent(row, workspacePath, projectId, pricing))
     .filter((e): e is NonNullable<typeof e> => e !== null);
 
-  const mappedFromStats = dailyStats.flatMap((entry) => mapDailyStats(entry, projectId));
+  const mappedFromStats = dailyStats.flatMap((entry) => mapDailyStats(entry, projectId, pricing));
 
   const mappedEvents = [...mappedFromEvents, ...mappedFromStats];
 
@@ -185,6 +219,7 @@ async function main(): Promise<void> {
 
   if (cliArgs.dryRun) {
     console.log(`[dry-run] Would send ${mappedEvents.length} event(s):`);
+    console.log(`[dry-run] Note: cost_usd values are estimates (see cost_model in metadata).`);
     for (const event of mappedEvents) {
       console.log(JSON.stringify(event, null, 2));
     }

@@ -1,3 +1,19 @@
+const COST_MODEL = "estimated_line_count" as const;
+
+export interface PricingConfig {
+  tokens_per_line: number;
+  completion_output_per_mtok: number;
+  chat_input_per_mtok: number;
+  chat_output_per_mtok: number;
+}
+
+export const DEFAULT_PRICING: PricingConfig = {
+  tokens_per_line: 15,
+  completion_output_per_mtok: 0.60,
+  chat_input_per_mtok: 3.00,
+  chat_output_per_mtok: 15.00,
+};
+
 export interface CursorRow {
   requestId?: string | null;
   timestamp?: number | string | null;
@@ -15,11 +31,13 @@ export interface Db90Payload {
   model: string;
   tokens_in: number;
   tokens_out: number;
+  cost_usd: number;
   occurred_at: string;
   project_id?: string;
   metadata: {
     cursor_session_id: string | null;
     workspace: string;
+    cost_model: typeof COST_MODEL;
   };
 }
 
@@ -42,6 +60,31 @@ function toIsoString(timestamp: number | string | null | undefined): string | nu
   return date.toISOString();
 }
 
+// ─── Cost helpers ─────────────────────────────────────────────────────────────
+
+// For line-count layout (daily stats v1.5).
+function computeLineCost(
+  eventType: "completion" | "chat",
+  lines: number,
+  pricing: PricingConfig
+): number {
+  if (eventType === "completion")
+    return (lines * pricing.tokens_per_line * pricing.completion_output_per_mtok) / 1_000_000;
+  return (lines * pricing.tokens_per_line * (pricing.chat_output_per_mtok + pricing.chat_input_per_mtok * 2)) / 1_000_000;
+}
+
+// For token-based events (legacy cursor.db + model-keyed fallback).
+function computeTokenCost(
+  eventType: "completion" | "chat",
+  tokensIn: number,
+  tokensOut: number,
+  pricing: PricingConfig
+): number {
+  if (eventType === "completion")
+    return (tokensOut * pricing.completion_output_per_mtok) / 1_000_000;
+  return (tokensIn * pricing.chat_input_per_mtok + tokensOut * pricing.chat_output_per_mtok) / 1_000_000;
+}
+
 // ─── Daily stats mapping (state.vscdb / ItemTable) ───────────────────────────
 
 import type { DailyStatsEntry } from "./cursor-reader.js";
@@ -55,23 +98,26 @@ function pick(obj: unknown, ...keys: string[]): number | null {
   return typeof cur === "number" ? cur : null;
 }
 
-function buildPayload(
-  eventType: "completion" | "chat",
-  tokensIn: number,
-  tokensOut: number,
-  occurredAt: string,
-  dbPath: string,
-  model = "unknown",
-  projectId?: string
-): Db90Payload {
+function buildPayload(opts: {
+  eventType: "completion" | "chat";
+  tokensIn: number;
+  tokensOut: number;
+  costUsd: number;
+  occurredAt: string;
+  dbPath: string;
+  model?: string;
+  projectId?: string;
+}): Db90Payload {
+  const { eventType, tokensIn, tokensOut, costUsd, occurredAt, dbPath, model = "unknown", projectId } = opts;
   const payload: Db90Payload = {
     tool_name: "cursor",
     event_type: eventType,
     model,
     tokens_in: tokensIn,
     tokens_out: tokensOut,
+    cost_usd: costUsd,
     occurred_at: occurredAt,
-    metadata: { cursor_session_id: null, workspace: dbPath },
+    metadata: { cursor_session_id: null, workspace: dbPath, cost_model: COST_MODEL },
   };
   if (projectId) payload.project_id = projectId;
   return payload;
@@ -89,7 +135,11 @@ function buildPayload(
  * Older or future Cursor versions may use model-keyed token counts instead;
  * that layout is handled as a fallback.
  */
-export function mapDailyStats(entry: DailyStatsEntry, projectId?: string): Db90Payload[] {
+export function mapDailyStats(
+  entry: DailyStatsEntry,
+  projectId?: string,
+  pricing: PricingConfig = DEFAULT_PRICING
+): Db90Payload[] {
   const { date, value, dbPath } = entry;
   const occurredAt = `${date}T00:00:00.000Z`;
   const results: Db90Payload[] = [];
@@ -104,10 +154,24 @@ export function mapDailyStats(entry: DailyStatsEntry, projectId?: string): Db90P
   const composerAccepted  = pick(obj, "composerAcceptedLines") ?? 0;
 
   if (tabSuggested > 0 || tabAccepted > 0)
-    results.push(buildPayload("completion", tabSuggested, tabAccepted, occurredAt, dbPath, "unknown", projectId));
+    results.push(buildPayload({
+      eventType: "completion",
+      tokensIn: tabSuggested,
+      tokensOut: tabAccepted,
+      // Cost is driven by suggested (output) lines, not accepted lines —
+      // the model incurs cost when generating suggestions regardless of acceptance.
+      costUsd: computeLineCost("completion", tabSuggested, pricing),
+      occurredAt, dbPath, projectId,
+    }));
 
   if (composerSuggested > 0 || composerAccepted > 0)
-    results.push(buildPayload("chat", composerSuggested, composerAccepted, occurredAt, dbPath, "unknown", projectId));
+    results.push(buildPayload({
+      eventType: "chat",
+      tokensIn: composerSuggested,
+      tokensOut: composerAccepted,
+      costUsd: computeLineCost("chat", composerSuggested, pricing),
+      occurredAt, dbPath, projectId,
+    }));
 
   if (results.length > 0) return results;
 
@@ -120,13 +184,23 @@ export function mapDailyStats(entry: DailyStatsEntry, projectId?: string): Db90P
     const tokensIn  = pick(stats, "inputTokens") ?? pick(stats, "promptTokens") ?? 0;
     const tokensOut = pick(stats, "outputTokens") ?? pick(stats, "generatedTokens") ?? 0;
     if (tokensIn === 0 && tokensOut === 0) continue;
-    results.push(buildPayload("chat", tokensIn, tokensOut, occurredAt, dbPath, model, projectId));
+    results.push(buildPayload({
+      eventType: "chat",
+      tokensIn, tokensOut,
+      costUsd: computeTokenCost("chat", tokensIn, tokensOut, pricing),
+      occurredAt, dbPath, model, projectId,
+    }));
   }
 
   return results;
 }
 
-export function mapEvent(row: CursorRow, workspacePath: string, projectId?: string): Db90Payload | null {
+export function mapEvent(
+  row: CursorRow,
+  workspacePath: string,
+  projectId?: string,
+  pricing: PricingConfig = DEFAULT_PRICING
+): Db90Payload | null {
   const occurredAt = toIsoString(row.timestamp);
   if (!occurredAt) return null;
 
@@ -134,17 +208,21 @@ export function mapEvent(row: CursorRow, workspacePath: string, projectId?: stri
   if (!model) return null;
 
   const eventType: "completion" | "chat" = row.type === 1 ? "chat" : "completion";
+  const tokensIn  = row.promptTokens ?? 0;
+  const tokensOut = row.generatedTokens ?? 0;
 
   const payload: Db90Payload = {
     tool_name: "cursor",
     event_type: eventType,
     model,
-    tokens_in: row.promptTokens ?? 0,
-    tokens_out: row.generatedTokens ?? 0,
+    tokens_in: tokensIn,
+    tokens_out: tokensOut,
+    cost_usd: computeTokenCost(eventType, tokensIn, tokensOut, pricing),
     occurred_at: occurredAt,
     metadata: {
       cursor_session_id: row.sessionId ?? row.requestId ?? null,
       workspace: workspacePath,
+      cost_model: COST_MODEL,
     },
   };
   if (projectId) payload.project_id = projectId;

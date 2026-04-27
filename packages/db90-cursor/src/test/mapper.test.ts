@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { mapEvent, mapDailyStats } from "../mapper.js";
-import type { CursorRow } from "../mapper.js";
+import { mapEvent, mapDailyStats, DEFAULT_PRICING } from "../mapper.js";
+import type { CursorRow, PricingConfig } from "../mapper.js";
 import type { DailyStatsEntry } from "../cursor-reader.js";
 
 describe("mapEvent", () => {
@@ -28,6 +28,8 @@ describe("mapEvent", () => {
     expect(result!.occurred_at).toBe(new Date(1700000000000).toISOString());
     expect(result!.metadata.cursor_session_id).toBe("session-xyz");
     expect(result!.metadata.workspace).toBe(workspace);
+    expect(result!.cost_usd).toBeTypeOf("number");
+    expect(result!.metadata.cost_model).toBe("estimated_line_count");
   });
 
   it("maps a chat event (type=1) correctly", () => {
@@ -47,6 +49,8 @@ describe("mapEvent", () => {
     expect(result!.event_type).toBe("chat");
     expect(result!.model).toBe("claude-3-sonnet");
     expect(result!.metadata.cursor_session_id).toBe("req-def-456");
+    expect(result!.cost_usd).toBeTypeOf("number");
+    expect(result!.metadata.cost_model).toBe("estimated_line_count");
   });
 
   it("handles timestamps in seconds (< 1e12)", () => {
@@ -63,6 +67,8 @@ describe("mapEvent", () => {
 
     expect(result).not.toBeNull();
     expect(result!.occurred_at).toBe(new Date(1700000000 * 1000).toISOString());
+    expect(result!.cost_usd).toBeTypeOf("number");
+    expect(result!.metadata.cost_model).toBe("estimated_line_count");
   });
 
   it("returns null when timestamp is missing", () => {
@@ -105,6 +111,8 @@ describe("mapEvent", () => {
     expect(result).not.toBeNull();
     expect(result!.tokens_in).toBe(0);
     expect(result!.tokens_out).toBe(0);
+    expect(result!.cost_usd).toBe(0);
+    expect(result!.metadata.cost_model).toBe("estimated_line_count");
   });
 
   it("falls back to requestId for session_id when sessionId is null", () => {
@@ -121,6 +129,8 @@ describe("mapEvent", () => {
     const result = mapEvent(row, workspace);
     expect(result).not.toBeNull();
     expect(result!.metadata.cursor_session_id).toBe("req-fallback");
+    expect(result!.cost_usd).toBeTypeOf("number");
+    expect(result!.metadata.cost_model).toBe("estimated_line_count");
   });
 
   it("treats type=undefined as completion", () => {
@@ -135,6 +145,27 @@ describe("mapEvent", () => {
     const result = mapEvent(row, workspace);
     expect(result).not.toBeNull();
     expect(result!.event_type).toBe("completion");
+    expect(result!.cost_usd).toBeTypeOf("number");
+    expect(result!.metadata.cost_model).toBe("estimated_line_count");
+  });
+
+  it("sets cost_usd to 0 when tokens are zero (completion, type=0)", () => {
+    const row: CursorRow = {
+      requestId: "r",
+      timestamp: 1700000000000,
+      model: "gpt-4",
+      promptTokens: 0,
+      generatedTokens: 0,
+      type: 0,
+    };
+
+    const result = mapEvent(row, workspace);
+    expect(result).not.toBeNull();
+    expect(result!.cost_usd).toBe(0);
+    expect(result!.metadata.cost_model).toBe("estimated_line_count");
+    // same holds for chat (type=1) with zero tokens
+    const resultChat = mapEvent({ ...row, type: 1 }, workspace);
+    expect(resultChat!.cost_usd).toBe(0);
   });
 });
 
@@ -154,10 +185,14 @@ describe("mapDailyStats", () => {
     expect(tab.tokens_in).toBe(6);
     expect(tab.tokens_out).toBe(2);
     expect(tab.occurred_at).toBe("2026-02-09T00:00:00.000Z");
+    expect(tab.cost_usd).toBeTypeOf("number");
+    expect(tab.metadata.cost_model).toBe("estimated_line_count");
 
     const composer = results.find((r) => r.event_type === "chat")!;
     expect(composer.tokens_in).toBe(43);
     expect(composer.tokens_out).toBe(50);
+    expect(composer.cost_usd).toBeTypeOf("number");
+    expect(composer.metadata.cost_model).toBe("estimated_line_count");
   });
 
   it("emits only tab event when composer counts are zero", () => {
@@ -169,6 +204,8 @@ describe("mapDailyStats", () => {
     const results = mapDailyStats(entry);
     expect(results).toHaveLength(1);
     expect(results[0].event_type).toBe("completion");
+    expect(results[0].cost_usd).toBeTypeOf("number");
+    expect(results[0].metadata.cost_model).toBe("estimated_line_count");
   });
 
   it("emits only composer event when tab counts are zero", () => {
@@ -180,6 +217,8 @@ describe("mapDailyStats", () => {
     const results = mapDailyStats(entry);
     expect(results).toHaveLength(1);
     expect(results[0].event_type).toBe("chat");
+    expect(results[0].cost_usd).toBeTypeOf("number");
+    expect(results[0].metadata.cost_model).toBe("estimated_line_count");
   });
 
   it("returns empty array when all counts are zero", () => {
@@ -202,10 +241,61 @@ describe("mapDailyStats", () => {
     expect(results[0].model).toBe("claude-3-5-sonnet");
     expect(results[0].tokens_in).toBe(5000);
     expect(results[0].tokens_out).toBe(1200);
+    expect(results[0].cost_usd).toBeTypeOf("number");
+    expect(results[0].metadata.cost_model).toBe("estimated_line_count");
   });
 
   it("returns empty array for unknown shape", () => {
     const entry: DailyStatsEntry = { date: "2026-01-01", dbPath, value: { foo: "bar" } };
     expect(mapDailyStats(entry)).toHaveLength(0);
+  });
+
+  it("computes tab completion cost from line count using default pricing", () => {
+    // cost = tabSuggestedLines × tokens_per_line × completion_output_per_mtok / 1_000_000
+    // = 100 × 15 × 0.60 / 1_000_000 = 0.0009
+    const entry: DailyStatsEntry = {
+      date: "2026-04-01",
+      dbPath,
+      value: { tabSuggestedLines: 100, tabAcceptedLines: 80, composerSuggestedLines: 0, composerAcceptedLines: 0 },
+    };
+    const results = mapDailyStats(entry);
+    expect(results).toHaveLength(1);
+    expect(results[0].event_type).toBe("completion");
+    expect(results[0].cost_usd).toBeCloseTo(0.0009, 10);
+  });
+
+  it("computes composer chat cost from line count using default pricing", () => {
+    // cost = composerSuggestedLines × tokens_per_line × (chat_output_per_mtok + chat_input_per_mtok × 2) / 1_000_000
+    // = 100 × 15 × (15.00 + 3.00 × 2) / 1_000_000 = 100 × 15 × 21 / 1_000_000 = 0.0315
+    const entry: DailyStatsEntry = {
+      date: "2026-04-01",
+      dbPath,
+      value: { tabSuggestedLines: 0, tabAcceptedLines: 0, composerSuggestedLines: 100, composerAcceptedLines: 60 },
+    };
+    const results = mapDailyStats(entry);
+    expect(results).toHaveLength(1);
+    expect(results[0].event_type).toBe("chat");
+    expect(results[0].cost_usd).toBeCloseTo(0.0315, 10);
+  });
+
+  it("uses custom PricingConfig rates when provided", () => {
+    const customPricing: PricingConfig = {
+      tokens_per_line: 10,
+      completion_output_per_mtok: 1.00,
+      chat_input_per_mtok: 2.00,
+      chat_output_per_mtok: 10.00,
+    };
+    // tab: 50 × 10 × 1.00 / 1_000_000 = 0.0005
+    const entry: DailyStatsEntry = {
+      date: "2026-04-01",
+      dbPath,
+      value: { tabSuggestedLines: 50, tabAcceptedLines: 40, composerSuggestedLines: 0, composerAcceptedLines: 0 },
+    };
+    const results = mapDailyStats(entry, undefined, customPricing);
+    expect(results).toHaveLength(1);
+    expect(results[0].cost_usd).toBeCloseTo(0.0005, 10);
+    // Verify it differs from the default-pricing result
+    const defaultResults = mapDailyStats(entry);
+    expect(results[0].cost_usd).not.toBe(defaultResults[0].cost_usd);
   });
 });

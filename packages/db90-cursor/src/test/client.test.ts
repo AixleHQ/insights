@@ -8,10 +8,12 @@ const sampleEvent: Db90Payload = {
   model: "gpt-4",
   tokens_in: 100,
   tokens_out: 50,
+  cost_usd: 0,
   occurred_at: "2024-01-01T00:00:00.000Z",
   metadata: {
     cursor_session_id: "session-123",
     workspace: "/home/user/project",
+    cost_model: "estimated_line_count",
   },
 };
 
