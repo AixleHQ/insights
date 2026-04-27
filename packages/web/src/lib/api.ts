@@ -7,7 +7,7 @@
  * - Handles common response scenarios (401, 403, etc.)
  */
 
-import { getAccessToken } from "./auth";
+import { getAccessToken, silentRenew } from "./auth";
 
 export interface ApiClientOptions {
   baseUrl?: string;
@@ -67,6 +67,11 @@ export function getCurrentOrganizationId(): string | null {
   return currentOrgId;
 }
 
+/** When set, OIDC silent renew + one retry on 401 is skipped (e.g. admin impersonation). */
+function isImpersonating(): boolean {
+  return !!localStorage.getItem(IMPERSONATION_STORAGE_KEY);
+}
+
 /**
  * Make an authenticated API request
  */
@@ -76,30 +81,43 @@ export async function apiRequest<T = unknown>(
 ): Promise<T> {
   const { skipAuth = false, skipOrgHeader = false, headers = {}, ...fetchOptions } = options;
 
-  const requestHeaders: HeadersInit = {
-    "Content-Type": "application/json",
-    ...headers,
-  };
-
-  // Add Authorization header
-  if (!skipAuth) {
-    const token = await getAuthToken();
-    if (token) {
-      (requestHeaders as Record<string, string>)["Authorization"] = `Bearer ${token}`;
-    }
-  }
-
-  // Add X-Organization-ID header
-  if (!skipOrgHeader && currentOrgId) {
-    (requestHeaders as Record<string, string>)["X-Organization-ID"] = currentOrgId;
-  }
-
   const url = endpoint.startsWith("http") ? endpoint : `${DEFAULT_BASE_URL}${endpoint}`;
 
-  const response = await fetch(url, {
-    ...fetchOptions,
-    headers: requestHeaders,
-  });
+  const buildHeaders = async (): Promise<HeadersInit> => {
+    const requestHeaders: HeadersInit = {
+      "Content-Type": "application/json",
+      ...headers,
+    };
+
+    if (!skipAuth) {
+      const token = await getAuthToken();
+      if (token) {
+        (requestHeaders as Record<string, string>)["Authorization"] = `Bearer ${token}`;
+      }
+    }
+
+    if (!skipOrgHeader && currentOrgId) {
+      (requestHeaders as Record<string, string>)["X-Organization-ID"] = currentOrgId;
+    }
+
+    return requestHeaders;
+  };
+
+  const doFetch = async () =>
+    fetch(url, {
+      ...fetchOptions,
+      headers: await buildHeaders(),
+    });
+
+  let response = await doFetch();
+
+  // Expired access token right after silent renew window: retry once after OIDC refresh.
+  if (response.status === 401 && !skipAuth && !isImpersonating()) {
+    const renewed = await silentRenew();
+    if (renewed) {
+      response = await doFetch();
+    }
+  }
 
   // Handle common error responses
   if (!response.ok) {

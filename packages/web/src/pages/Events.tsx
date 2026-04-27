@@ -11,8 +11,7 @@ import {
   type EventFiltersState,
   type EventRow,
 } from "@/components/events";
-
-const availableTools = ["GitHub Copilot", "Claude Code", "Cursor", "Aider", "Codeium"];
+import { EVENTS_TOOL_FILTER_OPTIONS } from "@/lib/eventsToolFilters";
 
 type SortField = "created_at" | "tool_name" | "risk_level" | "cost_usd";
 type SortDirection = "asc" | "desc";
@@ -193,7 +192,7 @@ export function Events() {
           setFilters(newFilters);
           setPage(1); // Reset to first page on filter change
         }}
-        tools={availableTools}
+        tools={EVENTS_TOOL_FILTER_OPTIONS}
       />
 
       <EventsTable

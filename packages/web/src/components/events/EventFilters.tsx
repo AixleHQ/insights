@@ -13,10 +13,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
+import { cn, humanizeToolName } from "@/lib/utils";
+import type { EventsToolFilterOption } from "@/lib/eventsToolFilters";
 
 export interface EventFiltersState {
   search?: string;
+  /** Canonical API `tool_name` (e.g. `cursor`, `claude_code`). */
   tool?: string;
   riskLevel?: string;
   eventType?: string;
@@ -27,7 +29,7 @@ export interface EventFiltersState {
 interface EventFiltersProps {
   filters: EventFiltersState;
   onFiltersChange: (filters: EventFiltersState) => void;
-  tools: string[];
+  tools: readonly EventsToolFilterOption[];
   className?: string;
 }
 
@@ -181,7 +183,9 @@ export function EventFilters({
   const activeFilters: { key: keyof EventFiltersState; label: string; value: string; colorDot?: string }[] = [];
 
   if (filters.tool) {
-    activeFilters.push({ key: "tool", label: "Tool", value: filters.tool });
+    const toolLabel =
+      tools.find((t) => t.value === filters.tool)?.label ?? humanizeToolName(filters.tool);
+    activeFilters.push({ key: "tool", label: "Tool", value: toolLabel });
   }
   if (filters.riskLevel) {
     const risk = riskLevels.find(r => r.value === filters.riskLevel);
@@ -253,9 +257,9 @@ export function EventFilters({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All tools</SelectItem>
-              {tools.map((tool) => (
-                <SelectItem key={tool} value={tool}>
-                  {tool}
+              {tools.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
                 </SelectItem>
               ))}
             </SelectContent>

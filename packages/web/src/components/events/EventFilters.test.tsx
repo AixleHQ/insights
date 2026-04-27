@@ -2,9 +2,15 @@ import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { EventFilters, type EventFiltersState } from "./EventFilters";
+import type { EventsToolFilterOption } from "@/lib/eventsToolFilters";
 
 describe("EventFilters", () => {
-  const defaultTools = ["Claude", "Cursor", "GitHub Copilot", "Windsurf"];
+  const defaultTools: EventsToolFilterOption[] = [
+    { value: "claude_code", label: "Claude Code" },
+    { value: "cursor", label: "Cursor" },
+    { value: "github_copilot", label: "GitHub Copilot" },
+    { value: "windsurf", label: "Windsurf" },
+  ];
   let mockOnFiltersChange: Mock<(filters: EventFiltersState) => void>;
   let defaultFilters: EventFiltersState;
 
@@ -15,7 +21,7 @@ describe("EventFilters", () => {
 
   const renderFilters = (
     filters: EventFiltersState = defaultFilters,
-    tools: string[] = defaultTools
+    tools: readonly EventsToolFilterOption[] = defaultTools
   ) => {
     return render(
       <EventFilters
@@ -106,14 +112,15 @@ describe("EventFilters", () => {
 
   describe("Tool Filter", () => {
     it("shows selected tool name in trigger when tool is selected", () => {
-      renderFilters({ tool: "Claude" });
+      renderFilters({ tool: "claude_code" });
       // When a tool is selected, "All tools" should not be visible
       expect(screen.queryByText("All tools")).not.toBeInTheDocument();
     });
 
     it("displays tool filter chip when tool is selected", () => {
-      renderFilters({ tool: "Claude" });
+      renderFilters({ tool: "claude_code" });
       expect(screen.getByText("Tool:")).toBeInTheDocument();
+      expect(screen.getAllByText("Claude Code").length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -222,12 +229,12 @@ describe("EventFilters", () => {
 
   describe("Active Filter Chips", () => {
     it("shows active filters section when filters are set", () => {
-      renderFilters({ tool: "Claude" });
+      renderFilters({ tool: "claude_code" });
       expect(screen.getByText("Active filters:")).toBeInTheDocument();
     });
 
     it("shows filter chip for tool filter", () => {
-      renderFilters({ tool: "Claude" });
+      renderFilters({ tool: "claude_code" });
       expect(screen.getByText("Tool:")).toBeInTheDocument();
     });
 
@@ -259,7 +266,7 @@ describe("EventFilters", () => {
 
     it("removes filter when chip remove button clicked", async () => {
       const user = userEvent.setup();
-      renderFilters({ tool: "Claude" });
+      renderFilters({ tool: "claude_code" });
 
       // Find buttons in the active filters section
       const activeFiltersSection = screen.getByText("Active filters:").parentElement;
@@ -275,7 +282,7 @@ describe("EventFilters", () => {
 
     it("shows multiple filter chips when multiple filters active", () => {
       renderFilters({
-        tool: "Claude",
+        tool: "claude_code",
         riskLevel: "high",
         eventType: "completion",
       });
@@ -293,7 +300,7 @@ describe("EventFilters", () => {
     });
 
     it("shows clear all button when dropdown filters are active", () => {
-      renderFilters({ tool: "Claude" });
+      renderFilters({ tool: "claude_code" });
       expect(screen.getByText("Clear all")).toBeInTheDocument();
     });
 
@@ -301,7 +308,7 @@ describe("EventFilters", () => {
       const user = userEvent.setup();
       renderFilters({
         search: "test",
-        tool: "Claude",
+        tool: "claude_code",
         riskLevel: "high",
         eventType: "completion",
         dateFrom: "2024-01-15",
@@ -316,14 +323,14 @@ describe("EventFilters", () => {
   describe("Filter State Management", () => {
     it("preserves other filters when updating one", async () => {
       const user = userEvent.setup();
-      renderFilters({ tool: "Claude", riskLevel: "high" });
+      renderFilters({ tool: "claude_code", riskLevel: "high" });
 
       const searchInput = screen.getByPlaceholderText("Search events...");
       await user.type(searchInput, "x");
 
       // Last call should have all filters
       const lastCall = mockOnFiltersChange.mock.calls[mockOnFiltersChange.mock.calls.length - 1][0];
-      expect(lastCall.tool).toBe("Claude");
+      expect(lastCall.tool).toBe("claude_code");
       expect(lastCall.riskLevel).toBe("high");
     });
   });
