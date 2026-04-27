@@ -16,13 +16,11 @@ module ToolEvents
   # for the same session_id, eliminating the TOCTOU window in the naive
   # find-then-insert approach.
   class Upsert
-    # Fields that change as a session grows.
     MUTABLE_FIELDS = %i[
       tokens_in tokens_out tokens_total cost_usd
       model duration_ms project_id metadata
     ].freeze
 
-    # @param attributes [Hash] Symbolized attribute hash (same shape as tool_event_params)
     # @return [Hash] { tool_event: ToolEvent, created: Boolean }
     def self.call(attributes)
       new(attributes).call
@@ -47,9 +45,8 @@ module ToolEvents
 
     def upsert_with_lock
       ToolEvent.transaction do
-        # Advisory lock scoped to this transaction — auto-released at transaction end.
-        # Serialises concurrent requests for the same session_id so the
-        # find-then-insert below has no TOCTOU window.
+        # Advisory lock auto-released at transaction end — serialises concurrent
+        # requests for the same session_id to eliminate the TOCTOU window.
         lock_key = Zlib.crc32(@session_id)
         ToolEvent.connection.exec_query(
           "SELECT pg_advisory_xact_lock($1)",
@@ -60,7 +57,6 @@ module ToolEvents
         existing = ToolEvent
           .where(organization_id: @attributes[:organization_id])
           .where("metadata->>'session_id' = ?", @session_id)
-          .order(occurred_at: :desc)
           .first
 
         if existing

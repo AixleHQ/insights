@@ -19,16 +19,9 @@ export interface State {
 export const APP_DIR = join(homedir(), ".db90-claude");
 
 /**
- * Derive a per-credential filename stem so that different host+token pairs
- * each get their own state file. This means switching organisations or hosts
- * automatically starts with a clean slate — sessions sent to org A are not
- * mistakenly treated as "already sent" when you start posting to org B.
- *
+ * Derives a per-credential filename stem.
  * Format: `state-<hostname>-<8-char token hash>`
  * Example: `state-app.db90.io-a1b2c3d4.json`
- *
- * The token is hashed (never stored in the filename) and the hostname makes
- * the file human-readable when you list ~/.db90-claude/.
  */
 export function stateKey(host: string, token: string): string {
   let hostname: string;

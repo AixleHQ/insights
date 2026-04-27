@@ -116,20 +116,7 @@ export function mergePricing(base: PricingTable, overrides: PricingTable): Prici
 
 /**
  * Computes cost in USD, rounded to 6 decimal places (matching DB DECIMAL(10,6)).
- * Returns null if:
- *   - model is null (no model recorded in transcript)
- *   - model is not present in the pricing table
- *   - any rate for the model is non-finite (e.g. partial config override for a new model ID)
- *
- * Formula:
- *   (baseInputTokens × rate_in
- *    + outputTokens × rate_out
- *    + cacheWriteTokens × rate_cache_write
- *    + cacheReadTokens × rate_cache_read) / 1_000_000
- *
- * `baseInputTokens` is the raw (non-cached) input token count:
- *   baseInputTokens = tokensIn - cacheWriteTokens - cacheReadTokens
- * (tokensIn already bundles all three input token types in SessionAggregate)
+ * Returns null when model is null, not in the pricing table, or has non-finite rates.
  */
 /** Returns true only when all four rate fields are finite numbers. */
 function hasValidRates(rates: ModelPricing): boolean {

@@ -171,7 +171,7 @@ export interface ToolEvent {
   costUsd: number;
   inputTokens: number | null;
   outputTokens: number | null;
-  // Detail endpoint returns these instead of inputTokens/outputTokens
+  // TODO: align list and detail serialisers to use the same token field names
   tokensIn?: number | null;
   tokensOut?: number | null;
   tokensTotal?: number | null;
