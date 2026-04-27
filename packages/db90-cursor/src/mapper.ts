@@ -63,7 +63,6 @@ function toIsoString(timestamp: number | string | null | undefined): string | nu
 // ─── Cost helpers ─────────────────────────────────────────────────────────────
 
 // For line-count layout (daily stats v1.5).
-// lines = suggestedLines (tab output side for completion; composer suggested for chat).
 function computeLineCost(
   eventType: "completion" | "chat",
   lines: number,
@@ -99,16 +98,17 @@ function pick(obj: unknown, ...keys: string[]): number | null {
   return typeof cur === "number" ? cur : null;
 }
 
-function buildPayload(
-  eventType: "completion" | "chat",
-  tokensIn: number,
-  tokensOut: number,
-  costUsd: number,
-  occurredAt: string,
-  dbPath: string,
-  model = "unknown",
-  projectId?: string
-): Db90Payload {
+function buildPayload(opts: {
+  eventType: "completion" | "chat";
+  tokensIn: number;
+  tokensOut: number;
+  costUsd: number;
+  occurredAt: string;
+  dbPath: string;
+  model?: string;
+  projectId?: string;
+}): Db90Payload {
+  const { eventType, tokensIn, tokensOut, costUsd, occurredAt, dbPath, model = "unknown", projectId } = opts;
   const payload: Db90Payload = {
     tool_name: "cursor",
     event_type: eventType,
@@ -154,18 +154,24 @@ export function mapDailyStats(
   const composerAccepted  = pick(obj, "composerAcceptedLines") ?? 0;
 
   if (tabSuggested > 0 || tabAccepted > 0)
-    results.push(buildPayload(
-      "completion", tabSuggested, tabAccepted,
-      computeLineCost("completion", tabSuggested, pricing),
-      occurredAt, dbPath, "unknown", projectId
-    ));
+    results.push(buildPayload({
+      eventType: "completion",
+      tokensIn: tabSuggested,
+      tokensOut: tabAccepted,
+      // Cost is driven by suggested (output) lines, not accepted lines —
+      // the model incurs cost when generating suggestions regardless of acceptance.
+      costUsd: computeLineCost("completion", tabSuggested, pricing),
+      occurredAt, dbPath, projectId,
+    }));
 
   if (composerSuggested > 0 || composerAccepted > 0)
-    results.push(buildPayload(
-      "chat", composerSuggested, composerAccepted,
-      computeLineCost("chat", composerSuggested, pricing),
-      occurredAt, dbPath, "unknown", projectId
-    ));
+    results.push(buildPayload({
+      eventType: "chat",
+      tokensIn: composerSuggested,
+      tokensOut: composerAccepted,
+      costUsd: computeLineCost("chat", composerSuggested, pricing),
+      occurredAt, dbPath, projectId,
+    }));
 
   if (results.length > 0) return results;
 
@@ -178,11 +184,12 @@ export function mapDailyStats(
     const tokensIn  = pick(stats, "inputTokens") ?? pick(stats, "promptTokens") ?? 0;
     const tokensOut = pick(stats, "outputTokens") ?? pick(stats, "generatedTokens") ?? 0;
     if (tokensIn === 0 && tokensOut === 0) continue;
-    results.push(buildPayload(
-      "chat", tokensIn, tokensOut,
-      computeTokenCost("chat", tokensIn, tokensOut, pricing),
-      occurredAt, dbPath, model, projectId
-    ));
+    results.push(buildPayload({
+      eventType: "chat",
+      tokensIn, tokensOut,
+      costUsd: computeTokenCost("chat", tokensIn, tokensOut, pricing),
+      occurredAt, dbPath, model, projectId,
+    }));
   }
 
   return results;
