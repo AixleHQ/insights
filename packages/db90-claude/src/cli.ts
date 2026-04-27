@@ -1,19 +1,31 @@
 #!/usr/bin/env node
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
-import { readState, writeState, markSessionSent, APP_DIR } from "./state.js";
-import { findTranscriptFiles, parseTranscriptFile, toDb90Payload } from "./claude-reader.js";
+import { readState, writeState, markSessionSent, migrateLegacyState, APP_DIR } from "./state.js";
+import { findTranscriptFiles, parseTranscriptFile, toDb90Payload, type SessionAggregate } from "./claude-reader.js";
 import { postEvent } from "./client.js";
 import { resolveProjectId } from "./project-resolver.js";
+import { type PricingTable, DEFAULT_PRICING, mergePricing, getCostWarning } from "./pricing.js";
 
 interface Config {
   token?: string;
   host?: string;
   project_id?: string;
+  pricing?: PricingTable;
 }
 
-function loadConfig(): Config {
-  const configPath = join(APP_DIR, "config.json");
+/** Minimal structural check: is this an object whose values are all objects? */
+function isPricingTable(value: unknown): value is PricingTable {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.values(value).every((v) => typeof v === "object" && v !== null && !Array.isArray(v))
+  );
+}
+
+export function loadConfig(dir?: string): Config {
+  const configPath = join(dir ?? APP_DIR, "config.json");
   try {
     const parsed = JSON.parse(readFileSync(configPath, "utf-8")) as unknown;
     if (typeof parsed === "object" && parsed !== null) {
@@ -22,6 +34,7 @@ function loadConfig(): Config {
         token: typeof obj.token === "string" ? obj.token : undefined,
         host: typeof obj.host === "string" ? obj.host : undefined,
         project_id: typeof obj.project_id === "string" ? obj.project_id : undefined,
+        pricing: isPricingTable(obj.pricing) ? (obj.pricing as PricingTable) : undefined,
       };
     }
   } catch {
@@ -113,7 +126,11 @@ Options:
   --help, -h                 Show this help message
 
 Config file: ~/.db90-claude/config.json
-  { "token": "...", "host": "https://app.db90.io", "project_id": "..." }
+  { "token": "...", "host": "https://app.db90.io", "project_id": "...",
+    "pricing": { "<model-id>": { "input_per_mtok": 3.00, "output_per_mtok": 15.00,
+                                  "cache_write_per_mtok": 3.75, "cache_read_per_mtok": 0.30 } } }
+  The "pricing" key overrides per-model rates used for cost_usd estimation.
+  For models not in the default table, supply all four *_per_mtok fields.
 
 Reads transcripts from:
   ~/.config/claude/projects/  (Claude Code v1.0.30+)
@@ -127,60 +144,94 @@ interface SyncResult {
   skipped: number;
 }
 
-async function syncOnce(
-  token: string,
-  host: string,
-  dryRun: boolean,
-  verbose: boolean,
-  projectId: string | null
-): Promise<SyncResult> {
+interface SyncOptions {
+  token: string;
+  host: string;
+  dryRun: boolean;
+  verbose: boolean;
+  projectId: string | null;
+  pricing: PricingTable;
+}
+
+async function syncOnce(options: SyncOptions): Promise<SyncResult> {
+  const { token, host, dryRun, verbose, projectId, pricing } = options;
   const files = findTranscriptFiles();
 
   if (verbose) {
     console.log(`[verbose] Found ${files.length} transcript file(s)`);
   }
 
-  let state = readState();
+  // Phase 1: parse all transcript files in parallel, then keep only the most-complete
+  // aggregate per session (highest combined token count). The same session ID can appear
+  // in multiple files (e.g. both ~/.claude/projects/ and ~/.config/claude/projects/ may
+  // have copies at different stages). Parallelising the reads cuts wall-time proportionally.
+  const allFileSessions = await Promise.all(files.map((f) => parseTranscriptFile(f, verbose)));
+  const bestAggs = new Map<string, SessionAggregate>();
+  for (const fileSessions of allFileSessions) {
+    for (const [sessionId, agg] of fileSessions) {
+      const existing = bestAggs.get(sessionId);
+      if (!existing || agg.tokensIn + agg.tokensOut > existing.tokensIn + existing.tokensOut) {
+        bestAggs.set(sessionId, agg);
+      }
+    }
+  }
+
+  if (verbose) {
+    const fileCount = files.length;
+    const sessionCount = bestAggs.size;
+    if (fileCount !== sessionCount) {
+      console.log(`[verbose] Deduplicated ${fileCount} file(s) → ${sessionCount} unique session(s)`);
+    }
+  }
+
+  let state = readState(APP_DIR, host, token);
   let totalSent = 0;
   let totalFailed = 0;
   let totalSkipped = 0;
 
-  for (const filePath of files) {
-    const sessions = await parseTranscriptFile(filePath, verbose);
+  for (const [sessionId, agg] of bestAggs) {
+    const known = state.sessions[sessionId];
 
-    for (const [sessionId, agg] of sessions) {
-      const known = state.sessions[sessionId];
-
-      // Skip if file size hasn't changed since last successful send
-      if (known && known.fileSize === agg.fileSize) {
-        totalSkipped++;
-        if (verbose) {
-          console.log(`[verbose] Skipping unchanged session ${sessionId}`);
-        }
-        continue;
-      }
-
-      const payload = toDb90Payload(agg, projectId ?? undefined);
-
-      if (dryRun) {
-        console.log(`[dry-run] Would send session ${sessionId}:`);
-        console.log(JSON.stringify(payload, null, 2));
-        totalSent++;
-        continue;
-      }
-
+    // Skip if file size hasn't changed since last successful send
+    if (known && known.fileSize === agg.fileSize) {
+      totalSkipped++;
       if (verbose) {
-        console.log(`[verbose] Sending session ${sessionId} (${agg.tokensIn + agg.tokensOut} tokens)`);
+        console.log(`[verbose] Skipping unchanged session ${sessionId}`);
       }
+      continue;
+    }
 
-      const ok = await postEvent(payload, host, token);
-      if (ok) {
-        state = markSessionSent(state, sessionId, agg.fileSize);
-        writeState(state);
-        totalSent++;
+    const payload = toDb90Payload(agg, { projectId, pricing });
+
+    if (verbose && payload.cost_usd === null) {
+      if (!agg.model) {
+        if (agg.tokensIn > 0 || agg.tokensOut > 0) {
+          console.warn(`[warn] Session ${sessionId} has usage but no model — cost_usd will be null`);
+        }
       } else {
-        totalFailed++;
+        const warning = getCostWarning(agg.model, pricing);
+        if (warning) console.warn(`[warn] ${warning}`);
       }
+    }
+
+    if (dryRun) {
+      console.log(`[dry-run] Would send session ${sessionId}:`);
+      console.log(JSON.stringify(payload, null, 2));
+      totalSent++;
+      continue;
+    }
+
+    if (verbose) {
+      console.log(`[verbose] Sending session ${sessionId} (${agg.tokensIn + agg.tokensOut} tokens)`);
+    }
+
+    const ok = await postEvent(payload, host, token);
+    if (ok) {
+      state = markSessionSent(state, sessionId, agg.fileSize);
+      writeState(state, APP_DIR, host, token);
+      totalSent++;
+    } else {
+      totalFailed++;
     }
   }
 
@@ -199,6 +250,7 @@ async function main(): Promise<void> {
 
   const token = cliArgs.token ?? process.env["DB90_TOKEN"] ?? fileConfig.token;
   const host = cliArgs.host ?? process.env["DB90_HOST"] ?? fileConfig.host;
+  const pricing = mergePricing(DEFAULT_PRICING, fileConfig.pricing ?? {});
 
   if (!token) {
     console.error(
@@ -214,6 +266,10 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  // Run once at startup — renames legacy state.json to the per-credential filename
+  // if it exists and the new file does not. No-op on all subsequent runs.
+  migrateLegacyState(APP_DIR, host, token);
+
   const resolution = await resolveProjectId(
     cliArgs.projectId,
     fileConfig.project_id,
@@ -228,13 +284,22 @@ async function main(): Promise<void> {
     );
   }
 
+  const syncOptions: SyncOptions = {
+    token,
+    host,
+    dryRun: cliArgs.dryRun,
+    verbose: cliArgs.verbose,
+    projectId: resolution.projectId,
+    pricing,
+  };
+
   if (cliArgs.watch) {
     console.log(
       `Watching for Claude transcripts every ${cliArgs.watchInterval}s… (Ctrl+C to stop)`
     );
 
     const runSync = async () => {
-      const result = await syncOnce(token, host, cliArgs.dryRun, cliArgs.verbose, resolution.projectId);
+      const result = await syncOnce(syncOptions);
       if (result.sent > 0 || result.failed > 0) {
         console.log(
           `Sent: ${result.sent}, Failed: ${result.failed}, Skipped: ${result.skipped}`
@@ -263,7 +328,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const result = await syncOnce(token, host, cliArgs.dryRun, cliArgs.verbose, resolution.projectId);
+  const result = await syncOnce(syncOptions);
   console.log(`Sent: ${result.sent}, Failed: ${result.failed}, Skipped: ${result.skipped}`);
 
   if (result.failed > 0) {

@@ -82,6 +82,7 @@ Expected output:
   "tokens_in": 18420,
   "tokens_out": 3210,
   "tokens_total": 21630,
+  "cost_usd": 0.137625,
   "occurred_at": "2026-04-10T14:23:11.000Z",
   "metadata": {
     "session_id": "abc123def",
@@ -145,6 +146,7 @@ Create `~/.db90-claude/config.json`:
 | Ingest token | `--token <token>` | `DB90_TOKEN` | `token` | db90 ingest token (required) |
 | db90 host | `--host <url>` | `DB90_HOST` | `host` | db90 host URL (required) |
 | Project ID | `--project-id <uuid>` | — | `project_id` | Associate events with a project (see [Project Attribution](#project-attribution)) |
+| Cost pricing | — | — | `pricing` | Per-model rate overrides for cost estimation (see [Cost Estimation](#cost-estimation)) |
 | Dry run | `--dry-run` | — | — | Print events without posting or updating state |
 | Watch mode | `--watch` | — | — | Poll for new transcripts on an interval |
 | Watch interval | `--watch-interval <secs>` | — | — | Poll interval in seconds (default: 30) |
@@ -152,11 +154,84 @@ Create `~/.db90-claude/config.json`:
 
 ### State file
 
-The CLI stores per-session progress in `~/.db90-claude/state.json` to prevent duplicate posts. Each session is tracked by its Claude session ID and the file size of its `.jsonl` transcript at the time it was last successfully sent.
+The CLI stores per-session progress in `~/.db90-claude/` to prevent duplicate posts. Each session is tracked by its Claude session ID and the file size of its `.jsonl` transcript at the time it was last successfully sent.
+
+**One state file per host + token.** The state file is named `state-<hostname>-<token-hash>.json` (e.g. `state-app.db90.io-a1b2c3d4.json`). This means switching organisations or hosts automatically starts with a clean slate — sessions posted to org A are never skipped when you start posting to org B.
 
 **Idempotency rule:** a session is skipped if its transcript file size matches the checkpoint stored from the last successful POST. When a session grows (new messages), it is re-processed and re-sent with the updated aggregated totals.
 
 State is only updated after a successful HTTP 2xx response — a failed POST leaves the session eligible for retry on the next run.
+
+**To force a full re-send** (e.g. after switching tokens or recovering from a corrupted state), delete the relevant state file:
+
+```bash
+# List all state files
+ls ~/.db90-claude/state-*.json
+
+# Delete a specific one, or all of them
+rm ~/.db90-claude/state-app.db90.io-a1b2c3d4.json
+```
+
+## Cost Estimation
+
+`db90-claude` ships baked-in per-million-token rates for the most common Claude models used in Claude Code. It computes an estimated `cost_usd` for each session using the formula:
+
+```
+cost_usd = (base_input_tokens × rate_in
+           + output_tokens    × rate_out
+           + cache_write_tokens × rate_cache_write
+           + cache_read_tokens  × rate_cache_read) / 1_000_000
+```
+
+where `base_input_tokens = tokens_in − cache_write_tokens − cache_read_tokens`.
+
+The result is rounded to 6 decimal places and sent in the ingest payload. The db90 Cost KPI cards and financial reports use this value to show estimated spend.
+
+### When `cost_usd` is null
+
+`cost_usd` is sent as `null` and a `[warn]` is printed in `--verbose` mode when:
+
+| Situation | Verbose warning |
+|---|---|
+| Model ID not in the default pricing table (e.g. a future dated variant) | `[warn] Model "…" not in pricing table — add it to config.json` |
+| Model IS in config but missing one or more rate fields (new model ID with partial override) | `[warn] Incomplete pricing for "…" — all four *_per_mtok fields required for new model IDs` |
+| Transcript has usage but recorded no model at all (rare) | `[warn] Session … has usage but no model` |
+
+### Overriding or adding rates
+
+You can update rates or add new model IDs without reinstalling by adding a `pricing` key to `~/.db90-claude/config.json`. Your config is **deep-merged** with the defaults on a per-model basis:
+
+- **Partial override** — supply only the fields you want to change for an existing model; missing fields fall back to the default:
+  ```json
+  {
+    "token": "...",
+    "host": "https://app.db90.io",
+    "pricing": {
+      "claude-opus-4-6": { "input_per_mtok": 12.00 }
+    }
+  }
+  ```
+- **New model ID** — supply all four rate fields:
+  ```json
+  {
+    "token": "...",
+    "host": "https://app.db90.io",
+    "pricing": {
+      "claude-future-model-20990101": {
+        "input_per_mtok": 5.00,
+        "output_per_mtok": 20.00,
+        "cache_write_per_mtok": 6.25,
+        "cache_read_per_mtok": 0.50
+      }
+    }
+  }
+  ```
+  If any of the four fields is missing for a new model ID, `cost_usd` will be `null` for that model and a verbose warning will fire.
+
+### Known limitations
+
+- **Multi-model sessions:** Claude Code may use different models within the same conversation. `db90-claude` records only the last-seen model per session and computes cost as if all tokens used that model. This is a session-level approximation and may over- or under-count costs for sessions that mixed Opus and Sonnet turns.
+- **Estimates only:** `cost_usd` values are estimates based on public Anthropic list prices. Authoritative billing figures come from the Anthropic dashboard. Rate source: <https://platform.claude.com/docs/en/about-claude/pricing> (verify when updating rates).
 
 ## Scheduling
 
@@ -278,6 +353,7 @@ All four usage fields are summed across every assistant message in a session. `t
   "tokens_in": 18420,
   "tokens_out": 3210,
   "tokens_total": 21630,
+  "cost_usd": 0.137625,
   "occurred_at": "2026-04-10T14:23:11.000Z",
   "metadata": {
     "session_id": "abc123def",
@@ -286,6 +362,8 @@ All four usage fields are summed across every assistant message in a session. `t
   }
 }
 ```
+
+`cost_usd` is always present. It is `null` when the model is not in the pricing table (see [Cost Estimation](#cost-estimation)).
 
 ## Project Attribution
 

@@ -171,6 +171,10 @@ export interface ToolEvent {
   costUsd: number;
   inputTokens: number | null;
   outputTokens: number | null;
+  // TODO: align list and detail serialisers to use the same token field names
+  tokensIn?: number | null;
+  tokensOut?: number | null;
+  tokensTotal?: number | null;
   model: string | null;
   securityFindings: SecurityFinding[];
   user: { id: string; email: string; name: string | null } | null;

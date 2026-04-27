@@ -1,5 +1,8 @@
-import { describe, it, expect } from "vitest";
-import { parseArgs } from "../cli.js";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { parseArgs, loadConfig } from "../cli.js";
 
 describe("parseArgs", () => {
   it("returns defaults with no args", () => {
@@ -103,5 +106,70 @@ describe("parseArgs", () => {
   it("leaves projectId undefined when not provided", () => {
     const args = parseArgs(["node", "cli.js"]);
     expect(args.projectId).toBeUndefined();
+  });
+});
+
+describe("loadConfig", () => {
+  let testDir: string;
+
+  beforeEach(() => {
+    testDir = mkdtempSync(join(tmpdir(), "db90-cli-config-test-"));
+  });
+
+  afterEach(() => {
+    rmSync(testDir, { recursive: true, force: true });
+  });
+
+  it("returns empty config when config file does not exist", () => {
+    const config = loadConfig(testDir);
+    expect(config.token).toBeUndefined();
+    expect(config.host).toBeUndefined();
+    expect(config.pricing).toBeUndefined();
+  });
+
+  it("reads token and host from config file", () => {
+    writeFileSync(
+      join(testDir, "config.json"),
+      JSON.stringify({ token: "my-token", host: "https://app.db90.io" }),
+      "utf-8"
+    );
+    const config = loadConfig(testDir);
+    expect(config.token).toBe("my-token");
+    expect(config.host).toBe("https://app.db90.io");
+  });
+
+  it("reads a pricing table from config", () => {
+    const pricing = {
+      "claude-sonnet-4-6": {
+        input_per_mtok: 3.0,
+        output_per_mtok: 15.0,
+        cache_write_per_mtok: 3.75,
+        cache_read_per_mtok: 0.3,
+      },
+    };
+    writeFileSync(
+      join(testDir, "config.json"),
+      JSON.stringify({ token: "tok", pricing }),
+      "utf-8"
+    );
+    const config = loadConfig(testDir);
+    expect(config.pricing).toEqual(pricing);
+  });
+
+  it("returns pricing: undefined when pricing key is not an object", () => {
+    writeFileSync(
+      join(testDir, "config.json"),
+      JSON.stringify({ token: "tok", pricing: "invalid" }),
+      "utf-8"
+    );
+    const config = loadConfig(testDir);
+    expect(config.pricing).toBeUndefined();
+  });
+
+  it("returns empty config for malformed JSON", () => {
+    writeFileSync(join(testDir, "config.json"), "not-json", "utf-8");
+    const config = loadConfig(testDir);
+    expect(config.token).toBeUndefined();
+    expect(config.pricing).toBeUndefined();
   });
 });

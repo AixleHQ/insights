@@ -60,7 +60,7 @@ module Api
       def audit_trail
         authorize! @event, to: :show?
 
-        audit_log = @event.audit_log
+        audit_log = @event.audit_logs.order(created_at: :desc).first
 
         if audit_log
           render_resource(audit_log, AuditLogSerializer)
@@ -73,7 +73,7 @@ module Api
 
       def set_event
         @event = current_organization.tool_events
-                                     .includes(:user, :project, :audit_log)
+                                     .includes(:user, :project, :audit_logs)
                                      .find(params[:id])
       end
 

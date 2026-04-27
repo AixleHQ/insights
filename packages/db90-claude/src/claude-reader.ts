@@ -3,6 +3,7 @@ import { createInterface } from "node:readline";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { glob } from "glob";
+import { type PricingTable, calculateCost } from "./pricing.js";
 
 /** Subset of a Claude Code JSONL assistant message usage block. */
 interface ClaudeUsage {
@@ -48,13 +49,23 @@ export interface Db90Payload {
   tokens_in?: number;
   tokens_out?: number;
   tokens_total?: number;
+  cost_usd: number | null;
   occurred_at: string;
   project_id?: string;
   metadata: {
     session_id: string;
-    cache_write_tokens?: number;
-    cache_read_tokens?: number;
+    model: string | null;
+    base_input_tokens: number;
+    output_tokens: number;
+    cache_write_tokens: number;
+    cache_read_tokens: number;
   };
+}
+
+/** Options for toDb90Payload. */
+export interface ToDb90PayloadOptions {
+  projectId?: string | null;
+  pricing?: PricingTable;
 }
 
 /** Returns the two candidate Claude project directories (v1.0.30+ and legacy). */
@@ -171,13 +182,28 @@ export async function parseTranscriptFile(
 }
 
 /** Converts a SessionAggregate to a db90 ingest payload. */
-export function toDb90Payload(agg: SessionAggregate, projectId?: string): Db90Payload {
+export function toDb90Payload(agg: SessionAggregate, options?: ToDb90PayloadOptions): Db90Payload {
+  const { projectId, pricing } = options ?? {};
+
+  // tokensIn = input_tokens + cache_write + cache_read (see parseTranscriptFile).
+  // Decompose back to bill each component at its own rate.
+  const baseInputTokens = Math.max(0, agg.tokensIn - agg.cacheWriteTokens - agg.cacheReadTokens);
+  const cost = pricing
+    ? calculateCost(agg.model, baseInputTokens, agg.tokensOut, agg.cacheWriteTokens, agg.cacheReadTokens, pricing)
+    : null;
+
   const payload: Db90Payload = {
     tool_name: "claude_code",
     event_type: "chat",
+    cost_usd: cost,
     occurred_at: agg.occurredAt,
     metadata: {
       session_id: agg.sessionId,
+      model: agg.model,
+      base_input_tokens: baseInputTokens,
+      output_tokens: agg.tokensOut,
+      cache_write_tokens: agg.cacheWriteTokens,
+      cache_read_tokens: agg.cacheReadTokens,
     },
   };
 
@@ -186,12 +212,6 @@ export function toDb90Payload(agg: SessionAggregate, projectId?: string): Db90Pa
   if (agg.tokensOut > 0) payload.tokens_out = agg.tokensOut;
   if (agg.tokensIn > 0 || agg.tokensOut > 0) {
     payload.tokens_total = agg.tokensIn + agg.tokensOut;
-  }
-  if (agg.cacheWriteTokens > 0) {
-    payload.metadata.cache_write_tokens = agg.cacheWriteTokens;
-  }
-  if (agg.cacheReadTokens > 0) {
-    payload.metadata.cache_read_tokens = agg.cacheReadTokens;
   }
   if (projectId) payload.project_id = projectId;
 
