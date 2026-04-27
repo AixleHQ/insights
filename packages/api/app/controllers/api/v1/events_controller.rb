@@ -73,7 +73,7 @@ module Api
 
       def set_event
         @event = current_organization.tool_events
-                                     .includes(:user, :project, :audit_log)
+                                     .includes(:user, :project, :audit_logs)
                                      .find(params[:id])
       end
 
