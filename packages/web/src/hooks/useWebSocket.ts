@@ -1,12 +1,12 @@
-import { useEffect, useCallback, useRef, useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useOrg } from '@/contexts/OrgContext';
+import { useEffect, useCallback, useRef, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useOrg } from "@/contexts/OrgContext";
 import {
   getWebSocketClient,
   connectWebSocket,
   disconnectWebSocket,
   type WebSocketMessage,
-} from '@/lib/websocket';
+} from "@/lib/websocket";
 
 export interface UseWebSocketOptions {
   /** Whether to auto-connect when the user is authenticated */
@@ -39,17 +39,17 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
   const handleMessage = useCallback(
     (message: WebSocketMessage) => {
       switch (message.type) {
-        case 'new_event':
+        case "new_event":
           onNewEvent?.(message.data);
           break;
-        case 'event_updated':
+        case "event_updated":
           onEventUpdated?.(message.data);
           break;
-        case 'alert':
+        case "alert":
           onAlert?.(message.data);
           break;
         default:
-          console.log('[useWebSocket] Unknown message type:', message.type);
+          console.log("[useWebSocket] Unknown message type:", message.type);
       }
     },
     [onNewEvent, onEventUpdated, onAlert]
@@ -69,18 +69,18 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
         // Subscribe to the organization's events channel
         const client = getWebSocketClient();
         unsubscribeRef.current = client.subscribe({
-          channel: 'EventsChannel',
+          channel: "EventsChannel",
           params: { organization_id: currentOrg.id },
           onMessage: handleMessage,
           onSubscribed: () => {
-            console.log('[useWebSocket] Subscribed to EventsChannel');
+            console.log("[useWebSocket] Subscribed to EventsChannel");
           },
           onDisconnected: () => {
             setIsConnected(false);
           },
         });
       } catch (error) {
-        console.error('[useWebSocket] Failed to connect:', error);
+        console.error("[useWebSocket] Failed to connect:", error);
         setIsConnected(false);
       }
     };
@@ -109,7 +109,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
       await connectWebSocket();
       setIsConnected(true);
     } catch (error) {
-      console.error('[useWebSocket] Failed to connect:', error);
+      console.error("[useWebSocket] Failed to connect:", error);
       setIsConnected(false);
     }
   }, []);

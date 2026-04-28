@@ -1,0 +1,106 @@
+name: Monitor Claude Pricing
+
+# Runs every Monday at 09:00 UTC.
+# Can also be triggered manually via Actions → "Run workflow".
+on:
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+jobs:
+  check-pricing:
+    name: Check Claude pricing page for rate changes
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+
+    steps:
+      - name: Fetch pricing page
+        run: |
+          curl -sL \
+            -A "Mozilla/5.0 (compatible; db90-pricing-monitor/1.0)" \
+            "https://platform.claude.com/docs/en/about-claude/pricing" \
+            -o /tmp/pricing.html
+          echo "Fetched $(wc -c < /tmp/pricing.html) bytes"
+
+      - name: Check for known rate values
+        id: check
+        run: |
+          MISSING=""
+
+          # These values are highly distinctive and unlikely to appear outside a
+          # pricing table. If any are absent the rates have likely changed.
+          # Keep this list in sync with DEFAULT_PRICING in
+          # packages/db90-claude/src/pricing.ts.
+          declare -A RATES=(
+            ["Opus output (\$75/MTok)"]="75\.00"
+            ["Opus/Haiku cache-write (\$18.75/MTok)"]="18\.75"
+            ["Sonnet cache-write (\$3.75/MTok)"]="3\.75"
+            ["Sonnet input (\$3/MTok)"]="3\.00"
+            ["Haiku input (\$0.80/MTok)"]="0\.80"
+          )
+
+          for label in "${!RATES[@]}"; do
+            pattern="${RATES[$label]}"
+            if ! grep -q "$pattern" /tmp/pricing.html; then
+              MISSING="${MISSING}\n- ${label} (pattern: \`${pattern}\`)"
+            fi
+          done
+
+          if [ -n "$MISSING" ]; then
+            echo "changes_detected=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "missing<<EOF"
+              echo -e "$MISSING"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "changes_detected=false" >> "$GITHUB_OUTPUT"
+            echo "All expected rate values found — no action needed."
+          fi
+
+      - name: Check for existing open issue (avoid duplicates)
+        if: steps.check.outputs.changes_detected == 'true'
+        id: dedup
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          COUNT=$(gh issue list \
+            --repo "${{ github.repository }}" \
+            --state open \
+            --label "pricing" \
+            --json number \
+            --jq length)
+          echo "open_issues=$COUNT" >> "$GITHUB_OUTPUT"
+
+      - name: Open issue if rates may have changed
+        if: >
+          steps.check.outputs.changes_detected == 'true' &&
+          steps.dedup.outputs.open_issues == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "Claude pricing may have changed — update packages/db90-claude/src/pricing.ts" \
+            --label "pricing" \
+            --body "The weekly pricing monitor detected that one or more expected rate values are no longer present on the [Claude pricing page](https://platform.claude.com/docs/en/about-claude/pricing).
+
+          **Missing patterns:**
+          ${{ steps.check.outputs.missing }}
+
+          **Action required:**
+          1. Open [packages/db90-claude/src/pricing.ts](https://github.com/${{ github.repository }}/blob/develop/packages/db90-claude/src/pricing.ts)
+          2. Compare \`DEFAULT_PRICING\` entries against the current [Claude pricing page](https://platform.claude.com/docs/en/about-claude/pricing)
+          3. Update any rates that have changed
+          4. Bump the \`Rates last verified\` date at the top of the file
+          5. Close this issue once the update is merged
+
+          > This issue was opened automatically by the [Monitor Claude Pricing](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) workflow."
+
+      - name: Skip duplicate issue notice
+        if: >
+          steps.check.outputs.changes_detected == 'true' &&
+          steps.dedup.outputs.open_issues != '0'
+        run: |
+          echo "Rate change detected but an open 'pricing' issue already exists — skipping duplicate."

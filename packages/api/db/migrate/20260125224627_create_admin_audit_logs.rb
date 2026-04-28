@@ -13,7 +13,7 @@ class CreateAdminAuditLogs < ActiveRecord::Migration[8.1]
       t.datetime :created_at, null: false
     end
 
-    add_index :admin_audit_logs, [:resource_type, :resource_id]
+    add_index :admin_audit_logs, [ :resource_type, :resource_id ]
     add_index :admin_audit_logs, :created_at
   end
 end

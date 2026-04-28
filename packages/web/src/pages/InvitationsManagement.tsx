@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState } from "react";
 import {
   Mail,
   Loader2,
@@ -13,24 +13,24 @@ import {
   Send,
   Copy,
   Check,
-} from 'lucide-react';
-import { useOrg } from '@/contexts/OrgContext';
+} from "lucide-react";
+import { useOrg } from "@/contexts/OrgContext";
 import {
   useInvitations,
   useCreateInvitation,
   useRevokeInvitation,
   useResendInvitation,
-} from '@/hooks/useApi';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+} from "@/hooks/useApi";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
+} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -38,7 +38,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,14 +49,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -64,22 +64,22 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import type { Invitation, InvitationStatus, MemberRole } from '@/lib/types';
+} from "@/components/ui/tooltip";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { Invitation, InvitationStatus, MemberRole } from "@/lib/types";
 
 function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
+  return new Date(dateString).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
   });
 }
 
@@ -89,22 +89,22 @@ function formatRelativeDate(dateString: string): string {
   const diff = date.getTime() - now.getTime();
   const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
 
-  if (days < 0) return 'Expired';
-  if (days === 0) return 'Today';
-  if (days === 1) return 'Tomorrow';
+  if (days < 0) return "Expired";
+  if (days === 0) return "Today";
+  if (days === 1) return "Tomorrow";
   if (days <= 7) return `${days} days`;
   return formatDate(dateString);
 }
 
 function getStatusIcon(status: InvitationStatus) {
   switch (status) {
-    case 'pending':
+    case "pending":
       return <Clock className="size-4" />;
-    case 'accepted':
+    case "accepted":
       return <CheckCircle2 className="size-4" />;
-    case 'revoked':
+    case "revoked":
       return <XCircle className="size-4" />;
-    case 'expired':
+    case "expired":
       return <AlertTriangle className="size-4" />;
     default:
       return null;
@@ -113,30 +113,30 @@ function getStatusIcon(status: InvitationStatus) {
 
 function getStatusVariant(
   status: InvitationStatus
-): 'default' | 'secondary' | 'destructive' | 'outline' {
+): "default" | "secondary" | "destructive" | "outline" {
   switch (status) {
-    case 'pending':
-      return 'default';
-    case 'accepted':
-      return 'secondary';
-    case 'revoked':
-      return 'destructive';
-    case 'expired':
-      return 'outline';
+    case "pending":
+      return "default";
+    case "accepted":
+      return "secondary";
+    case "revoked":
+      return "destructive";
+    case "expired":
+      return "outline";
     default:
-      return 'outline';
+      return "outline";
   }
 }
 
-function getRoleBadgeVariant(role: MemberRole): 'default' | 'secondary' | 'outline' {
+function getRoleBadgeVariant(role: MemberRole): "default" | "secondary" | "outline" {
   switch (role) {
-    case 'owner':
-    case 'admin':
-      return 'default';
-    case 'member':
-      return 'secondary';
+    case "owner":
+    case "admin":
+      return "default";
+    case "member":
+      return "secondary";
     default:
-      return 'outline';
+      return "outline";
   }
 }
 
@@ -154,7 +154,7 @@ function InvitationRow({
   isResending: boolean;
 }) {
   const [copied, setCopied] = useState(false);
-  const isPending = invitation.status === 'pending';
+  const isPending = invitation.status === "pending";
   const inviteUrl = `${window.location.origin}/invitations/${invitation.id}`;
 
   const handleCopyLink = async () => {
@@ -189,13 +189,13 @@ function InvitationRow({
           <span
             className={`${
               new Date(invitation.expiresAt) <= new Date()
-                ? 'text-destructive'
-                : ''
+                ? "text-destructive"
+                : ""
             }`}
           >
             {formatRelativeDate(invitation.expiresAt)}
           </span>
-        ) : invitation.status === 'accepted' ? (
+        ) : invitation.status === "accepted" ? (
           <span>{formatDate(invitation.acceptedAt!)}</span>
         ) : (
           <span className="text-muted-foreground/50">—</span>
@@ -225,7 +225,7 @@ function InvitationRow({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    {copied ? 'Copied!' : 'Copy invite link'}
+                    {copied ? "Copied!" : "Copy invite link"}
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -277,7 +277,7 @@ function InvitationRow({
                   <AlertDialogHeader>
                     <AlertDialogTitle>Revoke Invitation</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Are you sure you want to revoke the invitation sent to{' '}
+                      Are you sure you want to revoke the invitation sent to{" "}
                       <span className="font-medium text-foreground">
                         {invitation.email}
                       </span>
@@ -316,8 +316,8 @@ function InviteDialog({
   isSubmitting: boolean;
   error: string | null;
 }) {
-  const [email, setEmail] = useState('');
-  const [role, setRole] = useState<MemberRole>('member');
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<MemberRole>("member");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -328,8 +328,8 @@ function InviteDialog({
   // Reset form when dialog closes
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
-      setEmail('');
-      setRole('member');
+      setEmail("");
+      setRole("member");
     }
     onOpenChange(newOpen);
   };
@@ -431,7 +431,7 @@ function InviteDialog({
 
 export function InvitationsManagement() {
   const { currentOrg } = useOrg();
-  const orgId = currentOrg?.id || '';
+  const orgId = currentOrg?.id || "";
 
   // Fetch all invitations
   const { data: invitations, isLoading } = useInvitations(orgId);
@@ -450,7 +450,7 @@ export function InvitationsManagement() {
   const [resendingIds, setResendingIds] = useState<Set<string>>(new Set());
 
   // Current tab filter
-  const [statusFilter, setStatusFilter] = useState<'all' | InvitationStatus>('all');
+  const [statusFilter, setStatusFilter] = useState<"all" | InvitationStatus>("all");
 
   const handleCreateInvitation = async (email: string, role: MemberRole) => {
     setInviteError(null);
@@ -459,7 +459,7 @@ export function InvitationsManagement() {
       setInviteDialogOpen(false);
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : 'Failed to send invitation';
+        err instanceof Error ? err.message : "Failed to send invitation";
       setInviteError(message);
     }
   };
@@ -469,7 +469,7 @@ export function InvitationsManagement() {
     try {
       await revokeInvitation.mutateAsync({ orgId, invitationId });
     } catch (err) {
-      console.error('Failed to revoke invitation:', err);
+      console.error("Failed to revoke invitation:", err);
     } finally {
       setRevokingIds((prev) => {
         const next = new Set(prev);
@@ -484,7 +484,7 @@ export function InvitationsManagement() {
     try {
       await resendInvitation.mutateAsync({ orgId, invitationId });
     } catch (err) {
-      console.error('Failed to resend invitation:', err);
+      console.error("Failed to resend invitation:", err);
     } finally {
       setResendingIds((prev) => {
         const next = new Set(prev);
@@ -496,16 +496,16 @@ export function InvitationsManagement() {
 
   // Filter invitations by status
   const filteredInvitations = invitations?.filter(
-    (inv) => statusFilter === 'all' || inv.status === statusFilter
+    (inv) => statusFilter === "all" || inv.status === statusFilter
   );
 
   // Count by status
   const counts = {
     all: invitations?.length || 0,
-    pending: invitations?.filter((i) => i.status === 'pending').length || 0,
-    accepted: invitations?.filter((i) => i.status === 'accepted').length || 0,
-    revoked: invitations?.filter((i) => i.status === 'revoked').length || 0,
-    expired: invitations?.filter((i) => i.status === 'expired').length || 0,
+    pending: invitations?.filter((i) => i.status === "pending").length || 0,
+    accepted: invitations?.filter((i) => i.status === "accepted").length || 0,
+    revoked: invitations?.filter((i) => i.status === "revoked").length || 0,
+    expired: invitations?.filter((i) => i.status === "expired").length || 0,
   };
 
   return (
@@ -538,8 +538,8 @@ export function InvitationsManagement() {
               <CardTitle>Invitations</CardTitle>
               <CardDescription>
                 {counts.pending > 0
-                  ? `${counts.pending} pending invitation${counts.pending === 1 ? '' : 's'}`
-                  : 'No pending invitations'}
+                  ? `${counts.pending} pending invitation${counts.pending === 1 ? "" : "s"}`
+                  : "No pending invitations"}
               </CardDescription>
             </div>
           </div>
@@ -583,7 +583,7 @@ export function InvitationsManagement() {
                         <TableHead>Role</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="hidden sm:table-cell">
-                          {statusFilter === 'accepted' ? 'Accepted' : 'Expires'}
+                          {statusFilter === "accepted" ? "Accepted" : "Expires"}
                         </TableHead>
                         <TableHead className="hidden md:table-cell">Invited By</TableHead>
                         <TableHead className="w-[100px]"></TableHead>
@@ -608,11 +608,11 @@ export function InvitationsManagement() {
                   <Mail className="mb-3 size-10 text-muted-foreground/50" />
                   <h3 className="font-medium">No invitations</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {statusFilter === 'all'
+                    {statusFilter === "all"
                       ? "You haven't sent any invitations yet."
                       : `No ${statusFilter} invitations.`}
                   </p>
-                  {statusFilter === 'all' && (
+                  {statusFilter === "all" && (
                     <Button
                       variant="outline"
                       className="mt-4"

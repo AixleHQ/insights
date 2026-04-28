@@ -63,6 +63,19 @@ module AuthHelper
     headers['X-Organization-ID'] = organization.id.to_s if organization
     delete path, headers: headers
   end
+
+  def impersonation_headers_for(user:, impersonator:)
+    {
+      'Authorization' => "Bearer test-impersonation-#{user.id}-by-#{impersonator.id}",
+      'Content-Type' => 'application/json'
+    }
+  end
+
+  def impersonated_post(path, user:, impersonator:, organization: nil, params: {})
+    headers = impersonation_headers_for(user: user, impersonator: impersonator)
+    headers['X-Organization-ID'] = organization.id.to_s if organization
+    post path, params: params.to_json, headers: headers
+  end
 end
 
 RSpec.configure do |config|

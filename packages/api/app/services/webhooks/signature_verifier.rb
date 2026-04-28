@@ -3,11 +3,11 @@
 module Webhooks
   class SignatureVerifier
     VERIFIER_MAP = {
-      'github' => Webhooks::GithubVerifier,
-      'gitlab' => Webhooks::GitlabVerifier,
-      'bitbucket' => Webhooks::BitbucketVerifier,
-      'jira' => Webhooks::JiraVerifier,
-      'linear' => Webhooks::LinearVerifier
+      "github" => Webhooks::GithubVerifier,
+      "gitlab" => Webhooks::GitlabVerifier,
+      "bitbucket" => Webhooks::BitbucketVerifier,
+      "jira" => Webhooks::JiraVerifier,
+      "linear" => Webhooks::LinearVerifier
     }.freeze
 
     class << self

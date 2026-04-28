@@ -1,21 +1,22 @@
 class ToolEvent < ApplicationRecord
-  self.table_name = 'timeseries.tool_events'
-  self.primary_key = 'id'
+  self.table_name = "timeseries.tool_events"
+  self.primary_key = "id"
 
   TOOL_NAMES = %w[
     claude_code cursor windsurf github_copilot
     aider continue cody tabnine amazon_q
-    openrouter anthropic_api openai_api gemini_api
-    custom
+    openrouter_api anthropic_api openai_api gemini_api
+    custom jira linear github
   ].freeze
 
-  EVENT_TYPES = %w[chat completion edit commit review test debug refactor documentation other].freeze
+  EVENT_TYPES = %w[chat completion edit commit review test debug refactor documentation other
+                   issue comment sprint tool_use].freeze
 
   belongs_to :user, optional: true
   belongs_to :organization
   belongs_to :project, optional: true
   belongs_to :repository, optional: true
-  has_one :audit_log, dependent: :nullify
+  has_many :audit_logs, dependent: :nullify
 
   validates :tool_name, presence: true, inclusion: { in: TOOL_NAMES }
   validates :event_type, presence: true, inclusion: { in: EVENT_TYPES }

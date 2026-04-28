@@ -1,11 +1,10 @@
-import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   Activity,
   FolderKanban,
   Plug,
-  Users,
   Settings,
   ChevronDown,
   LogOut,
@@ -16,10 +15,10 @@ import {
   Crown,
   Eye,
   User,
-} from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useOrg, type MemberRole } from '@/contexts/OrgContext';
-import { useCreateOrganization } from '@/hooks/useApi';
+} from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useOrg, type MemberRole } from "@/contexts/OrgContext";
+import { useCreateOrganization, useCurrentUser } from "@/hooks/useApi";
 import {
   Sidebar,
   SidebarContent,
@@ -32,7 +31,7 @@ import {
   SidebarMenuItem,
   SidebarSeparator,
   useSidebar,
-} from '@/components/ui/sidebar';
+} from "@/components/ui/sidebar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,7 +39,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -48,20 +47,19 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const navItems = [
-  { title: 'Profile', icon: User, href: '/profile' },
-  { title: 'Dashboard', icon: LayoutDashboard, href: '/' },
-  { title: 'Events', icon: Activity, href: '/events' },
-  { title: 'Projects', icon: FolderKanban, href: '/projects' },
-  { title: 'Integrations', icon: Plug, href: '/integrations' },
-  { title: 'Team', icon: Users, href: '/team' },
-  { title: 'Settings', icon: Settings, href: '/settings' },
+  { title: "Profile", icon: User, href: "/profile" },
+  { title: "Dashboard", icon: LayoutDashboard, href: "/" },
+  { title: "Events", icon: Activity, href: "/events" },
+  { title: "Projects", icon: FolderKanban, href: "/projects" },
+  { title: "Integrations", icon: Plug, href: "/integrations" },
+  { title: "Settings", icon: Settings, href: "/settings" },
 ];
 
 const roleIcons: Record<MemberRole, typeof Crown> = {
@@ -72,18 +70,18 @@ const roleIcons: Record<MemberRole, typeof Crown> = {
 };
 
 const roleColors: Record<MemberRole, string> = {
-  owner: 'text-amber-500',
-  admin: 'text-blue-500',
-  member: 'text-emerald-500',
-  viewer: 'text-muted-foreground',
+  owner: "text-amber-500",
+  admin: "text-blue-500",
+  member: "text-emerald-500",
+  viewer: "text-muted-foreground",
 };
 
 function getOrgInitials(name: string | undefined | null) {
-  if (!name) return '??';
+  if (!name) return "??";
   return name
-    .split(' ')
+    .split(" ")
     .map((word) => word[0])
-    .join('')
+    .join("")
     .toUpperCase()
     .slice(0, 2);
 }
@@ -97,8 +95,8 @@ function CreateOrgDialog({
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
 }) {
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const createOrg = useCreateOrganization();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -106,13 +104,16 @@ function CreateOrgDialog({
     if (!name.trim()) return;
 
     try {
-      await createOrg.mutateAsync({ name: name.trim(), description: description.trim() || undefined });
-      setName('');
-      setDescription('');
+      await createOrg.mutateAsync({
+        name: name.trim(),
+        description: description.trim() || undefined,
+      });
+      setName("");
+      setDescription("");
       onOpenChange(false);
       onSuccess();
     } catch (error) {
-      console.error('Failed to create organization:', error);
+      console.error("Failed to create organization:", error);
     }
   };
 
@@ -148,11 +149,18 @@ function CreateOrgDialog({
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={!name.trim() || createOrg.isPending}>
-              {createOrg.isPending ? 'Creating...' : 'Create Organization'}
+            <Button
+              type="submit"
+              disabled={!name.trim() || createOrg.isPending}
+            >
+              {createOrg.isPending ? "Creating..." : "Create Organization"}
             </Button>
           </DialogFooter>
         </form>
@@ -162,16 +170,19 @@ function CreateOrgDialog({
 }
 
 function OrgSwitcher() {
-  const { currentOrg, memberships, setCurrentOrg, refreshOrganizations } = useOrg();
+  const { currentOrg, memberships, setCurrentOrg, refreshOrganizations } =
+    useOrg();
   const { state } = useSidebar();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   if (!currentOrg) return null;
 
-  const currentMembership = memberships.find((m) => m.organization.id === currentOrg.id);
-  const currentRole = currentMembership?.role || 'member';
+  const currentMembership = memberships.find(
+    (m) => m.organization.id === currentOrg.id,
+  );
+  const currentRole = currentMembership?.role || "member";
   const RoleIcon = roleIcons[currentRole];
-  const isCollapsed = state === 'collapsed';
+  const isCollapsed = state === "collapsed";
 
   return (
     <>
@@ -184,7 +195,7 @@ function OrgSwitcher() {
               hover:bg-sidebar-accent hover:border-sidebar-primary/50
               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring
               data-[state=open]:bg-sidebar-accent data-[state=open]:border-sidebar-primary/50
-              ${isCollapsed ? 'justify-center' : ''}
+              ${isCollapsed ? "justify-center" : ""}
             `}
           >
             {/* Org Avatar/Icon */}
@@ -223,11 +234,13 @@ function OrgSwitcher() {
         <DropdownMenuContent
           className="w-[--radix-dropdown-menu-trigger-width] min-w-72"
           align="start"
-          side={isCollapsed ? 'right' : 'bottom'}
+          side={isCollapsed ? "right" : "bottom"}
           sideOffset={4}
         >
           <DropdownMenuLabel className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Switch Organization</span>
+            <span className="text-xs font-medium text-muted-foreground">
+              Switch Organization
+            </span>
             <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
               {memberships.length} total
             </span>
@@ -242,15 +255,18 @@ function OrgSwitcher() {
               <DropdownMenuItem
                 key={org.id}
                 onClick={() => setCurrentOrg(org)}
-                className={`gap-3 p-2.5 ${isSelected ? 'bg-accent' : ''}`}
+                className={`gap-3 p-2.5 ${isSelected ? "bg-accent" : ""}`}
               >
-                <div className={`
+                <div
+                  className={`
                   flex size-9 shrink-0 items-center justify-center rounded-md text-xs font-bold
-                  ${isSelected
-                    ? 'bg-gradient-to-br from-primary to-primary/70 text-primary-foreground'
-                    : 'border border-border bg-muted text-muted-foreground'
+                  ${
+                    isSelected
+                      ? "bg-gradient-to-br from-primary to-primary/70 text-primary-foreground"
+                      : "border border-border bg-muted text-muted-foreground"
                   }
-                `}>
+                `}
+                >
                   {getOrgInitials(org.name)}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -263,22 +279,31 @@ function OrgSwitcher() {
                     )}
                   </div>
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <RoleIconItem className={`size-3 ${roleColors[membership.role]}`} />
+                    <RoleIconItem
+                      className={`size-3 ${roleColors[membership.role]}`}
+                    />
                     <span className="capitalize">{membership.role}</span>
                   </div>
                 </div>
-                {isSelected && <Check className="size-4 shrink-0 text-primary" />}
+                {isSelected && (
+                  <Check className="size-4 shrink-0 text-primary" />
+                )}
               </DropdownMenuItem>
             );
           })}
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setCreateDialogOpen(true)} className="gap-3 p-2.5">
+          <DropdownMenuItem
+            onClick={() => setCreateDialogOpen(true)}
+            className="gap-3 p-2.5"
+          >
             <div className="flex size-9 items-center justify-center rounded-md border-2 border-dashed border-muted-foreground/30">
               <Plus className="size-4 text-muted-foreground" />
             </div>
             <div className="flex-1">
               <span className="font-medium">Create Organization</span>
-              <p className="text-xs text-muted-foreground">Start a new workspace</p>
+              <p className="text-xs text-muted-foreground">
+                Start a new workspace
+              </p>
             </div>
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -295,18 +320,22 @@ function OrgSwitcher() {
 
 function UserMenu() {
   const { profile, logout } = useAuth();
+  const { data: currentUser } = useCurrentUser();
   const { state } = useSidebar();
+
+  const displayName = currentUser?.name || profile?.name || "User";
+  const avatarSrc = currentUser?.avatarUrl || profile?.picture;
 
   const getInitials = (name?: string, email?: string) => {
     if (name) {
       return name
-        .split(' ')
+        .split(" ")
         .map((word) => word[0])
-        .join('')
+        .join("")
         .toUpperCase()
         .slice(0, 2);
     }
-    return email?.slice(0, 2).toUpperCase() || 'U';
+    return email?.slice(0, 2).toUpperCase() || "U";
   };
 
   return (
@@ -317,15 +346,13 @@ function UserMenu() {
           className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
         >
           <Avatar className="size-8">
-            {profile?.picture && (
-              <AvatarImage src={profile.picture} alt={profile.name || 'User'} />
-            )}
+            {avatarSrc && <AvatarImage src={avatarSrc} alt={displayName} />}
             <AvatarFallback className="bg-sidebar-accent text-sidebar-accent-foreground text-xs">
-              {getInitials(profile?.name, profile?.email)}
+              {getInitials(displayName, profile?.email)}
             </AvatarFallback>
           </Avatar>
           <div className="grid flex-1 text-left text-sm leading-tight">
-            <span className="truncate font-semibold">{profile?.name || 'User'}</span>
+            <span className="truncate font-semibold">{displayName}</span>
             <span className="truncate text-xs text-sidebar-foreground/60">
               {profile?.email}
             </span>
@@ -336,12 +363,12 @@ function UserMenu() {
       <DropdownMenuContent
         className="w-[--radix-dropdown-menu-trigger-width] min-w-56"
         align="start"
-        side={state === 'collapsed' ? 'right' : 'top'}
+        side={state === "collapsed" ? "right" : "top"}
         sideOffset={4}
       >
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium">{profile?.name || 'User'}</p>
+            <p className="text-sm font-medium">{displayName}</p>
             <p className="text-xs text-muted-foreground">{profile?.email}</p>
           </div>
         </DropdownMenuLabel>
@@ -375,21 +402,22 @@ export function AppSidebar() {
   // Filter nav items based on role - hide Dashboard for members/viewers
   const visibleNavItems = navItems.filter((item) => {
     // Dashboard (href: '/') is only visible to owners and admins
-    if (item.href === '/') {
-      return currentRole === 'owner' || currentRole === 'admin';
+    if (item.href === "/") {
+      return currentRole === "owner" || currentRole === "admin";
     }
     return true;
   });
 
   const isActive = (href: string) => {
-    if (href === '/') {
-      return location.pathname === '/';
+    if (href === "/") {
+      return location.pathname === "/";
     }
     return location.pathname.startsWith(href);
   };
 
   // Determine home link based on role
-  const homeLink = currentRole === 'owner' || currentRole === 'admin' ? '/' : '/profile';
+  const homeLink =
+    currentRole === "owner" || currentRole === "admin" ? "/" : "/profile";
 
   return (
     <Sidebar collapsible="icon" variant="sidebar">
@@ -404,7 +432,9 @@ export function AppSidebar() {
                   </span>
                 </div>
                 <div className="grid flex-1 text-left leading-tight">
-                  <span className="truncate font-semibold tracking-tight">DB90</span>
+                  <span className="truncate font-semibold tracking-tight">
+                    DB90
+                  </span>
                   <span className="truncate text-xs text-sidebar-foreground/60">
                     AI Tool Analytics
                   </span>

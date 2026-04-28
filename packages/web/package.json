@@ -1,7 +1,7 @@
 {
   "name": "web",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,11 +10,11 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:e2e": "playwright test --project=chromium-no-setup",
-    "test:e2e:ui": "playwright test --ui",
-    "test:e2e:headed": "playwright test --headed",
-    "test:e2e:setup": "playwright test --project=setup --headed",
-    "test:e2e:full": "playwright test --project=chromium"
+    "test:e2e": "node --env-file=.env ./node_modules/.bin/playwright test --project=chromium-no-setup",
+    "test:e2e:ui": "node --env-file=.env ./node_modules/.bin/playwright test --ui",
+    "test:e2e:headed": "node --env-file=.env ./node_modules/.bin/playwright test --headed",
+    "test:e2e:setup": "node --env-file=.env ./node_modules/.bin/playwright test --project=setup --headed",
+    "test:e2e:full": "node --env-file=.env ./node_modules/.bin/playwright test --project=chromium"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -31,6 +31,7 @@
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "@rollbar/react": "^1.0.0",
     "@tanstack/react-query": "^5.90.20",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -41,6 +42,7 @@
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.13.0",
     "recharts": "^2.15.4",
+    "rollbar": "^3.0.0",
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
@@ -50,7 +52,7 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
-    "@types/node": "^24.10.9",
+    "@types/node": "^24.12.2",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
     "@types/react-router-dom": "^5.3.3",

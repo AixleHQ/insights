@@ -3,20 +3,20 @@
 class LinearSyncJob
   include Sidekiq::Job
 
-  sidekiq_options queue: 'connectors', retry: 3
+  sidekiq_options queue: "connectors", retry: 3
 
-  def perform(connector_id, action = 'sync', options = {})
+  def perform(connector_id, action = "sync", options = {})
     @connector = OrganizationConnector.find(connector_id)
     @options = options.symbolize_keys
 
     Rails.logger.info("[LinearSyncJob] Starting #{action} for connector #{connector_id}")
 
     case action
-    when 'sync'
+    when "sync"
       sync_teams
-    when 'refresh_token'
+    when "refresh_token"
       refresh_token
-    when 'webhook'
+    when "webhook"
       process_webhook
     else
       Rails.logger.warn("[LinearSyncJob] Unknown action: #{action}")
@@ -38,7 +38,7 @@ class LinearSyncJob
     teams = provider.list_teams
 
     @connector.metadata ||= {}
-    @connector.metadata['teams'] = teams.map do |team|
+    @connector.metadata["teams"] = teams.map do |team|
       {
         id: team[:id],
         name: team[:name],
@@ -63,17 +63,17 @@ class LinearSyncJob
     event_type = @options[:event_type]
     payload = @options[:payload]
 
-    entity_type = payload['type']
-    action = payload['action']
+    entity_type = payload["type"]
+    action = payload["action"]
 
     case entity_type
-    when 'Issue'
+    when "Issue"
       process_issue_event(payload, action)
-    when 'Comment'
+    when "Comment"
       process_comment_event(payload, action)
-    when 'Project'
+    when "Project"
       process_project_event(payload, action)
-    when 'Cycle'
+    when "Cycle"
       process_cycle_event(payload, action)
     else
       Rails.logger.info("[LinearSyncJob] Ignoring webhook event: #{entity_type}/#{action}")
@@ -81,96 +81,96 @@ class LinearSyncJob
   end
 
   def process_issue_event(payload, action)
-    data = payload['data']
+    data = payload["data"]
     return unless data
 
     ToolEvent.create!(
       organization_id: @connector.organization_id,
-      tool_name: 'linear',
-      event_type: 'issue',
-      occurred_at: Time.parse(payload['createdAt']),
+      tool_name: "linear",
+      event_type: "issue",
+      occurred_at: Time.parse(payload["createdAt"]),
       metadata: {
         action: action,
-        issue_id: data['id'],
-        issue_identifier: data['identifier'],
-        title: data['title'],
-        state: data.dig('state', 'name'),
-        priority: data['priority'],
-        team_id: data.dig('team', 'id'),
-        team_name: data.dig('team', 'name'),
-        assignee_id: data.dig('assignee', 'id'),
-        assignee_name: data.dig('assignee', 'name'),
-        creator_id: data.dig('creator', 'id'),
-        creator_name: data.dig('creator', 'name'),
+        issue_id: data["id"],
+        issue_identifier: data["identifier"],
+        title: data["title"],
+        state: data.dig("state", "name"),
+        priority: data["priority"],
+        team_id: data.dig("team", "id"),
+        team_name: data.dig("team", "name"),
+        assignee_id: data.dig("assignee", "id"),
+        assignee_name: data.dig("assignee", "name"),
+        creator_id: data.dig("creator", "id"),
+        creator_name: data.dig("creator", "name"),
         labels: extract_labels(data)
       }
     )
   end
 
   def process_comment_event(payload, action)
-    data = payload['data']
+    data = payload["data"]
     return unless data
 
     ToolEvent.create!(
       organization_id: @connector.organization_id,
-      tool_name: 'linear',
-      event_type: 'comment',
-      occurred_at: Time.parse(payload['createdAt']),
+      tool_name: "linear",
+      event_type: "comment",
+      occurred_at: Time.parse(payload["createdAt"]),
       metadata: {
         action: action,
-        comment_id: data['id'],
-        issue_id: data.dig('issue', 'id'),
-        issue_identifier: data.dig('issue', 'identifier'),
-        user_id: data.dig('user', 'id'),
-        user_name: data.dig('user', 'name')
+        comment_id: data["id"],
+        issue_id: data.dig("issue", "id"),
+        issue_identifier: data.dig("issue", "identifier"),
+        user_id: data.dig("user", "id"),
+        user_name: data.dig("user", "name")
       }
     )
   end
 
   def process_project_event(payload, action)
-    data = payload['data']
+    data = payload["data"]
     return unless data
 
     ToolEvent.create!(
       organization_id: @connector.organization_id,
-      tool_name: 'linear',
-      event_type: 'project',
-      occurred_at: Time.parse(payload['createdAt']),
+      tool_name: "linear",
+      event_type: "project",
+      occurred_at: Time.parse(payload["createdAt"]),
       metadata: {
         action: action,
-        project_id: data['id'],
-        project_name: data['name'],
-        state: data['state'],
-        progress: data['progress'],
-        team_ids: data['teamIds']
+        project_id: data["id"],
+        project_name: data["name"],
+        state: data["state"],
+        progress: data["progress"],
+        team_ids: data["teamIds"]
       }
     )
   end
 
   def process_cycle_event(payload, action)
-    data = payload['data']
+    data = payload["data"]
     return unless data
 
     ToolEvent.create!(
       organization_id: @connector.organization_id,
-      tool_name: 'linear',
-      event_type: 'cycle',
-      occurred_at: Time.parse(payload['createdAt']),
+      tool_name: "linear",
+      event_type: "cycle",
+      occurred_at: Time.parse(payload["createdAt"]),
       metadata: {
         action: action,
-        cycle_id: data['id'],
-        cycle_name: data['name'],
-        cycle_number: data['number'],
-        starts_at: data['startsAt'],
-        ends_at: data['endsAt'],
-        team_id: data.dig('team', 'id'),
-        team_name: data.dig('team', 'name')
+        cycle_id: data["id"],
+        cycle_name: data["name"],
+        cycle_number: data["number"],
+        starts_at: data["startsAt"],
+        ends_at: data["endsAt"],
+        team_id: data.dig("team", "id"),
+        team_name: data.dig("team", "name")
       }
     )
   end
 
   def extract_labels(data)
-    labels = data['labels'] || []
-    labels.map { |l| { id: l['id'], name: l['name'] } }
+    labels = data["labels"] || []
+    labels.map { |l| { id: l["id"], name: l["name"] } }
   end
 end

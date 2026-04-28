@@ -1,12 +1,12 @@
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from 'recharts';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-} from '@/components/ui/chart';
-import type { ChartConfig } from '@/components/ui/chart';
-import { cn, humanizeToolName } from '@/lib/utils';
+} from "@/components/ui/chart";
+import type { ChartConfig } from "@/components/ui/chart";
+import { cn, humanizeToolName } from "@/lib/utils";
 
 export interface ToolUsageData {
   tool_name: string;
@@ -22,12 +22,12 @@ interface TopToolsChartProps {
 
 const chartConfig = {
   event_count: {
-    label: 'Events',
-    color: 'var(--chart-1)',
+    label: "Events",
+    color: "var(--chart-1)",
   },
   total_cost: {
-    label: 'Cost',
-    color: 'var(--chart-2)',
+    label: "Cost",
+    color: "var(--chart-2)",
   },
 } satisfies ChartConfig;
 
@@ -38,7 +38,7 @@ export function TopToolsChart({ data, isLoading, className }: TopToolsChartProps
     .map((d) => ({ ...d, tool_name: humanizeToolName(d.tool_name) }));
 
   return (
-    <Card className={cn('', className)}>
+    <Card className={cn("", className)}>
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-medium">Top Tools</CardTitle>
         <CardDescription className="text-xs">
@@ -68,7 +68,7 @@ export function TopToolsChart({ data, isLoading, className }: TopToolsChartProps
                   type="category"
                   tickLine={false}
                   axisLine={false}
-                  tick={{ fill: 'currentColor', fontSize: 11 }}
+                  tick={{ fill: "currentColor", fontSize: 11 }}
                   width={80}
                   tickFormatter={(value) =>
                     value.length > 12 ? `${value.slice(0, 12)}...` : value
@@ -78,10 +78,10 @@ export function TopToolsChart({ data, isLoading, className }: TopToolsChartProps
                   content={
                     <ChartTooltipContent
                       formatter={(value, name) => {
-                        if (name === 'total_cost') {
+                        if (name === "total_cost") {
                           return `$${(value as number).toFixed(2)}`;
                         }
-                        return new Intl.NumberFormat('en-US').format(value as number);
+                        return new Intl.NumberFormat("en-US").format(value as number);
                       }}
                     />
                   }

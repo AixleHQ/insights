@@ -6,7 +6,7 @@ RSpec.describe UserToolAccount, type: :model do
       expected = %w[
         claude_code cursor windsurf github_copilot
         aider continue cody tabnine amazon_q
-        openrouter anthropic_api openai_api gemini_api
+        openrouter_api anthropic_api openai_api gemini_api
         custom
       ]
       expect(UserToolAccount::TOOL_NAMES).to eq(expected)
@@ -40,7 +40,8 @@ RSpec.describe UserToolAccount, type: :model do
 
   describe 'encryption' do
     it 'encrypts access_token' do
-      account = create(:user_tool_account, access_token: 'secret_token')
+      # Use a non-ingest tool so the before_create callback does not override access_token
+      account = create(:user_tool_account, tool_name: 'windsurf', access_token: 'secret_token')
       expect(account.access_token).to eq('secret_token')
     end
   end
@@ -64,6 +65,82 @@ RSpec.describe UserToolAccount, type: :model do
         expect(UserToolAccount.by_tool('claude_code')).to include(claude)
         expect(UserToolAccount.by_tool('claude_code')).not_to include(cursor)
       end
+    end
+  end
+
+  describe 'INGEST_TOOLS' do
+    it 'includes claude_code and cursor' do
+      expect(UserToolAccount::INGEST_TOOLS).to contain_exactly('claude_code', 'cursor')
+    end
+  end
+
+  describe 'ingest token generation' do
+    context 'when tool is an ingest tool' do
+      it 'generates a token_hash on create' do
+        account = create(:user_tool_account, tool_name: 'claude_code')
+        expect(account.token_hash).to be_present
+      end
+
+      it 'sets access_token on create' do
+        account = create(:user_tool_account, tool_name: 'cursor')
+        expect(account.access_token).to start_with('db90_')
+      end
+
+      it 'exposes plaintext_token immediately after create' do
+        account = create(:user_tool_account, tool_name: 'claude_code')
+        expect(account.plaintext_token).to start_with('db90_')
+      end
+
+      it 'does not persist plaintext_token (nil on a fresh load from DB)' do
+        account = create(:user_tool_account, tool_name: 'cursor')
+        fresh = UserToolAccount.find(account.id)
+        expect(fresh.plaintext_token).to be_nil
+      end
+
+      it 'stores a SHA256 hash of the raw token' do
+        account = create(:user_tool_account, tool_name: 'claude_code')
+        raw = account.plaintext_token
+        expect(account.token_hash).to eq(Digest::SHA256.hexdigest(raw))
+      end
+    end
+
+    context 'when tool is not an ingest tool' do
+      it 'does not set token_hash on create' do
+        account = create(:user_tool_account, tool_name: 'windsurf')
+        expect(account.token_hash).to be_nil
+      end
+
+      it 'does not expose plaintext_token' do
+        account = create(:user_tool_account, tool_name: 'windsurf')
+        expect(account.plaintext_token).to be_nil
+      end
+    end
+  end
+
+  describe '.find_by_ingest_token' do
+    let!(:account) { create(:user_tool_account, tool_name: 'cursor') }
+    let(:raw_token) { account.plaintext_token }
+
+    it 'finds an account by its raw token' do
+      expect(UserToolAccount.find_by_ingest_token(raw_token)).to eq(account)
+    end
+
+    it 'returns nil for a wrong token' do
+      expect(UserToolAccount.find_by_ingest_token('db90_wrongtoken')).to be_nil
+    end
+
+    it 'returns nil for a blank token' do
+      expect(UserToolAccount.find_by_ingest_token('')).to be_nil
+    end
+
+    it 'returns nil for nil input' do
+      expect(UserToolAccount.find_by_ingest_token(nil)).to be_nil
+    end
+
+    it 'is deterministic: same token always resolves to the same account' do
+      result1 = UserToolAccount.find_by_ingest_token(raw_token)
+      result2 = UserToolAccount.find_by_ingest_token(raw_token)
+      expect(result1).to eq(result2)
     end
   end
 

@@ -1,8 +1,8 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import type { ReactNode } from 'react';
-import { useOrg } from './OrgContext';
-import { useWebSocket } from '@/hooks/useWebSocket';
-import { formatDistanceToNow, humanizeToolName } from '@/lib/utils';
+import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import type { ReactNode } from "react";
+import { useOrg } from "./OrgContext";
+import { useWebSocket } from "@/hooks/useWebSocket";
+import { formatDistanceToNow, humanizeToolName } from "@/lib/utils";
 
 export interface Notification {
   id: string;
@@ -10,7 +10,7 @@ export interface Notification {
   description: string;
   time: string;
   read: boolean;
-  type: 'alert' | 'info' | 'success' | 'event';
+  type: "alert" | "info" | "success" | "event";
   timestamp: number;
 }
 
@@ -24,10 +24,11 @@ interface NotificationsContextType {
 
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useNotifications() {
   const context = useContext(NotificationsContext);
   if (!context) {
-    throw new Error('useNotifications must be used within a NotificationsProvider');
+    throw new Error("useNotifications must be used within a NotificationsProvider");
   }
   return context;
 }
@@ -55,6 +56,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   }, [notifications, storageKey, currentOrg?.id]);
 
   // Clear notifications when org changes
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (currentOrg?.id) {
       try {
@@ -65,12 +67,13 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       }
     }
   }, [currentOrg?.id, storageKey]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
-  const addNotification = useCallback((notification: Omit<Notification, 'id' | 'time' | 'read' | 'timestamp'>) => {
+  const addNotification = useCallback((notification: Omit<Notification, "id" | "time" | "read" | "timestamp">) => {
     const newNotification: Notification = {
       ...notification,
       id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      time: 'Just now',
+      time: "Just now",
       read: false,
       timestamp: Date.now(),
     };
@@ -99,18 +102,18 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const handleNewEvent = useCallback((data: unknown) => {
     const event = data as { tool_name?: string; event_type?: string };
     addNotification({
-      title: 'New Event',
-      description: `${humanizeToolName(event.tool_name)}: ${event.event_type || 'event'}`,
-      type: 'event',
+      title: "New Event",
+      description: `${humanizeToolName(event.tool_name)}: ${event.event_type || "event"}`,
+      type: "event",
     });
   }, [addNotification]);
 
   const handleAlert = useCallback((data: unknown) => {
     const alert = data as { alert?: { title?: string; description?: string } };
     addNotification({
-      title: alert.alert?.title || 'Alert',
-      description: alert.alert?.description || 'New alert received',
-      type: 'alert',
+      title: alert.alert?.title || "Alert",
+      description: alert.alert?.description || "New alert received",
+      type: "alert",
     });
   }, [addNotification]);
 

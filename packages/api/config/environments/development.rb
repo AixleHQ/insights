@@ -3,6 +3,12 @@ require "active_support/core_ext/integer/time"
 Rails.application.configure do
   # Settings specified here will take precedence over those in config/application.rb.
 
+  # Allow Docker service hostnames in development
+  config.hosts << "api"
+  config.hosts << /.*\.local/
+  # Allow the default RSpec request spec host (tests run with RAILS_ENV=development in Docker)
+  config.hosts << "www.example.com"
+
   # Make code changes take effect immediately without server restart.
   config.enable_reloading = true
 
@@ -41,7 +47,7 @@ Rails.application.configure do
   # Use letter_opener to preview emails in browser during development
   config.action_mailer.delivery_method = :letter_opener
   LetterOpener.configure do |c|
-    c.location = Rails.root.join('tmp', 'letter_opener')
+    c.location = Rails.root.join("tmp", "letter_opener")
   end
 
   # Print deprecation notices to the Rails logger.
@@ -55,6 +61,9 @@ Rails.application.configure do
 
   # Append comments with runtime information tags to SQL queries in logs.
   config.active_record.query_log_tags_enabled = true
+
+  # Use Sidekiq for background jobs in development (matches staging/production behaviour).
+  config.active_job.queue_adapter = :sidekiq
 
   # Highlight code that enqueued background job in logs.
   config.active_job.verbose_enqueue_logs = true
@@ -78,7 +87,7 @@ Rails.application.configure do
   # config.generators.apply_rubocop_autocorrect_after_generate!
 
   # Configure Active Record encryption for development
-  config.active_record.encryption.primary_key = 'dev_primary_key_32_characters_xx'
-  config.active_record.encryption.deterministic_key = 'dev_deterministic_key_32_chars__'
-  config.active_record.encryption.key_derivation_salt = 'dev_key_derivation_salt_value___'
+  config.active_record.encryption.primary_key = "dev_primary_key_32_characters_xx"
+  config.active_record.encryption.deterministic_key = "dev_deterministic_key_32_chars__"
+  config.active_record.encryption.key_derivation_salt = "dev_key_derivation_salt_value___"
 end

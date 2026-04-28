@@ -2,7 +2,7 @@
 
 class OrganizationConnectorSerializer < BaseSerializer
   # Never expose tokens - only metadata
-  attributes :id, :connector_type, :is_active
+  attributes :id, :connector_type, :is_active, :status
   timestamps
 
   attribute :external_account_id do |connector|

@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useMemo } from "react";
+import { Link } from "react-router-dom";
 import {
   ArrowLeft,
   Search,
@@ -7,17 +7,17 @@ import {
   User,
   RefreshCw,
   HelpCircle,
-} from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
-import { useOrg } from '@/contexts/OrgContext';
-import { useUnattributedEvents, useOrganizationMembers, queryKeys } from '@/hooks/useApi';
-import { api } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { SortButton, type SortDirection } from '@/components/ui/sort-button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent } from '@/components/ui/card';
+} from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useOrg } from "@/contexts/OrgContext";
+import { useUnattributedEvents, useOrganizationMembers, queryKeys } from "@/hooks/useApi";
+import { api } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { SortButton, type SortDirection } from "@/components/ui/sort-button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -25,14 +25,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -40,11 +40,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { RiskBadge } from '@/components/dashboard';
-import { formatDistanceToNow } from '@/lib/utils';
+} from "@/components/ui/dialog";
+import { RiskBadge } from "@/components/dashboard";
+import { formatDistanceToNow } from "@/lib/utils";
 
-type UnattributedSortField = 'tool_name' | 'risk_level' | 'cost_usd' | 'created_at';
+type UnattributedSortField = "tool_name" | "risk_level" | "cost_usd" | "created_at";
 
 const riskLevelOrder: Record<string, number> = {
   critical: 4,
@@ -82,23 +82,23 @@ function EventSkeleton() {
 export function UnattributedEvents() {
   const { currentOrg } = useOrg();
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState('');
-  const [sortField, setSortField] = useState<UnattributedSortField>('created_at');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [search, setSearch] = useState("");
+  const [sortField, setSortField] = useState<UnattributedSortField>("created_at");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
-  const [selectedUser, setSelectedUser] = useState<string>('');
+  const [selectedUser, setSelectedUser] = useState<string>("");
   const [isAssigning, setIsAssigning] = useState(false);
 
-  const { data: events, isLoading, isFetching } = useUnattributedEvents(currentOrg?.id || '');
-  const { data: members } = useOrganizationMembers(currentOrg?.id || '');
+  const { data: events, isLoading, isFetching } = useUnattributedEvents(currentOrg?.id || "");
+  const { data: members } = useOrganizationMembers(currentOrg?.id || "");
 
   const handleSort = (field: UnattributedSortField) => {
     if (sortField === field) {
-      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
     } else {
       setSortField(field);
-      setSortDirection('desc');
+      setSortDirection("desc");
     }
   };
 
@@ -112,8 +112,8 @@ export function UnattributedEvents() {
       const searchLower = search.toLowerCase();
       result = result.filter(
         (e) =>
-          (e.toolName || '').toLowerCase().includes(searchLower) ||
-          (e.model || '').toLowerCase().includes(searchLower)
+          (e.toolName || "").toLowerCase().includes(searchLower) ||
+          (e.model || "").toLowerCase().includes(searchLower)
       );
     }
 
@@ -121,20 +121,20 @@ export function UnattributedEvents() {
     result.sort((a, b) => {
       let comparison = 0;
       switch (sortField) {
-        case 'tool_name':
-          comparison = (a.toolName || '').localeCompare(b.toolName || '');
+        case "tool_name":
+          comparison = (a.toolName || "").localeCompare(b.toolName || "");
           break;
-        case 'risk_level':
-          comparison = (riskLevelOrder[a.riskLevel || 'none'] || 0) - (riskLevelOrder[b.riskLevel || 'none'] || 0);
+        case "risk_level":
+          comparison = (riskLevelOrder[a.riskLevel || "none"] || 0) - (riskLevelOrder[b.riskLevel || "none"] || 0);
           break;
-        case 'cost_usd':
+        case "cost_usd":
           comparison = (Number(a.costUsd) || 0) - (Number(b.costUsd) || 0);
           break;
-        case 'created_at':
+        case "created_at":
           comparison = new Date(a.occurredAt || a.createdAt || 0).getTime() - new Date(b.occurredAt || b.createdAt || 0).getTime();
           break;
       }
-      return sortDirection === 'asc' ? comparison : -comparison;
+      return sortDirection === "asc" ? comparison : -comparison;
     });
 
     return result;
@@ -142,7 +142,7 @@ export function UnattributedEvents() {
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({
-      queryKey: queryKeys.events.unattributed(currentOrg?.id || ''),
+      queryKey: queryKeys.events.unattributed(currentOrg?.id || ""),
     });
   };
 
@@ -160,9 +160,9 @@ export function UnattributedEvents() {
       });
       setAssignDialogOpen(false);
       setSelectedEvent(null);
-      setSelectedUser('');
+      setSelectedUser("");
     } catch (error) {
-      console.error('Failed to assign event:', error);
+      console.error("Failed to assign event:", error);
     } finally {
       setIsAssigning(false);
     }
@@ -190,7 +190,7 @@ export function UnattributedEvents() {
           </div>
         </div>
         <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isFetching} className="self-start sm:self-auto">
-          <RefreshCw className={`mr-2 size-4 ${isFetching ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`mr-2 size-4 ${isFetching ? "animate-spin" : ""}`} />
           Refresh
         </Button>
       </div>
@@ -284,7 +284,7 @@ export function UnattributedEvents() {
                   <div className="flex flex-col items-center gap-2">
                     <User className="size-8 text-muted-foreground" />
                     <p className="text-muted-foreground">
-                      {search ? 'No matching events found' : 'All events are attributed'}
+                      {search ? "No matching events found" : "All events are attributed"}
                     </p>
                   </div>
                 </TableCell>
@@ -294,7 +294,7 @@ export function UnattributedEvents() {
                 <TableRow key={event.id}>
                   <TableCell>
                     <div>
-                      <p className="font-medium">{event.toolName || 'Unknown'}</p>
+                      <p className="font-medium">{event.toolName || "Unknown"}</p>
                       {event.model && (
                         <p className="text-xs text-muted-foreground">{event.model}</p>
                       )}
@@ -302,11 +302,11 @@ export function UnattributedEvents() {
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">
                     <Badge variant="secondary" className="text-xs">
-                      {event.eventType || 'unknown'}
+                      {event.eventType || "unknown"}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <RiskBadge level={event.riskLevel || 'none'} />
+                    <RiskBadge level={event.riskLevel || "none"} />
                   </TableCell>
                   <TableCell className="hidden sm:table-cell font-mono text-sm">
                     ${Number(event.costUsd ?? 0).toFixed(4)}
@@ -365,7 +365,7 @@ export function UnattributedEvents() {
               Cancel
             </Button>
             <Button onClick={handleAssign} disabled={!selectedUser || isAssigning}>
-              {isAssigning ? 'Assigning...' : 'Assign Event'}
+              {isAssigning ? "Assigning..." : "Assign Event"}
             </Button>
           </DialogFooter>
         </DialogContent>

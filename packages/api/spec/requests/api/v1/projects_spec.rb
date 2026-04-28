@@ -122,6 +122,58 @@ RSpec.describe 'Api::V1::Projects', type: :request do
     end
   end
 
+  describe 'PUT /api/v1/projects/:id/settings/:key' do
+    let!(:project) { create(:project, owner: user, organization: nil) }
+
+    it 'creates a settings.create audit log for a new key' do
+      expect {
+        authenticated_put "/api/v1/projects/#{project.id}/settings/new_key",
+                          user: user,
+                          params: { value: 'some_value' }
+      }.to change(ProjectAuditLog, :count).by(1)
+
+      log = ProjectAuditLog.last
+      expect(log.action).to eq('settings.create')
+      expect(log.actor).to eq(user)
+      expect(log.tracked_changes['key']).to eq('new_key')
+      expect(log.tracked_changes['after']).to eq('some_value')
+    end
+
+    it 'creates a settings.update audit log for an existing key' do
+      create(:project_setting, project: project, key: 'existing_key', value: 'old_value')
+
+      expect {
+        authenticated_put "/api/v1/projects/#{project.id}/settings/existing_key",
+                          user: user,
+                          params: { value: 'new_value' }
+      }.to change(ProjectAuditLog, :count).by(1)
+
+      log = ProjectAuditLog.last
+      expect(log.action).to eq('settings.update')
+      expect(log.actor).to eq(user)
+      expect(log.tracked_changes['key']).to eq('existing_key')
+      expect(log.tracked_changes['before']).to eq('old_value')
+      expect(log.tracked_changes['after']).to eq('new_value')
+    end
+  end
+
+  describe 'DELETE /api/v1/projects/:id/settings/:key' do
+    let!(:project) { create(:project, owner: user, organization: nil) }
+    let!(:setting) { create(:project_setting, project: project, key: 'delete_me', value: 'goodbye') }
+
+    it 'creates a settings.delete audit log' do
+      expect {
+        authenticated_delete "/api/v1/projects/#{project.id}/settings/delete_me", user: user
+      }.to change(ProjectAuditLog, :count).by(1)
+
+      log = ProjectAuditLog.last
+      expect(log.action).to eq('settings.delete')
+      expect(log.actor).to eq(user)
+      expect(log.tracked_changes['key']).to eq('delete_me')
+      expect(log.tracked_changes['before']).to eq('goodbye')
+    end
+  end
+
   describe 'GET /api/v1/projects/:id/stats' do
     let!(:project) { create(:project, organization: organization, owner: nil) }
 
@@ -201,7 +253,7 @@ RSpec.describe 'Api::V1::Projects', type: :request do
 
         expect_success
         expect(json_response[:data]).to eq([])
-        expect(json_response[:tools]).to eq(['Other'])
+        expect(json_response[:tools]).to eq([ 'Other' ])
       end
     end
   end
@@ -247,6 +299,254 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       authenticated_get "/api/v1/projects/#{project.id}/members", user: other_user
 
       expect_forbidden
+    end
+  end
+
+  describe 'GET /api/v1/projects/:id/retention_policy' do
+    let!(:project) { create(:project, organization: organization, owner: nil) }
+    let!(:project_membership) { create(:project_membership, project: project, user: user, role: 'admin') }
+
+    it 'returns the retention policy with camelCase keys' do
+      authenticated_get "/api/v1/projects/#{project.id}/retention_policy", user: user
+
+      expect_success
+      expect(json_data[:rawEventTtl]).to eq('24_hours')
+      expect(json_data[:toolEventsRetention]).to eq('90_days')
+      expect(json_data[:hourlyAggregateRetention]).to eq('365_days')
+      expect(json_data[:dailyAggregateRetention]).to eq('forever')
+      expect(json_data[:projectId]).to eq(project.id)
+    end
+
+    it 'returns 403 for non-admin members' do
+      non_admin = create(:user)
+      create(:organization_membership, user: non_admin, organization: organization, role: 'member')
+      authenticated_get "/api/v1/projects/#{project.id}/retention_policy", user: non_admin
+
+      expect_forbidden
+    end
+
+    it 'returns 401 for unauthenticated requests' do
+      get "/api/v1/projects/#{project.id}/retention_policy"
+
+      expect(response).to have_http_status(:unauthorized)
+    end
+  end
+
+  describe 'GET /api/v1/projects/:id/stats/commits_by_user' do
+    let!(:project) { create(:project, organization: organization, owner: nil) }
+    let!(:other_member) { create(:user) }
+
+    context 'with commit events' do
+      before do
+        create(:tool_event, project: project, organization: organization,
+               user: user, event_type: 'commit', tool_name: 'github_copilot',
+               occurred_at: 1.day.ago)
+        create(:tool_event, project: project, organization: organization,
+               user: user, event_type: 'commit', tool_name: 'github_copilot',
+               occurred_at: 2.days.ago)
+        create(:tool_event, project: project, organization: organization,
+               user: other_member, event_type: 'commit', tool_name: 'github_copilot',
+               occurred_at: 1.day.ago)
+      end
+
+      it 'returns pagination meta' do
+        authenticated_get "/api/v1/projects/#{project.id}/stats/commits_by_user", user: user
+
+        expect_success
+        expect(json_response[:meta]).to include(
+          :current_page, :total_pages, :total_count, :per_page
+        )
+      end
+
+      it 'returns commit counts grouped by user' do
+        authenticated_get "/api/v1/projects/#{project.id}/stats/commits_by_user", user: user
+
+        expect_success
+        data = json_response[:data]
+        top_user = data.find { |d| d[:userId] == user.id }
+        expect(top_user[:commitCount]).to eq(2)
+      end
+
+      it 'respects per_page param' do
+        authenticated_get "/api/v1/projects/#{project.id}/stats/commits_by_user",
+                          user: user, params: { per_page: 1 }
+
+        expect_success
+        expect(json_response[:data].length).to eq(1)
+        expect(json_response[:meta][:total_count]).to eq(2)
+        expect(json_response[:meta][:total_pages]).to eq(2)
+      end
+
+      it 'respects page param' do
+        authenticated_get "/api/v1/projects/#{project.id}/stats/commits_by_user",
+                          user: user, params: { per_page: 1, page: 2 }
+
+        expect_success
+        expect(json_response[:data].length).to eq(1)
+        expect(json_response[:meta][:current_page]).to eq(2)
+      end
+    end
+
+    context 'without commit events' do
+      it 'returns empty data with pagination meta' do
+        authenticated_get "/api/v1/projects/#{project.id}/stats/commits_by_user", user: user
+
+        expect_success
+        expect(json_response[:data]).to eq([])
+        expect(json_response[:meta][:total_count]).to eq(0)
+      end
+    end
+
+    it 'returns 403 for unauthorized users' do
+      authenticated_get "/api/v1/projects/#{project.id}/stats/commits_by_user", user: other_user
+
+      expect_forbidden
+    end
+  end
+
+  describe 'PATCH /api/v1/projects/:id/retention_policy' do
+    let!(:project) { create(:project, organization: organization, owner: nil) }
+    let!(:project_membership) { create(:project_membership, project: project, user: user, role: 'admin') }
+
+    it 'updates the retention policy and returns 200' do
+      authenticated_patch "/api/v1/projects/#{project.id}/retention_policy",
+                          user: user,
+                          params: { raw_event_ttl: '48_hours' }
+
+      expect_success
+      expect(json_data[:rawEventTtl]).to eq('48_hours')
+    end
+
+    it 'creates a project audit log on update' do
+      expect {
+        authenticated_patch "/api/v1/projects/#{project.id}/retention_policy",
+                            user: user,
+                            params: { tool_events_retention: '180_days' }
+      }.to change(ProjectAuditLog, :count).by(1)
+
+      log = ProjectAuditLog.last
+      expect(log.action).to eq('settings.update')
+      expect(log.actor).to eq(user)
+    end
+
+    it 'returns 422 with errors for invalid enum value' do
+      authenticated_patch "/api/v1/projects/#{project.id}/retention_policy",
+                          user: user,
+                          params: { raw_event_ttl: 'invalid_value' }
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(json_response[:errors]).to be_present
+    end
+
+    it 'returns 403 for non-admin members' do
+      non_admin = create(:user)
+      create(:organization_membership, user: non_admin, organization: organization, role: 'member')
+      authenticated_patch "/api/v1/projects/#{project.id}/retention_policy",
+                          user: non_admin,
+                          params: { raw_event_ttl: '48_hours' }
+
+      expect_forbidden
+    end
+  end
+
+  describe 'POST /api/v1/projects/:id/link_jira' do
+    let!(:project) { create(:project, organization: organization, owner: nil) }
+    let!(:project_membership) { create(:project_membership, project: project, user: user, role: 'admin') }
+    let!(:connector) { create(:organization_connector, :jira, organization: organization) }
+
+    it 'saves jira_connector_id and jira_project_key settings' do
+      authenticated_post "/api/v1/projects/#{project.id}/link_jira",
+                         user: user,
+                         params: { connector_id: connector.id, jira_project_key: 'SCRUM' }
+
+      expect_success
+      expect(json_data[:linked]).to be true
+      expect(project.project_settings.find_by(key: 'jira_connector_id')&.value).to eq(connector.id.to_s)
+      expect(project.project_settings.find_by(key: 'jira_project_key')&.value).to eq('SCRUM')
+    end
+
+    it 'overwrites existing settings on re-link' do
+      project.project_settings.create!(key: 'jira_connector_id', value: connector.id.to_s)
+      project.project_settings.create!(key: 'jira_project_key', value: 'OLD')
+
+      authenticated_post "/api/v1/projects/#{project.id}/link_jira",
+                         user: user,
+                         params: { connector_id: connector.id, jira_project_key: 'NEW' }
+
+      expect_success
+      expect(project.reload.project_settings.find_by(key: 'jira_project_key')&.value).to eq('NEW')
+    end
+
+    it 'returns 404 when connector belongs to another org' do
+      other_org = create(:organization)
+      other_connector = create(:organization_connector, :jira, organization: other_org)
+
+      authenticated_post "/api/v1/projects/#{project.id}/link_jira",
+                         user: user,
+                         params: { connector_id: other_connector.id, jira_project_key: 'SCRUM' }
+
+      expect_not_found
+    end
+
+    it 'returns 403 for project members without update permission' do
+      member_only = create(:user)
+      create(:organization_membership, user: member_only, organization: organization, role: 'member')
+      create(:project_membership, project: project, user: member_only, role: 'member')
+
+      authenticated_post "/api/v1/projects/#{project.id}/link_jira",
+                         user: member_only,
+                         params: { connector_id: connector.id, jira_project_key: 'SCRUM' }
+
+      expect_forbidden
+    end
+
+    it 'returns 401 without authentication' do
+      post "/api/v1/projects/#{project.id}/link_jira",
+           params: { connector_id: connector.id, jira_project_key: 'SCRUM' }
+
+      expect_unauthorized
+    end
+
+    it 'returns 422 for an invalid jira_project_key format' do
+      authenticated_post "/api/v1/projects/#{project.id}/link_jira",
+                         user: user,
+                         params: { connector_id: connector.id, jira_project_key: 'invalid key!' }
+
+      expect_unprocessable
+    end
+  end
+
+  describe 'POST /api/v1/projects/:id/sync_issues' do
+    let!(:project) { create(:project, organization: organization, owner: nil) }
+    let!(:project_membership) { create(:project_membership, project: project, user: user, role: 'admin') }
+    let!(:connector) { create(:organization_connector, :jira, organization: organization) }
+
+    before do
+      project.project_settings.create!(key: 'jira_connector_id', value: connector.id.to_s)
+      project.project_settings.create!(key: 'jira_project_key', value: 'SCRUM')
+      allow(JiraSyncJob).to receive(:perform_now)
+    end
+
+    it 'runs the sync job synchronously and returns synced_at' do
+      authenticated_post "/api/v1/projects/#{project.id}/sync_issues", user: user
+
+      expect_success
+      expect(json_data[:synced_at]).to be_present
+      expect(JiraSyncJob).to have_received(:perform_now).with(connector.id, 'sync', project_id: project.id)
+    end
+
+    it 'returns 422 when no Jira project is linked' do
+      project.project_settings.find_by(key: 'jira_connector_id')&.destroy!
+
+      authenticated_post "/api/v1/projects/#{project.id}/sync_issues", user: user
+
+      expect_unprocessable
+    end
+
+    it 'returns 401 without authentication' do
+      post "/api/v1/projects/#{project.id}/sync_issues"
+
+      expect_unauthorized
     end
   end
 end

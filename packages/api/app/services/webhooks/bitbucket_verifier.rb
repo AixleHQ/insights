@@ -2,24 +2,24 @@
 
 module Webhooks
   class BitbucketVerifier
-    SIGNATURE_HEADER = 'X-Hub-Signature'
+    SIGNATURE_HEADER = "X-Hub-Signature"
 
     class << self
       def verify!(payload:, signature:, secret:)
-        raise SignatureMissingError, 'Missing webhook signature' if signature.blank?
-        raise SignatureMissingError, 'Missing webhook secret' if secret.blank?
+        raise SignatureMissingError, "Missing webhook signature" if signature.blank?
+        raise SignatureMissingError, "Missing webhook secret" if secret.blank?
 
         expected = compute_signature(payload, secret)
 
         unless secure_compare(signature, expected)
-          raise SignatureInvalidError, 'Invalid Bitbucket webhook signature'
+          raise SignatureInvalidError, "Invalid Bitbucket webhook signature"
         end
 
         true
       end
 
       def compute_signature(payload, secret)
-        digest = OpenSSL::HMAC.hexdigest('SHA256', secret, payload)
+        digest = OpenSSL::HMAC.hexdigest("SHA256", secret, payload)
         "sha256=#{digest}"
       end
 

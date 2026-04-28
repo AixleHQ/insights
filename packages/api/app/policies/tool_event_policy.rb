@@ -37,8 +37,8 @@ class ToolEventPolicy < ApplicationPolicy
   def record_organization
     @record_organization ||= if record.is_a?(ToolEvent)
                                record.organization
-                             else
+    else
                                organization
-                             end
+    end
   end
 end

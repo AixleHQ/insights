@@ -2,20 +2,20 @@
 
 module Oauth
   class LinearProvider < BaseProvider
-    API_URL = 'https://api.linear.app'
+    API_URL = "https://api.linear.app"
     GRAPHQL_URL = "#{API_URL}/graphql"
 
     def test_connection
-      query = '{ viewer { id name email } }'
+      query = "{ viewer { id name email } }"
       response = graphql_request(query)
 
       if response.success?
         data = JSON.parse(response.body)
-        if data['data'] && data['data']['viewer']
-          viewer = data['data']['viewer']
-          { success: true, account: viewer['email'], name: viewer['name'] }
+        if data["data"] && data["data"]["viewer"]
+          viewer = data["data"]["viewer"]
+          { success: true, account: viewer["email"], name: viewer["name"] }
         else
-          { success: false, error: data['errors']&.first&.dig('message') || 'Unknown error' }
+          { success: false, error: data["errors"]&.first&.dig("message") || "Unknown error" }
         end
       else
         { success: false, error: "Linear API error: #{response.status}" }
@@ -41,13 +41,13 @@ module Oauth
       return [] unless response.success?
 
       data = JSON.parse(response.body)
-      return [] unless data['data'] && data['data']['teams']
+      return [] unless data["data"] && data["data"]["teams"]
 
-      data['data']['teams']['nodes'].map do |team|
+      data["data"]["teams"]["nodes"].map do |team|
         {
-          external_id: team['id'],
-          name: team['name'],
-          key: team['key']
+          external_id: team["id"],
+          name: team["name"],
+          key: team["key"]
         }
       end
     end
@@ -75,14 +75,14 @@ module Oauth
       return [] unless response.success?
 
       data = JSON.parse(response.body)
-      return [] unless data['data'] && data['data']['projects']
+      return [] unless data["data"] && data["data"]["projects"]
 
-      data['data']['projects']['nodes'].map do |project|
+      data["data"]["projects"]["nodes"].map do |project|
         {
-          external_id: project['id'],
-          name: project['name'],
-          state: project['state'],
-          teams: project['teams']['nodes']
+          external_id: project["id"],
+          name: project["name"],
+          state: project["state"],
+          teams: project["teams"]["nodes"]
         }
       end
     end
@@ -90,20 +90,20 @@ module Oauth
     class << self
       def client_id
         Rails.application.credentials.dig(:linear, :client_id) ||
-          ENV.fetch('LINEAR_CLIENT_ID', nil)
+          ENV.fetch("LINEAR_CLIENT_ID", nil)
       end
 
       def client_secret
         Rails.application.credentials.dig(:linear, :client_secret) ||
-          ENV.fetch('LINEAR_CLIENT_SECRET', nil)
+          ENV.fetch("LINEAR_CLIENT_SECRET", nil)
       end
 
       def authorize_endpoint
-        'https://linear.app/oauth/authorize'
+        "https://linear.app/oauth/authorize"
       end
 
       def token_endpoint
-        'https://api.linear.app/oauth/token'
+        "https://api.linear.app/oauth/token"
       end
 
       def scopes
@@ -112,20 +112,20 @@ module Oauth
 
       def fetch_account_info(access_token)
         response = Faraday.post(GRAPHQL_URL) do |req|
-          req.headers['Authorization'] = "Bearer #{access_token}"
-          req.headers['Content-Type'] = 'application/json'
-          req.body = { query: '{ viewer { id email name } }' }.to_json
+          req.headers["Authorization"] = "Bearer #{access_token}"
+          req.headers["Content-Type"] = "application/json"
+          req.body = { query: "{ viewer { id email name } }" }.to_json
         end
 
         return {} unless response.success?
 
         data = JSON.parse(response.body)
-        return {} unless data['data'] && data['data']['viewer']
+        return {} unless data["data"] && data["data"]["viewer"]
 
-        viewer = data['data']['viewer']
+        viewer = data["data"]["viewer"]
         {
-          account_id: viewer['id'],
-          account_name: viewer['email']
+          account_id: viewer["id"],
+          account_name: viewer["email"]
         }
       end
     end
@@ -134,8 +134,8 @@ module Oauth
 
     def graphql_request(query, variables: {})
       Faraday.post(GRAPHQL_URL) do |req|
-        req.headers['Authorization'] = "Bearer #{connector.access_token}"
-        req.headers['Content-Type'] = 'application/json'
+        req.headers["Authorization"] = "Bearer #{connector.access_token}"
+        req.headers["Content-Type"] = "application/json"
         req.body = { query: query, variables: variables }.to_json
       end
     end

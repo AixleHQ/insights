@@ -1,14 +1,14 @@
-import { useMemo } from 'react';
-import { useParams } from 'react-router-dom';
-import { useOrg } from '@/contexts/OrgContext';
-import { useEvent } from '@/hooks/useApi';
-import { EventDetail, type EventDetailData } from '@/components/events';
+import { useMemo } from "react";
+import { useParams } from "react-router-dom";
+import { useOrg } from "@/contexts/OrgContext";
+import { useEvent } from "@/hooks/useApi";
+import { EventDetail, type EventDetailData } from "@/components/events";
 
 export function EventDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { currentOrg } = useOrg();
 
-  const { data: apiEvent, isLoading } = useEvent(currentOrg?.id || '', id || '');
+  const { data: apiEvent, isLoading } = useEvent(currentOrg?.id || "", id || "");
 
   // Transform API response to EventDetailData format
   const event: EventDetailData | null = useMemo(() => {
@@ -20,7 +20,9 @@ export function EventDetailPage() {
       event_type: apiEvent.eventType,
       risk_level: apiEvent.riskLevel,
       cost_usd: apiEvent.costUsd,
-      token_count: (apiEvent.inputTokens || 0) + (apiEvent.outputTokens || 0),
+      token_count:
+        apiEvent.tokensTotal ??
+        (apiEvent.inputTokens || 0) + (apiEvent.outputTokens || 0),
       created_at: apiEvent.occurredAt || apiEvent.createdAt,
       user: apiEvent.user
         ? {
@@ -36,7 +38,7 @@ export function EventDetailPage() {
           }
         : undefined,
       sanitized_content: apiEvent.sanitizedContent || undefined,
-      metadata: apiEvent.model ? { model: apiEvent.model } : undefined,
+      metadata: apiEvent.metadata,
       findings: apiEvent.securityFindings?.map((f) => ({
         type: f.type,
         severity: f.severity,

@@ -1,207 +1,217 @@
-name: CI
+name: DB90 CI/CD Pipeline
 
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+on: [push]
 
 env:
-  RUBY_VERSION: "3.4.8"
-  NODE_VERSION: "24.13.0"
+  PROJECT: db90
+  APPLICATION: app
+  USE_IMAGE_TAG_ENV_PREFIX: true
+  CI_COMMIT_BRANCH: ${{ github.ref_name }}
+  CI_COMMIT_SHA: ${{ github.sha }}
+
+permissions:
+  id-token: write
+  contents: read
 
 jobs:
-  lint-api:
-    name: Lint API (Rubocop)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: packages/api
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: ${{ env.RUBY_VERSION }}
-          bundler-cache: true
-          working-directory: packages/api
-
-      - name: Run Rubocop
-        run: bundle exec rubocop --parallel
-
-  lint-web:
-    name: Lint Web (ESLint)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: packages/web
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: "npm"
-          cache-dependency-path: packages/web/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run ESLint
-        run: npm run lint
-
-  test-api:
-    name: Test API (RSpec)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: packages/api
-
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: db90_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      redis:
-        image: redis:7
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    env:
-      RAILS_ENV: test
-      DATABASE_HOST: localhost
-      DATABASE_PORT: 5432
-      DATABASE_USERNAME: postgres
-      DATABASE_PASSWORD: postgres
-      REDIS_URL: redis://localhost:6379/1
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: ${{ env.RUBY_VERSION }}
-          bundler-cache: true
-          working-directory: packages/api
-
-      - name: Set up database
-        run: |
-          bundle exec rails db:create
-          bundle exec rails db:schema:load
-
-      - name: Run RSpec
-        run: bundle exec rspec --format progress --format RspecJunitFormatter --out tmp/rspec-results.xml
-
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: rspec-results
-          path: packages/api/tmp/rspec-results.xml
-
-  test-web:
-    name: Test Web (Vitest)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: packages/web
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: "npm"
-          cache-dependency-path: packages/web/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run Vitest
-        run: npm run test:run
-
   build:
-    name: Build
+    name: Build & Push Images
     runs-on: ubuntu-latest
-    needs: [lint-api, lint-web, test-api, test-web]
+    container: ghcr.io/artempartos/ecs_toolbox:latest
+    env:
+      ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+    strategy:
+      matrix:
+        image:
+          - api
+          - web
+          - temporal-worker
+          - keycloak
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Build and push ${{ matrix.image }}
+        run: |
+          ecs_helper build_and_push \
+            --image=${{ matrix.image }} \
+            --file=./Dockerfile.${{ matrix.image }}
+
+  # --- API checks (build from source with CI target) ---
+
+  api_test:
+    name: API Tests (RSpec)
+    uses: ./.github/workflows/code-check.yml
+    secrets: inherit
+    with:
+      check_command: bash -c "bundle exec rails db:create db:schema:load && bundle exec rspec"
+      container_name: api
+
+  api_lint:
+    name: API Lint (Rubocop)
+    uses: ./.github/workflows/code-check.yml
+    secrets: inherit
+    with:
+      check_command: bundle exec rubocop --parallel
+      container_name: api
+
+  api_security:
+    name: API Security (Brakeman)
+    uses: ./.github/workflows/code-check.yml
+    secrets: inherit
+    with:
+      check_command: bundle exec brakeman --no-pager
+      container_name: api
+
+  # --- Web checks ---
+
+  web_test:
+    name: Web Tests (Vitest)
+    uses: ./.github/workflows/code-check.yml
+    secrets: inherit
+    with:
+      check_command: npm run test:run
+      container_name: web
+      docker_compose_file: docker-compose.ci-web.yml
+
+  web_lint:
+    name: Web Lint (ESLint)
+    uses: ./.github/workflows/code-check.yml
+    secrets: inherit
+    with:
+      check_command: npm run lint
+      container_name: web
+      docker_compose_file: docker-compose.ci-web.yml
+
+  web_typecheck:
+    name: Web Typecheck (TypeScript)
+    uses: ./.github/workflows/code-check.yml
+    secrets: inherit
+    with:
+      check_command: npx tsc --noEmit
+      container_name: web
+      docker_compose_file: docker-compose.ci-web.yml
+
+  # --- db90-cursor package checks ---
+
+  cursor_check:
+    name: db90-cursor (build + test)
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build API image
-        uses: docker/build-push-action@v6
+      - uses: actions/setup-node@v4
         with:
-          context: .
-          file: ./Dockerfile.api
-          push: false
-          tags: db90-api:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: packages/db90-cursor/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+        working-directory: packages/db90-cursor
+      - name: Build
+        run: npm run build
+        working-directory: packages/db90-cursor
+      - name: Test
+        run: npm test
+        working-directory: packages/db90-cursor
 
-      - name: Build Web image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile.web
-          push: false
-          tags: db90-web:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+  # --- db90-claude package checks ---
 
-      - name: Build Temporal Worker image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile.temporal-worker
-          push: false
-          tags: db90-temporal-worker:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  security:
-    name: Security Scan
+  claude_check:
+    name: db90-claude (build + test)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: packages/api
-
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
+      - uses: actions/setup-node@v4
         with:
-          ruby-version: ${{ env.RUBY_VERSION }}
-          bundler-cache: true
-          working-directory: packages/api
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: packages/db90-claude/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+        working-directory: packages/db90-claude
+      - name: Build
+        run: npm run build
+        working-directory: packages/db90-claude
+      - name: Test
+        run: npm test
+        working-directory: packages/db90-claude
 
-      - name: Run Brakeman
-        run: bundle exec brakeman --no-pager
+  # --- Deploy pipeline (staging and main only) ---
 
-      - name: Run Bundle Audit
-        run: bundle exec bundle-audit check --update
+  migrate:
+    name: Run DB Migrations
+    runs-on: ubuntu-latest
+    container: ghcr.io/artempartos/ecs_toolbox:latest
+    needs: [build, api_test, api_lint, api_security, web_test, web_lint, web_typecheck, cursor_check, claude_check]
+    if: github.ref_name == 'staging' || github.ref_name == 'main'
+    env:
+      ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+      APPLICATION: api
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Run db:migrate
+        run: |
+          ecs_helper run_command --command "bundle exec rails db:migrate" --name 'db-migrate'
+
+  deploy:
+    name: Deploy Services
+    runs-on: ubuntu-latest
+    container: ghcr.io/artempartos/ecs_toolbox:latest
+    needs: [migrate]
+    if: github.ref_name == 'staging' || github.ref_name == 'main'
+    env:
+      ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+    strategy:
+      matrix:
+        service:
+          - api
+          - web
+          - sidekiq
+          - temporal-worker
+          - keycloak
+      max-parallel: 5
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Deploy ${{ matrix.service }}
+        run: APPLICATION=${{ matrix.service }} ecs_helper deploy --timeout 3600
+
+  post_deploy:
+    name: Post Deploy (Rollbar)
+    runs-on: ubuntu-latest
+    container: ghcr.io/artempartos/ecs_toolbox:latest
+    if: github.ref_name == 'staging' || github.ref_name == 'main'
+    env:
+      ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+      APPLICATION: api
+    needs: [deploy]
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Notify Rollbar of deploy
+        run: |
+          COMMIT_SHA="${{ github.sha }}"
+          ACTOR="${{ github.actor }}"
+          ACTOR_ID="${{ github.actor_id }}"
+          DEPLOY_USER="${ACTOR} ${ACTOR_ID}+${ACTOR}@users.noreply.github.com"
+          ecs_helper run_command \
+            --command "bash -c 'export DEPLOY_REVISION=${COMMIT_SHA} && export DEPLOY_USER=\"${DEPLOY_USER}\" && bundle exec rake rollbar:deploy'" \
+            --name 'rollbar-deploy'

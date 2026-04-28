@@ -42,6 +42,21 @@ RSpec.describe UserSyncService do
           expect(user.last_login_at).to eq(Time.current)
         end
       end
+
+      it 'sets last_sign_in_at on first login' do
+        freeze_time do
+          user = described_class.sync_from_claims(claims)
+          expect(user.last_sign_in_at).to eq(Time.current)
+        end
+      end
+
+      it 'sets last_sign_in_at on first sync even without iat claim' do
+        claims_without_iat = claims.except('iat')
+        freeze_time do
+          user = described_class.sync_from_claims(claims_without_iat)
+          expect(user.last_sign_in_at).to eq(Time.current)
+        end
+      end
     end
 
     context 'when user already exists' do
@@ -59,12 +74,19 @@ RSpec.describe UserSyncService do
         }.not_to change(User, :count)
       end
 
-      it 'updates user attributes from claims' do
+      it 'updates non-editable attributes from claims' do
         user = described_class.sync_from_claims(claims)
 
         expect(user.id).to eq(existing_user.id)
         expect(user.email).to eq('test@example.com')
-        expect(user.name).to eq('Test User')
+      end
+
+      it 'does not overwrite user-editable attributes (name, avatar_url)' do
+        original_avatar = existing_user.avatar_url
+        user = described_class.sync_from_claims(claims)
+
+        expect(user.name).to eq('Old Name')
+        expect(user.avatar_url).to eq(original_avatar)
       end
 
       it 'updates last_login_at for fresh login' do
@@ -72,6 +94,22 @@ RSpec.describe UserSyncService do
           user = described_class.sync_from_claims(claims)
           expect(user.last_login_at).to eq(Time.current)
         end
+      end
+
+      it 'updates last_sign_in_at for fresh login' do
+        freeze_time do
+          user = described_class.sync_from_claims(claims)
+          expect(user.last_sign_in_at).to eq(Time.current)
+        end
+      end
+
+      it 'does not update last_sign_in_at for old token' do
+        existing_user.update!(last_sign_in_at: 1.hour.ago)
+        old_token_claims = claims.merge('iat' => 3.minutes.ago.to_i)
+
+        user = described_class.sync_from_claims(old_token_claims)
+
+        expect(user.last_sign_in_at).to be_within(1.second).of(1.hour.ago)
       end
 
       it 'does not update last_login_at for old token if recently logged in' do
@@ -138,6 +176,62 @@ RSpec.describe UserSyncService do
         expect {
           described_class.sync_from_claims(claims_dbp)
         }.not_to change(OrganizationMembership, :count)
+      end
+    end
+
+    context 'with auto-assign project' do
+      let(:claims_project) do
+        {
+          'sub' => 'keycloak-project-user',
+          'email' => 'developer@projectdomain.com',
+          'name' => 'Project User'
+        }
+      end
+
+      let!(:project) { create(:project) }
+      let!(:project_setting) do
+        create(:project_setting, project: project, key: 'allowed_email_domain', value: 'projectdomain.com')
+      end
+      # User must be a member of the project's org for auto-assign to apply
+      let!(:org_setting) do
+        create(:organization_setting, organization: project.organization, key: 'allowed_email_domain', value: 'projectdomain.com')
+      end
+
+      it 'auto-assigns user to project based on email domain' do
+        user = described_class.sync_from_claims(claims_project)
+
+        expect(user.projects).to include(project)
+      end
+
+      it 'creates membership with member role' do
+        user = described_class.sync_from_claims(claims_project)
+
+        membership = user.project_memberships.find_by(project: project)
+        expect(membership.role).to eq('member')
+      end
+
+      it 'does not create duplicate memberships' do
+        user = described_class.sync_from_claims(claims_project)
+
+        expect {
+          described_class.sync_from_claims(claims_project)
+        }.not_to change(ProjectMembership, :count)
+      end
+
+      it 'handles no matching domain gracefully' do
+        claims_no_match = claims_project.merge('email' => 'user@otherdomain.com')
+
+        user = described_class.sync_from_claims(claims_no_match)
+        expect(user.project_memberships).to be_empty
+      end
+
+      it 'does not assign user to a project in an org they do not belong to' do
+        other_org_project = create(:project)
+        create(:project_setting, project: other_org_project, key: 'allowed_email_domain', value: 'projectdomain.com')
+
+        user = described_class.sync_from_claims(claims_project)
+
+        expect(user.projects).not_to include(other_org_project)
       end
     end
 

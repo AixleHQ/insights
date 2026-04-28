@@ -16,35 +16,101 @@ COPY packages/web/ .
 
 RUN npm run build
 
+# CI stage: full Node environment with dev dependencies for tests and linters
+FROM base AS ci
+ENV NODE_ENV="test"
+COPY packages/web/package.json packages/web/package-lock.json ./
+RUN npm ci --include=dev
+COPY packages/web/ .
+CMD ["npm", "run", "test:run"]
+
 # Production stage
 FROM nginx:alpine AS production
 
 COPY --from=build /app/dist /usr/share/nginx/html
 
-COPY <<EOF /etc/nginx/conf.d/default.conf
+COPY <<'EOF' /etc/nginx/templates/default.conf.template
 server {
     listen 80;
     server_name localhost;
     root /usr/share/nginx/html;
     index index.html;
 
+    resolver 169.254.169.253 valid=10s ipv6=off;
+
+    set $forwarded_proto $http_x_forwarded_proto;
+    if ($forwarded_proto = '') {
+        set $forwarded_proto $scheme;
+    }
+
     location / {
-        try_files \$uri \$uri/ /index.html;
+        try_files $uri $uri/ /index.html;
     }
 
     location /api {
-        proxy_pass http://api:3000;
+        set $api_backend "http://${API_UPSTREAM}";
+        proxy_pass $api_backend;
         proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
-        proxy_set_header Host \$host;
-        proxy_cache_bypass \$http_upgrade;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $forwarded_proto;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    location /admin {
+        set $api_backend "http://${API_UPSTREAM}";
+        proxy_pass $api_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $forwarded_proto;
+    }
+
+    location /cable {
+        set $api_backend "http://${API_UPSTREAM}";
+        proxy_pass $api_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $forwarded_proto;
+    }
+
+    location /up {
+        return 200 'ok';
+        add_header Content-Type text/plain;
     }
 
     gzip on;
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
 }
 EOF
+
+ENV API_UPSTREAM="api:3000"
+ENV KEYCLOAK_URL=""
+ENV KEYCLOAK_REALM="db90"
+ENV KEYCLOAK_CLIENT_ID="db90-web"
+ENV ROLLBAR_CLIENT_TOKEN=""
+
+COPY <<'ENTRYPOINT' /docker-entrypoint.d/90-runtime-config.sh
+#!/bin/sh
+cat > /usr/share/nginx/html/config.js << EOF
+window.__APP_CONFIG__ = {
+  keycloakUrl: "${KEYCLOAK_URL}",
+  keycloakRealm: "${KEYCLOAK_REALM}",
+  keycloakClientId: "${KEYCLOAK_CLIENT_ID}",
+  rollbarClientToken: "${ROLLBAR_CLIENT_TOKEN}"
+};
+EOF
+ENTRYPOINT
+
+RUN chmod +x /docker-entrypoint.d/90-runtime-config.sh
 
 EXPOSE 80
 

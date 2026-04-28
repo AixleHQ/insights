@@ -5,7 +5,7 @@
 
 if Rails.env.test?
   class TestJwtAuthMiddleware
-    EXCLUDED_PATHS = ['/admin'].freeze
+    EXCLUDED_PATHS = [ "/admin" ].freeze
 
     def initialize(app)
       @app = app
@@ -13,25 +13,45 @@ if Rails.env.test?
 
     def call(env)
       # Skip for admin paths
-      request_path = env['PATH_INFO']
+      request_path = env["PATH_INFO"]
       if EXCLUDED_PATHS.any? { |path| request_path&.start_with?(path) }
         return @app.call(env)
       end
 
-      auth_header = env['HTTP_AUTHORIZATION']
+      auth_header = env["HTTP_AUTHORIZATION"]
 
-      if auth_header&.start_with?('Bearer test-token-for-')
-        user_id = auth_header.sub('Bearer test-token-for-', '')
+      if auth_header&.start_with?("Bearer test-impersonation-")
+        # Format: test-impersonation-<user_id>-by-<impersonator_id>
+        match = auth_header.match(/Bearer test-impersonation-(.+)-by-([a-f0-9-]+)\z/)
+        if match
+          user = User.find_by(id: match[1])
+          impersonator = User.find_by(id: match[2])
+
+          if user && impersonator
+            env["jwt.claims"] = {
+              "sub" => user.keycloak_sub,
+              "email" => user.email,
+              "name" => user.name,
+              "iat" => Time.current.to_i,
+              "exp" => 1.hour.from_now.to_i
+            }
+            env["jwt.impersonation"] = true
+            env["jwt.impersonator_id"] = impersonator.id
+            env["jwt.impersonator_email"] = impersonator.email
+          end
+        end
+      elsif auth_header&.start_with?("Bearer test-token-for-")
+        user_id = auth_header.sub("Bearer test-token-for-", "")
         user = User.find_by(id: user_id)
 
         if user
-          env['jwt.claims'] = {
-            'sub' => user.keycloak_sub,
-            'email' => user.email,
-            'name' => user.name,
-            'preferred_username' => user.email.split('@').first,
-            'iat' => Time.current.to_i,
-            'exp' => 1.hour.from_now.to_i
+          env["jwt.claims"] = {
+            "sub" => user.keycloak_sub,
+            "email" => user.email,
+            "name" => user.name,
+            "preferred_username" => user.email.split("@").first,
+            "iat" => Time.current.to_i,
+            "exp" => 1.hour.from_now.to_i
           }
         end
       end

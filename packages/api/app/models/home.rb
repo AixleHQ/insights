@@ -4,14 +4,14 @@
 # This represents the admin home/dashboard page, not an actual database model
 class Home
   def self.model_name
-    ActiveModel::Name.new(self, nil, 'Home')
+    ActiveModel::Name.new(self, nil, "Home")
   end
 
   def self.table_name
-    'homes'
+    "homes"
   end
 
   def self.primary_key
-    'id'
+    "id"
   end
 end

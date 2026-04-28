@@ -19,7 +19,7 @@ RSpec.describe InvitationMailer, type: :mailer do
 
     it 'renders the headers' do
       expect(mail.subject).to eq("You've been invited to join Test Organization on DB90")
-      expect(mail.to).to eq(['invitee@example.com'])
+      expect(mail.to).to eq([ 'invitee@example.com' ])
     end
 
     it 'includes organization name in body' do

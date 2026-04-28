@@ -1,6 +1,7 @@
-import { useMemo, useState, useCallback } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import React, { useMemo, useState, useCallback } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import {
+  AlertCircle,
   ArrowLeft,
   Activity,
   DollarSign,
@@ -10,43 +11,53 @@ import {
   MoreHorizontal,
   RefreshCw,
   Trash2,
-} from 'lucide-react';
-import { useOrg } from '@/contexts/OrgContext';
+} from "lucide-react";
+import { useOrg } from "@/contexts/OrgContext";
 import {
   useProject,
   useEvents,
   useDeleteProject,
   useProjectDailyByTool,
-  useProjectMembers,
   useProjectRepositories,
-} from '@/hooks/useApi';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+  useDisconnectRepo,
+  useProjectMembers,
+  type ProjectMember,
+} from "@/hooks/useApi";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
+} from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { EventsTable, EventDrawer, type EventRow } from '@/components/events';
-import { ToolUsageByDayChart } from '@/components/dashboard';
-import { ProjectTeamSection, ProjectReposSection } from '@/components/project';
-import { formatDistanceToNow } from '@/lib/utils';
+} from "@/components/ui/dropdown-menu";
+import { EventsTable, EventDrawer, FilterChip, type EventRow } from "@/components/events";
+import { ToolUsageByDayChart } from "@/components/dashboard";
+import { ProjectReposSection, ProjectNotFound, ConnectRepoSheet, ProjectIssuesTab } from "@/components/project";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { formatDistanceToNow, toEventRow, getMemberDisplayName } from "@/lib/utils";
 
 function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
     minimumFractionDigits: 2,
   }).format(value);
 }
@@ -87,43 +98,41 @@ export function ProjectDetail() {
   const navigate = useNavigate();
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [connectRepoOpen, setConnectRepoOpen] = useState(false);
 
-  const { data: project, isLoading: isLoadingProject } = useProject(id || '');
-  const { data: eventsResponse, isLoading: isLoadingEvents } = useEvents(
-    currentOrg?.id || '',
-    { project_id: id, per_page: 10 }
+  const [selectedUserId, setSelectedUserId] = useState<string | undefined>(undefined);
+
+  const { data: project, isLoading: isLoadingProject } = useProject(id || "");
+  const { data: projectMembers } = useProjectMembers(id || "");
+  const { data: eventsResponse, isLoading: isLoadingEvents, isError: isEventsError } = useEvents(
+    currentOrg?.id || "",
+    { project_id: id, per_page: 10, user_id: selectedUserId }
   );
-  const { data: dailyByToolData, isLoading: isLoadingDailyByTool } = useProjectDailyByTool(id || '');
-  const { data: projectMembers, isLoading: isLoadingMembers } = useProjectMembers(id || '');
-  const { data: projectRepositories, isLoading: isLoadingRepositories } = useProjectRepositories(id || '');
+  const { data: dailyByToolData, isLoading: isLoadingDailyByTool } = useProjectDailyByTool(id || "");
+  const { data: projectRepositories, isLoading: isLoadingRepositories } = useProjectRepositories(id || "");
+  const disconnectRepo = useDisconnectRepo(id || "");
   const deleteProject = useDeleteProject();
 
-  // Transform events for the table
-  const events: EventRow[] = useMemo(() => {
-    return eventsResponse?.data?.map((e) => ({
-      id: e.id,
-      tool_name: e.toolName,
-      event_type: e.eventType,
-      risk_level: e.riskLevel,
-      cost_usd: e.costUsd,
-      token_count: (e.inputTokens || 0) + (e.outputTokens || 0),
-      created_at: e.occurredAt || e.createdAt,
-      user: e.user ? { email: e.user.email } : undefined,
-      project: e.project ? { name: e.project.name } : undefined,
-    })) || [];
-  }, [eventsResponse]);
+  const events: EventRow[] = useMemo(
+    () => eventsResponse?.data?.map(toEventRow) ?? [],
+    [eventsResponse]
+  );
+
+  const selectedMember = selectedUserId
+    ? projectMembers?.find((m) => m.userId === selectedUserId)
+    : undefined;
 
   const handleEventClick = useCallback((eventId: string) => {
     setSelectedEventId(eventId);
     setDrawerOpen(true);
   }, []);
 
-  const handleNavigate = useCallback((direction: 'prev' | 'next') => {
+  const handleNavigate = useCallback((direction: "prev" | "next") => {
     if (!selectedEventId) return;
     const currentIndex = events.findIndex((e) => e.id === selectedEventId);
     if (currentIndex === -1) return;
 
-    const newIndex = direction === 'prev' ? currentIndex - 1 : currentIndex + 1;
+    const newIndex = direction === "prev" ? currentIndex - 1 : currentIndex + 1;
     if (newIndex >= 0 && newIndex < events.length) {
       setSelectedEventId(events[newIndex].id);
     }
@@ -135,12 +144,12 @@ export function ProjectDetail() {
 
   const handleDelete = async () => {
     if (!id) return;
-    if (window.confirm('Are you sure you want to delete this project?')) {
+    if (window.confirm("Are you sure you want to delete this project?")) {
       try {
         await deleteProject.mutateAsync(id);
-        navigate('/projects');
+        navigate("/projects");
       } catch (error) {
-        console.error('Failed to delete project:', error);
+        console.error("Failed to delete project:", error);
       }
     }
   };
@@ -166,17 +175,7 @@ export function ProjectDetail() {
   }
 
   if (!project) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <p className="text-muted-foreground">Project not found</p>
-        <Button asChild variant="link" className="mt-2">
-          <Link to="/projects">
-            <ArrowLeft className="mr-2 size-4" />
-            Back to projects
-          </Link>
-        </Button>
-      </div>
-    );
+    return <ProjectNotFound />;
   }
 
   return (
@@ -191,8 +190,8 @@ export function ProjectDetail() {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-xl font-semibold">{project.name}</h1>
-              <Badge variant={(project.is_active ?? project.isActive) ? 'default' : 'secondary'}>
-                {(project.is_active ?? project.isActive) ? 'Active' : 'Inactive'}
+              <Badge variant={(project.is_active ?? project.isActive) ? "default" : "secondary"}>
+                {(project.is_active ?? project.isActive) ? "Active" : "Inactive"}
               </Badge>
             </div>
             <p className="text-sm text-muted-foreground">{project.description}</p>
@@ -200,14 +199,14 @@ export function ProjectDetail() {
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon">
+            <Button variant="outline" size="icon" aria-label="Project actions">
               <MoreHorizontal className="size-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => navigate(`/projects/${id}/edit`)}>
+            <DropdownMenuItem onClick={() => navigate(`/projects/${id}/settings`)}>
               <Settings className="mr-2 size-4" />
-              Edit project
+              Settings
             </DropdownMenuItem>
             <DropdownMenuItem>
               <RefreshCw className="mr-2 size-4" />
@@ -222,73 +221,68 @@ export function ProjectDetail() {
         </DropdownMenu>
       </div>
 
-      {/* Tool Usage Chart */}
-      {dailyByToolData && dailyByToolData.data && dailyByToolData.data.length > 0 && (
-        <ToolUsageByDayChart
-          data={dailyByToolData.data}
-          tools={dailyByToolData.tools}
-          isLoading={isLoadingDailyByTool}
-        />
-      )}
-
-      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
-        <StatCard
-          icon={Activity}
-          label="Total Events"
-          value={(project.event_count ?? project.eventCount ?? 0).toLocaleString()}
-        />
-        <StatCard
-          icon={DollarSign}
-          label="Total Cost"
-          value={formatCurrency(project.total_cost_usd ?? project.totalCostUsd ?? 0)}
-        />
-        <StatCard
-          icon={Calendar}
-          label="Created"
-          value={new Date(project.createdAt || project.created_at).toLocaleDateString()}
-        />
-        <StatCard
-          icon={GitBranch}
-          label="Last Activity"
-          value={project.last_event_at || project.lastEventAt ? formatDistanceToNow(project.last_event_at || project.lastEventAt!) : 'Never'}
-        />
-      </div>
-
-      {/* Team and Repositories */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <ProjectTeamSection
-          members={projectMembers}
-          isLoading={isLoadingMembers}
-        />
-        <ProjectReposSection
-          repositories={projectRepositories}
-          isLoading={isLoadingRepositories}
-        />
-      </div>
-
-      {project.repository_url && (
-        <Card>
-          <CardContent className="flex items-center gap-3 p-4">
-            <GitBranch className="size-4 text-muted-foreground" />
-            <a
-              href={project.repository_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-primary hover:underline"
-            >
-              {project.repository_url}
-            </a>
-          </CardContent>
-        </Card>
-      )}
-
-      <Tabs defaultValue="activity">
+      <Tabs defaultValue="overview">
         <TabsList>
-          <TabsTrigger value="activity">Recent Activity</TabsTrigger>
-          <TabsTrigger value="integrations">Integrations</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="issues">Issues</TabsTrigger>
         </TabsList>
-        <TabsContent value="activity" className="mt-4">
+
+        <TabsContent value="overview" className="space-y-6 mt-4">
+          {/* Tool Usage Chart */}
+          {dailyByToolData && dailyByToolData.data && dailyByToolData.data.length > 0 && (
+            <ToolUsageByDayChart
+              data={dailyByToolData.data}
+              tools={dailyByToolData.tools}
+              isLoading={isLoadingDailyByTool}
+            />
+          )}
+
+          <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+            <StatCard
+              icon={Activity}
+              label="Total Events"
+              value={(project.event_count ?? project.eventCount ?? 0).toLocaleString()}
+            />
+            <StatCard
+              icon={DollarSign}
+              label="Total Cost"
+              value={formatCurrency(project.total_cost_usd ?? project.totalCostUsd ?? 0)}
+            />
+            <StatCard
+              icon={Calendar}
+              label="Created"
+              value={new Date(project.createdAt || project.created_at).toLocaleDateString()}
+            />
+            <StatCard
+              icon={GitBranch}
+              label="Last Activity"
+              value={project.last_event_at || project.lastEventAt ? formatDistanceToNow(project.last_event_at || project.lastEventAt!) : "Never"}
+            />
+          </div>
+
+          <ProjectReposSection
+            repositories={projectRepositories}
+            isLoading={isLoadingRepositories}
+            onConnectRepo={() => setConnectRepoOpen(true)}
+            onDisconnect={(repoId) => disconnectRepo.mutateAsync(repoId)}
+          />
+
+          {project.repositoryUrl && (
+            <Card>
+              <CardContent className="flex items-center gap-3 p-4">
+                <GitBranch className="size-4 text-muted-foreground" />
+                <a
+                  href={project.repositoryUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-primary hover:underline"
+                >
+                  {project.repositoryUrl}
+                </a>
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Recent Events</CardTitle>
@@ -296,79 +290,71 @@ export function ProjectDetail() {
                 Latest AI tool activity for this project
               </CardDescription>
             </CardHeader>
+            {projectMembers && projectMembers.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 px-6 pb-3">
+                <Select
+                  value={selectedUserId ?? "__all__"}
+                  onValueChange={(val) => setSelectedUserId(val === "__all__" ? undefined : val)}
+                >
+                  <SelectTrigger className="h-8 w-[180px] text-sm">
+                    <SelectValue placeholder="All members" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All members</SelectItem>
+                    {projectMembers.map((member: ProjectMember) => (
+                      <SelectItem key={member.userId} value={member.userId}>
+                        {getMemberDisplayName(member)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedUserId && selectedMember && (
+                  <FilterChip
+                    label="Member"
+                    value={getMemberDisplayName(selectedMember)}
+                    onRemove={() => setSelectedUserId(undefined)}
+                  />
+                )}
+              </div>
+            )}
             <CardContent className="p-0">
-              <EventsTable
-                events={events}
-                isLoading={isLoadingEvents}
-                onEventClick={handleEventClick}
-                selectedEventId={selectedEventId}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="integrations" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Connected Services</CardTitle>
-              <CardDescription>
-                Integrations linked to this project
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {project.connectors && project.connectors.length > 0 ? (
-                <div className="space-y-2">
-                  {project.connectors.map((connector) => (
-                    <div
-                      key={connector.id}
-                      className="flex items-center justify-between rounded-lg border p-3"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="flex size-8 items-center justify-center rounded bg-muted text-sm font-medium capitalize">
-                          {connector.provider[0]}
-                        </div>
-                        <span className="font-medium capitalize">
-                          {connector.provider}
-                        </span>
-                      </div>
-                      <Badge variant="outline" className="text-success">
-                        Connected
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
+              {isEventsError ? (
+                <Alert variant="destructive" className="m-4">
+                  <AlertCircle className="size-4" />
+                  <AlertDescription>Failed to load events. Please try again.</AlertDescription>
+                </Alert>
               ) : (
-                <p className="text-sm text-muted-foreground">
-                  No connectors linked to this project
-                </p>
+                <EventsTable
+                  events={events}
+                  isLoading={isLoadingEvents}
+                  onEventClick={handleEventClick}
+                  selectedEventId={selectedEventId}
+                />
               )}
             </CardContent>
           </Card>
+
+          <EventDrawer
+            eventId={selectedEventId}
+            open={drawerOpen}
+            onOpenChange={setDrawerOpen}
+            onNavigate={handleNavigate}
+            hasPrev={selectedEventIndex > 0}
+            hasNext={selectedEventIndex < events.length - 1}
+          />
+
+          <ConnectRepoSheet
+            projectId={id || ""}
+            open={connectRepoOpen}
+            onOpenChange={setConnectRepoOpen}
+            onSuccess={() => setConnectRepoOpen(false)}
+          />
         </TabsContent>
-        <TabsContent value="settings" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Project Settings</CardTitle>
-              <CardDescription>
-                Configure project-specific options
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Project settings coming soon...
-              </p>
-            </CardContent>
-          </Card>
+
+        <TabsContent value="issues" className="mt-4">
+          <ProjectIssuesTab projectId={id || ""} project={project} />
         </TabsContent>
       </Tabs>
-
-      <EventDrawer
-        eventId={selectedEventId}
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-        onNavigate={handleNavigate}
-        hasPrev={selectedEventIndex > 0}
-        hasNext={selectedEventIndex < events.length - 1}
-      />
     </div>
   );
 }

@@ -15,21 +15,16 @@ test:
   <<: *default
   database: db90_test
 
+staging:
+  <<: *default
+  database: <%= ENV.fetch("DATABASE_NAME") { "db90_staging" } %>
+  username: <%= ENV.fetch("DATABASE_USERNAME") { "db90" } %>
+  password: <%= ENV["DATABASE_PASSWORD"] %>
+  sslmode: <%= ENV.fetch("DATABASE_SSLMODE") { "require" } %>
+
 production:
-  primary: &primary_production
-    <<: *default
-    database: db90_production
-    username: <%= ENV.fetch("DATABASE_USERNAME") { "db90" } %>
-    password: <%= ENV["DATABASE_PASSWORD"] %>
-  cache:
-    <<: *primary_production
-    database: db90_production_cache
-    migrations_paths: db/cache_migrate
-  queue:
-    <<: *primary_production
-    database: db90_production_queue
-    migrations_paths: db/queue_migrate
-  cable:
-    <<: *primary_production
-    database: db90_production_cable
-    migrations_paths: db/cable_migrate
+  <<: *default
+  database: <%= ENV.fetch("DATABASE_NAME") { "db90_production" } %>
+  username: <%= ENV.fetch("DATABASE_USERNAME") { "db90" } %>
+  password: <%= ENV["DATABASE_PASSWORD"] %>
+  sslmode: <%= ENV.fetch("DATABASE_SSLMODE") { "require" } %>

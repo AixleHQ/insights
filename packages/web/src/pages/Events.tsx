@@ -1,21 +1,20 @@
-import { useState, useMemo, useCallback } from 'react';
-import { Download, RefreshCw } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
-import { useOrg } from '@/contexts/OrgContext';
-import { useEvents, queryKeys } from '@/hooks/useApi';
-import { Button } from '@/components/ui/button';
+import { useState, useMemo, useCallback } from "react";
+import { Download, RefreshCw } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useOrg } from "@/contexts/OrgContext";
+import { useEvents, queryKeys } from "@/hooks/useApi";
+import { Button } from "@/components/ui/button";
 import {
   EventFilters,
   EventsTable,
   EventDrawer,
   type EventFiltersState,
   type EventRow,
-} from '@/components/events';
+} from "@/components/events";
+import { EVENTS_TOOL_FILTER_OPTIONS } from "@/lib/eventsToolFilters";
 
-const availableTools = ['GitHub Copilot', 'Claude Code', 'Cursor', 'Aider', 'Codeium'];
-
-type SortField = 'created_at' | 'tool_name' | 'risk_level' | 'cost_usd';
-type SortDirection = 'asc' | 'desc';
+type SortField = "created_at" | "tool_name" | "risk_level" | "cost_usd";
+type SortDirection = "asc" | "desc";
 
 const riskLevelOrder = {
   critical: 4,
@@ -29,8 +28,8 @@ export function Events() {
   const { currentOrg } = useOrg();
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<EventFiltersState>({});
-  const [sortField, setSortField] = useState<SortField>('created_at');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [sortField, setSortField] = useState<SortField>("created_at");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [page, setPage] = useState(1);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -47,7 +46,7 @@ export function Events() {
   }), [page, filters]);
 
   const { data: eventsResponse, isLoading, isFetching } = useEvents(
-    currentOrg?.id || '',
+    currentOrg?.id || "",
     apiParams
   );
 
@@ -57,6 +56,7 @@ export function Events() {
       id: e.id,
       tool_name: e.toolName,
       event_type: e.eventType,
+      attribution: e.attribution,
       risk_level: e.riskLevel,
       cost_usd: e.costUsd,
       token_count: (e.inputTokens || 0) + (e.outputTokens || 0),
@@ -68,10 +68,10 @@ export function Events() {
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
-      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
     } else {
       setSortField(field);
-      setSortDirection('desc');
+      setSortDirection("desc");
     }
   };
 
@@ -84,9 +84,9 @@ export function Events() {
       const search = filters.search.toLowerCase();
       result = result.filter(
         (e) =>
-          (e.tool_name || '').toLowerCase().includes(search) ||
-          (e.user?.email || '').toLowerCase().includes(search) ||
-          (e.project?.name || '').toLowerCase().includes(search)
+          (e.tool_name || "").toLowerCase().includes(search) ||
+          (e.user?.email || "").toLowerCase().includes(search) ||
+          (e.project?.name || "").toLowerCase().includes(search)
       );
     }
 
@@ -94,20 +94,20 @@ export function Events() {
     result.sort((a, b) => {
       let comparison = 0;
       switch (sortField) {
-        case 'created_at':
+        case "created_at":
           comparison = new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
           break;
-        case 'tool_name':
-          comparison = (a.tool_name || '').localeCompare(b.tool_name || '');
+        case "tool_name":
+          comparison = (a.tool_name || "").localeCompare(b.tool_name || "");
           break;
-        case 'risk_level':
+        case "risk_level":
           comparison = (riskLevelOrder[a.risk_level as keyof typeof riskLevelOrder] || 0) - (riskLevelOrder[b.risk_level as keyof typeof riskLevelOrder] || 0);
           break;
-        case 'cost_usd':
+        case "cost_usd":
           comparison = (a.cost_usd || 0) - (b.cost_usd || 0);
           break;
       }
-      return sortDirection === 'asc' ? comparison : -comparison;
+      return sortDirection === "asc" ? comparison : -comparison;
     });
 
     return result;
@@ -115,31 +115,31 @@ export function Events() {
 
   const handleExport = () => {
     // Convert to CSV
-    const headers = ['ID', 'Tool', 'Event Type', 'Risk Level', 'Cost (USD)', 'Tokens', 'User', 'Project', 'Created At'];
+    const headers = ["ID", "Tool", "Event Type", "Risk Level", "Cost (USD)", "Tokens", "User", "Project", "Created At"];
     const rows = filteredAndSortedEvents.map((e) => [
       e.id,
       e.tool_name,
       e.event_type,
       e.risk_level,
-      e.cost_usd != null ? Number(e.cost_usd).toFixed(4) : '0',
-      e.token_count || '0',
-      e.user?.email || '',
-      e.project?.name || '',
+      e.cost_usd != null ? Number(e.cost_usd).toFixed(4) : "0",
+      e.token_count || "0",
+      e.user?.email || "",
+      e.project?.name || "",
       e.created_at,
     ]);
 
-    const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = `events-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `events-${new Date().toISOString().split("T")[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   const handleRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.events.all(currentOrg?.id || '', apiParams) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.events.all(currentOrg?.id || "", apiParams) });
   };
 
   const handleEventClick = useCallback((eventId: string) => {
@@ -147,12 +147,12 @@ export function Events() {
     setDrawerOpen(true);
   }, []);
 
-  const handleNavigate = useCallback((direction: 'prev' | 'next') => {
+  const handleNavigate = useCallback((direction: "prev" | "next") => {
     if (!selectedEventId) return;
     const currentIndex = filteredAndSortedEvents.findIndex((e) => e.id === selectedEventId);
     if (currentIndex === -1) return;
 
-    const newIndex = direction === 'prev' ? currentIndex - 1 : currentIndex + 1;
+    const newIndex = direction === "prev" ? currentIndex - 1 : currentIndex + 1;
     if (newIndex >= 0 && newIndex < filteredAndSortedEvents.length) {
       setSelectedEventId(filteredAndSortedEvents[newIndex].id);
     }
@@ -176,7 +176,7 @@ export function Events() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isFetching}>
-            <RefreshCw className={`mr-2 size-4 ${isFetching ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`mr-2 size-4 ${isFetching ? "animate-spin" : ""}`} />
             <span className="hidden sm:inline">Refresh</span>
           </Button>
           <Button variant="outline" size="sm" onClick={handleExport}>
@@ -192,7 +192,7 @@ export function Events() {
           setFilters(newFilters);
           setPage(1); // Reset to first page on filter change
         }}
-        tools={availableTools}
+        tools={EVENTS_TOOL_FILTER_OPTIONS}
       />
 
       <EventsTable

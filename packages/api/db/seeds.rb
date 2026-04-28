@@ -40,15 +40,28 @@ KNOWN_DEV_USERS = [
   {
     email: 'ada.lovelace@example.com',
     name: 'Ada Lovelace',
-    keycloak_sub: 'ada.lovelace@example.com', # Keycloak uses email as sub
+    keycloak_sub: 'ada.lovelace@example.com',
     global_admin: true,
     org_role: 'owner'
+  },
+  {
+    email: 'alan.turing@example.com',
+    name: 'Alan Turing',
+    keycloak_sub: 'alan.turing@example.com',
+    global_admin: true,
+    org_role: 'admin'
+  },
+  {
+    email: 'grace.hopper@example.com',
+    name: 'Grace Hopper',
+    keycloak_sub: 'grace.hopper@example.com',
+    global_admin: true,
+    org_role: 'admin'
   }
-  # Add more known dev users here as needed
 ].freeze
 
 # Only seed sample data in development
-if Rails.env.development?
+if Rails.env.development? || Rails.env.staging?
   puts "Seeding development data with realistic usage simulation..."
   puts "This simulates 100 engineers over 45 days"
 
@@ -78,7 +91,7 @@ if Rails.env.development?
   ]
 
   # Tool configurations with realistic usage patterns
-  # Valid tool_names: claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter, anthropic_api, openai_api, gemini_api, custom
+  # Valid tool_names: claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom
   # Valid event_types: chat, completion, edit, commit, review, test, debug, refactor, documentation, other
   TOOL_CONFIGS = {
     'github_copilot' => {
@@ -204,10 +217,10 @@ if Rails.env.development?
 
     # Assign role based on position
     role = case i
-           when 0 then 'owner'
-           when 1..4 then 'admin'
-           else 'member'
-           end
+    when 0 then 'owner'
+    when 1..4 then 'admin'
+    else 'member'
+    end
 
     OrganizationMembership.find_or_create_by!(user: user, organization: org) do |m|
       m.role = role

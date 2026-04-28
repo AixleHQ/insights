@@ -3,7 +3,7 @@
 module Api
   module V1
     class ProjectsController < BaseController
-      before_action :set_project, only: %i[show update destroy settings update_setting destroy_setting stats daily_by_tool members]
+      before_action :set_project, only: %i[show update destroy settings update_setting destroy_setting stats daily_by_tool commits_by_user members retention_policy update_retention_policy link_jira sync_issues]
 
       # GET /api/v1/projects
       # GET /api/v1/organizations/:organization_id/projects
@@ -14,11 +14,11 @@ module Api
         if params[:organization_id].present?
           require_organization!
           projects = projects.where(organization_id: current_organization.id)
-        elsif params[:personal] == 'true'
+        elsif params[:personal] == "true"
           projects = projects.where(owner_id: current_user.id)
         end
 
-        projects = projects.active if params[:active] == 'true'
+        projects = projects.active if params[:active] == "true"
         projects = projects.order(:name)
 
         render_collection(projects, ProjectSerializer)
@@ -49,14 +49,14 @@ module Api
           @project.save!
           # Add creator as project owner (for org projects)
           if @project.organization_project?
-            @project.project_memberships.create!(user: current_user, role: 'owner')
+            @project.project_memberships.create!(user: current_user, role: "owner")
           end
         end
 
         render_created(@project, ProjectSerializer)
       rescue ActiveRecord::RecordInvalid => e
         render json: {
-          error: 'Unprocessable Entity',
+          error: "Unprocessable Entity",
           errors: format_validation_errors(e.record.errors)
         }, status: :unprocessable_entity
       end
@@ -69,7 +69,7 @@ module Api
           render_resource(@project, ProjectSerializer)
         else
           render json: {
-            error: 'Unprocessable Entity',
+            error: "Unprocessable Entity",
             errors: format_validation_errors(@project.errors)
           }, status: :unprocessable_entity
         end
@@ -96,13 +96,23 @@ module Api
         authorize! @project, to: :settings?
 
         setting = @project.project_settings.find_or_initialize_by(key: params[:key])
+        action = setting.new_record? ? "settings.create" : "settings.update"
+        old_value = setting.value
         setting.value = params[:value]
 
         if setting.save
+          ProjectAuditLog.log(
+            project: @project,
+            actor: current_user,
+            action: action,
+            resource: setting,
+            tracked_changes: { key: params[:key], before: old_value, after: setting.value },
+            request: request
+          )
           render_resource(setting, ProjectSettingSerializer)
         else
           render json: {
-            error: 'Unprocessable Entity',
+            error: "Unprocessable Entity",
             errors: format_validation_errors(setting.errors)
           }, status: :unprocessable_entity
         end
@@ -114,6 +124,16 @@ module Api
 
         setting = @project.project_settings.find_by!(key: params[:key])
         setting.destroy!
+
+        ProjectAuditLog.log(
+          project: @project,
+          actor: current_user,
+          action: "settings.delete",
+          resource: setting,
+          tracked_changes: { key: params[:key], before: setting.value },
+          request: request
+        )
+
         render_no_content
       end
 
@@ -131,10 +151,10 @@ module Api
           .group("DATE_TRUNC('day', occurred_at)")
           .select(
             "DATE_TRUNC('day', occurred_at) as day",
-            'COUNT(*) as event_count',
-            'SUM(cost_usd) as cost_usd'
+            "COUNT(*) as event_count",
+            "SUM(cost_usd) as cost_usd"
           )
-          .order('day')
+          .order("day")
           .map do |row|
             {
               date: row.day&.to_date&.iso8601,
@@ -163,7 +183,7 @@ module Api
         # Get top tools by total event count
         top_tools = events
           .group(:tool_name)
-          .order(Arel.sql('COUNT(*) DESC'))
+          .order(Arel.sql("COUNT(*) DESC"))
           .limit(3)
           .pluck(:tool_name)
 
@@ -172,10 +192,10 @@ module Api
           .group("DATE_TRUNC('day', occurred_at)", :tool_name)
           .select(
             "DATE_TRUNC('day', occurred_at) as day",
-            'tool_name',
-            'COUNT(*) as event_count'
+            "tool_name",
+            "COUNT(*) as event_count"
           )
-          .order('day')
+          .order("day")
 
         # Transform into chart-friendly format
         date_map = {}
@@ -184,15 +204,48 @@ module Api
           next unless date
 
           date_map[date] ||= { date: date }
-          tool_key = top_tools.include?(row.tool_name) ? row.tool_name : 'Other'
+          tool_key = top_tools.include?(row.tool_name) ? row.tool_name : "Other"
           date_map[date][tool_key] ||= 0
           date_map[date][tool_key] += row.event_count
         end
 
         render json: {
           data: date_map.values.sort_by { |d| d[:date] },
-          tools: top_tools + ['Other']
+          tools: top_tools + [ "Other" ]
         }
+      end
+
+      # GET /api/v1/projects/:id/stats/commits_by_user
+      def commits_by_user
+        authorize! @project, to: :show?
+
+        days = (params[:days] || 30).to_i
+        since = days.days.ago.beginning_of_day
+
+        rows = @project.tool_events
+          .where(event_type: "commit")
+          .where(occurred_at: since..)
+          .where.not(user_id: nil)
+          .group(:user_id)
+          .select("user_id, COUNT(*) as commit_count, MAX(occurred_at) as last_commit_at")
+
+        user_ids = rows.map(&:user_id)
+        users_by_id = User.where(id: user_ids).index_by(&:id)
+
+        data = rows.map do |row|
+          user = users_by_id[row.user_id]
+          {
+            userId: row.user_id,
+            name: user&.name,
+            email: user&.email,
+            avatarUrl: user&.avatar_url,
+            commitCount: row.commit_count,
+            lastCommitAt: row.last_commit_at&.iso8601
+          }
+        end.sort_by { |d| -d[:commitCount] }
+
+        paged = paginate(Kaminari.paginate_array(data))
+        render json: { data: paged, meta: pagination_meta(paged) }
       end
 
       # GET /api/v1/projects/:id/members
@@ -200,6 +253,7 @@ module Api
         authorize! @project, to: :show?
 
         project_members = @project.project_memberships.includes(:user)
+        project_members = project_members.where(role: params[:role]) if params[:role].present?
 
         members_data = project_members.map do |pm|
           user = pm.user
@@ -217,18 +271,99 @@ module Api
         render json: { data: members_data }
       end
 
+      # POST /api/v1/projects/:id/link_jira
+      def link_jira
+        authorize! @project, to: :link_jira?
+
+        connector_id     = params.require(:connector_id)
+        jira_project_key = params.require(:jira_project_key)
+
+        unless jira_project_key.match?(/\A[A-Z][A-Z0-9_]{1,9}\z/)
+          return render json: { error: "Invalid Jira project key format" }, status: :unprocessable_entity
+        end
+
+        # Verify connector belongs to the same org as the project (prevents cross-org injection)
+        connector = @project.organization.organization_connectors.find(connector_id)
+
+        ApplicationRecord.transaction do
+          @project.project_settings.find_or_initialize_by(key: "jira_connector_id").update!(value: connector.id.to_s)
+          @project.project_settings.find_or_initialize_by(key: "jira_project_key").update!(value: jira_project_key)
+        end
+
+        render json: { data: { linked: true } }
+      end
+
+      # POST /api/v1/projects/:id/sync_issues
+      # Runs the Jira issue sync synchronously so the response returns only
+      # after issues are updated in the DB — no polling needed on the client.
+      def sync_issues
+        authorize! @project, to: :link_jira?
+
+        connector_id = @project.project_settings.find_by(key: "jira_connector_id")&.value
+        return render json: { error: "No Jira project linked" }, status: :unprocessable_entity if connector_id.blank?
+
+        connector = @project.organization.organization_connectors.find(connector_id)
+        JiraSyncJob.perform_now(connector.id, "sync", project_id: @project.id)
+
+        render json: { data: { synced_at: Time.current } }
+      rescue ActiveRecord::RecordNotFound
+        render json: { error: "Connector not found" }, status: :not_found
+      rescue StandardError => e
+        render json: { error: e.message }, status: :unprocessable_entity
+      end
+
+      # GET /api/v1/projects/:id/retention_policy
+      def retention_policy
+        authorize! @project, to: :retention_policy?
+        policy = @project.retention_policy || @project.create_retention_policy!
+        render_resource(policy, ProjectRetentionPolicySerializer)
+      end
+
+      # PATCH /api/v1/projects/:id/retention_policy
+      def update_retention_policy
+        authorize! @project, to: :retention_policy?
+
+        return render_resource(@project.retention_policy || @project.create_retention_policy!, ProjectRetentionPolicySerializer) if retention_policy_params.empty?
+
+        policy = @project.retention_policy || @project.build_retention_policy
+        changes_before = policy.attributes.slice(*retention_policy_params.keys)
+
+        policy.updated_by = current_user
+        if policy.update(retention_policy_params)
+          ProjectAuditLog.log(
+            project: @project,
+            actor: current_user,
+            action: "settings.update",
+            resource: policy,
+            tracked_changes: { before: changes_before, after: policy.attributes.slice(*retention_policy_params.keys) },
+            request: request
+          )
+          render_resource(policy, ProjectRetentionPolicySerializer)
+        else
+          render json: {
+            error: "Unprocessable Entity",
+            errors: format_validation_errors(policy.errors)
+          }, status: :unprocessable_entity
+        end
+      end
+
       private
 
       def set_project
-        @project = Project.find(params[:id])
+        @project = Project.includes(:retention_policy, :project_settings).find(params[:id])
       end
 
       def project_params
-        params.permit(:name, :slug, :description, :is_active)
+        params.permit(:name, :slug, :description, :repository_url, :git_remote_url, :is_active)
       end
 
       def project_update_params
-        params.permit(:name, :slug, :description, :is_active)
+        params.permit(:name, :slug, :description, :repository_url, :git_remote_url, :is_active)
+      end
+
+      def retention_policy_params
+        params.permit(:raw_event_ttl, :tool_events_retention, :hourly_aggregate_retention,
+                      :daily_aggregate_retention, :retention_reason)
       end
     end
   end

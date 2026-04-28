@@ -28,7 +28,7 @@ module Api
         }, status: :accepted
       rescue StandardError => e
         Rails.logger.error "[Telemetry] Ingest failed: #{e.message}"
-        render json: { error: 'Processing failed', message: e.message }, status: :unprocessable_entity
+        render json: { error: "Processing failed", message: e.message }, status: :unprocessable_entity
       end
 
       # POST /api/v1/organizations/:organization_id/telemetry/batch
@@ -37,12 +37,12 @@ module Api
 
         events = params[:events] || []
         if events.empty?
-          return render json: { error: 'Bad Request', message: 'No events provided' }, status: :bad_request
+          return render json: { error: "Bad Request", message: "No events provided" }, status: :bad_request
         end
 
         if events.length > max_batch_size
           return render json: {
-            error: 'Bad Request',
+            error: "Bad Request",
             message: "Batch size exceeds maximum of #{max_batch_size}"
           }, status: :bad_request
         end
@@ -71,7 +71,7 @@ module Api
           :tool_name, :event_type, :model, :tokens_in, :tokens_out,
           :cost_usd, :duration_ms, :occurred_at, :project_id, :user_id,
           :prompt, :response, :system_prompt,
-          messages: [:role, :content],
+          messages: [ :role, :content ],
           metadata: {}
         ).to_h.symbolize_keys
       end
@@ -88,11 +88,11 @@ module Api
         workflow_id = "ingest-#{current_organization.id}-#{SecureRandom.uuid}"
 
         Temporal::Client.start_workflow(
-          'Workflows::IngestionSanitizationWorkflow',
+          "Workflows::IngestionSanitizationWorkflow",
           workflow_id: workflow_id,
           args: {
             raw_event_key: raw_key,
-            raw_event_bucket: ENV.fetch('MINIO_BUCKET', 'db90-raw-events'),
+            raw_event_bucket: ENV.fetch("MINIO_BUCKET", "db90-raw-events"),
             event: event_params.merge(
               organization_id: current_organization.id,
               occurred_at: event_params[:occurred_at] || Time.current.iso8601
@@ -129,7 +129,7 @@ module Api
           :tool_name, :event_type, :model, :tokens_in, :tokens_out,
           :cost_usd, :duration_ms, :occurred_at, :project_id, :user_id,
           :prompt, :response, :system_prompt,
-          messages: [:role, :content],
+          messages: [ :role, :content ],
           metadata: {}
         ).to_h.symbolize_keys
 
@@ -145,7 +145,7 @@ module Api
       end
 
       def max_batch_size
-        ENV.fetch('TELEMETRY_MAX_BATCH_SIZE', 100).to_i
+        ENV.fetch("TELEMETRY_MAX_BATCH_SIZE", 100).to_i
       end
     end
   end

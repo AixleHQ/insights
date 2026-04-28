@@ -1,22 +1,24 @@
-import { Search, X, Calendar, ChevronDown } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Search, X, Calendar, ChevronDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
+} from "@/components/ui/popover";
+import { cn, humanizeToolName } from "@/lib/utils";
+import type { EventsToolFilterOption } from "@/lib/eventsToolFilters";
 
 export interface EventFiltersState {
   search?: string;
+  /** Canonical API `tool_name` (e.g. `cursor`, `claude_code`). */
   tool?: string;
   riskLevel?: string;
   eventType?: string;
@@ -27,26 +29,26 @@ export interface EventFiltersState {
 interface EventFiltersProps {
   filters: EventFiltersState;
   onFiltersChange: (filters: EventFiltersState) => void;
-  tools: string[];
+  tools: readonly EventsToolFilterOption[];
   className?: string;
 }
 
 const riskLevels = [
-  { value: 'critical', label: 'Critical', color: 'bg-risk-critical' },
-  { value: 'high', label: 'High', color: 'bg-risk-high' },
-  { value: 'medium', label: 'Medium', color: 'bg-risk-medium' },
-  { value: 'low', label: 'Low', color: 'bg-risk-low' },
-  { value: 'none', label: 'None', color: 'bg-muted-foreground' },
+  { value: "critical", label: "Critical", color: "bg-risk-critical" },
+  { value: "high", label: "High", color: "bg-risk-high" },
+  { value: "medium", label: "Medium", color: "bg-risk-medium" },
+  { value: "low", label: "Low", color: "bg-risk-low" },
+  { value: "none", label: "None", color: "bg-muted-foreground" },
 ];
 
 const eventTypes = [
-  { value: 'prompt', label: 'Prompt' },
-  { value: 'completion', label: 'Completion' },
-  { value: 'function_call', label: 'Function Call' },
-  { value: 'file_operation', label: 'File Operation' },
+  { value: "prompt", label: "Prompt" },
+  { value: "completion", label: "Completion" },
+  { value: "function_call", label: "Function Call" },
+  { value: "file_operation", label: "File Operation" },
 ];
 
-function FilterChip({
+export function FilterChip({
   label,
   value,
   onRemove,
@@ -60,7 +62,7 @@ function FilterChip({
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/15">
       {colorDot && (
-        <span className={cn('size-2 rounded-full', colorDot)} />
+        <span className={cn("size-2 rounded-full", colorDot)} />
       )}
       <span className="text-muted-foreground">{label}:</span>
       <span>{value}</span>
@@ -89,15 +91,15 @@ function DateRangePicker({
 
   const formatDateDisplay = () => {
     if (dateFrom && dateTo) {
-      return `${new Date(dateFrom).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${new Date(dateTo).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+      return `${new Date(dateFrom).toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${new Date(dateTo).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
     }
     if (dateFrom) {
-      return `From ${new Date(dateFrom).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+      return `From ${new Date(dateFrom).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
     }
     if (dateTo) {
-      return `Until ${new Date(dateTo).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+      return `Until ${new Date(dateTo).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
     }
-    return 'Date range';
+    return "Date range";
   };
 
   return (
@@ -107,12 +109,12 @@ function DateRangePicker({
           variant="outline"
           size="sm"
           className={cn(
-            'h-8 gap-2 border-dashed font-normal',
-            hasDateFilter && 'border-solid border-primary/50 bg-primary/5'
+            "h-8 gap-2 border-dashed font-normal",
+            hasDateFilter && "border-solid border-primary/50 bg-primary/5"
           )}
         >
           <Calendar className="size-3.5 text-muted-foreground" />
-          <span className={hasDateFilter ? 'text-foreground' : 'text-muted-foreground'}>
+          <span className={hasDateFilter ? "text-foreground" : "text-muted-foreground"}>
             {formatDateDisplay()}
           </span>
           <ChevronDown className="size-3 text-muted-foreground" />
@@ -126,7 +128,7 @@ function DateRangePicker({
               <label className="text-xs text-muted-foreground">From</label>
               <Input
                 type="date"
-                value={dateFrom || ''}
+                value={dateFrom || ""}
                 onChange={(e) => onDateFromChange(e.target.value || undefined)}
                 className="h-8 text-sm"
               />
@@ -135,7 +137,7 @@ function DateRangePicker({
               <label className="text-xs text-muted-foreground">To</label>
               <Input
                 type="date"
-                value={dateTo || ''}
+                value={dateTo || ""}
                 onChange={(e) => onDateToChange(e.target.value || undefined)}
                 className="h-8 text-sm"
               />
@@ -169,7 +171,7 @@ export function EventFilters({
   const updateFilter = (key: keyof EventFiltersState, value: string | undefined) => {
     onFiltersChange({
       ...filters,
-      [key]: value === '' || value === 'all' ? undefined : value,
+      [key]: value === "" || value === "all" ? undefined : value,
     });
   };
 
@@ -181,40 +183,42 @@ export function EventFilters({
   const activeFilters: { key: keyof EventFiltersState; label: string; value: string; colorDot?: string }[] = [];
 
   if (filters.tool) {
-    activeFilters.push({ key: 'tool', label: 'Tool', value: filters.tool });
+    const toolLabel =
+      tools.find((t) => t.value === filters.tool)?.label ?? humanizeToolName(filters.tool);
+    activeFilters.push({ key: "tool", label: "Tool", value: toolLabel });
   }
   if (filters.riskLevel) {
     const risk = riskLevels.find(r => r.value === filters.riskLevel);
     activeFilters.push({
-      key: 'riskLevel',
-      label: 'Risk',
+      key: "riskLevel",
+      label: "Risk",
       value: risk?.label || filters.riskLevel,
       colorDot: risk?.color
     });
   }
   if (filters.eventType) {
     const type = eventTypes.find(t => t.value === filters.eventType);
-    activeFilters.push({ key: 'eventType', label: 'Type', value: type?.label || filters.eventType });
+    activeFilters.push({ key: "eventType", label: "Type", value: type?.label || filters.eventType });
   }
   if (filters.dateFrom) {
     activeFilters.push({
-      key: 'dateFrom',
-      label: 'From',
-      value: new Date(filters.dateFrom).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      key: "dateFrom",
+      label: "From",
+      value: new Date(filters.dateFrom).toLocaleDateString("en-US", { month: "short", day: "numeric" })
     });
   }
   if (filters.dateTo) {
     activeFilters.push({
-      key: 'dateTo',
-      label: 'To',
-      value: new Date(filters.dateTo).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      key: "dateTo",
+      label: "To",
+      value: new Date(filters.dateTo).toLocaleDateString("en-US", { month: "short", day: "numeric" })
     });
   }
 
   const hasActiveFilters = activeFilters.length > 0 || filters.search;
 
   return (
-    <div className={cn('space-y-3', className)}>
+    <div className={cn("space-y-3", className)}>
       {/* Main filter bar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
         {/* Search input */}
@@ -222,13 +226,13 @@ export function EventFilters({
           <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search events..."
-            value={filters.search || ''}
-            onChange={(e) => updateFilter('search', e.target.value)}
+            value={filters.search || ""}
+            onChange={(e) => updateFilter("search", e.target.value)}
             className="h-9 sm:h-8 pl-8 pr-8 text-sm"
           />
           {filters.search && (
             <button
-              onClick={() => updateFilter('search', undefined)}
+              onClick={() => updateFilter("search", undefined)}
               className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground hover:bg-muted"
             >
               <X className="size-3.5" />
@@ -242,20 +246,20 @@ export function EventFilters({
         <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-2">
           {/* Tool filter */}
           <Select
-            value={filters.tool || 'all'}
-            onValueChange={(value) => updateFilter('tool', value)}
+            value={filters.tool || "all"}
+            onValueChange={(value) => updateFilter("tool", value)}
           >
             <SelectTrigger className={cn(
-              'h-9 sm:h-8 w-full sm:w-[140px] gap-1 border-dashed text-sm font-normal',
-              filters.tool && 'border-solid border-primary/50 bg-primary/5'
+              "h-9 sm:h-8 w-full sm:w-[140px] gap-1 border-dashed text-sm font-normal",
+              filters.tool && "border-solid border-primary/50 bg-primary/5"
             )}>
               <SelectValue placeholder="Tool" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All tools</SelectItem>
-              {tools.map((tool) => (
-                <SelectItem key={tool} value={tool}>
-                  {tool}
+              {tools.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -263,12 +267,12 @@ export function EventFilters({
 
           {/* Risk level filter */}
           <Select
-            value={filters.riskLevel || 'all'}
-            onValueChange={(value) => updateFilter('riskLevel', value)}
+            value={filters.riskLevel || "all"}
+            onValueChange={(value) => updateFilter("riskLevel", value)}
           >
             <SelectTrigger className={cn(
-              'h-9 sm:h-8 w-full sm:w-[130px] gap-1 border-dashed text-sm font-normal',
-              filters.riskLevel && 'border-solid border-primary/50 bg-primary/5'
+              "h-9 sm:h-8 w-full sm:w-[130px] gap-1 border-dashed text-sm font-normal",
+              filters.riskLevel && "border-solid border-primary/50 bg-primary/5"
             )}>
               <SelectValue placeholder="Risk level" />
             </SelectTrigger>
@@ -277,7 +281,7 @@ export function EventFilters({
               {riskLevels.map((level) => (
                 <SelectItem key={level.value} value={level.value}>
                   <span className="flex items-center gap-2">
-                    <span className={cn('size-2 rounded-full', level.color)} />
+                    <span className={cn("size-2 rounded-full", level.color)} />
                     {level.label}
                   </span>
                 </SelectItem>
@@ -287,12 +291,12 @@ export function EventFilters({
 
           {/* Event type filter */}
           <Select
-            value={filters.eventType || 'all'}
-            onValueChange={(value) => updateFilter('eventType', value)}
+            value={filters.eventType || "all"}
+            onValueChange={(value) => updateFilter("eventType", value)}
           >
             <SelectTrigger className={cn(
-              'h-9 sm:h-8 w-full sm:w-[140px] gap-1 border-dashed text-sm font-normal',
-              filters.eventType && 'border-solid border-primary/50 bg-primary/5'
+              "h-9 sm:h-8 w-full sm:w-[140px] gap-1 border-dashed text-sm font-normal",
+              filters.eventType && "border-solid border-primary/50 bg-primary/5"
             )}>
               <SelectValue placeholder="Event type" />
             </SelectTrigger>
@@ -310,8 +314,8 @@ export function EventFilters({
           <DateRangePicker
             dateFrom={filters.dateFrom}
             dateTo={filters.dateTo}
-            onDateFromChange={(value) => updateFilter('dateFrom', value)}
-            onDateToChange={(value) => updateFilter('dateTo', value)}
+            onDateFromChange={(value) => updateFilter("dateFrom", value)}
+            onDateToChange={(value) => updateFilter("dateTo", value)}
           />
         </div>
 

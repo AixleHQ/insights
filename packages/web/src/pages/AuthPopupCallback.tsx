@@ -1,24 +1,24 @@
-import { useEffect, useState } from 'react';
-import { Loader2, CheckCircle, XCircle } from 'lucide-react';
-import { User } from 'oidc-client-ts';
-import { getUserManager } from '../lib/auth';
+import { useEffect, useState } from "react";
+import { Loader2, CheckCircle, XCircle } from "lucide-react";
+import { User } from "oidc-client-ts";
+import { getUserManager } from "../lib/auth";
+import { config } from "../lib/config";
 
-// Keycloak configuration - must match auth.ts
 const keycloakConfig = {
-  url: import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost:8080',
-  realm: import.meta.env.VITE_KEYCLOAK_REALM || 'db90',
-  clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'db90-web',
+  url: config.keycloakUrl,
+  realm: config.keycloakRealm,
+  clientId: config.keycloakClientId,
 };
 
 // Storage key for PKCE verifier - must match Login.tsx
-const PKCE_VERIFIER_KEY = 'pkce_code_verifier';
+const PKCE_VERIFIER_KEY = "pkce_code_verifier";
 
 /**
  * This page handles the OAuth callback when authentication is done via popup.
  * It completes the token exchange with PKCE and sends a postMessage to the opener window.
  */
 export function AuthPopupCallback() {
-  const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
+  const [status, setStatus] = useState<"processing" | "success" | "error">("processing");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -26,16 +26,16 @@ export function AuthPopupCallback() {
       try {
         // Get the authorization code from the URL
         const params = new URLSearchParams(window.location.search);
-        const code = params.get('code');
-        const errorParam = params.get('error');
-        const errorDescription = params.get('error_description');
+        const code = params.get("code");
+        const errorParam = params.get("error");
+        const errorDescription = params.get("error_description");
 
         if (errorParam) {
           throw new Error(errorDescription || errorParam);
         }
 
         if (!code) {
-          throw new Error('No authorization code received');
+          throw new Error("No authorization code received");
         }
 
         // Get the PKCE code verifier from the opener's sessionStorage
@@ -55,7 +55,7 @@ export function AuthPopupCallback() {
         }
 
         if (!codeVerifier) {
-          throw new Error('PKCE code verifier not found');
+          throw new Error("PKCE code verifier not found");
         }
 
         // Exchange the code for tokens with PKCE
@@ -63,12 +63,12 @@ export function AuthPopupCallback() {
         const redirectUri = `${window.location.origin}/auth/popup-callback`;
 
         const response = await fetch(tokenUrl, {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
+            "Content-Type": "application/x-www-form-urlencoded",
           },
           body: new URLSearchParams({
-            grant_type: 'authorization_code',
+            grant_type: "authorization_code",
             client_id: keycloakConfig.clientId,
             code,
             redirect_uri: redirectUri,
@@ -78,19 +78,19 @@ export function AuthPopupCallback() {
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error_description || 'Token exchange failed');
+          throw new Error(errorData.error_description || "Token exchange failed");
         }
 
         const tokenResponse = await response.json();
 
         // Parse the ID token to get user info
-        const idTokenParts = tokenResponse.id_token.split('.');
+        const idTokenParts = tokenResponse.id_token.split(".");
         const idTokenPayload = JSON.parse(atob(idTokenParts[1]));
 
         // Create a User object compatible with oidc-client-ts
         const user = new User({
           access_token: tokenResponse.access_token,
-          token_type: tokenResponse.token_type || 'Bearer',
+          token_type: tokenResponse.token_type || "Bearer",
           id_token: tokenResponse.id_token,
           refresh_token: tokenResponse.refresh_token,
           profile: {
@@ -114,7 +114,7 @@ export function AuthPopupCallback() {
         const manager = getUserManager();
         await manager.storeUser(user);
 
-        setStatus('success');
+        setStatus("success");
 
         // Clean up PKCE verifier
         try {
@@ -128,23 +128,23 @@ export function AuthPopupCallback() {
 
         // Notify opener window of success
         if (window.opener) {
-          window.opener.postMessage({ type: 'keycloak-auth-success' }, window.location.origin);
+          window.opener.postMessage({ type: "keycloak-auth-success" }, window.location.origin);
           // Close the popup after a short delay
           setTimeout(() => window.close(), 1000);
         } else {
           // Not a popup, redirect directly
-          window.location.href = '/';
+          window.location.href = "/";
         }
       } catch (error) {
-        console.error('Auth callback error:', error);
-        setStatus('error');
-        setErrorMessage(error instanceof Error ? error.message : 'Authentication failed');
+        console.error("Auth callback error:", error);
+        setStatus("error");
+        setErrorMessage(error instanceof Error ? error.message : "Authentication failed");
 
         // Notify opener window of error
         if (window.opener) {
           window.opener.postMessage({
-            type: 'keycloak-auth-error',
-            error: error instanceof Error ? error.message : 'Authentication failed'
+            type: "keycloak-auth-error",
+            error: error instanceof Error ? error.message : "Authentication failed"
           }, window.location.origin);
         }
       }
@@ -156,14 +156,14 @@ export function AuthPopupCallback() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="text-center space-y-4">
-        {status === 'processing' && (
+        {status === "processing" && (
           <>
             <Loader2 className="mx-auto size-8 animate-spin text-primary" />
             <p className="text-sm text-muted-foreground">Completing sign in...</p>
           </>
         )}
 
-        {status === 'success' && (
+        {status === "success" && (
           <>
             <CheckCircle className="mx-auto size-8 text-green-500" />
             <p className="text-sm text-muted-foreground">Sign in successful!</p>
@@ -171,7 +171,7 @@ export function AuthPopupCallback() {
           </>
         )}
 
-        {status === 'error' && (
+        {status === "error" && (
           <>
             <XCircle className="mx-auto size-8 text-destructive" />
             <p className="text-sm text-destructive">Sign in failed</p>

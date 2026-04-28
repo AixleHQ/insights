@@ -58,5 +58,4 @@ RSpec.describe UserPolicy, type: :policy do
       expect(policy(nil, current_user: global_admin).apply(:index?)).to be true
     end
   end
-
 end

@@ -3,7 +3,7 @@
 class UserToolAccountPolicy < ApplicationPolicy
   # Users can view their own tool accounts
   def index?
-    own_account? || global_admin?
+    own_membership? || global_admin?
   end
 
   def show?

@@ -1,25 +1,20 @@
-import { Link } from 'react-router-dom';
-import { formatDistanceToNow, humanizeToolName } from '@/lib/utils';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
-import {
-  Code2,
-  Terminal,
-  FileSearch,
-  MessageSquare,
-  Bot,
-  Sparkles,
-  ArrowRight,
-} from 'lucide-react';
+import { Link } from "react-router-dom";
+import { formatDistanceToNow, humanizeToolName } from "@/lib/utils";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+import { formatCost, getEventActorLabel } from "@/lib/formatters";
+import { ProviderLogo } from "@/components/icons/ProviderLogo";
+import { ArrowRight } from "lucide-react";
 
 export interface ActivityEvent {
   id: string;
   tool_name?: string;
   event_type?: string;
-  risk_level?: 'critical' | 'high' | 'medium' | 'low' | 'none';
+  attribution?: string;
+  risk_level?: "critical" | "high" | "medium" | "low" | "none";
   cost_usd?: number;
   created_at: string;
   user?: {
@@ -38,46 +33,31 @@ interface ActivityFeedProps {
   selectedEventId?: string | null;
 }
 
-const toolIcons: Record<string, typeof Code2> = {
-  'github-copilot': Code2,
-  'cursor': Terminal,
-  'claude-code': Bot,
-  'aider': MessageSquare,
-  'codeium': Sparkles,
-  'default': FileSearch,
-};
-
-function getToolIcon(toolName: string | undefined | null) {
-  if (!toolName) return toolIcons.default;
-  const normalizedName = toolName.toLowerCase().replace(/[\s_-]/g, '-');
-  return toolIcons[normalizedName] || toolIcons.default;
-}
-
 const riskColors: Record<string, { bg: string; text: string; border: string }> = {
   critical: {
-    bg: 'bg-risk-critical/10',
-    text: 'text-risk-critical',
-    border: 'border-risk-critical/30',
+    bg: "bg-risk-critical/10",
+    text: "text-risk-critical",
+    border: "border-risk-critical/30",
   },
   high: {
-    bg: 'bg-risk-high/10',
-    text: 'text-risk-high',
-    border: 'border-risk-high/30',
+    bg: "bg-risk-high/10",
+    text: "text-risk-high",
+    border: "border-risk-high/30",
   },
   medium: {
-    bg: 'bg-risk-medium/10',
-    text: 'text-risk-medium',
-    border: 'border-risk-medium/30',
+    bg: "bg-risk-medium/10",
+    text: "text-risk-medium",
+    border: "border-risk-medium/30",
   },
   low: {
-    bg: 'bg-risk-low/10',
-    text: 'text-risk-low',
-    border: 'border-risk-low/30',
+    bg: "bg-risk-low/10",
+    text: "text-risk-low",
+    border: "border-risk-low/30",
   },
   none: {
-    bg: 'bg-muted',
-    text: 'text-muted-foreground',
-    border: 'border-muted',
+    bg: "bg-muted",
+    text: "text-muted-foreground",
+    border: "border-muted",
   },
 };
 
@@ -94,7 +74,7 @@ export function RiskBadge({
     <Badge
       variant="outline"
       className={cn(
-        'font-mono-display text-[10px] uppercase tracking-wider',
+        "font-mono-display text-[10px] uppercase tracking-wider",
         colors.bg,
         colors.text,
         colors.border,
@@ -115,28 +95,25 @@ function ActivityItem({
   onClick?: () => void;
   isSelected?: boolean;
 }) {
-  const ToolIcon = getToolIcon(event.tool_name);
   const timeAgo = formatDistanceToNow(event.created_at);
 
   const content = (
     <>
-      <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-        <ToolIcon className="size-4" />
-      </div>
+      <ProviderLogo provider={event.tool_name || "unknown"} size="sm" showBackground className="shrink-0 !size-8" />
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex items-center gap-2">
           <span className="truncate text-sm font-medium">{humanizeToolName(event.tool_name)}</span>
-          <RiskBadge level={event.risk_level || 'none'} />
+          <RiskBadge level={event.risk_level || "none"} />
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="truncate">{event.user?.email || 'Unknown user'}</span>
+          <span className="truncate">{getEventActorLabel(event)}</span>
           <span>·</span>
           <span>{timeAgo}</span>
           {event.cost_usd !== undefined && Number(event.cost_usd) > 0 && (
             <>
               <span>·</span>
               <span className="font-mono-display">
-                ${Number(event.cost_usd).toFixed(3)}
+                {formatCost(Number(event.cost_usd))}
               </span>
             </>
           )}
@@ -152,13 +129,13 @@ function ActivityItem({
   );
 
   const className = cn(
-    'group flex items-start gap-3 rounded-lg p-3 transition-colors hover:bg-muted/50 cursor-pointer',
-    isSelected && 'bg-muted'
+    "group flex items-start gap-3 rounded-lg p-3 transition-colors hover:bg-muted/50 cursor-pointer",
+    isSelected && "bg-muted"
   );
 
   if (onClick) {
     return (
-      <button type="button" onClick={onClick} className={cn(className, 'w-full text-left')}>
+      <button type="button" onClick={onClick} className={cn(className, "w-full text-left")}>
         {content}
       </button>
     );
@@ -194,7 +171,7 @@ export function ActivityFeed({
   selectedEventId,
 }: ActivityFeedProps) {
   return (
-    <Card className={cn('col-span-full lg:col-span-2', className)}>
+    <Card className={cn("col-span-full lg:col-span-2", className)}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <div>
           <CardTitle className="text-base font-medium">Recent Activity</CardTitle>

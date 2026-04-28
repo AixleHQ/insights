@@ -1,17 +1,18 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 export interface ProjectFormData {
   name: string;
   description?: string;
   repository_url?: string;
+  git_remote_url?: string;
   is_active: boolean;
 }
 
@@ -32,9 +33,10 @@ export function ProjectForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<ProjectFormData>(
     initialData || {
-      name: '',
-      description: '',
-      repository_url: '',
+      name: "",
+      description: "",
+      repository_url: "",
+      git_remote_url: "",
       is_active: true,
     }
   );
@@ -44,13 +46,13 @@ export function ProjectForm({
     const newErrors: Record<string, string> = {};
 
     if (!formData.name.trim()) {
-      newErrors.name = 'Project name is required';
+      newErrors.name = "Project name is required";
     } else if (formData.name.length < 2) {
-      newErrors.name = 'Project name must be at least 2 characters';
+      newErrors.name = "Project name must be at least 2 characters";
     }
 
     if (formData.repository_url && !isValidUrl(formData.repository_url)) {
-      newErrors.repository_url = 'Please enter a valid URL';
+      newErrors.repository_url = "Please enter a valid URL";
     }
 
     setErrors(newErrors);
@@ -74,9 +76,9 @@ export function ProjectForm({
     setIsSubmitting(true);
     try {
       await onSubmit(formData);
-      navigate('/projects');
+      navigate("/projects");
     } catch (error) {
-      console.error('Failed to save project:', error);
+      console.error("Failed to save project:", error);
     } finally {
       setIsSubmitting(false);
     }
@@ -88,24 +90,24 @@ export function ProjectForm({
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: '' }));
+      setErrors((prev) => ({ ...prev, [field]: "" }));
     }
   };
 
   return (
-    <div className={cn('space-y-6', className)}>
+    <div className={cn("space-y-6", className)}>
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/projects')}>
+        <Button variant="ghost" size="icon" onClick={() => navigate("/projects")}>
           <ArrowLeft className="size-4" />
         </Button>
         <div>
           <h1 className="text-xl font-semibold">
-            {isEditing ? 'Edit Project' : 'New Project'}
+            {isEditing ? "Edit Project" : "New Project"}
           </h1>
           <p className="text-sm text-muted-foreground">
             {isEditing
-              ? 'Update your project settings'
-              : 'Create a new project to track AI tool usage'}
+              ? "Update your project settings"
+              : "Create a new project to track AI tool usage"}
           </p>
         </div>
       </div>
@@ -127,8 +129,8 @@ export function ProjectForm({
                 id="name"
                 placeholder="my-project"
                 value={formData.name}
-                onChange={(e) => updateField('name', e.target.value)}
-                className={cn(errors.name && 'border-destructive')}
+                onChange={(e) => updateField("name", e.target.value)}
+                className={cn(errors.name && "border-destructive")}
               />
               {errors.name && (
                 <p className="text-xs text-destructive">{errors.name}</p>
@@ -140,8 +142,8 @@ export function ProjectForm({
               <Input
                 id="description"
                 placeholder="A brief description of the project"
-                value={formData.description || ''}
-                onChange={(e) => updateField('description', e.target.value)}
+                value={formData.description || ""}
+                onChange={(e) => updateField("description", e.target.value)}
               />
             </div>
 
@@ -150,13 +152,28 @@ export function ProjectForm({
               <Input
                 id="repository_url"
                 placeholder="https://github.com/org/repo"
-                value={formData.repository_url || ''}
-                onChange={(e) => updateField('repository_url', e.target.value)}
-                className={cn(errors.repository_url && 'border-destructive')}
+                value={formData.repository_url || ""}
+                onChange={(e) => updateField("repository_url", e.target.value)}
+                className={cn(errors.repository_url && "border-destructive")}
               />
               {errors.repository_url && (
                 <p className="text-xs text-destructive">{errors.repository_url}</p>
               )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="git_remote_url">Git Remote URL</Label>
+              <Input
+                id="git_remote_url"
+                placeholder="git@github.com:org/repo.git"
+                value={formData.git_remote_url || ""}
+                onChange={(e) => updateField("git_remote_url", e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Used by db90-claude and db90-cursor to auto-detect this project. Paste the output of{" "}
+                <code className="font-mono">git remote get-url origin</code>
+                {" "}— the <code className="font-mono">.git</code> suffix and casing are normalized automatically.
+              </p>
             </div>
 
             <div className="flex items-center justify-between rounded-lg border p-3">
@@ -171,7 +188,7 @@ export function ProjectForm({
               <Switch
                 id="is_active"
                 checked={formData.is_active}
-                onCheckedChange={(checked) => updateField('is_active', checked)}
+                onCheckedChange={(checked) => updateField("is_active", checked)}
               />
             </div>
           </CardContent>
@@ -181,14 +198,14 @@ export function ProjectForm({
           <Button
             type="button"
             variant="outline"
-            onClick={() => navigate('/projects')}
+            onClick={() => navigate("/projects")}
             disabled={isSubmitting}
           >
             Cancel
           </Button>
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
-            {isEditing ? 'Save Changes' : 'Create Project'}
+            {isEditing ? "Save Changes" : "Create Project"}
           </Button>
         </div>
       </form>

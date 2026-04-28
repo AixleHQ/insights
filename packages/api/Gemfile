@@ -18,6 +18,7 @@ gem "image_processing", "~> 1.2"
 
 # Background jobs
 gem "sidekiq"
+gem "sidekiq-cron"
 gem "redis"
 
 # Authorization
@@ -46,6 +47,9 @@ gem "faraday"
 
 # CORS
 gem "rack-cors"
+
+# Error tracking
+gem "rollbar"
 
 group :development, :test do
   gem "debug", platforms: %i[ mri windows ], require: "debug/prelude"

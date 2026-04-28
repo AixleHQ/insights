@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useState } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   Building2,
   Loader2,
@@ -10,19 +10,19 @@ import {
   AlertTriangle,
   UserPlus,
   Shield,
-} from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useOrg } from '@/contexts/OrgContext';
-import { useInvitationByToken, useAcceptInvitation } from '@/hooks/useApi';
-import { Button } from '@/components/ui/button';
+} from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useOrg } from "@/contexts/OrgContext";
+import { useInvitationByToken, useAcceptInvitation } from "@/hooks/useApi";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 function formatExpirationDate(dateString: string): string {
   const date = new Date(dateString);
@@ -30,40 +30,40 @@ function formatExpirationDate(dateString: string): string {
   const diff = date.getTime() - now.getTime();
   const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
 
-  if (days <= 0) return 'today';
-  if (days === 1) return 'tomorrow';
+  if (days <= 0) return "today";
+  if (days === 1) return "tomorrow";
   if (days <= 7) return `in ${days} days`;
-  return date.toLocaleDateString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
+  return date.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
   });
 }
 
-function getRoleBadgeVariant(role: string): 'default' | 'secondary' | 'outline' {
+function getRoleBadgeVariant(role: string): "default" | "secondary" | "outline" {
   switch (role) {
-    case 'owner':
-    case 'admin':
-      return 'default';
-    case 'member':
-      return 'secondary';
+    case "owner":
+    case "admin":
+      return "default";
+    case "member":
+      return "secondary";
     default:
-      return 'outline';
+      return "outline";
   }
 }
 
 function getRoleDescription(role: string): string {
   switch (role) {
-    case 'owner':
-      return 'Full control over organization settings, billing, and member management';
-    case 'admin':
-      return 'Manage projects, members, and organization settings';
-    case 'member':
-      return 'View dashboards and contribute to projects';
-    case 'viewer':
-      return 'Read-only access to organization data';
+    case "owner":
+      return "Full control over organization settings, billing, and member management";
+    case "admin":
+      return "Manage projects, members, and organization settings";
+    case "member":
+      return "View dashboards and contribute to projects";
+    case "viewer":
+      return "Read-only access to organization data";
     default:
-      return 'Access to organization resources';
+      return "Access to organization resources";
   }
 }
 
@@ -82,7 +82,7 @@ export function InvitationAccept() {
     data: invitation,
     isLoading,
     error,
-  } = useInvitationByToken(token || '');
+  } = useInvitationByToken(token || "");
 
   const acceptInvitation = useAcceptInvitation();
 
@@ -110,11 +110,11 @@ export function InvitationAccept() {
             is_active: true,
           });
         }
-        navigate('/profile');
+        navigate("/profile");
       }, 1500);
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : 'Failed to accept invitation';
+        err instanceof Error ? err.message : "Failed to accept invitation";
       setAcceptError(message);
     } finally {
       setIsAccepting(false);
@@ -122,10 +122,10 @@ export function InvitationAccept() {
   };
 
   // Determine the current state for rendering
-  const isNotFound = error?.message?.includes('404') || error?.message?.includes('Not Found');
-  const isExpired = invitation?.expired || invitation?.status === 'expired';
-  const isRevoked = invitation?.status === 'revoked';
-  const isAlreadyAccepted = invitation?.status === 'accepted';
+  const isNotFound = error?.message?.includes("404") || error?.message?.includes("Not Found");
+  const isExpired = invitation?.expired || invitation?.status === "expired";
+  const isRevoked = invitation?.status === "revoked";
+  const isAlreadyAccepted = invitation?.status === "accepted";
 
   return (
     <div className="flex min-h-svh flex-col bg-background">
@@ -212,14 +212,14 @@ export function InvitationAccept() {
                 <div className="space-y-2">
                   <CardTitle className="text-xl">Invitation Expired</CardTitle>
                   <CardDescription className="text-base">
-                    This invitation to join{' '}
+                    This invitation to join{" "}
                     <span className="font-medium text-foreground">
                       {invitation?.organization.name}
-                    </span>{' '}
-                    has expired. Please ask{' '}
+                    </span>{" "}
+                    has expired. Please ask{" "}
                     <span className="font-medium text-foreground">
                       {invitation?.invitedByName}
-                    </span>{' '}
+                    </span>{" "}
                     to send you a new invitation.
                   </CardDescription>
                 </div>
@@ -245,10 +245,10 @@ export function InvitationAccept() {
                 <div className="space-y-2">
                   <CardTitle className="text-xl">Invitation Revoked</CardTitle>
                   <CardDescription className="text-base">
-                    This invitation to join{' '}
+                    This invitation to join{" "}
                     <span className="font-medium text-foreground">
                       {invitation?.organization.name}
-                    </span>{' '}
+                    </span>{" "}
                     has been revoked. If you believe this is a mistake, please
                     contact the organization administrator.
                   </CardDescription>
@@ -275,7 +275,7 @@ export function InvitationAccept() {
                 <div className="space-y-2">
                   <CardTitle className="text-xl">Already a Member</CardTitle>
                   <CardDescription className="text-base">
-                    This invitation has already been accepted. You're a member of{' '}
+                    This invitation has already been accepted. You're a member of{" "}
                     <span className="font-medium text-foreground">
                       {invitation?.organization.name}
                     </span>
@@ -304,7 +304,7 @@ export function InvitationAccept() {
                 <div className="space-y-2">
                   <CardTitle className="text-xl">Welcome Aboard!</CardTitle>
                   <CardDescription className="text-base">
-                    You've successfully joined{' '}
+                    You've successfully joined{" "}
                     <span className="font-medium text-foreground">
                       {invitation?.organization.name}
                     </span>
@@ -341,7 +341,7 @@ export function InvitationAccept() {
                     <CardDescription className="text-base">
                       <span className="font-medium text-foreground">
                         {invitation.invitedByName}
-                      </span>{' '}
+                      </span>{" "}
                       has invited you to join their organization
                     </CardDescription>
                   </div>
@@ -386,7 +386,7 @@ export function InvitationAccept() {
                   <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                     <Clock className="size-4" />
                     <span>
-                      This invitation expires{' '}
+                      This invitation expires{" "}
                       {formatExpirationDate(invitation.expiresAt)}
                     </span>
                   </div>

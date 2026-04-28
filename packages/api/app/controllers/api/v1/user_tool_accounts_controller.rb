@@ -5,15 +5,16 @@ module Api
     class UserToolAccountsController < BaseController
       before_action :require_organization!
       before_action :set_membership
-      before_action :set_tool_account, only: %i[show update destroy]
+      before_action :set_tool_account, only: %i[show update destroy regenerate_token]
 
       # GET /api/v1/organizations/:organization_id/tool_accounts
       def index
+        authorize! @membership, to: :index?, with: UserToolAccountPolicy
         accounts = @membership.user_tool_accounts.order(:tool_name)
 
         # Allow filtering by tool
         accounts = accounts.by_tool(params[:tool]) if params[:tool].present?
-        accounts = accounts.active if params[:active] == 'true'
+        accounts = accounts.active if params[:active] == "true"
 
         render json: {
           data: UserToolAccountSerializer.new(accounts).serialize
@@ -32,10 +33,12 @@ module Api
         authorize! @membership, to: :create?, with: UserToolAccountPolicy
 
         if @tool_account.save
-          render_created(@tool_account, UserToolAccountSerializer)
+          data = UserToolAccountSerializer.new(@tool_account).serialize
+          data[:ingestToken] = @tool_account.plaintext_token if @tool_account.plaintext_token
+          render json: { data: data }, status: :created
         else
           render json: {
-            error: 'Unprocessable Entity',
+            error: "Unprocessable Entity",
             errors: format_validation_errors(@tool_account.errors)
           }, status: :unprocessable_entity
         end
@@ -49,7 +52,7 @@ module Api
           render_resource(@tool_account, UserToolAccountSerializer)
         else
           render json: {
-            error: 'Unprocessable Entity',
+            error: "Unprocessable Entity",
             errors: format_validation_errors(@tool_account.errors)
           }, status: :unprocessable_entity
         end
@@ -60,6 +63,14 @@ module Api
         authorize! @tool_account
         @tool_account.destroy!
         render_no_content
+      end
+
+      # POST /api/v1/organizations/:organization_id/tool_accounts/:id/regenerate_token
+      def regenerate_token
+        authorize! @tool_account, to: :update?
+        @tool_account.rotate_ingest_token!
+        data = UserToolAccountSerializer.new(@tool_account).serialize
+        render json: { data: data.merge(ingestToken: @tool_account.plaintext_token) }, status: :ok
       end
 
       private
@@ -74,12 +85,12 @@ module Api
 
       def tool_account_params
         params.permit(:tool_name, :access_token, :refresh_token, :token_expires_at,
-                      :external_account_id, :external_account_name, :is_active)
+                      :external_user_id, :external_username, :is_active)
       end
 
       def tool_account_update_params
         params.permit(:access_token, :refresh_token, :token_expires_at,
-                      :external_account_id, :external_account_name, :is_active)
+                      :external_user_id, :external_username, :is_active)
       end
     end
   end

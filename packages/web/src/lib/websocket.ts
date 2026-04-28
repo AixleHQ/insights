@@ -5,10 +5,10 @@
  * with auto-reconnect and subscription management.
  */
 
-import { getAccessToken } from './auth';
+import { getAccessToken } from "./auth";
 
 export interface WebSocketMessage {
-  type: 'new_event' | 'event_updated' | 'alert' | 'ping';
+  type: "new_event" | "event_updated" | "alert" | "ping";
   data?: unknown;
 }
 
@@ -20,7 +20,7 @@ export interface ChannelSubscription {
   onDisconnected?: () => void;
 }
 
-type ConnectionState = 'disconnected' | 'connecting' | 'connected';
+type ConnectionState = "disconnected" | "connecting" | "connected";
 
 class ActionCableClient {
   private ws: WebSocket | null = null;
@@ -28,7 +28,7 @@ class ActionCableClient {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 10;
   private reconnectDelay = 1000;
-  private state: ConnectionState = 'disconnected';
+  private state: ConnectionState = "disconnected";
   private messageQueue: string[] = [];
   private pingInterval: ReturnType<typeof setInterval> | null = null;
   private baseUrl: string;
@@ -38,22 +38,22 @@ class ActionCableClient {
   }
 
   async connect(): Promise<void> {
-    if (this.state === 'connecting' || this.state === 'connected') {
+    if (this.state === "connecting" || this.state === "connected") {
       return;
     }
 
-    this.state = 'connecting';
+    this.state = "connecting";
 
     try {
       const token = await getAccessToken();
-      const wsUrl = this.baseUrl.replace(/^http/, 'ws');
+      const wsUrl = this.baseUrl.replace(/^http/, "ws");
       const url = `${wsUrl}/cable?token=${token}`;
 
       this.ws = new WebSocket(url);
 
       this.ws.onopen = () => {
-        console.log('[WebSocket] Connected');
-        this.state = 'connected';
+        console.log("[WebSocket] Connected");
+        this.state = "connected";
         this.reconnectAttempts = 0;
         this.flushMessageQueue();
         this.resubscribeAll();
@@ -65,33 +65,33 @@ class ActionCableClient {
           const data = JSON.parse(event.data);
           this.handleMessage(data);
         } catch (e) {
-          console.error('[WebSocket] Failed to parse message:', e);
+          console.error("[WebSocket] Failed to parse message:", e);
         }
       };
 
       this.ws.onclose = (event) => {
-        console.log('[WebSocket] Disconnected:', event.code, event.reason);
-        this.state = 'disconnected';
+        console.log("[WebSocket] Disconnected:", event.code, event.reason);
+        this.state = "disconnected";
         this.stopPing();
         this.notifyDisconnected();
         this.scheduleReconnect();
       };
 
       this.ws.onerror = (error) => {
-        console.error('[WebSocket] Error:', error);
+        console.error("[WebSocket] Error:", error);
       };
     } catch (error) {
-      console.error('[WebSocket] Failed to connect:', error);
-      this.state = 'disconnected';
+      console.error("[WebSocket] Failed to connect:", error);
+      this.state = "disconnected";
       this.scheduleReconnect();
     }
   }
 
   disconnect(): void {
-    this.state = 'disconnected';
+    this.state = "disconnected";
     this.stopPing();
     if (this.ws) {
-      this.ws.close(1000, 'Client disconnect');
+      this.ws.close(1000, "Client disconnect");
       this.ws = null;
     }
   }
@@ -100,7 +100,7 @@ class ActionCableClient {
     const key = this.getSubscriptionKey(subscription.channel, subscription.params);
     this.subscriptions.set(key, subscription);
 
-    if (this.state === 'connected') {
+    if (this.state === "connected") {
       this.sendSubscribe(subscription);
     }
 
@@ -113,9 +113,9 @@ class ActionCableClient {
     const key = this.getSubscriptionKey(channel, params);
     this.subscriptions.delete(key);
 
-    if (this.state === 'connected') {
+    if (this.state === "connected") {
       this.send({
-        command: 'unsubscribe',
+        command: "unsubscribe",
         identifier: JSON.stringify({ channel, ...params }),
       });
     }
@@ -127,7 +127,7 @@ class ActionCableClient {
 
   private send(data: unknown): void {
     const message = JSON.stringify(data);
-    if (this.state === 'connected' && this.ws) {
+    if (this.state === "connected" && this.ws) {
       this.ws.send(message);
     } else {
       this.messageQueue.push(message);
@@ -135,7 +135,7 @@ class ActionCableClient {
   }
 
   private flushMessageQueue(): void {
-    while (this.messageQueue.length > 0 && this.ws && this.state === 'connected') {
+    while (this.messageQueue.length > 0 && this.ws && this.state === "connected") {
       const message = this.messageQueue.shift();
       if (message) {
         this.ws.send(message);
@@ -150,7 +150,7 @@ class ActionCableClient {
     });
 
     this.send({
-      command: 'subscribe',
+      command: "subscribe",
       identifier,
     });
   }
@@ -166,17 +166,17 @@ class ActionCableClient {
     identifier?: string;
     message?: WebSocketMessage;
   }): void {
-    if (data.type === 'ping') {
+    if (data.type === "ping") {
       // ActionCable ping, ignore
       return;
     }
 
-    if (data.type === 'welcome') {
-      console.log('[WebSocket] Welcome received');
+    if (data.type === "welcome") {
+      console.log("[WebSocket] Welcome received");
       return;
     }
 
-    if (data.type === 'confirm_subscription') {
+    if (data.type === "confirm_subscription") {
       const identifier = data.identifier;
       if (identifier) {
         const subscription = this.subscriptions.get(identifier);
@@ -205,7 +205,7 @@ class ActionCableClient {
 
   private scheduleReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('[WebSocket] Max reconnect attempts reached');
+      console.error("[WebSocket] Max reconnect attempts reached");
       return;
     }
 
@@ -215,7 +215,7 @@ class ActionCableClient {
     console.log(`[WebSocket] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
 
     setTimeout(() => {
-      if (this.state === 'disconnected') {
+      if (this.state === "disconnected") {
         this.connect();
       }
     }, delay);
@@ -223,8 +223,8 @@ class ActionCableClient {
 
   private startPing(): void {
     this.pingInterval = setInterval(() => {
-      if (this.state === 'connected' && this.ws) {
-        this.ws.send(JSON.stringify({ type: 'ping' }));
+      if (this.state === "connected" && this.ws) {
+        this.ws.send(JSON.stringify({ type: "ping" }));
       }
     }, 30000);
   }
@@ -242,7 +242,7 @@ let client: ActionCableClient | null = null;
 
 export function getWebSocketClient(): ActionCableClient {
   if (!client) {
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
     client = new ActionCableClient(baseUrl);
   }
   return client;

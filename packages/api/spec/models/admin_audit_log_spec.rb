@@ -65,7 +65,7 @@ RSpec.describe AdminAuditLog, type: :model do
           admin_user: admin,
           action: 'organizations#update',
           resource: organization,
-          tracked_changes: { name: ['Old', 'New'] },
+          tracked_changes: { name: [ 'Old', 'New' ] },
           metadata: { reason: 'Test' }
         )
       }.to change(AdminAuditLog, :count).by(1)
@@ -75,7 +75,7 @@ RSpec.describe AdminAuditLog, type: :model do
       expect(log.action).to eq('organizations#update')
       expect(log.resource_type).to eq('Organization')
       expect(log.resource_id).to eq(organization.id)
-      expect(log.tracked_changes).to eq('name' => ['Old', 'New'])
+      expect(log.tracked_changes).to eq('name' => [ 'Old', 'New' ])
       expect(log.metadata).to eq('reason' => 'Test')
     end
 

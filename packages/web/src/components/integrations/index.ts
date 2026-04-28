@@ -3,4 +3,5 @@ export {
   type IntegrationData,
   type IntegrationProvider,
   type ProviderInfo,
-} from './IntegrationCard';
+} from "./IntegrationCard";
+export { IngestTokenConnectSheet } from "./IngestTokenConnectSheet";

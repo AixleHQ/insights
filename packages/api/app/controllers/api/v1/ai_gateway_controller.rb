@@ -21,13 +21,13 @@ module Api
 
         render json: { data: format_completion_response(result) }
       rescue Ai::RateLimitError => e
-        render json: { error: 'Rate Limited', message: e.message }, status: :too_many_requests
+        render json: { error: "Rate Limited", message: e.message }, status: :too_many_requests
       rescue Ai::AuthenticationError => e
-        render json: { error: 'Authentication Failed', message: e.message }, status: :unauthorized
+        render json: { error: "Authentication Failed", message: e.message }, status: :unauthorized
       rescue Ai::InvalidRequestError => e
-        render json: { error: 'Invalid Request', message: e.message }, status: :bad_request
+        render json: { error: "Invalid Request", message: e.message }, status: :bad_request
       rescue Ai::ApiError => e
-        render json: { error: 'API Error', message: e.message }, status: :bad_gateway
+        render json: { error: "API Error", message: e.message }, status: :bad_gateway
       end
 
       # POST /api/v1/organizations/:organization_id/ai/:provider/chat
@@ -44,13 +44,13 @@ module Api
 
         render json: { data: format_chat_response(result) }
       rescue Ai::RateLimitError => e
-        render json: { error: 'Rate Limited', message: e.message }, status: :too_many_requests
+        render json: { error: "Rate Limited", message: e.message }, status: :too_many_requests
       rescue Ai::AuthenticationError => e
-        render json: { error: 'Authentication Failed', message: e.message }, status: :unauthorized
+        render json: { error: "Authentication Failed", message: e.message }, status: :unauthorized
       rescue Ai::InvalidRequestError => e
-        render json: { error: 'Invalid Request', message: e.message }, status: :bad_request
+        render json: { error: "Invalid Request", message: e.message }, status: :bad_request
       rescue Ai::ApiError => e
-        render json: { error: 'API Error', message: e.message }, status: :bad_gateway
+        render json: { error: "API Error", message: e.message }, status: :bad_gateway
       end
 
       # GET /api/v1/organizations/:organization_id/ai/:provider/models
@@ -64,19 +64,31 @@ module Api
 
         render json: { data: models }
       rescue Ai::AuthenticationError => e
-        render json: { error: 'Authentication Failed', message: e.message }, status: :unauthorized
+        render json: { error: "Authentication Failed", message: e.message }, status: :unauthorized
       rescue Ai::ApiError => e
-        render json: { error: 'API Error', message: e.message }, status: :bad_gateway
+        render json: { error: "API Error", message: e.message }, status: :bad_gateway
       end
 
       private
 
+      # Providers that are connected for usage polling only — chat/completion
+      # via the gateway is not permitted for these, regardless of authorization.
+      POLLING_ONLY_PROVIDERS = %w[anthropic].freeze
+
       def set_connector
         provider = params[:provider]
 
+        if POLLING_ONLY_PROVIDERS.include?(provider)
+          return render json: {
+            error: "Forbidden",
+            message: "Provider '#{provider}' is configured for usage polling only. " \
+                     "Chat/completion via this provider is not permitted."
+          }, status: :forbidden
+        end
+
         unless Ai::ProxyService.supported_providers.include?(provider)
           return render json: {
-            error: 'Bad Request',
+            error: "Bad Request",
             message: "Unsupported AI provider: #{provider}"
           }, status: :bad_request
         end
@@ -87,7 +99,7 @@ module Api
 
         unless @connector
           render json: {
-            error: 'Not Found',
+            error: "Not Found",
             message: "No active #{provider} connector found for this organization"
           }, status: :not_found
         end
@@ -101,8 +113,8 @@ module Api
 
         if current_count >= rate_limit_max_requests
           render json: {
-            error: 'Rate Limited',
-            message: 'Too many requests. Please try again later.',
+            error: "Rate Limited",
+            message: "Too many requests. Please try again later.",
             retry_after: rate_limit_window
           }, status: :too_many_requests
           return
@@ -134,7 +146,7 @@ module Api
           id: result[:id],
           model: result[:model],
           message: {
-            role: 'assistant',
+            role: "assistant",
             content: result[:content]
           },
           finish_reason: result[:finish_reason],
@@ -143,7 +155,7 @@ module Api
       end
 
       def rate_limit_enabled?
-        ENV.fetch('AI_GATEWAY_RATE_LIMIT_ENABLED', 'true') == 'true'
+        ENV.fetch("AI_GATEWAY_RATE_LIMIT_ENABLED", "true") == "true"
       end
 
       def rate_limit_key
@@ -151,11 +163,11 @@ module Api
       end
 
       def rate_limit_max_requests
-        ENV.fetch('AI_GATEWAY_RATE_LIMIT_MAX', 100).to_i
+        ENV.fetch("AI_GATEWAY_RATE_LIMIT_MAX", 100).to_i
       end
 
       def rate_limit_window
-        ENV.fetch('AI_GATEWAY_RATE_LIMIT_WINDOW', 60).to_i.seconds
+        ENV.fetch("AI_GATEWAY_RATE_LIMIT_WINDOW", 60).to_i.seconds
       end
     end
   end

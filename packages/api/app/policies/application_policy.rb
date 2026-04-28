@@ -20,7 +20,7 @@ class ApplicationPolicy < ActionPolicy::Base
 
   def org_owner?(org = organization)
     return false unless user && org
-    user.role_in(org) == 'owner'
+    user.role_in(org) == "owner"
   end
 
   def org_role(org = organization)

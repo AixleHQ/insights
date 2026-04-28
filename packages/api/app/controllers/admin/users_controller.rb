@@ -33,6 +33,8 @@ module Admin
         user_agent: request.user_agent
       )
 
+      ImpersonationAuditService.log_started(user: user, actor: current_admin_user, request: request)
+
       # Generate an impersonation token
       token = ImpersonationService.generate_token(
         admin_user: current_admin_user,

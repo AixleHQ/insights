@@ -33,17 +33,35 @@ class ProjectPolicy < ApplicationPolicy
     false
   end
 
-  # Only admins can destroy projects
+  # Only owners can destroy projects
   def destroy?
     return true if global_admin?
     return own_personal_project? if record.personal?
-    return project_admin?(record) if record.organization_project?
+    return project_owner?(record) || org_owner?(record.organization) if record.organization_project?
     false
   end
 
   # Project settings access
   def settings?
     update?
+  end
+
+  # Retention policy access
+  def retention_policy?
+    update?
+  end
+
+  # Linking a Jira project requires the same permission as updating the project
+  def link_jira?
+    update?
+  end
+
+  # Only project admins/owners can view audit logs
+  def audit_logs?
+    return true if global_admin?
+    return own_personal_project? if record.personal?
+    return project_admin?(record) if record.organization_project?
+    false
   end
 
   private

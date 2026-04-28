@@ -1,153 +1,197 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { ProjectReposSection } from './ProjectReposSection';
-import type { ProjectRepository } from '@/hooks/useApi';
+import { describe, it, expect, vi, beforeAll } from "vitest";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { ProjectReposSection } from "./ProjectReposSection";
+import type { ProjectRepository } from "@/hooks/useApi";
 
 const mockRepositories: ProjectRepository[] = [
   {
-    id: '1',
-    name: 'my-project',
-    fullName: 'org/my-project',
-    provider: 'github',
-    url: 'https://github.com/org/my-project',
-    lastSyncAt: '2024-01-15T10:00:00Z',
+    id: "1",
+    name: "my-project",
+    fullName: "org/my-project",
+    provider: "github",
+    url: "https://github.com/org/my-project",
+    lastSyncAt: "2024-01-15T10:00:00Z",
     isActive: true,
   },
   {
-    id: '2',
-    name: 'other-repo',
-    fullName: 'org/other-repo',
-    provider: 'gitlab',
-    url: 'https://gitlab.com/org/other-repo',
+    id: "2",
+    name: "other-repo",
+    fullName: "org/other-repo",
+    provider: "gitlab",
+    url: "https://gitlab.com/org/other-repo",
     lastSyncAt: null,
     isActive: false,
   },
 ];
 
+beforeAll(() => {
+  window.Element.prototype.hasPointerCapture = vi.fn(() => false);
+  window.Element.prototype.setPointerCapture = vi.fn();
+  window.Element.prototype.releasePointerCapture = vi.fn();
+  window.Element.prototype.scrollIntoView = vi.fn();
+});
+
 const renderComponent = (props: Partial<Parameters<typeof ProjectReposSection>[0]> = {}) => {
   return render(<ProjectReposSection repositories={mockRepositories} {...props} />);
 };
 
-describe('ProjectReposSection', () => {
-  describe('Initial Render', () => {
-    it('renders the component with title', () => {
+describe("ProjectReposSection", () => {
+  describe("Initial Render", () => {
+    it("renders the component with title", () => {
       renderComponent();
-      expect(screen.getByText('Repositories')).toBeInTheDocument();
+      expect(screen.getByText("Repositories")).toBeInTheDocument();
     });
 
-    it('displays repository count correctly', () => {
+    it("displays repository count correctly", () => {
       renderComponent();
-      expect(screen.getByText('2 repositories linked')).toBeInTheDocument();
+      expect(screen.getByText("2 repositories linked")).toBeInTheDocument();
     });
 
-    it('displays singular repository text for single repo', () => {
+    it("displays singular repository text for single repo", () => {
       renderComponent({ repositories: [mockRepositories[0]] });
-      expect(screen.getByText('1 repository linked')).toBeInTheDocument();
+      expect(screen.getByText("1 repository linked")).toBeInTheDocument();
     });
   });
 
-  describe('Repository Display', () => {
-    it('renders repository full names', () => {
+  describe("Repository Display", () => {
+    it("renders repository full names", () => {
       renderComponent();
-      expect(screen.getByText('org/my-project')).toBeInTheDocument();
-      expect(screen.getByText('org/other-repo')).toBeInTheDocument();
+      expect(screen.getByText("org/my-project")).toBeInTheDocument();
+      expect(screen.getByText("org/other-repo")).toBeInTheDocument();
     });
 
-    it('renders external links to repositories', () => {
+    it("renders external links to repositories", () => {
       renderComponent();
-      const links = screen.getAllByRole('link');
+      const links = screen.getAllByRole("link");
       expect(links.length).toBe(2);
-      expect(links[0]).toHaveAttribute('href', 'https://github.com/org/my-project');
-      expect(links[0]).toHaveAttribute('target', '_blank');
-      expect(links[0]).toHaveAttribute('rel', 'noopener noreferrer');
+      expect(links[0]).toHaveAttribute("href", "https://github.com/org/my-project");
+      expect(links[0]).toHaveAttribute("target", "_blank");
+      expect(links[0]).toHaveAttribute("rel", "noopener noreferrer");
     });
 
-    it('displays active status badge', () => {
+    it("displays active status badge", () => {
       renderComponent();
-      expect(screen.getByText('Active')).toBeInTheDocument();
+      expect(screen.getByText("Active")).toBeInTheDocument();
     });
 
-    it('displays inactive status badge', () => {
+    it("displays inactive status badge", () => {
       renderComponent();
-      expect(screen.getByText('Inactive')).toBeInTheDocument();
+      expect(screen.getByText("Inactive")).toBeInTheDocument();
     });
   });
 
-  describe('Last Sync Display', () => {
-    it('displays last sync time when available', () => {
+  describe("Last Sync Display", () => {
+    it("displays last sync time when available", () => {
       renderComponent();
       // The component uses formatDistanceToNow which includes "ago"
       expect(screen.getByText(/Synced/)).toBeInTheDocument();
     });
 
-    it('does not display sync time when lastSyncAt is null', () => {
+    it("does not display sync time when lastSyncAt is null", () => {
       renderComponent({ repositories: [mockRepositories[1]] });
       expect(screen.queryByText(/Synced/)).not.toBeInTheDocument();
     });
   });
 
-  describe('Loading State', () => {
-    it('shows loading text when isLoading is true', () => {
+  describe("Loading State", () => {
+    it("shows loading text when isLoading is true", () => {
       renderComponent({ isLoading: true });
-      expect(screen.getByText('Loading repositories...')).toBeInTheDocument();
+      expect(screen.getByText("Loading repositories...")).toBeInTheDocument();
     });
 
-    it('shows skeleton loaders when loading', () => {
+    it("shows skeleton loaders when loading", () => {
       const { container } = renderComponent({ isLoading: true });
       const skeletons = container.querySelectorAll('[class*="animate-pulse"]');
       expect(skeletons.length).toBeGreaterThan(0);
     });
   });
 
-  describe('Empty State', () => {
-    it('shows empty message when no repositories', () => {
+  describe("Empty State", () => {
+    it("shows empty message when no repositories", () => {
       renderComponent({ repositories: [] });
-      expect(screen.getByText('No repositories linked to this project')).toBeInTheDocument();
+      expect(screen.getByText("No repositories linked to this project")).toBeInTheDocument();
     });
 
-    it('shows empty message when repositories is undefined', () => {
+    it("shows empty message when repositories is undefined", () => {
       renderComponent({ repositories: undefined });
-      expect(screen.getByText('No repositories linked to this project')).toBeInTheDocument();
+      expect(screen.getByText("No repositories linked to this project")).toBeInTheDocument();
     });
 
-    it('displays 0 repositories count', () => {
+    it("displays 0 repositories count", () => {
       renderComponent({ repositories: [] });
-      expect(screen.getByText('0 repositories linked')).toBeInTheDocument();
+      expect(screen.getByText("0 repositories linked")).toBeInTheDocument();
     });
   });
 
-  describe('Provider Icons', () => {
-    it('renders github icon for github provider', () => {
+  describe("Provider Icons", () => {
+    it("renders github icon for github provider", () => {
       renderComponent({ repositories: [mockRepositories[0]] });
       // The Github icon should be rendered - we check for the link instead
-      const link = screen.getByRole('link');
-      expect(link).toHaveAttribute('href', 'https://github.com/org/my-project');
+      const link = screen.getByRole("link");
+      expect(link).toHaveAttribute("href", "https://github.com/org/my-project");
     });
 
-    it('renders git branch icon for non-github providers', () => {
+    it("renders git branch icon for non-github providers", () => {
       renderComponent({ repositories: [mockRepositories[1]] });
       // The GitBranch icon is used as fallback - we check for the link instead
-      const link = screen.getByRole('link');
-      expect(link).toHaveAttribute('href', 'https://gitlab.com/org/other-repo');
+      const link = screen.getByRole("link");
+      expect(link).toHaveAttribute("href", "https://gitlab.com/org/other-repo");
     });
   });
 
-  describe('Custom className', () => {
-    it('applies custom className to container', () => {
-      const { container } = renderComponent({ className: 'custom-class' });
-      expect(container.firstChild).toHaveClass('custom-class');
+  describe("Custom className", () => {
+    it("applies custom className to container", () => {
+      const { container } = renderComponent({ className: "custom-class" });
+      expect(container.firstChild).toHaveClass("custom-class");
     });
   });
 
-  describe('Fallback to name when fullName is empty', () => {
-    it('uses name when fullName is not available', () => {
+  describe("Disconnect", () => {
+    it("does not render disconnect buttons when onDisconnect is not provided", () => {
+      renderComponent();
+      expect(screen.queryByRole("button", { name: /disconnect/i })).not.toBeInTheDocument();
+    });
+
+    it("renders disconnect buttons when onDisconnect is provided", () => {
+      const onDisconnect = vi.fn().mockResolvedValue({});
+      renderComponent({ onDisconnect });
+      const buttons = screen.getAllByRole("button", { name: /disconnect/i });
+      expect(buttons).toHaveLength(2);
+    });
+
+    it("calls onDisconnect with repo id after confirmation", async () => {
+      const user = userEvent.setup();
+      const onDisconnect = vi.fn().mockResolvedValue({});
+      renderComponent({ onDisconnect });
+
+      await user.click(screen.getAllByRole("button", { name: /disconnect/i })[0]);
+      await user.click(screen.getByRole("button", { name: "Disconnect" }));
+
+      expect(onDisconnect).toHaveBeenCalledWith("1");
+    });
+
+    it("does not call onDisconnect when confirmation is cancelled", async () => {
+      const user = userEvent.setup();
+      const onDisconnect = vi.fn();
+      renderComponent({ onDisconnect });
+
+      await user.click(screen.getAllByRole("button", { name: /disconnect/i })[0]);
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+      expect(onDisconnect).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Fallback to name when fullName is empty", () => {
+    it("uses name when fullName is not available", () => {
       const repoWithoutFullName: ProjectRepository = {
         ...mockRepositories[0],
-        fullName: '',
-        name: 'just-the-name',
+        fullName: "",
+        name: "just-the-name",
       };
       renderComponent({ repositories: [repoWithoutFullName] });
-      expect(screen.getByText('just-the-name')).toBeInTheDocument();
+      expect(screen.getByText("just-the-name")).toBeInTheDocument();
     });
   });
 });

@@ -3,7 +3,11 @@ require 'rails_helper'
 RSpec.describe OrganizationConnector, type: :model do
   describe 'constants' do
     it 'defines valid connector types' do
-      expect(OrganizationConnector::CONNECTOR_TYPES).to eq(%w[github gitlab bitbucket jira linear openrouter anthropic openai gemini])
+      expect(OrganizationConnector::CONNECTOR_TYPES).to eq(%w[github gitlab bitbucket jira linear openrouter anthropic openai gemini slack])
+    end
+
+    it 'defines valid statuses' do
+      expect(OrganizationConnector::STATUSES).to eq(%w[connected testing error disconnected])
     end
   end
 
@@ -45,8 +49,8 @@ RSpec.describe OrganizationConnector, type: :model do
   describe 'scopes' do
     describe '.active' do
       it 'returns only active connectors' do
-        active = create(:organization_connector, is_active: true)
-        inactive = create(:organization_connector, is_active: false)
+        active = create(:organization_connector, is_active: true, status: 'connected')
+        inactive = create(:organization_connector, is_active: false, status: 'disconnected')
 
         expect(OrganizationConnector.active).to include(active)
         expect(OrganizationConnector.active).not_to include(inactive)
@@ -132,6 +136,15 @@ RSpec.describe OrganizationConnector, type: :model do
         expect(connector.last_sync_at).to eq(Time.current)
         expect(connector.last_error).to be_nil
       end
+    end
+  end
+
+  describe '#mark_testing!' do
+    it 'sets status to testing and clears last_error' do
+      connector = create(:organization_connector, status: 'error', last_error: 'previous error')
+      connector.mark_testing!
+      expect(connector.status).to eq('testing')
+      expect(connector.last_error).to be_nil
     end
   end
 

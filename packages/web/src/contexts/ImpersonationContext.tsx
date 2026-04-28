@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
+import { api } from "@/lib/api";
 
 interface ImpersonationState {
   isImpersonating: boolean;
@@ -8,10 +9,10 @@ interface ImpersonationState {
 
 interface ImpersonationContextValue extends ImpersonationState {
   startImpersonation: (token: string) => void;
-  stopImpersonation: () => void;
+  stopImpersonation: () => Promise<void>;
 }
 
-const STORAGE_KEY = 'impersonation_token';
+const STORAGE_KEY = "impersonation_token";
 
 const ImpersonationContext = createContext<ImpersonationContextValue | null>(null);
 
@@ -26,12 +27,12 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Check URL for impersonation token
     const params = new URLSearchParams(window.location.search);
-    const urlToken = params.get('impersonate');
+    const urlToken = params.get("impersonate");
 
     if (urlToken) {
       // Store the token and remove from URL
       localStorage.setItem(STORAGE_KEY, urlToken);
-      window.history.replaceState({}, '', window.location.pathname);
+      window.history.replaceState({}, "", window.location.pathname);
       decodeAndSetToken(urlToken);
     } else {
       // Check localStorage for existing token
@@ -45,9 +46,9 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
   const decodeAndSetToken = (token: string) => {
     try {
       // Decode JWT to get impersonator info
-      const parts = token.split('.');
+      const parts = token.split(".");
       if (parts.length !== 3) {
-        throw new Error('Invalid token format');
+        throw new Error("Invalid token format");
       }
 
       const payload = JSON.parse(atob(parts[1]));
@@ -64,7 +65,7 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
         token,
       });
     } catch (error) {
-      console.error('Failed to decode impersonation token:', error);
+      console.error("Failed to decode impersonation token:", error);
       localStorage.removeItem(STORAGE_KEY);
     }
   };
@@ -74,7 +75,12 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
     decodeAndSetToken(token);
   }, []);
 
-  const stopImpersonation = useCallback(() => {
+  const stopImpersonation = useCallback(async () => {
+    try {
+      await api.post("/users/me/stop_impersonation");
+    } catch (error) {
+      console.error("Failed to log impersonation end:", error);
+    }
     localStorage.removeItem(STORAGE_KEY);
     setState({
       isImpersonating: false,
@@ -82,7 +88,7 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
       token: null,
     });
     // Reload to get fresh auth state
-    window.location.href = '/';
+    window.location.href = "/";
   }, []);
 
   return (
@@ -98,10 +104,11 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useImpersonation(): ImpersonationContextValue {
   const context = useContext(ImpersonationContext);
   if (!context) {
-    throw new Error('useImpersonation must be used within an ImpersonationProvider');
+    throw new Error("useImpersonation must be used within an ImpersonationProvider");
   }
   return context;
 }

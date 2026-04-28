@@ -15,6 +15,22 @@ RSpec.describe 'Api::V1::Users', type: :request do
       expect(json_data[:email]).to eq(user.email)
     end
 
+    it 'includes settings hash in response' do
+      create(:user_setting, user: user, key: 'theme', value: 'dark')
+
+      authenticated_get '/api/v1/users/me', user: user
+
+      expect_success
+      expect(json_data[:settings]).to eq({ theme: 'dark' })
+    end
+
+    it 'returns empty settings hash when user has no settings' do
+      authenticated_get '/api/v1/users/me', user: user
+
+      expect_success
+      expect(json_data[:settings]).to eq({})
+    end
+
     it 'returns unauthorized without authentication' do
       get '/api/v1/users/me'
 
@@ -29,6 +45,22 @@ RSpec.describe 'Api::V1::Users', type: :request do
       expect_success
       expect(json_data[:name]).to eq('New Name')
       expect(user.reload.name).to eq('New Name')
+    end
+
+    it 'updates the avatar_url' do
+      authenticated_patch '/api/v1/users/me', user: user, params: { avatar_url: 'https://example.com/avatar.png' }
+
+      expect_success
+      expect(json_data[:avatarUrl]).to eq('https://example.com/avatar.png')
+      expect(user.reload.avatar_url).to eq('https://example.com/avatar.png')
+    end
+
+    it 'updates name and avatar_url together' do
+      authenticated_patch '/api/v1/users/me', user: user, params: { name: 'New Name', avatar_url: 'https://example.com/avatar.png' }
+
+      expect_success
+      expect(json_data[:name]).to eq('New Name')
+      expect(json_data[:avatarUrl]).to eq('https://example.com/avatar.png')
     end
 
     it 'does not allow updating email directly' do
@@ -83,6 +115,69 @@ RSpec.describe 'Api::V1::Users', type: :request do
       expect_success
       expect(json_data[:value]).to eq('light')
     end
+
+    context 'theme validation' do
+      it 'accepts valid theme values' do
+        %w[light dark system].each do |theme|
+          authenticated_put '/api/v1/users/me/settings/theme', user: user, params: { value: theme }
+
+          expect_success
+          expect(json_data[:value]).to eq(theme)
+        end
+      end
+
+      it 'rejects invalid theme values' do
+        authenticated_put '/api/v1/users/me/settings/theme', user: user, params: { value: 'purple' }
+
+        expect_unprocessable
+        expect(json_response[:errors][:value]).to include('must be one of: light, dark, system')
+      end
+    end
+
+    context 'default_org_id validation' do
+      let!(:org) { create(:organization) }
+      let!(:_membership) { create(:organization_membership, user: user, organization: org) }
+      let!(:other_org) { create(:organization) }
+
+      it 'accepts an org the user belongs to' do
+        authenticated_put '/api/v1/users/me/settings/default_org_id', user: user, params: { value: org.id }
+
+        expect_success
+        expect(json_data[:value]).to eq(org.id)
+      end
+
+      it 'rejects an org the user does not belong to' do
+        authenticated_put '/api/v1/users/me/settings/default_org_id', user: user, params: { value: other_org.id }
+
+        expect_unprocessable
+        expect(json_response[:errors][:value]).to include('must be a valid organization you belong to')
+      end
+    end
+
+    context 'notification key validation' do
+      %w[notify_in_app_risk notify_in_app_cost notify_email_digest notify_email_alerts].each do |key|
+        it "accepts true for #{key}" do
+          authenticated_put "/api/v1/users/me/settings/#{key}", user: user, params: { value: 'true' }
+
+          expect_success
+          expect(json_data[:value]).to eq('true')
+        end
+
+        it "accepts false for #{key}" do
+          authenticated_put "/api/v1/users/me/settings/#{key}", user: user, params: { value: 'false' }
+
+          expect_success
+          expect(json_data[:value]).to eq('false')
+        end
+
+        it "rejects invalid value for #{key}" do
+          authenticated_put "/api/v1/users/me/settings/#{key}", user: user, params: { value: 'yes' }
+
+          expect_unprocessable
+          expect(json_response[:errors][:value]).to include('must be true or false')
+        end
+      end
+    end
   end
 
   describe 'DELETE /api/v1/users/me/settings/:key' do
@@ -99,6 +194,70 @@ RSpec.describe 'Api::V1::Users', type: :request do
       authenticated_delete '/api/v1/users/me/settings/nonexistent', user: user
 
       expect_not_found
+    end
+  end
+
+  describe 'POST /api/v1/users/me/stop_impersonation' do
+    let(:admin) { create(:user, global_admin: true) }
+    let!(:organization) { create(:organization) }
+    let!(:membership) { create(:organization_membership, user: user, organization: organization) }
+
+    context 'when in impersonation mode' do
+      it 'logs impersonation.ended and returns success' do
+        expect {
+          impersonated_post '/api/v1/users/me/stop_impersonation',
+                           user: user,
+                           impersonator: admin
+        }.to change(OrganizationAuditLog, :count).by(1)
+
+        expect_success
+        expect(json_data[:success]).to be true
+
+        log = OrganizationAuditLog.last
+        expect(log.action).to eq('impersonation.ended')
+        expect(log.actor_id).to eq(admin.id)
+        expect(log.organization_id).to eq(organization.id)
+        expect(log.resource_type).to eq('User')
+        expect(log.resource_id).to eq(user.id)
+      end
+
+      it 'logs to all organizations the user belongs to' do
+        other_org = create(:organization)
+        create(:organization_membership, user: user, organization: other_org)
+
+        expect {
+          impersonated_post '/api/v1/users/me/stop_impersonation',
+                           user: user,
+                           impersonator: admin
+        }.to change(OrganizationAuditLog, :count).by(2)
+      end
+
+      it 'logs impersonation.ended to each project the user belongs to' do
+        project = create(:project, organization: organization)
+        create(:project_membership, user: user, project: project, role: 'member')
+
+        expect {
+          impersonated_post '/api/v1/users/me/stop_impersonation',
+                           user: user,
+                           impersonator: admin
+        }.to change(ProjectAuditLog, :count).by(1)
+
+        log = ProjectAuditLog.last
+        expect(log.action).to eq('impersonation.ended')
+        expect(log.project).to eq(project)
+        expect(log.actor).to eq(admin)
+        expect(log.resource_type).to eq('User')
+        expect(log.resource_id).to eq(user.id)
+      end
+    end
+
+    context 'when not in impersonation mode' do
+      it 'returns bad request' do
+        authenticated_post '/api/v1/users/me/stop_impersonation', user: user
+
+        expect_bad_request
+        expect(json_response[:error]).to eq('Not in impersonation mode')
+      end
     end
   end
 end

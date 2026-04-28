@@ -1,0 +1,482 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent } from "@/test/utils";
+import { ToolInsightsSection } from "./ToolInsightsSection";
+import type {
+  ToolOverviewStats,
+  ToolModelsResponse,
+  ToolUsersResponse,
+  ToolDailyResponse,
+  ToolEventTypesResponse,
+} from "@/lib/types";
+
+// Mock recharts to avoid jsdom SVG rendering issues
+vi.mock("recharts", () => ({
+  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="chart-container">{children}</div>
+  ),
+  AreaChart: () => <div data-testid="area-chart" />,
+  BarChart: () => <div data-testid="bar-chart" />,
+  Area: () => null,
+  Bar: () => null,
+  CartesianGrid: () => null,
+  XAxis: () => null,
+  YAxis: () => null,
+}));
+
+// Mock the ChartContainer / Tooltip from shadcn/ui chart to be a simple passthrough
+vi.mock("@/components/ui/chart", () => ({
+  ChartContainer: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="chart">{children}</div>
+  ),
+  ChartTooltip: () => null,
+  ChartTooltipContent: () => null,
+}));
+
+vi.mock("@/hooks/useApi", () => ({
+  useToolOverview: vi.fn(),
+  useToolModels: vi.fn(),
+  useToolUsers: vi.fn(),
+  useToolDaily: vi.fn(),
+  useToolEventTypes: vi.fn(),
+  useConnectors: vi.fn(),
+  useConnectorSyncStatus: vi.fn(),
+  useSyncConnector: vi.fn(),
+}));
+
+import {
+  useToolOverview,
+  useToolModels,
+  useToolUsers,
+  useToolDaily,
+  useToolEventTypes,
+  useConnectors,
+  useConnectorSyncStatus,
+  useSyncConnector,
+} from "@/hooks/useApi";
+
+const mockUseToolOverview = vi.mocked(useToolOverview);
+const mockUseToolModels = vi.mocked(useToolModels);
+const mockUseToolUsers = vi.mocked(useToolUsers);
+const mockUseToolDaily = vi.mocked(useToolDaily);
+const mockUseToolEventTypes = vi.mocked(useToolEventTypes);
+const mockUseConnectors = vi.mocked(useConnectors);
+const mockUseConnectorSyncStatus = vi.mocked(useConnectorSyncStatus);
+const mockUseSyncConnector = vi.mocked(useSyncConnector);
+
+function makeOverview(total_events: number): { data: ToolOverviewStats; isLoading: false } {
+  return {
+    data: {
+      tool: "cursor",
+      total_events,
+      total_cost_usd: 1.5,
+      total_tokens_in: 50000,
+      total_tokens_out: 15000,
+      active_users: 3,
+      events_change_pct: 5,
+      cost_change_pct: 2,
+    },
+    isLoading: false,
+  };
+}
+
+const emptyModels: { data: ToolModelsResponse; isLoading: false } = {
+  data: { tool: "cursor", timeRange: { start: "", end: "" }, models: [] },
+  isLoading: false,
+};
+
+const emptyUsers: { data: ToolUsersResponse; isLoading: false } = {
+  data: { tool: "cursor", timeRange: { start: "", end: "" }, users: [] },
+  isLoading: false,
+};
+
+const emptyDaily: { data: ToolDailyResponse; isLoading: false } = {
+  data: {
+    tool: "cursor",
+    timeRange: { start: "", end: "" },
+    daily: [
+      { date: "2026-04-01", eventCount: 5, tokensIn: 1000, tokensOut: 500, costUsd: 0.01 },
+    ],
+  },
+  isLoading: false,
+};
+
+const emptyEventTypes: { data: ToolEventTypesResponse; isLoading: false } = {
+  data: { tool: "cursor", timeRange: { start: "", end: "" }, eventTypes: [] },
+  isLoading: false,
+};
+
+const noConnectors = { data: [], isLoading: false };
+const noSyncStatus = { data: undefined, isLoading: false };
+
+// noMutate is recreated per-test (not module-level) to prevent mock call
+// counts from leaking between tests when asserted on.
+function makeNoMutate() {
+  return { mutate: vi.fn(), isPending: false };
+}
+
+function setupLoadingState() {
+  mockUseToolOverview.mockReturnValue({ data: undefined, isLoading: true } as never);
+  mockUseToolModels.mockReturnValue({ data: undefined, isLoading: true } as never);
+  mockUseToolUsers.mockReturnValue({ data: undefined, isLoading: true } as never);
+  mockUseToolDaily.mockReturnValue({ data: undefined, isLoading: true } as never);
+  mockUseToolEventTypes.mockReturnValue({ data: undefined, isLoading: true } as never);
+  mockUseConnectors.mockReturnValue(noConnectors as never);
+  mockUseConnectorSyncStatus.mockReturnValue(noSyncStatus as never);
+  mockUseSyncConnector.mockReturnValue(makeNoMutate() as never);
+}
+
+function setupCursorOnlyData() {
+  mockUseToolOverview.mockImplementation((_, tool) => {
+    if (tool === "cursor") return makeOverview(42) as never;
+    return makeOverview(0) as never;
+  });
+  mockUseToolModels.mockReturnValue(emptyModels as never);
+  mockUseToolUsers.mockReturnValue(emptyUsers as never);
+  mockUseToolDaily.mockReturnValue(emptyDaily as never);
+  mockUseToolEventTypes.mockReturnValue(emptyEventTypes as never);
+  mockUseConnectors.mockReturnValue(noConnectors as never);
+  mockUseConnectorSyncStatus.mockReturnValue(noSyncStatus as never);
+  mockUseSyncConnector.mockReturnValue(makeNoMutate() as never);
+}
+
+function setupNoData() {
+  mockUseToolOverview.mockReturnValue(makeOverview(0) as never);
+  mockUseToolModels.mockReturnValue(emptyModels as never);
+  mockUseToolUsers.mockReturnValue(emptyUsers as never);
+  mockUseToolDaily.mockReturnValue(emptyDaily as never);
+  mockUseToolEventTypes.mockReturnValue(emptyEventTypes as never);
+  mockUseConnectors.mockReturnValue(noConnectors as never);
+  mockUseConnectorSyncStatus.mockReturnValue(noSyncStatus as never);
+  mockUseSyncConnector.mockReturnValue(makeNoMutate() as never);
+}
+
+describe("ToolInsightsSection", () => {
+  const defaultProps = {
+    orgId: "org-123",
+    days: 30,
+    onDaysChange: vi.fn(),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("renders nothing while both tool overviews are still loading", () => {
+    setupLoadingState();
+    const { container } = render(<ToolInsightsSection {...defaultProps} />);
+    expect(container.firstChild).toBeNull();
+  });
+
+  it("renders nothing while only one overview is still loading (loading race)", () => {
+    // Cursor resolved with 0 events; OpenRouter still pending.
+    // The section must not flash-hide before OpenRouter returns data.
+    mockUseToolOverview.mockImplementation((_, tool) => {
+      if (tool === "cursor") return makeOverview(0) as never;
+      return { data: undefined, isLoading: true } as never;
+    });
+    mockUseToolModels.mockReturnValue(emptyModels as never);
+    mockUseToolUsers.mockReturnValue(emptyUsers as never);
+    mockUseToolDaily.mockReturnValue(emptyDaily as never);
+    mockUseToolEventTypes.mockReturnValue(emptyEventTypes as never);
+
+    const { container } = render(<ToolInsightsSection {...defaultProps} />);
+    expect(container.firstChild).toBeNull();
+  });
+
+  it("renders nothing when both tools have zero events", () => {
+    setupNoData();
+    const { container } = render(<ToolInsightsSection {...defaultProps} />);
+    expect(container.firstChild).toBeNull();
+  });
+
+  it("renders the section when cursor has events", () => {
+    setupCursorOnlyData();
+    render(<ToolInsightsSection {...defaultProps} />);
+    expect(screen.getByText("Tool Insights")).toBeInTheDocument();
+  });
+
+  it("shows Cursor tab when cursor has events", () => {
+    setupCursorOnlyData();
+    render(<ToolInsightsSection {...defaultProps} />);
+    expect(screen.getByRole("tab", { name: "Cursor" })).toBeInTheDocument();
+  });
+
+  it("does not show OpenRouter tab when openrouter_api has no events", () => {
+    setupCursorOnlyData();
+    render(<ToolInsightsSection {...defaultProps} />);
+    expect(screen.queryByRole("tab", { name: "OpenRouter" })).not.toBeInTheDocument();
+  });
+
+  it("shows both tabs when both tools have events", () => {
+    mockUseToolOverview.mockReturnValue(makeOverview(10) as never);
+    mockUseToolModels.mockReturnValue(emptyModels as never);
+    mockUseToolUsers.mockReturnValue(emptyUsers as never);
+    mockUseToolDaily.mockReturnValue(emptyDaily as never);
+    mockUseToolEventTypes.mockReturnValue(emptyEventTypes as never);
+    mockUseConnectors.mockReturnValue(noConnectors as never);
+    mockUseConnectorSyncStatus.mockReturnValue(noSyncStatus as never);
+    mockUseSyncConnector.mockReturnValue(makeNoMutate() as never);
+
+    render(<ToolInsightsSection {...defaultProps} />);
+    expect(screen.getByRole("tab", { name: "Cursor" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "OpenRouter" })).toBeInTheDocument();
+  });
+
+  it("renders day range buttons (7d, 30d, 90d)", () => {
+    setupCursorOnlyData();
+    render(<ToolInsightsSection {...defaultProps} />);
+    expect(screen.getByRole("button", { name: "7d" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "30d" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "90d" })).toBeInTheDocument();
+  });
+
+  it("calls onDaysChange with 7 when the 7d button is clicked", () => {
+    const onDaysChange = vi.fn();
+    setupCursorOnlyData();
+    render(<ToolInsightsSection {...defaultProps} onDaysChange={onDaysChange} />);
+    fireEvent.click(screen.getByRole("button", { name: "7d" }));
+    expect(onDaysChange).toHaveBeenCalledWith(7);
+  });
+
+  it("calls onDaysChange with 90 when the 90d button is clicked", () => {
+    const onDaysChange = vi.fn();
+    setupCursorOnlyData();
+    render(<ToolInsightsSection {...defaultProps} onDaysChange={onDaysChange} />);
+    fireEvent.click(screen.getByRole("button", { name: "90d" }));
+    expect(onDaysChange).toHaveBeenCalledWith(90);
+  });
+
+  it("shows active users count derived from users response", () => {
+    mockUseToolOverview.mockImplementation((_, tool) => {
+      if (tool === "cursor") return makeOverview(5) as never;
+      return makeOverview(0) as never;
+    });
+    mockUseToolModels.mockReturnValue(emptyModels as never);
+    mockUseToolUsers.mockReturnValue({
+      data: {
+        tool: "cursor",
+        timeRange: { start: "", end: "" },
+        users: [
+          { userId: "u1", name: "Alice", email: "a@a.com", eventCount: 10, totalTokens: 1000, costUsd: 0.1 },
+          { userId: "u2", name: "Bob", email: "b@b.com", eventCount: 5, totalTokens: 500, costUsd: 0.05 },
+        ],
+      },
+      isLoading: false,
+    } as never);
+    mockUseToolDaily.mockReturnValue(emptyDaily as never);
+    mockUseToolEventTypes.mockReturnValue(emptyEventTypes as never);
+    mockUseConnectors.mockReturnValue(noConnectors as never);
+    mockUseConnectorSyncStatus.mockReturnValue(noSyncStatus as never);
+    mockUseSyncConnector.mockReturnValue(makeNoMutate() as never);
+
+    render(<ToolInsightsSection {...defaultProps} />);
+    // Active Users card should show 2
+    expect(screen.getByText("2")).toBeInTheDocument();
+  });
+
+  it("shows only OpenRouter tab and no Cursor tab when only openrouter has events", () => {
+    mockUseToolOverview.mockImplementation((_, tool) => {
+      if (tool === "openrouter_api") return makeOverview(15) as never;
+      return makeOverview(0) as never;
+    });
+    mockUseToolModels.mockReturnValue(emptyModels as never);
+    mockUseToolUsers.mockReturnValue(emptyUsers as never);
+    mockUseToolDaily.mockReturnValue({
+      data: {
+        tool: "openrouter_api",
+        timeRange: { start: "", end: "" },
+        daily: [
+          { date: "2026-04-01", eventCount: 5, tokensIn: 1000, tokensOut: 500, costUsd: 0.01 },
+        ],
+      },
+      isLoading: false,
+    } as never);
+    mockUseToolEventTypes.mockReturnValue(emptyEventTypes as never);
+    mockUseConnectors.mockReturnValue(noConnectors as never);
+    mockUseConnectorSyncStatus.mockReturnValue(noSyncStatus as never);
+    mockUseSyncConnector.mockReturnValue(makeNoMutate() as never);
+
+    render(<ToolInsightsSection {...defaultProps} />);
+    expect(screen.getByRole("tab", { name: "OpenRouter" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Cursor" })).not.toBeInTheDocument();
+    // Real tab content — shows metric cards
+    expect(screen.getByText("Total Events")).toBeInTheDocument();
+    expect(screen.queryByText("OpenRouter insights coming soon.")).not.toBeInTheDocument();
+  });
+
+  it("shows empty state inside Cursor tab when daily data has no events", () => {
+    mockUseToolOverview.mockImplementation((_, tool) => {
+      if (tool === "cursor") return makeOverview(5) as never;
+      return makeOverview(0) as never;
+    });
+    mockUseToolModels.mockReturnValue(emptyModels as never);
+    mockUseToolUsers.mockReturnValue(emptyUsers as never);
+    mockUseToolDaily.mockReturnValue({
+      data: { tool: "cursor", timeRange: { start: "", end: "" }, daily: [] },
+      isLoading: false,
+    } as never);
+    mockUseToolEventTypes.mockReturnValue(emptyEventTypes as never);
+    mockUseConnectors.mockReturnValue(noConnectors as never);
+    mockUseConnectorSyncStatus.mockReturnValue(noSyncStatus as never);
+    mockUseSyncConnector.mockReturnValue(makeNoMutate() as never);
+
+    render(<ToolInsightsSection {...defaultProps} />);
+    expect(screen.getByText(/No Cursor events in the last 30 days/i)).toBeInTheDocument();
+  });
+
+  it("shows sync status subsection when active OpenRouter connector exists", () => {
+    mockUseToolOverview.mockImplementation((_, tool) => {
+      if (tool === "openrouter_api") return makeOverview(10) as never;
+      return makeOverview(0) as never;
+    });
+    mockUseToolModels.mockReturnValue(emptyModels as never);
+    mockUseToolUsers.mockReturnValue(emptyUsers as never);
+    mockUseToolDaily.mockReturnValue({
+      data: {
+        tool: "openrouter_api",
+        timeRange: { start: "", end: "" },
+        daily: [{ date: "2026-04-01", eventCount: 3, tokensIn: 100, tokensOut: 50, costUsd: 0.05 }],
+      },
+      isLoading: false,
+    } as never);
+    mockUseToolEventTypes.mockReturnValue(emptyEventTypes as never);
+    mockUseConnectors.mockReturnValue({
+      data: [{ id: "conn-1", connectorType: "openrouter", isActive: true, status: "connected" }],
+      isLoading: false,
+    } as never);
+    mockUseConnectorSyncStatus.mockReturnValue({
+      data: { connector_type: "openrouter", status: "connected", last_sync_at: null, last_error: null, total_events: 10 },
+      isLoading: false,
+    } as never);
+    mockUseSyncConnector.mockReturnValue(makeNoMutate() as never);
+
+    render(<ToolInsightsSection {...defaultProps} />);
+    expect(screen.getByText("Data Sync")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Sync Now/i })).toBeInTheDocument();
+  });
+
+  it("hides sync status subsection when no active OpenRouter connector", () => {
+    mockUseToolOverview.mockImplementation((_, tool) => {
+      if (tool === "openrouter_api") return makeOverview(10) as never;
+      return makeOverview(0) as never;
+    });
+    mockUseToolModels.mockReturnValue(emptyModels as never);
+    mockUseToolUsers.mockReturnValue(emptyUsers as never);
+    mockUseToolDaily.mockReturnValue({
+      data: {
+        tool: "openrouter_api",
+        timeRange: { start: "", end: "" },
+        daily: [{ date: "2026-04-01", eventCount: 3, tokensIn: 100, tokensOut: 50, costUsd: 0.05 }],
+      },
+      isLoading: false,
+    } as never);
+    mockUseToolEventTypes.mockReturnValue(emptyEventTypes as never);
+    mockUseConnectors.mockReturnValue(noConnectors as never);
+    mockUseConnectorSyncStatus.mockReturnValue(noSyncStatus as never);
+    mockUseSyncConnector.mockReturnValue(makeNoMutate() as never);
+
+    render(<ToolInsightsSection {...defaultProps} />);
+    expect(screen.queryByText("Data Sync")).not.toBeInTheDocument();
+  });
+
+  it("clicking Sync Now calls mutate with orgId and connectorId", () => {
+    const mutateSpy = vi.fn();
+    mockUseToolOverview.mockImplementation((_, tool) => {
+      if (tool === "openrouter_api") return makeOverview(10) as never;
+      return makeOverview(0) as never;
+    });
+    mockUseToolModels.mockReturnValue(emptyModels as never);
+    mockUseToolUsers.mockReturnValue(emptyUsers as never);
+    mockUseToolDaily.mockReturnValue({
+      data: {
+        tool: "openrouter_api",
+        timeRange: { start: "", end: "" },
+        daily: [{ date: "2026-04-01", eventCount: 3, tokensIn: 100, tokensOut: 50, costUsd: 0.05 }],
+      },
+      isLoading: false,
+    } as never);
+    mockUseToolEventTypes.mockReturnValue(emptyEventTypes as never);
+    mockUseConnectors.mockReturnValue({
+      data: [{ id: "conn-1", connectorType: "openrouter", isActive: true, status: "connected" }],
+      isLoading: false,
+    } as never);
+    mockUseConnectorSyncStatus.mockReturnValue({
+      data: { connector_type: "openrouter", status: "connected", last_sync_at: null, last_error: null, total_events: 10 },
+      isLoading: false,
+    } as never);
+    mockUseSyncConnector.mockReturnValue({ mutate: mutateSpy, isPending: false } as never);
+
+    render(<ToolInsightsSection {...defaultProps} />);
+    fireEvent.click(screen.getByRole("button", { name: /Sync Now/i }));
+    expect(mutateSpy).toHaveBeenCalledOnce();
+    expect(mutateSpy).toHaveBeenCalledWith({ orgId: "org-123", connectorId: "conn-1" });
+  });
+
+  it("disables Sync Now button and shows Syncing text while isPending", () => {
+    mockUseToolOverview.mockImplementation((_, tool) => {
+      if (tool === "openrouter_api") return makeOverview(10) as never;
+      return makeOverview(0) as never;
+    });
+    mockUseToolModels.mockReturnValue(emptyModels as never);
+    mockUseToolUsers.mockReturnValue(emptyUsers as never);
+    mockUseToolDaily.mockReturnValue({
+      data: {
+        tool: "openrouter_api",
+        timeRange: { start: "", end: "" },
+        daily: [{ date: "2026-04-01", eventCount: 3, tokensIn: 100, tokensOut: 50, costUsd: 0.05 }],
+      },
+      isLoading: false,
+    } as never);
+    mockUseToolEventTypes.mockReturnValue(emptyEventTypes as never);
+    mockUseConnectors.mockReturnValue({
+      data: [{ id: "conn-1", connectorType: "openrouter", isActive: true, status: "connected" }],
+      isLoading: false,
+    } as never);
+    mockUseConnectorSyncStatus.mockReturnValue({
+      data: { connector_type: "openrouter", status: "connected", last_sync_at: null, last_error: null, total_events: 10 },
+      isLoading: false,
+    } as never);
+    mockUseSyncConnector.mockReturnValue({ mutate: vi.fn(), isPending: true } as never);
+
+    render(<ToolInsightsSection {...defaultProps} />);
+    const button = screen.getByRole("button", { name: /Syncing/i });
+    expect(button).toBeDisabled();
+    expect(button).toHaveTextContent("Syncing…");
+  });
+
+  it("shows Models Used metric in OpenRouter tab", () => {
+    mockUseToolOverview.mockImplementation((_, tool) => {
+      if (tool === "openrouter_api") return makeOverview(10) as never;
+      return makeOverview(0) as never;
+    });
+    mockUseToolModels.mockReturnValue({
+      data: {
+        tool: "openrouter_api",
+        timeRange: { start: "", end: "" },
+        models: [
+          { name: "gpt-4o", eventCount: 5, tokensIn: 500, tokensOut: 200, costUsd: 1.2, price_per_million_input: null, price_per_million_output: null },
+          { name: "claude-3", eventCount: 3, tokensIn: 300, tokensOut: 100, costUsd: 0.8, price_per_million_input: null, price_per_million_output: null },
+        ],
+      },
+      isLoading: false,
+    } as never);
+    mockUseToolUsers.mockReturnValue(emptyUsers as never);
+    mockUseToolDaily.mockReturnValue({
+      data: {
+        tool: "openrouter_api",
+        timeRange: { start: "", end: "" },
+        daily: [{ date: "2026-04-01", eventCount: 8, tokensIn: 800, tokensOut: 300, costUsd: 2.0 }],
+      },
+      isLoading: false,
+    } as never);
+    mockUseToolEventTypes.mockReturnValue(emptyEventTypes as never);
+    mockUseConnectors.mockReturnValue(noConnectors as never);
+    mockUseConnectorSyncStatus.mockReturnValue(noSyncStatus as never);
+    mockUseSyncConnector.mockReturnValue(makeNoMutate() as never);
+
+    render(<ToolInsightsSection {...defaultProps} />);
+    expect(screen.getByText("Models Used")).toBeInTheDocument();
+    // 2 models in the response
+    expect(screen.getByText("2")).toBeInTheDocument();
+  });
+});

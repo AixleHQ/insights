@@ -1,0 +1,28 @@
+{
+  "name": "db90-cursor",
+  "version": "0.1.0",
+  "description": "CLI tool that reads Cursor IDE telemetry and pushes usage events to db90",
+  "type": "module",
+  "bin": {
+    "db90-cursor": "./dist/cli.js"
+  },
+  "exports": {
+    ".": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "dev": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.9.0",
+    "glob": "^10.5.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.8",
+    "@types/node": "^20.11.5",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.2"
+  }
+}

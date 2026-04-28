@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useMemo } from "react";
+import { Link } from "react-router-dom";
 import {
   Search,
   Building2,
@@ -9,21 +9,21 @@ import {
   MoreVertical,
   ExternalLink,
   X,
-} from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { SortButton, type SortDirection } from '@/components/ui/sort-button';
+} from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { SortButton, type SortDirection } from "@/components/ui/sort-button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -31,17 +31,17 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { formatDistanceToNow, formatCurrency } from '@/lib/utils';
+} from "@/components/ui/dropdown-menu";
+import { formatDistanceToNow, formatCurrency } from "@/lib/utils";
 
-type OrgSortField = 'name' | 'members_count' | 'events_count' | 'total_cost_usd' | 'created_at';
+type OrgSortField = "name" | "members_count" | "events_count" | "total_cost_usd" | "created_at";
 
 interface AdminOrganization {
   id: string;
@@ -49,7 +49,7 @@ interface AdminOrganization {
   slug: string;
   logo_url: string | null;
   plan: string;
-  status: 'active' | 'suspended' | 'trial';
+  status: "active" | "suspended" | "trial";
   members_count: number;
   projects_count: number;
   events_count: number;
@@ -95,13 +95,13 @@ function OrgSkeleton() {
   );
 }
 
-function StatusBadge({ status }: { status: AdminOrganization['status'] }) {
+function StatusBadge({ status }: { status: AdminOrganization["status"] }) {
   switch (status) {
-    case 'active':
+    case "active":
       return <Badge variant="default">Active</Badge>;
-    case 'suspended':
+    case "suspended":
       return <Badge variant="destructive">Suspended</Badge>;
-    case 'trial':
+    case "trial":
       return <Badge variant="secondary">Trial</Badge>;
     default:
       return null;
@@ -109,46 +109,46 @@ function StatusBadge({ status }: { status: AdminOrganization['status'] }) {
 }
 
 function PlanBadge({ plan }: { plan: string }) {
-  const variants: Record<string, 'default' | 'secondary' | 'outline'> = {
-    enterprise: 'default',
-    team: 'secondary',
-    free: 'outline',
+  const variants: Record<string, "default" | "secondary" | "outline"> = {
+    enterprise: "default",
+    team: "secondary",
+    free: "outline",
   };
   return (
-    <Badge variant={variants[plan] || 'outline'} className="capitalize">
+    <Badge variant={variants[plan] || "outline"} className="capitalize">
       {plan}
     </Badge>
   );
 }
 
 export function AdminOrganizations() {
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [planFilter, setPlanFilter] = useState<string>('all');
-  const [sortField, setSortField] = useState<OrgSortField>('created_at');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [planFilter, setPlanFilter] = useState<string>("all");
+  const [sortField, setSortField] = useState<OrgSortField>("created_at");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   const { data: organizations, isLoading } = useQuery({
-    queryKey: ['admin', 'organizations'],
-    queryFn: () => api.get<AdminOrganization[]>('/admin/organizations'),
+    queryKey: ["admin", "organizations"],
+    queryFn: () => api.get<AdminOrganization[]>("/admin/organizations"),
   });
 
   const handleSort = (field: OrgSortField) => {
     if (sortField === field) {
-      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
     } else {
       setSortField(field);
-      setSortDirection('desc');
+      setSortDirection("desc");
     }
   };
 
   const clearFilters = () => {
-    setSearch('');
-    setStatusFilter('all');
-    setPlanFilter('all');
+    setSearch("");
+    setStatusFilter("all");
+    setPlanFilter("all");
   };
 
-  const hasActiveFilters = search || statusFilter !== 'all' || planFilter !== 'all';
+  const hasActiveFilters = search || statusFilter !== "all" || planFilter !== "all";
 
   const filteredOrgs = useMemo(() => {
     if (!organizations) return [];
@@ -166,12 +166,12 @@ export function AdminOrganizations() {
     }
 
     // Apply status filter
-    if (statusFilter !== 'all') {
+    if (statusFilter !== "all") {
       result = result.filter((org) => org.status === statusFilter);
     }
 
     // Apply plan filter
-    if (planFilter !== 'all') {
+    if (planFilter !== "all") {
       result = result.filter((org) => org.plan === planFilter);
     }
 
@@ -179,23 +179,23 @@ export function AdminOrganizations() {
     result.sort((a, b) => {
       let comparison = 0;
       switch (sortField) {
-        case 'name':
+        case "name":
           comparison = a.name.localeCompare(b.name);
           break;
-        case 'members_count':
+        case "members_count":
           comparison = a.members_count - b.members_count;
           break;
-        case 'events_count':
+        case "events_count":
           comparison = a.events_count - b.events_count;
           break;
-        case 'total_cost_usd':
+        case "total_cost_usd":
           comparison = a.total_cost_usd - b.total_cost_usd;
           break;
-        case 'created_at':
+        case "created_at":
           comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
           break;
       }
-      return sortDirection === 'asc' ? comparison : -comparison;
+      return sortDirection === "asc" ? comparison : -comparison;
     });
 
     return result;
@@ -345,7 +345,7 @@ export function AdminOrganizations() {
                   <div className="flex flex-col items-center gap-2">
                     <Building2 className="size-8 text-muted-foreground" />
                     <p className="text-muted-foreground">
-                      {search ? 'No organizations found' : 'No organizations yet'}
+                      {search ? "No organizations found" : "No organizations yet"}
                     </p>
                   </div>
                 </TableCell>
@@ -414,7 +414,7 @@ export function AdminOrganizations() {
                         <DropdownMenuItem>Edit Settings</DropdownMenuItem>
                         <DropdownMenuItem>Change Plan</DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        {org.status === 'active' ? (
+                        {org.status === "active" ? (
                           <DropdownMenuItem className="text-destructive">
                             Suspend Organization
                           </DropdownMenuItem>

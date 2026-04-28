@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   MoreHorizontal,
   RefreshCw,
@@ -5,42 +6,47 @@ import {
   AlertCircle,
   Clock,
   Unplug,
-} from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+  FlaskConical,
+  ChevronDown,
+  KeyRound,
+} from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { cn, formatDistanceToNow } from '@/lib/utils';
-import { ProviderLogo } from '@/components/icons';
+} from "@/components/ui/dropdown-menu";
+import { cn, formatDistanceToNow } from "@/lib/utils";
+import { ProviderLogo } from "@/components/icons";
+import type { ConnectorStatus } from "@/lib/types";
 
 export type IntegrationProvider =
-  | 'github'
-  | 'gitlab'
-  | 'bitbucket'
-  | 'jira'
-  | 'linear'
-  | 'slack'
-  | 'figma'
-  | 'claude'
-  | 'claude-code'
-  | 'anthropic'
-  | 'openai'
-  | 'openrouter'
-  | 'cursor'
-  | 'copilot'
-  | 'google';
+  | "github"
+  | "gitlab"
+  | "bitbucket"
+  | "jira"
+  | "linear"
+  | "slack"
+  | "figma"
+  | "claude"
+  | "claude-code"
+  | "anthropic"
+  | "openai"
+  | "openrouter"
+  | "gemini"
+  | "cursor"
+  | "copilot"
+  | "google";
 
 export interface IntegrationData {
   id: string;
   provider: IntegrationProvider;
   name: string;
-  status: 'connected' | 'error' | 'syncing' | 'disconnected';
+  status: ConnectorStatus;
   last_sync_at?: string;
   sync_error?: string;
   metadata?: {
@@ -53,63 +59,99 @@ export interface ProviderInfo {
   id: IntegrationProvider;
   name: string;
   description: string;
-  category: 'code' | 'project' | 'ai' | 'design' | 'communication';
+  category: "code" | "project" | "ai" | "design" | "communication";
   features: string[];
   available: boolean;
   comingSoon?: boolean;
+  inputLabel?: string;
+  inputPlaceholder?: string;
+  connectSheet?: "webhook";
 }
 
 interface IntegrationCardProps {
   integration?: IntegrationData;
   provider?: ProviderInfo;
   onSync?: (id: string) => void;
+  onTest?: (id: string) => void;
   onDisconnect?: (id: string) => void;
+  onRegenerateToken?: (id: string) => void;
   onConnect?: (providerId: string) => void;
+  isTesting?: boolean;
   className?: string;
 }
 
 const statusConfig = {
   connected: {
-    label: 'Connected',
+    label: "Connected",
     icon: CheckCircle2,
-    color: 'text-success',
-    bg: 'bg-success/10',
+    color: "text-success",
+    bg: "bg-success/10",
+  },
+  testing: {
+    label: "Testing",
+    icon: RefreshCw,
+    color: "text-primary",
+    bg: "bg-primary/10",
   },
   error: {
-    label: 'Error',
+    label: "Error",
     icon: AlertCircle,
-    color: 'text-destructive',
-    bg: 'bg-destructive/10',
-  },
-  syncing: {
-    label: 'Syncing',
-    icon: RefreshCw,
-    color: 'text-primary',
-    bg: 'bg-primary/10',
+    color: "text-destructive",
+    bg: "bg-destructive/10",
   },
   disconnected: {
-    label: 'Disconnected',
+    label: "Disconnected",
     icon: Unplug,
-    color: 'text-muted-foreground',
-    bg: 'bg-muted',
+    color: "text-muted-foreground",
+    bg: "bg-muted",
   },
 };
+
+function ErrorPanel({ error }: { error: string }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="rounded-md border border-destructive/20 bg-destructive/5 text-xs">
+      <button
+        type="button"
+        className="flex w-full items-center gap-2 px-3 py-2 text-destructive"
+        onClick={() => setExpanded((prev) => !prev)}
+        aria-expanded={expanded}
+      >
+        <AlertCircle className="size-3 shrink-0" />
+        <span className="flex-1 truncate text-left font-medium">Last error</span>
+        <ChevronDown
+          className={cn("size-3 shrink-0 transition-transform duration-150", expanded && "rotate-180")}
+        />
+      </button>
+      {expanded && (
+        <div className="border-t border-destructive/20 px-3 py-2">
+          <p className="break-all font-mono text-destructive/80">{error}</p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function IntegrationCard({
   integration,
   provider,
   onSync,
+  onTest,
   onDisconnect,
+  onRegenerateToken,
   onConnect,
+  isTesting = false,
   className,
 }: IntegrationCardProps) {
   // Display as available provider to connect
   if (provider && !integration) {
     return (
       <Card
+        data-testid={`provider-card-${provider.id}`}
         className={cn(
-          'group relative transition-all hover:shadow-md',
-          !provider.available && 'opacity-60',
+          "group relative transition-all hover:shadow-md",
+          !provider.available && "opacity-60",
           className
         )}
       >
@@ -140,7 +182,7 @@ export function IntegrationCard({
             disabled={!provider.available}
             onClick={() => onConnect?.(provider.id)}
           >
-            {provider.available ? 'Connect' : 'Coming Soon'}
+            {provider.available ? "Connect" : "Coming Soon"}
           </Button>
         </CardContent>
       </Card>
@@ -154,7 +196,7 @@ export function IntegrationCard({
   const StatusIcon = status.icon;
 
   return (
-    <Card className={cn('group relative transition-all hover:shadow-md', className)}>
+    <Card className={cn("group relative transition-all hover:shadow-md", className)}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
@@ -162,7 +204,7 @@ export function IntegrationCard({
             <div>
               <CardTitle className="text-base">{integration.name}</CardTitle>
               <CardDescription className="text-xs capitalize">
-                {integration.provider.replace('-', ' ')}
+                {integration.provider.replace("-", " ")}
                 {integration.metadata?.account_name &&
                   ` · ${integration.metadata.account_name}`}
               </CardDescription>
@@ -180,11 +222,28 @@ export function IntegrationCard({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onSync?.(integration.id)}>
-                <RefreshCw className="mr-2 size-4" />
-                Sync now
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
+              {onSync && (
+                <DropdownMenuItem onClick={() => onSync(integration.id)}>
+                  <RefreshCw className="mr-2 size-4" />
+                  Sync now
+                </DropdownMenuItem>
+              )}
+              {onTest && (
+                <DropdownMenuItem
+                  onClick={() => onTest(integration.id)}
+                  disabled={isTesting}
+                >
+                  <FlaskConical className="mr-2 size-4" />
+                  Test connection
+                </DropdownMenuItem>
+              )}
+              {onRegenerateToken && (
+                <DropdownMenuItem onClick={() => onRegenerateToken(integration.id)}>
+                  <KeyRound className="mr-2 size-4" />
+                  Regenerate token
+                </DropdownMenuItem>
+              )}
+              {(onSync || onTest || onRegenerateToken) && <DropdownMenuSeparator />}
               <DropdownMenuItem
                 className="text-destructive"
                 onClick={() => onDisconnect?.(integration.id)}
@@ -199,16 +258,19 @@ export function IntegrationCard({
       <CardContent className="space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className={cn('gap-1', status.bg)}>
-              <StatusIcon
-                className={cn(
-                  'size-3',
-                  status.color,
-                  integration.status === 'syncing' && 'animate-spin'
-                )}
-              />
-              <span className={status.color}>{status.label}</span>
-            </Badge>
+            {isTesting ? (
+              <Badge variant="outline" className="gap-1 bg-primary/10">
+                <RefreshCw className="size-3 animate-spin text-primary" />
+                <span className="text-primary">Testing…</span>
+              </Badge>
+            ) : (
+              <Badge variant="outline" className={cn("gap-1", status.bg)}>
+                <StatusIcon
+                  className={cn("size-3", status.color, integration.status === "testing" && "animate-spin")}
+                />
+                <span className={status.color}>{status.label}</span>
+              </Badge>
+            )}
           </div>
           {integration.metadata?.resources_count !== undefined && (
             <span className="text-xs text-muted-foreground">
@@ -225,9 +287,7 @@ export function IntegrationCard({
         )}
 
         {integration.sync_error && (
-          <div className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
-            {integration.sync_error}
-          </div>
+          <ErrorPanel error={integration.sync_error} />
         )}
       </CardContent>
     </Card>

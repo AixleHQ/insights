@@ -11,8 +11,8 @@ module Api
         repositories = @project.repositories.includes(:organization_connector).order(:name)
 
         # Allow filtering
-        repositories = repositories.private_repos if params[:private] == 'true'
-        repositories = repositories.public_repos if params[:private] == 'false'
+        repositories = repositories.private_repos if params[:private] == "true"
+        repositories = repositories.public_repos if params[:private] == "false"
 
         render_collection(repositories, RepositorySerializer)
       end
@@ -29,10 +29,11 @@ module Api
         authorize! @repository
 
         if @repository.save
+          enqueue_sync(@repository)
           render_created(@repository, RepositorySerializer)
         else
           render json: {
-            error: 'Unprocessable Entity',
+            error: "Unprocessable Entity",
             errors: format_validation_errors(@repository.errors)
           }, status: :unprocessable_entity
         end
@@ -46,7 +47,7 @@ module Api
           render_resource(@repository, RepositorySerializer)
         else
           render json: {
-            error: 'Unprocessable Entity',
+            error: "Unprocessable Entity",
             errors: format_validation_errors(@repository.errors)
           }, status: :unprocessable_entity
         end
@@ -82,11 +83,20 @@ module Api
 
       def repository_params
         params.permit(:organization_connector_id, :external_id, :name, :full_name,
-                      :url, :default_branch, :is_private)
+                      :url, :html_url, :clone_url, :default_branch, :is_private, :description)
       end
 
       def repository_update_params
         params.permit(:default_branch, :url)
+      end
+
+      def enqueue_sync(repository)
+        connector = repository.organization_connector
+        return unless connector
+
+        # Runs sync_repositories which refreshes repo metadata from the provider.
+        # Commit history arrives via webhooks going forward.
+        ConnectorSyncService.enqueue(connector)
       end
     end
   end

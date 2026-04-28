@@ -1,7 +1,7 @@
-import { useNavigate } from 'react-router-dom';
-import { useOrg } from '@/contexts/OrgContext';
-import { useCreateProject } from '@/hooks/useApi';
-import { ProjectForm, type ProjectFormData } from '@/components/projects';
+import { useNavigate } from "react-router-dom";
+import { useOrg } from "@/contexts/OrgContext";
+import { useCreateProject } from "@/hooks/useApi";
+import { ProjectForm, type ProjectFormData } from "@/components/projects";
 
 export function NewProject() {
   const navigate = useNavigate();
@@ -17,6 +17,7 @@ export function NewProject() {
         name: data.name,
         description: data.description || null,
         repository_url: data.repository_url || null,
+        git_remote_url: data.git_remote_url || null,
         is_active: data.is_active ?? true,
       },
     });

@@ -5,7 +5,7 @@ class OrganizationRetentionPolicy < ApplicationRecord
   DAILY_AGGREGATE_RETENTIONS = %w[365_days 730_days 1095_days forever].freeze
 
   belongs_to :organization
-  belongs_to :updated_by, class_name: 'User', optional: true
+  belongs_to :updated_by, class_name: "User", optional: true
 
   validates :organization_id, uniqueness: true
   validates :raw_event_ttl, inclusion: { in: RAW_EVENT_TTLS }
@@ -26,15 +26,15 @@ class OrganizationRetentionPolicy < ApplicationRecord
   end
 
   def daily_aggregate_retention_duration
-    return nil if daily_aggregate_retention == 'forever'
+    return nil if daily_aggregate_retention == "forever"
     parse_duration(daily_aggregate_retention)
   end
 
   private
 
   def parse_duration(value)
-    return nil if value == 'forever'
-    amount, unit = value.split('_')
+    return nil if value == "forever"
+    amount, unit = value.split("_")
     amount.to_i.send(unit)
   end
 end

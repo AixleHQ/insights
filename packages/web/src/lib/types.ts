@@ -9,15 +9,17 @@ export interface User {
   id: string;
   email: string;
   name: string | null;
-  avatar_url: string | null;
-  role: 'admin' | 'member' | 'viewer';
+  avatarUrl: string | null;
+  role: "admin" | "member" | "viewer";
   super_admin: boolean;
   created_at: string;
   updated_at: string;
+  lastSignInAt: string | null;
 }
 
 export interface CurrentUser extends User {
   organizations: Organization[];
+  settings: Record<string, string>;
 }
 
 // Organization types
@@ -25,7 +27,10 @@ export interface Organization {
   id: string;
   name: string;
   slug: string;
+  description?: string;
   logo_url: string | null;
+  is_active?: boolean;
+  user_role?: MemberRole;
   created_at: string;
   updated_at: string;
 }
@@ -41,7 +46,7 @@ export interface OrganizationMember {
   id: string;
   user_id: string;
   organization_id: string;
-  role: 'owner' | 'admin' | 'member' | 'viewer';
+  role: "owner" | "admin" | "member" | "viewer";
   user: User;
   created_at: string;
   updated_at: string;
@@ -57,7 +62,9 @@ export interface Project {
   organization_id: string | null;
   organizationId?: string | null;
   repository_url: string | null;
-  repositoryUrl?: string | null;
+  repositoryUrl: string | null;
+  git_remote_url: string | null;
+  gitRemoteUrl: string | null;
   is_active: boolean;
   isActive?: boolean;
   created_at: string;
@@ -74,11 +81,13 @@ export interface ProjectWithStats extends Project {
   last_event_at: string | null;
   lastEventAt?: string | null;
   connectors: { id: string; provider: string }[];
+  jiraProjectKey?: string | null;
+  jiraConnectorId?: string | null;
 }
 
 // Connector types
-export type ConnectorProvider = 'github' | 'gitlab' | 'bitbucket' | 'jira' | 'linear';
-export type ConnectorStatus = 'active' | 'inactive' | 'error';
+export type ConnectorProvider = "github" | "gitlab" | "bitbucket" | "jira" | "linear" | "anthropic" | "openai" | "openrouter" | "gemini" | "slack";
+export type ConnectorStatus = "connected" | "testing" | "error" | "disconnected";
 
 export interface Connector {
   id: string;
@@ -88,6 +97,35 @@ export interface Connector {
   connector_type?: ConnectorProvider;
   isActive: boolean;
   is_active?: boolean;
+  status: ConnectorStatus;
+  externalAccountId?: string | null;
+  external_account_id?: string | null;
+  externalAccountName?: string | null;
+  external_account_name?: string | null;
+  lastSyncAt?: string | null;
+  last_sync_at?: string | null;
+  lastError?: string | null;
+  last_error?: string | null;
+  tokenExpired?: boolean;
+  token_expired?: boolean;
+  createdAt?: string;
+  created_at?: string;
+  updatedAt?: string;
+  updated_at?: string;
+}
+
+// Project connector types
+export type ProjectConnectorProvider = "anthropic" | "openai" | "openrouter" | "gemini" | "slack";
+
+export interface ProjectConnector {
+  id: string;
+  projectId?: string;
+  project_id?: string;
+  connectorType: ProjectConnectorProvider;
+  connector_type?: ProjectConnectorProvider;
+  isActive: boolean;
+  is_active?: boolean;
+  status: ConnectorStatus;
   externalAccountId?: string | null;
   external_account_id?: string | null;
   externalAccountName?: string | null;
@@ -107,34 +145,47 @@ export interface Connector {
 // Tool account types
 export interface ToolAccount {
   id: string;
-  user_id: string;
-  provider: string;
-  external_id: string;
-  external_username: string | null;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  toolName: string;
+  isActive: boolean;
+  externalUserId: string | null;
+  externalUsername: string | null;
+  externalEmail: string | null;
+  organizationMembershipId: string;
+  tokenExpired: boolean;
+  tokenExpiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  ingestToken?: string; // one-time, only present immediately after create/regenerate
 }
 
 // Event types
-export type RiskLevel = 'none' | 'low' | 'medium' | 'high' | 'critical';
-export type EventType = 'completion' | 'prompt' | 'chat' | 'edit' | 'generation';
+export type RiskLevel = "none" | "low" | "medium" | "high" | "critical";
+export type EventType = "completion" | "prompt" | "chat" | "edit" | "generation";
 
 export interface ToolEvent {
   id: string;
   toolName: string;
   eventType: EventType;
+  attribution: string;
   riskLevel: RiskLevel;
   costUsd: number;
   inputTokens: number | null;
   outputTokens: number | null;
+  // TODO: align list and detail serialisers to use the same token field names
+  tokensIn?: number | null;
+  tokensOut?: number | null;
+  tokensTotal?: number | null;
   model: string | null;
-  sanitizedContent: string | null;
   securityFindings: SecurityFinding[];
   user: { id: string; email: string; name: string | null } | null;
   project: { id: string; name: string } | null;
   createdAt: string;
   occurredAt: string;
+  // Detail-only fields (returned by the show endpoint, not the list endpoint)
+  sanitizedContent?: string | null;
+  metadata?: Record<string, unknown> | null;
+  durationMs?: number | null;
+  auditLog?: AuditLog | null;
 }
 
 export interface SecurityFinding {
@@ -191,7 +242,7 @@ export interface ToolUsageStats {
 }
 
 // Alert types
-export type AlertSeverity = 'info' | 'warning' | 'error' | 'critical';
+export type AlertSeverity = "info" | "warning" | "error" | "critical";
 
 export interface Alert {
   id: string;
@@ -202,6 +253,22 @@ export interface Alert {
   is_read: boolean;
   created_at: string;
 }
+
+// Audit log types (shared shape — both serializers output identical JSON)
+export interface AuditLog {
+  id: string;
+  action: string;
+  resourceType: string | null;
+  resourceId: string | null;
+  trackedChanges: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  ipAddress: string | null;
+  createdAt: string;
+  actor: { id: string; email: string; name: string | null } | null;
+}
+
+export type OrganizationAuditLog = AuditLog;
+export type ProjectAuditLog = AuditLog;
 
 // Pagination types
 export interface PaginatedResponse<T> {
@@ -214,19 +281,35 @@ export interface PaginatedResponse<T> {
   };
 }
 
-// Retention policy types
-export type RetentionPeriod = '7_days' | '30_days' | '90_days' | '1_year' | 'forever';
+// Retention policy types — values match backend model constants
+export type RawEventTtl = "6_hours" | "12_hours" | "24_hours" | "48_hours" | "72_hours";
+export type ToolEventsRetention = "30_days" | "60_days" | "90_days" | "180_days" | "365_days" | "730_days";
+export type HourlyAggregateRetention = "90_days" | "180_days" | "365_days" | "730_days";
+export type DailyAggregateRetention = "365_days" | "730_days" | "1095_days" | "forever";
 
 export interface RetentionPolicy {
-  raw_content_retention: RetentionPeriod;
-  sanitized_content_retention: RetentionPeriod;
-  metadata_retention: RetentionPeriod;
-  audit_log_retention: RetentionPeriod;
+  rawEventTtl: RawEventTtl;
+  toolEventsRetention: ToolEventsRetention;
+  hourlyAggregateRetention: HourlyAggregateRetention;
+  dailyAggregateRetention: DailyAggregateRetention;
+}
+
+export interface ProjectRetentionPolicy {
+  id: string;
+  projectId: string;
+  rawEventTtl: RawEventTtl;
+  toolEventsRetention: ToolEventsRetention;
+  hourlyAggregateRetention: HourlyAggregateRetention;
+  dailyAggregateRetention: DailyAggregateRetention;
+  retentionReason?: string;
+  updatedById?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Invitation types
-export type InvitationStatus = 'pending' | 'accepted' | 'revoked' | 'expired';
-export type MemberRole = 'owner' | 'admin' | 'member' | 'viewer';
+export type InvitationStatus = "pending" | "accepted" | "revoked" | "expired";
+export type MemberRole = "owner" | "admin" | "member" | "viewer";
 
 export interface Invitation {
   id: string;
@@ -261,4 +344,111 @@ export interface InvitationPublic {
   invitedByName: string;
   expired: boolean;
   expiresAt: string;
+}
+
+// Jira issue types
+export interface Issue {
+  id: string;
+  key: string;
+  summary: string;
+  status?: string;
+  statusCategory?: string;
+  issueType?: string;
+  priority?: string;
+  assigneeName?: string;
+  assigneeId?: string;
+  reporterName?: string;
+  jiraProjectKey: string;
+  dueDate?: string;
+  labels?: string[];
+  externalCreatedAt?: string;
+  externalUpdatedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JiraProject {
+  externalId: string;
+  key: string;
+  name: string;
+  avatarUrl?: string;
+}
+
+// Tool analytics types (shared by Cursor & OpenRouter pages)
+export interface ToolOverviewStats {
+  tool: string;
+  total_events: number;
+  total_cost_usd: number;
+  total_tokens_in: number;
+  total_tokens_out: number;
+  active_users: number;
+  events_change_pct: number;
+  cost_change_pct: number;
+}
+
+export interface ToolModelStat {
+  name: string;
+  eventCount: number;
+  tokensIn: number;
+  tokensOut: number;
+  costUsd: number;
+  price_per_million_input: number | null;
+  price_per_million_output: number | null;
+}
+
+export interface ToolUserStat {
+  userId: string;
+  name: string;
+  email: string;
+  eventCount: number;
+  totalTokens: number;
+  costUsd: number;
+}
+
+export interface ToolDailyPoint {
+  date: string;
+  eventCount: number;
+  tokensIn: number;
+  tokensOut: number;
+  costUsd: number;
+}
+
+export interface ToolEventTypeStat {
+  name: string;
+  eventCount: number;
+  tokensIn: number;
+  tokensOut: number;
+  costUsd: number;
+}
+
+export interface ToolModelsResponse {
+  tool: string;
+  timeRange: { start: string; end: string };
+  models: ToolModelStat[];
+}
+
+export interface ToolUsersResponse {
+  tool: string;
+  timeRange: { start: string; end: string };
+  users: ToolUserStat[];
+}
+
+export interface ToolDailyResponse {
+  tool: string;
+  timeRange: { start: string; end: string };
+  daily: ToolDailyPoint[];
+}
+
+export interface ToolEventTypesResponse {
+  tool: string;
+  timeRange: { start: string; end: string };
+  eventTypes: ToolEventTypeStat[];
+}
+
+export interface ConnectorSyncStatus {
+  connector_type: string;
+  status: string;
+  last_sync_at: string | null;
+  last_error: string | null;
+  total_events: number;
 }

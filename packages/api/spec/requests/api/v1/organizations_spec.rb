@@ -118,5 +118,75 @@ RSpec.describe 'Api::V1::Organizations', type: :request do
       expect(json_data[:rawEventTtl]).to eq('48_hours')
       expect(json_data[:toolEventsRetention]).to eq('90_days')
     end
+
+    it 'returns the full policy in camelCase' do
+      authenticated_patch "/api/v1/organizations/#{organization.id}/retention_policy",
+                          user: user,
+                          params: { raw_event_ttl: '6_hours' }
+
+      expect_success
+      expect(json_data).to have_key(:rawEventTtl)
+      expect(json_data).to have_key(:toolEventsRetention)
+      expect(json_data).to have_key(:hourlyAggregateRetention)
+      expect(json_data).to have_key(:dailyAggregateRetention)
+    end
+
+    it 'returns 422 for an invalid raw_event_ttl value' do
+      authenticated_patch "/api/v1/organizations/#{organization.id}/retention_policy",
+                          user: user,
+                          params: { raw_event_ttl: '1_year' }
+
+      expect_unprocessable
+      expect(json_response[:errors]).to have_key(:raw_event_ttl)
+    end
+
+    it 'returns 422 for an invalid tool_events_retention value' do
+      authenticated_patch "/api/v1/organizations/#{organization.id}/retention_policy",
+                          user: user,
+                          params: { tool_events_retention: '7_days' }
+
+      expect_unprocessable
+      expect(json_response[:errors]).to have_key(:tool_events_retention)
+    end
+
+    it 'returns 422 for an invalid hourly_aggregate_retention value' do
+      authenticated_patch "/api/v1/organizations/#{organization.id}/retention_policy",
+                          user: user,
+                          params: { hourly_aggregate_retention: '30_days' }
+
+      expect_unprocessable
+      expect(json_response[:errors]).to have_key(:hourly_aggregate_retention)
+    end
+
+    it 'returns 422 for an invalid daily_aggregate_retention value' do
+      authenticated_patch "/api/v1/organizations/#{organization.id}/retention_policy",
+                          user: user,
+                          params: { daily_aggregate_retention: '90_days' }
+
+      expect_unprocessable
+      expect(json_response[:errors]).to have_key(:daily_aggregate_retention)
+    end
+
+    it 'does not update when an invalid value is submitted' do
+      original_ttl = organization.retention_policy.raw_event_ttl
+
+      authenticated_patch "/api/v1/organizations/#{organization.id}/retention_policy",
+                          user: user,
+                          params: { raw_event_ttl: 'bogus_value' }
+
+      expect_unprocessable
+      expect(organization.retention_policy.reload.raw_event_ttl).to eq(original_ttl)
+    end
+
+    it 'returns 403 for non-admins' do
+      member = create(:user)
+      create(:organization_membership, user: member, organization: organization, role: 'member')
+
+      authenticated_patch "/api/v1/organizations/#{organization.id}/retention_policy",
+                          user: member,
+                          params: { raw_event_ttl: '6_hours' }
+
+      expect_forbidden
+    end
   end
 end

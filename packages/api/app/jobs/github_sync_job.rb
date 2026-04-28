@@ -1,22 +1,20 @@
 # frozen_string_literal: true
 
-class GithubSyncJob
-  include Sidekiq::Job
+class GithubSyncJob < ApplicationJob
+  queue_as :connectors
 
-  sidekiq_options queue: 'connectors', retry: 3
-
-  def perform(connector_id, action = 'sync', options = {})
+  def perform(connector_id, action = "sync", options = {})
     @connector = OrganizationConnector.find(connector_id)
     @options = options.symbolize_keys
 
     Rails.logger.info("[GithubSyncJob] Starting #{action} for connector #{connector_id}")
 
     case action
-    when 'sync'
+    when "sync"
       sync_repositories
-    when 'refresh_token'
+    when "refresh_token"
       refresh_token
-    when 'webhook'
+    when "webhook"
       process_webhook
     else
       Rails.logger.warn("[GithubSyncJob] Unknown action: #{action}")
@@ -35,7 +33,7 @@ class GithubSyncJob
 
   def sync_repositories
     provider = Oauth::BaseProvider.for(@connector)
-    repos = provider.list_repositories
+    repos = provider.fetch_repositories
 
     repos.each do |repo_data|
       sync_repository(repo_data)
@@ -44,7 +42,7 @@ class GithubSyncJob
 
   def sync_repository(repo_data)
     repository = @connector.repositories.find_or_initialize_by(
-      external_id: repo_data[:id].to_s
+      external_id: repo_data[:external_id].to_s
     )
 
     repository.update!(
@@ -52,7 +50,7 @@ class GithubSyncJob
       full_name: repo_data[:full_name],
       url: repo_data[:html_url],
       default_branch: repo_data[:default_branch],
-      is_private: repo_data[:private],
+      is_private: repo_data[:is_private],
       metadata: {
         language: repo_data[:language],
         description: repo_data[:description],
@@ -77,11 +75,11 @@ class GithubSyncJob
     payload = @options[:payload]
 
     case event_type
-    when 'push'
+    when "push"
       process_push_event(payload)
-    when 'pull_request'
+    when "pull_request"
       process_pull_request_event(payload)
-    when 'installation', 'installation_repositories'
+    when "installation", "installation_repositories"
       sync_repositories
     else
       Rails.logger.info("[GithubSyncJob] Ignoring webhook event: #{event_type}")
@@ -89,34 +87,35 @@ class GithubSyncJob
   end
 
   def process_push_event(payload)
-    repository = find_repository(payload.dig('repository', 'id'))
+    repository = find_repository(payload.dig("repository", "id"))
     return unless repository
 
-    commits = payload['commits'] || []
-    commits.each do |commit|
-      create_commit_event(repository, commit)
-    end
+    commits = payload["commits"] || []
+    return if commits.empty?
+
+    member_by_email = load_member_by_email
+    commits.each { |commit| create_commit_event(repository, commit, member_by_email) }
   end
 
   def process_pull_request_event(payload)
-    repository = find_repository(payload.dig('repository', 'id'))
+    repository = find_repository(payload.dig("repository", "id"))
     return unless repository
 
-    pr = payload['pull_request']
-    action = payload['action']
+    pr = payload["pull_request"]
+    action = payload["action"]
 
     ToolEvent.create!(
       organization_id: @connector.organization_id,
-      tool_name: 'github',
-      event_type: 'pull_request',
-      occurred_at: Time.parse(pr['updated_at']),
+      tool_name: "github_copilot",
+      event_type: "review",
+      occurred_at: Time.parse(pr["updated_at"]),
       metadata: {
         action: action,
-        pr_number: pr['number'],
-        pr_title: pr['title'],
-        pr_state: pr['state'],
+        pr_number: pr["number"],
+        pr_title: pr["title"],
+        pr_state: pr["state"],
         repository_id: repository.id,
-        author: pr.dig('user', 'login')
+        author: pr.dig("user", "login")
       }
     )
   end
@@ -125,19 +124,28 @@ class GithubSyncJob
     @connector.repositories.find_by(external_id: external_id.to_s)
   end
 
-  def create_commit_event(repository, commit)
+  def load_member_by_email
+    @connector.organization.members.index_by { |m| m.email.downcase }
+  end
+
+  def create_commit_event(repository, commit, member_by_email = {})
+    author_email = commit.dig("author", "email")&.downcase
+    user = member_by_email[author_email] if author_email
+
     ToolEvent.create!(
       organization_id: @connector.organization_id,
-      tool_name: 'github',
-      event_type: 'commit',
-      occurred_at: Time.parse(commit['timestamp']),
+      user_id: user&.id,
+      repository_id: repository.id,
+      project_id: repository.project_id,
+      tool_name: "github_copilot",
+      event_type: "commit",
+      occurred_at: Time.parse(commit["timestamp"]),
       metadata: {
-        sha: commit['id'],
-        message: commit['message'],
-        author_name: commit.dig('author', 'name'),
-        author_email: commit.dig('author', 'email'),
-        repository_id: repository.id,
-        url: commit['url']
+        sha: commit["id"],
+        message: commit["message"],
+        author_name: commit.dig("author", "name"),
+        git_author_email: author_email,
+        url: commit["url"]
       }
     )
   end

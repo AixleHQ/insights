@@ -69,15 +69,15 @@ module Temporal
       end
 
       def host
-        ENV.fetch('TEMPORAL_HOST', 'localhost:7233')
+        ENV.fetch("TEMPORAL_HOST", "localhost:7233")
       end
 
       def namespace
-        ENV.fetch('TEMPORAL_NAMESPACE', 'default')
+        ENV.fetch("TEMPORAL_NAMESPACE", "default")
       end
 
       def default_task_queue
-        ENV.fetch('TEMPORAL_TASK_QUEUE', 'db90-tasks')
+        ENV.fetch("TEMPORAL_TASK_QUEUE", "db90-tasks")
       end
     end
   end

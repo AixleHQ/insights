@@ -107,33 +107,269 @@ Keycloak manages authentication via OpenID Connect. The frontend uses `oidc-clie
 - **Admin console**: [localhost:8080](http://localhost:8080) — username `admin`, password `admin`
 - **Google login**: Optional — set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env`
 
+### Setting up Google login locally
+
+Google OAuth goes through Keycloak as an identity broker — Google never redirects back to your frontend or Rails API directly.
+
+1. Go to [Google Cloud Console → APIs & Credentials](https://console.cloud.google.com/apis/credentials)
+2. Create or edit an **OAuth 2.0 Client ID**
+3. Under **Authorized redirect URIs**, add **only** this URL:
+   ```
+   http://localhost:8080/realms/db90/broker/google-dbp/endpoint
+   ```
+4. Copy the **Client ID** and **Client Secret** into your `.env`:
+   ```env
+   GOOGLE_CLIENT_ID=your-client-id
+   GOOGLE_CLIENT_SECRET=your-client-secret
+   ```
+5. Restart the containers: `docker compose up -d`
+
+## Integration Auth
+
+Each integration uses either an OAuth app (code hosting / project management) or a plain API key (AI providers). Credentials are passed to the Rails API via environment variables — add them to your `.env` file and `docker-compose.yml` under the `api` service's `environment:` block, then restart the container.
+
+```bash
+docker compose up -d api
+```
+
+---
+
+### GitHub
+
+1. Go to **Settings → Developer settings → OAuth Apps → New OAuth App**
+2. Set **Authorization callback URL** to `http://localhost:5173/integrations/callback`
+3. Copy the **Client ID** and generate a **Client Secret**
+
+```env
+GITHUB_CLIENT_ID=your-client-id
+GITHUB_CLIENT_SECRET=your-client-secret
+```
+
+`docker-compose.yml` → `api.environment`:
+```yaml
+GITHUB_CLIENT_ID: "${GITHUB_CLIENT_ID}"
+GITHUB_CLIENT_SECRET: "${GITHUB_CLIENT_SECRET}"
+```
+
+---
+
+### GitLab
+
+1. Go to **Preferences → Applications → Add new application** (or use a [Group](https://gitlab.com/groups) application for shared access)
+2. Set **Redirect URI** to `http://localhost:5173/integrations/callback`
+3. Enable scopes: `read_user`, `read_api`, `read_repository`
+4. Copy the **Application ID** and **Secret**
+
+```env
+GITLAB_CLIENT_ID=your-application-id
+GITLAB_CLIENT_SECRET=your-secret
+```
+
+`docker-compose.yml` → `api.environment`:
+```yaml
+GITLAB_CLIENT_ID: "${GITLAB_CLIENT_ID}"
+GITLAB_CLIENT_SECRET: "${GITLAB_CLIENT_SECRET}"
+```
+
+---
+
+### Bitbucket
+
+> **Note:** Bitbucket OAuth consumers are workspace-level
+
+1. Log into [Bitbucket.org](https://bitbucket.org)
+2. Select your **Workspace** (bottom-left corner)
+3. Click **Settings** (gear icon) on the left sidebar
+4. Under **Apps and Features**, click **OAuth consumers**
+5. Click **Add consumer**
+6. Set **Callback URL** to `http://localhost:5173/integrations/callback`
+7. Enable the following permissions:
+
+| Scope | Permission | Purpose |
+|---|---|---|
+| Account | Read | Retrieve user identity (email/profile) |
+| Repositories | Read | Access repository metadata |
+| Pull Requests | Read | Read pull request data |
+| Issues | Read | Read issues (if using Bitbucket-native issue tracker) |
+| Webhooks | Read and Write | Listen for code push events |
+
+8. Copy the **Key** (client ID) and **Secret**
+
+```env
+BITBUCKET_CLIENT_ID=your-key
+BITBUCKET_CLIENT_SECRET=your-secret
+```
+
+`docker-compose.yml` → `api.environment`:
+```yaml
+BITBUCKET_CLIENT_ID: "${BITBUCKET_CLIENT_ID}"
+BITBUCKET_CLIENT_SECRET: "${BITBUCKET_CLIENT_SECRET}"
+```
+
+---
+
+### Jira
+
+1. Go to [developer.atlassian.com](https://developer.atlassian.com/console/myapps/) → **Create → OAuth 2.0 integration**
+2. Add callback URL `http://localhost:5173/integrations/callback`
+3. Add scopes: `read:jira-user`, `read:jira-work`
+4. Copy the **Client ID** and **Secret** from the **Authorization** tab
+
+```env
+ATLASSIAN_CLIENT_ID=your-atlassian-client-id
+ATLASSIAN_CLIENT_SECRET=your-atlassian-client-secret
+```
+
+`docker-compose.yml` → `api.environment`:
+```yaml
+ATLASSIAN_CLIENT_ID: "${ATLASSIAN_CLIENT_ID}"
+ATLASSIAN_CLIENT_SECRET: "${ATLASSIAN_CLIENT_SECRET}"
+```
+
+---
+
+### Linear
+
+1. Go to **Settings → API → OAuth applications → Create new**
+2. Set **Callback URL** to `http://localhost:5173/integrations/callback`
+3. Copy the **Client ID** and **Client Secret**
+
+```env
+LINEAR_CLIENT_ID=your-client-id
+LINEAR_CLIENT_SECRET=your-client-secret
+```
+
+`docker-compose.yml` → `api.environment`:
+```yaml
+LINEAR_CLIENT_ID: "${LINEAR_CLIENT_ID}"
+LINEAR_CLIENT_SECRET: "${LINEAR_CLIENT_SECRET}"
+```
+
+---
+
+### Anthropic API
+
+No OAuth app needed — generate an API key from the [Anthropic Console](https://console.anthropic.com/settings/keys). The key is entered directly in the Connect sheet in the UI and validated against `https://api.anthropic.com/v1/models` before being saved.
+
+---
+
+### OpenAI
+
+No OAuth app needed — generate an API key from [platform.openai.com/api-keys](https://platform.openai.com/api-keys). The key is entered directly in the Connect sheet in the UI and validated against `https://api.openai.com/v1/models` before being saved.
+
+---
+
+### OpenRouter
+
+No OAuth app needed — generate an API key from [openrouter.ai/settings/keys](https://openrouter.ai/settings/keys). The key is entered directly in the Connect sheet in the UI and validated against `https://openrouter.ai/api/v1/models` before being saved.
+
+---
+
+### Gemini
+
+No OAuth app needed — generate an API key from [Google AI Studio](https://aistudio.google.com/app/apikey). The key is entered directly in the Connect sheet in the UI and validated against `https://generativelanguage.googleapis.com/v1beta/models` before being saved.
+
 ## Makefile Reference
 
 ```
-make help             Show all commands
+make help                          Show all commands
 
-make up / down        Start / stop Docker services
-make logs             Tail Docker logs
+Docker:
+  make up / down                   Start / stop Docker services
+  make build                       Build/rebuild app containers
+  make logs                        Tail all logs
+  make logs-api                    Tail Rails API logs
+  make logs-web                    Tail Vite dev server logs
+  make logs-sidekiq                Tail Sidekiq logs
 
-make api              Start Rails server
-make web              Start Vite dev server
-make worker           Start Temporal worker
+Development:
+  make console                     Rails console inside API container
+  make worker                      Start Temporal worker
+  make sidekiq                     View Sidekiq status
 
-make db-create        Create databases
-make db-migrate       Run migrations
-make db-seed          Seed sample data
-make db-reset         Drop and recreate everything
+Database:
+  make db-create                   Create databases
+  make db-migrate                  Run migrations
+  make db-seed                     Seed sample data
+  make db-reset                    Drop and recreate everything
 
-make test             Run all tests
-make test-api         RSpec (Rails)
-make test-web         Vitest (frontend)
+Testing:
+  make test                        Run all tests
+  make test-api                    RSpec (Rails)
+  make test-web                    Vitest (frontend)
 
-make lint             Run all linters
-make lint-api         Rubocop
-make lint-web         ESLint
+Code Quality:
+  make lint                        Run all linters
+  make lint-api                    Rubocop
+  make lint-web                    ESLint
 
-make generate-types   Generate TypeScript types from OpenAPI
-make clean            Remove build artifacts
+Code Generation:
+  make generate-types              Generate TypeScript types from OpenAPI
+
+Setup & Cleanup:
+  make setup                       Full setup (build, up, db-create, migrate, seed)
+  make clean                       Remove build artifacts
+
+Remote (ECS operations):
+  make remote-build                Build remote container
+  make remote-shell                Shell into remote container
+  make toolbox-shell               Shell into toolbox container
+
+Staging — Exec:
+  make staging-exec-api            Exec into staging API container
+  make staging-exec-web            Exec into staging web container
+  make staging-exec-sidekiq        Exec into staging Sidekiq container
+  make staging-exec-keycloak       Exec into staging Keycloak container
+  make staging-exec-temporal       Exec into staging Temporal container
+
+Staging — Logs:
+  make staging-logs-api            View staging API logs
+  make staging-logs-web            View staging web logs
+  make staging-logs-keycloak       View staging Keycloak logs
+  make staging-logs-temporal       View staging Temporal logs
+  make staging-logs-sidekiq        View staging Sidekiq logs
+  make watch-staging-logs-api      Follow staging API logs
+  make watch-staging-logs-web      Follow staging web logs
+  make watch-staging-logs-keycloak Follow staging Keycloak logs
+  make watch-staging-logs-temporal Follow staging Temporal logs
+  make watch-staging-logs-sidekiq  Follow staging Sidekiq logs
+
+Staging — Build & Deploy:
+  make staging-build               Build & push all staging images
+  make staging-build-api           Build & push staging API image
+  make staging-build-keycloak      Build & push staging Keycloak image
+  make staging-deploy              Deploy all staging services
+  make staging-deploy-api          Deploy staging API
+  make staging-deploy-web          Deploy staging web
+  make staging-deploy-sidekiq      Deploy staging Sidekiq
+  make staging-deploy-keycloak     Deploy staging Keycloak
+  make staging-deploy-temporal-worker  Deploy staging Temporal worker
+
+Production — Exec:
+  make prod-exec-api               Exec into prod API container
+  make prod-exec-web               Exec into prod web container
+  make prod-exec-keycloak          Exec into prod Keycloak container
+
+Production — Logs:
+  make prod-logs-api               View prod API logs
+  make prod-logs-web               View prod web logs
+  make prod-logs-keycloak          View prod Keycloak logs
+  make prod-logs-temporal          View prod Temporal logs
+  make prod-logs-sidekiq           View prod Sidekiq logs
+  make watch-prod-logs-api         Follow prod API logs
+  make watch-prod-logs-web         Follow prod web logs
+  make watch-prod-logs-keycloak    Follow prod Keycloak logs
+  make watch-prod-logs-temporal    Follow prod Temporal logs
+  make watch-prod-logs-sidekiq     Follow prod Sidekiq logs
+
+Production — Build & Deploy:
+  make prod-build                  Build & push all prod images
+  make prod-deploy                 Deploy all prod services
+  make prod-deploy-api             Deploy prod API
+  make prod-deploy-web             Deploy prod web
+  make prod-deploy-sidekiq         Deploy prod Sidekiq
+  make prod-deploy-keycloak        Deploy prod Keycloak
+  make prod-deploy-temporal-worker Deploy prod Temporal worker
 ```
 
 ## Testing

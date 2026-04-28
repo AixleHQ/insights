@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom';
+import React from "react";
+import { Link } from "react-router-dom";
 import {
   Clock,
   User,
@@ -9,30 +10,31 @@ import {
   ExternalLink,
   ChevronLeft,
   ChevronRight,
-} from 'lucide-react';
+} from "lucide-react";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   SheetDescription,
-} from '@/components/ui/sheet';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { RiskBadge } from '@/components/dashboard/ActivityFeed';
-import { useOrg } from '@/contexts/OrgContext';
-import { useEvent } from '@/hooks/useApi';
-import { cn, humanizeToolName } from '@/lib/utils';
+} from "@/components/ui/sheet";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { RiskBadge } from "@/components/dashboard/ActivityFeed";
+import { useOrg } from "@/contexts/OrgContext";
+import { useEvent } from "@/hooks/useApi";
+import { cn, humanizeToolName } from "@/lib/utils";
+import { formatTokens } from "@/lib/formatters";
 
 interface EventDrawerProps {
   eventId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onNavigate?: (direction: 'prev' | 'next') => void;
+  onNavigate?: (direction: "prev" | "next") => void;
   hasPrev?: boolean;
   hasNext?: boolean;
 }
@@ -49,7 +51,7 @@ function DetailRow({
   className?: string;
 }) {
   return (
-    <div className={cn('flex items-start gap-3', className)}>
+    <div className={cn("flex items-start gap-3", className)}>
       <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
         <Icon className="size-4 text-muted-foreground" />
       </div>
@@ -66,7 +68,7 @@ function ContentPanel({ title, content }: { title: string; content?: string }) {
     <div className="space-y-2">
       <h4 className="text-sm font-medium">{title}</h4>
       <pre className="max-h-64 overflow-auto rounded-md bg-muted p-4 text-xs">
-        <code className="whitespace-pre-wrap break-all">{content || 'No content available'}</code>
+        <code className="whitespace-pre-wrap break-all">{content || "No content available"}</code>
       </pre>
     </div>
   );
@@ -104,16 +106,18 @@ export function EventDrawer({
   hasNext = false,
 }: EventDrawerProps) {
   const { currentOrg } = useOrg();
-  const { data: event, isLoading } = useEvent(currentOrg?.id || '', eventId || '');
+  const { data: event, isLoading } = useEvent(currentOrg?.id || "", eventId || "");
 
   const formattedDate = event?.createdAt
-    ? new Date(event.createdAt).toLocaleString('en-US', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
+    ? new Date(event.createdAt).toLocaleString("en-US", {
+        dateStyle: "medium",
+        timeStyle: "short",
       })
-    : '';
+    : "";
 
-  const tokenCount = (event?.inputTokens || 0) + (event?.outputTokens || 0);
+  const tokenCount =
+    event?.tokensTotal ??
+    (event?.inputTokens || 0) + (event?.outputTokens || 0);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -123,7 +127,13 @@ export function EventDrawer({
         showCloseButton={false}
       >
         {isLoading || !event ? (
-          <DrawerSkeleton />
+          <>
+            <SheetHeader className="sr-only">
+              <SheetTitle>Event details</SheetTitle>
+              <SheetDescription>Loading event details</SheetDescription>
+            </SheetHeader>
+            <DrawerSkeleton />
+          </>
         ) : (
           <>
             {/* Header */}
@@ -134,11 +144,11 @@ export function EventDrawer({
                     <SheetTitle className="truncate text-lg">
                       {humanizeToolName(event.toolName)}
                     </SheetTitle>
-                    <RiskBadge level={event.riskLevel || 'none'} />
+                    <RiskBadge level={event.riskLevel || "none"} />
                   </div>
                   <SheetDescription className="mt-1">
-                    <span className="capitalize">{(event.eventType || 'unknown').replace('_', ' ')}</span>
-                    {' · '}
+                    <span className="capitalize">{(event.eventType || "unknown").replace("_", " ")}</span>
+                    {" · "}
                     {formattedDate}
                   </SheetDescription>
                 </div>
@@ -149,7 +159,7 @@ export function EventDrawer({
                         variant="ghost"
                         size="icon"
                         className="size-8"
-                        onClick={() => onNavigate('prev')}
+                        onClick={() => onNavigate("prev")}
                         disabled={!hasPrev}
                       >
                         <ChevronLeft className="size-4" />
@@ -159,7 +169,7 @@ export function EventDrawer({
                         variant="ghost"
                         size="icon"
                         className="size-8"
-                        onClick={() => onNavigate('next')}
+                        onClick={() => onNavigate("next")}
                         disabled={!hasNext}
                       >
                         <ChevronRight className="size-4" />
@@ -222,7 +232,7 @@ export function EventDrawer({
                     <DetailRow
                       icon={Shield}
                       label="Risk Level"
-                      value={<RiskBadge level={event.riskLevel || 'none'} />}
+                      value={<RiskBadge level={event.riskLevel || "none"} />}
                     />
                     <DetailRow
                       icon={DollarSign}
@@ -243,10 +253,7 @@ export function EventDrawer({
                       value={
                         tokenCount > 0 ? (
                           <span className="font-mono-display">
-                            {tokenCount.toLocaleString()}
-                            <span className="text-muted-foreground text-xs ml-1">
-                              ({event.inputTokens?.toLocaleString() || 0} in / {event.outputTokens?.toLocaleString() || 0} out)
-                            </span>
+                            {formatTokens(tokenCount)}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">-</span>
@@ -285,8 +292,8 @@ export function EventDrawer({
                       <ContentPanel
                         title="Event Metadata"
                         content={
-                          event.model
-                            ? JSON.stringify({ model: event.model }, null, 2)
+                          event.metadata
+                            ? JSON.stringify(event.metadata, null, 2)
                             : undefined
                         }
                       />
@@ -307,15 +314,15 @@ export function EventDrawer({
                           <div
                             key={index}
                             className={cn(
-                              'rounded-lg border p-3',
-                              finding.severity === 'critical' &&
-                                'border-risk-critical/30 bg-risk-critical/10',
-                              finding.severity === 'high' &&
-                                'border-risk-high/30 bg-risk-high/10',
-                              finding.severity === 'medium' &&
-                                'border-risk-medium/30 bg-risk-medium/10',
-                              finding.severity === 'low' &&
-                                'border-risk-low/30 bg-risk-low/10'
+                              "rounded-lg border p-3",
+                              finding.severity === "critical" &&
+                                "border-risk-critical/30 bg-risk-critical/10",
+                              finding.severity === "high" &&
+                                "border-risk-high/30 bg-risk-high/10",
+                              finding.severity === "medium" &&
+                                "border-risk-medium/30 bg-risk-medium/10",
+                              finding.severity === "low" &&
+                                "border-risk-low/30 bg-risk-low/10"
                             )}
                           >
                             <div className="flex items-center gap-2">
@@ -328,11 +335,11 @@ export function EventDrawer({
                               <Badge
                                 variant="outline"
                                 className={cn(
-                                  'font-mono-display text-[10px] uppercase',
-                                  finding.severity === 'critical' && 'text-risk-critical',
-                                  finding.severity === 'high' && 'text-risk-high',
-                                  finding.severity === 'medium' && 'text-risk-medium',
-                                  finding.severity === 'low' && 'text-risk-low'
+                                  "font-mono-display text-[10px] uppercase",
+                                  finding.severity === "critical" && "text-risk-critical",
+                                  finding.severity === "high" && "text-risk-high",
+                                  finding.severity === "medium" && "text-risk-medium",
+                                  finding.severity === "low" && "text-risk-low"
                                 )}
                               >
                                 {finding.severity}

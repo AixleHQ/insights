@@ -25,13 +25,13 @@ module Api
         Organization.transaction do
           @organization.save!
           # Make the creator an owner
-          @organization.organization_memberships.create!(user: current_user, role: 'owner')
+          @organization.organization_memberships.create!(user: current_user, role: "owner")
         end
 
         render_created(@organization, OrganizationSerializer)
       rescue ActiveRecord::RecordInvalid => e
         render json: {
-          error: 'Unprocessable Entity',
+          error: "Unprocessable Entity",
           errors: format_validation_errors(e.record.errors)
         }, status: :unprocessable_entity
       end
@@ -40,11 +40,24 @@ module Api
       def update
         authorize! @organization
 
+        tracked_changes = organization_params.to_h.each_with_object({}) do |(key, value), changes|
+          old = @organization.public_send(key)
+          changes[key] = { before: old, after: value } if old != value
+        end
+
         if @organization.update(organization_params)
+          OrganizationAuditLog.log(
+            organization: @organization,
+            actor: current_user,
+            action: "settings.update",
+            resource: @organization,
+            tracked_changes: tracked_changes,
+            request: request
+          )
           render_resource(@organization, OrganizationSerializer)
         else
           render json: {
-            error: 'Unprocessable Entity',
+            error: "Unprocessable Entity",
             errors: format_validation_errors(@organization.errors)
           }, status: :unprocessable_entity
         end
@@ -68,11 +81,21 @@ module Api
         authorize! @organization, to: :retention_policy?
 
         policy = @organization.retention_policy || @organization.build_retention_policy
+        changes_before = policy.attributes.slice(*retention_policy_params.keys)
+
         if policy.update(retention_policy_params)
+          OrganizationAuditLog.log(
+            organization: @organization,
+            actor: current_user,
+            action: "settings.update",
+            resource: policy,
+            tracked_changes: { before: changes_before, after: policy.attributes.slice(*retention_policy_params.keys) },
+            request: request
+          )
           render_resource(policy, OrganizationRetentionPolicySerializer)
         else
           render json: {
-            error: 'Unprocessable Entity',
+            error: "Unprocessable Entity",
             errors: format_validation_errors(policy.errors)
           }, status: :unprocessable_entity
         end
@@ -92,13 +115,24 @@ module Api
         authorize! @organization, to: :settings?
 
         setting = @organization.organization_settings.find_or_initialize_by(key: params[:key])
+        action = setting.new_record? ? "settings.create" : "settings.update"
+        old_value = setting.value
+
         setting.value = params[:value]
 
         if setting.save
+          OrganizationAuditLog.log(
+            organization: @organization,
+            actor: current_user,
+            action: action,
+            resource: setting,
+            tracked_changes: { key: params[:key], before: old_value, after: setting.value },
+            request: request
+          )
           render_resource(setting, OrganizationSettingSerializer)
         else
           render json: {
-            error: 'Unprocessable Entity',
+            error: "Unprocessable Entity",
             errors: format_validation_errors(setting.errors)
           }, status: :unprocessable_entity
         end
@@ -110,6 +144,16 @@ module Api
 
         setting = @organization.organization_settings.find_by!(key: params[:key])
         setting.destroy!
+
+        OrganizationAuditLog.log(
+          organization: @organization,
+          actor: current_user,
+          action: "settings.delete",
+          resource: setting,
+          tracked_changes: { key: params[:key], before: setting.value },
+          request: request
+        )
+
         render_no_content
       end
 

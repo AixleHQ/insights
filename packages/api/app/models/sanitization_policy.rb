@@ -3,8 +3,9 @@ class SanitizationPolicy < ApplicationRecord
 
   validates :version, presence: true, uniqueness: true, numericality: { only_integer: true, greater_than: 0 }
   validates :name, presence: true
-  validates :is_active, inclusion: { in: [true, false] }
+  validates :is_active, inclusion: { in: [ true, false ] }
 
+  before_validation :assign_version, on: :create
   before_save :set_effective_at, if: -> { is_active_changed? && is_active? }
   after_save :deactivate_other_policies, if: -> { saved_change_to_is_active? && is_active? }
 
@@ -28,6 +29,10 @@ class SanitizationPolicy < ApplicationRecord
   end
 
   private
+
+  def assign_version
+    self.version ||= self.class.next_version
+  end
 
   def set_effective_at
     self.effective_at = Time.current

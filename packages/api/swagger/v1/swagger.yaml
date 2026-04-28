@@ -760,6 +760,45 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /api/v1/organizations/{organization_id}/connectors/{id}/sync_status:
+    get:
+      summary: Get connector sync status
+      description: Returns the connector's current status, last sync time, last error, and total synced event count
+      tags:
+        - Organization Connectors
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Sync status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  connector_type:
+                    type: string
+                  status:
+                    type: string
+                    enum: [connected, testing, error, disconnected]
+                  last_sync_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  last_error:
+                    type: string
+                    nullable: true
+                  total_events:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /api/v1/organizations/{organization_id}/connectors/authorize/{type}:
     get:
       summary: Get OAuth authorization URL
@@ -849,7 +888,7 @@ paths:
           description: Filter by tool name
           schema:
             type: string
-            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter, anthropic_api, openai_api, gemini_api, custom]
+            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom]
         - name: active
           in: query
           schema:
@@ -884,7 +923,7 @@ paths:
               properties:
                 tool_name:
                   type: string
-                  enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter, anthropic_api, openai_api, gemini_api, custom]
+                  enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom]
                 access_token:
                   type: string
                 refresh_token:
@@ -981,6 +1020,650 @@ paths:
           description: Tool account deleted
 
   # ============================================
+  # STATS ENDPOINTS
+  # ============================================
+  /api/v1/organizations/{organization_id}/stats/overview:
+    get:
+      summary: Organization stats overview
+      description: Returns aggregate event count, cost, active users, and high-risk event count for the current month, with percentage change vs the previous month.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      responses:
+        '200':
+          description: Overview stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_events:
+                    type: integer
+                  total_cost_usd:
+                    type: number
+                    format: float
+                  high_risk_events:
+                    type: integer
+                  active_users:
+                    type: integer
+                  events_change_percent:
+                    type: number
+                    format: float
+                  cost_change_percent:
+                    type: number
+                    format: float
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/stats/hourly:
+    get:
+      summary: Hourly stats
+      description: Returns per-hour event counts, token totals, cost, and unique users. Defaults to the last 24 hours; override with start_date/end_date.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+      responses:
+        '200':
+          description: Hourly stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      timeRange:
+                        type: object
+                        properties:
+                          start:
+                            type: string
+                            format: date-time
+                          end:
+                            type: string
+                            format: date-time
+                      hourly:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            hour:
+                              type: string
+                              format: date-time
+                            eventCount:
+                              type: integer
+                            tokensIn:
+                              type: integer
+                            tokensOut:
+                              type: integer
+                            costUsd:
+                              type: number
+                              format: float
+                            uniqueUsers:
+                              type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/stats/daily:
+    get:
+      summary: Daily stats
+      description: Returns daily event counts and cost, plus a per-tool breakdown. Defaults to the last 30 days; pass `days` to override.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: days
+          in: query
+          description: Number of days to look back (default 30)
+          schema:
+            type: integer
+            default: 30
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+      responses:
+        '200':
+          description: Daily stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                        event_count:
+                          type: integer
+                        cost_usd:
+                          type: number
+                          format: float
+                  tool_breakdown:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        tool_name:
+                          type: string
+                        event_count:
+                          type: integer
+                        cost_usd:
+                          type: number
+                          format: float
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/stats/daily_by_tool:
+    get:
+      summary: Daily stats by tool
+      description: Returns daily event counts grouped by the top 3 tools plus an "Other" bucket — shaped for stacked bar charts. Defaults to the last 30 days.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: days
+          in: query
+          description: Number of days to look back (default 30)
+          schema:
+            type: integer
+            default: 30
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+      responses:
+        '200':
+          description: Daily stats by tool
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    description: One entry per day; keys are tool names + "Other"
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                      additionalProperties:
+                        type: integer
+                  tools:
+                    type: array
+                    description: Ordered list of tool names present in data (top 3 + "Other")
+                    items:
+                      type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/stats/heatmap:
+    get:
+      summary: Activity heatmap
+      description: Returns daily event counts for the past year, shaped for a calendar heatmap.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      responses:
+        '200':
+          description: Heatmap data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    date:
+                      type: string
+                      format: date
+                    count:
+                      type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/overview:
+    get:
+      summary: Tool overview stats
+      description: Returns aggregate usage stats (events, cost, tokens, active users) for a specific tool. Returns 422 if tool_name is not a recognised value.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: tool_name
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github]
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+      responses:
+        '200':
+          description: Tool overview stats for the current month vs previous month
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tool:
+                    type: string
+                    example: cursor
+                  total_events:
+                    type: integer
+                    description: Event count for the current month
+                  total_cost_usd:
+                    type: number
+                    format: float
+                    description: Total cost in USD for the current month
+                  total_tokens_in:
+                    type: integer
+                    description: Total input tokens for the current month
+                  total_tokens_out:
+                    type: integer
+                    description: Total output tokens for the current month
+                  active_users:
+                    type: integer
+                    description: Distinct non-null user IDs with events this month
+                  events_change_pct:
+                    type: number
+                    format: float
+                    description: Percentage change in events vs previous month (0 if no prior data)
+                  cost_change_pct:
+                    type: number
+                    format: float
+                    description: Percentage change in cost vs previous month (0 if no prior data)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/models:
+    get:
+      summary: Tool model breakdown
+      description: Returns per-model usage aggregates (event count, tokens, cost) enriched with pricing data. Sorted by eventCount descending. Null-model events are excluded. Defaults to the last 30 days; pass days or start_date/end_date to override.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: tool_name
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github]
+        - name: days
+          in: query
+          description: Number of days to look back (default 30)
+          schema:
+            type: integer
+            default: 30
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+      responses:
+        '200':
+          description: Model breakdown for the tool
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tool:
+                    type: string
+                    example: openrouter_api
+                  timeRange:
+                    type: object
+                    properties:
+                      start:
+                        type: string
+                        format: date-time
+                      end:
+                        type: string
+                        format: date-time
+                  models:
+                    type: array
+                    description: Per-model aggregates sorted by eventCount descending
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                          example: claude-3-5-sonnet-20241022
+                        eventCount:
+                          type: integer
+                        tokensIn:
+                          type: integer
+                        tokensOut:
+                          type: integer
+                        costUsd:
+                          type: number
+                          format: float
+                        price_per_million_input:
+                          type: number
+                          format: float
+                          nullable: true
+                          description: Input price per million tokens; null if model not in pricing table
+                        price_per_million_output:
+                          type: number
+                          format: float
+                          nullable: true
+                          description: Output price per million tokens; null if model not in pricing table
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/users:
+    get:
+      summary: Tool user breakdown
+      description: Returns top users by token consumption for a specific tool, sorted by totalTokens descending. Events without a user_id are excluded.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: tool_name
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github]
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+        - name: days
+          in: query
+          required: false
+          description: Number of past days to include (ignored when start_date/end_date are provided). Defaults to 30.
+          schema:
+            type: integer
+            default: 30
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of users to return. Clamped between 1 and 100. Defaults to 20.
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: User breakdown sorted by totalTokens descending
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tool:
+                    type: string
+                    example: cursor
+                  timeRange:
+                    type: object
+                    properties:
+                      start:
+                        type: string
+                        format: date-time
+                      end:
+                        type: string
+                        format: date-time
+                  users:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        userId:
+                          type: string
+                          format: uuid
+                        name:
+                          type: string
+                          example: Alice Chen
+                        email:
+                          type: string
+                          format: email
+                          example: alice@company.com
+                        eventCount:
+                          type: integer
+                          example: 214
+                        totalTokens:
+                          type: integer
+                          example: 380000
+                        costUsd:
+                          type: number
+                          format: float
+                          example: 6.12
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/daily:
+    get:
+      summary: Tool daily stats
+      description: Returns day-by-day event counts, tokens, and cost for a specific tool. Every day in the range has an entry — days with no events are zero-filled.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: tool_name
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github]
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+        - name: days
+          in: query
+          required: false
+          description: Number of past days to include (ignored when start_date/end_date are provided). Defaults to 30.
+          schema:
+            type: integer
+            default: 30
+      responses:
+        '200':
+          description: Daily trend data with zero-filled gaps
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tool:
+                    type: string
+                    example: claude_code
+                  timeRange:
+                    type: object
+                    properties:
+                      start:
+                        type: string
+                        format: date-time
+                      end:
+                        type: string
+                        format: date-time
+                  daily:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                          example: '2026-04-10'
+                        eventCount:
+                          type: integer
+                          example: 42
+                        tokensIn:
+                          type: integer
+                          example: 15000
+                        tokensOut:
+                          type: integer
+                          example: 32000
+                        costUsd:
+                          type: number
+                          format: float
+                          example: 0.87
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/event_types:
+    get:
+      summary: Tool event type breakdown
+      description: Returns per-event-type usage aggregates (event count, tokens, cost) for a specific tool. Sorted by eventCount descending. Defaults to the last 30 days; pass days or start_date/end_date to override.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: tool_name
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github]
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+        - name: days
+          in: query
+          required: false
+          description: Number of past days to include (ignored when start_date/end_date are provided). Defaults to 30.
+          schema:
+            type: integer
+            default: 30
+      responses:
+        '200':
+          description: Event type breakdown sorted by eventCount descending
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tool:
+                    type: string
+                    example: cursor
+                  timeRange:
+                    type: object
+                    properties:
+                      start:
+                        type: string
+                        format: date-time
+                      end:
+                        type: string
+                        format: date-time
+                  eventTypes:
+                    type: array
+                    description: Per-event-type aggregates sorted by eventCount descending
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                          enum: [chat, completion, edit, commit, review, test, debug, refactor, documentation, other, issue, comment, sprint]
+                          example: chat
+                        eventCount:
+                          type: integer
+                          example: 580
+                        tokensIn:
+                          type: integer
+                          example: 72000
+                        tokensOut:
+                          type: integer
+                          example: 31000
+                        costUsd:
+                          type: number
+                          format: float
+                          example: 14.85
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  # ============================================
+  # PROJECT LOOKUP (ingest token auth)
+  # ============================================
+  /api/v1/projects/lookup:
+    get:
+      summary: Look up project by git remote URL
+      description: >
+        Returns a project matching the given git remote URL, scoped to projects
+        accessible by the ingest token's user (org projects + personal projects).
+        URL is normalized (lowercased, `.git` suffix stripped, whitespace trimmed)
+        before lookup. SSH and HTTPS variants are not interchangeable — the stored
+        value must match the exact protocol form of `git remote get-url origin`.
+        Used by CLI connectors for automatic project attribution.
+      tags:
+        - Projects
+      security:
+        - ingest_token_auth: []
+      parameters:
+        - name: git_remote
+          in: query
+          required: true
+          description: Git remote URL (e.g. git@github.com:org/repo.git)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Project found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      project_id:
+                        type: string
+                        format: uuid
+                      name:
+                        type: string
+                    required:
+                      - project_id
+                      - name
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================
   # PROJECT ENDPOINTS
   # ============================================
   /api/v1/projects:
@@ -1035,6 +1718,10 @@ paths:
                   type: string
                 description:
                   type: string
+                git_remote_url:
+                  type: string
+                  nullable: true
+                  description: Git remote URL used by CLI connectors for auto-detection (e.g. git@github.com:org/repo.git)
               required:
                 - name
       responses:
@@ -1100,6 +1787,10 @@ paths:
                   type: string
                 description:
                   type: string
+                git_remote_url:
+                  type: string
+                  nullable: true
+                  description: Git remote URL used by CLI connectors for auto-detection (e.g. git@github.com:org/repo.git)
               required:
                 - name
       responses:
@@ -1152,6 +1843,10 @@ paths:
                   type: string
                 is_active:
                   type: boolean
+                git_remote_url:
+                  type: string
+                  nullable: true
+                  description: Git remote URL used by CLI connectors for auto-detection (e.g. git@github.com:org/repo.git)
       responses:
         '200':
           description: Project updated
@@ -1525,6 +2220,419 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  # ============================================
+  # EVENTS
+  # ============================================
+  /api/v1/organizations/{organization_id}/events:
+    get:
+      summary: List events
+      description: Returns a paginated list of tool events for the organization. Supports filtering by tool, event type, risk level, user, project, model, and date range.
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+        - name: tool_name
+          in: query
+          schema:
+            type: string
+        - name: event_type
+          in: query
+          schema:
+            type: string
+        - name: risk_level
+          in: query
+          schema:
+            type: string
+            enum: [critical, high, medium, low, none]
+        - name: user_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: project_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: model
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated list of events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ToolEvent'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/events/{id}:
+    get:
+      summary: Get event details
+      description: Returns full details for a single tool event, including metadata, audit log, and associations.
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Event details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ToolEventDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/organizations/{organization_id}/events/summary:
+    get:
+      summary: Event summary statistics
+      description: Returns aggregate counts (events, tokens, cost) grouped by tool, event type, and user.
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+      responses:
+        '200':
+          description: Summary statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      totalEvents:
+                        type: integer
+                      totalTokensIn:
+                        type: integer
+                      totalTokensOut:
+                        type: integer
+                      totalCostUsd:
+                        type: number
+                        format: float
+                      byTool:
+                        type: object
+                        additionalProperties:
+                          type: integer
+                      byEventType:
+                        type: object
+                        additionalProperties:
+                          type: integer
+                      byUser:
+                        type: object
+                        additionalProperties:
+                          type: integer
+                      timeRange:
+                        type: object
+                        properties:
+                          start:
+                            type: string
+                            format: date-time
+                            nullable: true
+                          end:
+                            type: string
+                            format: date-time
+                            nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/events/unattributed:
+    get:
+      summary: List unattributed events
+      description: Returns events with no assigned user (user_id is null). Used for the attribution assignment UI.
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+        - name: tool_name
+          in: query
+          schema:
+            type: string
+        - name: event_type
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated list of unattributed events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ToolEvent'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/events/{id}/audit_trail:
+    get:
+      summary: Get event audit trail
+      description: Returns the audit log entry for a specific event, if one exists.
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Audit log for the event (or null if none exists)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AuditLog'
+                  - type: object
+                    properties:
+                      data:
+                        type: 'null'
+                      message:
+                        type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================
+  # AI GATEWAY
+  # ============================================
+  /api/v1/organizations/{organization_id}/ai/{provider}/completions:
+    post:
+      summary: AI completion
+      description: |
+        Proxies a completion request to the specified AI provider.
+        Polling-only providers (e.g. `anthropic`) return 403 — they are connected for usage data only, not chat/completion.
+      tags:
+        - AI Gateway
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                prompt:
+                  type: string
+                model:
+                  type: string
+                temperature:
+                  type: number
+                max_tokens:
+                  type: integer
+                top_p:
+                  type: number
+              required:
+                - prompt
+      responses:
+        '200':
+          description: Completion result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiCompletionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Forbidden — provider is polling-only or access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          description: Rate limited
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          description: Upstream AI provider error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/organizations/{organization_id}/ai/{provider}/chat:
+    post:
+      summary: AI chat
+      description: |
+        Proxies a chat request to the specified AI provider.
+        Polling-only providers (e.g. `anthropic`) return 403 — they are connected for usage data only, not chat/completion.
+      tags:
+        - AI Gateway
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                messages:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      role:
+                        type: string
+                        enum: [system, user, assistant]
+                      content:
+                        type: string
+                    required:
+                      - role
+                      - content
+                model:
+                  type: string
+                temperature:
+                  type: number
+                max_tokens:
+                  type: integer
+                top_p:
+                  type: number
+                stream:
+                  type: boolean
+              required:
+                - messages
+      responses:
+        '200':
+          description: Chat result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiChatResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Forbidden — provider is polling-only or access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          description: Rate limited
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          description: Upstream AI provider error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/organizations/{organization_id}/ai/{provider}/models:
+    get:
+      summary: List AI models
+      description: |
+        Returns available models for the specified AI provider.
+        Polling-only providers (e.g. `anthropic`) return 403.
+      tags:
+        - AI Gateway
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of available models
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Forbidden — provider is polling-only or access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          description: Upstream AI provider error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
 # ============================================
 # COMPONENTS
 # ============================================
@@ -1535,6 +2643,10 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: JWT token from Keycloak authentication
+    ingest_token_auth:
+      type: http
+      scheme: bearer
+      description: Opaque ingest token issued per UserToolAccount (CLI connectors only)
 
   parameters:
     id:
@@ -1583,6 +2695,20 @@ components:
         default: 25
         minimum: 1
         maximum: 100
+    start_date:
+      name: start_date
+      in: query
+      description: Start of the time range (ISO 8601 date, e.g. 2026-01-01)
+      schema:
+        type: string
+        format: date
+    end_date:
+      name: end_date
+      in: query
+      description: End of the time range (ISO 8601 date, e.g. 2026-01-31)
+      schema:
+        type: string
+        format: date
 
   responses:
     Unauthorized:
@@ -1882,7 +3008,7 @@ components:
           format: uuid
         toolName:
           type: string
-          enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter, anthropic_api, openai_api, gemini_api, custom]
+          enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom]
         isActive:
           type: boolean
         externalAccountId:
@@ -1926,6 +3052,15 @@ components:
           nullable: true
         isActive:
           type: boolean
+        repositoryUrl:
+          type: string
+          nullable: true
+        gitRemoteUrl:
+          type: string
+          nullable: true
+          description: >
+            Git remote URL used for automatic project attribution by CLI connectors.
+            Stored in normalized form (lowercased, .git suffix stripped).
         organizationId:
           type: string
           format: uuid
@@ -2088,3 +3223,233 @@ components:
         - value
         - createdAt
         - updatedAt
+
+    ToolEvent:
+      type: object
+      description: Tool event as returned by the list endpoint
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+          nullable: true
+        projectId:
+          type: string
+          format: uuid
+          nullable: true
+        toolName:
+          type: string
+        eventType:
+          type: string
+        model:
+          type: string
+          nullable: true
+        costUsd:
+          type: number
+          format: float
+          nullable: true
+        durationMs:
+          type: integer
+          nullable: true
+        inputTokens:
+          type: integer
+          nullable: true
+        outputTokens:
+          type: integer
+          nullable: true
+        costCents:
+          type: integer
+          nullable: true
+        riskLevel:
+          type: string
+          enum: [critical, high, medium, low, none]
+        attribution:
+          type: string
+          enum: [user, organization, unknown]
+        securityFindings:
+          type: array
+          items:
+            type: object
+        occurredAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        user:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            email:
+              type: string
+              format: email
+            name:
+              type: string
+              nullable: true
+        project:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+      required:
+        - id
+        - organizationId
+        - toolName
+        - eventType
+        - riskLevel
+        - attribution
+        - occurredAt
+        - createdAt
+
+    ToolEventDetail:
+      description: Tool event as returned by the detail endpoint (includes metadata and audit log)
+      allOf:
+        - $ref: '#/components/schemas/ToolEvent'
+        - type: object
+          properties:
+            metadata:
+              type: object
+              nullable: true
+              additionalProperties: true
+            project:
+              type: object
+              nullable: true
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                name:
+                  type: string
+                slug:
+                  type: string
+            auditLog:
+              nullable: true
+              $ref: '#/components/schemas/AuditLog'
+
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        toolEventId:
+          type: string
+          format: uuid
+        riskLevel:
+          type: string
+          nullable: true
+        temporalWorkflowId:
+          type: string
+          nullable: true
+        rawEventKey:
+          type: string
+          nullable: true
+        confidenceScore:
+          type: number
+          format: float
+          nullable: true
+        classificationLabels:
+          type: array
+          nullable: true
+          items:
+            type: string
+        sanitizationActions:
+          type: array
+          nullable: true
+          items:
+            type: string
+        highRisk:
+          type: boolean
+        detectionSummary:
+          type: object
+          nullable: true
+        sanitizationChanges:
+          type: object
+          nullable: true
+        riskScore:
+          type: number
+          format: float
+          nullable: true
+        policyVersion:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            version:
+              type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - organizationId
+        - toolEventId
+        - highRisk
+        - createdAt
+
+    AiCompletionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        model:
+          type: string
+        content:
+          type: string
+        finishReason:
+          type: string
+        usage:
+          type: object
+          properties:
+            promptTokens:
+              type: integer
+            completionTokens:
+              type: integer
+            totalTokens:
+              type: integer
+
+    AiChatResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        model:
+          type: string
+        message:
+          type: object
+          properties:
+            role:
+              type: string
+              enum: [assistant]
+            content:
+              type: string
+        finishReason:
+          type: string
+        usage:
+          type: object
+          properties:
+            promptTokens:
+              type: integer
+            completionTokens:
+              type: integer
+            totalTokens:
+              type: integer

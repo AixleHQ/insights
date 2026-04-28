@@ -1,20 +1,20 @@
-import { useState, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { UserPlus, Search, Users, LogOut, AlertTriangle, Mail, Clock, X } from 'lucide-react';
-import { useOrg } from '@/contexts/OrgContext';
-import { useAuth } from '@/contexts/AuthContext';
-import { useOrganizationMembers, useUpdateMemberRole, useRemoveMember, useLeaveOrganization, useInvitations, useRevokeInvitation } from '@/hooks/useApi';
-import type { Invitation } from '@/lib/types';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { SortButton, type SortDirection } from '@/components/ui/sort-button';
+import { useState, useMemo } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { UserPlus, Search, Users, LogOut, AlertTriangle, Mail, Clock, X } from "lucide-react";
+import { useOrg } from "@/contexts/OrgContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { useOrganizationMembers, useUpdateMemberRole, useRemoveMember, useLeaveOrganization, useInvitations, useRevokeInvitation } from "@/hooks/useApi";
+import type { Invitation } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { SortButton, type SortDirection } from "@/components/ui/sort-button";
 import {
   Table,
   TableBody,
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,10 +25,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Skeleton } from '@/components/ui/skeleton';
-import { MemberRow, type MemberData, type MemberRole } from '@/components/team';
+} from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
+import { MemberRow, type MemberData, type MemberRole } from "@/components/team";
 
 function MemberSkeleton() {
   return (
@@ -62,7 +62,7 @@ function MemberSkeleton() {
   );
 }
 
-type MemberSortField = 'name' | 'role' | 'status' | 'joined_at' | 'total_tokens';
+type MemberSortField = "name" | "role" | "status" | "joined_at" | "total_tokens";
 
 const roleOrder: Record<MemberRole, number> = {
   owner: 4,
@@ -75,12 +75,12 @@ export function Team() {
   const navigate = useNavigate();
   const { currentOrg, currentMembership, organizations, setCurrentOrg, refreshOrganizations } = useOrg();
   const { profile } = useAuth();
-  const [search, setSearch] = useState('');
-  const [sortField, setSortField] = useState<MemberSortField>('name');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [search, setSearch] = useState("");
+  const [sortField, setSortField] = useState<MemberSortField>("name");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
-  const { data: membersData, isLoading } = useOrganizationMembers(currentOrg?.id || '');
-  const { data: invitationsData } = useInvitations(currentOrg?.id || '', 'pending');
+  const { data: membersData, isLoading } = useOrganizationMembers(currentOrg?.id || "");
+  const { data: invitationsData } = useInvitations(currentOrg?.id || "", "pending");
   const updateMemberRole = useUpdateMemberRole();
   const removeMember = useRemoveMember();
   const leaveOrganization = useLeaveOrganization();
@@ -93,7 +93,7 @@ export function Team() {
       email: m.user.email,
       name: m.user.name || undefined,
       role: m.role as MemberRole,
-      status: 'active' as const,
+      status: "active" as const,
       joined_at: m.created_at,
       last_active_at: m.last_active_at || undefined,
       total_tokens: m.total_tokens,
@@ -109,32 +109,32 @@ export function Team() {
         role: newRole,
       });
     } catch (error) {
-      console.error('Failed to change role:', error);
+      console.error("Failed to change role:", error);
     }
   };
 
   const handleRemove = async (id: string) => {
     if (!currentOrg) return;
-    if (window.confirm('Are you sure you want to remove this member?')) {
+    if (window.confirm("Are you sure you want to remove this member?")) {
       try {
         await removeMember.mutateAsync({ orgId: currentOrg.id, memberId: id });
       } catch (error) {
-        console.error('Failed to remove member:', error);
+        console.error("Failed to remove member:", error);
       }
     }
   };
 
   const handleSort = (field: MemberSortField) => {
     if (sortField === field) {
-      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
     } else {
       setSortField(field);
-      setSortDirection('asc');
+      setSortDirection("asc");
     }
   };
 
   const filteredMembers = useMemo(() => {
-    let result = members.filter(
+    const result = members.filter(
       (member) =>
         member.email.toLowerCase().includes(search.toLowerCase()) ||
         member.name?.toLowerCase().includes(search.toLowerCase())
@@ -144,29 +144,29 @@ export function Team() {
     result.sort((a, b) => {
       let comparison = 0;
       switch (sortField) {
-        case 'name':
+        case "name":
           comparison = (a.name || a.email).localeCompare(b.name || b.email);
           break;
-        case 'role':
+        case "role":
           comparison = (roleOrder[a.role] || 0) - (roleOrder[b.role] || 0);
           break;
-        case 'status':
+        case "status":
           comparison = a.status.localeCompare(b.status);
           break;
-        case 'joined_at':
+        case "joined_at":
           comparison = new Date(a.joined_at || 0).getTime() - new Date(b.joined_at || 0).getTime();
           break;
-        case 'total_tokens':
+        case "total_tokens":
           comparison = (a.total_tokens || 0) - (b.total_tokens || 0);
           break;
       }
-      return sortDirection === 'asc' ? comparison : -comparison;
+      return sortDirection === "asc" ? comparison : -comparison;
     });
 
     return result;
   }, [members, search, sortField, sortDirection]);
 
-  const activeCount = members.filter((m) => m.status === 'active').length;
+  const activeCount = members.filter((m) => m.status === "active").length;
   const pendingInvitations = invitationsData || [];
   const pendingCount = pendingInvitations.length;
 
@@ -175,11 +175,11 @@ export function Team() {
     try {
       await revokeInvitation.mutateAsync({ orgId: currentOrg.id, invitationId });
     } catch (error) {
-      console.error('Failed to revoke invitation:', error);
+      console.error("Failed to revoke invitation:", error);
     }
   };
 
-  const canManageInvitations = currentMembership?.role === 'owner' || currentMembership?.role === 'admin';
+  const canManageInvitations = currentMembership?.role === "owner" || currentMembership?.role === "admin";
 
   return (
     <div className="space-y-6">
@@ -187,12 +187,12 @@ export function Team() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Team</h1>
           <p className="text-sm text-muted-foreground">
-            {activeCount} active member{activeCount !== 1 && 's'}
+            {activeCount} active member{activeCount !== 1 && "s"}
             {pendingCount > 0 && `, ${pendingCount} pending`}
           </p>
         </div>
         <Button asChild>
-          <Link to="/team/invite">
+          <Link to="/settings/members/invite">
             <UserPlus className="mr-2 size-4" />
             Invite
           </Link>
@@ -299,7 +299,7 @@ export function Team() {
                   <div className="flex flex-col items-center gap-2">
                     <Users className="size-8 text-muted-foreground" />
                     <p className="text-muted-foreground">
-                      {search ? 'No members found' : 'No team members yet'}
+                      {search ? "No members found" : "No team members yet"}
                     </p>
                   </div>
                 </td>
@@ -337,7 +337,7 @@ export function Team() {
           if (remainingOrgs.length > 0) {
             setCurrentOrg(remainingOrgs[0]);
           } else {
-            navigate('/');
+            navigate("/");
           }
         }}
         isLeaving={leaveOrganization.isPending}
@@ -371,8 +371,8 @@ function LeaveOrganizationSection({
   const currentUserMember = members.find((m) => m.email === currentUserEmail);
 
   // Check if user is the sole owner
-  const owners = members.filter((m) => m.role === 'owner');
-  const isSoleOwner = currentMembership.role === 'owner' && owners.length === 1;
+  const owners = members.filter((m) => m.role === "owner");
+  const isSoleOwner = currentMembership.role === "owner" && owners.length === 1;
 
   // Don't show if user is sole owner
   if (isSoleOwner) {
@@ -401,15 +401,15 @@ function LeaveOrganizationSection({
           <p className="mt-1 text-sm text-muted-foreground">
             Remove yourself from <span className="font-medium">{currentOrg.name}</span>.
             {organizations.length > 1
-              ? ' You will be switched to another organization.'
-              : ' You will need to create or join another organization.'}
+              ? " You will be switched to another organization."
+              : " You will need to create or join another organization."}
           </p>
         </div>
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button variant="destructive" size="sm" disabled={isLeaving || !currentUserMember}>
               <LogOut className="mr-2 size-4" />
-              {isLeaving ? 'Leaving...' : 'Leave'}
+              {isLeaving ? "Leaving..." : "Leave"}
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
@@ -444,9 +444,10 @@ interface PendingInvitationRowProps {
 }
 
 function PendingInvitationRow({ invitation, canRevoke, onRevoke, isRevoking }: PendingInvitationRowProps) {
+  const now = new Date();
   const expiresAt = new Date(invitation.expiresAt);
-  const isExpired = expiresAt < new Date();
-  const daysUntilExpiry = Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  const isExpired = expiresAt < now;
+  const daysUntilExpiry = Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
   return (
     <div className="flex items-center justify-between gap-4 rounded-md bg-background p-3 border">
@@ -464,7 +465,7 @@ function PendingInvitationRow({ invitation, canRevoke, onRevoke, isRevoking }: P
               {isExpired ? (
                 <span className="text-destructive">Expired</span>
               ) : (
-                <span>Expires in {daysUntilExpiry} day{daysUntilExpiry !== 1 ? 's' : ''}</span>
+                <span>Expires in {daysUntilExpiry} day{daysUntilExpiry !== 1 ? "s" : ""}</span>
               )}
             </span>
           </div>

@@ -1,8 +1,8 @@
-import type { ReactNode } from 'react';
-import { render, type RenderOptions } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { vi } from 'vitest';
+import type { ReactNode } from "react";
+import { render, type RenderOptions } from "@testing-library/react";
+import { BrowserRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { vi } from "vitest";
 
 // Create a fresh QueryClient for each test
 function createTestQueryClient() {
@@ -36,12 +36,13 @@ function createWrapper() {
 // Custom render with providers
 function customRender(
   ui: React.ReactElement,
-  options?: Omit<RenderOptions, 'wrapper'>
+  options?: Omit<RenderOptions, "wrapper">
 ) {
   return render(ui, { wrapper: createWrapper(), ...options });
 }
 
-export * from '@testing-library/react';
+// eslint-disable-next-line react-refresh/only-export-components
+export * from "@testing-library/react";
 export { customRender as render };
 
 // Mock auth context values
@@ -50,27 +51,27 @@ export const mockAuthContext = {
   isLoading: false,
   user: null,
   profile: {
-    sub: 'test-user-id',
-    email: 'test@example.com',
-    name: 'Test User',
+    sub: "test-user-id",
+    email: "test@example.com",
+    name: "Test User",
     picture: undefined,
   },
   error: null,
   login: vi.fn(),
   logout: vi.fn(),
-  getAccessToken: vi.fn().mockResolvedValue('test-token'),
+  getAccessToken: vi.fn().mockResolvedValue("test-token"),
 };
 
 // Mock org context values
 export const mockOrgContext = {
   currentOrg: {
-    id: 'test-org-id',
-    name: 'Test Organization',
-    slug: 'test-org',
+    id: "test-org-id",
+    name: "Test Organization",
+    slug: "test-org",
   },
   memberships: [],
   setCurrentOrg: vi.fn(),
   refreshOrganizations: vi.fn(),
   isLoading: false,
-  currentRole: 'admin' as const,
+  currentRole: "admin" as const,
 };

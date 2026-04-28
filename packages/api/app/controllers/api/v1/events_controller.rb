@@ -60,19 +60,21 @@ module Api
       def audit_trail
         authorize! @event, to: :show?
 
-        audit_log = @event.audit_log
+        audit_log = @event.audit_logs.order(created_at: :desc).first
 
         if audit_log
           render_resource(audit_log, AuditLogSerializer)
         else
-          render json: { data: nil, message: 'No audit trail available for this event' }
+          render json: { data: nil, message: "No audit trail available for this event" }
         end
       end
 
       private
 
       def set_event
-        @event = current_organization.tool_events.find(params[:id])
+        @event = current_organization.tool_events
+                                     .includes(:user, :project, :audit_logs)
+                                     .find(params[:id])
       end
 
       def apply_filters(scope)
@@ -87,10 +89,10 @@ module Api
 
       def apply_time_filter(scope)
         if params[:start_date].present?
-          scope = scope.where('occurred_at >= ?', Time.zone.parse(params[:start_date]))
+          scope = scope.where("occurred_at >= ?", Time.zone.parse(params[:start_date]))
         end
         if params[:end_date].present?
-          scope = scope.where('occurred_at <= ?', Time.zone.parse(params[:end_date]))
+          scope = scope.where("occurred_at <= ?", Time.zone.parse(params[:end_date]))
         end
         scope
       end

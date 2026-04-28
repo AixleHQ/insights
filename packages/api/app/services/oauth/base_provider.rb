@@ -1,15 +1,22 @@
 # frozen_string_literal: true
 
 module Oauth
+  MissingCredentialsError = Class.new(StandardError)
+
   class BaseProvider
     attr_reader :connector
 
     PROVIDER_MAP = {
-      'github' => 'Oauth::GithubProvider',
-      'gitlab' => 'Oauth::GitlabProvider',
-      'bitbucket' => 'Oauth::BitbucketProvider',
-      'jira' => 'Oauth::JiraProvider',
-      'linear' => 'Oauth::LinearProvider'
+      "github" => "Oauth::GithubProvider",
+      "gitlab" => "Oauth::GitlabProvider",
+      "bitbucket" => "Oauth::BitbucketProvider",
+      "jira" => "Oauth::JiraProvider",
+      "linear" => "Oauth::LinearProvider",
+      "anthropic" => "Oauth::AnthropicProvider",
+      "openai" => "Oauth::OpenaiProvider",
+      "openrouter" => "Oauth::OpenrouterProvider",
+      "gemini" => "Oauth::GeminiProvider",
+      "slack" => "Oauth::SlackProvider"
     }.freeze
 
     def self.for(connector)
@@ -28,37 +35,51 @@ module Oauth
     end
 
     def self.authorization_url(organization_id:, redirect_uri:, state: nil)
+      id = client_id
+      if id.blank?
+        raise Oauth::MissingCredentialsError,
+              "#{provider_display_name} integration is not configured (missing client_id)"
+      end
+
       state ||= SecureRandom.hex(32)
       params = {
-        client_id: client_id,
+        client_id: id,
         redirect_uri: redirect_uri,
-        scope: scopes.join(' '),
+        scope: scopes.join(" "),
         state: "#{organization_id}:#{state}",
-        response_type: 'code'
+        response_type: "code"
       }
       "#{authorize_endpoint}?#{params.to_query}"
     end
 
     def self.exchange_code(code, redirect_uri:)
+      id     = client_id
+      secret = client_secret
+      missing = [ ("client_id" if id.blank?), ("client_secret" if secret.blank?) ].compact
+      if missing.any?
+        raise Oauth::MissingCredentialsError,
+              "#{provider_display_name} integration is not configured (missing #{missing.join(" and ")})"
+      end
+
       response = Faraday.post(token_endpoint) do |req|
-        req.headers['Accept'] = 'application/json'
-        req.headers['Content-Type'] = 'application/x-www-form-urlencoded'
+        req.headers["Accept"] = "application/json"
+        req.headers["Content-Type"] = "application/x-www-form-urlencoded"
         req.body = {
-          client_id: client_id,
-          client_secret: client_secret,
+          client_id: id,
+          client_secret: secret,
           code: code,
           redirect_uri: redirect_uri,
-          grant_type: 'authorization_code'
+          grant_type: "authorization_code"
         }
       end
 
       data = JSON.parse(response.body)
-      raise "OAuth error: #{data['error_description'] || data['error']}" if data['error']
+      raise "OAuth error: #{data['error_description'] || data['error']}" if data["error"]
 
       token_data = {
-        access_token: data['access_token'],
-        refresh_token: data['refresh_token'],
-        expires_at: data['expires_in'] ? Time.current + data['expires_in'].to_i.seconds : nil
+        access_token: data["access_token"],
+        refresh_token: data["refresh_token"],
+        expires_at: data["expires_in"] ? Time.current + data["expires_in"].to_i.seconds : nil
       }
 
       # Fetch account info
@@ -67,30 +88,30 @@ module Oauth
     end
 
     def test_connection
-      raise NotImplementedError, 'Subclass must implement test_connection'
+      raise NotImplementedError, "Subclass must implement test_connection"
     end
 
     def refresh_token!
       return false unless connector.refresh_token.present?
 
       response = Faraday.post(self.class.token_endpoint) do |req|
-        req.headers['Accept'] = 'application/json'
-        req.headers['Content-Type'] = 'application/x-www-form-urlencoded'
+        req.headers["Accept"] = "application/json"
+        req.headers["Content-Type"] = "application/x-www-form-urlencoded"
         req.body = {
           client_id: self.class.client_id,
           client_secret: self.class.client_secret,
           refresh_token: connector.refresh_token,
-          grant_type: 'refresh_token'
+          grant_type: "refresh_token"
         }
       end
 
       data = JSON.parse(response.body)
-      return false if data['error']
+      return false if data["error"]
 
       connector.update!(
-        access_token: data['access_token'],
-        refresh_token: data['refresh_token'] || connector.refresh_token,
-        token_expires_at: data['expires_in'] ? Time.current + data['expires_in'].to_i.seconds : nil
+        access_token: data["access_token"],
+        refresh_token: data["refresh_token"] || connector.refresh_token,
+        token_expires_at: data["expires_in"] ? Time.current + data["expires_in"].to_i.seconds : nil
       )
 
       true
@@ -120,14 +141,20 @@ module Oauth
       def fetch_account_info(_access_token)
         raise NotImplementedError
       end
+
+      private
+
+      def provider_display_name
+        name.demodulize.delete_suffix("Provider")
+      end
     end
 
     protected
 
     def http_client
       @http_client ||= Faraday.new do |conn|
-        conn.headers['Authorization'] = "Bearer #{connector.access_token}"
-        conn.headers['Accept'] = 'application/json'
+        conn.headers["Authorization"] = "Bearer #{connector.access_token}"
+        conn.headers["Accept"] = "application/json"
         conn.adapter Faraday.default_adapter
       end
     end

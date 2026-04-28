@@ -1,0 +1,61 @@
+{
+  "ignored_warnings": [
+    {
+      "warning_type": "Mass Assignment",
+      "warning_code": 105,
+      "fingerprint": "7ee12b5cf4ca7ad8acf23eb5b40ab4821b6f4fed782120f3d6e64152d0d5bf85",
+      "check_name": "PermitAttributes",
+      "message": "Potentially dangerous key allowed for mass assignment",
+      "file": "app/controllers/api/v1/invitations_controller.rb",
+      "line": 97,
+      "code": "params.permit(:email, :role)",
+      "note": "Role is validated against ROLES whitelist in Invitation model and protected by authorization"
+    },
+    {
+      "warning_type": "Mass Assignment",
+      "warning_code": 105,
+      "fingerprint": "51a6edb5f8c634d844556fdb4c85069e2e89fa7274275735962c9c91332f4595",
+      "check_name": "PermitAttributes",
+      "message": "Potentially dangerous key allowed for mass assignment",
+      "file": "app/controllers/api/v1/organization_members_controller.rb",
+      "line": 278,
+      "code": "params.permit(:user_id, :role)",
+      "note": "Role is validated against ROLES whitelist in OrganizationMembership model and protected by authorization"
+    },
+    {
+      "warning_type": "Mass Assignment",
+      "warning_code": 105,
+      "fingerprint": "cc65338aee2d480399c1c58d8a87901a21750efb2055d719a132c9cebe89a210",
+      "check_name": "PermitAttributes",
+      "message": "Potentially dangerous key allowed for mass assignment",
+      "file": "app/controllers/api/v1/organization_members_controller.rb",
+      "line": 282,
+      "code": "params.permit(:role)",
+      "note": "Role is validated against ROLES whitelist in OrganizationMembership model and protected by authorization"
+    },
+    {
+      "warning_type": "Mass Assignment",
+      "warning_code": 105,
+      "fingerprint": "7b31c13f4827dd44644ff97fe475688adf671edadd565dc515f61375647219a6",
+      "check_name": "PermitAttributes",
+      "message": "Potentially dangerous key allowed for mass assignment",
+      "file": "app/controllers/api/v1/project_members_controller.rb",
+      "line": 72,
+      "code": "params.permit(:user_id, :role)",
+      "note": "Role is validated against ROLES whitelist in ProjectMembership model and protected by authorization"
+    },
+    {
+      "warning_type": "Mass Assignment",
+      "warning_code": 105,
+      "fingerprint": "4e0937c1a28f07e6f473c129edd84053dd8edfd0c690802c5a22e8e974058688",
+      "check_name": "PermitAttributes",
+      "message": "Potentially dangerous key allowed for mass assignment",
+      "file": "app/controllers/api/v1/project_members_controller.rb",
+      "line": 76,
+      "code": "params.permit(:role)",
+      "note": "Role is validated against ROLES whitelist in ProjectMembership model and protected by authorization"
+    }
+  ],
+  "updated": "2026-03-02 15:00:00 +0000",
+  "brakeman_version": "7.1.2"
+}

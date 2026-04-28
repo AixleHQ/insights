@@ -14,6 +14,6 @@ class CreateUserToolAccounts < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :user_tool_accounts, [:organization_membership_id, :tool_name], unique: true, name: 'idx_user_tool_accounts_membership_tool'
+    add_index :user_tool_accounts, [ :organization_membership_id, :tool_name ], unique: true, name: 'idx_user_tool_accounts_membership_tool'
   end
 end

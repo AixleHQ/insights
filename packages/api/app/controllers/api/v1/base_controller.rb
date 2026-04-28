@@ -16,7 +16,7 @@ module Api
 
       def paginate(scope)
         page = (params[:page] || 1).to_i
-        per_page = [(params[:per_page] || Kaminari.config.default_per_page).to_i, Kaminari.config.max_per_page].min
+        per_page = [ (params[:per_page] || Kaminari.config.default_per_page).to_i, Kaminari.config.max_per_page ].min
         per_page = 1 if per_page < 1
 
         scope.page(page).per(per_page)
@@ -49,7 +49,7 @@ module Api
         render_resource(resource, serializer_class, status: :created)
       end
 
-      def render_success(message: 'Success', data: nil)
+      def render_success(message: "Success", data: nil)
         response = { message: message }
         response[:data] = data if data
         render json: response, status: :ok
@@ -62,32 +62,41 @@ module Api
       private
 
       def render_not_found(exception = nil)
-        message = exception&.message || 'Resource not found'
-        render json: { error: 'Not Found', message: message }, status: :not_found
+        message = exception&.message || "Resource not found"
+        render json: { error: "Not Found", message: message }, status: :not_found
       end
 
       def render_unprocessable_entity(exception)
         errors = if exception.record
                    format_validation_errors(exception.record.errors)
-                 else
-                   { base: [exception.message] }
-                 end
-        render json: { error: 'Unprocessable Entity', errors: errors }, status: :unprocessable_entity
+        else
+                   { base: [ exception.message ] }
+        end
+        render json: { error: "Unprocessable Entity", errors: errors }, status: :unprocessable_entity
       end
 
       def render_forbidden(exception = nil)
-        message = exception&.result&.message || 'Access denied'
-        render json: { error: 'Forbidden', message: message }, status: :forbidden
+        message = exception&.result&.message || "Access denied"
+        render json: { error: "Forbidden", message: message }, status: :forbidden
       end
 
       def render_bad_request(message)
-        render json: { error: 'Bad Request', message: message }, status: :bad_request
+        render json: { error: "Bad Request", message: message }, status: :bad_request
       end
 
       def format_validation_errors(errors)
         errors.to_hash(true).transform_values do |messages|
           messages.map { |msg| msg.is_a?(Hash) ? msg[:message] : msg }
         end
+      end
+
+      def parse_date_param(value, param_name)
+        parsed = Time.zone.parse(value)
+        raise ArgumentError if parsed.nil?
+        parsed
+      rescue ArgumentError
+        render_bad_request("Invalid #{param_name} format — expected ISO 8601")
+        nil
       end
     end
   end

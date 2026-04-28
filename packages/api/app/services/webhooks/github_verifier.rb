@@ -2,24 +2,24 @@
 
 module Webhooks
   class GithubVerifier
-    SIGNATURE_HEADER = 'X-Hub-Signature-256'
+    SIGNATURE_HEADER = "X-Hub-Signature-256"
 
     class << self
       def verify!(payload:, signature:, secret:)
-        raise SignatureMissingError, 'Missing webhook signature' if signature.blank?
-        raise SignatureMissingError, 'Missing webhook secret' if secret.blank?
+        raise SignatureMissingError, "Missing webhook signature" if signature.blank?
+        raise SignatureMissingError, "Missing webhook secret" if secret.blank?
 
         expected = compute_signature(payload, secret)
 
         unless secure_compare(signature, expected)
-          raise SignatureInvalidError, 'Invalid GitHub webhook signature'
+          raise SignatureInvalidError, "Invalid GitHub webhook signature"
         end
 
         true
       end
 
       def compute_signature(payload, secret)
-        digest = OpenSSL::HMAC.hexdigest('SHA256', secret, payload)
+        digest = OpenSSL::HMAC.hexdigest("SHA256", secret, payload)
         "sha256=#{digest}"
       end
 

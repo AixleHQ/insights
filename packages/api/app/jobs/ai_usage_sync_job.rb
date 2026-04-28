@@ -3,20 +3,20 @@
 class AiUsageSyncJob
   include Sidekiq::Job
 
-  sidekiq_options queue: 'ai', retry: 3
+  sidekiq_options queue: "ai", retry: 3
 
   SUPPORTED_PROVIDERS = %w[openrouter anthropic openai gemini].freeze
 
   def perform(organization_id = nil, provider = nil)
-    Rails.logger.info('[AiUsageSyncJob] Starting AI usage reconciliation...')
+    Rails.logger.info("[AiUsageSyncJob] Starting AI usage reconciliation...")
 
     stats = { organizations_processed: 0, events_reconciled: 0, errors: [] }
 
     organizations = if organization_id
                       Organization.where(id: organization_id)
-                    else
+    else
                       Organization.all
-                    end
+    end
 
     organizations.find_each do |org|
       begin
@@ -38,7 +38,7 @@ class AiUsageSyncJob
   def reconcile_organization(org, provider_filter = nil)
     total_reconciled = 0
 
-    providers = provider_filter ? [provider_filter] : SUPPORTED_PROVIDERS
+    providers = provider_filter ? [ provider_filter ] : SUPPORTED_PROVIDERS
 
     providers.each do |provider|
       connector = org.organization_connectors.find_by(connector_type: provider, is_active: true)
@@ -80,11 +80,11 @@ class AiUsageSyncJob
 
   def fetch_provider_usage(connector, provider)
     case provider
-    when 'openrouter'
+    when "openrouter"
       fetch_openrouter_usage(connector)
-    when 'anthropic'
+    when "anthropic"
       fetch_anthropic_usage(connector)
-    when 'openai'
+    when "openai"
       fetch_openai_usage(connector)
     else
       nil
@@ -96,46 +96,68 @@ class AiUsageSyncJob
 
   def fetch_openrouter_usage(connector)
     # OpenRouter provides usage in the Generation endpoint
-    uri = URI('https://openrouter.ai/api/v1/generation')
+    uri = URI("https://openrouter.ai/api/v1/generation")
     http = Net::HTTP.new(uri.host, uri.port)
     http.use_ssl = true
 
     request = Net::HTTP::Get.new(uri)
-    request['Authorization'] = "Bearer #{connector.access_token}"
+    request["Authorization"] = "Bearer #{connector.access_token}"
 
     response = http.request(request)
     return nil unless response.code.to_i == 200
 
     data = JSON.parse(response.body)
-    generations = data['data'] || []
+    generations = data["data"] || []
 
     generations.map do |gen|
       {
-        external_id: gen['id'],
-        model: gen['model'],
-        tokens_in: gen['tokens_prompt'],
-        tokens_out: gen['tokens_completion'],
-        cost_usd: gen['total_cost'].to_f,
-        occurred_at: Time.parse(gen['created_at'])
+        external_id: gen["id"],
+        model: gen["model"],
+        tokens_in: gen["tokens_prompt"],
+        tokens_out: gen["tokens_completion"],
+        cost_usd: gen["total_cost"].to_f,
+        occurred_at: Time.parse(gen["created_at"])
       }
     end
   end
 
+  # How far back to sync on the first pull vs recurring syncs.
+  ANTHROPIC_INITIAL_SYNC_DAYS = 90
+  ANTHROPIC_RECURRING_SYNC_DAYS = 7
+
   def fetch_anthropic_usage(connector)
-    # Anthropic doesn't have a usage endpoint - we track during requests
-    nil
+    # Requires an Admin API key (sk-ant-admin...) stored in connector.access_token
+    days_back = connector.last_sync_at ? ANTHROPIC_RECURRING_SYNC_DAYS : ANTHROPIC_INITIAL_SYNC_DAYS
+    provider = Oauth::AnthropicProvider.new(connector)
+    data = provider.fetch_usage(start_date: days_back.days.ago.to_date, end_date: Date.today)
+    return nil unless data
+
+    Rails.logger.info("[Anthropic API] Raw usage data (#{data.size} entries): #{JSON.pretty_generate(data)}")
+
+    enriched = data.map do |entry|
+      cost = ModelPricingService.calculate_cost(
+        tokens_in: entry[:tokens_in],
+        tokens_out: entry[:tokens_out],
+        model: entry[:model]
+      )
+      entry.merge(cost_usd: cost[:total_cost])
+    end
+
+    Rails.logger.info("[Anthropic API] Enriched with cost (#{enriched.size} entries): #{JSON.pretty_generate(enriched)}")
+
+    enriched
   end
 
   def fetch_openai_usage(connector)
     # OpenAI usage endpoint
-    uri = URI('https://api.openai.com/v1/usage')
+    uri = URI("https://api.openai.com/v1/usage")
     uri.query = URI.encode_www_form(date: Date.today.to_s)
 
     http = Net::HTTP.new(uri.host, uri.port)
     http.use_ssl = true
 
     request = Net::HTTP::Get.new(uri)
-    request['Authorization'] = "Bearer #{connector.access_token}"
+    request["Authorization"] = "Bearer #{connector.access_token}"
 
     response = http.request(request)
     return nil unless response.code.to_i == 200
@@ -147,26 +169,35 @@ class AiUsageSyncJob
   end
 
   def find_matching_event(org, provider, usage)
-    org.tool_events
-       .where(tool_name: "#{provider}_api")
-       .where("metadata->>'external_id' = ?", usage[:external_id])
-       .first
+    scope = org.tool_events.where(tool_name: "#{provider}_api")
+
+    # Exact match on external_id (handles both old and new format)
+    match = scope.where("metadata->>'external_id' = ?", usage[:external_id]).first
+    return match if match
+
+    # Transition guard: if this entry has a workspace, also check the old
+    # aggregated format (without workspace in the ID) to prevent duplicates
+    # during the first sync after workspace support is deployed.
+    if usage[:workspace_name].present?
+      old_id = [ provider, usage[:model], usage[:occurred_at].to_date ].join("-")
+      scope.where("metadata->>'external_id' = ?", old_id).first
+    end
   end
 
   def create_event_from_usage(org, provider, usage)
+    metadata = { external_id: usage[:external_id], reconciled: true }
+    metadata[:workspace_name] = usage[:workspace_name] if usage[:workspace_name].present?
+
     ToolEvent.create!(
       organization_id: org.id,
       tool_name: "#{provider}_api",
-      event_type: 'completion',
+      event_type: "completion",
       model: usage[:model],
       tokens_in: usage[:tokens_in],
       tokens_out: usage[:tokens_out],
       cost_usd: usage[:cost_usd],
       occurred_at: usage[:occurred_at],
-      metadata: {
-        external_id: usage[:external_id],
-        reconciled: true
-      }
+      metadata: metadata
     )
   end
 end

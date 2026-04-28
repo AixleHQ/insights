@@ -13,7 +13,7 @@ module Admin
     end
 
     def resource_name
-      'repository'
+      "repository"
     end
 
     def scoped_resource

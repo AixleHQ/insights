@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Building2,
   Mail,
@@ -9,24 +9,24 @@ import {
   ArrowRight,
   Clock,
   CheckCircle2,
-} from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useOrg } from '@/contexts/OrgContext';
+} from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useOrg } from "@/contexts/OrgContext";
 import {
   useCheckPendingInvitations,
   useAcceptInvitation,
   useCreateOrganization,
-} from '@/hooks/useApi';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+} from "@/hooks/useApi";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
+} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -34,10 +34,10 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import type { InvitationPublic } from '@/lib/types';
+} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import type { InvitationPublic } from "@/lib/types";
 
 function InvitationCard({
   invitation,
@@ -54,8 +54,8 @@ function InvitationCard({
     <div
       className={`group relative overflow-hidden rounded-xl border p-4 transition-all duration-300 ${
         isExpired
-          ? 'border-border/50 bg-muted/30 opacity-60'
-          : 'border-border bg-card hover:border-primary/30 hover:shadow-md hover:shadow-primary/5'
+          ? "border-border/50 bg-muted/30 opacity-60"
+          : "border-border bg-card hover:border-primary/30 hover:shadow-md hover:shadow-primary/5"
       }`}
     >
       {/* Subtle gradient overlay on hover */}
@@ -68,7 +68,7 @@ function InvitationCard({
           <div className="flex items-center gap-2">
             <h4 className="font-medium">{invitation.organization.name}</h4>
             <Badge
-              variant={isExpired ? 'secondary' : 'outline'}
+              variant={isExpired ? "secondary" : "outline"}
               className="text-xs capitalize"
             >
               {invitation.role}
@@ -80,7 +80,7 @@ function InvitationCard({
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <Clock className="size-3" />
             <span>
-              {isExpired ? 'Expired' : `Expires ${formatDate(invitation.expiresAt)}`}
+              {isExpired ? "Expired" : `Expires ${formatDate(invitation.expiresAt)}`}
             </span>
           </div>
         </div>
@@ -94,7 +94,7 @@ function InvitationCard({
           {isAccepting ? (
             <Loader2 className="size-4 animate-spin" />
           ) : isExpired ? (
-            'Expired'
+            "Expired"
           ) : (
             <>
               Accept
@@ -113,8 +113,8 @@ function formatDate(dateString: string): string {
   const diff = date.getTime() - now.getTime();
   const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
 
-  if (days <= 0) return 'today';
-  if (days === 1) return 'tomorrow';
+  if (days <= 0) return "today";
+  if (days === 1) return "tomorrow";
   if (days <= 7) return `in ${days} days`;
   return date.toLocaleDateString();
 }
@@ -123,22 +123,6 @@ export function Onboarding() {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const { organizations, isInitialized, refreshOrganizations, setCurrentOrg } = useOrg();
-
-  // Redirect to dashboard if user already has organizations
-  useEffect(() => {
-    if (isInitialized && organizations.length > 0) {
-      navigate('/', { replace: true });
-    }
-  }, [isInitialized, organizations, navigate]);
-
-  // Show loading while checking if user has organizations
-  if (!isInitialized) {
-    return (
-      <div className="flex min-h-svh items-center justify-center bg-background">
-        <Loader2 className="size-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
 
   // Fetch pending invitations
   const {
@@ -153,13 +137,29 @@ export function Onboarding() {
 
   // Create org dialog state
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [orgName, setOrgName] = useState('');
-  const [orgDescription, setOrgDescription] = useState('');
+  const [orgName, setOrgName] = useState("");
+  const [orgDescription, setOrgDescription] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
   // Accept invitation state
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
+
+  // Redirect to dashboard if user already has organizations
+  useEffect(() => {
+    if (isInitialized && organizations.length > 0) {
+      navigate("/", { replace: true });
+    }
+  }, [isInitialized, organizations, navigate]);
+
+  // Show loading while checking if user has organizations
+  if (!isInitialized) {
+    return (
+      <div className="flex min-h-svh items-center justify-center bg-background">
+        <Loader2 className="size-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   const handleAcceptInvitation = async (invitation: InvitationPublic) => {
     setAcceptingId(invitation.id);
@@ -178,10 +178,10 @@ export function Onboarding() {
 
       // Navigate to dashboard
       if (result.data?.organization) {
-        navigate('/profile');
+        navigate("/profile");
       }
     } catch (err) {
-      console.error('Failed to accept invitation:', err);
+      console.error("Failed to accept invitation:", err);
     } finally {
       setAcceptingId(null);
       refetchInvitations();
@@ -215,9 +215,9 @@ export function Onboarding() {
       }
 
       setCreateDialogOpen(false);
-      navigate('/');
+      navigate("/");
     } catch (err) {
-      setCreateError(err instanceof Error ? err.message : 'Failed to create organization');
+      setCreateError(err instanceof Error ? err.message : "Failed to create organization");
     } finally {
       setIsCreating(false);
     }
@@ -319,7 +319,7 @@ export function Onboarding() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="org-description">
-                      Description{' '}
+                      Description{" "}
                       <span className="text-muted-foreground">(optional)</span>
                     </Label>
                     <Input
@@ -375,7 +375,7 @@ export function Onboarding() {
                   <CardTitle>Pending Invitations</CardTitle>
                   <CardDescription>
                     {hasInvitations
-                      ? `You have ${activeInvitations.length} invitation${activeInvitations.length > 1 ? 's' : ''} waiting for you.`
+                      ? `You have ${activeInvitations.length} invitation${activeInvitations.length > 1 ? "s" : ""} waiting for you.`
                       : "No pending invitations for your email address."}
                   </CardDescription>
                 </div>
@@ -412,7 +412,7 @@ export function Onboarding() {
 
           {/* Help text */}
           <p className="text-center text-sm text-muted-foreground">
-            Need help getting started?{' '}
+            Need help getting started?{" "}
             <a
               href="mailto:support@db90.dev"
               className="text-primary underline-offset-4 hover:underline"

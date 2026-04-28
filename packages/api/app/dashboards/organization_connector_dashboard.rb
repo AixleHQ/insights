@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'administrate/base_dashboard'
+require "administrate/base_dashboard"
 
 class OrganizationConnectorDashboard < Administrate::BaseDashboard
   ATTRIBUTE_TYPES = {
@@ -52,8 +52,8 @@ class OrganizationConnectorDashboard < Administrate::BaseDashboard
 
   COLLECTION_FILTERS = {
     active: ->(resources) { resources.where(is_active: true) },
-    github: ->(resources) { resources.where(connector_type: 'github') },
-    gitlab: ->(resources) { resources.where(connector_type: 'gitlab') }
+    github: ->(resources) { resources.where(connector_type: "github") },
+    gitlab: ->(resources) { resources.where(connector_type: "gitlab") }
   }.freeze
 
   def display_resource(connector)

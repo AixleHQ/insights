@@ -110,8 +110,163 @@ services:
     network_mode: "service:keycloak"
     restart: "no"
 
+  # ---- Application services ----
+
+  api:
+    build:
+      context: ./packages/api
+      dockerfile: Dockerfile.dev
+    container_name: db90-api
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./packages/api:/app
+      - api-bundle:/usr/local/bundle
+    environment:
+      RAILS_ENV: development
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USERNAME: postgres
+      DATABASE_PASSWORD: postgres
+      REDIS_URL: redis://redis:6379/0
+      TEMPORAL_HOST: temporal:7233
+      KEYCLOAK_ISSUER: http://localhost:8080/realms/db90
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/db90/protocol/openid-connect/certs
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      GITLAB_CLIENT_ID: ${GITLAB_CLIENT_ID}
+      GITLAB_CLIENT_SECRET: ${GITLAB_CLIENT_SECRET}
+      BITBUCKET_CLIENT_ID: ${BITBUCKET_CLIENT_ID}
+      BITBUCKET_CLIENT_SECRET: ${BITBUCKET_CLIENT_SECRET}
+      ATLASSIAN_CLIENT_ID: ${ATLASSIAN_CLIENT_ID}
+      ATLASSIAN_CLIENT_SECRET: ${ATLASSIAN_CLIENT_SECRET}
+      LINEAR_CLIENT_ID: ${LINEAR_CLIENT_ID}
+      LINEAR_CLIENT_SECRET: ${LINEAR_CLIENT_SECRET}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    stdin_open: true
+    tty: true
+
+  sidekiq:
+    build:
+      context: ./packages/api
+      dockerfile: Dockerfile.dev
+    container_name: db90-sidekiq
+    volumes:
+      - ./packages/api:/app
+      - api-bundle:/usr/local/bundle
+    environment:
+      RAILS_ENV: development
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USERNAME: postgres
+      DATABASE_PASSWORD: postgres
+      REDIS_URL: redis://redis:6379/0
+      TEMPORAL_HOST: temporal:7233
+      KEYCLOAK_ISSUER: http://localhost:8080/realms/db90
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/db90/protocol/openid-connect/certs
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    command: bundle exec sidekiq -C config/sidekiq.yml
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./packages/web
+    container_name: db90-web
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./packages/web:/app
+      - web-node-modules:/app/node_modules
+    environment:
+      API_PROXY_TARGET: http://api:3000
+      DOCKER: "true"
+    depends_on:
+      - api
+
+  worker:
+    build:
+      context: ./temporal
+    container_name: db90-worker
+    volumes:
+      - ./temporal:/app
+      - worker-bundle:/usr/local/bundle
+    environment:
+      TEMPORAL_HOST: temporal:7233
+      TEMPORAL_NAMESPACE: default
+      TEMPORAL_TASK_QUEUE: db90-tasks
+    depends_on:
+      - temporal
+    profiles:
+      - worker
+
+  remote:
+    build:
+      context: ./docker/remote
+      args:
+        platform: '${PLATFORM:-linux_arm64}'
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./docker/remote/Makefile:/app/Makefile
+    environment: &remote-environment
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-2}
+      - AWS_REGION=${AWS_REGION:-us-east-2}
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_SESSION_TOKEN
+      - AWS_SECURITY_TOKEN
+      - AWS_SESSION_EXPIRATION
+      - PROJECT=db90
+      - USE_IMAGE_TAG_ENV_PREFIX=true
+      - CI_COMMIT_SHA
+      - CI_COMMIT_BRANCH
+    profiles:
+      - remote
+
+  toolbox:
+    image: ghcr.io/artempartos/ecs_toolbox:latest
+    stdin_open: true
+    tty: true
+    environment:
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-2}
+      - AWS_REGION=${AWS_REGION:-us-east-2}
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_SESSION_TOKEN
+      - AWS_SECURITY_TOKEN
+      - AWS_SESSION_EXPIRATION
+      - PROJECT=db90
+      - USE_IMAGE_TAG_ENV_PREFIX=true
+      - CI_COMMIT_SHA
+      - CI_COMMIT_BRANCH
+      - DOCKER_DEFAULT_PLATFORM=linux/amd64
+    volumes:
+      - .:/app:cached
+      - /var/run/docker.sock:/var/run/docker.sock
+    profiles:
+      - remote
+
 volumes:
   postgres-data:
   redis-data:
   minio-data:
   temporal-data:
+  api-bundle:
+  web-node-modules:
+  worker-bundle:

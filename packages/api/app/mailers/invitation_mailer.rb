@@ -1,5 +1,5 @@
 class InvitationMailer < ApplicationMailer
-  default from: ENV.fetch('MAILER_FROM', 'noreply@db90.dev')
+  default from: ENV.fetch("MAILER_FROM", "noreply@db90.dev")
 
   def invite(invitation)
     @invitation = invitation

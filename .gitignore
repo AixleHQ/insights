@@ -2,6 +2,9 @@
 node_modules/
 vendor/bundle/
 
+.playwright-mcp/
+settings.local.json
+
 # Build outputs
 dist/
 build/
@@ -50,6 +53,11 @@ temporal-data/
 # Test coverage
 coverage/
 .coverage
+
+# Terraform
+infrastructure/**/.terraform/
+infrastructure/**/backend.tf
+infrastructure/tfvars/
 
 # Misc
 *.log

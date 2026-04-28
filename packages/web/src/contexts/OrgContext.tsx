@@ -5,11 +5,11 @@ import {
   useEffect,
   useCallback,
   type ReactNode,
-} from 'react';
-import { useAuth } from './AuthContext';
-import { setCurrentOrganizationId } from '../lib/api';
+} from "react";
+import { useAuth } from "./AuthContext";
+import { setCurrentOrganizationId } from "../lib/api";
 
-export type MemberRole = 'owner' | 'admin' | 'member' | 'viewer';
+export type MemberRole = "owner" | "admin" | "member" | "viewer";
 
 // Organization type matching the Rails API response
 export interface Organization {
@@ -46,14 +46,14 @@ interface OrgContextValue extends OrgState {
 
 const OrgContext = createContext<OrgContextValue | null>(null);
 
-const ORG_STORAGE_KEY = 'db90_current_org_id';
+const ORG_STORAGE_KEY = "db90_current_org_id";
 
 interface OrgProviderProps {
   children: ReactNode;
   apiBaseUrl?: string;
 }
 
-export function OrgProvider({ children, apiBaseUrl = '/api/v1' }: OrgProviderProps) {
+export function OrgProvider({ children, apiBaseUrl = "/api/v1" }: OrgProviderProps) {
   const { isAuthenticated, isLoading: authLoading, getAccessToken } = useAuth();
 
   const [state, setState] = useState<OrgState>({
@@ -81,12 +81,16 @@ export function OrgProvider({ children, apiBaseUrl = '/api/v1' }: OrgProviderPro
 
     try {
       const token = await getAccessToken();
-      const response = await fetch(`${apiBaseUrl}/users/me/organizations`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      };
+
+      // Fetch orgs and user settings in parallel
+      const [response, userResponse] = await Promise.all([
+        fetch(`${apiBaseUrl}/users/me/organizations`, { headers }),
+        fetch(`${apiBaseUrl}/users/me`, { headers }).catch(() => null),
+      ]);
 
       if (!response.ok) {
         throw new Error(`Failed to fetch organizations: ${response.status}`);
@@ -102,18 +106,30 @@ export function OrgProvider({ children, apiBaseUrl = '/api/v1' }: OrgProviderPro
         slug: org.slug as string,
         description: org.description as string | undefined,
         is_active: org.isActive as boolean,
-        user_role: (org.userRole as MemberRole) || 'member',
+        user_role: (org.userRole as MemberRole) || "member",
       }));
       const memberships: OrganizationMembership[] = organizations.map((org) => ({
         organization: org,
-        role: org.user_role || 'member',
+        role: org.user_role || "member",
       }));
 
-      // Restore previously selected org from localStorage
+      // Read default_org_id from user settings (non-fatal if unavailable)
+      let defaultOrgId: string | null = null;
+      if (userResponse?.ok) {
+        const userData = await userResponse.json();
+        defaultOrgId = (userData.data?.settings?.default_org_id as string) ?? null;
+      }
+
+      // Restore previously selected org: localStorage > default_org_id setting > first org
       const storedOrgId = localStorage.getItem(ORG_STORAGE_KEY);
       let currentOrg = organizations.find((o) => o.id === storedOrgId) || null;
 
-      // If no stored org or stored org not found, use first org
+      // No localStorage entry — try the server-persisted default_org_id
+      if (!currentOrg && defaultOrgId) {
+        currentOrg = organizations.find((o) => o.id === defaultOrgId) || null;
+      }
+
+      // If still no org, use first org
       if (!currentOrg && organizations.length > 0) {
         currentOrg = organizations[0];
         // Clear invalid stored org ID (e.g., after DB reseed)
@@ -139,7 +155,7 @@ export function OrgProvider({ children, apiBaseUrl = '/api/v1' }: OrgProviderPro
         ...prev,
         isLoading: false,
         isInitialized: true,
-        error: error instanceof Error ? error : new Error('Failed to fetch organizations'),
+        error: error instanceof Error ? error : new Error("Failed to fetch organizations"),
       }));
     }
   }, [isAuthenticated, getAccessToken, apiBaseUrl]);
@@ -208,15 +224,17 @@ export function OrgProvider({ children, apiBaseUrl = '/api/v1' }: OrgProviderPro
   return <OrgContext.Provider value={value}>{children}</OrgContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useOrg(): OrgContextValue {
   const context = useContext(OrgContext);
   if (!context) {
-    throw new Error('useOrg must be used within an OrgProvider');
+    throw new Error("useOrg must be used within an OrgProvider");
   }
   return context;
 }
 
 // Hook for requiring an organization to be selected
+// eslint-disable-next-line react-refresh/only-export-components
 export function useRequireOrg(): OrgContextValue & { isReady: boolean } {
   const org = useOrg();
   return {
@@ -226,6 +244,7 @@ export function useRequireOrg(): OrgContextValue & { isReady: boolean } {
 }
 
 // Hook for requiring specific roles
+// eslint-disable-next-line react-refresh/only-export-components
 export function useRequireRole(
   requiredRoles: string | string[]
 ): OrgContextValue & { hasAccess: boolean } {

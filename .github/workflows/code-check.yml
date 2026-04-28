@@ -1,0 +1,39 @@
+name: Reusable Code Check
+
+on:
+  workflow_call:
+    inputs:
+      check_command:
+        required: true
+        type: string
+        description: "Command to run (e.g. 'bundle exec rspec', 'npm run lint')"
+      toolbox_image:
+        required: false
+        type: string
+        description: 'Toolbox container image'
+        default: 'ghcr.io/artempartos/ecs_toolbox:latest'
+      docker_compose_file:
+        required: false
+        type: string
+        description: 'Docker compose file'
+        default: 'docker-compose.ci.yml'
+      container_name:
+        required: false
+        type: string
+        description: 'Container name to run check in'
+        default: 'api'
+
+jobs:
+  check:
+    container: ${{ inputs.toolbox_image }}
+    runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT: test
+      RAILS_ENV: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run check
+        run: |
+          docker compose -f ${{ inputs.docker_compose_file }} run --rm ${{ inputs.container_name }} ${{ inputs.check_command }}

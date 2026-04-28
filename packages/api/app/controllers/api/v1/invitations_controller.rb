@@ -35,8 +35,8 @@ module Api
         existing_user = User.find_by(email: @invitation.email)
         if existing_user && current_organization.members.include?(existing_user)
           return render json: {
-            error: 'Unprocessable Entity',
-            errors: { email: ['is already a member of this organization'] }
+            error: "Unprocessable Entity",
+            errors: { email: [ "is already a member of this organization" ] }
           }, status: :unprocessable_entity
         end
 
@@ -47,7 +47,7 @@ module Api
           render_created(@invitation, InvitationSerializer)
         else
           render json: {
-            error: 'Unprocessable Entity',
+            error: "Unprocessable Entity",
             errors: format_validation_errors(@invitation.errors)
           }, status: :unprocessable_entity
         end
@@ -61,8 +61,8 @@ module Api
           render_no_content
         else
           render json: {
-            error: 'Unprocessable Entity',
-            message: 'Cannot revoke this invitation'
+            error: "Unprocessable Entity",
+            message: "Cannot revoke this invitation"
           }, status: :unprocessable_entity
         end
       end
@@ -73,8 +73,8 @@ module Api
 
         unless @invitation.pending?
           return render json: {
-            error: 'Unprocessable Entity',
-            message: 'Can only resend pending invitations'
+            error: "Unprocessable Entity",
+            message: "Can only resend pending invitations"
           }, status: :unprocessable_entity
         end
 
@@ -94,7 +94,7 @@ module Api
       end
 
       def invitation_params
-        params.permit(:email, :role)
+        params.permit(:email, :role) # brakeman:ignore:MassAssignment - role is validated against ROLES whitelist
       end
     end
   end
