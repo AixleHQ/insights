@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { glob } from "glob";
 import { type PricingTable, calculateCost } from "./pricing.js";
+import { type RiskLevel, scanText } from "./risk-scanner.js";
 
 /** Subset of a Claude Code JSONL assistant message usage block. */
 interface ClaudeUsage {
@@ -13,10 +14,16 @@ interface ClaudeUsage {
   cache_read_input_tokens?: number;
 }
 
+interface ContentBlock {
+  type: string;
+  text?: string;
+}
+
 /** Subset of a Claude Code JSONL message. */
 interface ClaudeMessage {
   model?: string;
   usage?: ClaudeUsage;
+  content?: ContentBlock[] | string;
 }
 
 /** A single line in a Claude Code JSONL transcript. */
@@ -39,6 +46,9 @@ export interface SessionAggregate {
   cacheReadTokens: number;
   /** Latest assistant message timestamp in the session (ISO string). */
   occurredAt: string;
+  riskLevel: RiskLevel;
+  riskScore: number;
+  riskCategories: string[];
 }
 
 /** Payload shape expected by the db90 ingest API. */
@@ -59,6 +69,10 @@ export interface Db90Payload {
     output_tokens: number;
     cache_write_tokens: number;
     cache_read_tokens: number;
+    risk_level: RiskLevel;
+    risk_categories: string[];
+    risk_score: number;
+    scannable: true;
   };
 }
 
@@ -95,12 +109,19 @@ export function findTranscriptFiles(baseDirs?: string[]): string[] {
   return [...new Set(files)];
 }
 
+/** Extracts text strings from a content field (block array or plain string). */
+function extractContentText(content: ContentBlock[] | string): string[] {
+  if (typeof content === "string") return [content];
+  return content.filter((b) => b.type === "text" && b.text).map((b) => b.text!);
+}
+
 /** Streams a JSONL file and aggregates token usage per session. */
 export async function parseTranscriptFile(
   filePath: string,
   verbose: boolean = false
 ): Promise<Map<string, SessionAggregate>> {
   const sessions = new Map<string, SessionAggregate>();
+  const userTexts = new Map<string, string[]>();
 
   let fileSize = 0;
   try {
@@ -130,51 +151,75 @@ export async function parseTranscriptFile(
       continue;
     }
 
-    if (entry.type !== "assistant") continue;
-    if (!entry.sessionId || !entry.message) continue;
+    if (entry.type === "assistant") {
+      if (!entry.sessionId || !entry.message) continue;
 
-    const usage = entry.message.usage;
-    if (!usage) {
-      if (verbose) {
-        console.warn(`[warn] ${filePath}:${lineNumber} — assistant message has no usage, skipping`);
+      const usage = entry.message.usage;
+      if (!usage) {
+        if (verbose) {
+          console.warn(`[warn] ${filePath}:${lineNumber} — assistant message has no usage, skipping`);
+        }
+        continue;
       }
+
+      const sessionId = entry.sessionId;
+      const existing = sessions.get(sessionId);
+
+      const tokensIn =
+        (usage.input_tokens ?? 0) +
+        (usage.cache_creation_input_tokens ?? 0) +
+        (usage.cache_read_input_tokens ?? 0);
+      const tokensOut = usage.output_tokens ?? 0;
+      const cacheWrite = usage.cache_creation_input_tokens ?? 0;
+      const cacheRead = usage.cache_read_input_tokens ?? 0;
+      const model = entry.message.model ?? null;
+      const timestamp = entry.timestamp ?? new Date().toISOString();
+
+      if (!existing) {
+        sessions.set(sessionId, {
+          sessionId,
+          filePath,
+          fileSize,
+          model,
+          tokensIn,
+          tokensOut,
+          cacheWriteTokens: cacheWrite,
+          cacheReadTokens: cacheRead,
+          occurredAt: timestamp,
+          riskLevel: "low",
+          riskScore: 0,
+          riskCategories: [],
+        });
+      } else {
+        existing.tokensIn += tokensIn;
+        existing.tokensOut += tokensOut;
+        existing.cacheWriteTokens += cacheWrite;
+        existing.cacheReadTokens += cacheRead;
+        // Keep most common model (last seen wins for simplicity)
+        if (model) existing.model = model;
+        // Advance to latest timestamp
+        if (timestamp > existing.occurredAt) existing.occurredAt = timestamp;
+      }
+    } else if (entry.type === "user") {
+      if (!entry.sessionId || !entry.message?.content) continue;
+      const texts = extractContentText(entry.message.content);
+      const buf = userTexts.get(entry.sessionId) ?? [];
+      buf.push(...texts);
+      userTexts.set(entry.sessionId, buf);
+    } else {
       continue;
     }
+  }
 
-    const sessionId = entry.sessionId;
-    const existing = sessions.get(sessionId);
-
-    const tokensIn =
-      (usage.input_tokens ?? 0) +
-      (usage.cache_creation_input_tokens ?? 0) +
-      (usage.cache_read_input_tokens ?? 0);
-    const tokensOut = usage.output_tokens ?? 0;
-    const cacheWrite = usage.cache_creation_input_tokens ?? 0;
-    const cacheRead = usage.cache_read_input_tokens ?? 0;
-    const model = entry.message.model ?? null;
-    const timestamp = entry.timestamp ?? new Date().toISOString();
-
-    if (!existing) {
-      sessions.set(sessionId, {
-        sessionId,
-        filePath,
-        fileSize,
-        model,
-        tokensIn,
-        tokensOut,
-        cacheWriteTokens: cacheWrite,
-        cacheReadTokens: cacheRead,
-        occurredAt: timestamp,
-      });
-    } else {
-      existing.tokensIn += tokensIn;
-      existing.tokensOut += tokensOut;
-      existing.cacheWriteTokens += cacheWrite;
-      existing.cacheReadTokens += cacheRead;
-      // Keep most common model (last seen wins for simplicity)
-      if (model) existing.model = model;
-      // Advance to latest timestamp
-      if (timestamp > existing.occurredAt) existing.occurredAt = timestamp;
+  // Apply risk scanning to each session from accumulated user-turn text
+  for (const [sessionId, agg] of sessions) {
+    const texts = userTexts.get(sessionId) ?? [];
+    if (texts.length > 0) {
+      const combined = texts.join(" ");
+      const result = scanText(combined);
+      agg.riskLevel = result.risk_level;
+      agg.riskScore = result.risk_score;
+      agg.riskCategories = result.risk_categories;
     }
   }
 
@@ -204,6 +249,10 @@ export function toDb90Payload(agg: SessionAggregate, options?: ToDb90PayloadOpti
       output_tokens: agg.tokensOut,
       cache_write_tokens: agg.cacheWriteTokens,
       cache_read_tokens: agg.cacheReadTokens,
+      risk_level: agg.riskLevel,
+      risk_categories: agg.riskCategories,
+      risk_score: agg.riskScore,
+      scannable: true,
     },
   };
 

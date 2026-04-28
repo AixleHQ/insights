@@ -7,9 +7,38 @@ module Activities
       Temporalio::Activity::Context.current.heartbeat("Classifying event content")
 
       raw_payload = params["raw_payload"]
-      policy = params["policy"]
+      policy      = params["policy"]
 
-      content = extract_text_content(raw_payload)
+      metadata = extract_metadata(raw_payload)
+
+      # Path 1: cursor / unscannable — no prompt content, return 'none'
+      if metadata["scannable"] == false
+        return {
+          "detections"            => [],
+          "risk_score"            => 0,
+          "risk_level"            => "none",
+          "requires_sanitization" => false,
+          "detection_summary"     => "No content available for scanning"
+        }
+      end
+
+      # Path 2: pre-scanned by connector (db90-claude) — use result directly
+      if metadata["scannable"] == true && metadata["risk_level"]
+        categories = Array(metadata["risk_categories"])
+        return {
+          "detections"            => categories.map { |c|
+                                       { "category" => c, "pattern" => "pre_scanned",
+                                         "count" => 1, "action" => "none" } },
+          "risk_score"            => metadata["risk_score"].to_i,
+          "risk_level"            => metadata["risk_level"],
+          "requires_sanitization" => false,
+          "detection_summary"     => categories.empty? ? "No sensitive data detected" :
+                                       "Pre-classified: #{categories.join(', ')}"
+        }
+      end
+
+      # Path 3: standard server-side scan (web events, anything without scannable flag)
+      content    = extract_text_content(raw_payload)
       detections = []
       risk_score = 0
 
@@ -48,6 +77,11 @@ module Activities
     end
 
     private
+
+    def extract_metadata(raw_payload)
+      data = raw_payload.is_a?(String) ? (JSON.parse(raw_payload) rescue {}) : raw_payload
+      data.is_a?(Hash) ? (data["metadata"] || {}) : {}
+    end
 
     def extract_text_content(payload)
       if payload.is_a?(String)

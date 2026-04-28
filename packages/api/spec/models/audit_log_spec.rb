@@ -3,7 +3,7 @@ require 'rails_helper'
 RSpec.describe AuditLog, type: :model do
   describe 'constants' do
     it 'defines valid risk levels' do
-      expect(AuditLog::RISK_LEVELS).to eq(%w[low medium high critical])
+      expect(AuditLog::RISK_LEVELS).to eq(%w[low medium high critical none])
     end
   end
 
@@ -39,12 +39,14 @@ RSpec.describe AuditLog, type: :model do
         medium = create(:audit_log, risk_level: 'medium')
         high = create(:audit_log, risk_level: 'high')
         critical = create(:audit_log, risk_level: 'critical')
+        none = create(:audit_log, :none_risk)
 
         results = AuditLog.high_risk
         expect(results).not_to include(low)
         expect(results).not_to include(medium)
         expect(results).to include(high)
         expect(results).to include(critical)
+        expect(results).not_to include(none)
       end
     end
 
@@ -78,6 +80,11 @@ RSpec.describe AuditLog, type: :model do
 
     it 'returns false for medium risk level' do
       log = build(:audit_log, risk_level: 'medium')
+      expect(log.high_risk?).to be false
+    end
+
+    it 'returns false for none risk level' do
+      log = build(:audit_log, risk_level: 'none')
       expect(log.high_risk?).to be false
     end
   end

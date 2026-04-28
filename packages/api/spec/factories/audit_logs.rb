@@ -13,6 +13,10 @@ FactoryBot.define do
       classification_labels { %w[pii credentials] }
     end
 
+    trait :none_risk do
+      risk_level { 'none' }
+    end
+
     trait :with_workflow do
       temporal_workflow_id { SecureRandom.uuid }
     end
