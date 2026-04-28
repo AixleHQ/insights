@@ -30,6 +30,7 @@ RUN apt-get update -qq && \
     rm -rf /var/lib/apt/lists/*
 RUN bundle install
 COPY packages/api/ .
+COPY temporal/ /temporal/
 ENV RAILS_ENV="test"
 CMD ["bundle", "exec", "rspec"]
 

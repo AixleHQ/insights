@@ -3,13 +3,48 @@ require "json"
 
 module Activities
   class ClassificationActivity < Temporalio::Activity::Definition
+    VALID_RISK_LEVELS = %w[low medium high critical none].freeze
+
     def execute(params)
       Temporalio::Activity::Context.current.heartbeat("Classifying event content")
 
       raw_payload = params["raw_payload"]
-      policy = params["policy"]
+      policy      = params["policy"]
 
-      content = extract_text_content(raw_payload)
+      metadata = extract_metadata(raw_payload)
+
+      # Path 1: cursor / unscannable — no prompt content, return 'none'
+      if metadata["scannable"] == false
+        return {
+          "detections"            => [],
+          "risk_score"            => 0,
+          "risk_level"            => "none",
+          "requires_sanitization" => false,
+          "detection_summary"     => "No content available for scanning"
+        }
+      end
+
+      # Path 2: pre-scanned by connector (db90-claude) — use result directly.
+      # requires_sanitization is always false: the connector has already processed
+      # its own content and the raw text is not available server-side to sanitize.
+      if metadata["scannable"] == true && metadata["risk_level"]
+        raw_level  = metadata["risk_level"]
+        risk_level = VALID_RISK_LEVELS.include?(raw_level) ? raw_level : "low"
+        categories = Array(metadata["risk_categories"])
+        return {
+          "detections"            => categories.map { |c|
+                                       { "category" => c, "pattern" => "pre_scanned",
+                                         "count" => 1, "action" => "none" } },
+          "risk_score"            => metadata["risk_score"].to_i,
+          "risk_level"            => risk_level,
+          "requires_sanitization" => false,
+          "detection_summary"     => categories.empty? ? "No sensitive data detected" :
+                                       "Pre-classified: #{categories.join(', ')}"
+        }
+      end
+
+      # Path 3: standard server-side scan (web events, anything without scannable flag)
+      content    = extract_text_content(raw_payload)
       detections = []
       risk_score = 0
 
@@ -30,7 +65,6 @@ module Activities
               "action" => config["action"]
             }
 
-            # Increment risk score based on category
             risk_score += category_risk_weight(category) * matches.length
           end
         end
@@ -48,6 +82,13 @@ module Activities
     end
 
     private
+
+    def extract_metadata(raw_payload)
+      data = raw_payload.is_a?(String) ? JSON.parse(raw_payload) : raw_payload
+      data.is_a?(Hash) ? (data["metadata"] || {}) : {}
+    rescue JSON::ParserError
+      {}
+    end
 
     def extract_text_content(payload)
       if payload.is_a?(String)

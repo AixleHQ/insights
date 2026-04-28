@@ -30,6 +30,8 @@ describe("mapEvent", () => {
     expect(result!.metadata.workspace).toBe(workspace);
     expect(result!.cost_usd).toBeTypeOf("number");
     expect(result!.metadata.cost_model).toBe("estimated_line_count");
+    expect(result!.metadata.scannable).toBe(false);
+    expect(result!.metadata.risk_level).toBe("none");
   });
 
   it("maps a chat event (type=1) correctly", () => {
@@ -51,6 +53,8 @@ describe("mapEvent", () => {
     expect(result!.metadata.cursor_session_id).toBe("req-def-456");
     expect(result!.cost_usd).toBeTypeOf("number");
     expect(result!.metadata.cost_model).toBe("estimated_line_count");
+    expect(result!.metadata.scannable).toBe(false);
+    expect(result!.metadata.risk_level).toBe("none");
   });
 
   it("handles timestamps in seconds (< 1e12)", () => {
@@ -187,12 +191,16 @@ describe("mapDailyStats", () => {
     expect(tab.occurred_at).toBe("2026-02-09T00:00:00.000Z");
     expect(tab.cost_usd).toBeTypeOf("number");
     expect(tab.metadata.cost_model).toBe("estimated_line_count");
+    expect(tab.metadata.scannable).toBe(false);
+    expect(tab.metadata.risk_level).toBe("none");
 
     const composer = results.find((r) => r.event_type === "chat")!;
     expect(composer.tokens_in).toBe(43);
     expect(composer.tokens_out).toBe(50);
     expect(composer.cost_usd).toBeTypeOf("number");
     expect(composer.metadata.cost_model).toBe("estimated_line_count");
+    expect(composer.metadata.scannable).toBe(false);
+    expect(composer.metadata.risk_level).toBe("none");
   });
 
   it("emits only tab event when composer counts are zero", () => {

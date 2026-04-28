@@ -38,6 +38,8 @@ export interface Db90Payload {
     cursor_session_id: string | null;
     workspace: string;
     cost_model: typeof COST_MODEL;
+    scannable: false;
+    risk_level: "none";
   };
 }
 
@@ -117,7 +119,7 @@ function buildPayload(opts: {
     tokens_out: tokensOut,
     cost_usd: costUsd,
     occurred_at: occurredAt,
-    metadata: { cursor_session_id: null, workspace: dbPath, cost_model: COST_MODEL },
+    metadata: { cursor_session_id: null, workspace: dbPath, cost_model: COST_MODEL, scannable: false, risk_level: "none" },
   };
   if (projectId) payload.project_id = projectId;
   return payload;
@@ -223,6 +225,8 @@ export function mapEvent(
       cursor_session_id: row.sessionId ?? row.requestId ?? null,
       workspace: workspacePath,
       cost_model: COST_MODEL,
+      scannable: false,
+      risk_level: "none",
     },
   };
   if (projectId) payload.project_id = projectId;

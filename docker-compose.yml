@@ -121,6 +121,7 @@ services:
       - "3000:3000"
     volumes:
       - ./packages/api:/app
+      - ./temporal:/temporal
       - api-bundle:/usr/local/bundle
     environment:
       RAILS_ENV: development

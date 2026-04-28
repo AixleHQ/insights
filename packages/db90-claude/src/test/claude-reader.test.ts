@@ -60,10 +60,11 @@ describe("parseTranscriptFile", () => {
     expect(result.size).toBe(0);
   });
 
-  it("skips non-assistant lines", async () => {
+  it("ignores lines that are neither assistant nor user (system, tool_result, etc.)", async () => {
     const filePath = join(testDir, "session.jsonl");
-    const userLine = { type: "user", sessionId: "sess1", timestamp: "2024-01-01T00:00:00Z", message: { role: "user" } };
-    writeFileSync(filePath, JSON.stringify(userLine) + "\n", "utf-8");
+    const systemLine = { type: "system", sessionId: "sess1", timestamp: "2024-01-01T00:00:00Z", message: { role: "system" } };
+    const toolResultLine = { type: "tool_result", sessionId: "sess1", timestamp: "2024-01-01T00:00:00Z", message: { role: "tool" } };
+    writeFileSync(filePath, JSON.stringify(systemLine) + "\n" + JSON.stringify(toolResultLine) + "\n", "utf-8");
     const result = await parseTranscriptFile(filePath);
     expect(result.size).toBe(0);
   });
@@ -183,23 +184,142 @@ describe("parseTranscriptFile", () => {
     const result = await parseTranscriptFile(join(testDir, "missing.jsonl"));
     expect(result.size).toBe(0);
   });
+
+  it("scans user-turn text and sets riskLevel: 'high' when GitHub token is present", async () => {
+    const filePath = join(testDir, "session.jsonl");
+    const githubToken = "ghp_" + "A".repeat(36);
+    const userLine = {
+      type: "user",
+      sessionId: "sess1",
+      timestamp: "2024-01-01T00:00:00.000Z",
+      message: { content: `Please use token ${githubToken} for auth` },
+    };
+    const assistantLine = {
+      type: "assistant",
+      sessionId: "sess1",
+      timestamp: "2024-01-01T00:01:00.000Z",
+      message: { model: "claude-opus-4-5", usage: { input_tokens: 50, output_tokens: 20 } },
+    };
+    writeFileSync(
+      filePath,
+      JSON.stringify(userLine) + "\n" + JSON.stringify(assistantLine) + "\n",
+      "utf-8"
+    );
+
+    const result = await parseTranscriptFile(filePath);
+    const agg = result.get("sess1")!;
+    expect(agg.riskLevel).toBe("high");
+    expect(agg.riskCategories).toContain("secrets");
+  });
+
+  it("defaults to riskLevel: 'low' when only assistant lines are present (no user turns)", async () => {
+    const filePath = join(testDir, "session.jsonl");
+    const assistantLine = {
+      type: "assistant",
+      sessionId: "sess1",
+      timestamp: "2024-01-01T00:00:00.000Z",
+      message: { model: "claude-opus-4-5", usage: { input_tokens: 50, output_tokens: 20 } },
+    };
+    writeFileSync(filePath, JSON.stringify(assistantLine) + "\n", "utf-8");
+
+    const result = await parseTranscriptFile(filePath);
+    const agg = result.get("sess1")!;
+    expect(agg.riskLevel).toBe("low");
+    expect(agg.riskScore).toBe(0);
+    expect(agg.riskCategories).toEqual([]);
+  });
+
+  it("scans user-turn text when content is a plain string", async () => {
+    const filePath = join(testDir, "session.jsonl");
+    const userLine = {
+      type: "user",
+      sessionId: "sess1",
+      timestamp: "2024-01-01T00:00:00.000Z",
+      message: { content: "my email is test@example.com" },
+    };
+    const assistantLine = {
+      type: "assistant",
+      sessionId: "sess1",
+      timestamp: "2024-01-01T00:01:00.000Z",
+      message: { model: "claude-opus-4-5", usage: { input_tokens: 20, output_tokens: 10 } },
+    };
+    writeFileSync(
+      filePath,
+      JSON.stringify(userLine) + "\n" + JSON.stringify(assistantLine) + "\n",
+      "utf-8"
+    );
+
+    const result = await parseTranscriptFile(filePath);
+    const agg = result.get("sess1")!;
+    expect(agg.riskLevel).toBe("medium");
+    expect(agg.riskCategories).toContain("pii_standard");
+  });
+
+  it("discards user-turn text for sessions with no assistant lines — no aggregate created", async () => {
+    const filePath = join(testDir, "session.jsonl");
+    const githubToken = "ghp_" + "B".repeat(36);
+    const userLine = {
+      type: "user",
+      sessionId: "user-only-sess",
+      timestamp: "2024-01-01T00:00:00.000Z",
+      message: { content: `Token: ${githubToken}` },
+    };
+    writeFileSync(filePath, JSON.stringify(userLine) + "\n", "utf-8");
+
+    const result = await parseTranscriptFile(filePath);
+    expect(result.size).toBe(0);
+  });
+
+  it("scans user-turn text when content is a content block array", async () => {
+    const filePath = join(testDir, "session.jsonl");
+    const userLine = {
+      type: "user",
+      sessionId: "sess1",
+      timestamp: "2024-01-01T00:00:00.000Z",
+      message: {
+        content: [
+          { type: "text", text: "my SSN is 123-45-6789" },
+          { type: "tool_result", content: "some tool output" },
+        ],
+      },
+    };
+    const assistantLine = {
+      type: "assistant",
+      sessionId: "sess1",
+      timestamp: "2024-01-01T00:01:00.000Z",
+      message: { model: "claude-opus-4-5", usage: { input_tokens: 20, output_tokens: 10 } },
+    };
+    writeFileSync(
+      filePath,
+      JSON.stringify(userLine) + "\n" + JSON.stringify(assistantLine) + "\n",
+      "utf-8"
+    );
+
+    const result = await parseTranscriptFile(filePath);
+    const agg = result.get("sess1")!;
+    expect(agg.riskLevel).toBe("high");
+    expect(agg.riskCategories).toContain("pii_high");
+  });
 });
 
 describe("toDb90Payload", () => {
-  it("maps a session aggregate to the expected payload shape", () => {
-    const agg = {
-      sessionId: "sess-abc",
-      filePath: "/path/to/file.jsonl",
-      fileSize: 1234,
-      model: "claude-opus-4-5",
-      tokensIn: 100,
-      tokensOut: 50,
-      cacheWriteTokens: 10,
-      cacheReadTokens: 5,
-      occurredAt: "2024-01-01T00:00:00.000Z",
-    };
+  const baseAgg = {
+    sessionId: "sess-abc",
+    filePath: "/path/to/file.jsonl",
+    fileSize: 1234,
+    model: "claude-opus-4-5",
+    tokensIn: 100,
+    tokensOut: 50,
+    cacheWriteTokens: 10,
+    cacheReadTokens: 5,
+    occurredAt: "2024-01-01T00:00:00.000Z",
+    riskLevel: "low" as const,
+    riskScore: 0,
+    riskCategories: [] as string[],
+  };
 
-    const payload = toDb90Payload(agg);
+  it("maps a session aggregate to the expected payload shape", () => {
+    const payload = toDb90Payload(baseAgg);
     expect(payload.tool_name).toBe("claude_code");
     expect(payload.event_type).toBe("chat");
     expect(payload.model).toBe("claude-opus-4-5");
@@ -216,17 +336,36 @@ describe("toDb90Payload", () => {
     expect(payload.metadata.cache_read_tokens).toBe(5);
   });
 
+  it("includes risk fields in metadata", () => {
+    const agg = {
+      ...baseAgg,
+      riskLevel: "high" as const,
+      riskScore: 3,
+      riskCategories: ["secrets"],
+    };
+    const payload = toDb90Payload(agg);
+    expect(payload.metadata.risk_level).toBe("high");
+    expect(payload.metadata.risk_score).toBe(3);
+    expect(payload.metadata.risk_categories).toEqual(["secrets"]);
+    expect(payload.metadata.scannable).toBe(true);
+  });
+
+  it("includes risk_level: 'low' and scannable: true for clean sessions", () => {
+    const payload = toDb90Payload(baseAgg);
+    expect(payload.metadata.risk_level).toBe("low");
+    expect(payload.metadata.risk_score).toBe(0);
+    expect(payload.metadata.risk_categories).toEqual([]);
+    expect(payload.metadata.scannable).toBe(true);
+  });
+
   it("omits zero token fields", () => {
     const agg = {
-      sessionId: "sess-abc",
-      filePath: "/path/to/file.jsonl",
-      fileSize: 100,
+      ...baseAgg,
       model: null,
       tokensIn: 0,
       tokensOut: 0,
       cacheWriteTokens: 0,
       cacheReadTokens: 0,
-      occurredAt: "2024-01-01T00:00:00.000Z",
     };
 
     const payload = toDb90Payload(agg);
@@ -248,82 +387,37 @@ describe("toDb90Payload", () => {
     // cost = (100*15 + 50*75 + 10*18.75 + 5*1.50) / 1_000_000
     //      = (1500 + 3750 + 187.5 + 7.5) / 1_000_000
     //      = 5445 / 1_000_000 = 0.005445
-    const agg = {
-      sessionId: "sess-abc",
-      filePath: "/path/to/file.jsonl",
-      fileSize: 1234,
-      model: "claude-opus-4-5",
-      tokensIn: 115,
-      tokensOut: 50,
-      cacheWriteTokens: 10,
-      cacheReadTokens: 5,
-      occurredAt: "2024-01-01T00:00:00.000Z",
-    };
+    const agg = { ...baseAgg, tokensIn: 115 };
     const payload = toDb90Payload(agg, { pricing: TEST_PRICING });
     expect(payload.cost_usd).toBe(0.005445);
   });
 
   it("sets cost_usd to 0 when all tokens are zero but model is known", () => {
     const agg = {
-      sessionId: "sess-abc",
-      filePath: "/path/to/file.jsonl",
-      fileSize: 100,
-      model: "claude-opus-4-5",
+      ...baseAgg,
       tokensIn: 0,
       tokensOut: 0,
       cacheWriteTokens: 0,
       cacheReadTokens: 0,
-      occurredAt: "2024-01-01T00:00:00.000Z",
     };
     const payload = toDb90Payload(agg, { pricing: TEST_PRICING });
     expect(payload.cost_usd).toBe(0);
   });
 
   it("sets cost_usd to null when model is null even with pricing", () => {
-    const agg = {
-      sessionId: "sess-abc",
-      filePath: "/path/to/file.jsonl",
-      fileSize: 100,
-      model: null,
-      tokensIn: 100,
-      tokensOut: 50,
-      cacheWriteTokens: 0,
-      cacheReadTokens: 0,
-      occurredAt: "2024-01-01T00:00:00.000Z",
-    };
+    const agg = { ...baseAgg, model: null };
     const payload = toDb90Payload(agg, { pricing: TEST_PRICING });
     expect(payload.cost_usd).toBeNull();
   });
 
   it("sets cost_usd to null when model is unknown", () => {
-    const agg = {
-      sessionId: "sess-abc",
-      filePath: "/path/to/file.jsonl",
-      fileSize: 100,
-      model: "claude-unknown-model",
-      tokensIn: 100,
-      tokensOut: 50,
-      cacheWriteTokens: 0,
-      cacheReadTokens: 0,
-      occurredAt: "2024-01-01T00:00:00.000Z",
-    };
+    const agg = { ...baseAgg, model: "claude-unknown-model" };
     const payload = toDb90Payload(agg, { pricing: TEST_PRICING });
     expect(payload.cost_usd).toBeNull();
   });
 
   it("includes projectId in payload when provided via options", () => {
-    const agg = {
-      sessionId: "sess-abc",
-      filePath: "/path/to/file.jsonl",
-      fileSize: 100,
-      model: null,
-      tokensIn: 0,
-      tokensOut: 0,
-      cacheWriteTokens: 0,
-      cacheReadTokens: 0,
-      occurredAt: "2024-01-01T00:00:00.000Z",
-    };
-    const payload = toDb90Payload(agg, { projectId: "proj-uuid-123" });
+    const payload = toDb90Payload(baseAgg, { projectId: "proj-uuid-123" });
     expect(payload.project_id).toBe("proj-uuid-123");
   });
 });
