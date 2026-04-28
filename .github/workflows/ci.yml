@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     container: ghcr.io/artempartos/ecs_toolbox:latest
     env:
-      ENVIRONMENT: ${{ github.ref_name == 'main' && 'prod' || 'staging' }}
+      ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
     strategy:
       matrix:
         image:
@@ -151,7 +151,7 @@ jobs:
     needs: [build, api_test, api_lint, api_security, web_test, web_lint, web_typecheck, cursor_check, claude_check]
     if: github.ref_name == 'staging' || github.ref_name == 'main'
     env:
-      ENVIRONMENT: ${{ github.ref_name == 'main' && 'prod' || 'staging' }}
+      ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
       APPLICATION: api
     steps:
       - name: Configure AWS credentials
@@ -171,7 +171,7 @@ jobs:
     needs: [migrate]
     if: github.ref_name == 'staging' || github.ref_name == 'main'
     env:
-      ENVIRONMENT: ${{ github.ref_name == 'main' && 'prod' || 'staging' }}
+      ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
     strategy:
       matrix:
         service:
@@ -197,7 +197,7 @@ jobs:
     container: ghcr.io/artempartos/ecs_toolbox:latest
     if: github.ref_name == 'staging' || github.ref_name == 'main'
     env:
-      ENVIRONMENT: ${{ github.ref_name == 'main' && 'prod' || 'staging' }}
+      ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
       APPLICATION: api
     needs: [deploy]
     steps:

@@ -74,7 +74,7 @@ module "ecr_api" {
   name   = "${var.project}-${var.application}-api"
   environments_by_count = [
     { name = "staging", priority = 10, count = 10 },
-    { name = "prod", priority = 20, count = 20 },
+    { name = "production", priority = 20, count = 20 },
   ]
 }
 
@@ -83,7 +83,7 @@ module "ecr_web" {
   name   = "${var.project}-${var.application}-web"
   environments_by_count = [
     { name = "staging", priority = 10, count = 10 },
-    { name = "prod", priority = 20, count = 20 },
+    { name = "production", priority = 20, count = 20 },
   ]
 }
 
@@ -92,7 +92,7 @@ module "ecr_temporal_worker" {
   name   = "${var.project}-${var.application}-temporal-worker"
   environments_by_count = [
     { name = "staging", priority = 10, count = 10 },
-    { name = "prod", priority = 20, count = 20 },
+    { name = "production", priority = 20, count = 20 },
   ]
 }
 
@@ -101,7 +101,7 @@ module "ecr_keycloak" {
   name   = "${var.project}-${var.application}-keycloak"
   environments_by_count = [
     { name = "staging", priority = 10, count = 10 },
-    { name = "prod", priority = 20, count = 20 },
+    { name = "production", priority = 20, count = 20 },
   ]
 }
 

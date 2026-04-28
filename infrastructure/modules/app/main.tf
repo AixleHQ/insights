@@ -104,6 +104,9 @@ module "service" {
   security_groups     = var.security_group_ids
   subnets             = var.private_subnet_ids
 
+  # Required for `aws ecs execute-command` / ECS Exec (must be true + new deployment after enable).
+  enable_execute_command = true
+
   enable_fargate_spot = var.ecs_service.enable_fargate_spot
   fargate_base        = var.ecs_service.fargate_base
 
