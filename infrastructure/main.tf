@@ -108,12 +108,12 @@ module "alb" {
   environment = var.environment
   name        = "main"
 
-  alb_name        = "${var.project}-${var.environment}-alb"
-  subnets         = module.network.self.public_subnets
-  vpc_id          = module.network.self.vpc_id
-  security_groups = [module.security_groups.alb.security_group_id]
-  certificate_arn = module.certificate.arn
-  app_hostnames   = [var.app_domain]
+  alb_name          = "${var.project}-${var.environment}-alb"
+  subnets           = module.network.self.public_subnets
+  vpc_id            = module.network.self.vpc_id
+  security_groups   = [module.security_groups.alb.security_group_id]
+  certificate_arn   = module.certificate.arn
+  app_hostnames     = [var.app_domain]
   health_check_path = "/up"
 
   target_groups = {
@@ -214,7 +214,16 @@ module "s3_raw_events" {
 # Timescale Cloud VPC Peering Routes
 # =============================================================================
 
+locals {
+  timescale_peering_via_lookup = var.manage_timescale_vpc_routes && var.timescale_vpc_peering_connection_id == ""
+  timescale_peering_id = var.manage_timescale_vpc_routes ? (
+    var.timescale_vpc_peering_connection_id != "" ? var.timescale_vpc_peering_connection_id : data.aws_vpc_peering_connection.timescale[0].id
+  ) : null
+}
+
 data "aws_vpc_peering_connection" "timescale" {
+  count = local.timescale_peering_via_lookup ? 1 : 0
+
   filter {
     name   = "accepter-vpc-info.vpc-id"
     values = [module.network.self.vpc_id]
@@ -232,10 +241,10 @@ data "aws_vpc_peering_connection" "timescale" {
 }
 
 resource "aws_route" "timescale_private" {
-  count                     = length(module.network.self.private_route_table_ids)
+  count                     = var.manage_timescale_vpc_routes ? length(module.network.self.private_route_table_ids) : 0
   route_table_id            = module.network.self.private_route_table_ids[count.index]
   destination_cidr_block    = var.timescale_vpc_cidr
-  vpc_peering_connection_id = data.aws_vpc_peering_connection.timescale.id
+  vpc_peering_connection_id = local.timescale_peering_id
 }
 
 # =============================================================================
@@ -274,7 +283,7 @@ resource "aws_db_instance" "shared" {
   publicly_accessible    = false
 
   skip_final_snapshot = true
-  deletion_protection = var.environment == "prod"
+  deletion_protection = var.environment == "production"
 
   tags = {
     Name = "${var.project}-${var.environment}-shared"
@@ -509,10 +518,10 @@ resource "aws_ssm_parameter" "rollbar_client_token" {
 # =============================================================================
 
 locals {
-  redis_url        = "redis://${aws_elasticache_replication_group.app.primary_endpoint_address}:6379/0"
-  database_host    = var.app_database.host
-  database_port    = var.app_database.port
-  temporal_host    = "temporal.${local.namespace_name}:7233"
+  redis_url         = "redis://${aws_elasticache_replication_group.app.primary_endpoint_address}:6379/0"
+  database_host     = var.app_database.host
+  database_port     = var.app_database.port
+  temporal_host     = "temporal.${local.namespace_name}:7233"
   keycloak_internal = "http://keycloak.${local.namespace_name}:8080"
   keycloak_public   = "https://${var.kc_domain}"
 
@@ -524,14 +533,14 @@ locals {
     DATABASE_NAME       = "tsdb"
     DATABASE_USERNAME   = var.app_database.username
     DATABASE_SSLMODE    = "require"
-    REDIS_URL        = local.redis_url
-    TEMPORAL_HOST    = local.temporal_host
-    KEYCLOAK_ISSUER  = "${local.keycloak_public}/realms/db90"
-    KEYCLOAK_JWKS_URI = "${local.keycloak_internal}/realms/db90/protocol/openid-connect/certs"
-    S3_BUCKET        = module.s3_raw_events.bucket_name
-    S3_REGION        = var.region
-    MINIO_ENDPOINT   = "https://s3.${var.region}.amazonaws.com"
-    FRONTEND_URL     = "https://${var.app_domain}"
+    REDIS_URL           = local.redis_url
+    TEMPORAL_HOST       = local.temporal_host
+    KEYCLOAK_ISSUER     = "${local.keycloak_public}/realms/db90"
+    KEYCLOAK_JWKS_URI   = "${local.keycloak_internal}/realms/db90/protocol/openid-connect/certs"
+    S3_BUCKET           = module.s3_raw_events.bucket_name
+    S3_REGION           = var.region
+    MINIO_ENDPOINT      = "https://s3.${var.region}.amazonaws.com"
+    FRONTEND_URL        = "https://${var.app_domain}"
   }
 
   common_secrets = [
@@ -542,16 +551,16 @@ locals {
     { name = "ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY", valueFrom = aws_ssm_parameter.ar_encryption_deterministic_key.arn },
     { name = "ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT", valueFrom = aws_ssm_parameter.ar_encryption_key_derivation_salt.arn },
     { name = "ROLLBAR_ACCESS_TOKEN", valueFrom = aws_ssm_parameter.rollbar_access_token.arn },
-    { name = "GITHUB_CLIENT_ID",        valueFrom = aws_ssm_parameter.github_client_id.arn },
-    { name = "GITHUB_CLIENT_SECRET",    valueFrom = aws_ssm_parameter.github_client_secret.arn },
-    { name = "GITLAB_CLIENT_ID",        valueFrom = aws_ssm_parameter.gitlab_client_id.arn },
-    { name = "GITLAB_CLIENT_SECRET",    valueFrom = aws_ssm_parameter.gitlab_client_secret.arn },
-    { name = "BITBUCKET_CLIENT_ID",     valueFrom = aws_ssm_parameter.bitbucket_client_id.arn },
+    { name = "GITHUB_CLIENT_ID", valueFrom = aws_ssm_parameter.github_client_id.arn },
+    { name = "GITHUB_CLIENT_SECRET", valueFrom = aws_ssm_parameter.github_client_secret.arn },
+    { name = "GITLAB_CLIENT_ID", valueFrom = aws_ssm_parameter.gitlab_client_id.arn },
+    { name = "GITLAB_CLIENT_SECRET", valueFrom = aws_ssm_parameter.gitlab_client_secret.arn },
+    { name = "BITBUCKET_CLIENT_ID", valueFrom = aws_ssm_parameter.bitbucket_client_id.arn },
     { name = "BITBUCKET_CLIENT_SECRET", valueFrom = aws_ssm_parameter.bitbucket_client_secret.arn },
-    { name = "ATLASSIAN_CLIENT_ID",     valueFrom = aws_ssm_parameter.atlassian_client_id.arn },
+    { name = "ATLASSIAN_CLIENT_ID", valueFrom = aws_ssm_parameter.atlassian_client_id.arn },
     { name = "ATLASSIAN_CLIENT_SECRET", valueFrom = aws_ssm_parameter.atlassian_client_secret.arn },
-    { name = "LINEAR_CLIENT_ID",        valueFrom = aws_ssm_parameter.linear_client_id.arn },
-    { name = "LINEAR_CLIENT_SECRET",    valueFrom = aws_ssm_parameter.linear_client_secret.arn },
+    { name = "LINEAR_CLIENT_ID", valueFrom = aws_ssm_parameter.linear_client_id.arn },
+    { name = "LINEAR_CLIENT_SECRET", valueFrom = aws_ssm_parameter.linear_client_secret.arn },
   ]
 }
 
@@ -718,8 +727,8 @@ module "app_temporal" {
   environment = var.environment
   name        = "temporal"
 
-  image       = "temporalio/auto-setup:latest"
-  cluster_id  = module.ecs_cluster.id
+  image        = "temporalio/auto-setup:latest"
+  cluster_id   = module.ecs_cluster.id
   cluster_name = module.ecs_cluster.name
 
   security_group_ids = [module.security_groups.ecs.security_group_id]
