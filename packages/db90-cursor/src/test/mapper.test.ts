@@ -344,4 +344,12 @@ describe("mapRecentCommit", () => {
     const snapshot: RecentCommitSnapshot = { dbPath, value: { commitHash: "x" } };
     expect(mapRecentCommit(snapshot)).toBeNull();
   });
+
+  it("returns null when all line counts are zero", () => {
+    const snapshot: RecentCommitSnapshot = {
+      dbPath,
+      value: { timestamp: 1704067200000, commitHash: "abc" },
+    };
+    expect(mapRecentCommit(snapshot)).toBeNull();
+  });
 });

@@ -48,7 +48,10 @@ class EventsChannel < ApplicationCable::Channel
   end
 
   class << self
-    # Broadcast a new event to organization subscribers
+    # Broadcast a new event to organization subscribers.
+    # Payload is intentionally minimal — consumers should use this as a cache-invalidation
+    # signal and refetch via the REST API rather than rendering the payload directly.
+    # Add fields here only when a client needs them without a round-trip.
     def broadcast_new_event(organization_id, tool_event)
       ActionCable.server.broadcast(
         "events:#{organization_id}",

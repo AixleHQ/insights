@@ -39,23 +39,15 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
   const handleMessage = useCallback(
     (message: WebSocketMessage) => {
       switch (message.type) {
-        case "new_event": {
-          // Rails may send `event`, `data`, or a flat payload (internal broadcast).
-          const m = message as WebSocketMessage & {
-            data?: unknown;
-            event?: unknown;
-          };
-          onNewEvent?.(m.data ?? m.event ?? message);
+        case "new_event":
+          onNewEvent?.(message.event);
           break;
-        }
         case "event_updated":
-          onEventUpdated?.(message.data);
+          onEventUpdated?.(message.updates);
           break;
-        case "alert": {
-          const m = message as WebSocketMessage & { alert?: unknown };
-          onAlert?.(m.data ?? m.alert ?? message);
+        case "alert":
+          onAlert?.(message.alert);
           break;
-        }
         default:
           console.log("[useWebSocket] Unknown message type:", message.type);
       }
@@ -102,15 +94,6 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
       }
     };
   }, [autoConnect, isAuthenticated, currentOrg, handleMessage]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-      }
-    };
-  }, []);
 
   const connect = useCallback(async () => {
     try {

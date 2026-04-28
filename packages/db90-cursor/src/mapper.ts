@@ -227,6 +227,7 @@ export function mapRecentCommit(
   const cld = Number(obj.composerLinesDeleted) || 0;
   const tokensIn = la + tla + cla;
   const tokensOut = ld + tld + cld;
+  if (tokensIn === 0 && tokensOut === 0) return null;
   const lineForCost = tokensIn + tokensOut;
   const costUsd = computeLineCost("chat", Math.max(lineForCost, 0), pricing);
 

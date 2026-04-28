@@ -82,6 +82,7 @@ export async function apiRequest<T = unknown>(
   const { skipAuth = false, skipOrgHeader = false, headers = {}, ...fetchOptions } = options;
 
   const url = endpoint.startsWith("http") ? endpoint : `${DEFAULT_BASE_URL}${endpoint}`;
+  const impersonating = isImpersonating();
 
   const buildHeaders = async (): Promise<HeadersInit> => {
     const requestHeaders: HeadersInit = {
@@ -112,7 +113,7 @@ export async function apiRequest<T = unknown>(
   let response = await doFetch();
 
   // Expired access token right after silent renew window: retry once after OIDC refresh.
-  if (response.status === 401 && !skipAuth && !isImpersonating()) {
+  if (response.status === 401 && !skipAuth && !impersonating) {
     const renewed = await silentRenew();
     if (renewed) {
       response = await doFetch();
