@@ -109,8 +109,15 @@ module Api
           metadata: event_params[:metadata] || {}
         }
         result = ToolEvents::Upsert.call(attributes)
+        tool_event = result[:tool_event]
 
-        { workflow_id: nil, tool_event_id: result[:tool_event].id, fallback: true }
+        begin
+          EventsChannel.broadcast_new_event(org.id, tool_event)
+        rescue StandardError => e
+          Rails.logger.warn "[Ingest] ActionCable broadcast failed: #{e.message}"
+        end
+
+        { workflow_id: nil, tool_event_id: tool_event.id, fallback: true }
       end
 
       def permitted_params
