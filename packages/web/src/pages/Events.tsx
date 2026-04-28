@@ -3,6 +3,7 @@ import { Download, RefreshCw } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useOrg } from "@/contexts/OrgContext";
 import { useEvents, queryKeys } from "@/hooks/useApi";
+import { useEventsPageUpdates } from "@/hooks/useWebSocket";
 import { Button } from "@/components/ui/button";
 import {
   EventFilters,
@@ -49,6 +50,18 @@ export function Events() {
     currentOrg?.id || "",
     apiParams
   );
+
+  const invalidateOrgEvents = useCallback(() => {
+    if (!currentOrg?.id) return;
+    void queryClient.invalidateQueries({
+      queryKey: ["organizations", currentOrg.id, "events"],
+    });
+  }, [queryClient, currentOrg]);
+
+  useEventsPageUpdates({
+    onNewEvent: invalidateOrgEvents,
+    onEventUpdated: invalidateOrgEvents,
+  });
 
   // Transform API response to EventRow format
   const events: EventRow[] = useMemo(() => {

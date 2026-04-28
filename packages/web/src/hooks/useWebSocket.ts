@@ -39,15 +39,23 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
   const handleMessage = useCallback(
     (message: WebSocketMessage) => {
       switch (message.type) {
-        case "new_event":
-          onNewEvent?.(message.data);
+        case "new_event": {
+          // Rails may send `event`, `data`, or a flat payload (internal broadcast).
+          const m = message as WebSocketMessage & {
+            data?: unknown;
+            event?: unknown;
+          };
+          onNewEvent?.(m.data ?? m.event ?? message);
           break;
+        }
         case "event_updated":
           onEventUpdated?.(message.data);
           break;
-        case "alert":
-          onAlert?.(message.data);
+        case "alert": {
+          const m = message as WebSocketMessage & { alert?: unknown };
+          onAlert?.(m.data ?? m.alert ?? message);
           break;
+        }
         default:
           console.log("[useWebSocket] Unknown message type:", message.type);
       }
