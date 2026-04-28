@@ -10,7 +10,3 @@ development:
 
 test:
   <<: *default
-
-production:
-  database: cache
-  <<: *default
