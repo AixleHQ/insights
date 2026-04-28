@@ -121,7 +121,7 @@ export async function parseTranscriptFile(
   verbose: boolean = false
 ): Promise<Map<string, SessionAggregate>> {
   const sessions = new Map<string, SessionAggregate>();
-  const userTexts = new Map<string, string[]>();
+  const userTexts = new Map<string, string>();
 
   let fileSize = 0;
   try {
@@ -203,9 +203,8 @@ export async function parseTranscriptFile(
     } else if (entry.type === "user") {
       if (!entry.sessionId || !entry.message?.content) continue;
       const texts = extractContentText(entry.message.content);
-      const buf = userTexts.get(entry.sessionId) ?? [];
-      buf.push(...texts);
-      userTexts.set(entry.sessionId, buf);
+      const existing = userTexts.get(entry.sessionId);
+      userTexts.set(entry.sessionId, existing ? `${existing} ${texts.join(" ")}` : texts.join(" "));
     } else {
       continue;
     }
@@ -213,9 +212,8 @@ export async function parseTranscriptFile(
 
   // Apply risk scanning to each session from accumulated user-turn text
   for (const [sessionId, agg] of sessions) {
-    const texts = userTexts.get(sessionId) ?? [];
-    if (texts.length > 0) {
-      const combined = texts.join(" ");
+    const combined = userTexts.get(sessionId);
+    if (combined) {
       const result = scanText(combined);
       agg.riskLevel = result.risk_level;
       agg.riskScore = result.risk_score;

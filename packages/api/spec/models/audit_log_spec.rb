@@ -3,7 +3,7 @@ require 'rails_helper'
 RSpec.describe AuditLog, type: :model do
   describe 'constants' do
     it 'defines valid risk levels' do
-      expect(AuditLog::RISK_LEVELS).to eq(%w[low medium high critical none])
+      expect(AuditLog::RISK_LEVELS).to eq(%w[none low medium high critical])
     end
   end
 

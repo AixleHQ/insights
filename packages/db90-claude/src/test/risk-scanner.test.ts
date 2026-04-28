@@ -20,13 +20,11 @@ describe("scanText", () => {
     expect(result.scannable).toBe(true);
   });
 
-  it("detects GitHub token → at least high risk, secrets category", () => {
+  it("detects GitHub token → high risk (score 3), secrets category", () => {
     const token = "ghp_" + "A".repeat(36);
     const result = scanText(`Please use token ${token} to authenticate`);
-    // The token matches both the specific ghp_ pattern and the generic 32+ char pattern,
-    // so score ≥ 5 → critical (intentionally broad per plan)
-    expect(["high", "critical"]).toContain(result.risk_level);
-    expect(result.risk_score).toBeGreaterThanOrEqual(3);
+    expect(result.risk_level).toBe("high");
+    expect(result.risk_score).toBe(3);
     expect(result.risk_categories).toContain("secrets");
     expect(result.scannable).toBe(true);
   });
@@ -76,12 +74,11 @@ describe("scanText", () => {
     expect(result.risk_categories).toContain("pii_standard");
   });
 
-  it("detects JWT → at least high risk, secrets category", () => {
+  it("detects JWT → high risk (score 3), secrets category", () => {
     const jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c2VyMTIzIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
     const result = scanText(`Authorization: Bearer ${jwt}`);
-    // JWT signature part (44 chars) also matches the generic 32+ pattern → score ≥ 5 → critical
-    expect(["high", "critical"]).toContain(result.risk_level);
-    expect(result.risk_score).toBeGreaterThanOrEqual(3);
+    expect(result.risk_level).toBe("high");
+    expect(result.risk_score).toBe(3);
     expect(result.risk_categories).toContain("secrets");
   });
 });

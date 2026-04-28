@@ -208,8 +208,7 @@ describe("parseTranscriptFile", () => {
 
     const result = await parseTranscriptFile(filePath);
     const agg = result.get("sess1")!;
-    // Token matches both specific ghp_ pattern and generic 32+ pattern → score ≥ 5 → critical
-    expect(["high", "critical"]).toContain(agg.riskLevel);
+    expect(agg.riskLevel).toBe("high");
     expect(agg.riskCategories).toContain("secrets");
   });
 

@@ -119,7 +119,7 @@ function buildPayload(opts: {
     tokens_out: tokensOut,
     cost_usd: costUsd,
     occurred_at: occurredAt,
-    metadata: { cursor_session_id: null, workspace: dbPath, cost_model: COST_MODEL, scannable: false as const, risk_level: "none" as const },
+    metadata: { cursor_session_id: null, workspace: dbPath, cost_model: COST_MODEL, scannable: false, risk_level: "none" },
   };
   if (projectId) payload.project_id = projectId;
   return payload;
@@ -225,8 +225,8 @@ export function mapEvent(
       cursor_session_id: row.sessionId ?? row.requestId ?? null,
       workspace: workspacePath,
       cost_model: COST_MODEL,
-      scannable: false as const,
-      risk_level: "none" as const,
+      scannable: false,
+      risk_level: "none",
     },
   };
   if (projectId) payload.project_id = projectId;

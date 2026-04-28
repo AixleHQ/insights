@@ -131,4 +131,24 @@ RSpec.describe Activities::ClassificationActivity, type: :unit do
       expect(result["detections"]).not_to be_empty
     end
   end
+
+  describe "Path 2: invalid risk_level passthrough guard" do
+    it "falls back to 'low' when connector sends an unrecognised risk_level" do
+      params = {
+        "raw_payload" => JSON.generate({
+          "metadata" => {
+            "scannable"       => true,
+            "risk_level"      => "INJECTED_VALUE",
+            "risk_categories" => [],
+            "risk_score"      => 0
+          }
+        }),
+        "policy" => default_policy
+      }
+
+      result = activity.execute(params)
+
+      expect(result["risk_level"]).to eq("low")
+    end
+  end
 end

@@ -3,6 +3,8 @@ require "json"
 
 module Activities
   class ClassificationActivity < Temporalio::Activity::Definition
+    VALID_RISK_LEVELS = %w[low medium high critical none].freeze
+
     def execute(params)
       Temporalio::Activity::Context.current.heartbeat("Classifying event content")
 
@@ -22,15 +24,19 @@ module Activities
         }
       end
 
-      # Path 2: pre-scanned by connector (db90-claude) — use result directly
+      # Path 2: pre-scanned by connector (db90-claude) — use result directly.
+      # requires_sanitization is always false: the connector has already processed
+      # its own content and the raw text is not available server-side to sanitize.
       if metadata["scannable"] == true && metadata["risk_level"]
+        raw_level  = metadata["risk_level"]
+        risk_level = VALID_RISK_LEVELS.include?(raw_level) ? raw_level : "low"
         categories = Array(metadata["risk_categories"])
         return {
           "detections"            => categories.map { |c|
                                        { "category" => c, "pattern" => "pre_scanned",
                                          "count" => 1, "action" => "none" } },
           "risk_score"            => metadata["risk_score"].to_i,
-          "risk_level"            => metadata["risk_level"],
+          "risk_level"            => risk_level,
           "requires_sanitization" => false,
           "detection_summary"     => categories.empty? ? "No sensitive data detected" :
                                        "Pre-classified: #{categories.join(', ')}"
@@ -59,7 +65,6 @@ module Activities
               "action" => config["action"]
             }
 
-            # Increment risk score based on category
             risk_score += category_risk_weight(category) * matches.length
           end
         end
@@ -79,8 +84,10 @@ module Activities
     private
 
     def extract_metadata(raw_payload)
-      data = raw_payload.is_a?(String) ? (JSON.parse(raw_payload) rescue {}) : raw_payload
+      data = raw_payload.is_a?(String) ? JSON.parse(raw_payload) : raw_payload
       data.is_a?(Hash) ? (data["metadata"] || {}) : {}
+    rescue JSON::ParserError
+      {}
     end
 
     def extract_text_content(payload)

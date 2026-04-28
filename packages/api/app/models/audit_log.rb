@@ -1,5 +1,5 @@
 class AuditLog < ApplicationRecord
-  RISK_LEVELS = %w[low medium high critical none].freeze
+  RISK_LEVELS = %w[none low medium high critical].freeze
 
   belongs_to :organization
   belongs_to :policy_version, class_name: "SanitizationPolicy", optional: true

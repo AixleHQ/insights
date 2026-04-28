@@ -20,7 +20,6 @@ const CATEGORIES: Record<string, PatternCategory> = {
       /ghp_[A-Za-z0-9]{36}/gi,                        // GitHub personal access token
       /gho_[A-Za-z0-9]{36}/gi,                        // GitHub OAuth token
       /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/gi, // JWT
-      /\b[A-Za-z0-9_-]{32,}\b/gi,                    // Generic API key / token
     ],
   },
   pii_high: {
@@ -48,9 +47,7 @@ export function scanText(text: string): ScanResult {
   for (const [categoryName, { patterns, weight }] of Object.entries(CATEGORIES)) {
     let categoryMatches = 0;
     for (const pattern of patterns) {
-      // Reset lastIndex for global patterns
-      pattern.lastIndex = 0;
-      const matches = text.match(new RegExp(pattern.source, pattern.flags));
+      const matches = text.match(pattern);
       if (matches) {
         categoryMatches += matches.length;
       }
