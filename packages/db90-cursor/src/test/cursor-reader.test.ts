@@ -9,6 +9,7 @@ import {
   readLegacyEvents,
   readDailyStats,
   readEvents,
+  readRecentCommitSnapshots,
 } from "../cursor-reader.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -294,6 +295,61 @@ describe("readDailyStats", () => {
 
     const results = readDailyStats(null, tempDir);
     expect(results).toHaveLength(2);
+  });
+});
+
+// ─── readRecentCommitSnapshots ────────────────────────────────────────────────
+
+describe("readRecentCommitSnapshots", () => {
+  let tempDir: string;
+
+  beforeEach(() => { tempDir = makeTempDir(); });
+  afterEach(() => { rmSync(tempDir, { recursive: true, force: true }); });
+
+  function makeGlobalDb(entries: Array<{ key: string; value: string }>): void {
+    const dir = join(tempDir, "globalStorage");
+    mkdirSync(dir, { recursive: true });
+    createItemTableDb(join(dir, "state.vscdb"), entries);
+  }
+
+  it("reads aiCodeTracking.recentCommit when present", () => {
+    makeGlobalDb([
+      {
+        key: "aiCodeTracking.recentCommit",
+        value: JSON.stringify({
+          commitHash: "abc123",
+          timestamp: 1704067200000,
+          linesAdded: 5,
+          linesDeleted: 2,
+        }),
+      },
+    ]);
+
+    const results = readRecentCommitSnapshots(null, tempDir);
+    expect(results).toHaveLength(1);
+    expect(results[0].value.commitHash).toBe("abc123");
+    expect(Number(results[0].value.timestamp)).toBe(1704067200000);
+  });
+
+  it("filters rows older than since", () => {
+    makeGlobalDb([
+      {
+        key: "aiCodeTracking.recentCommit",
+        value: JSON.stringify({
+          commitHash: "abc123",
+          timestamp: 1704067200000,
+          linesAdded: 5,
+        }),
+      },
+    ]);
+
+    const since = new Date(1704067210000); // after commit
+    expect(readRecentCommitSnapshots(since, tempDir)).toHaveLength(0);
+  });
+
+  it("returns empty when key is absent", () => {
+    makeGlobalDb([{ key: "other.key", value: "{}" }]);
+    expect(readRecentCommitSnapshots(null, tempDir)).toHaveLength(0);
   });
 });
 

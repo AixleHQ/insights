@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { mapEvent, mapDailyStats, DEFAULT_PRICING } from "../mapper.js";
+import { mapEvent, mapDailyStats, mapRecentCommit, DEFAULT_PRICING } from "../mapper.js";
 import type { CursorRow, PricingConfig } from "../mapper.js";
-import type { DailyStatsEntry } from "../cursor-reader.js";
+import type { DailyStatsEntry, RecentCommitSnapshot } from "../cursor-reader.js";
 
 describe("mapEvent", () => {
   const workspace = "/home/user/projects/myapp";
@@ -305,5 +305,43 @@ describe("mapDailyStats", () => {
     // Verify it differs from the default-pricing result
     const defaultResults = mapDailyStats(entry);
     expect(results[0].cost_usd).not.toBe(defaultResults[0].cost_usd);
+  });
+});
+
+describe("mapRecentCommit", () => {
+  const dbPath = "/tmp/global/state.vscdb";
+
+  it("maps aiCodeTracking.recentCommit JSON to a chat event with metadata", () => {
+    const snapshot: RecentCommitSnapshot = {
+      dbPath,
+      value: {
+        timestamp: 1704067200000,
+        commitHash: "deadbeef",
+        commitMessage: "feat: hello",
+        repoName: "org/repo",
+        branchName: "main",
+        aiPercentage: "96.43",
+        linesAdded: 18,
+        linesDeleted: 10,
+      },
+    };
+    const result = mapRecentCommit(snapshot);
+    expect(result).not.toBeNull();
+    expect(result!.event_type).toBe("chat");
+    expect(result!.metadata.source).toBe("recent_commit");
+    expect(result!.metadata.commit_hash).toBe("deadbeef");
+    expect(result!.metadata.commit_message).toBe("feat: hello");
+    expect(result!.metadata.repo_name).toBe("org/repo");
+    expect(result!.metadata.branch_name).toBe("main");
+    expect(result!.metadata.ai_percentage).toBe("96.43");
+    expect(result!.tokens_in).toBe(18);
+    expect(result!.tokens_out).toBe(10);
+    expect(result!.occurred_at).toBe(new Date(1704067200000).toISOString());
+    expect(result!.metadata.cost_model).toBe("estimated_line_count");
+  });
+
+  it("returns null when timestamp is missing or invalid", () => {
+    const snapshot: RecentCommitSnapshot = { dbPath, value: { commitHash: "x" } };
+    expect(mapRecentCommit(snapshot)).toBeNull();
   });
 });
