@@ -285,6 +285,9 @@ prod-exec-web:
 prod-exec-keycloak:
 	$(REMOTE_EXEC) exec_prod_keycloak
 
+prod-exec-temporal:
+	$(REMOTE_EXEC) exec_prod_temporal
+
 prod-logs-api:
 	$(REMOTE_EXEC) prod_api_logs
 
@@ -319,36 +322,39 @@ watch-prod-logs-sidekiq:
 # ECS Build & Push (via ecs_helper in toolbox container)
 # ============================================================================
 
-staging-build: ENVIRONMENT = staging
-staging-build:
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=$(ENVIRONMENT) APPLICATION=api ecs_helper build_and_push --image=api --file=./Dockerfile.api'
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=$(ENVIRONMENT) APPLICATION=web ecs_helper build_and_push --image=web --file=./Dockerfile.web'
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=$(ENVIRONMENT) APPLICATION=temporal-worker ecs_helper build_and_push --image=temporal-worker --file=./Dockerfile.temporal-worker'
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=$(ENVIRONMENT) APPLICATION=keycloak ecs_helper build_and_push --image=keycloak --file=./Dockerfile.keycloak'
+staging-build: staging-build-api staging-build-web staging-build-temporal-worker staging-build-keycloak
 
 staging-build-api:
 	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=staging APPLICATION=api ecs_helper build_and_push --image=api --file=./Dockerfile.api'
 
+staging-build-web:
+	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=staging APPLICATION=web ecs_helper build_and_push --image=web --file=./Dockerfile.web'
+
+staging-build-temporal-worker:
+	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=staging APPLICATION=temporal-worker ecs_helper build_and_push --image=temporal-worker --file=./Dockerfile.temporal-worker'
+
 staging-build-keycloak:
 	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=staging APPLICATION=keycloak ecs_helper build_and_push --image=keycloak --file=./Dockerfile.keycloak'
 
-prod-build: ENVIRONMENT = prod
-prod-build:
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=$(ENVIRONMENT) APPLICATION=api ecs_helper build_and_push --image=api --file=./Dockerfile.api'
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=$(ENVIRONMENT) APPLICATION=web ecs_helper build_and_push --image=web --file=./Dockerfile.web'
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=$(ENVIRONMENT) APPLICATION=temporal-worker ecs_helper build_and_push --image=temporal-worker --file=./Dockerfile.temporal-worker'
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=$(ENVIRONMENT) APPLICATION=keycloak ecs_helper build_and_push --image=keycloak --file=./Dockerfile.keycloak'
+prod-build: prod-build-api prod-build-web prod-build-temporal-worker prod-build-keycloak
+
+prod-build-api:
+	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=api ecs_helper build_and_push --image=api --file=./Dockerfile.api'
+
+prod-build-web:
+	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=web ecs_helper build_and_push --image=web --file=./Dockerfile.web'
+
+prod-build-temporal-worker:
+	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=temporal-worker ecs_helper build_and_push --image=temporal-worker --file=./Dockerfile.temporal-worker'
+
+prod-build-keycloak:
+	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=keycloak ecs_helper build_and_push --image=keycloak --file=./Dockerfile.keycloak'
 
 # ============================================================================
 # ECS Deploy (via ecs_helper in toolbox container)
 # ============================================================================
 
-staging-deploy:
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=staging APPLICATION=api ecs_helper deploy --timeout 3600'
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=staging APPLICATION=web ecs_helper deploy --timeout 3600'
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=staging APPLICATION=sidekiq ecs_helper deploy --timeout 3600'
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=staging APPLICATION=keycloak ecs_helper deploy --timeout 3600'
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=staging APPLICATION=temporal-worker ecs_helper deploy --timeout 3600'
+staging-deploy: staging-deploy-api staging-deploy-web staging-deploy-sidekiq staging-deploy-keycloak staging-deploy-temporal-worker
 
 staging-deploy-api:
 	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=staging APPLICATION=api ecs_helper deploy --timeout 3600'
@@ -365,24 +371,19 @@ staging-deploy-keycloak:
 staging-deploy-temporal-worker:
 	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=staging APPLICATION=temporal-worker ecs_helper deploy --timeout 3600'
 
-prod-deploy:
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=prod APPLICATION=api ecs_helper deploy --timeout 3600'
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=prod APPLICATION=web ecs_helper deploy --timeout 3600'
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=prod APPLICATION=sidekiq ecs_helper deploy --timeout 3600'
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=prod APPLICATION=keycloak ecs_helper deploy --timeout 3600'
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=prod APPLICATION=temporal-worker ecs_helper deploy --timeout 3600'
+prod-deploy: prod-deploy-api prod-deploy-web prod-deploy-sidekiq prod-deploy-keycloak prod-deploy-temporal-worker
 
 prod-deploy-api:
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=prod APPLICATION=api ecs_helper deploy --timeout 3600'
+	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=api ecs_helper deploy --timeout 3600'
 
 prod-deploy-web:
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=prod APPLICATION=web ecs_helper deploy --timeout 3600'
+	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=web ecs_helper deploy --timeout 3600'
 
 prod-deploy-sidekiq:
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=prod APPLICATION=sidekiq ecs_helper deploy --timeout 3600'
+	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=sidekiq ecs_helper deploy --timeout 3600'
 
 prod-deploy-keycloak:
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=prod APPLICATION=keycloak ecs_helper deploy --timeout 3600'
+	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=keycloak ecs_helper deploy --timeout 3600'
 
 prod-deploy-temporal-worker:
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=prod APPLICATION=temporal-worker ecs_helper deploy --timeout 3600'
+	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=temporal-worker ecs_helper deploy --timeout 3600'
