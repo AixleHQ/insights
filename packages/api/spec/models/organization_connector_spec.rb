@@ -3,7 +3,7 @@ require 'rails_helper'
 RSpec.describe OrganizationConnector, type: :model do
   describe 'constants' do
     it 'defines valid connector types' do
-      expect(OrganizationConnector::CONNECTOR_TYPES).to eq(%w[github gitlab bitbucket jira linear openrouter anthropic openai gemini slack])
+      expect(OrganizationConnector::CONNECTOR_TYPES).to eq(%w[github gitlab bitbucket jira linear openrouter anthropic openai gemini slack github_copilot])
     end
 
     it 'defines valid statuses' do
@@ -124,6 +124,30 @@ RSpec.describe OrganizationConnector, type: :model do
 
     it 'returns false for github' do
       expect(build(:organization_connector, connector_type: 'github').ai_provider?).to be false
+    end
+  end
+
+  describe '#copilot?' do
+    it 'returns true for github_copilot' do
+      expect(build(:organization_connector, :github_copilot).copilot?).to be true
+    end
+
+    it 'returns false for github' do
+      expect(build(:organization_connector, connector_type: 'github').copilot?).to be false
+    end
+  end
+
+  describe '#tool_event_name' do
+    it 'returns "github_copilot" for a Copilot connector' do
+      expect(build(:organization_connector, :github_copilot).tool_event_name).to eq('github_copilot')
+    end
+
+    it 'returns "<type>_api" for an AI provider connector' do
+      expect(build(:organization_connector, connector_type: 'anthropic').tool_event_name).to eq('anthropic_api')
+    end
+
+    it 'returns nil for a source control connector' do
+      expect(build(:organization_connector, connector_type: 'github').tool_event_name).to be_nil
     end
   end
 

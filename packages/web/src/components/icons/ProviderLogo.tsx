@@ -21,6 +21,8 @@ const logoMap: Record<string, string> = {
 
   // Tool account aliases (backend uses underscores which normalize to hyphens)
   "github-copilot": "/logos/copilot.svg",
+  "github_copilot": "/logos/copilot.svg",
+  gemini: "/logos/google.svg",
   "anthropic-api": "/logos/anthropic.svg",
   "openai-api": "/logos/openai.svg",
   "openrouter-api": "/logos/openrouter.svg",
@@ -60,6 +62,8 @@ const providerColors: Record<string, string> = {
   openrouter: "bg-[#6366f1]",
   copilot: "bg-[#000000]",
   "github-copilot": "bg-[#24292f]",
+  "github_copilot": "bg-[#24292f]",
+  gemini: "bg-[#4285f4]",
   "anthropic-api": "bg-[#d97757]",
   "openai-api": "bg-[#10a37f]",
   "openrouter-api": "bg-[#6366f1]",

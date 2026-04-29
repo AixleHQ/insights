@@ -39,4 +39,16 @@ class OrganizationConnectorSerializer < BaseSerializer
   attribute :ai_provider do |connector|
     connector.ai_provider?
   end
+
+  attribute :seat_count do |connector|
+    connector.config&.dig("seat_count") if connector.copilot?
+  end
+
+  attribute :active_users_count do |connector|
+    connector.config&.dig("active_users") if connector.copilot?
+  end
+
+  attribute :copilot_connector do |connector|
+    connector.copilot?
+  end
 end

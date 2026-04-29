@@ -106,7 +106,7 @@ class GithubSyncJob < ApplicationJob
 
     ToolEvent.create!(
       organization_id: @connector.organization_id,
-      tool_name: "github_copilot",
+      tool_name: "github",
       event_type: "review",
       occurred_at: Time.parse(pr["updated_at"]),
       metadata: {
@@ -137,7 +137,7 @@ class GithubSyncJob < ApplicationJob
       user_id: user&.id,
       repository_id: repository.id,
       project_id: repository.project_id,
-      tool_name: "github_copilot",
+      tool_name: "github",
       event_type: "commit",
       occurred_at: Time.parse(commit["timestamp"]),
       metadata: {

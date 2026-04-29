@@ -32,6 +32,12 @@ FactoryBot.define do
       is_active { false }
     end
 
+    trait :github_copilot do
+      connector_type { "github_copilot" }
+      external_org_name { "acme-org" }
+      access_token { SecureRandom.hex(32) }
+    end
+
     trait :with_tokens do
       access_token { SecureRandom.hex(32) }
       refresh_token { SecureRandom.hex(32) }

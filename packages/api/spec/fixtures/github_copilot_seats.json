@@ -1,0 +1,23 @@
+{
+  "total_seats": 2,
+  "seats": [
+    {
+      "last_activity_at": "2021-10-14T00:53:32-06:00",
+      "plan_type": "business",
+      "assignee": {
+        "login": "octocat",
+        "id": 1,
+        "type": "User"
+      }
+    },
+    {
+      "last_activity_at": null,
+      "plan_type": "business",
+      "assignee": {
+        "login": "monalisa",
+        "id": 2,
+        "type": "User"
+      }
+    }
+  ]
+}

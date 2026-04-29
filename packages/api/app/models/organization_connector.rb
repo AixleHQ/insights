@@ -1,5 +1,5 @@
 class OrganizationConnector < ApplicationRecord
-  CONNECTOR_TYPES = %w[github gitlab bitbucket jira linear openrouter anthropic openai gemini slack].freeze
+  CONNECTOR_TYPES = %w[github gitlab bitbucket jira linear openrouter anthropic openai gemini slack github_copilot].freeze
   STATUSES = %w[connected testing error disconnected].freeze
 
   belongs_to :organization
@@ -34,6 +34,10 @@ class OrganizationConnector < ApplicationRecord
     connector_type.in?(%w[openrouter anthropic openai gemini])
   end
 
+  def copilot?
+    connector_type == "github_copilot"
+  end
+
   def slack_webhook?
     connector_type == "slack"
   end
@@ -62,6 +66,7 @@ class OrganizationConnector < ApplicationRecord
   # Only AI provider connectors produce tool events (e.g. openrouter → openrouter_api).
   # Source control and project management connectors do not generate tool events.
   def tool_event_name
+    return "github_copilot" if copilot?
     "#{connector_type}_api" if ai_provider?
   end
 end
