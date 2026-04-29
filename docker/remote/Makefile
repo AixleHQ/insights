@@ -67,6 +67,9 @@ exec_prod_web:
 exec_prod_keycloak:
 	@aws ecs execute-command --cluster db90-production-cluster --task $(call get_task,db90-production-cluster,db90-production-keycloak) --container keycloak --command /bin/bash --interactive --region $(REGION)
 
+exec_prod_temporal:
+	@aws ecs execute-command --cluster db90-production-cluster --task $(call get_task,db90-production-cluster,db90-production-temporal) --container temporal --command /bin/bash --interactive --region $(REGION)
+
 # --- Logs (production) ---
 
 prod_api_logs:

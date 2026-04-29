@@ -285,6 +285,9 @@ prod-exec-web:
 prod-exec-keycloak:
 	$(REMOTE_EXEC) exec_prod_keycloak
 
+prod-exec-temporal:
+	$(REMOTE_EXEC) exec_prod_temporal
+
 prod-logs-api:
 	$(REMOTE_EXEC) prod_api_logs
 

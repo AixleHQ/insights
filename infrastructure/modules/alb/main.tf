@@ -37,7 +37,7 @@ resource "aws_alb_target_group" "main" {
 
   stickiness {
     cookie_duration = 86400
-    enabled         = false
+    enabled         = coalesce(each.value.stickiness_enabled, false)
     type            = "lb_cookie"
   }
 

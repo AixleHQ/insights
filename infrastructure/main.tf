@@ -124,6 +124,7 @@ module "alb" {
       health_check_path                = "/realms/master"
       health_check_interval            = 30
       health_check_unhealthy_threshold = 5
+      stickiness_enabled               = true
     }
     "${var.project}-${var.environment}-temporal-ui" = {
       health_check_path = "/"
@@ -910,13 +911,14 @@ module "app_keycloak" {
     KC_DB_URL_PORT     = "5432"
     KC_DB_URL_DATABASE = "keycloak"
     KC_DB_USERNAME     = var.shared_database.username
-    KC_HOSTNAME        = var.kc_domain
-    KC_PROXY_HEADERS   = "xforwarded"
-    KC_HTTP_ENABLED    = "true"
-    KC_HEALTH_ENABLED  = "true"
-    KC_SSL_REQUIRED    = "external"
-    KEYCLOAK_ADMIN     = "admin"
-    APP_URL            = "https://${var.app_domain}"
+    # Full HTTPS URL required behind ALB (TLS at edge, HTTP to container); hostname-only breaks redirects.
+    KC_HOSTNAME       = local.keycloak_public
+    KC_PROXY_HEADERS  = "xforwarded"
+    KC_HTTP_ENABLED   = "true"
+    KC_HEALTH_ENABLED = "true"
+    KC_SSL_REQUIRED   = "external"
+    KEYCLOAK_ADMIN    = "admin"
+    APP_URL           = "https://${var.app_domain}"
   }
   secrets = [
     { name = "KEYCLOAK_ADMIN_PASSWORD", valueFrom = aws_ssm_parameter.keycloak_admin_password.arn },

@@ -38,10 +38,12 @@ variable "app_hostnames" {
 
 variable "target_groups" {
   type = map(object({
-    health_check_path              = optional(string, null)
-    health_check_interval          = optional(number, null)
-    health_check_healthy_threshold = optional(number, null)
+    health_check_path                = optional(string, null)
+    health_check_interval            = optional(number, null)
+    health_check_healthy_threshold   = optional(number, null)
     health_check_unhealthy_threshold = optional(number, null)
+    # Keycloak needs ALB stickiness when multiple ECS tasks run (session tied to node — see AUTH_SESSION_ID route).
+    stickiness_enabled = optional(bool, false)
   }))
 }
 
