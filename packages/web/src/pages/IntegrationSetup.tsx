@@ -138,6 +138,24 @@ const providers: Record<string, ProviderConfig> = {
     requiresWebhook: true,
     requiresOAuth: true,
   },
+  github_copilot: {
+    id: "github_copilot",
+    name: "github_copilot",
+    displayName: "GitHub Copilot",
+    description: "Connect GitHub Copilot to track real seat counts, acceptance rates, and daily active users via the GitHub Copilot Metrics API.",
+    features: [
+      "Daily usage sync from GitHub API",
+      "Acceptance rate analytics",
+      "Seat count tracking",
+      "Active user breakdown",
+    ],
+    scopes: [
+      { name: "manage_billing:copilot", description: "Access Copilot billing and usage data" },
+      { name: "read:org", description: "Read organization membership to resolve your GitHub org" },
+    ],
+    requiresWebhook: false,
+    requiresOAuth: true,
+  },
   "claude-code": {
     id: "claude-code",
     name: "claude-code",

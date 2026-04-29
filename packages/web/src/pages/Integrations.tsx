@@ -172,18 +172,17 @@ const availableProviders: ProviderInfo[] = [
     available: true,
   },
   {
-    id: "copilot",
+    id: "github_copilot",
     name: "GitHub Copilot",
-    description: "Track Copilot suggestions and usage",
+    description: "Track real Copilot seat counts, suggestion acceptance rates, and daily active users via the GitHub API",
     category: "ai",
     features: [
-      "Suggestion tracking",
-      "Acceptance rates",
-      "Language breakdown",
-      "Developer productivity",
+      "Seat count & active users",
+      "Acceptance rate tracking",
+      "Lines suggested vs accepted",
+      "Daily sync from GitHub API",
     ],
-    available: false,
-    comingSoon: true,
+    available: true,
   },
   {
     id: "cursor",
@@ -301,6 +300,9 @@ export function Integrations() {
           account_name: externalAccountName || "",
           resources_count: 0,
         },
+        copilotConnector: c.copilotConnector,
+        seatCount: c.seatCount,
+        activeUsersCount: c.activeUsersCount,
       };
     });
 

@@ -599,7 +599,7 @@ paths:
               properties:
                 connector_type:
                   type: string
-                  enum: [github, gitlab, bitbucket, jira, linear, openrouter, anthropic, openai, gemini]
+                  enum: [github, gitlab, bitbucket, jira, linear, openrouter, anthropic, openai, gemini, slack, github_copilot]
                 access_token:
                   type: string
                   description: OAuth access token (sensitive)
@@ -813,7 +813,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [github, gitlab, bitbucket, jira, linear]
+            enum: [github, gitlab, bitbucket, jira, linear, github_copilot]
       responses:
         '200':
           description: Authorization URL
@@ -849,7 +849,7 @@ paths:
               properties:
                 connector_type:
                   type: string
-                  enum: [github, gitlab, bitbucket, jira, linear]
+                  enum: [github, gitlab, bitbucket, jira, linear, github_copilot]
                 code:
                   type: string
                   description: OAuth authorization code
@@ -2924,7 +2924,7 @@ components:
           format: uuid
         connectorType:
           type: string
-          enum: [github, gitlab, bitbucket, jira, linear, openrouter, anthropic, openai, gemini]
+          enum: [github, gitlab, bitbucket, jira, linear, openrouter, anthropic, openai, gemini, slack, github_copilot]
         isActive:
           type: boolean
         externalAccountId:
@@ -2952,6 +2952,14 @@ components:
           type: boolean
         aiProvider:
           type: boolean
+        copilotConnector:
+          type: boolean
+        seatCount:
+          type: integer
+          nullable: true
+        activeUsersCount:
+          type: integer
+          nullable: true
         createdAt:
           type: string
           format: date-time

@@ -39,7 +39,7 @@ export type IntegrationProvider =
   | "openrouter"
   | "gemini"
   | "cursor"
-  | "copilot"
+  | "github_copilot"
   | "google";
 
 export interface IntegrationData {
@@ -53,6 +53,10 @@ export interface IntegrationData {
     account_name?: string;
     resources_count?: number;
   };
+  // GitHub Copilot-specific fields (camelCase, from Alba serializer)
+  copilotConnector?: boolean;
+  seatCount?: number | null;
+  activeUsersCount?: number | null;
 }
 
 export interface ProviderInfo {
@@ -278,6 +282,12 @@ export function IntegrationCard({
             </span>
           )}
         </div>
+
+        {integration.copilotConnector && integration.seatCount != null && (
+          <div className="text-xs text-muted-foreground">
+            {integration.seatCount} seats · {integration.activeUsersCount ?? 0} active
+          </div>
+        )}
 
         {integration.last_sync_at && (
           <div className="flex items-center gap-1 text-xs text-muted-foreground">

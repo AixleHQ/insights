@@ -86,7 +86,7 @@ export interface ProjectWithStats extends Project {
 }
 
 // Connector types
-export type ConnectorProvider = "github" | "gitlab" | "bitbucket" | "jira" | "linear" | "anthropic" | "openai" | "openrouter" | "gemini" | "slack";
+export type ConnectorProvider = "github" | "gitlab" | "bitbucket" | "jira" | "linear" | "anthropic" | "openai" | "openrouter" | "gemini" | "slack" | "github_copilot";
 export type ConnectorStatus = "connected" | "testing" | "error" | "disconnected";
 
 export interface Connector {
@@ -112,6 +112,11 @@ export interface Connector {
   created_at?: string;
   updatedAt?: string;
   updated_at?: string;
+  // GitHub Copilot-specific fields (camelCase only — serialized by Alba with transform_keys :lower_camel)
+  seatCount?: number | null;
+  activeUsersCount?: number | null;
+  copilotConnector?: boolean;
+  config?: Record<string, unknown>;
 }
 
 // Project connector types
