@@ -71,6 +71,9 @@ module Api
       end
 
       def start_ingestion_workflow(raw_key, event_params, org)
+        # NOTE: The Temporal worker that completes this workflow is responsible for
+        # broadcasting via EventsChannel after the upsert. The fallback path below
+        # handles the broadcast inline when Temporal is unavailable.
         workflow_id = "ingest-#{org.id}-#{SecureRandom.uuid}"
 
         Temporal::Client.start_workflow(

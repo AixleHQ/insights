@@ -14,7 +14,6 @@ class EventsChannel < ApplicationCable::Channel
       return
     end
 
-    stream_for organization
     stream_from "events:#{organization.id}"
 
     transmit(

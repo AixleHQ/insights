@@ -333,7 +333,7 @@ describe("mapRecentCommit", () => {
     expect(result!.metadata.commit_message).toBe("feat: hello");
     expect(result!.metadata.repo_name).toBe("org/repo");
     expect(result!.metadata.branch_name).toBe("main");
-    expect(result!.metadata.ai_percentage).toBe("96.43");
+    expect(result!.metadata.ai_percentage).toBe(96.43);
     expect(result!.tokens_in).toBe(18);
     expect(result!.tokens_out).toBe(10);
     expect(result!.occurred_at).toBe(new Date(1704067200000).toISOString());

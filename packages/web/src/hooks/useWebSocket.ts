@@ -48,8 +48,15 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
         case "alert":
           onAlert?.(message.alert);
           break;
-        default:
-          console.log("[useWebSocket] Unknown message type:", message.type);
+        case "subscription_confirmed":
+        case "recent_events":
+          // intentionally ignored at this layer
+          break;
+        default: {
+          // Exhaustiveness guard — compile error if WebSocketMessage union grows without updating this switch
+          const _exhaustive: never = message;
+          console.warn("[useWebSocket] Unhandled message type:", (_exhaustive as { type: string }).type);
+        }
       }
     },
     [onNewEvent, onEventUpdated, onAlert]

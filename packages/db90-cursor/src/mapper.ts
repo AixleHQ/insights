@@ -37,7 +37,7 @@ export type Db90PayloadMetadata = {
   commit_message?: string;
   repo_name?: string;
   branch_name?: string;
-  ai_percentage?: string;
+  ai_percentage?: number;
 };
 
 export interface Db90Payload {
@@ -225,10 +225,12 @@ export function mapRecentCommit(
   const tld = Number(obj.tabLinesDeleted) || 0;
   const cla = Number(obj.composerLinesAdded) || 0;
   const cld = Number(obj.composerLinesDeleted) || 0;
-  const tokensIn = la + tla + cla;
-  const tokensOut = ld + tld + cld;
-  if (tokensIn === 0 && tokensOut === 0) return null;
-  const lineForCost = tokensIn + tokensOut;
+  // Line counts used as token proxies (cost_model = "estimated_line_count").
+  // Stored in tokens_in/tokens_out so the schema is uniform, but these are not real token counts.
+  const linesAddedProxy = la + tla + cla;
+  const linesDeletedProxy = ld + tld + cld;
+  if (linesAddedProxy === 0 && linesDeletedProxy === 0) return null;
+  const lineForCost = linesAddedProxy + linesDeletedProxy;
   const costUsd = computeLineCost("chat", Math.max(lineForCost, 0), pricing);
 
   const commitHash = obj.commitHash;
@@ -241,8 +243,8 @@ export function mapRecentCommit(
     tool_name: "cursor",
     event_type: "chat",
     model: "unknown",
-    tokens_in: tokensIn,
-    tokens_out: tokensOut,
+    tokens_in: linesAddedProxy,
+    tokens_out: linesDeletedProxy,
     cost_usd: costUsd,
     occurred_at: occurredAt,
     metadata: {
@@ -254,7 +256,9 @@ export function mapRecentCommit(
       commit_message: typeof commitMessage === "string" ? commitMessage : undefined,
       repo_name: typeof repoName === "string" ? repoName : undefined,
       branch_name: typeof branchName === "string" ? branchName : undefined,
-      ai_percentage: typeof aiPct === "string" || typeof aiPct === "number" ? String(aiPct) : undefined,
+      ai_percentage: typeof aiPct === "number" ? aiPct
+                   : typeof aiPct === "string" ? parseFloat(aiPct) || undefined
+                   : undefined,
       scannable: false,
       risk_level: "none"
     },
