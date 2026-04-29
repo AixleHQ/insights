@@ -35,7 +35,7 @@ module Api
             return render json: {
               error: "Unprocessable Entity",
               errors: { access_token: [ result[:error] || "Invalid API key" ] }
-            }, status: :unprocessable_entity
+            }, status: :unprocessable_content
           end
         end
 
@@ -53,7 +53,7 @@ module Api
           render json: {
             error: "Unprocessable Entity",
             errors: format_validation_errors(@connector.errors)
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
       end
 
@@ -77,7 +77,7 @@ module Api
           render json: {
             error: "Unprocessable Entity",
             errors: format_validation_errors(@connector.errors)
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
       end
 
@@ -162,7 +162,7 @@ module Api
       rescue ActionPolicy::Unauthorized
         raise
       rescue StandardError => e
-        render json: { error: e.message }, status: :unprocessable_entity
+        render json: { error: e.message }, status: :unprocessable_content
       end
 
       # GET /api/v1/organizations/:organization_id/connectors/:id/available_projects
@@ -177,7 +177,7 @@ module Api
       rescue ActionPolicy::Unauthorized
         raise
       rescue StandardError => e
-        render json: { error: e.message }, status: :unprocessable_entity
+        render json: { error: e.message }, status: :unprocessable_content
       end
 
       # POST /api/v1/organizations/:organization_id/connectors/:id/sync
@@ -257,7 +257,7 @@ module Api
           render json: {
             error: "Unprocessable Entity",
             errors: format_validation_errors(connector.errors)
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
       rescue Oauth::MissingCredentialsError => e
         render json: { error: e.message, code: "integration_not_configured" }, status: :service_unavailable

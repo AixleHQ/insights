@@ -11,7 +11,7 @@ module Api
       result = ToolEvents::Upsert.call(tool_event_params.to_h.symbolize_keys)
       render json: { data: { id: result[:tool_event].id } }, status: :created
     rescue ActiveRecord::RecordInvalid => e
-      render json: { error: "Validation failed", errors: e.record.errors.to_hash }, status: :unprocessable_entity
+      render json: { error: "Validation failed", errors: e.record.errors.to_hash }, status: :unprocessable_content
     end
 
     # POST /api/internal/audit_logs
@@ -19,7 +19,7 @@ module Api
       audit_log = AuditLog.create!(audit_log_params)
       render json: { data: { id: audit_log.id } }, status: :created
     rescue ActiveRecord::RecordInvalid => e
-      render json: { error: "Validation failed", errors: e.record.errors.to_hash }, status: :unprocessable_entity
+      render json: { error: "Validation failed", errors: e.record.errors.to_hash }, status: :unprocessable_content
     end
 
     # POST /api/internal/alerts

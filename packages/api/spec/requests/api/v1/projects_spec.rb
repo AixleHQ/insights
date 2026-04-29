@@ -455,7 +455,7 @@ RSpec.describe 'Api::V1::Projects', type: :request do
                           user: user,
                           params: { raw_event_ttl: 'invalid_value' }
 
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(json_response[:errors]).to be_present
     end
 

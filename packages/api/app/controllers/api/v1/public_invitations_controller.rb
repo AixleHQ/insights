@@ -30,7 +30,7 @@ module Api
           return render json: {
             error: "Unprocessable Entity",
             message: "This invitation has been #{status}"
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
 
         # Check if user is already a member
@@ -38,7 +38,7 @@ module Api
           return render json: {
             error: "Unprocessable Entity",
             message: "You are already a member of this organization"
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
 
         # Accept the invitation
@@ -60,7 +60,7 @@ module Api
           render json: {
             error: "Unprocessable Entity",
             message: "Failed to accept invitation"
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
       end
 

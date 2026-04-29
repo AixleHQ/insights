@@ -58,7 +58,7 @@ module Api
         render json: {
           error: "Unprocessable Entity",
           errors: format_validation_errors(e.record.errors)
-        }, status: :unprocessable_entity
+        }, status: :unprocessable_content
       end
 
       # PATCH /api/v1/projects/:id
@@ -71,7 +71,7 @@ module Api
           render json: {
             error: "Unprocessable Entity",
             errors: format_validation_errors(@project.errors)
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
       end
 
@@ -114,7 +114,7 @@ module Api
           render json: {
             error: "Unprocessable Entity",
             errors: format_validation_errors(setting.errors)
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
       end
 
@@ -279,7 +279,7 @@ module Api
         jira_project_key = params.require(:jira_project_key)
 
         unless jira_project_key.match?(/\A[A-Z][A-Z0-9_]{1,9}\z/)
-          return render json: { error: "Invalid Jira project key format" }, status: :unprocessable_entity
+          return render json: { error: "Invalid Jira project key format" }, status: :unprocessable_content
         end
 
         # Verify connector belongs to the same org as the project (prevents cross-org injection)
@@ -300,7 +300,7 @@ module Api
         authorize! @project, to: :link_jira?
 
         connector_id = @project.project_settings.find_by(key: "jira_connector_id")&.value
-        return render json: { error: "No Jira project linked" }, status: :unprocessable_entity if connector_id.blank?
+        return render json: { error: "No Jira project linked" }, status: :unprocessable_content if connector_id.blank?
 
         connector = @project.organization.organization_connectors.find(connector_id)
         JiraSyncJob.perform_now(connector.id, "sync", project_id: @project.id)
@@ -309,7 +309,7 @@ module Api
       rescue ActiveRecord::RecordNotFound
         render json: { error: "Connector not found" }, status: :not_found
       rescue StandardError => e
-        render json: { error: e.message }, status: :unprocessable_entity
+        render json: { error: e.message }, status: :unprocessable_content
       end
 
       # GET /api/v1/projects/:id/retention_policy
@@ -343,7 +343,7 @@ module Api
           render json: {
             error: "Unprocessable Entity",
             errors: format_validation_errors(policy.errors)
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
       end
 

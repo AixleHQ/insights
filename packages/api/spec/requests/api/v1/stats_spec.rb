@@ -549,7 +549,7 @@ RSpec.describe 'Api::V1::Stats', type: :request do
                           user: user,
                           organization: organization
 
-        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response).to have_http_status(:unprocessable_content)
         expect(json_response[:error]).to eq('Unknown tool: invalid')
       end
 

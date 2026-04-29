@@ -72,7 +72,7 @@ module Api
         else
                    { base: [ exception.message ] }
         end
-        render json: { error: "Unprocessable Entity", errors: errors }, status: :unprocessable_entity
+        render json: { error: "Unprocessable Entity", errors: errors }, status: :unprocessable_content
       end
 
       def render_forbidden(exception = nil)

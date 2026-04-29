@@ -33,7 +33,7 @@ module Api
         render json: {
           error: "Unprocessable Entity",
           errors: format_validation_errors(e.record.errors)
-        }, status: :unprocessable_entity
+        }, status: :unprocessable_content
       end
 
       # PATCH /api/v1/organizations/:id
@@ -59,7 +59,7 @@ module Api
           render json: {
             error: "Unprocessable Entity",
             errors: format_validation_errors(@organization.errors)
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
       end
 
@@ -97,7 +97,7 @@ module Api
           render json: {
             error: "Unprocessable Entity",
             errors: format_validation_errors(policy.errors)
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
       end
 
@@ -134,7 +134,7 @@ module Api
           render json: {
             error: "Unprocessable Entity",
             errors: format_validation_errors(setting.errors)
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
       end
 

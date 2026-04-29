@@ -33,7 +33,7 @@ module Api
           return render json: {
             error: "Unprocessable Entity",
             errors: { connector_type: [ "already exists for this project" ] }
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
 
         @connector.assign_attributes(connector_params)
@@ -53,7 +53,7 @@ module Api
           return render json: {
             error: "Unprocessable Entity",
             errors: { access_token: [ error_msg ] }
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
 
         @connector.assign_attributes(is_active: true, status: "connected", last_error: nil, last_sync_at: Time.current)
@@ -71,7 +71,7 @@ module Api
           render json: {
             error: "Unprocessable Entity",
             errors: format_validation_errors(@connector.errors)
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
       end
 
@@ -97,7 +97,7 @@ module Api
           render json: {
             error: "Unprocessable Entity",
             errors: format_validation_errors(@connector.errors)
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
       end
 
