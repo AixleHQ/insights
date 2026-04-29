@@ -56,48 +56,51 @@ watch_staging_temporal_logs:
 watch_staging_sidekiq_logs:
 	aws logs tail db90-staging-sidekiq --follow --region $(REGION)
 
-# --- Exec (prod) ---
+# --- Exec (production — matches Terraform var.environment = "production") ---
 
 exec_prod_api:
-	@aws ecs execute-command --cluster db90-prod-cluster --task $(call get_task,db90-prod-cluster,db90-prod-api) --container api --command /bin/bash --interactive --region $(REGION)
+	@aws ecs execute-command --cluster db90-production-cluster --task $(call get_task,db90-production-cluster,db90-production-api) --container api --command /bin/bash --interactive --region $(REGION)
 
 exec_prod_web:
-	@aws ecs execute-command --cluster db90-prod-cluster --task $(call get_task,db90-prod-cluster,db90-prod-web) --container web --command /bin/bash --interactive --region $(REGION)
+	@aws ecs execute-command --cluster db90-production-cluster --task $(call get_task,db90-production-cluster,db90-production-web) --container web --command /bin/bash --interactive --region $(REGION)
 
 exec_prod_keycloak:
-	@aws ecs execute-command --cluster db90-prod-cluster --task $(call get_task,db90-prod-cluster,db90-prod-keycloak) --container keycloak --command /bin/bash --interactive --region $(REGION)
+	@aws ecs execute-command --cluster db90-production-cluster --task $(call get_task,db90-production-cluster,db90-production-keycloak) --container keycloak --command /bin/bash --interactive --region $(REGION)
 
-# --- Logs (prod) ---
+exec_prod_temporal:
+	@aws ecs execute-command --cluster db90-production-cluster --task $(call get_task,db90-production-cluster,db90-production-temporal) --container temporal --command /bin/bash --interactive --region $(REGION)
+
+# --- Logs (production) ---
 
 prod_api_logs:
-	aws logs tail db90-prod-api --since $(LOG_PERIOD) --region $(REGION)
+	aws logs tail db90-production-api --since $(LOG_PERIOD) --region $(REGION)
 
 prod_web_logs:
-	aws logs tail db90-prod-web --since $(LOG_PERIOD) --region $(REGION)
+	aws logs tail db90-production-web --since $(LOG_PERIOD) --region $(REGION)
 
 prod_keycloak_logs:
-	aws logs tail db90-prod-keycloak --since $(LOG_PERIOD) --region $(REGION)
+	aws logs tail db90-production-keycloak --since $(LOG_PERIOD) --region $(REGION)
 
 prod_temporal_logs:
-	aws logs tail db90-prod-temporal --since $(LOG_PERIOD) --region $(REGION)
+	aws logs tail db90-production-temporal --since $(LOG_PERIOD) --region $(REGION)
 
 prod_sidekiq_logs:
-	aws logs tail db90-prod-sidekiq --since $(LOG_PERIOD) --region $(REGION)
+	aws logs tail db90-production-sidekiq --since $(LOG_PERIOD) --region $(REGION)
 
 watch_prod_api_logs:
-	aws logs tail db90-prod-api --follow --region $(REGION)
+	aws logs tail db90-production-api --follow --region $(REGION)
 
 watch_prod_web_logs:
-	aws logs tail db90-prod-web --follow --region $(REGION)
+	aws logs tail db90-production-web --follow --region $(REGION)
 
 watch_prod_keycloak_logs:
-	aws logs tail db90-prod-keycloak --follow --region $(REGION)
+	aws logs tail db90-production-keycloak --follow --region $(REGION)
 
 watch_prod_temporal_logs:
-	aws logs tail db90-prod-temporal --follow --region $(REGION)
+	aws logs tail db90-production-temporal --follow --region $(REGION)
 
 watch_prod_sidekiq_logs:
-	aws logs tail db90-prod-sidekiq --follow --region $(REGION)
+	aws logs tail db90-production-sidekiq --follow --region $(REGION)
 
 # --- Deploy (staging) ---
 
@@ -118,21 +121,21 @@ deploy_staging_temporal_worker:
 
 deploy_staging_all: deploy_staging_api deploy_staging_web deploy_staging_sidekiq deploy_staging_keycloak deploy_staging_temporal_worker
 
-# --- Deploy (prod) ---
+# --- Deploy (production; ENVIRONMENT must match CI / ECR tags: production-latest) ---
 
 deploy_prod_api:
-	ENVIRONMENT=prod APPLICATION=api ecs_helper deploy --timeout 3600
+	ENVIRONMENT=production APPLICATION=api ecs_helper deploy --timeout 3600
 
 deploy_prod_web:
-	ENVIRONMENT=prod APPLICATION=web ecs_helper deploy --timeout 3600
+	ENVIRONMENT=production APPLICATION=web ecs_helper deploy --timeout 3600
 
 deploy_prod_sidekiq:
-	ENVIRONMENT=prod APPLICATION=sidekiq ecs_helper deploy --timeout 3600
+	ENVIRONMENT=production APPLICATION=sidekiq ecs_helper deploy --timeout 3600
 
 deploy_prod_keycloak:
-	ENVIRONMENT=prod APPLICATION=keycloak ecs_helper deploy --timeout 3600
+	ENVIRONMENT=production APPLICATION=keycloak ecs_helper deploy --timeout 3600
 
 deploy_prod_temporal_worker:
-	ENVIRONMENT=prod APPLICATION=temporal-worker ecs_helper deploy --timeout 3600
+	ENVIRONMENT=production APPLICATION=temporal-worker ecs_helper deploy --timeout 3600
 
 deploy_prod_all: deploy_prod_api deploy_prod_web deploy_prod_sidekiq deploy_prod_keycloak deploy_prod_temporal_worker

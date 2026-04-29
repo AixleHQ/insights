@@ -16,7 +16,7 @@ variable "environment" {
 
   validation {
     condition     = var.environment != "default"
-    error_message = "Use 'terraform workspace select ENV' where ENV: staging/prod."
+    error_message = "Use 'terraform workspace select ENV' where ENV: staging/production."
   }
 }
 
@@ -71,6 +71,21 @@ variable "app_database" {
 variable "timescale_vpc_cidr" {
   type    = string
   default = "172.30.0.0/16"
+}
+
+# Timescale Cloud VPC peering: routes from private subnets to Timescale.
+# Set manage_timescale_vpc_routes = false on first apply if peering is not active yet (avoids data source error).
+# Optionally set timescale_vpc_peering_connection_id = "pcx-..." after creating peering in AWS/Timescale.
+variable "manage_timescale_vpc_routes" {
+  type        = bool
+  default     = true
+  description = "Create aws_route entries via VPC peering to Timescale. Disable until peering exists."
+}
+
+variable "timescale_vpc_peering_connection_id" {
+  type        = string
+  default     = ""
+  description = "If non-empty, use this peering connection ID; otherwise resolve via data source when manage_timescale_vpc_routes is true."
 }
 
 variable "google_client_id" {
