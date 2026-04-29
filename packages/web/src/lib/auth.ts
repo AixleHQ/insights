@@ -32,6 +32,9 @@ const settings: UserManagerSettings = {
 // Create singleton UserManager instance
 let userManager: UserManager | null = null;
 
+/** Deduplicate concurrent signinRedirectCallback (React Strict Mode dev, rare races). */
+let signinRedirectCallbackInFlight: Promise<User> | null = null;
+
 export function getUserManager(): UserManager {
   if (!userManager) {
     userManager = new UserManager(settings);
@@ -73,7 +76,13 @@ export async function login(): Promise<void> {
 
 export async function loginCallback(): Promise<User> {
   const manager = getUserManager();
-  return manager.signinRedirectCallback();
+  if (signinRedirectCallbackInFlight) {
+    return signinRedirectCallbackInFlight;
+  }
+  signinRedirectCallbackInFlight = manager.signinRedirectCallback().finally(() => {
+    signinRedirectCallbackInFlight = null;
+  });
+  return signinRedirectCallbackInFlight;
 }
 
 export async function logout(): Promise<void> {
