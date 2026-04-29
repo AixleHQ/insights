@@ -2,7 +2,7 @@ require 'rails_helper'
 
 RSpec.describe Repository, type: :model do
   describe 'associations' do
-    it { should belong_to(:project) }
+    it { should belong_to(:project).optional }
     it { should belong_to(:organization_connector) }
 
     # Note: tool_events association uses timeseries schema, tested separately

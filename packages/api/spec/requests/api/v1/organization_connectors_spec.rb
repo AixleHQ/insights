@@ -380,6 +380,26 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
       expect(json_response[:total_events]).to eq(2)
     end
 
+    it 'counts source control events by linked repositories for gitlab connectors' do
+      gitlab_connector = create(:organization_connector, organization: organization, connector_type: 'gitlab')
+      project = create(:project, organization: organization, owner: nil)
+      repository = create(:repository, organization_connector: gitlab_connector, project: project)
+      other_repository = create(:repository, organization_connector: connector, project: project)
+
+      create(:tool_event, organization: organization, repository: repository, project: project, tool_name: 'gitlab', event_type: 'commit')
+      create(:tool_event, organization: organization, repository: repository, project: project, tool_name: 'gitlab', event_type: 'review')
+      create(:tool_event, organization: organization, repository: other_repository, project: project, tool_name: 'github', event_type: 'commit')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{gitlab_connector.id}/sync_status",
+                        user: admin,
+                        organization: organization
+
+      expect_success
+      expect(json_response[:total_events]).to eq(2)
+      expect(json_response[:repository_count]).to eq(1)
+      expect(json_response[:last_event_at]).to be_present
+    end
+
     it 'returns null last_error when connection is healthy' do
       openrouter_connector.update!(last_error: nil)
 
@@ -461,6 +481,18 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
       unlinked = json_data.find { |r| r[:externalId] == "2" }
       expect(linked[:alreadyLinked]).to be true
       expect(unlinked[:alreadyLinked]).to be false
+    end
+
+    it 'does not mark org-level synced repos without a project link as already linked' do
+      create(:repository, organization_connector: connector, project: nil, external_id: "1")
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{connector.id}/available_repos",
+                        user: admin,
+                        organization: organization
+
+      expect_success
+      repo = json_data.find { |r| r[:externalId] == "1" }
+      expect(repo[:alreadyLinked]).to be false
     end
 
     it 'returns 403 for org members' do

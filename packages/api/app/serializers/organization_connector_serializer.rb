@@ -51,4 +51,16 @@ class OrganizationConnectorSerializer < BaseSerializer
   attribute :copilot_connector do |connector|
     connector.copilot?
   end
+
+  attribute :repository_count do |connector|
+    connector.repositories.count
+  end
+
+  attribute :synced_event_count do |connector|
+    connector.synced_event_count
+  end
+
+  attribute :last_event_at do |connector|
+    connector.synced_event_last_occurred_at&.iso8601
+  end
 end

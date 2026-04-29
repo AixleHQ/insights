@@ -194,7 +194,8 @@ CREATE TYPE public.tool_name AS ENUM (
     'custom',
     'jira',
     'linear',
-    'github'
+    'github',
+    'gitlab'
 );
 
 

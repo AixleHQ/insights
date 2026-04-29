@@ -792,6 +792,12 @@ paths:
                     nullable: true
                   total_events:
                     type: integer
+                  repository_count:
+                    type: integer
+                  last_event_at:
+                    type: string
+                    format: date-time
+                    nullable: true
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1258,7 +1264,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github]
+            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github, gitlab]
         - $ref: '#/components/parameters/start_date'
         - $ref: '#/components/parameters/end_date'
       responses:
@@ -1317,7 +1323,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github]
+            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github, gitlab]
         - name: days
           in: query
           description: Number of days to look back (default 30)
@@ -1395,7 +1401,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github]
+            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github, gitlab]
         - $ref: '#/components/parameters/start_date'
         - $ref: '#/components/parameters/end_date'
         - name: days
@@ -1480,7 +1486,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github]
+            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github, gitlab]
         - $ref: '#/components/parameters/start_date'
         - $ref: '#/components/parameters/end_date'
         - name: days
@@ -1553,7 +1559,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github]
+            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github, gitlab]
         - $ref: '#/components/parameters/start_date'
         - $ref: '#/components/parameters/end_date'
         - name: days
@@ -2959,6 +2965,13 @@ components:
           nullable: true
         activeUsersCount:
           type: integer
+        repositoryCount:
+          type: integer
+        syncedEventCount:
+          type: integer
+        lastEventAt:
+          type: string
+          format: date-time
           nullable: true
         createdAt:
           type: string
@@ -3107,6 +3120,32 @@ components:
               type: integer
             repositoryCount:
               type: integer
+            sourceControlSummary:
+              type: array
+              items:
+                $ref: '#/components/schemas/SourceControlSummary'
+
+    SourceControlSummary:
+      type: object
+      properties:
+        provider:
+          type: string
+        repositoryCount:
+          type: integer
+        commitCount:
+          type: integer
+        reviewCount:
+          type: integer
+        pipelineCount:
+          type: integer
+        lastActivityAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastSyncAt:
+          type: string
+          format: date-time
+          nullable: true
 
     OrganizationMinimal:
       type: object

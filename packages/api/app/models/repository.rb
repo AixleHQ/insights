@@ -1,5 +1,5 @@
 class Repository < ApplicationRecord
-  belongs_to :project
+  belongs_to :project, optional: true
   belongs_to :organization_connector
   has_many :tool_events, class_name: "ToolEvent", dependent: :restrict_with_error
 

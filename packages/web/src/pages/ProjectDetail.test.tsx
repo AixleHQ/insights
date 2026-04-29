@@ -52,6 +52,17 @@ const mockProject = {
   totalCostUsd: 12.5,
   createdAt: "2026-01-15T00:00:00Z",
   lastEventAt: "2026-03-20T10:30:00Z",
+  sourceControlSummary: [
+    {
+      provider: "gitlab",
+      repositoryCount: 2,
+      commitCount: 14,
+      reviewCount: 3,
+      pipelineCount: 5,
+      lastActivityAt: "2026-03-20T10:30:00Z",
+      lastSyncAt: "2026-03-20T11:00:00Z",
+    },
+  ],
 };
 
 const mockMembers = [
@@ -126,6 +137,14 @@ describe("ProjectDetail", () => {
     render(<ProjectDetail />);
 
     expect(screen.getByText("Recent Events")).toBeInTheDocument();
+  });
+
+  it("renders source control summary when available", () => {
+    render(<ProjectDetail />);
+
+    expect(screen.getByText("Source Control Activity")).toBeInTheDocument();
+    expect(screen.getByText("14")).toBeInTheDocument();
+    expect(screen.getByText("5")).toBeInTheDocument();
   });
 
   it("does not render Team section on the overview", () => {

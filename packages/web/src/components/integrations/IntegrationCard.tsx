@@ -48,10 +48,12 @@ export interface IntegrationData {
   name: string;
   status: ConnectorStatus;
   last_sync_at?: string;
+  last_event_at?: string;
   sync_error?: string;
   metadata?: {
     account_name?: string;
     resources_count?: number;
+    event_count?: number;
   };
   // GitHub Copilot-specific fields (camelCase, from Alba serializer)
   copilotConnector?: boolean;
@@ -293,6 +295,13 @@ export function IntegrationCard({
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <Clock className="size-3" />
             Last synced {formatDistanceToNow(integration.last_sync_at)}
+          </div>
+        )}
+
+        {integration.metadata?.event_count !== undefined && (
+          <div className="text-xs text-muted-foreground">
+            {integration.metadata.event_count} synced events
+            {integration.last_event_at ? ` · latest activity ${formatDistanceToNow(integration.last_event_at)}` : ""}
           </div>
         )}
 

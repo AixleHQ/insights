@@ -774,6 +774,10 @@ export function useCreateConnector() {
       api.post<Connector>(`/organizations/${orgId}/connectors/callback`, {
         code,
         connector_type: connectorType,
+      }, {
+        headers: {
+          "X-Organization-ID": orgId,
+        },
       }),
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });

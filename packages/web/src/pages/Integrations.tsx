@@ -287,6 +287,9 @@ export function Integrations() {
       const externalAccountName =
         c.externalAccountName || c.external_account_name;
       const lastSyncAt = c.lastSyncAt || c.last_sync_at;
+      const lastEventAt = c.lastEventAt || c.last_event_at;
+      const repositoryCount = c.repositoryCount || c.repository_count || 0;
+      const syncedEventCount = c.syncedEventCount || c.synced_event_count || 0;
       const providerInfo = availableProviders.find((p) => p.id === connectorType);
 
       return {
@@ -295,10 +298,12 @@ export function Integrations() {
         name: externalAccountName || providerInfo?.name || connectorType,
         status: c.status as ConnectorStatus,
         last_sync_at: lastSyncAt || undefined,
+        last_event_at: lastEventAt || undefined,
         sync_error: lastError || undefined,
         metadata: {
           account_name: externalAccountName || "",
-          resources_count: 0,
+          resources_count: repositoryCount,
+          event_count: syncedEventCount,
         },
         copilotConnector: c.copilotConnector,
         seatCount: c.seatCount,

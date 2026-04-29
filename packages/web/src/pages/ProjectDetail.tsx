@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ProviderLogo } from "@/components/icons";
 import {
   Card,
   CardContent,
@@ -266,6 +267,53 @@ export function ProjectDetail() {
             onConnectRepo={() => setConnectRepoOpen(true)}
             onDisconnect={(repoId) => disconnectRepo.mutateAsync(repoId)}
           />
+
+          {(project.sourceControlSummary?.length ?? 0) > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Source Control Activity</CardTitle>
+                <CardDescription>
+                  Recent synced repository activity across linked providers
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3 md:grid-cols-2">
+                {project.sourceControlSummary?.map((summary) => (
+                  <div key={summary.provider} className="rounded-lg border p-4">
+                    <div className="flex items-center gap-3">
+                      <ProviderLogo provider={summary.provider} size="sm" showBackground />
+                      <div>
+                        <p className="text-sm font-medium capitalize">{summary.provider}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {summary.repositoryCount} linked repos
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">Commits</p>
+                        <p className="font-medium">{summary.commitCount}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Reviews</p>
+                        <p className="font-medium">{summary.reviewCount}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Pipelines</p>
+                        <p className="font-medium">{summary.pipelineCount}</p>
+                      </div>
+                    </div>
+                    {(summary.lastActivityAt || summary.lastSyncAt) && (
+                      <p className="mt-3 text-xs text-muted-foreground">
+                        {summary.lastActivityAt ? `Latest activity ${formatDistanceToNow(summary.lastActivityAt)}` : null}
+                        {summary.lastActivityAt && summary.lastSyncAt ? " · " : ""}
+                        {summary.lastSyncAt ? `Synced ${formatDistanceToNow(summary.lastSyncAt)}` : null}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
 
           {project.repositoryUrl && (
             <Card>

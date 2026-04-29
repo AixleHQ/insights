@@ -41,6 +41,79 @@ module Oauth
       end
     end
 
+    def fetch_merge_requests(project_id, updated_after:, page: 1, per_page: 100)
+      response = http_client.get("#{API_URL}/projects/#{project_id}/merge_requests") do |req|
+        req.params["page"] = page
+        req.params["per_page"] = per_page
+        req.params["scope"] = "all"
+        req.params["state"] = "all"
+        req.params["updated_after"] = updated_after.iso8601
+        req.params["order_by"] = "updated_at"
+        req.params["sort"] = "desc"
+      end
+
+      return [] unless response.success?
+
+      JSON.parse(response.body).map do |mr|
+        {
+          iid: mr["iid"],
+          title: mr["title"],
+          state: mr["state"],
+          updated_at: mr["updated_at"],
+          web_url: mr["web_url"],
+          author_username: mr.dig("author", "username")
+        }
+      end
+    end
+
+    def fetch_pipelines(project_id, updated_after:, page: 1, per_page: 100)
+      response = http_client.get("#{API_URL}/projects/#{project_id}/pipelines") do |req|
+        req.params["page"] = page
+        req.params["per_page"] = per_page
+        req.params["updated_after"] = updated_after.iso8601
+        req.params["order_by"] = "updated_at"
+        req.params["sort"] = "desc"
+      end
+
+      return [] unless response.success?
+
+      JSON.parse(response.body).map do |pipeline|
+        {
+          id: pipeline["id"],
+          status: pipeline["status"],
+          ref: pipeline["ref"],
+          updated_at: pipeline["updated_at"] || pipeline["created_at"],
+          web_url: pipeline["web_url"],
+          sha: pipeline["sha"]
+        }
+      end
+    end
+
+    def fetch_commits(project_id, ref_name:, since:, page: 1, per_page: 100)
+      response = http_client.get("#{API_URL}/projects/#{project_id}/repository/commits") do |req|
+        req.params["page"] = page
+        req.params["per_page"] = per_page
+        req.params["ref_name"] = ref_name if ref_name.present?
+        req.params["since"] = since.iso8601
+        req.params["all"] = true
+      end
+
+      return [] unless response.success?
+
+      JSON.parse(response.body).map do |commit|
+        {
+          "id" => commit["id"],
+          "message" => commit["message"],
+          "timestamp" => commit["committed_date"] || commit["created_at"],
+          "url" => commit["web_url"],
+          "author" => {
+            "name" => commit["author_name"],
+            "email" => commit["author_email"]
+          }
+        }
+      end
+    end
+
     class << self
       def client_id
         Rails.application.credentials.dig(:gitlab, :client_id) ||

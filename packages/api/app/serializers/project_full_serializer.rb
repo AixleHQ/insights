@@ -34,4 +34,23 @@ class ProjectFullSerializer < ProjectSerializer
   attribute :jira_connector_id do |project|
     project.project_settings.to_a.find { |s| s.key == "jira_connector_id" }&.value
   end
+
+  attribute :source_control_summary do |project|
+    repositories_by_provider = project.repositories.includes(:organization_connector).group_by(&:provider)
+
+    repositories_by_provider.map do |provider, repositories|
+      repo_ids = repositories.map(&:id)
+      events = project.tool_events.where(repository_id: repo_ids)
+
+      {
+        "provider" => provider,
+        "repositoryCount" => repositories.count,
+        "commitCount" => events.by_event_type("commit").count,
+        "reviewCount" => events.by_event_type("review").count,
+        "pipelineCount" => events.by_event_type("other").where("metadata ? 'pipeline_id'").count,
+        "lastActivityAt" => events.maximum(:occurred_at)&.iso8601,
+        "lastSyncAt" => repositories.map(&:last_sync_at).compact.max&.iso8601
+      }
+    end
+  end
 end

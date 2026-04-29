@@ -152,7 +152,7 @@ module Api
           per_page: params.fetch(:per_page, 50).to_i
         )
 
-        linked_ids = @connector.repositories.pluck(:external_id).to_set
+        linked_ids = @connector.repositories.where.not(project_id: nil).pluck(:external_id).to_set
         repos = repos.map do |r|
           r.merge(already_linked: linked_ids.include?(r[:external_id]))
            .transform_keys { |k| k.to_s.camelize(:lower) }
@@ -202,18 +202,14 @@ module Api
       def sync_status
         authorize! @connector, to: :sync_status?
 
-        event_count = if (name = @connector.tool_event_name)
-          current_organization.tool_events.by_tool(name).count
-        else
-          0
-        end
-
         render json: {
           connector_type: @connector.connector_type,
           status:         @connector.status,
           last_sync_at:   @connector.last_sync_at&.iso8601,
           last_error:     @connector.last_error,
-          total_events:   event_count
+          total_events:   @connector.synced_event_count,
+          repository_count: @connector.repositories.count,
+          last_event_at:  @connector.synced_event_last_occurred_at&.iso8601
         }
       end
 

@@ -69,4 +69,22 @@ class OrganizationConnector < ApplicationRecord
     return "github_copilot" if copilot?
     "#{connector_type}_api" if ai_provider?
   end
+
+  def synced_event_scope
+    if source_control?
+      organization.tool_events.where(repository_id: repositories.select(:id))
+    elsif (name = tool_event_name)
+      organization.tool_events.by_tool(name)
+    else
+      ToolEvent.none
+    end
+  end
+
+  def synced_event_count
+    synced_event_scope.count
+  end
+
+  def synced_event_last_occurred_at
+    synced_event_scope.maximum(:occurred_at)
+  end
 end

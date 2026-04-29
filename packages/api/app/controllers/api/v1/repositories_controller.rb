@@ -25,7 +25,18 @@ module Api
 
       # POST /api/v1/projects/:project_id/repositories
       def create
-        @repository = @project.repositories.new(repository_params)
+        connector = current_organization.organization_connectors.find(repository_params[:organization_connector_id])
+        @repository = connector.repositories.find_or_initialize_by(external_id: repository_params[:external_id])
+        @repository.assign_attributes(repository_params.except(:organization_connector_id))
+        @repository.project ||= @project
+
+        if @repository.project_id.present? && @repository.project_id != @project.id
+          return render json: {
+            error: "Unprocessable Entity",
+            errors: { external_id: [ "repository is already linked to another project" ] }
+          }, status: :unprocessable_entity
+        end
+
         authorize! @repository
 
         if @repository.save
