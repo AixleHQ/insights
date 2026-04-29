@@ -75,13 +75,35 @@ module Oauth
       rows
     end
 
-    # Fetch seat allocation info from GET /orgs/{org}/copilot/billing/seats
-    # Shape: { "total_seats": N, "seats": [{ "assignee": {...}, "last_activity_at": "..." }] }
+    # Fetch seat allocation info from GET /orgs/{org}/copilot/billing/seats.
+    # Paginates fully — orgs with >100 seats would otherwise silently under-count
+    # active users since only the first page would be inspected.
+    # Shape per page: { "total_seats": N, "seats": [{ "assignee": {...}, "last_activity_at": "..." }] }
     def fetch_seats
-      org = connector.external_org_name
-      response = copilot_client.get("#{API_URL}/orgs/#{org}/copilot/billing/seats")
-      return {} unless response.success?
-      JSON.parse(response.body)
+      org       = connector.external_org_name
+      page      = 1
+      all_seats = []
+      total_seats = nil
+
+      loop do
+        response = copilot_client.get("#{API_URL}/orgs/#{org}/copilot/billing/seats") do |req|
+          req.params["per_page"] = 100
+          req.params["page"]     = page
+        end
+        break unless response.success?
+
+        data = JSON.parse(response.body)
+        total_seats ||= data["total_seats"]
+        batch = Array(data["seats"])
+        all_seats.concat(batch)
+        break if batch.size < 100
+
+        page += 1
+      end
+
+      return {} if total_seats.nil?
+
+      { "total_seats" => total_seats, "seats" => all_seats }
     end
 
     class << self

@@ -41,11 +41,11 @@ class OrganizationConnectorSerializer < BaseSerializer
   end
 
   attribute :seat_count do |connector|
-    connector.config&.dig("seat_count")
+    connector.config&.dig("seat_count") if connector.copilot?
   end
 
   attribute :active_users_count do |connector|
-    connector.config&.dig("active_users")
+    connector.config&.dig("active_users") if connector.copilot?
   end
 
   attribute :copilot_connector do |connector|

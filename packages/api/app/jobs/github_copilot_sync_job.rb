@@ -47,7 +47,12 @@ class GithubCopilotSyncJob < ApplicationJob
     day_str = row["date"]
     return if day_str.blank?
 
-    day = Date.parse(day_str)
+    begin
+      day = Date.parse(day_str)
+    rescue Date::Error, ArgumentError => e
+      Rails.logger.warn("[GithubCopilotSyncJob] Skipping row with unparseable date '#{day_str}': #{e.message}")
+      return
+    end
 
     # Aggregate suggestion counts from nested structure:
     # copilot_ide_code_completions.editors[].models[].languages[]
@@ -100,6 +105,9 @@ class GithubCopilotSyncJob < ApplicationJob
       }
     )
     event.save!
+  rescue ActiveRecord::RecordNotUnique
+    # Concurrent job already inserted this day — idempotent, safe to ignore.
+    Rails.logger.debug("[GithubCopilotSyncJob] Skipping duplicate event for #{day_str} (concurrent write)")
   end
 
   def sync_seats(provider)
