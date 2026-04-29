@@ -2,8 +2,8 @@
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
 import { readState, writeState, APP_DIR } from "./state.js";
-import { readEvents, readDailyStats } from "./cursor-reader.js";
-import { mapEvent, mapDailyStats, DEFAULT_PRICING } from "./mapper.js";
+import { readEvents, readDailyStats, readRecentCommitSnapshots } from "./cursor-reader.js";
+import { mapEvent, mapDailyStats, mapRecentCommit, DEFAULT_PRICING } from "./mapper.js";
 import type { PricingConfig } from "./mapper.js";
 import { postEvents } from "./client.js";
 import { resolveProjectId } from "./project-resolver.js";
@@ -199,6 +199,7 @@ async function main(): Promise<void> {
 
   const rawEvents = readEvents(since, undefined, cliArgs.verbose);
   const dailyStats = readDailyStats(since, undefined, cliArgs.verbose);
+  const recentCommits = readRecentCommitSnapshots(since, undefined, cliArgs.verbose);
 
   const projectId = resolution.projectId ?? undefined;
 
@@ -208,7 +209,11 @@ async function main(): Promise<void> {
 
   const mappedFromStats = dailyStats.flatMap((entry) => mapDailyStats(entry, projectId, pricing));
 
-  const mappedEvents = [...mappedFromEvents, ...mappedFromStats];
+  const mappedFromRecent = recentCommits
+    .map((snap) => mapRecentCommit(snap, projectId, pricing))
+    .filter((e): e is NonNullable<typeof e> => e !== null);
+
+  const mappedEvents = [...mappedFromEvents, ...mappedFromStats, ...mappedFromRecent];
 
   if (mappedEvents.length === 0) {
     console.log("No new Cursor events found.");

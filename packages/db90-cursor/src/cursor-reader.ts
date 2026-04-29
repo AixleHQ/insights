@@ -211,6 +211,110 @@ export function readDailyStats(
   return results;
 }
 
+// ─── Recent commit snapshot: aiCodeTracking.recentCommit (single key, no date in name) ─
+
+const RECENT_COMMIT_KEY = "aiCodeTracking.recentCommit";
+
+export interface RecentCommitSnapshot {
+  value: Record<string, unknown>;
+  dbPath: string;
+}
+
+function toTimestampMs(raw: unknown): number | null {
+  if (typeof raw === "number" && !isNaN(raw) && raw > 0) return raw;
+  if (typeof raw === "string") {
+    const n = Number(raw);
+    if (!isNaN(n) && n > 0) return n;
+  }
+  return null;
+}
+
+function dedupeRecentCommitSnapshots(entries: RecentCommitSnapshot[]): RecentCommitSnapshot[] {
+  const byKey = new Map<string, RecentCommitSnapshot>();
+  for (const e of entries) {
+    const h =
+      typeof e.value.commitHash === "string" && e.value.commitHash.length > 0
+        ? e.value.commitHash
+        : `${e.dbPath}:${String(e.value.timestamp ?? "")}`;
+    const prev = byKey.get(h);
+    const tE = toTimestampMs(e.value.timestamp);
+    if (tE === null) continue;
+    if (!prev) {
+      byKey.set(h, e);
+      continue;
+    }
+    const tP = toTimestampMs(prev.value.timestamp);
+    if (tP === null || tE > tP) byKey.set(h, e);
+  }
+  return [...byKey.values()];
+}
+
+function readRecentCommitFromDb(
+  dbPath: string,
+  since: Date | null,
+  verbose: boolean
+): RecentCommitSnapshot[] {
+  let db: Database.Database | null = null;
+  try {
+    db = new Database(dbPath, { readonly: true });
+    if (!tableExists(db, STATE_TABLE)) return [];
+
+    const row = db
+      .prepare(`SELECT value FROM ${STATE_TABLE} WHERE key = ?`)
+      .get(RECENT_COMMIT_KEY) as { value: string } | undefined;
+    if (!row) return [];
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(row.value);
+    } catch {
+      return [];
+    }
+    if (typeof parsed !== "object" || parsed === null) return [];
+    const obj = parsed as Record<string, unknown>;
+    const tMs = toTimestampMs(obj.timestamp);
+    if (tMs === null) return [];
+
+    if (since !== null) {
+      const sinceMs = since.getTime();
+      if (tMs <= sinceMs) return [];
+    }
+
+    if (verbose) {
+      const ch = typeof obj.commitHash === "string" ? obj.commitHash : "";
+      console.log(`  [recentCommit] ${dbPath}`);
+      if (ch) console.log(`    commitHash → ${ch.slice(0, 12)}…`);
+    }
+
+    return [{ value: obj, dbPath }];
+  } catch {
+    return [];
+  } finally {
+    db?.close();
+  }
+}
+
+/**
+ * Reads Cursor’s `aiCodeTracking.recentCommit` row (latest commit recorded by Cursor, not git history).
+ * Multiple `state.vscdb` files are de-duplicated by `commitHash` when present.
+ */
+export function readRecentCommitSnapshots(
+  since: Date | null,
+  baseDir?: string,
+  verbose = false
+): RecentCommitSnapshot[] {
+  const dbPaths = findStateVscDbs(baseDir);
+  if (verbose) {
+    console.log(`Searching recentCommit: ${baseDir ?? cursorUserDir()}`);
+  }
+
+  const found: RecentCommitSnapshot[] = [];
+  for (const dbPath of dbPaths) {
+    found.push(...readRecentCommitFromDb(dbPath, since, verbose));
+  }
+  return dedupeRecentCommitSnapshots(found);
+}
+
 export function readEvents(
   since: Date | null,
   baseDir?: string,

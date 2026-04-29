@@ -40,16 +40,23 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
     (message: WebSocketMessage) => {
       switch (message.type) {
         case "new_event":
-          onNewEvent?.(message.data);
+          onNewEvent?.(message.event);
           break;
         case "event_updated":
-          onEventUpdated?.(message.data);
+          onEventUpdated?.(message.updates);
           break;
         case "alert":
-          onAlert?.(message.data);
+          onAlert?.(message.alert);
           break;
-        default:
-          console.log("[useWebSocket] Unknown message type:", message.type);
+        case "subscription_confirmed":
+        case "recent_events":
+          // intentionally ignored at this layer
+          break;
+        default: {
+          // Exhaustiveness guard — compile error if WebSocketMessage union grows without updating this switch
+          const _exhaustive: never = message;
+          console.warn("[useWebSocket] Unhandled message type:", (_exhaustive as { type: string }).type);
+        }
       }
     },
     [onNewEvent, onEventUpdated, onAlert]
@@ -94,15 +101,6 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
       }
     };
   }, [autoConnect, isAuthenticated, currentOrg, handleMessage]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-      }
-    };
-  }, []);
 
   const connect = useCallback(async () => {
     try {

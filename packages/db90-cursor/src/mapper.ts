@@ -25,6 +25,21 @@ export interface CursorRow {
   [key: string]: unknown;
 }
 
+export type Db90PayloadMetadata = {
+  cursor_session_id: string | null;
+  workspace: string;
+  cost_model: typeof COST_MODEL;
+  scannable: false;
+  risk_level: "none";
+  /** Set when the event comes from Cursor’s `aiCodeTracking.recentCommit` row (one per install, last commit only). */
+  source?: "recent_commit";
+  commit_hash?: string;
+  commit_message?: string;
+  repo_name?: string;
+  branch_name?: string;
+  ai_percentage?: number;
+};
+
 export interface Db90Payload {
   tool_name: "cursor";
   event_type: "completion" | "chat";
@@ -34,13 +49,7 @@ export interface Db90Payload {
   cost_usd: number;
   occurred_at: string;
   project_id?: string;
-  metadata: {
-    cursor_session_id: string | null;
-    workspace: string;
-    cost_model: typeof COST_MODEL;
-    scannable: false;
-    risk_level: "none";
-  };
+  metadata: Db90PayloadMetadata;
 }
 
 // Cursor timestamps can be in seconds or milliseconds.
@@ -89,7 +98,7 @@ function computeTokenCost(
 
 // ─── Daily stats mapping (state.vscdb / ItemTable) ───────────────────────────
 
-import type { DailyStatsEntry } from "./cursor-reader.js";
+import type { DailyStatsEntry, RecentCommitSnapshot } from "./cursor-reader.js";
 
 function pick(obj: unknown, ...keys: string[]): number | null {
   let cur: unknown = obj;
@@ -195,6 +204,67 @@ export function mapDailyStats(
   }
 
   return results;
+}
+
+/**
+ * Maps Cursor’s latest-commit snapshot (`aiCodeTracking.recentCommit`) to a single chat-style event.
+ * Cursor only keeps one recent commit row (overwritten on each new commit).
+ */
+export function mapRecentCommit(
+  entry: RecentCommitSnapshot,
+  projectId?: string,
+  pricing: PricingConfig = DEFAULT_PRICING
+): Db90Payload | null {
+  const { value: obj, dbPath } = entry;
+  const occurredAt = toIsoString(obj.timestamp as number | string | null | undefined);
+  if (!occurredAt) return null;
+
+  const la = Number(obj.linesAdded) || 0;
+  const ld = Number(obj.linesDeleted) || 0;
+  const tla = Number(obj.tabLinesAdded) || 0;
+  const tld = Number(obj.tabLinesDeleted) || 0;
+  const cla = Number(obj.composerLinesAdded) || 0;
+  const cld = Number(obj.composerLinesDeleted) || 0;
+  // Line counts used as token proxies (cost_model = "estimated_line_count").
+  // Stored in tokens_in/tokens_out so the schema is uniform, but these are not real token counts.
+  const linesAddedProxy = la + tla + cla;
+  const linesDeletedProxy = ld + tld + cld;
+  if (linesAddedProxy === 0 && linesDeletedProxy === 0) return null;
+  const lineForCost = linesAddedProxy + linesDeletedProxy;
+  const costUsd = computeLineCost("chat", Math.max(lineForCost, 0), pricing);
+
+  const commitHash = obj.commitHash;
+  const commitMessage = obj.commitMessage;
+  const repoName = obj.repoName;
+  const branchName = obj.branchName;
+  const aiPct = obj.aiPercentage;
+
+  const payload: Db90Payload = {
+    tool_name: "cursor",
+    event_type: "chat",
+    model: "unknown",
+    tokens_in: linesAddedProxy,
+    tokens_out: linesDeletedProxy,
+    cost_usd: costUsd,
+    occurred_at: occurredAt,
+    metadata: {
+      cursor_session_id: null,
+      workspace: dbPath,
+      cost_model: COST_MODEL,
+      source: "recent_commit",
+      commit_hash: typeof commitHash === "string" ? commitHash : undefined,
+      commit_message: typeof commitMessage === "string" ? commitMessage : undefined,
+      repo_name: typeof repoName === "string" ? repoName : undefined,
+      branch_name: typeof branchName === "string" ? branchName : undefined,
+      ai_percentage: typeof aiPct === "number" ? aiPct
+                   : typeof aiPct === "string" ? parseFloat(aiPct) || undefined
+                   : undefined,
+      scannable: false,
+      risk_level: "none"
+    },
+  };
+  if (projectId) payload.project_id = projectId;
+  return payload;
 }
 
 export function mapEvent(
