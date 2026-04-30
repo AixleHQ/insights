@@ -31,20 +31,25 @@ module Api
             }, status: :unprocessable_entity
           end
 
-          tool_account = membership.user_tool_accounts.new(tool_name: tool_name, is_active: true)
+          tool_account = membership.user_tool_accounts.find_or_initialize_by(tool_name: tool_name)
+          tool_account.is_active = true
 
-          if tool_account.save
-            render json: {
-              ingest_token: tool_account.plaintext_token,
-              host: ingest_host,
-              tool_name: tool_name
-            }, status: :created
+          if tool_account.new_record?
+            unless tool_account.save
+              return render json: {
+                error: "Unprocessable Entity",
+                errors: format_validation_errors(tool_account.errors)
+              }, status: :unprocessable_entity
+            end
           else
-            render json: {
-              error: "Unprocessable Entity",
-              errors: format_validation_errors(tool_account.errors)
-            }, status: :unprocessable_entity
+            tool_account.rotate_ingest_token!
           end
+
+          render json: {
+            ingest_token: tool_account.plaintext_token,
+            host: ingest_host,
+            tool_name: tool_name
+          }, status: :created
         end
 
         private

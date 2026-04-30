@@ -34,14 +34,16 @@ RSpec.describe "Api::V1::Integrations::Mcp", type: :request do
         expect(JSON.parse(response.body)["tool_name"]).to eq("cursor")
       end
 
-      it "issues a fresh token on each call (no idempotency)" do
-        2.times do
+      it "rotates the token on each call (one account, fresh credential)" do
+        tokens = 2.times.map do
           authenticated_post "/api/v1/integrations/mcp/exchange",
                              user: internal_user,
                              params: { tool_name: "claude_code" }
+          JSON.parse(response.body)["ingest_token"]
         end
 
-        expect(internal_membership.reload.user_tool_accounts.count).to eq(2)
+        expect(internal_membership.reload.user_tool_accounts.count).to eq(1)
+        expect(tokens.uniq.size).to eq(2)
       end
     end
 
