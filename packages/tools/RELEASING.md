@@ -1,89 +1,95 @@
-# Releasing `@db90/*` CLI packages
+# Releasing the db90 CLIs
 
-This runbook covers `@db90/claude` and `@db90/cursor`. MCP (`@db90/mcp`) follows the same steps once Track A is live — a separate `cli-mcp-v*` tag will be enabled in `release-cli.yml` at that point.
+Runbook for cutting a new release of `@db90/claude` or `@db90/cursor` to public npm. Each package versions independently.
 
-## Prerequisites
+> MCP (`@db90/mcp`) is currently excluded — see the note at the bottom.
 
-- `@db90` npm org exists and you are a member with publish access.
-- `NPM_TOKEN` (automation token, scoped `@db90/*`, read + write) is set as a GitHub Actions repository secret.
-- You are on an up-to-date `develop` branch with both PR A and PR B merged.
-- `git status` is clean.
+## Prerequisites (once per maintainer)
 
-## 1. Verify locally
+- Member of the `@db90` npm org with hardware 2FA enabled.
+- Commit access to this repo.
+- Repo secret `NPM_TOKEN` exists and is not expired. See `CLAUDE.md` → "Release secrets" for rotation policy.
+- `gh` CLI authenticated (`gh auth status` succeeds) for tag pushes via the terminal, optional if you prefer the GitHub UI.
 
-```bash
-cd packages/tools
-npm ci
-npm run build --workspace=@db90/sdk
-npm run build --workspace=@db90/claude && npm test --workspace=@db90/claude
-npm run build --workspace=@db90/cursor && npm test --workspace=@db90/cursor
-```
+## Release flow (happy path)
 
-## 2. Pack dry-run
+For a release of package `<pkg>` (`claude` or `cursor`) at version `X.Y.Z`:
 
-```bash
-cd db90-claude && npm pack --dry-run
-cd ../db90-cursor && npm pack --dry-run
-```
+1. **Branch and bump.** On a feature branch cut from `develop`:
+   ```
+   cd packages/tools/db90-<pkg>
+   # edit package.json: "version": "X.Y.Z"
+   ```
+2. **Update the changelog.** Same directory:
+   ```
+   # edit CHANGELOG.md:
+   #   - Replace "## X.Y.Z — TBD" with "## X.Y.Z — YYYY-MM-DD"
+   #   - Move anything under "## Unreleased" into the new version section
+   ```
+3. **Verify locally.** From the workspace root:
+   ```
+   cd packages/tools
+   npm ci
+   npm run build --workspace=@db90/sdk
+   npm run build --workspace=@db90/<pkg>
+   npm test --workspace=@db90/<pkg>
+   cd db90-<pkg>
+   npm pack --dry-run
+   # review the file list — should only contain dist/**, node_modules/@db90/sdk/**, README.md, LICENSE, package.json
+   ```
+4. **Commit and open a PR.** Commit message:
+   ```
+   [AIX-<ticket>] Release @db90/<pkg> X.Y.Z
+   ```
+   Land via the normal review/CI flow on `develop`.
+5. **Tag once merged.** After the PR merges to `develop`:
+   ```
+   git checkout develop
+   git pull
+   git tag cli-<pkg>-vX.Y.Z
+   git push origin cli-<pkg>-vX.Y.Z
+   ```
+6. **Watch the workflow.** [`release-cli.yml`](../../.github/workflows/release-cli.yml) runs:
+   - Verifies tag version matches `package.json` version (fails otherwise).
+   - Rejects placeholder scopes and `file:`/`link:` dependencies.
+   - Installs the workspace, builds the SDK, builds and tests the target connector.
+   - Runs `npm pack --dry-run` and verifies the tarball contains only the allowlisted paths and includes the bundled SDK (`node_modules/@db90/sdk/dist/**`).
+   - Runs `npm publish` with `NODE_AUTH_TOKEN` from `NPM_TOKEN`.
+7. **Smoke-test the published package.** From a temp directory (not the monorepo):
+   ```
+   npx -y @db90/<pkg> --help
+   npx -y @db90/<pkg> --token test --host https://example.com --dry-run
+   ```
+   If either fails, re-publish a patch version with the fix rather than unpublishing.
+8. **Create the GitHub release.** Optional but recommended:
+   ```
+   gh release create cli-<pkg>-vX.Y.Z \
+     --title "@db90/<pkg> X.Y.Z" \
+     --notes-file packages/tools/db90-<pkg>/CHANGELOG.md
+   ```
 
-Expected for each tarball: `dist/**`, `node_modules/@db90/sdk/dist/**` (bundled), `README.md`, `LICENSE`, `package.json`. Nothing else. If `@db90/sdk/dist/` is missing, run `npm run build --workspace=@db90/sdk` first.
+## Manual publish (dispatch)
 
-## 3. Confirm CHANGELOG and version
+If a tag push can't be used (e.g. hotfix from a non-default branch), use the `workflow_dispatch` path:
 
-- `packages/tools/db90-claude/CHANGELOG.md` — top version entry must match `package.json` version and have a real date (not "TBD").
-- Same for `db90-cursor`.
+1. Ensure `package.json` version on the branch you want to publish is correct.
+2. Trigger [`release-cli.yml`](../../.github/workflows/release-cli.yml) → "Run workflow" → select `package` and enter `version` (must match `package.json` exactly; no leading `v`).
+3. Manual runs still go through all guards, including the version-match check.
 
-## 4. Push tags
+## If something goes wrong
 
-```bash
-git checkout develop && git pull
-git tag cli-claude-vX.Y.Z
-git tag cli-cursor-vX.Y.Z
-git push origin cli-claude-vX.Y.Z cli-cursor-vX.Y.Z
-```
+- **Workflow fails at "Verify version matches package.json"** — tag or dispatch input does not match `package.json`. Don't force-push; bump the version in a new commit and re-tag.
+- **Workflow fails at "Verify pack contents"** — something leaked outside the `files` allowlist. Check `packages/tools/db90-<pkg>/package.json` `files` field and the `.gitignore`/`npmignore`.
+- **Workflow fails at "BLOCKER: tarball is missing node_modules/@db90/sdk/dist/**"** — `prepack` did not stage the SDK. Rebuild SDK first (`npm run build --workspace=@db90/sdk`) or investigate [`scripts/stage-sdk-bundle.mjs`](scripts/stage-sdk-bundle.mjs).
+- **`npm publish` fails with 403** — `NPM_TOKEN` is expired or no longer has write access on `@db90/*`. See `CLAUDE.md` → "Release secrets" and regenerate.
+- **Accidentally published a broken build** — publish a patch version with the fix. Do not `npm unpublish` — that shifts semver promises and breaks any consumer who already installed.
 
-`release-cli.yml` triggers on each tag and publishes independently. Claude and Cursor do not need to release together.
+## Independent versioning policy
 
-## 5. Watch the workflow
+- Each CLI versions on its own axis. `@db90/claude@0.2.0` does not imply anything about `@db90/cursor` or vice versa.
+- Tag prefixes (`cli-claude-v*`, `cli-cursor-v*`) route to the correct package; a tag with the wrong prefix won't publish the wrong package.
+- Keep `CHANGELOG.md` dates, package.json versions, and tag numbers identical for a given release.
 
-GitHub → Actions → filter by the tag. Each job:
-1. Resolves the package from the tag name.
-2. Checks `package.json` version matches the tag (aborts if not).
-3. Rejects stale `@<scope>` or `@aixle/` scope names.
-4. Builds SDK → builds package → runs tests.
-5. Verifies tarball contents (SDK must be bundled).
-6. `npm publish`.
+## MCP exclusion
 
-## 6. Smoke test post-publish
-
-From a directory **outside the monorepo**:
-
-```bash
-mkdir /tmp/db90-smoke && cd /tmp/db90-smoke
-npx -y @db90/claude@X.Y.Z --help
-npx -y @db90/cursor@X.Y.Z --help
-```
-
-Follow the README verbatim with a staging ingest token to confirm end-to-end ingest.
-
-## 7. Create GitHub Releases
-
-```bash
-gh release create cli-claude-vX.Y.Z \
-  --title "@db90/claude X.Y.Z" \
-  --notes-file packages/tools/db90-claude/CHANGELOG.md
-
-gh release create cli-cursor-vX.Y.Z \
-  --title "@db90/cursor X.Y.Z" \
-  --notes-file packages/tools/db90-cursor/CHANGELOG.md
-```
-
-## Fix-forward policy
-
-- **Do not `npm unpublish`** — it breaks anyone who already installed.
-- If a publish has a bug: bump the patch version, update CHANGELOG, push a new tag.
-- Minimum patch bump: `X.Y.Z` → `X.Y.(Z+1)`.
-
-## NPM_TOKEN rotation
-
-Set a calendar reminder 11 months after token creation. Generate a new automation token in the npm org, update the GitHub secret, and delete the old token. Owner: Ada Lovelace or Grace Hopper.
+`@db90/mcp` is intentionally not covered by this runbook. `src/sync.ts` currently ships scaffold stubs (`runClaudeSync` and `runCursorSync` return zero counts). The `cli-mcp-v*` tag prefix has been removed from [`release-cli.yml`](../../.github/workflows/release-cli.yml) until [Task 10](../../plans/npm-distribution-AIX-157/tasks/10-mcp-publish.md) lands the real sync wiring. Re-enable the tag prefix in the same PR that lands Task 10.
