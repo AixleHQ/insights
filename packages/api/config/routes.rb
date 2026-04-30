@@ -131,6 +131,13 @@ Rails.application.routes.draw do
       # Public ingest endpoint — Bearer token auth, no JWT/org context
       post "ingest/events", to: "ingest#create"
 
+      # MCP integration: exchanges an authenticated OIDC session for a fresh
+      # UserToolAccount ingest token. Called once by the MCP client after a
+      # successful Keycloak device-flow login (see plan/tasks/07-mcp-auth.md).
+      namespace :integrations do
+        post "mcp/exchange", to: "mcp#exchange"
+      end
+
       # Project lookup by git remote — Bearer ingest token auth, no JWT.
       # Must be declared before `resources :projects` so "lookup" isn't matched as an :id.
       get "projects/lookup", to: "project_lookup#show"
