@@ -13,6 +13,8 @@ class OrganizationAuditLogPolicy < ApplicationPolicy
   end
 
   relation_scope do |scope|
+    # NOTE: `record` here is OrganizationAuditLog (the class), not the organization instance.
+    # Use `user` and membership scopes directly; do not reference `record`.
     if global_admin?
       scope.all
     elsif user
