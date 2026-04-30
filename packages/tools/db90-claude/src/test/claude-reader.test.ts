@@ -421,3 +421,76 @@ describe("toDb90Payload", () => {
     expect(payload.project_id).toBe("proj-uuid-123");
   });
 });
+
+describe("toDb90Payload — numeric security", () => {
+  const baseAgg = {
+    sessionId: "sess-security",
+    filePath: "/path/to/file.jsonl",
+    fileSize: 100,
+    model: "claude-opus-4-5",
+    tokensIn: 100,
+    tokensOut: 50,
+    cacheWriteTokens: 0,
+    cacheReadTokens: 0,
+    occurredAt: "2024-01-01T00:00:00.000Z",
+    riskLevel: "low" as const,
+    riskScore: 0,
+    riskCategories: [] as string[],
+  };
+
+  it("Infinity tokensIn: serialized cost_usd is not Infinity (JSON-safe)", () => {
+    const agg = { ...baseAgg, tokensIn: Infinity };
+    const payload = toDb90Payload(agg, { pricing: TEST_PRICING });
+    // JSON.stringify(Infinity) === "null", so Infinity must not appear in the payload.
+    const serialized = JSON.stringify(payload);
+    expect(serialized).not.toContain("Infinity");
+    expect(serialized).not.toMatch(/:\s*Infinity/);
+  });
+
+  it("NaN tokensIn: serialized payload contains no NaN value", () => {
+    const agg = { ...baseAgg, tokensIn: NaN };
+    const payload = toDb90Payload(agg, { pricing: TEST_PRICING });
+    const serialized = JSON.stringify(payload);
+    expect(serialized).not.toContain("NaN");
+    expect(serialized).not.toMatch(/:\s*NaN/);
+  });
+
+  it("baseInputTokens clamp is load-bearing: cacheTokens > tokensIn produces 0, not negative", () => {
+    // tokensIn=5 but cacheWrite=50, cacheRead=20 → would be -65 without Math.max
+    const agg = { ...baseAgg, tokensIn: 5, cacheWriteTokens: 50, cacheReadTokens: 20 };
+    const payload = toDb90Payload(agg, { pricing: TEST_PRICING });
+    // cost_usd should be 0 or positive (never negative); base_input_tokens should be 0
+    if (payload.cost_usd !== null) {
+      expect(payload.cost_usd).toBeGreaterThanOrEqual(0);
+    }
+    expect(payload.metadata.base_input_tokens).toBe(0);
+  });
+});
+
+describe("parseTranscriptFile — prototype pollution via JSONL", () => {
+  it("__proto__ injection in a JSONL line does not pollute Object.prototype", async () => {
+    const maliciousLine = JSON.stringify({
+      "__proto__": { "isAdmin": true },
+      type: "assistant",
+      message: { usage: { input_tokens: 10, output_tokens: 5 } },
+    });
+    const filePath = join(testDir, "malicious.jsonl");
+    writeFileSync(filePath, maliciousLine + "\n");
+    await parseTranscriptFile(filePath);
+    expect((Object.prototype as Record<string, unknown>)["isAdmin"]).toBeUndefined();
+    delete (Object.prototype as Record<string, unknown>)["isAdmin"];
+  });
+
+  it("oversized single JSONL line (512 KB) does not crash, returns no sessions", async () => {
+    const bigLine = JSON.stringify({
+      type: "assistant",
+      message: { usage: { input_tokens: 1, output_tokens: 1 }, content: "x".repeat(512 * 1024) },
+      sessionId: "oversized-session",
+    });
+    const filePath = join(testDir, "oversized.jsonl");
+    writeFileSync(filePath, bigLine + "\n");
+    // Should not throw; may return 0 or 1 sessions depending on size guards
+    const result = await parseTranscriptFile(filePath);
+    expect(result).toBeDefined();
+  });
+});

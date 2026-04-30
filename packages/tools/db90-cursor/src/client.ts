@@ -1,3 +1,4 @@
+import { postEvent as sdkPostEvent } from "@db90/sdk";
 import type { Db90Payload } from "./mapper.js";
 
 export interface PostResult {
@@ -7,6 +8,12 @@ export interface PostResult {
   lastSentAt: string | null;
 }
 
+/**
+ * Batch POST with per-event watermarking. Delegates the HTTP plumbing to
+ * the SDK primitive and adds cursor-specific logic for tracking the newest
+ * successfully-sent `occurred_at` so the sync loop can advance state on
+ * partial failure.
+ */
 export async function postEvents(
   events: Db90Payload[],
   host: string,
@@ -14,18 +21,11 @@ export async function postEvents(
 ): Promise<PostResult> {
   if (events.length === 0) return { sent: 0, failed: 0, lastSentAt: null };
 
-  const url = `${host.replace(/\/$/, "")}/api/v1/ingest/events`;
-  const headers = {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`,
-  };
-
   const outcomes = await Promise.allSettled(
-    events.map((event) =>
-      fetch(url, { method: "POST", headers, body: JSON.stringify(event) }).then(
-        (response) => ({ event, response })
-      )
-    )
+    events.map(async (event) => ({
+      event,
+      ok: await sdkPostEvent(event as unknown as Parameters<typeof sdkPostEvent>[0], host, token),
+    }))
   );
 
   let sent = 0;
@@ -34,15 +34,16 @@ export async function postEvents(
 
   for (const outcome of outcomes) {
     if (outcome.status === "rejected") {
-      console.error(`Network error posting event: ${outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason)}`);
+      // sdkPostEvent never rejects, so this branch only fires if the wrapper
+      // itself throws (out-of-memory, etc.). Count as failure.
       failed++;
-    } else if (outcome.value.response.ok) {
+      continue;
+    }
+    if (outcome.value.ok) {
       sent++;
       const t = outcome.value.event.occurred_at;
       if (lastSentAt === null || t > lastSentAt) lastSentAt = t;
     } else {
-      const body = await outcome.value.response.text().catch(() => "");
-      console.error(`Failed to post event: HTTP ${outcome.value.response.status} ${outcome.value.response.statusText}${body ? ` — ${body}` : ""}`);
       failed++;
     }
   }

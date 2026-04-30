@@ -73,27 +73,40 @@ function toIsoString(timestamp: number | string | null | undefined): string | nu
 
 // ─── Cost helpers ─────────────────────────────────────────────────────────────
 
+// Defensive: callers may receive a PricingConfig from CLI/SDK consumers that
+// bypassed the cli.ts validation guard. Clamping at the math layer guarantees
+// no negative cost ever lands in an outbound payload.
+const nn = (n: number): number => (n > 0 ? n : 0);
+
 // For line-count layout (daily stats v1.5).
+// Line counts are clamped to >= 0 alongside pricing rates so a malformed DB
+// row can never produce a negative cost_usd in the outbound payload.
 function computeLineCost(
   eventType: "completion" | "chat",
   lines: number,
   pricing: PricingConfig
 ): number {
+  const safeLines = Math.max(0, lines);
+  const tokensPerLine = nn(pricing.tokens_per_line);
   if (eventType === "completion")
-    return (lines * pricing.tokens_per_line * pricing.completion_output_per_mtok) / 1_000_000;
-  return (lines * pricing.tokens_per_line * (pricing.chat_output_per_mtok + pricing.chat_input_per_mtok * 2)) / 1_000_000;
+    return (safeLines * tokensPerLine * nn(pricing.completion_output_per_mtok)) / 1_000_000;
+  return (safeLines * tokensPerLine * (nn(pricing.chat_output_per_mtok) + nn(pricing.chat_input_per_mtok) * 2)) / 1_000_000;
 }
 
 // For token-based events (legacy cursor.db + model-keyed fallback).
+// Token counts are clamped to >= 0 so a malformed DB row with negative
+// values cannot produce a negative cost_usd in the outbound payload.
 function computeTokenCost(
   eventType: "completion" | "chat",
   tokensIn: number,
   tokensOut: number,
   pricing: PricingConfig
 ): number {
+  const safeIn  = Math.max(0, tokensIn);
+  const safeOut = Math.max(0, tokensOut);
   if (eventType === "completion")
-    return (tokensOut * pricing.completion_output_per_mtok) / 1_000_000;
-  return (tokensIn * pricing.chat_input_per_mtok + tokensOut * pricing.chat_output_per_mtok) / 1_000_000;
+    return (safeOut * nn(pricing.completion_output_per_mtok)) / 1_000_000;
+  return (safeIn * nn(pricing.chat_input_per_mtok) + safeOut * nn(pricing.chat_output_per_mtok)) / 1_000_000;
 }
 
 // ─── Daily stats mapping (state.vscdb / ItemTable) ───────────────────────────

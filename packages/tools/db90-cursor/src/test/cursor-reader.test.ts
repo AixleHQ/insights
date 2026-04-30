@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -371,5 +371,46 @@ describe("readEvents", () => {
     const results = readEvents(null, tempDir);
     expect(results).toHaveLength(1);
     expect(results[0].row.requestId).toBe("r1");
+  });
+});
+
+describe("readDailyStats — security", () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = makeTempDir();
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  it("verbose=false suppresses SQLite row value dump to console", () => {
+    const wsDir = join(tempDir, "User", "globalStorage", "cursor.cursor-always-local-storage");
+    mkdirSync(wsDir, { recursive: true });
+    const dbPath = join(wsDir, "state.vscdb");
+    createItemTableDb(dbPath, [
+      { key: "aiCodeTracking", value: JSON.stringify({ tabSuggestedLines: 10 }) },
+    ]);
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    readDailyStats(null, tempDir, false);
+    // Confirm no raw row value (the aiCodeTracking JSON) was printed
+    const allLogs = consoleSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+    expect(allLogs).not.toContain("tabSuggestedLines");
+    consoleSpy.mockRestore();
+  });
+
+  it("baseDir with path traversal resolves to an empty result (no FS reads outside glob)", () => {
+    // Passing a path that resolves to a directory with no Cursor DB files.
+    // Should return [] without crashing.
+    const safeResult = readDailyStats(null, join(tmpdir(), "definitely-does-not-exist-12345"), false);
+    expect(safeResult).toEqual([]);
+  });
+
+  it("deeply nested path traversal baseDir returns empty result", () => {
+    // ../../../etc is resolved by glob but no .vscdb files exist there
+    const result = readDailyStats(null, join(tmpdir(), "..", "..", "etc"), false);
+    expect(result).toEqual([]);
   });
 });

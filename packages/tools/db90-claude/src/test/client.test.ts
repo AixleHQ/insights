@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { postEvent, postEvents } from "../client.js";
 import type { Db90Payload } from "../claude-reader.js";
 
@@ -105,5 +105,49 @@ describe("postEvents", () => {
     const result = await postEvents(events, "http://localhost:3000", "tok");
     expect(result.sent).toBe(2);
     expect(result.failed).toBe(1);
+  });
+});
+
+describe("postEvent — security", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("Bearer token is not echoed to console on success or failure", async () => {
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const consoleSpy2 = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 200 }));
+    await postEvent(samplePayload, "http://localhost:3000", "super-secret-token");
+    for (const call of [...consoleSpy.mock.calls, ...consoleSpy2.mock.calls]) {
+      for (const arg of call) {
+        expect(String(arg)).not.toContain("super-secret-token");
+      }
+    }
+  });
+
+  it("file:// host: fetch rejection returns false without uncaught error", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("fetch failed")));
+    const result = await postEvent(samplePayload, "file:///etc/passwd", "tok");
+    expect(result).toBe(false);
+  });
+
+  it("javascript:// host: fetch rejection returns false", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("fetch failed")));
+    const result = await postEvent(samplePayload, "javascript://evil", "tok");
+    expect(result).toBe(false);
+  });
+
+  it("host with path-injection suffix still appends the ingest endpoint", async () => {
+    const capturedUrls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((url: string) => {
+        capturedUrls.push(url);
+        return Promise.resolve({ ok: true, status: 200 });
+      })
+    );
+    await postEvent(samplePayload, "https://legit.host/../../evil", "tok");
+    expect(capturedUrls[0]).toMatch(/\/api\/v1\/ingest\/events/);
   });
 });

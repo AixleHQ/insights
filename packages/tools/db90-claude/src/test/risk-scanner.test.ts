@@ -82,3 +82,46 @@ describe("scanText", () => {
     expect(result.risk_categories).toContain("secrets");
   });
 });
+
+describe("scanText — security / adversarial inputs", () => {
+  it("completes within 500 ms on 50 KB crafted email-like input (ReDoS guard)", () => {
+    // The email regex /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/ could
+    // be slow on pathological inputs in naive engines. Measure wall-clock time.
+    const input = "a@".repeat(25_000); // 50 KB
+    const start = performance.now();
+    scanText(input);
+    const elapsed = performance.now() - start;
+    expect(elapsed).toBeLessThan(500);
+  });
+
+  it("completes within 2 s on 1 MB benign input", () => {
+    const input = "hello world ".repeat(85_000); // ~1 MB
+    const start = performance.now();
+    const result = scanText(input);
+    const elapsed = performance.now() - start;
+    expect(elapsed).toBeLessThan(2000);
+    expect(result.risk_level).toBe("low");
+  });
+
+  it("risk_score is bounded with many overlapping JWT patterns (not exponential)", () => {
+    const jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c2VyMTIzIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
+    const input = Array.from({ length: 10 }, () => jwt).join(" ");
+    const result = scanText(input);
+    // 10 matches × weight 3 = 30; score is match-count × weight, linearly bounded
+    expect(result.risk_score).toBe(30);
+    expect(result.risk_level).toBe("critical");
+  });
+
+  it("__proto__ key in scanned text does not pollute Object.prototype", () => {
+    const input = JSON.stringify({ "__proto__": { "polluted": true } });
+    scanText(input);
+    expect((Object.prototype as Record<string, unknown>)["polluted"]).toBeUndefined();
+    delete (Object.prototype as Record<string, unknown>)["polluted"];
+  });
+
+  it("null-like input: scanText('') returns low-risk zero score (boundary)", () => {
+    const result = scanText("");
+    expect(result.risk_score).toBe(0);
+    expect(result.risk_level).toBe("low");
+  });
+});

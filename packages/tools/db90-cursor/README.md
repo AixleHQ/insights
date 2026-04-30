@@ -2,16 +2,30 @@
 
 A CLI tool that reads Cursor IDE's local SQLite telemetry database and pushes AI usage events to your [db90](https://db90.io) ingest endpoint.
 
+## Or install once with the MCP server
+
+Prefer a "set and forget" experience? Install [`@db90/mcp`](https://www.npmjs.com/package/@db90/mcp) instead — it auto-forwards usage telemetry from every Claude Code and Cursor session, no cron / launchd needed:
+
+```bash
+npx -y @db90/mcp init
+```
+
+The instructions below cover the standalone CLI for users who prefer cron / launchd or a lighter install.
+
 ## Installation
 
-> **Note:** The package is not yet published to npm. Use the local development instructions below.
+```bash
+npx @db90/cursor --token <token> --host <host>
+```
+
+After install, the on-disk command is still `db90-cursor`, preserving existing scripts and aliases.
 
 ### From the db90 repo (local development)
 
 Build and run directly:
 
 ```bash
-cd packages/db90-cursor
+cd packages/tools/db90-cursor
 npm install
 npm run build
 node dist/cli.js --token <token> --host http://localhost:3000
@@ -20,17 +34,17 @@ node dist/cli.js --token <token> --host http://localhost:3000
 Or install globally from the local path so `db90-cursor` works anywhere:
 
 ```bash
-npm install -g ./packages/db90-cursor
+npm install -g ./packages/tools/db90-cursor
 db90-cursor --token <token> --host http://localhost:3000
 ```
 
-### Once published to npm
+### From npm (recommended)
 
 ```bash
-npm install -g db90-cursor
-# or
-npx db90-cursor --token <token> --host <host>
+npx @db90/cursor --token <token> --host <host>
 ```
+
+The on-disk command is `db90-cursor` after `npx` resolves the package.
 
 ## Quick Start
 
@@ -46,8 +60,7 @@ echo '{"token":"your-ingest-token","host":"https://app.db90.io"}' > ~/.db90-curs
 3. Run the CLI:
 
 ```bash
-node dist/cli.js
-# or, once published: db90-cursor
+npx @db90/cursor
 ```
 
 4. (Recommended) Schedule it to run automatically — see [Scheduling](#scheduling) below.
@@ -59,7 +72,7 @@ This section documents the real-world setup process, including schema discovery 
 ### Step 1 — Build the package
 
 ```bash
-cd packages/db90-cursor
+cd packages/tools/db90-cursor
 npm install
 npm run build
 ```
@@ -315,5 +328,19 @@ If you are not in a git repo (or there is no `origin` remote), attribution is sk
 
 ## Requirements
 
-- Node.js 18+ (uses built-in `fetch`)
+- Node.js 20+ (matches the `engines` field; uses built-in `fetch`)
 - Cursor IDE installed with telemetry data
+
+## Platform support
+
+`@db90/cursor` depends on [`better-sqlite3`](https://www.npmjs.com/package/better-sqlite3) to read Cursor's local SQLite state files. `better-sqlite3` ships **prebuilt native binaries** for the following platforms, so `npm install` does **not** require a C++ toolchain:
+
+- macOS x64, macOS arm64 (Apple Silicon)
+- Linux x64, Linux arm64
+- Windows x64
+
+Tested end-to-end on:
+
+- macOS arm64 (darwin 24 / Node 20) — verified via `npm pack` + `npm install <tarball>` + `db90-cursor --help` + `db90-cursor --dry-run --verbose`.
+
+If you are on a platform not in the list above, `npm install` will fall back to building `better-sqlite3` from source and you will need Python 3 + a C++ compiler (`build-essential` on Debian/Ubuntu, Xcode Command Line Tools on macOS, Visual Studio Build Tools on Windows). If you hit build errors, please open an issue.

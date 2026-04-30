@@ -85,3 +85,32 @@ describe("parseArgs", () => {
     expect(result.projectId).toBeUndefined();
   });
 });
+
+describe("parseArgs — security / adversarial inputs", () => {
+  it("path traversal in --token value is stored verbatim (no interpretation)", () => {
+    const result = parseArgs(["node", "cli.js", "--token", "../../etc/passwd"]);
+    expect(result.token).toBe("../../etc/passwd");
+  });
+
+  it("null-byte in --host value is stored verbatim", () => {
+    const result = parseArgs(["node", "cli.js", "--host", "https://host\x00evil"]);
+    expect(result.host).toBe("https://host\x00evil");
+  });
+
+  it("shell metacharacters in --project-id are stored verbatim (no shell expansion)", () => {
+    const result = parseArgs(["node", "cli.js", "--project-id", "$(evil)"]);
+    expect(result.projectId).toBe("$(evil)");
+  });
+
+  it("very long token value (64 KB) is stored without truncation", () => {
+    const longToken = "x".repeat(65536);
+    const result = parseArgs(["node", "cli.js", "--token", longToken]);
+    expect(result.token).toBe(longToken);
+  });
+
+  it("unknown flags are silently ignored and do not crash the parser", () => {
+    expect(() =>
+      parseArgs(["node", "cli.js", "--unknown-flag", "--another-unknown"])
+    ).not.toThrow();
+  });
+});

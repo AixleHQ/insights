@@ -173,3 +173,45 @@ describe("loadConfig", () => {
     expect(config.pricing).toBeUndefined();
   });
 });
+
+describe("parseArgs — watch-interval security", () => {
+  it("non-numeric value falls back to default 30", () => {
+    const args = parseArgs(["node", "cli.js", "--watch-interval", "abc"]);
+    expect(args.watchInterval).toBe(30);
+  });
+
+  it("negative value falls back to default 30", () => {
+    const args = parseArgs(["node", "cli.js", "--watch-interval", "-100"]);
+    expect(args.watchInterval).toBe(30);
+  });
+
+  it("zero falls back to default 30", () => {
+    const args = parseArgs(["node", "cli.js", "--watch-interval", "0"]);
+    expect(args.watchInterval).toBe(30);
+  });
+
+  it("empty string via = form falls back to default 30", () => {
+    const args = parseArgs(["node", "cli.js", "--watch-interval="]);
+    expect(args.watchInterval).toBe(30);
+  });
+
+  it("float string is truncated by parseInt and accepted if >= 1", () => {
+    const args = parseArgs(["node", "cli.js", "--watch-interval", "60.9"]);
+    expect(args.watchInterval).toBe(60);
+  });
+
+  it("large positive value is accepted as-is", () => {
+    const args = parseArgs(["node", "cli.js", "--watch-interval", "999999999"]);
+    expect(args.watchInterval).toBe(999999999);
+  });
+
+  it("NaN string (e.g. 'NaN') falls back to 30", () => {
+    const args = parseArgs(["node", "cli.js", "--watch-interval", "NaN"]);
+    expect(args.watchInterval).toBe(30);
+  });
+
+  it("equals-form non-numeric falls back to 30", () => {
+    const args = parseArgs(["node", "cli.js", "--watch-interval=evil"]);
+    expect(args.watchInterval).toBe(30);
+  });
+});

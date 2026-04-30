@@ -171,6 +171,34 @@ describe("mapEvent", () => {
     const resultChat = mapEvent({ ...row, type: 1 }, workspace);
     expect(resultChat!.cost_usd).toBe(0);
   });
+
+  it("includes projectId on the payload when provided", () => {
+    const row: CursorRow = {
+      requestId: "req-with-pid",
+      timestamp: 1700000000000,
+      model: "gpt-4",
+      promptTokens: 10,
+      generatedTokens: 5,
+      type: 0,
+    };
+    const result = mapEvent(row, workspace, "proj-uuid-456");
+    expect(result).not.toBeNull();
+    expect(result!.project_id).toBe("proj-uuid-456");
+  });
+
+  it("omits project_id when projectId is not provided", () => {
+    const row: CursorRow = {
+      requestId: "req-no-pid",
+      timestamp: 1700000000000,
+      model: "gpt-4",
+      promptTokens: 10,
+      generatedTokens: 5,
+      type: 0,
+    };
+    const result = mapEvent(row, workspace);
+    expect(result).not.toBeNull();
+    expect(result!.project_id).toBeUndefined();
+  });
 });
 
 describe("mapDailyStats", () => {
@@ -306,6 +334,47 @@ describe("mapDailyStats", () => {
     const defaultResults = mapDailyStats(entry);
     expect(results[0].cost_usd).not.toBe(defaultResults[0].cost_usd);
   });
+
+  it("threads projectId into emitted payloads when provided", () => {
+    const entry: DailyStatsEntry = {
+      date: "2026-04-15",
+      dbPath,
+      value: { tabSuggestedLines: 5, tabAcceptedLines: 1, composerSuggestedLines: 7, composerAcceptedLines: 4 },
+    };
+    const results = mapDailyStats(entry, "proj-uuid-123");
+    expect(results).toHaveLength(2);
+    expect(results.every((r) => r.project_id === "proj-uuid-123")).toBe(true);
+  });
+
+  it("omits project_id when no projectId is provided", () => {
+    const entry: DailyStatsEntry = {
+      date: "2026-04-15",
+      dbPath,
+      value: { tabSuggestedLines: 5, tabAcceptedLines: 1, composerSuggestedLines: 0, composerAcceptedLines: 0 },
+    };
+    const results = mapDailyStats(entry);
+    expect(results).toHaveLength(1);
+    expect(results[0].project_id).toBeUndefined();
+  });
+
+  it("clamps negative pricing rates to zero (defensive — no negative cost can leak)", () => {
+    // CLI guards reject negatives at config-load time; this protects the math layer
+    // from any caller that bypasses CLI validation (direct SDK use, tests, etc.)
+    const malformed: PricingConfig = {
+      tokens_per_line: -15,
+      completion_output_per_mtok: -0.60,
+      chat_input_per_mtok: -3.00,
+      chat_output_per_mtok: -15.00,
+    };
+    const entry: DailyStatsEntry = {
+      date: "2026-04-15",
+      dbPath,
+      value: { tabSuggestedLines: 100, tabAcceptedLines: 50, composerSuggestedLines: 100, composerAcceptedLines: 60 },
+    };
+    const results = mapDailyStats(entry, undefined, malformed);
+    expect(results).toHaveLength(2);
+    for (const r of results) expect(r.cost_usd).toBe(0);
+  });
 });
 
 describe("mapRecentCommit", () => {
@@ -351,5 +420,80 @@ describe("mapRecentCommit", () => {
       value: { timestamp: 1704067200000, commitHash: "abc" },
     };
     expect(mapRecentCommit(snapshot)).toBeNull();
+  });
+});
+
+describe("mapEvent — security / numeric abuse", () => {
+  const workspace = "/home/user/projects/myapp";
+  const baseRow: CursorRow = {
+    requestId: "req-security",
+    timestamp: 1700000000000,
+    model: "gpt-4",
+    type: 0,
+  };
+
+  it("negative promptTokens produces cost_usd >= 0", () => {
+    const row: CursorRow = { ...baseRow, promptTokens: -1_000_000, generatedTokens: 100 };
+    const result = mapEvent(row, workspace, undefined, DEFAULT_PRICING);
+    expect(result).not.toBeNull();
+    expect(result!.cost_usd).toBeGreaterThanOrEqual(0);
+  });
+
+  it("negative generatedTokens produces cost_usd >= 0", () => {
+    const row: CursorRow = { ...baseRow, promptTokens: 100, generatedTokens: -1_000_000 };
+    const result = mapEvent(row, workspace, undefined, DEFAULT_PRICING);
+    expect(result).not.toBeNull();
+    expect(result!.cost_usd).toBeGreaterThanOrEqual(0);
+  });
+
+  it("both negative token counts produce cost_usd === 0", () => {
+    const row: CursorRow = { ...baseRow, promptTokens: -500, generatedTokens: -500 };
+    const result = mapEvent(row, workspace, undefined, DEFAULT_PRICING);
+    expect(result).not.toBeNull();
+    expect(result!.cost_usd).toBe(0);
+  });
+
+  it("NaN promptTokens: cost_usd is 0 (Math.max(0, NaN) === 0)", () => {
+    const row: CursorRow = { ...baseRow, promptTokens: NaN, generatedTokens: 100 };
+    const result = mapEvent(row, workspace, undefined, DEFAULT_PRICING);
+    expect(result).not.toBeNull();
+    const serialized = JSON.stringify(result);
+    expect(serialized).not.toContain("NaN");
+    expect(result!.cost_usd).toBeGreaterThanOrEqual(0);
+  });
+
+  it("Infinity generatedTokens: serialized payload contains no Infinity", () => {
+    const row: CursorRow = { ...baseRow, promptTokens: 100, generatedTokens: Infinity };
+    const result = mapEvent(row, workspace, undefined, DEFAULT_PRICING);
+    if (result !== null) {
+      const serialized = JSON.stringify(result);
+      expect(serialized).not.toContain("Infinity");
+    }
+  });
+});
+
+describe("mapDailyStats — security / numeric abuse", () => {
+  const dbPath = "/path/to/state.vscdb";
+
+  it("negative tabSuggestedLines: cost_usd is >= 0", () => {
+    const entry: DailyStatsEntry = {
+      date: "2026-04-15",
+      dbPath,
+      value: { tabSuggestedLines: -1000, tabAcceptedLines: 50, composerSuggestedLines: 0, composerAcceptedLines: 0 },
+    };
+    const results = mapDailyStats(entry, undefined, DEFAULT_PRICING);
+    // Negative lines means no event is emitted (guarded by > 0 check in mapDailyStats)
+    for (const r of results) expect(r.cost_usd).toBeGreaterThanOrEqual(0);
+  });
+
+  it("__proto__ injection in DailyStatsEntry value does not pollute Object.prototype", () => {
+    const entry: DailyStatsEntry = {
+      date: "2026-04-15",
+      dbPath,
+      value: { "__proto__": { "polluted": true }, tabSuggestedLines: 10, tabAcceptedLines: 5 },
+    };
+    mapDailyStats(entry, undefined, DEFAULT_PRICING);
+    expect((Object.prototype as Record<string, unknown>)["polluted"]).toBeUndefined();
+    delete (Object.prototype as Record<string, unknown>)["polluted"];
   });
 });

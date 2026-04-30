@@ -1,11 +1,9 @@
 #!/usr/bin/env node
-import { join } from "node:path";
-import { readFileSync } from "node:fs";
-import { readState, writeState, markSessionSent, migrateLegacyState, APP_DIR } from "./state.js";
-import { findTranscriptFiles, parseTranscriptFile, toDb90Payload, type SessionAggregate } from "./claude-reader.js";
-import { postEvent } from "./client.js";
+import { loadBaseConfig } from "@db90/sdk";
+import { migrateLegacyState, APP_DIR } from "./state.js";
 import { resolveProjectId } from "./project-resolver.js";
-import { type PricingTable, DEFAULT_PRICING, mergePricing, getCostWarning } from "./pricing.js";
+import { type PricingTable, DEFAULT_PRICING, mergePricing } from "./pricing.js";
+import { syncOnce, type SyncOptions } from "./sync.js";
 
 interface Config {
   token?: string;
@@ -25,44 +23,30 @@ function isPricingTable(value: unknown): value is PricingTable {
 }
 
 export function loadConfig(dir?: string): Config {
-  const configPath = join(dir ?? APP_DIR, "config.json");
-  try {
-    const parsed = JSON.parse(readFileSync(configPath, "utf-8")) as unknown;
-    if (typeof parsed === "object" && parsed !== null) {
-      const obj = parsed as Record<string, unknown>;
-      return {
-        token: typeof obj.token === "string" ? obj.token : undefined,
-        host: typeof obj.host === "string" ? obj.host : undefined,
-        project_id: typeof obj.project_id === "string" ? obj.project_id : undefined,
-        pricing: isPricingTable(obj.pricing) ? (obj.pricing as PricingTable) : undefined,
-      };
-    }
-  } catch {
-    // missing or invalid config — fall through
-  }
-  return {};
+  return loadBaseConfig<PricingTable>(dir ?? APP_DIR, (raw) =>
+    isPricingTable(raw.pricing) ? (raw.pricing as PricingTable) : undefined
+  );
 }
 
-export interface Args {
-  token?: string;
-  host?: string;
-  projectId?: string;
-  dryRun: boolean;
+import { type BaseArgs, BASE_ARGS_DEFAULTS, extractEqualsValue } from "@db90/sdk";
+
+export interface Args extends BaseArgs {
   watch: boolean;
   watchInterval: number;
-  verbose: boolean;
-  help: boolean;
+}
+
+/** Parse --watch-interval value; falls back to 30 if non-positive or non-finite. */
+function parseWatchInterval(raw: string): number {
+  const v = parseInt(raw, 10);
+  return Number.isFinite(v) && v >= 1 ? v : 30;
 }
 
 export function parseArgs(argv: string[]): Args {
   const args = argv.slice(2);
   const result: Args = {
-    dryRun: false,
+    ...BASE_ARGS_DEFAULTS,
     watch: false,
     watchInterval: 30,
-    verbose: false,
-    help: false,
-    projectId: undefined,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -84,7 +68,7 @@ export function parseArgs(argv: string[]): Args {
         result.watch = true;
         break;
       case "--watch-interval":
-        result.watchInterval = parseInt(args[++i] ?? "30", 10);
+        result.watchInterval = parseWatchInterval(args[++i] ?? "");
         break;
       case "--verbose":
       case "-v":
@@ -94,14 +78,19 @@ export function parseArgs(argv: string[]): Args {
       case "-h":
         result.help = true;
         break;
-      default:
-        if (arg.startsWith("--token=")) result.token = arg.slice(8);
-        else if (arg.startsWith("--host=")) result.host = arg.slice(7);
-        else if (arg.startsWith("--project-id=")) result.projectId = arg.slice(13);
-        else if (arg.startsWith("--watch-interval=")) {
-          result.watchInterval = parseInt(arg.slice(17), 10);
+      default: {
+        const tokenEq = extractEqualsValue(arg, "--token");
+        const hostEq = extractEqualsValue(arg, "--host");
+        const projectIdEq = extractEqualsValue(arg, "--project-id");
+        const watchIntervalEq = extractEqualsValue(arg, "--watch-interval");
+        if (tokenEq !== undefined) result.token = tokenEq;
+        else if (hostEq !== undefined) result.host = hostEq;
+        else if (projectIdEq !== undefined) result.projectId = projectIdEq;
+        else if (watchIntervalEq !== undefined) {
+          result.watchInterval = parseWatchInterval(watchIntervalEq);
         }
         break;
+      }
     }
   }
 
@@ -136,106 +125,6 @@ Reads transcripts from:
   ~/.config/claude/projects/  (Claude Code v1.0.30+)
   ~/.claude/projects/          (legacy)
 `);
-}
-
-interface SyncResult {
-  sent: number;
-  failed: number;
-  skipped: number;
-}
-
-interface SyncOptions {
-  token: string;
-  host: string;
-  dryRun: boolean;
-  verbose: boolean;
-  projectId: string | null;
-  pricing: PricingTable;
-}
-
-async function syncOnce(options: SyncOptions): Promise<SyncResult> {
-  const { token, host, dryRun, verbose, projectId, pricing } = options;
-  const files = findTranscriptFiles();
-
-  if (verbose) {
-    console.log(`[verbose] Found ${files.length} transcript file(s)`);
-  }
-
-  // Phase 1: parse all transcript files in parallel, then keep only the most-complete
-  // aggregate per session (highest combined token count). The same session ID can appear
-  // in multiple files (e.g. both ~/.claude/projects/ and ~/.config/claude/projects/ may
-  // have copies at different stages). Parallelising the reads cuts wall-time proportionally.
-  const allFileSessions = await Promise.all(files.map((f) => parseTranscriptFile(f, verbose)));
-  const bestAggs = new Map<string, SessionAggregate>();
-  for (const fileSessions of allFileSessions) {
-    for (const [sessionId, agg] of fileSessions) {
-      const existing = bestAggs.get(sessionId);
-      if (!existing || agg.tokensIn + agg.tokensOut > existing.tokensIn + existing.tokensOut) {
-        bestAggs.set(sessionId, agg);
-      }
-    }
-  }
-
-  if (verbose) {
-    const fileCount = files.length;
-    const sessionCount = bestAggs.size;
-    if (fileCount !== sessionCount) {
-      console.log(`[verbose] Deduplicated ${fileCount} file(s) → ${sessionCount} unique session(s)`);
-    }
-  }
-
-  let state = readState(APP_DIR, host, token);
-  let totalSent = 0;
-  let totalFailed = 0;
-  let totalSkipped = 0;
-
-  for (const [sessionId, agg] of bestAggs) {
-    const known = state.sessions[sessionId];
-
-    // Skip if file size hasn't changed since last successful send
-    if (known && known.fileSize === agg.fileSize) {
-      totalSkipped++;
-      if (verbose) {
-        console.log(`[verbose] Skipping unchanged session ${sessionId}`);
-      }
-      continue;
-    }
-
-    const payload = toDb90Payload(agg, { projectId, pricing });
-
-    if (verbose && payload.cost_usd === null) {
-      if (!agg.model) {
-        if (agg.tokensIn > 0 || agg.tokensOut > 0) {
-          console.warn(`[warn] Session ${sessionId} has usage but no model — cost_usd will be null`);
-        }
-      } else {
-        const warning = getCostWarning(agg.model, pricing);
-        if (warning) console.warn(`[warn] ${warning}`);
-      }
-    }
-
-    if (dryRun) {
-      console.log(`[dry-run] Would send session ${sessionId}:`);
-      console.log(JSON.stringify(payload, null, 2));
-      totalSent++;
-      continue;
-    }
-
-    if (verbose) {
-      console.log(`[verbose] Sending session ${sessionId} (${agg.tokensIn + agg.tokensOut} tokens)`);
-    }
-
-    const ok = await postEvent(payload, host, token);
-    if (ok) {
-      state = markSessionSent(state, sessionId, agg.fileSize);
-      writeState(state, APP_DIR, host, token);
-      totalSent++;
-    } else {
-      totalFailed++;
-    }
-  }
-
-  return { sent: totalSent, failed: totalFailed, skipped: totalSkipped };
 }
 
 async function main(): Promise<void> {
@@ -336,9 +225,23 @@ async function main(): Promise<void> {
   }
 }
 
-// Only execute when run directly (not when imported by tests)
+// Only execute when run directly (not when imported by tests).
+// Resolve both paths with realpathSync because npm's bin installer creates a
+// symlink at node_modules/.bin/db90-claude → ../@db90/claude/dist/cli.js.
+// When users run `db90-claude` or `npx @db90/claude`, Node keeps argv[1] as
+// the symlink path while import.meta.url resolves to the real file — so a
+// naive string compare would always be false and main() would never fire.
 import { fileURLToPath } from "node:url";
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+import { realpathSync } from "node:fs";
+function isEntryPoint(): boolean {
+  if (!process.argv[1]) return false;
+  try {
+    return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+if (isEntryPoint()) {
   main().catch((err) => {
     console.error(
       "Unexpected error:",
