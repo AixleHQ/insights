@@ -158,9 +158,9 @@ describe("IngestTokenConnectSheet", () => {
       return user;
     }
 
-    it("shows npx db90-cursor command for cursor", async () => {
+    it("shows npx @db90/cursor command for cursor", async () => {
       await goToSetupStep(cursorProvider);
-      expect(screen.getByText(/npx db90-cursor --token/i)).toBeInTheDocument();
+      expect(screen.getByText(/npx @db90\/cursor --token/i)).toBeInTheDocument();
     });
 
     it("shows settings.json instructions for claude-code", async () => {
