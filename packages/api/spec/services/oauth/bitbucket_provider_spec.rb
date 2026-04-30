@@ -52,26 +52,39 @@ RSpec.describe Oauth::BitbucketProvider, type: :service do
 
   describe '#fetch_repositories' do
     context 'when the request succeeds' do
-      it 'returns a list of mapped repositories' do
+      it 'returns a list of mapped repositories across accessible workspaces' do
+        workspaces = {
+          values: [
+            { workspace: { slug: 'bbworkspace' } }
+          ]
+        }
         repos = {
           values: [
             {
               uuid: '{repo-uuid}',
               name: 'bb-repo',
-              full_name: 'bbuser/bb-repo',
+              full_name: 'bbworkspace/bb-repo',
               description: 'A Bitbucket repo',
               mainbranch: { name: 'main' },
               links: {
-                clone: [ { name: 'https', href: 'https://bbuser@bitbucket.org/bbuser/bb-repo.git' } ],
-                html: { href: 'https://bitbucket.org/bbuser/bb-repo' }
+                clone: [ { name: 'https', href: 'https://bbuser@bitbucket.org/bbworkspace/bb-repo.git' } ],
+                html: { href: 'https://bitbucket.org/bbworkspace/bb-repo' }
               },
               is_private: true
             }
           ]
         }
 
-        stub_request(:get, 'https://api.bitbucket.org/2.0/repositories')
-          .with(query: hash_including('page' => '1', 'pagelen' => '100', 'role' => 'member'))
+        stub_request(:get, 'https://api.bitbucket.org/2.0/user/workspaces')
+          .with(query: hash_including('page' => '1', 'pagelen' => '100'))
+          .to_return(
+            status: 200,
+            body: workspaces.to_json,
+            headers: { 'Content-Type' => 'application/json' }
+          )
+
+        stub_request(:get, 'https://api.bitbucket.org/2.0/repositories/bbworkspace')
+          .with(query: hash_including('page' => '1', 'pagelen' => '100'))
           .to_return(
             status: 200,
             body: repos.to_json,
@@ -88,21 +101,34 @@ RSpec.describe Oauth::BitbucketProvider, type: :service do
       end
 
       it 'falls back to "main" when mainbranch is absent' do
+        workspaces = {
+          values: [
+            { workspace: { slug: 'bbworkspace' } }
+          ]
+        }
         repos = {
           values: [
             {
               uuid: '{repo-uuid}',
               name: 'bb-repo',
-              full_name: 'bbuser/bb-repo',
+              full_name: 'bbworkspace/bb-repo',
               description: nil,
-              links: { clone: [], html: { href: 'https://bitbucket.org/bbuser/bb-repo' } },
+              links: { clone: [], html: { href: 'https://bitbucket.org/bbworkspace/bb-repo' } },
               is_private: false
             }
           ]
         }
 
-        stub_request(:get, 'https://api.bitbucket.org/2.0/repositories')
-          .with(query: hash_including('page' => '1', 'pagelen' => '100', 'role' => 'member'))
+        stub_request(:get, 'https://api.bitbucket.org/2.0/user/workspaces')
+          .with(query: hash_including('page' => '1', 'pagelen' => '100'))
+          .to_return(
+            status: 200,
+            body: workspaces.to_json,
+            headers: { 'Content-Type' => 'application/json' }
+          )
+
+        stub_request(:get, 'https://api.bitbucket.org/2.0/repositories/bbworkspace')
+          .with(query: hash_including('page' => '1', 'pagelen' => '100'))
           .to_return(
             status: 200,
             body: repos.to_json,
@@ -116,12 +142,137 @@ RSpec.describe Oauth::BitbucketProvider, type: :service do
 
     context 'when the request fails' do
       it 'returns an empty array' do
-        stub_request(:get, 'https://api.bitbucket.org/2.0/repositories')
-          .with(query: hash_including('page' => '1', 'pagelen' => '100', 'role' => 'member'))
+        stub_request(:get, 'https://api.bitbucket.org/2.0/user/workspaces')
+          .with(query: hash_including('page' => '1', 'pagelen' => '100'))
           .to_return(status: 401, body: '{}')
 
         expect(provider.fetch_repositories).to eq([])
       end
+    end
+  end
+
+  describe '#fetch_pull_requests' do
+    it 'returns mapped pull requests updated after the requested time' do
+      pull_requests = {
+        values: [
+          {
+            id: 17,
+            title: 'Improve CI visibility',
+            state: 'MERGED',
+            updated_on: '2026-04-29T11:21:47Z',
+            links: { html: { href: 'https://bitbucket.org/ws/repo/pull-requests/17' } },
+            author: { nickname: 'bbuser' }
+          }
+        ]
+      }
+
+      stub_request(:get, 'https://api.bitbucket.org/2.0/repositories/ws/repo/pullrequests')
+        .with(query: hash_including('page' => '1', 'pagelen' => '100'))
+        .to_return(
+          status: 200,
+          body: pull_requests.to_json,
+          headers: { 'Content-Type' => 'application/json' }
+        )
+
+      result = provider.fetch_pull_requests('ws', 'repo', updated_after: Time.zone.parse('2026-04-01T00:00:00Z'))
+
+      expect(result).to eq([
+        {
+          id: 17,
+          title: 'Improve CI visibility',
+          state: 'MERGED',
+          updated_at: '2026-04-29T11:21:47Z',
+          web_url: 'https://bitbucket.org/ws/repo/pull-requests/17',
+          author_username: 'bbuser'
+        }
+      ])
+    end
+  end
+
+  describe '#fetch_pipelines' do
+    it 'returns mapped pipelines' do
+      pipelines = {
+        values: [
+          {
+            uuid: '{pipeline-uuid}',
+            created_on: '2026-04-29T11:20:00Z',
+            completed_on: '2026-04-29T11:22:00Z',
+            state: { name: 'COMPLETED' },
+            target: { ref_name: 'main', commit: { hash: 'abc123' } },
+            links: { html: { href: 'https://bitbucket.org/ws/repo/pipelines/results/12' } }
+          }
+        ]
+      }
+
+      stub_request(:get, 'https://api.bitbucket.org/2.0/repositories/ws/repo/pipelines')
+        .with(query: hash_including('page' => '1', 'pagelen' => '100'))
+        .to_return(
+          status: 200,
+          body: pipelines.to_json,
+          headers: { 'Content-Type' => 'application/json' }
+        )
+
+      result = provider.fetch_pipelines('ws', 'repo', updated_after: Time.zone.parse('2026-04-01T00:00:00Z'))
+
+      expect(result).to eq([
+        {
+          id: '{pipeline-uuid}',
+          status: 'COMPLETED',
+          ref: 'main',
+          updated_at: '2026-04-29T11:22:00Z',
+          web_url: 'https://bitbucket.org/ws/repo/pipelines/results/12',
+          sha: 'abc123'
+        }
+      ])
+    end
+  end
+
+  describe '#fetch_commits' do
+    it 'returns mapped commits since the requested time' do
+      commits = {
+        values: [
+          {
+            hash: 'abc123',
+            date: '2026-04-29T11:21:47Z',
+            message: 'Ship analytics',
+            author: {
+              raw: 'BB User <bb@example.com>',
+              user: { display_name: 'BB User' }
+            },
+            links: { html: { href: 'https://bitbucket.org/ws/repo/commits/abc123' } }
+          },
+          {
+            hash: 'old111',
+            date: '2026-03-01T10:00:00Z',
+            message: 'Old commit',
+            author: { raw: 'BB User <bb@example.com>' },
+            links: { html: { href: 'https://bitbucket.org/ws/repo/commits/old111' } }
+          }
+        ]
+      }
+
+      stub_request(:get, 'https://api.bitbucket.org/2.0/repositories/ws/repo/commits/main')
+        .with(query: hash_including('page' => '1', 'pagelen' => '100', 'include' => 'main'))
+        .to_return(
+          status: 200,
+          body: commits.to_json,
+          headers: { 'Content-Type' => 'application/json' }
+        )
+
+      result = provider.fetch_commits('ws', 'repo', branch: 'main', since: Time.zone.parse('2026-04-01T00:00:00Z'))
+
+      expect(result).to eq([
+        {
+          "id" => 'abc123',
+          "message" => 'Ship analytics',
+          "timestamp" => '2026-04-29T11:21:47Z',
+          "url" => 'https://bitbucket.org/ws/repo/commits/abc123',
+          "author" => {
+            "name" => 'BB User',
+            "email" => 'bb@example.com'
+          }
+        }
+      ])
     end
   end
 
@@ -149,6 +300,30 @@ RSpec.describe Oauth::BitbucketProvider, type: :service do
 
         expect(described_class.fetch_account_info('bad-token')).to eq({})
       end
+    end
+  end
+
+  describe '.authorization_url' do
+    before do
+      allow(described_class).to receive(:client_id).and_return('bb-client-id')
+    end
+
+    it 'builds a Bitbucket authorize URL without a scope query param' do
+      url = described_class.authorization_url(
+        organization_id: 'org-1',
+        redirect_uri: 'http://localhost:5173/integrations/callback'
+      )
+
+      expect(url).to start_with('https://bitbucket.org/site/oauth2/authorize')
+      expect(url).to include('client_id=bb-client-id')
+      expect(url).to include('response_type=code')
+      expect(url).not_to include('scope=')
+    end
+  end
+
+  describe '.scopes' do
+    it 'includes repository, pull request, and pipeline scopes' do
+      expect(described_class.scopes).to eq(%w[account repository pullrequest pipeline])
     end
   end
 end

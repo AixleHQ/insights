@@ -6,7 +6,7 @@ class ToolEvent < ApplicationRecord
     claude_code cursor windsurf github_copilot
     aider continue cody tabnine amazon_q
     openrouter_api anthropic_api openai_api gemini_api
-    custom jira linear github gitlab
+    custom jira linear github gitlab bitbucket
   ].freeze
 
   EVENT_TYPES = %w[chat completion edit commit review test debug refactor documentation other

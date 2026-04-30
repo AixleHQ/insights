@@ -63,11 +63,13 @@ const availableProviders: ProviderInfo[] = [
   {
     id: "bitbucket",
     name: "Bitbucket",
-    description: "Connect repositories and pull requests",
+    description: "Connect workspaces, repositories, pull requests, and pipelines",
     category: "code",
     features: [
+      "Workspace sync",
       "Repository tracking",
       "Pull request events",
+      "Commit monitoring",
       "Pipeline monitoring",
     ],
     available: true,
