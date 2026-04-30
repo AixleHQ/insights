@@ -109,16 +109,19 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: packages/db90-cursor/package-lock.json
-      - name: Install dependencies
+          cache-dependency-path: packages/tools/package-lock.json
+      - name: Install workspace
         run: npm ci
-        working-directory: packages/db90-cursor
+        working-directory: packages/tools
+      - name: Build SDK
+        run: npm run build --workspace=@db90/sdk
+        working-directory: packages/tools
       - name: Build
-        run: npm run build
-        working-directory: packages/db90-cursor
+        run: npm run build --workspace=@db90/cursor
+        working-directory: packages/tools
       - name: Test
-        run: npm test
-        working-directory: packages/db90-cursor
+        run: npm test --workspace=@db90/cursor
+        working-directory: packages/tools
 
   # --- db90-claude package checks ---
 
@@ -131,16 +134,71 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: packages/db90-claude/package-lock.json
-      - name: Install dependencies
+          cache-dependency-path: packages/tools/package-lock.json
+      - name: Install workspace
         run: npm ci
-        working-directory: packages/db90-claude
+        working-directory: packages/tools
+      - name: Build SDK
+        run: npm run build --workspace=@db90/sdk
+        working-directory: packages/tools
       - name: Build
-        run: npm run build
-        working-directory: packages/db90-claude
+        run: npm run build --workspace=@db90/claude
+        working-directory: packages/tools
       - name: Test
-        run: npm test
-        working-directory: packages/db90-claude
+        run: npm test --workspace=@db90/claude
+        working-directory: packages/tools
+
+  # --- Plan task budget check ---
+  # Verifies every plans/<feature>/tasks/*.md fits Sonnet 4.6's 200K context
+  # without compaction. Runs only when plan files changed (or on develop/main
+  # for periodic verification). Exits non-zero if any task is red.
+
+  plan_budget_check:
+    name: Plan task budget (Sonnet-fit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Verify all plans fit Sonnet's context window
+        run: |
+          set -euo pipefail
+          if [ ! -d plans ]; then
+            echo "No plans/ directory; nothing to check."
+            exit 0
+          fi
+          fail=0
+          for folder in plans/*/; do
+            if [ -d "${folder}tasks" ]; then
+              echo "::group::${folder}"
+              node --experimental-strip-types --no-warnings .claude/scripts/plan-task-budget.ts "${folder}" || fail=1
+              echo "::endgroup::"
+            fi
+          done
+          exit "$fail"
+
+  # --- db90-mcp package checks ---
+
+  mcp_check:
+    name: db90-mcp (build + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: packages/tools/package-lock.json
+      - name: Install workspace
+        run: npm ci
+        working-directory: packages/tools
+      - name: Build
+        run: npm run build --workspace=@db90/mcp
+        working-directory: packages/tools
+      - name: Test
+        run: npm test --workspace=@db90/mcp
+        working-directory: packages/tools
 
   # --- Deploy pipeline (staging and main only) ---
 
@@ -148,7 +206,7 @@ jobs:
     name: Run DB Migrations
     runs-on: ubuntu-latest
     container: ghcr.io/artempartos/ecs_toolbox:latest
-    needs: [build, api_test, api_lint, api_security, web_test, web_lint, web_typecheck, cursor_check, claude_check]
+    needs: [build, api_test, api_lint, api_security, web_test, web_lint, web_typecheck, cursor_check, claude_check, mcp_check]
     if: github.ref_name == 'staging' || github.ref_name == 'main'
     env:
       ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
