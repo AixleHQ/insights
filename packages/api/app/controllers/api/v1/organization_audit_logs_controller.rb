@@ -7,11 +7,14 @@ module Api
 
       # GET /api/v1/organizations/:organization_id/audit_logs
       def index
-        authorize! current_organization, to: :audit_logs?
+        authorize! current_organization, to: :index?, with: OrganizationAuditLogPolicy
 
-        logs = current_organization.organization_audit_logs
-                                   .includes(:actor)
-                                   .order(created_at: :desc)
+        logs = authorized_scope(
+          current_organization.organization_audit_logs
+                              .includes(:actor)
+                              .order(created_at: :desc),
+          with: OrganizationAuditLogPolicy
+        )
 
         logs = logs.by_actor(params[:actor_id]) if params[:actor_id].present?
         logs = logs.by_action(params[:log_action]) if params[:log_action].present?

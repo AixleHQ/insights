@@ -1737,6 +1737,74 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationError'
 
+  # ============================================
+  # ORGANIZATION AUDIT LOG ENDPOINTS
+  # ============================================
+  /api/v1/organizations/{organization_id}/audit_logs:
+    get:
+      summary: List organization audit logs
+      description: >
+        Returns paginated audit log entries for the organization.
+        Requires org admin or global admin role. Members receive 403.
+        All fields including `ipAddress` and `trackedChanges` are included.
+      tags:
+        - Organization Audit Logs
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - name: actor_id
+          in: query
+          description: Filter by actor user ID
+          schema:
+            type: string
+            format: uuid
+        - name: log_action
+          in: query
+          description: Filter by action (e.g. settings.update, member.removed)
+          schema:
+            type: string
+        - name: resource_type
+          in: query
+          description: Filter by resource type (e.g. OrganizationConnector)
+          schema:
+            type: string
+        - name: from_date
+          in: query
+          description: Filter entries on or after this ISO 8601 datetime
+          schema:
+            type: string
+            format: date-time
+        - name: to_date
+          in: query
+          description: Filter entries on or before this ISO 8601 datetime
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Paginated audit log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OrganizationAuditLog'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   /api/v1/organizations/{organization_id}/projects:
     get:
       summary: List organization projects
@@ -1930,6 +1998,80 @@ paths:
       responses:
         '204':
           description: Setting deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================
+  # PROJECT AUDIT LOG ENDPOINTS
+  # ============================================
+  /api/v1/projects/{project_id}/audit_logs:
+    get:
+      summary: List project audit logs
+      description: >
+        Returns paginated audit log entries for the project.
+        Accessible by project admins (owner/admin role on the project), org admins, and global admins.
+        Project members and viewers receive 403.
+
+        **Role-based field visibility:**
+        - Org admins and global admins: all fields including `ipAddress` and `trackedChanges`
+        - Project admins (non-org-admin): `ipAddress` and `trackedChanges` are omitted from the response
+        - Personal project owners: all fields included
+      tags:
+        - Project Audit Logs
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - name: actor_id
+          in: query
+          description: Filter by actor user ID
+          schema:
+            type: string
+            format: uuid
+        - name: log_action
+          in: query
+          description: Filter by action (e.g. settings.update, member.removed)
+          schema:
+            type: string
+        - name: resource_type
+          in: query
+          description: Filter by resource type (e.g. ProjectConnector)
+          schema:
+            type: string
+        - name: from_date
+          in: query
+          description: Filter entries on or after this ISO 8601 datetime
+          schema:
+            type: string
+            format: date-time
+        - name: to_date
+          in: query
+          description: Filter entries on or before this ISO 8601 datetime
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Paginated audit log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProjectAuditLog'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
@@ -2784,6 +2926,106 @@ components:
         - totalPages
         - totalCount
         - perPage
+
+    AuditLogActor:
+      type: object
+      nullable: true
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          nullable: true
+      required:
+        - id
+        - email
+
+    OrganizationAuditLog:
+      type: object
+      description: Organization-level audit log entry. All fields visible to org admins and global admins.
+      properties:
+        id:
+          type: string
+          format: uuid
+        action:
+          type: string
+          example: settings.update
+        resourceType:
+          type: string
+          nullable: true
+        resourceId:
+          type: string
+          format: uuid
+          nullable: true
+        trackedChanges:
+          type: object
+          description: JSON diff of before/after values for the audited resource
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+        ipAddress:
+          type: string
+          nullable: true
+          description: IP address of the actor at the time of the action
+        createdAt:
+          type: string
+          format: date-time
+        actor:
+          $ref: '#/components/schemas/AuditLogActor'
+      required:
+        - id
+        - action
+        - trackedChanges
+        - metadata
+        - ipAddress
+        - createdAt
+
+    ProjectAuditLog:
+      type: object
+      description: >
+        Project-level audit log entry.
+        `ipAddress` and `trackedChanges` are omitted (key absent, not null) for project-admin callers
+        who are not org admins. Org admins and global admins receive all fields.
+      properties:
+        id:
+          type: string
+          format: uuid
+        action:
+          type: string
+          example: settings.update
+        resourceType:
+          type: string
+          nullable: true
+        resourceId:
+          type: string
+          format: uuid
+          nullable: true
+        trackedChanges:
+          type: object
+          description: JSON diff of before/after values. Omitted for project-admin callers (non-org-admin).
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+        ipAddress:
+          type: string
+          nullable: true
+          description: IP of the actor at action time. Omitted for project-admin callers (non-org-admin).
+        createdAt:
+          type: string
+          format: date-time
+        actor:
+          $ref: '#/components/schemas/AuditLogActor'
+      required:
+        - id
+        - action
+        - metadata
+        - createdAt
 
     User:
       type: object

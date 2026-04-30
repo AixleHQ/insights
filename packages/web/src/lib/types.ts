@@ -265,9 +265,11 @@ export interface AuditLog {
   action: string;
   resourceType: string | null;
   resourceId: string | null;
-  trackedChanges: Record<string, unknown>;
+  /** Absent for project-admin callers (non-org-admin); present for org admins and global admins */
+  trackedChanges?: Record<string, unknown>;
   metadata: Record<string, unknown>;
-  ipAddress: string | null;
+  /** Absent for project-admin callers (non-org-admin); present for org admins and global admins */
+  ipAddress?: string | null;
   createdAt: string;
   actor: { id: string; email: string; name: string | null } | null;
 }
