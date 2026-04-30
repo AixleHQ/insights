@@ -170,19 +170,37 @@ export class ApiError extends Error {
 /**
  * Fetch a binary resource with authentication and trigger a browser download.
  * Returns { queued: true, jobId } if the server responds 202 (large async export).
+ *
+ * @param organizationId Prefer the org in the URL path; falls back to {@link setCurrentOrganizationId}.
  */
 export async function downloadBlob(
   endpoint: string,
   filename: string,
-  accept = "text/csv"
+  accept = "text/csv",
+  organizationId?: string | null
 ): Promise<{ queued: boolean; jobId?: string }> {
   const url = endpoint.startsWith("http") ? endpoint : `${DEFAULT_BASE_URL}${endpoint}`;
-  const token = await getAuthToken();
-  const requestHeaders: Record<string, string> = { Accept: accept };
-  if (token) requestHeaders["Authorization"] = `Bearer ${token}`;
-  if (currentOrgId) requestHeaders["X-Organization-ID"] = currentOrgId;
+  const impersonating = isImpersonating();
+  const orgForHeader = organizationId ?? currentOrgId;
 
-  const response = await fetch(url, { method: "GET", headers: requestHeaders });
+  const buildHeaders = async (): Promise<Record<string, string>> => {
+    const token = await getAuthToken();
+    const requestHeaders: Record<string, string> = { Accept: accept };
+    if (token) requestHeaders.Authorization = `Bearer ${token}`;
+    if (orgForHeader) requestHeaders["X-Organization-ID"] = orgForHeader;
+    return requestHeaders;
+  };
+
+  const doFetch = async () => fetch(url, { method: "GET", headers: await buildHeaders() });
+
+  let response = await doFetch();
+
+  if (response.status === 401 && !impersonating) {
+    const renewed = await silentRenew();
+    if (renewed) {
+      response = await doFetch();
+    }
+  }
 
   if (response.status === 202) {
     const body = (await response.json()) as { job_id: string };

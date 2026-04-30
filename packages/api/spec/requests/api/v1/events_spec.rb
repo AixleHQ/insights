@@ -301,6 +301,21 @@ RSpec.describe 'Api::V1::Events', type: :request do
         expect(response.body).not_to include("claude_code")
       end
 
+      it "respects risk_level filter (critical uses the same bucket as high)" do
+        create(:tool_event,
+               organization: organization,
+               user: user,
+               tool_name: "windsurf",
+               cost_usd: 5.0,
+               occurred_at: 30.minutes.ago)
+
+        authenticated_get export_path, user: user, organization: organization,
+                          params: { risk_level: "critical" }
+
+        expect(response.body).to     include("windsurf")
+        expect(response.body).not_to include("claude_code")
+      end
+
       it "respects date range filter" do
         old_event = create(:tool_event,
                            organization: organization,
@@ -313,6 +328,24 @@ RSpec.describe 'Api::V1::Events', type: :request do
 
         expect(response.body).to     include("claude_code")
         expect(response.body).not_to include("github_copilot")
+      end
+
+      it "includes events through the end calendar day of end_date" do
+        day = Time.zone.today
+        create(:tool_event,
+               organization: organization,
+               user: user,
+               tool_name: "cursor",
+               cost_usd: 0.005,
+               occurred_at: day.beginning_of_day + 23.hours)
+
+        authenticated_get export_path, user: user, organization: organization,
+                          params: {
+                            start_date: (day - 1.day).to_date.iso8601,
+                            end_date: day.to_date.iso8601
+                          }
+
+        expect(response.body).to include("cursor")
       end
     end
 

@@ -19,15 +19,20 @@ module ToolEventFilterable
 
   def apply_tool_event_time_filter(scope, fp)
     fp = fp.transform_keys(&:to_s)
-    scope = scope.where("occurred_at >= ?", Time.zone.parse(fp["start_date"])) if fp["start_date"].present?
-    scope = scope.where("occurred_at <= ?", Time.zone.parse(fp["end_date"]))   if fp["end_date"].present?
+    if fp["start_date"].present?
+      scope = scope.where("occurred_at >= ?", Time.zone.parse(fp["start_date"]).beginning_of_day)
+    end
+    if fp["end_date"].present?
+      # Inclusive calendar end date (UI sends YYYY-MM-DD from <input type="date">).
+      scope = scope.where("occurred_at <= ?", Time.zone.parse(fp["end_date"]).end_of_day)
+    end
     scope
   end
 
-  # Thresholds match ToolEventAttributes#risk_level — "critical" is not a valid value.
+  # Thresholds match ToolEventAttributes#risk_level. UI may send "critical"; bucket it with high (cost > $1).
   def apply_tool_event_risk_level_filter(scope, risk_level)
     case risk_level
-    when "high"   then scope.where("cost_usd > 1.0")
+    when "high", "critical" then scope.where("cost_usd > 1.0")
     when "medium" then scope.where("cost_usd > 0.1 AND cost_usd <= 1.0")
     when "low"    then scope.where("cost_usd > 0.01 AND cost_usd <= 0.1")
     when "none"   then scope.where("cost_usd IS NULL OR cost_usd <= 0.01")

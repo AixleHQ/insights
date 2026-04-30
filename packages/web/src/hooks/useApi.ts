@@ -1114,7 +1114,7 @@ export function useExportEvents(orgId: string) {
         });
         const query = searchParams.toString();
         const endpoint = `/organizations/${orgId}/events/export${query ? `?${query}` : ""}`;
-        return await downloadBlob(endpoint, filename);
+        return await downloadBlob(endpoint, filename, "text/csv", orgId);
       } finally {
         setIsExporting(false);
       }

@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { Download, Loader2, RefreshCw } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useOrg } from "@/contexts/OrgContext";
-import { useEvents, useExportEvents, queryKeys } from "@/hooks/useApi";
+import { useEvents, useExportEvents, useProjects, queryKeys } from "@/hooks/useApi";
 import { useEventsPageUpdates } from "@/hooks/useWebSocket";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,7 +37,9 @@ export function Events() {
   const [exportQueued, setExportQueued] = useState(false);
   const [exportError, setExportError] = useState(false);
 
-  // Build API params from filters
+  const { data: orgProjects } = useProjects(currentOrg?.id || "");
+
+  // Build API params from filters (keep in sync with handleExport)
   const apiParams = useMemo(() => ({
     page,
     per_page: 25,
@@ -46,6 +48,7 @@ export function Events() {
     event_type: filters.eventType,
     start_date: filters.dateFrom,
     end_date: filters.dateTo,
+    project_id: filters.projectId,
   }), [page, filters]);
 
   const { data: eventsResponse, isLoading, isFetching } = useEvents(
@@ -144,6 +147,7 @@ export function Events() {
         event_type: filters.eventType,
         start_date: filters.dateFrom,
         end_date: filters.dateTo,
+        project_id: filters.projectId,
         filename,
       });
 
@@ -215,6 +219,7 @@ export function Events() {
           setPage(1); // Reset to first page on filter change
         }}
         tools={EVENTS_TOOL_FILTER_OPTIONS}
+        projects={orgProjects}
       />
 
       <EventsTable
