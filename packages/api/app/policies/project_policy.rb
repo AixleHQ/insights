@@ -56,14 +56,6 @@ class ProjectPolicy < ApplicationPolicy
     update?
   end
 
-  # Only project admins/owners can view audit logs
-  def audit_logs?
-    return true if global_admin?
-    return own_personal_project? if record.personal?
-    return project_admin?(record) if record.organization_project?
-    false
-  end
-
   private
 
   def own_personal_project?

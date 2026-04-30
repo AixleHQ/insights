@@ -7,11 +7,14 @@ module Api
 
       # GET /api/v1/projects/:project_id/audit_logs
       def index
-        authorize! @project, to: :audit_logs?
+        authorize! @project, to: :index?, with: ProjectAuditLogPolicy
 
-        logs = @project.project_audit_logs
-                       .includes(:actor)
-                       .order(created_at: :desc)
+        logs = authorized_scope(
+          @project.project_audit_logs
+                  .includes(:actor)
+                  .order(created_at: :desc),
+          with: ProjectAuditLogPolicy
+        )
 
         logs = logs.by_actor(params[:actor_id]) if params[:actor_id].present?
         logs = logs.by_action(params[:log_action]) if params[:log_action].present?
@@ -27,9 +30,10 @@ module Api
         end
 
         paginated = paginate(logs)
+        full_access = allowed_to?(:full_access?, @project, with: ProjectAuditLogPolicy)
 
         render json: {
-          data: ProjectAuditLogSerializer.new(paginated).serialize,
+          data: ProjectAuditLogSerializer.new(paginated, params: { full_access: full_access }).serialize,
           meta: pagination_meta(paginated)
         }
       end
@@ -37,7 +41,9 @@ module Api
       private
 
       def set_project
-        @project = Project.find(params[:project_id])
+        # Use authorized_scope so unauthorized project IDs 404 rather than 403-after-load,
+        # consistent with IssuesController
+        @project = authorized_scope(Project.all).find(params[:project_id])
       end
     end
   end
