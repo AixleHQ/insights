@@ -2,6 +2,41 @@
 
 A CLI tool that reads Cursor IDE's local SQLite telemetry database and pushes AI usage events to your [db90](https://db90.io) ingest endpoint.
 
+## Integration with db90-rails
+
+This CLI posts your Cursor usage to a running db90-rails backend. Setup splits into three roles — do the steps matching your role, skip the others.
+
+### If you are a Developer (install + ingest your own data)
+
+1. Ask your Rails admin for an ingest token — or create one yourself via **Settings → Integrations → Cursor → Connect** in your org's dashboard.
+2. Pick your environment host:
+   | Environment | `DB90_HOST` value |
+   |---|---|
+   | Local (Vite proxy)   | `http://localhost:5173` |
+   | Local (direct Rails) | `http://localhost:3000` |
+   | Staging              | `https://insights.example.com` |
+   | Production           | `https://app.db90.io` |
+3. Run once:
+   ```bash
+   export DB90_TOKEN=<your-token>
+   export DB90_HOST=<environment-url>
+   npx @db90/cursor --dry-run --verbose   # preview what would be sent
+   npx @db90/cursor                        # real send
+   ```
+4. (Recommended) Schedule via cron or launchd (see [Scheduling](#scheduling)). Cursor has no long-lived watch mode; run on a timer.
+
+### If you are a Rails Admin (issue tokens to developers)
+
+1. Verify the developer's user exists in your org (**Settings → Members**).
+2. Have them go to **Settings → Integrations → Cursor → Connect**, which generates a `UserToolAccount`-scoped ingest token tied to their user. They copy the token from the modal (shown once — not recoverable).
+3. To **revoke**: **Settings → Integrations** → find the tool account → **Deactivate**. The CLI starts returning 401 within seconds.
+4. To **see who is ingesting**: **Settings → Integrations** lists every active `UserToolAccount` for your org with last-used timestamps.
+5. Events auto-attribute to a project when the CLI is run inside a git repo whose `origin` remote matches any project's `git_remote_url`. Configure at **Settings → Projects**. See [Project Attribution](#project-attribution).
+
+### If you are a Platform Owner (manage npm + release infra)
+
+Out of scope for this README. See `CLAUDE.md` → "Release secrets" in the repo for `NPM_TOKEN` rotation policy and named owners, and `packages/tools/RELEASING.md` for the release runbook.
+
 ## Or install once with the MCP server
 
 Prefer a "set and forget" experience? Install [`@db90/mcp`](https://www.npmjs.com/package/@db90/mcp) instead — it auto-forwards usage telemetry from every Claude Code and Cursor session, no cron / launchd needed:
