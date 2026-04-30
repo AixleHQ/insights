@@ -18,6 +18,10 @@ FactoryBot.define do
       connector_type { 'jira' }
     end
 
+    trait :linear do
+      connector_type { 'linear' }
+    end
+
     trait :anthropic do
       connector_type { 'anthropic' }
       access_token { 'sk-ant-admin-test-key' }

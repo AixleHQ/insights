@@ -35,6 +35,18 @@ class ProjectFullSerializer < ProjectSerializer
     project.project_settings.to_a.find { |s| s.key == "jira_connector_id" }&.value
   end
 
+  attribute :linear_project_id do |project|
+    project.project_settings.to_a.find { |s| s.key == "linear_project_id" }&.value
+  end
+
+  attribute :linear_project_name do |project|
+    project.project_settings.to_a.find { |s| s.key == "linear_project_name" }&.value
+  end
+
+  attribute :linear_connector_id do |project|
+    project.project_settings.to_a.find { |s| s.key == "linear_connector_id" }&.value
+  end
+
   attribute :source_control_summary do |project|
     ProjectFullSerializer.build_source_control_summary(project)
   end
@@ -88,5 +100,47 @@ class ProjectFullSerializer < ProjectSerializer
         "lastSyncAt" => repositories.map(&:last_sync_at).compact.max&.iso8601
       }
     end
+  end
+
+  attribute :issue_throughput_summary do |project|
+    next [] unless project.organization
+
+    member_ids = project.members.pluck(:id)
+    next [] if member_ids.empty?
+
+    events = project.organization.tool_events
+                    .where(tool_name: "linear", user_id: member_ids)
+                    .where(event_type: %w[issue sprint])
+                    .order(occurred_at: :desc)
+                    .to_a
+
+    next [] if events.empty?
+
+    issue_events = events.select { |event| event.event_type == "issue" }
+    sprint_events = events.select { |event| event.event_type == "sprint" }
+
+    latest_issue_snapshots = issue_events.each_with_object({}) do |event, snapshots|
+      issue_id = event.metadata["issue_id"]
+      next if issue_id.blank?
+      next unless event.metadata["action"] == "synced"
+
+      snapshots[issue_id] ||= event
+    end
+
+    [
+      {
+        "provider" => "linear",
+        "issueCount" => latest_issue_snapshots.size,
+        "completedCount" => latest_issue_snapshots.values.count { |event| event.metadata["state_type"] == "completed" },
+        "stateChangeCount" => issue_events.count do |event|
+          event.metadata["action"] == "state_changed" ||
+            event.metadata["from_state_id"].present? ||
+            event.metadata["to_state_id"].present?
+        end,
+        "cycleCount" => sprint_events.map { |event| event.metadata["cycle_id"] }.compact.uniq.count,
+        "lastActivityAt" => events.max_by(&:occurred_at)&.occurred_at&.iso8601,
+        "lastSyncAt" => project.organization.organization_connectors.find_by(connector_type: "linear")&.last_sync_at&.iso8601
+      }
+    ]
   end
 end

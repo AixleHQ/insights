@@ -7,6 +7,7 @@ class ConnectorSyncService
     when "gitlab"    then GitlabSyncJob.perform_later(connector.id)
     when "bitbucket" then BitbucketSyncJob.perform_later(connector.id)
     when "jira"           then JiraSyncJob.perform_later(connector.id, "sync")
+    when "linear"         then LinearSyncJob.perform_later(connector.id, "sync")
     when "github_copilot" then GithubCopilotSyncJob.perform_later(connector.id)
     end
   end

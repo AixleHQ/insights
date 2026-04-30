@@ -34,6 +34,7 @@ import type {
   MemberRole,
   Issue,
   JiraProject,
+  IssueProviderProject,
   ToolOverviewStats,
   ToolModelsResponse,
   ToolUsersResponse,
@@ -1435,7 +1436,7 @@ export function useProjectAuditLogs(projectId: string, filters: AuditLogFilters 
 }
 
 // ============================================================================
-// Jira Issues Hooks
+// Issue Provider Hooks
 // ============================================================================
 
 export interface IssueFilters {
@@ -1477,9 +1478,22 @@ export function useAvailableJiraProjects(orgId: string, connectorId: string) {
   });
 }
 
+export function useAvailableLinearProjects(orgId: string, connectorId: string) {
+  return useQuery({
+    queryKey: queryKeys.connectors.availableProjects(orgId, connectorId),
+    queryFn: async () => {
+      const response = await api.get<{ data: IssueProviderProject[] }>(
+        `/organizations/${orgId}/connectors/${connectorId}/available_projects`
+      );
+      return response.data;
+    },
+    enabled: !!orgId && !!connectorId,
+  });
+}
+
 // POST /api/v1/projects/:projectId/sync_issues
 // Runs synchronously — only invalidate after the server confirms completion.
-export function useSyncJiraIssues(projectId: string) {
+export function useSyncProjectIssues(projectId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -1497,6 +1511,19 @@ export function useLinkJira(projectId: string) {
   return useMutation({
     mutationFn: (payload: { connector_id: string; jira_project_key: string }) =>
       api.post<{ data: { linked: boolean } }>(`/projects/${projectId}/link_jira`, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects.detail(projectId) });
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "issues"] });
+    },
+  });
+}
+
+export function useLinkLinear(projectId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: { connector_id: string; linear_project_id: string; linear_project_name: string }) =>
+      api.post<{ data: { linked: boolean } }>(`/projects/${projectId}/link_linear`, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projects.detail(projectId) });
       queryClient.invalidateQueries({ queryKey: ["projects", projectId, "issues"] });

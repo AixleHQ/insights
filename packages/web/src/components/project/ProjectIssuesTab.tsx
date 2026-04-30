@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Layers, Bug, BookOpen, CheckSquare, Zap, Circle, RefreshCw } from "lucide-react";
-import { useProjectIssues, useSyncJiraIssues } from "@/hooks/useApi";
+import { useProjectIssues, useSyncProjectIssues } from "@/hooks/useApi";
 import type { ProjectWithStats } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +20,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ConnectJiraSheet } from "./ConnectJiraSheet";
+import { ConnectLinearSheet } from "./ConnectLinearSheet";
 import { formatDistanceToNow } from "@/lib/utils";
 
 const STATUS_CATEGORY_LABELS: Record<string, string> = {
@@ -71,12 +72,15 @@ interface ProjectIssuesTabProps {
 
 export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) {
   const [connectJiraOpen, setConnectJiraOpen] = useState(false);
+  const [connectLinearOpen, setConnectLinearOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [typeFilter, setTypeFilter] = useState<string>("");
   const [assigneeFilter, setAssigneeFilter] = useState<string>("");
 
-  const isLinked = !!project.jiraProjectKey;
-  const syncJira = useSyncJiraIssues(projectId);
+  const linkedProvider = project.linearProjectId ? "linear" : project.jiraProjectKey ? "jira" : null;
+  const isLinked = !!linkedProvider;
+  const syncIssues = useSyncProjectIssues(projectId);
+  const linkedProjectLabel = project.linearProjectName || project.jiraProjectKey || undefined;
 
   const { data: issuesResponse, isLoading } = useProjectIssues(
     projectId,
@@ -109,14 +113,15 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
           <CardHeader>
             <div className="flex items-center gap-2">
               <Layers className="size-5 text-muted-foreground" />
-              <CardTitle className="text-base">Jira Issues</CardTitle>
+              <CardTitle className="text-base">Project Issues</CardTitle>
             </div>
             <CardDescription>
-              Connect a Jira project to track issues alongside your AI tool usage.
+              Connect a Jira or Linear project to track issues alongside your AI tool usage.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-wrap gap-2">
             <Button onClick={() => setConnectJiraOpen(true)}>Connect Jira Project</Button>
+            <Button variant="outline" onClick={() => setConnectLinearOpen(true)}>Connect Linear Project</Button>
           </CardContent>
         </Card>
 
@@ -125,6 +130,12 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
           open={connectJiraOpen}
           onOpenChange={setConnectJiraOpen}
           onSuccess={() => setConnectJiraOpen(false)}
+        />
+        <ConnectLinearSheet
+          projectId={projectId}
+          open={connectLinearOpen}
+          onOpenChange={setConnectLinearOpen}
+          onSuccess={() => setConnectLinearOpen(false)}
         />
       </>
     );
@@ -138,9 +149,9 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
             <div className="flex items-center gap-2">
               <Layers className="size-5 text-muted-foreground" />
               <CardTitle className="text-base">
-                Issues
+                {linkedProvider === "linear" ? "Linear Issues" : "Jira Issues"}
                 <span className="ml-2 text-sm font-normal text-muted-foreground">
-                  {project.jiraProjectKey}
+                  {linkedProjectLabel}
                 </span>
               </CardTitle>
             </div>
@@ -148,15 +159,21 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
               <Button
                 variant="outline"
                 size="sm"
-                disabled={syncJira.isPending}
-                onClick={() => syncJira.mutate()}
+                disabled={syncIssues.isPending}
+                onClick={() => syncIssues.mutate()}
               >
-                <RefreshCw className={`mr-1.5 size-3.5 ${syncJira.isPending ? "animate-spin" : ""}`} />
+                <RefreshCw className={`mr-1.5 size-3.5 ${syncIssues.isPending ? "animate-spin" : ""}`} />
                 Sync
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setConnectJiraOpen(true)}>
-                Change project
-              </Button>
+              {linkedProvider === "linear" ? (
+                <Button variant="outline" size="sm" onClick={() => setConnectLinearOpen(true)}>
+                  Change project
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" onClick={() => setConnectJiraOpen(true)}>
+                  Change project
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -271,6 +288,12 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
         open={connectJiraOpen}
         onOpenChange={setConnectJiraOpen}
         onSuccess={() => setConnectJiraOpen(false)}
+      />
+      <ConnectLinearSheet
+        projectId={projectId}
+        open={connectLinearOpen}
+        onOpenChange={setConnectLinearOpen}
+        onSuccess={() => setConnectLinearOpen(false)}
       />
     </>
   );

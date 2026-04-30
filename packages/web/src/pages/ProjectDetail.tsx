@@ -315,6 +315,57 @@ export function ProjectDetail() {
             </Card>
           )}
 
+          {(project.issueThroughputSummary?.length ?? 0) > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Issue Throughput</CardTitle>
+                <CardDescription>
+                  Recent synced issue lifecycle activity for project members
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3 md:grid-cols-2">
+                {project.issueThroughputSummary?.map((summary) => (
+                  <div key={summary.provider} className="rounded-lg border p-4">
+                    <div className="flex items-center gap-3">
+                      <ProviderLogo provider={summary.provider} size="sm" showBackground />
+                      <div>
+                        <p className="text-sm font-medium capitalize">{summary.provider}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Synced issue throughput
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-4 gap-2 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">Issues</p>
+                        <p className="font-medium">{summary.issueCount}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Completed</p>
+                        <p className="font-medium">{summary.completedCount}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">State Changes</p>
+                        <p className="font-medium">{summary.stateChangeCount}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Cycles</p>
+                        <p className="font-medium">{summary.cycleCount}</p>
+                      </div>
+                    </div>
+                    {(summary.lastActivityAt || summary.lastSyncAt) && (
+                      <p className="mt-3 text-xs text-muted-foreground">
+                        {summary.lastActivityAt ? `Latest activity ${formatDistanceToNow(summary.lastActivityAt)}` : null}
+                        {summary.lastActivityAt && summary.lastSyncAt ? " · " : ""}
+                        {summary.lastSyncAt ? `Synced ${formatDistanceToNow(summary.lastSyncAt)}` : null}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
           {project.repositoryUrl && (
             <Card>
               <CardContent className="flex items-center gap-3 p-4">

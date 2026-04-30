@@ -155,6 +155,7 @@ Rails.application.routes.draw do
           get :retention_policy
           patch :retention_policy, action: :update_retention_policy
           post :link_jira
+          post :link_linear
           post :sync_issues
         end
 

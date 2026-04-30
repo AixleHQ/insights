@@ -77,17 +77,62 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       expect(summary).not_to have_key(:pipeline_count)
     end
 
-    it 'counts pipeline events only for the matching SCM tool_name' do
-      connector = create(:organization_connector, organization: organization, connector_type: 'gitlab')
-      repository = create(:repository, organization_connector: connector, project: project)
-      create(:tool_event, organization: organization, project: project, repository: repository, tool_name: 'gitlab', event_type: 'other', metadata: { pipeline_id: '1' })
-      create(:tool_event, organization: organization, project: project, repository: repository, tool_name: 'custom', event_type: 'other', metadata: { pipeline_id: '2' })
+    it 'includes linear issue throughput summary for project members' do
+      connector = create(:organization_connector, :linear, organization: organization, last_sync_at: Time.zone.parse('2026-04-29T11:22:58Z'))
+      create(:project_membership, project: project, user: user, role: 'member')
+      create(
+        :tool_event,
+        organization: organization,
+        user: user,
+        tool_name: 'linear',
+        event_type: 'issue',
+        occurred_at: Time.zone.parse('2026-04-29T11:21:47Z'),
+        metadata: {
+          issue_id: 'issue-1',
+          issue_identifier: 'ENG-101',
+          state_type: 'completed',
+          action: 'synced'
+        }
+      )
+      create(
+        :tool_event,
+        organization: organization,
+        user: user,
+        tool_name: 'linear',
+        event_type: 'issue',
+        occurred_at: Time.zone.parse('2026-04-29T11:20:00Z'),
+        metadata: {
+          issue_id: 'issue-1',
+          action: 'state_changed',
+          from_state_id: 'state-0',
+          to_state_id: 'state-1'
+        }
+      )
+      create(
+        :tool_event,
+        organization: organization,
+        user: user,
+        tool_name: 'linear',
+        event_type: 'sprint',
+        occurred_at: Time.zone.parse('2026-04-29T11:19:00Z'),
+        metadata: {
+          cycle_id: 'cycle-1',
+          cycle_name: 'Sprint 42'
+        }
+      )
 
       authenticated_get "/api/v1/projects/#{project.id}", user: user
 
       expect_success
-      summary = json_data[:sourceControlSummary].find { |item| item[:provider] == 'gitlab' }
-      expect(summary[:pipelineCount]).to eq(1)
+      summary = json_data[:issueThroughputSummary].find { |item| item[:provider] == 'linear' }
+      expect(summary[:issueCount]).to eq(1)
+      expect(summary[:completedCount]).to eq(1)
+      expect(summary[:stateChangeCount]).to eq(1)
+      expect(summary[:cycleCount]).to eq(1)
+      expect(summary).not_to have_key(:issue_count)
+      expect(summary).not_to have_key(:completed_count)
+      expect(summary).not_to have_key(:state_change_count)
+      expect(summary).not_to have_key(:cycle_count)
     end
   end
 
@@ -550,6 +595,38 @@ RSpec.describe 'Api::V1::Projects', type: :request do
     end
   end
 
+  describe 'POST /api/v1/projects/:id/link_linear' do
+    let!(:project) { create(:project, organization: organization, owner: nil) }
+    let!(:project_membership) { create(:project_membership, project: project, user: user, role: 'admin') }
+    let!(:connector) { create(:organization_connector, :linear, organization: organization) }
+
+    it 'saves linear connector and project settings' do
+      authenticated_post "/api/v1/projects/#{project.id}/link_linear",
+                         user: user,
+                         params: { connector_id: connector.id, linear_project_id: 'project-1', linear_project_name: 'Platform' }
+
+      expect_success
+      expect(json_data[:linked]).to be true
+      expect(project.project_settings.find_by(key: 'linear_connector_id')&.value).to eq(connector.id.to_s)
+      expect(project.project_settings.find_by(key: 'linear_project_id')&.value).to eq('project-1')
+      expect(project.project_settings.find_by(key: 'linear_project_name')&.value).to eq('Platform')
+    end
+
+    it 'clears jira settings when switching providers' do
+      jira_connector = create(:organization_connector, :jira, organization: organization)
+      project.project_settings.create!(key: 'jira_connector_id', value: jira_connector.id.to_s)
+      project.project_settings.create!(key: 'jira_project_key', value: 'SCRUM')
+
+      authenticated_post "/api/v1/projects/#{project.id}/link_linear",
+                         user: user,
+                         params: { connector_id: connector.id, linear_project_id: 'project-1', linear_project_name: 'Platform' }
+
+      expect_success
+      expect(project.reload.project_settings.find_by(key: 'jira_connector_id')).to be_nil
+      expect(project.project_settings.find_by(key: 'jira_project_key')).to be_nil
+    end
+  end
+
   describe 'POST /api/v1/projects/:id/sync_issues' do
     let!(:project) { create(:project, organization: organization, owner: nil) }
     let!(:project_membership) { create(:project_membership, project: project, user: user, role: 'admin') }
@@ -581,6 +658,19 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       post "/api/v1/projects/#{project.id}/sync_issues"
 
       expect_unauthorized
+    end
+
+    it 'dispatches to LinearSyncJob when a Linear project is linked' do
+      linear_connector = create(:organization_connector, :linear, organization: organization)
+      project.project_settings.where(key: %w[jira_connector_id jira_project_key]).destroy_all
+      project.project_settings.create!(key: 'linear_connector_id', value: linear_connector.id.to_s)
+      project.project_settings.create!(key: 'linear_project_id', value: 'project-1')
+      allow(LinearSyncJob).to receive(:perform_now)
+
+      authenticated_post "/api/v1/projects/#{project.id}/sync_issues", user: user
+
+      expect_success
+      expect(LinearSyncJob).to have_received(:perform_now).with(linear_connector.id, 'sync', project_id: project.id)
     end
   end
 end

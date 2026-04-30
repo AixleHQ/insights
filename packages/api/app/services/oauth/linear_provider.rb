@@ -87,6 +87,120 @@ module Oauth
       end
     end
 
+    def fetch_cycles(team_id: nil)
+      filter = {}
+      filter[:team] = { id: { eq: team_id } } if team_id.present?
+
+      query = <<~GRAPHQL
+        query($filter: CycleFilter) {
+          cycles(filter: $filter) {
+            nodes {
+              id
+              number
+              name
+              startsAt
+              endsAt
+              team {
+                id
+                name
+                key
+              }
+            }
+          }
+        }
+      GRAPHQL
+
+      data = graphql_data(query, variables: { filter: filter.presence })
+      return [] unless data.dig("cycles", "nodes")
+
+      data["cycles"]["nodes"].map do |cycle|
+        {
+          external_id: cycle["id"],
+          number: cycle["number"],
+          name: cycle["name"],
+          starts_at: cycle["startsAt"],
+          ends_at: cycle["endsAt"],
+          team_id: cycle.dig("team", "id"),
+          team_name: cycle.dig("team", "name"),
+          team_key: cycle.dig("team", "key")
+        }
+      end
+    end
+
+    def fetch_issues(updated_after: nil, team_ids: [], project_ids: [])
+      filter = {}
+      filter[:updatedAt] = { gte: updated_after.iso8601 } if updated_after.present?
+      filter[:team] = { id: { in: Array(team_ids) } } if team_ids.present?
+      filter[:project] = { id: { in: Array(project_ids) } } if project_ids.present?
+
+      query = <<~GRAPHQL
+        query($first: Int!, $after: String, $filter: IssueFilter) {
+          issues(first: $first, after: $after, filter: $filter) {
+            nodes {
+              id
+              identifier
+              title
+              priority
+              createdAt
+              updatedAt
+              completedAt
+              canceledAt
+              state {
+                id
+                name
+                type
+              }
+              team {
+                id
+                name
+                key
+              }
+              project {
+                id
+                name
+              }
+              cycle {
+                id
+                name
+                number
+              }
+              assignee {
+                id
+                name
+                email
+              }
+              creator {
+                id
+                name
+                email
+              }
+            }
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
+          }
+        }
+      GRAPHQL
+
+      issues = []
+      cursor = nil
+
+      loop do
+        data = graphql_data(query, variables: { first: 50, after: cursor, filter: filter.presence })
+        issue_nodes = data.dig("issues", "nodes") || []
+        issues.concat(issue_nodes.map { |issue| map_issue(issue) })
+
+        page_info = data.dig("issues", "pageInfo") || {}
+        break unless page_info["hasNextPage"]
+
+        cursor = page_info["endCursor"]
+        break if cursor.blank?
+      end
+
+      issues
+    end
+
     class << self
       def client_id
         Rails.application.credentials.dig(:linear, :client_id) ||
@@ -131,6 +245,44 @@ module Oauth
     end
 
     private
+
+    def map_issue(issue)
+      {
+        external_id: issue["id"],
+        identifier: issue["identifier"],
+        title: issue["title"],
+        priority: issue["priority"],
+        created_at: issue["createdAt"],
+        updated_at: issue["updatedAt"],
+        completed_at: issue["completedAt"],
+        canceled_at: issue["canceledAt"],
+        state_id: issue.dig("state", "id"),
+        state_name: issue.dig("state", "name"),
+        state_type: issue.dig("state", "type"),
+        team_id: issue.dig("team", "id"),
+        team_name: issue.dig("team", "name"),
+        team_key: issue.dig("team", "key"),
+        project_id: issue.dig("project", "id"),
+        project_name: issue.dig("project", "name"),
+        cycle_id: issue.dig("cycle", "id"),
+        cycle_name: issue.dig("cycle", "name"),
+        cycle_number: issue.dig("cycle", "number"),
+        assignee_id: issue.dig("assignee", "id"),
+        assignee_name: issue.dig("assignee", "name"),
+        assignee_email: issue.dig("assignee", "email"),
+        creator_id: issue.dig("creator", "id"),
+        creator_name: issue.dig("creator", "name"),
+        creator_email: issue.dig("creator", "email")
+      }
+    end
+
+    def graphql_data(query, variables: {})
+      response = graphql_request(query, variables: variables.compact)
+      return {} unless response.success?
+
+      body = JSON.parse(response.body)
+      body["data"] || {}
+    end
 
     def graphql_request(query, variables: {})
       Faraday.post(GRAPHQL_URL) do |req|
