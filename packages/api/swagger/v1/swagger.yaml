@@ -2579,6 +2579,129 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /api/v1/organizations/{organization_id}/events/export:
+    get:
+      summary: Export events as CSV
+      description: >
+        Exports filtered events as a CSV file. Columns vary by role:
+        members receive base columns only; org admins add user_email;
+        global admins also add model and session_id.
+        If the result set exceeds 100,000 rows the export is queued as a
+        background job and a 202 response is returned with a Link header
+        pointing to the job status endpoint.
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+        - name: tool_name
+          in: query
+          schema:
+            type: string
+        - name: event_type
+          in: query
+          schema:
+            type: string
+        - name: risk_level
+          in: query
+          schema:
+            type: string
+            enum: [high, medium, low, none]
+        - name: project_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: user_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: model
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: CSV file download
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        '202':
+          description: Export queued — result set exceeds 100,000 rows
+          headers:
+            Link:
+              description: URL of the background job status endpoint
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_id:
+                    type: string
+                  message:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/event_export_jobs/{id}:
+    get:
+      summary: Get export job status
+      description: Returns the status of a background CSV export job.
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Job status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_id:
+                    type: string
+                  status:
+                    type: string
+                    enum: [pending, complete, failed, not_found]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/event_export_jobs/{id}/download:
+    get:
+      summary: Download completed export CSV
+      description: Streams the CSV for a completed export job. Returns 404 if not ready or expired.
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: CSV file download
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   # ============================================
   # AI GATEWAY
   # ============================================

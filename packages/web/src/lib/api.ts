@@ -167,6 +167,48 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Fetch a binary resource with authentication and trigger a browser download.
+ * Returns { queued: true, jobId } if the server responds 202 (large async export).
+ */
+export async function downloadBlob(
+  endpoint: string,
+  filename: string,
+  accept = "text/csv"
+): Promise<{ queued: boolean; jobId?: string }> {
+  const url = endpoint.startsWith("http") ? endpoint : `${DEFAULT_BASE_URL}${endpoint}`;
+  const token = await getAuthToken();
+  const requestHeaders: Record<string, string> = { Accept: accept };
+  if (token) requestHeaders["Authorization"] = `Bearer ${token}`;
+  if (currentOrgId) requestHeaders["X-Organization-ID"] = currentOrgId;
+
+  const response = await fetch(url, { method: "GET", headers: requestHeaders });
+
+  if (response.status === 202) {
+    const body = (await response.json()) as { job_id: string };
+    return { queued: true, jobId: body.job_id };
+  }
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new ApiError(
+      (data as { message?: string } | null)?.message ??
+        `Request failed with status ${response.status}`,
+      response.status,
+      data
+    );
+  }
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = objectUrl;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(objectUrl);
+  return { queued: false };
+}
+
 // Convenience methods
 export const api = {
   get: <T = unknown>(endpoint: string, options?: RequestOptions) =>

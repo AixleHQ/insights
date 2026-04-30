@@ -3,8 +3,12 @@
 module Api
   module V1
     class EventsController < BaseController
+      include ToolEventFilterable
+
       before_action :require_organization!
       before_action :set_event, only: %i[show audit_trail]
+
+      EXPORT_ROW_CAP = 100_000
 
       # GET /api/v1/organizations/:organization_id/events
       def index
@@ -69,6 +73,42 @@ module Api
         end
       end
 
+      # GET /api/v1/organizations/:organization_id/events/export
+      def export
+        authorize! current_organization, to: :show?
+
+        events = authorized_scope(current_organization.tool_events)
+        events = apply_filters(events)
+
+        # Role-based data scoping: members see only their own events
+        unless current_user.global_admin? || current_user.admin_of?(current_organization)
+          events = events.where(user_id: current_user.id)
+        end
+
+        events = events.includes(:user, :project).order(occurred_at: :desc)
+        total_count = events.count
+
+        if total_count > EXPORT_ROW_CAP
+          role = export_role
+          job_id = ToolEventExportJob.perform_async(
+            export_filter_params.to_h,
+            current_user.id,
+            current_organization.id,
+            role.to_s
+          )
+          response.set_header(
+            "Link",
+            "<#{api_v1_organization_event_export_job_url(current_organization, job_id)}>; rel=\"job_status\""
+          )
+          render json: { job_id: job_id, message: "Export queued" }, status: :accepted
+          return
+        end
+
+        # No respond_to — ActionController::API does not include MimeResponds
+        csv_data = ToolEventCsvExporter.generate(events.limit(EXPORT_ROW_CAP), export_role)
+        send_data csv_data, filename: export_filename, type: "text/csv", disposition: "attachment"
+      end
+
       private
 
       def set_event
@@ -77,24 +117,34 @@ module Api
                                      .find(params[:id])
       end
 
+      # Delegates to ToolEventFilterable using request params hash
       def apply_filters(scope)
-        scope = apply_time_filter(scope)
-        scope = scope.where(tool_name: params[:tool_name]) if params[:tool_name].present?
-        scope = scope.where(event_type: params[:event_type]) if params[:event_type].present?
-        scope = scope.where(user_id: params[:user_id]) if params[:user_id].present?
-        scope = scope.where(project_id: params[:project_id]) if params[:project_id].present?
-        scope = scope.where(model: params[:model]) if params[:model].present?
-        scope
+        apply_tool_event_filters(scope, params.to_unsafe_h)
       end
 
       def apply_time_filter(scope)
-        if params[:start_date].present?
-          scope = scope.where("occurred_at >= ?", Time.zone.parse(params[:start_date]))
+        apply_tool_event_time_filter(scope, params.to_unsafe_h)
+      end
+
+      def export_role
+        if current_user.global_admin?
+          :global_admin
+        elsif current_user.admin_of?(current_organization)
+          :org_admin
+        else
+          :member
         end
-        if params[:end_date].present?
-          scope = scope.where("occurred_at <= ?", Time.zone.parse(params[:end_date]))
-        end
-        scope
+      end
+
+      def export_filename
+        start_str = params[:start_date].presence || "all"
+        end_str   = params[:end_date].presence || Date.current.iso8601
+        "db90-events-#{start_str}-#{end_str}.csv"
+      end
+
+      def export_filter_params
+        params.permit(:tool_name, :event_type, :user_id, :project_id,
+                      :model, :start_date, :end_date, :risk_level)
       end
     end
   end

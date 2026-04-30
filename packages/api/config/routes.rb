@@ -85,9 +85,17 @@ Rails.application.routes.draw do
           collection do
             get :summary
             get :unattributed
+            get :export
           end
           member do
             get :audit_trail
+          end
+        end
+
+        # Async export job status (> 100k row exports)
+        resources :event_export_jobs, only: [ :show ] do
+          member do
+            get :download
           end
         end
 
