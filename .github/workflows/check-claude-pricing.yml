@@ -31,7 +31,7 @@ jobs:
           # These values are highly distinctive and unlikely to appear outside a
           # pricing table. If any are absent the rates have likely changed.
           # Keep this list in sync with DEFAULT_PRICING in
-          # packages/db90-claude/src/pricing.ts.
+          # packages/tools/db90-claude/src/pricing.ts.
           declare -A RATES=(
             ["Opus output (\$75/MTok)"]="75\.00"
             ["Opus/Haiku cache-write (\$18.75/MTok)"]="18\.75"
@@ -82,7 +82,7 @@ jobs:
         run: |
           gh issue create \
             --repo "${{ github.repository }}" \
-            --title "Claude pricing may have changed — update packages/db90-claude/src/pricing.ts" \
+            --title "Claude pricing may have changed — update packages/tools/db90-claude/src/pricing.ts" \
             --label "pricing" \
             --body "The weekly pricing monitor detected that one or more expected rate values are no longer present on the [Claude pricing page](https://platform.claude.com/docs/en/about-claude/pricing).
 
@@ -90,7 +90,7 @@ jobs:
           ${{ steps.check.outputs.missing }}
 
           **Action required:**
-          1. Open [packages/db90-claude/src/pricing.ts](https://github.com/${{ github.repository }}/blob/develop/packages/db90-claude/src/pricing.ts)
+          1. Open [packages/tools/db90-claude/src/pricing.ts](https://github.com/${{ github.repository }}/blob/develop/packages/tools/db90-claude/src/pricing.ts)
           2. Compare \`DEFAULT_PRICING\` entries against the current [Claude pricing page](https://platform.claude.com/docs/en/about-claude/pricing)
           3. Update any rates that have changed
           4. Bump the \`Rates last verified\` date at the top of the file
