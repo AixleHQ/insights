@@ -266,7 +266,7 @@ test.describe("Cursor Integration — Available tab", () => {
     await expect(
       dialog.getByRole("button", { name: /copy token/i }),
     ).toBeVisible();
-    await expect(dialog.getByText(/npx db90-cursor --token/)).toBeVisible();
+    await expect(dialog.getByText(/npx @db90\/cursor --token/)).toBeVisible();
 
     // Only Done button in footer (no Cancel)
     await expect(

@@ -1,0 +1,68 @@
+{
+  "name": "@db90/cursor",
+  "version": "0.1.0",
+  "description": "CLI tool that reads Cursor IDE telemetry and pushes usage events to db90",
+  "type": "module",
+  "bin": {
+    "db90-cursor": "./dist/cli.js"
+  },
+  "exports": {
+    ".": "./dist/cli.js",
+    "./sync": {
+      "import": "./dist/sync.js",
+      "types": "./dist/sync.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dualboot-partners/db90-rails.git",
+    "directory": "packages/tools/db90-cursor"
+  },
+  "homepage": "https://github.com/dualboot-partners/db90-rails/tree/develop/packages/tools/db90-cursor#readme",
+  "bugs": {
+    "url": "https://github.com/dualboot-partners/db90-rails/issues"
+  },
+  "keywords": [
+    "cursor",
+    "cursor-ide",
+    "ai-usage",
+    "analytics",
+    "ingest",
+    "db90",
+    "mcp"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "dev": "tsx src/cli.ts",
+    "prepublishOnly": "npm run build",
+    "prepack": "node ../scripts/stage-sdk-bundle.mjs"
+  },
+  "bundledDependencies": [
+    "@db90/sdk"
+  ],
+  "dependencies": {
+    "@db90/sdk": "*",
+    "better-sqlite3": "^12.9.0",
+    "glob": "^10.5.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.8",
+    "@types/node": "^24",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.2"
+  }
+}

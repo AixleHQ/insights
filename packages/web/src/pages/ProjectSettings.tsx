@@ -176,7 +176,7 @@ function ProjectGeneralSettingsForm({
               placeholder="git@github.com:org/repo.git"
             />
             <p className="text-xs text-muted-foreground">
-              Used by db90-claude and db90-cursor to auto-detect this project. Must match the output of{" "}
+              Used by the db90 Claude and Cursor CLIs to auto-detect this project. Must match the output of{" "}
               <code className="font-mono">git remote get-url origin</code> exactly.
             </p>
           </div>

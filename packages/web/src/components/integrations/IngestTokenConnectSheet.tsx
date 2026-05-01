@@ -99,7 +99,7 @@ function ClaudeCodeSetupInstructions({ token }: { token: string }) {
   }, []);
 
   const host = ingestHostUrl();
-  const npxCommand = `npx db90-claude --token ${token} --host ${host}`;
+  const npxCommand = `npx @db90/claude --token ${token} --host ${host}`;
   const settingsSnippet = buildClaudeCodeSettingsSnippet(token);
 
   const handleCopyNpx = async () => {
@@ -163,7 +163,7 @@ function SetupInstructions({ providerId, token }: { providerId: string; token: s
     <div className="space-y-2">
       <p className="text-sm font-medium">Run the db90 Cursor reporter</p>
       <pre className="text-xs bg-muted rounded p-3 overflow-x-auto">
-        {`npx db90-cursor --token ${token}`}
+        {`npx @db90/cursor --token ${token}`}
       </pre>
     </div>
   );

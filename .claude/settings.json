@@ -1,6 +1,6 @@
 {
   "model": "sonnet",
-  "advisorModel": "claude-opus-4-6",
+  "advisorModel": "claude-opus-4-7",
   "env": {
     "DB90_COACHING": "true"
   },
@@ -37,6 +37,10 @@
           {
             "type": "command",
             "command": "node --experimental-strip-types --no-warnings ${CLAUDE_PROJECT_DIR}/.claude/hooks/on-edit-lint.ts"
+          },
+          {
+            "type": "command",
+            "command": "node --experimental-strip-types --no-warnings ${CLAUDE_PROJECT_DIR}/.claude/hooks/on-plan-task-edit.ts"
           }
         ]
       }

@@ -1,0 +1,9 @@
+{
+  "private": true,
+  "workspaces": [
+    "db90-claude",
+    "db90-cursor",
+    "db90-mcp",
+    "db90-sdk"
+  ]
+}

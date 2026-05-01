@@ -2900,6 +2900,59 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /api/v1/integrations/mcp/exchange:
+    post:
+      summary: Exchange OIDC session for an MCP ingest token
+      description: |
+        Mints a fresh `UserToolAccount` ingest token for the authenticated user
+        and the requested tool, scoped to the user's primary organization
+        membership. Internal-only — restricted to `@example.com`
+        accounts. Called by `@db90/mcp` once after a successful Keycloak
+        device-flow login. The plaintext token is returned exactly once.
+      tags:
+        - Integrations
+      security:
+        - bearer_auth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tool_name:
+                  type: string
+                  enum: [claude_code, cursor]
+              required:
+                - tool_name
+      responses:
+        '201':
+          description: Ingest token minted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ingest_token:
+                    type: string
+                    description: Plaintext ingest token, returned exactly once
+                  host:
+                    type: string
+                    format: uri
+                  tool_name:
+                    type: string
+                    enum: [claude_code, cursor]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Forbidden — non-internal email or no DBP membership
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
 # ============================================
 # COMPONENTS
 # ============================================

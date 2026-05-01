@@ -1,0 +1,197 @@
+name: Release CLI to npm
+
+on:
+  push:
+    tags:
+      - 'cli-claude-v*'
+      - 'cli-cursor-v*'
+      # NOTE: cli-mcp-v* intentionally excluded.
+      # @db90/mcp ships a scaffold sync.ts (runClaudeSync/runCursorSync return
+      # empty results) per plans/npm-distribution-AIX-157/tasks/10-mcp-publish.md.
+      # Re-enable this tag prefix once Task 10 lands the real sync wiring.
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Package to publish'
+        required: true
+        type: choice
+        options:
+          - claude
+          - cursor
+          # mcp intentionally omitted — see tags note above. Add back with
+          # Task 10's publish PR.
+      version:
+        description: 'Version to publish (must equal package.json version; no leading v). Required.'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  resolve:
+    name: Resolve target package + version
+    runs-on: ubuntu-latest
+    outputs:
+      package: ${{ steps.target.outputs.package }}
+      working_directory: ${{ steps.target.outputs.working_directory }}
+      tag_version: ${{ steps.target.outputs.tag_version }}
+    steps:
+      - id: target
+        env:
+          REF: ${{ github.ref }}
+          INPUT_PACKAGE: ${{ github.event.inputs.package }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ "$REF" == refs/tags/cli-claude-v* ]]; then
+            echo "package=claude" >> "$GITHUB_OUTPUT"
+            echo "working_directory=packages/tools/db90-claude" >> "$GITHUB_OUTPUT"
+            echo "tag_version=${REF#refs/tags/cli-claude-v}" >> "$GITHUB_OUTPUT"
+          elif [[ "$REF" == refs/tags/cli-cursor-v* ]]; then
+            echo "package=cursor" >> "$GITHUB_OUTPUT"
+            echo "working_directory=packages/tools/db90-cursor" >> "$GITHUB_OUTPUT"
+            echo "tag_version=${REF#refs/tags/cli-cursor-v}" >> "$GITHUB_OUTPUT"
+          elif [[ -n "$INPUT_PACKAGE" ]]; then
+            # workflow_dispatch: require an explicit version input so the
+            # package.json-version check below always runs. An empty version
+            # here would bypass the guard and allow publishing any version.
+            if [[ -z "$INPUT_VERSION" ]]; then
+              echo "workflow_dispatch requires a 'version' input." >&2
+              exit 1
+            fi
+            echo "package=$INPUT_PACKAGE" >> "$GITHUB_OUTPUT"
+            echo "working_directory=packages/tools/db90-$INPUT_PACKAGE" >> "$GITHUB_OUTPUT"
+            echo "tag_version=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
+          else
+            echo "Could not resolve target package from ref=$REF / input=$INPUT_PACKAGE" >&2
+            exit 1
+          fi
+
+  publish:
+    name: Publish ${{ needs.resolve.outputs.package }} to npm
+    needs: resolve
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: packages/tools/package-lock.json
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Verify version matches package.json
+        env:
+          TAG_VERSION: ${{ needs.resolve.outputs.tag_version }}
+          WORKING_DIRECTORY: ${{ needs.resolve.outputs.working_directory }}
+        run: |
+          set -euo pipefail
+          # Both tag push and workflow_dispatch populate tag_version via the
+          # resolve job, so this guard runs for every publish path. No bypass.
+          PKG_VERSION=$(node -p "require('./${WORKING_DIRECTORY}/package.json').version")
+          if [[ "$PKG_VERSION" != "$TAG_VERSION" ]]; then
+            echo "Version mismatch: requested $TAG_VERSION, package.json has $PKG_VERSION" >&2
+            exit 1
+          fi
+
+      - name: "Reject obsolete-scope placeholders in package source"
+        env:
+          WORKING_DIRECTORY: ${{ needs.resolve.outputs.working_directory }}
+        run: |
+          set -euo pipefail
+          # Reject both the original `@<scope>` placeholder (forward-looking trap
+          # for new packages that copy the convention without filling in the
+          # scope) and the historical `@aixle/` scope (reverted to `@db90/` on
+          # 2026-04-29). Catches stragglers that escaped the mass-rename.
+          for needle in '@<scope>' '@aixle/'; do
+            # Use -F (fixed-string) so needles are matched literally and never
+            # interpreted as regex — future-proofs against needles that happen
+            # to contain regex metacharacters.
+            if grep -Frn --binary-files=without-match "$needle" "$WORKING_DIRECTORY"; then
+              echo "Found obsolete-scope reference: $needle — block publish." >&2
+              exit 1
+            fi
+          done
+
+      - name: "Reject file:/link: dependencies in package.json"
+        env:
+          WORKING_DIRECTORY: ${{ needs.resolve.outputs.working_directory }}
+        run: |
+          set -euo pipefail
+          node <<'EOF'
+          const pkg = require(`${process.env.WORKING_DIRECTORY}/package.json`);
+          const sections = ['dependencies', 'peerDependencies', 'optionalDependencies'];
+          const offenders = [];
+          for (const section of sections) {
+            for (const [name, spec] of Object.entries(pkg[section] ?? {})) {
+              if (typeof spec === 'string' && (spec.startsWith('file:') || spec.startsWith('link:'))) {
+                offenders.push(`${section}.${name} = ${spec}`);
+              }
+            }
+          }
+          if (offenders.length > 0) {
+            console.error('Local-only dependencies cannot be published:');
+            for (const o of offenders) console.error('  ' + o);
+            process.exit(1);
+          }
+          EOF
+
+      - name: Install workspace
+        run: npm ci
+        working-directory: packages/tools
+
+      - name: Build SDK
+        run: npm run build --workspace=@db90/sdk
+        working-directory: packages/tools
+
+      - name: Build
+        run: npm run build
+        working-directory: ${{ needs.resolve.outputs.working_directory }}
+
+      - name: Test
+        run: npm test
+        working-directory: ${{ needs.resolve.outputs.working_directory }}
+
+      - name: Verify pack contents (dist + README + LICENSE only)
+        working-directory: ${{ needs.resolve.outputs.working_directory }}
+        env:
+          PACKAGE: ${{ needs.resolve.outputs.package }}
+        run: |
+          set -euo pipefail
+          npm pack --dry-run --json > /tmp/pack.json
+          node <<'EOF'
+          const out = require('/tmp/pack.json');
+          const allow = new Set(['README.md', 'LICENSE', 'package.json']);
+          const paths = out[0].files.map((f) => f.path);
+          const leaks = paths.filter(
+            (p) => !allow.has(p) && !p.startsWith('dist/') && !p.startsWith('node_modules/@db90/sdk/'),
+          );
+          if (leaks.length > 0) {
+            console.error("Tarball contains files outside the allowlist (dist/**, node_modules/@db90/sdk/**, README.md, LICENSE, package.json):");
+            for (const p of leaks) console.error('  ' + p);
+            console.error("Fix the 'files' field in package.json.");
+            process.exit(1);
+          }
+          // Fail-closed: claude/cursor declare @db90/sdk in bundledDependencies
+          // and the SDK is private (not on npm). If the staged SDK is missing
+          // from the tarball, end-users would hit "no matching version" on install.
+          const pkg = process.env.PACKAGE;
+          if (pkg === 'claude' || pkg === 'cursor') {
+            const hasSdkDist = paths.some((p) => p.startsWith('node_modules/@db90/sdk/dist/'));
+            if (!hasSdkDist) {
+              console.error("BLOCKER: tarball is missing node_modules/@db90/sdk/dist/** — the prepack staging step did not run or failed silently.");
+              console.error("Without bundled SDK, end-user 'npm install @db90/" + pkg + "' resolves @db90/sdk@* against npm registry and fails (SDK is private).");
+              process.exit(1);
+            }
+          }
+          EOF
+
+      - name: Publish to npm
+        working-directory: ${{ needs.resolve.outputs.working_directory }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish

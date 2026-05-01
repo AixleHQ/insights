@@ -168,16 +168,16 @@ test-web:
 	docker compose exec web npm run test:run
 
 test-cursor:
-	cd packages/db90-cursor && npm test
+	cd packages/tools/db90-cursor && npm test
 
 test-claude:
-	cd packages/db90-claude && npm test
+	cd packages/tools/db90-claude && npm test
 
 build-cursor:
-	cd packages/db90-cursor && npm run build
+	cd packages/tools/db90-cursor && npm run build
 
 build-claude:
-	cd packages/db90-claude && npm run build
+	cd packages/tools/db90-claude && npm run build
 
 # ============================================================================
 # Linting
