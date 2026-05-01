@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/popover";
 import { cn, humanizeToolName } from "@/lib/utils";
 import type { EventsToolFilterOption } from "@/lib/eventsToolFilters";
+import type { ProjectWithStats } from "@/lib/types";
 
 export interface EventFiltersState {
   search?: string;
@@ -24,12 +25,16 @@ export interface EventFiltersState {
   eventType?: string;
   dateFrom?: string;
   dateTo?: string;
+  /** API `project_id` (organization project UUID). */
+  projectId?: string;
 }
 
 interface EventFiltersProps {
   filters: EventFiltersState;
   onFiltersChange: (filters: EventFiltersState) => void;
   tools: readonly EventsToolFilterOption[];
+  /** When provided, shows a project filter wired to `project_id` on the API. */
+  projects?: ProjectWithStats[];
   className?: string;
 }
 
@@ -166,6 +171,7 @@ export function EventFilters({
   filters,
   onFiltersChange,
   tools,
+  projects,
   className,
 }: EventFiltersProps) {
   const updateFilter = (key: keyof EventFiltersState, value: string | undefined) => {
@@ -212,6 +218,14 @@ export function EventFilters({
       key: "dateTo",
       label: "To",
       value: new Date(filters.dateTo).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+    });
+  }
+  if (filters.projectId && projects?.length) {
+    const proj = projects.find((p) => p.id === filters.projectId);
+    activeFilters.push({
+      key: "projectId",
+      label: "Project",
+      value: proj?.name ?? filters.projectId,
     });
   }
 
@@ -309,6 +323,31 @@ export function EventFilters({
               ))}
             </SelectContent>
           </Select>
+
+          {/* Project filter (server-side project_id — matches export + list API) */}
+          {projects && projects.length > 0 && (
+            <Select
+              value={filters.projectId || "all"}
+              onValueChange={(value) => updateFilter("projectId", value)}
+            >
+              <SelectTrigger
+                className={cn(
+                  "h-9 sm:h-8 w-full min-w-[140px] sm:w-[180px] gap-1 border-dashed text-sm font-normal",
+                  filters.projectId && "border-solid border-primary/50 bg-primary/5"
+                )}
+              >
+                <SelectValue placeholder="Project" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All projects</SelectItem>
+                {projects.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
 
           {/* Date range picker */}
           <DateRangePicker

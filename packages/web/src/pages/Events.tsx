@@ -1,8 +1,8 @@
 import { useState, useMemo, useCallback } from "react";
-import { Download, RefreshCw } from "lucide-react";
+import { Download, Loader2, RefreshCw } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useOrg } from "@/contexts/OrgContext";
-import { useEvents, queryKeys } from "@/hooks/useApi";
+import { useEvents, useExportEvents, useProjects, queryKeys } from "@/hooks/useApi";
 import { useEventsPageUpdates } from "@/hooks/useWebSocket";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,8 +34,12 @@ export function Events() {
   const [page, setPage] = useState(1);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [exportQueued, setExportQueued] = useState(false);
+  const [exportError, setExportError] = useState(false);
 
-  // Build API params from filters
+  const { data: orgProjects } = useProjects(currentOrg?.id || "");
+
+  // Build API params from filters (keep in sync with handleExport)
   const apiParams = useMemo(() => ({
     page,
     per_page: 25,
@@ -44,12 +48,15 @@ export function Events() {
     event_type: filters.eventType,
     start_date: filters.dateFrom,
     end_date: filters.dateTo,
+    project_id: filters.projectId,
   }), [page, filters]);
 
   const { data: eventsResponse, isLoading, isFetching } = useEvents(
     currentOrg?.id || "",
     apiParams
   );
+
+  const { exportEvents, isExporting } = useExportEvents(currentOrg?.id || "");
 
   const invalidateOrgEvents = useCallback(() => {
     if (!currentOrg?.id) return;
@@ -126,29 +133,31 @@ export function Events() {
     return result;
   }, [events, filters.search, sortField, sortDirection]);
 
-  const handleExport = () => {
-    // Convert to CSV
-    const headers = ["ID", "Tool", "Event Type", "Risk Level", "Cost (USD)", "Tokens", "User", "Project", "Created At"];
-    const rows = filteredAndSortedEvents.map((e) => [
-      e.id,
-      e.tool_name,
-      e.event_type,
-      e.risk_level,
-      e.cost_usd != null ? Number(e.cost_usd).toFixed(4) : "0",
-      e.token_count || "0",
-      e.user?.email || "",
-      e.project?.name || "",
-      e.created_at,
-    ]);
+  const handleExport = async () => {
+    setExportQueued(false);
+    setExportError(false);
+    const startStr = filters.dateFrom ?? "all";
+    const endStr = filters.dateTo ?? new Date().toISOString().split("T")[0];
+    const filename = `db90-events-${startStr}-${endStr}.csv`;
 
-    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `events-${new Date().toISOString().split("T")[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      const result = await exportEvents({
+        tool_name: filters.tool,
+        risk_level: filters.riskLevel,
+        event_type: filters.eventType,
+        start_date: filters.dateFrom,
+        end_date: filters.dateTo,
+        project_id: filters.projectId,
+        filename,
+      });
+
+      if (result?.queued) {
+        setExportQueued(true);
+      }
+    } catch (err) {
+      console.error("Export failed:", err);
+      setExportError(true);
+    }
   };
 
   const handleRefresh = () => {
@@ -192,9 +201,13 @@ export function Events() {
             <RefreshCw className={`mr-2 size-4 ${isFetching ? "animate-spin" : ""}`} />
             <span className="hidden sm:inline">Refresh</span>
           </Button>
-          <Button variant="outline" size="sm" onClick={handleExport}>
-            <Download className="mr-2 size-4" />
-            <span className="hidden sm:inline">Export</span>
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={isExporting}>
+            {isExporting ? (
+              <Loader2 className="mr-2 size-4 animate-spin" />
+            ) : (
+              <Download className="mr-2 size-4" />
+            )}
+            <span className="hidden sm:inline">{isExporting ? "Exporting…" : "Export"}</span>
           </Button>
         </div>
       </div>
@@ -206,6 +219,7 @@ export function Events() {
           setPage(1); // Reset to first page on filter change
         }}
         tools={EVENTS_TOOL_FILTER_OPTIONS}
+        projects={orgProjects}
       />
 
       <EventsTable
@@ -226,6 +240,17 @@ export function Events() {
         hasPrev={selectedEventIndex > 0}
         hasNext={selectedEventIndex < filteredAndSortedEvents.length - 1}
       />
+
+      {exportQueued && (
+        <p className="text-sm text-muted-foreground">
+          Your export is too large to download immediately. It has been queued — check back shortly.
+        </p>
+      )}
+      {exportError && (
+        <p className="text-sm text-destructive">
+          Export failed. Please try again.
+        </p>
+      )}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm text-muted-foreground">
         <p>

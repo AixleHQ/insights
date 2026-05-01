@@ -190,4 +190,199 @@ RSpec.describe 'Api::V1::Events', type: :request do
       expect(json_data).to be_nil
     end
   end
+
+  describe 'GET /api/v1/organizations/:organization_id/events/export' do
+    let(:other_user) { create(:user) }
+    let!(:own_event) do
+      create(:tool_event,
+             organization: organization,
+             user: user,
+             tool_name: "claude_code",
+             cost_usd: 0.005,
+             occurred_at: 1.hour.ago)
+    end
+    let!(:other_event) do
+      create(:tool_event,
+             organization: organization,
+             user: other_user,
+             tool_name: "cursor",
+             cost_usd: 0.005,
+             occurred_at: 2.hours.ago)
+    end
+
+    def export_path(params = {})
+      "/api/v1/organizations/#{organization.id}/events/export"
+    end
+
+    # Column header row (after optional "Applied filters" preamble rows).
+    def csv_table_header_line(body)
+      body.each_line.map(&:chomp).find { |line| line.start_with?("occurred_at") }
+    end
+
+    context "as a member" do
+      it "returns a CSV response" do
+        authenticated_get export_path, user: user, organization: organization
+
+        expect(response).to have_http_status(:ok)
+        expect(response.content_type).to include("text/csv")
+      end
+
+      it "includes only the requesting user's events" do
+        authenticated_get export_path, user: user, organization: organization
+
+        expect(response.body).to include("claude_code")
+        expect(response.body).not_to include("cursor")
+      end
+
+      it "does not include user_email in the header row" do
+        authenticated_get export_path, user: user, organization: organization
+
+        header_row = csv_table_header_line(response.body)
+        expect(header_row).not_to include("user_email")
+      end
+
+      it "sets Content-Disposition: attachment" do
+        authenticated_get export_path, user: user, organization: organization
+
+        expect(response.headers["Content-Disposition"]).to include("attachment")
+      end
+
+      it "uses the date range in the filename when start_date and end_date are provided" do
+        authenticated_get export_path, user: user, organization: organization,
+                          params: { start_date: "2026-01-01", end_date: "2026-04-30" }
+
+        expect(response.headers["Content-Disposition"]).to include("db90-events-2026-01-01-2026-04-30.csv")
+      end
+    end
+
+    context "as an admin" do
+      before { membership.update!(role: "admin") }
+      after  { membership.update!(role: "member") }
+
+      it "returns all org events" do
+        authenticated_get export_path, user: user, organization: organization
+
+        expect(response.body).to include("claude_code")
+        expect(response.body).to include("cursor")
+      end
+
+      it "includes user_email in the header row" do
+        authenticated_get export_path, user: user, organization: organization
+
+        header_row = csv_table_header_line(response.body)
+        expect(header_row).to include("user_email")
+      end
+
+      it "does not include model or session_id columns" do
+        authenticated_get export_path, user: user, organization: organization
+
+        header_row = csv_table_header_line(response.body)
+        expect(header_row).not_to include("model")
+        expect(header_row).not_to include("session_id")
+      end
+    end
+
+    context "filter params" do
+      it "includes Applied filters preamble rows when query params are present" do
+        authenticated_get export_path, user: user, organization: organization,
+                          params: { tool_name: "claude_code", risk_level: "high" }
+
+        lines = response.body.each_line.map(&:chomp).reject(&:empty?)
+        title_idx = lines.index("Applied filters")
+        expect(title_idx).to be_present
+        expect(lines[title_idx + 1]).to eq("Tool: claude_code")
+        expect(lines[title_idx + 2]).to eq("Risk level: high")
+        expect(csv_table_header_line(response.body)).to start_with("occurred_at")
+      end
+
+      it "respects tool_name filter" do
+        authenticated_get export_path, user: user, organization: organization,
+                          params: { tool_name: "claude_code" }
+
+        expect(response.body).to     include("claude_code")
+        expect(response.body).not_to include("cursor")
+      end
+
+      it "respects risk_level filter (high = cost_usd > 1.0)" do
+        high_event = create(:tool_event,
+                            organization: organization,
+                            user: user,
+                            tool_name: "windsurf",
+                            cost_usd: 5.0,
+                            occurred_at: 30.minutes.ago)
+
+        authenticated_get export_path, user: user, organization: organization,
+                          params: { risk_level: "high" }
+
+        expect(response.body).to     include("windsurf")
+        expect(response.body).not_to include("claude_code")
+      end
+
+      it "respects risk_level filter (critical uses the same bucket as high)" do
+        create(:tool_event,
+               organization: organization,
+               user: user,
+               tool_name: "windsurf",
+               cost_usd: 5.0,
+               occurred_at: 30.minutes.ago)
+
+        authenticated_get export_path, user: user, organization: organization,
+                          params: { risk_level: "critical" }
+
+        expect(response.body).to     include("windsurf")
+        expect(response.body).not_to include("claude_code")
+      end
+
+      it "respects date range filter" do
+        old_event = create(:tool_event,
+                           organization: organization,
+                           user: user,
+                           tool_name: "github_copilot",
+                           occurred_at: 10.days.ago)
+
+        authenticated_get export_path, user: user, organization: organization,
+                          params: { start_date: 3.days.ago.iso8601 }
+
+        expect(response.body).to     include("claude_code")
+        expect(response.body).not_to include("github_copilot")
+      end
+
+      it "includes events through the end calendar day of end_date" do
+        day = Time.zone.today
+        create(:tool_event,
+               organization: organization,
+               user: user,
+               tool_name: "cursor",
+               cost_usd: 0.005,
+               occurred_at: day.beginning_of_day + 23.hours)
+
+        authenticated_get export_path, user: user, organization: organization,
+                          params: {
+                            start_date: (day - 1.day).to_date.iso8601,
+                            end_date: day.to_date.iso8601
+                          }
+
+        expect(response.body).to include("cursor")
+      end
+    end
+
+    it "returns 403 for non-members" do
+      non_member = create(:user)
+
+      authenticated_get export_path, user: non_member, organization: organization
+
+      expect_forbidden
+    end
+
+    it "returns 202 and a job_id when the result set exceeds 100k rows" do
+      allow_any_instance_of(ActiveRecord::Relation).to receive(:count).and_return(100_001)
+      allow(ToolEventExportJob).to receive(:perform_async).and_return("fake-job-id")
+
+      authenticated_get export_path, user: user, organization: organization
+
+      expect(response).to have_http_status(:accepted)
+      expect(json_response[:job_id]).to eq("fake-job-id")
+      expect(response.headers["Link"]).to include("fake-job-id")
+    end
+  end
 end

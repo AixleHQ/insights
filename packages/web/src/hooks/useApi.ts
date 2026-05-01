@@ -6,7 +6,8 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { useState, useCallback } from "react";
+import { api, downloadBlob } from "@/lib/api";
 import type {
   CurrentUser,
   Organization,
@@ -1094,6 +1095,34 @@ export function useEvent(orgId: string, id: string) {
     },
     enabled: !!orgId && !!id,
   });
+}
+
+export function useExportEvents(orgId: string) {
+  const [isExporting, setIsExporting] = useState(false);
+
+  const exportEvents = useCallback(
+    async (params: EventsParams & { filename: string }) => {
+      if (!orgId) return;
+      setIsExporting(true);
+      try {
+        const { filename, ...filterParams } = params;
+        const searchParams = new URLSearchParams();
+        Object.entries(filterParams).forEach(([k, v]) => {
+          if (v !== undefined && v !== null && v !== "") {
+            searchParams.append(k, String(v));
+          }
+        });
+        const query = searchParams.toString();
+        const endpoint = `/organizations/${orgId}/events/export${query ? `?${query}` : ""}`;
+        return await downloadBlob(endpoint, filename, "text/csv", orgId);
+      } finally {
+        setIsExporting(false);
+      }
+    },
+    [orgId]
+  );
+
+  return { exportEvents, isExporting };
 }
 
 export function useEventAuditTrail(orgId: string, id: string) {
