@@ -4,7 +4,7 @@ All notable changes to `@db90/claude` will be documented in this file.
 
 ## Unreleased
 
-## 0.1.0 — TBD
+## 0.1.0 — 2026-05-01
 
 - First public release on npm as `@db90/claude`.
 - On-disk command name remains `db90-claude` to preserve existing scripts and aliases.

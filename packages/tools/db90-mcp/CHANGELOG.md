@@ -4,7 +4,7 @@ All notable changes to `@db90/mcp` will be documented in this file.
 
 ## Unreleased
 
-## 0.1.0 — TBD
+## 0.1.0 — 2026-05-01
 
 - First public release on npm as `@db90/mcp`.
 - One-time installer: `npx -y @db90/mcp init` writes the MCP entry to `~/.claude.json`, ensures `~/.db90-mcp/config.json` exists, and runs the Keycloak device flow if the user isn't already authenticated.

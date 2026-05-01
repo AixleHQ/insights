@@ -4,7 +4,7 @@ All notable changes to `@db90/cursor` will be documented in this file.
 
 ## Unreleased
 
-## 0.1.0 — TBD
+## 0.1.0 — 2026-05-01
 
 - First public release on npm as `@db90/cursor`.
 - On-disk command name remains `db90-cursor` to preserve existing scripts and aliases.

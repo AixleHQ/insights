@@ -1,6 +1,6 @@
 {
   "model": "sonnet",
-  "advisorModel": "claude-opus-4-6",
+  "advisorModel": "claude-opus-4-7",
   "env": {
     "DB90_COACHING": "true"
   },
