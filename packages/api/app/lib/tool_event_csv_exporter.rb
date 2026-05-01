@@ -52,7 +52,7 @@ module ToolEventCsvExporter
 
     return nil if lines.empty?
 
-    ["Applied filters", *lines]
+    [ "Applied filters", *lines ]
   end
 
   # @param filter_summary_lines [Array<String>, nil] optional preamble before column headers (see {#filter_summary_lines_for_export})
@@ -67,7 +67,7 @@ module ToolEventCsvExporter
     require "csv"
     CSV.generate(headers: true) do |csv|
       if filter_summary_lines.present?
-        filter_summary_lines.each { |line| csv << [line] }
+        filter_summary_lines.each { |line| csv << [ line ] }
         csv << []
       end
       csv << headers
