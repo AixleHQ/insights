@@ -115,14 +115,14 @@ describe("mergePricing", () => {
 
   it("user override wins for an existing model's field", () => {
     const result = mergePricing(DEFAULT_PRICING, {
-      "claude-opus-4-6": {
+      "claude-opus-4-7": {
         input_per_mtok: 20.0,
         output_per_mtok: 80.0,
         cache_write_per_mtok: 25.0,
         cache_read_per_mtok: 2.0,
       },
     });
-    expect(result["claude-opus-4-6"]).toEqual({
+    expect(result["claude-opus-4-7"]).toEqual({
       input_per_mtok: 20.0,
       output_per_mtok: 80.0,
       cache_write_per_mtok: 25.0,

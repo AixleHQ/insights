@@ -256,7 +256,7 @@ You can update rates or add new model IDs without reinstalling by adding a `pric
     "token": "...",
     "host": "https://app.db90.io",
     "pricing": {
-      "claude-opus-4-6": { "input_per_mtok": 12.00 }
+      "claude-opus-4-7": { "input_per_mtok": 12.00 }
     }
   }
   ```

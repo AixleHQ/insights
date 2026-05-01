@@ -254,7 +254,7 @@ The executor/advisor pattern in this repo is implemented entirely within Claude 
 
 - **Executor agents** (Sonnet) do the work with hard-coded tripwires that force a reviewer call at decision points.
 - **Reviewer/auditor agents** act as the advisor — they return findings and pass/fail verdicts, not code.
-- **Model pairing**: executors use `claude-sonnet-4-6`; complex decisions escalate to `claude-opus-4-6` (or the latest stable Opus) via the Task tool.
+- **Model pairing**: executors use `claude-sonnet-4-6`; complex decisions escalate to `claude-opus-4-7` (or the latest stable Opus) via the Task tool.
 
 The timing block every executor follows: call reviewer/advisor **before** substantive work, **when stuck**, **when changing approach**, and **before declaring done**. Never silently switch when evidence conflicts — surface the conflict via another call.
 
