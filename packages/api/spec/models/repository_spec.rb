@@ -55,6 +55,16 @@ RSpec.describe Repository, type: :model do
         expect(Repository.recently_synced).not_to include(never)
       end
     end
+
+    describe '.linked' do
+      it 'returns only repositories with a project' do
+        linked = create(:repository)
+        orphan = create(:repository, project: nil)
+
+        expect(Repository.linked).to include(linked)
+        expect(Repository.linked).not_to include(orphan)
+      end
+    end
   end
 
   describe '#needs_sync?' do

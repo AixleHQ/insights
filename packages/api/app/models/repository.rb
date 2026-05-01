@@ -10,6 +10,7 @@ class Repository < ApplicationRecord
   scope :private_repos, -> { where(is_private: true) }
   scope :public_repos, -> { where(is_private: false) }
   scope :recently_synced, -> { where("last_sync_at > ?", 1.hour.ago) }
+  scope :linked, -> { where.not(project_id: nil) }
 
   def needs_sync?
     last_sync_at.nil? || last_sync_at < 1.hour.ago

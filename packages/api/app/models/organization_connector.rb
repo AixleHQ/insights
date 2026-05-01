@@ -62,9 +62,8 @@ class OrganizationConnector < ApplicationRecord
     update!(status: "disconnected", is_active: false)
   end
 
-  # Returns the tool_name used in ToolEvent for this connector, or nil if not applicable.
-  # Only AI provider connectors produce tool events (e.g. openrouter → openrouter_api).
-  # Source control and project management connectors do not generate tool events.
+  # Returns the tool_name used in ToolEvent for AI/Copilot billing sync, or nil otherwise.
+  # Project management events use +connector_type+ as +tool_name+ (+jira+, +linear+); see +synced_event_scope+.
   def tool_event_name
     return "github_copilot" if copilot?
     "#{connector_type}_api" if ai_provider?
@@ -73,6 +72,8 @@ class OrganizationConnector < ApplicationRecord
   def synced_event_scope
     if source_control?
       organization.tool_events.where(repository_id: repositories.select(:id))
+    elsif project_management?
+      organization.tool_events.by_tool(connector_type)
     elsif (name = tool_event_name)
       organization.tool_events.by_tool(name)
     else

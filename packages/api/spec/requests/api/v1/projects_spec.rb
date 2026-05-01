@@ -76,6 +76,19 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       expect(summary).not_to have_key(:review_count)
       expect(summary).not_to have_key(:pipeline_count)
     end
+
+    it 'counts pipeline events only for the matching SCM tool_name' do
+      connector = create(:organization_connector, organization: organization, connector_type: 'gitlab')
+      repository = create(:repository, organization_connector: connector, project: project)
+      create(:tool_event, organization: organization, project: project, repository: repository, tool_name: 'gitlab', event_type: 'other', metadata: { pipeline_id: '1' })
+      create(:tool_event, organization: organization, project: project, repository: repository, tool_name: 'custom', event_type: 'other', metadata: { pipeline_id: '2' })
+
+      authenticated_get "/api/v1/projects/#{project.id}", user: user
+
+      expect_success
+      summary = json_data[:sourceControlSummary].find { |item| item[:provider] == 'gitlab' }
+      expect(summary[:pipelineCount]).to eq(1)
+    end
   end
 
   describe 'POST /api/v1/projects' do

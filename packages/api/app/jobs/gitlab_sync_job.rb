@@ -12,9 +12,9 @@ class GitlabSyncJob < ApplicationJob
 
     case action
     when "sync"
-      sync_projects
-    when "refresh_token"
-      refresh_token
+      fanout = sync_projects
+      # When fan-out is active, mark_synced! is deferred to the last child job.
+      return if fanout
     when "webhook"
       process_webhook
     else
@@ -25,6 +25,8 @@ class GitlabSyncJob < ApplicationJob
     Rails.logger.info("[GitlabSyncJob] Completed #{action} for connector #{connector_id}")
   rescue ActiveRecord::RecordNotFound
     Rails.logger.error("[GitlabSyncJob] Connector #{connector_id} not found")
+  rescue Oauth::TokenRefreshError => e
+    Rails.logger.error("[GitlabSyncJob] Token refresh failed for connector #{connector_id}: #{e.message}")
   rescue StandardError => e
     Rails.logger.error("[GitlabSyncJob] Failed: #{e.message}")
     raise
@@ -32,15 +34,42 @@ class GitlabSyncJob < ApplicationJob
 
   private
 
+  # Returns true when fan-out mode is active (GITLAB_FANOUT=true env var).
+  # In fan-out mode, one GitlabRepositoryActivitySyncJob is enqueued per repo;
+  # mark_synced! is deferred to the last child via a counter on the connector.
   def sync_projects
     provider = Oauth::BaseProvider.for(@connector)
-    projects = provider.fetch_repositories
+    projects = provider.fetch_repositories(all_pages: true)
 
     projects.each do |project_data|
       sync_project(project_data)
     end
 
-    sync_recent_activity(provider)
+    if fanout_enabled?
+      enqueue_activity_jobs
+      return true
+    end
+
+    sync_recent_activity(@connector)
+    false
+  end
+
+  def fanout_enabled?
+    ENV["GITLAB_FANOUT"].to_s.downcase == "true"
+  end
+
+  # Sets the pending counter and enqueues one child job per repository.
+  # The counter is set atomically before any child starts so no race is possible.
+  def enqueue_activity_jobs
+    repo_ids = @connector.repositories.pluck(:id)
+    return if repo_ids.empty?
+
+    @connector.update_column(:pending_activity_jobs, repo_ids.size)
+    Rails.logger.info("[GitlabSyncJob] Fan-out: enqueuing #{repo_ids.size} activity jobs for connector #{@connector.id}")
+
+    repo_ids.each do |repo_id|
+      GitlabRepositoryActivitySyncJob.perform_later(@connector.id, repo_id)
+    end
   end
 
   def sync_project(project_data)
@@ -61,24 +90,48 @@ class GitlabSyncJob < ApplicationJob
     )
   end
 
-  def sync_recent_activity(provider)
-    @connector.repositories.find_each do |repository|
-      sync_commits(provider, repository)
-      sync_merge_requests(provider, repository)
-      sync_pipelines(provider, repository)
+  def sync_recent_activity(connector)
+    member_by_email = load_member_by_email
+
+    connector.repositories.find_each do |repository|
+      sync_repository_activity(repository, member_by_email)
       repository.mark_synced!
     end
   end
 
-  def refresh_token
-    provider = Oauth::BaseProvider.for(@connector)
-    token_data = provider.refresh_access_token
+  # Fetches commits, MRs, and pipelines for a single repository in parallel.
+  # Each fetch spawns its own GitlabProvider instance to avoid sharing the
+  # memoized Faraday connection across threads.
+  def sync_repository_activity(repository, member_by_email)
+    commits_future = Concurrent::Promises.future do
+      Oauth::GitlabProvider.new(@connector).fetch_commits(
+        repository.external_id,
+        ref_name: repository.default_branch,
+        since: SYNC_WINDOW.ago
+      )
+    end
 
-    @connector.update!(
-      access_token: token_data[:access_token],
-      refresh_token: token_data[:refresh_token],
-      token_expires_at: token_data[:expires_at]
-    )
+    mrs_future = Concurrent::Promises.future do
+      Oauth::GitlabProvider.new(@connector).fetch_merge_requests(
+        repository.external_id,
+        updated_after: SYNC_WINDOW.ago
+      )
+    end
+
+    pipelines_future = Concurrent::Promises.future do
+      Oauth::GitlabProvider.new(@connector).fetch_pipelines(
+        repository.external_id,
+        updated_after: SYNC_WINDOW.ago
+      )
+    end
+
+    commits   = commits_future.value!
+    mrs       = mrs_future.value!
+    pipelines = pipelines_future.value!
+
+    commits.each { |commit| create_commit_event(repository, commit, member_by_email) }
+    persist_merge_requests(repository, mrs)
+    persist_pipelines(repository, pipelines)
   end
 
   def process_webhook
@@ -114,7 +167,7 @@ class GitlabSyncJob < ApplicationJob
 
     mr = payload["object_attributes"]
 
-    upsert_event!(
+    ToolEvents::ConnectorUpsert.call(
       unique_key: "mr_iid",
       unique_value: mr["iid"],
       organization_id: @connector.organization_id,
@@ -141,7 +194,7 @@ class GitlabSyncJob < ApplicationJob
 
     pipeline = payload["object_attributes"]
 
-    upsert_event!(
+    ToolEvents::ConnectorUpsert.call(
       unique_key: "pipeline_id",
       unique_value: pipeline["id"],
       organization_id: @connector.organization_id,
@@ -173,7 +226,7 @@ class GitlabSyncJob < ApplicationJob
     author_email = commit.dig("author", "email")&.downcase
     user = member_by_email[author_email] if author_email
 
-    upsert_event!(
+    ToolEvents::ConnectorUpsert.call(
       unique_key: "sha",
       unique_value: commit["id"],
       organization_id: @connector.organization_id,
@@ -193,27 +246,9 @@ class GitlabSyncJob < ApplicationJob
     )
   end
 
-  def sync_commits(provider, repository)
-    commits = provider.fetch_commits(
-      repository.external_id,
-      ref_name: repository.default_branch,
-      since: SYNC_WINDOW.ago
-    )
-
-    return if commits.empty?
-
-    member_by_email = load_member_by_email
-    commits.each { |commit| create_commit_event(repository, commit, member_by_email) }
-  end
-
-  def sync_merge_requests(provider, repository)
-    merge_requests = provider.fetch_merge_requests(
-      repository.external_id,
-      updated_after: SYNC_WINDOW.ago
-    )
-
+  def persist_merge_requests(repository, merge_requests)
     merge_requests.each do |mr|
-      upsert_event!(
+      ToolEvents::ConnectorUpsert.call(
         unique_key: "mr_iid",
         unique_value: mr[:iid],
         organization_id: @connector.organization_id,
@@ -234,14 +269,9 @@ class GitlabSyncJob < ApplicationJob
     end
   end
 
-  def sync_pipelines(provider, repository)
-    pipelines = provider.fetch_pipelines(
-      repository.external_id,
-      updated_after: SYNC_WINDOW.ago
-    )
-
+  def persist_pipelines(repository, pipelines)
     pipelines.each do |pipeline|
-      upsert_event!(
+      ToolEvents::ConnectorUpsert.call(
         unique_key: "pipeline_id",
         unique_value: pipeline[:id],
         organization_id: @connector.organization_id,
@@ -260,25 +290,6 @@ class GitlabSyncJob < ApplicationJob
           url: pipeline[:web_url]
         }
       )
-    end
-  end
-
-  def upsert_event!(unique_key:, unique_value:, **attributes)
-    existing_event = ToolEvent
-      .where(
-        organization_id: attributes[:organization_id],
-        repository_id: attributes[:repository_id],
-        tool_name: attributes[:tool_name],
-        event_type: attributes[:event_type]
-      )
-      .where("metadata ->> ? = ?", unique_key.to_s, unique_value.to_s)
-      .order(occurred_at: :desc)
-      .first
-
-    if existing_event
-      existing_event.update!(attributes)
-    else
-      ToolEvent.create!(attributes)
     end
   end
 end

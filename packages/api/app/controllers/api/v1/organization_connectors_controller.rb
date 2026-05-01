@@ -152,7 +152,7 @@ module Api
           per_page: params.fetch(:per_page, 50).to_i
         )
 
-        linked_ids = @connector.repositories.where.not(project_id: nil).pluck(:external_id).to_set
+        linked_ids = @connector.repositories.linked.pluck(:external_id).to_set
         repos = repos.map do |r|
           r.merge(already_linked: linked_ids.include?(r[:external_id]))
            .transform_keys { |k| k.to_s.camelize(:lower) }

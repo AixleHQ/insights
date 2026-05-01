@@ -11,6 +11,7 @@ module ToolEvents
   # TimescaleDB constraint: UNIQUE indexes on hypertables must include the
   # partition column (occurred_at). Since occurred_at must not change after
   # creation, we enforce uniqueness here at the application layer instead.
+  # See also +ToolEvents::ConnectorUpsert+ for connector webhook dedupe by metadata keys.
   #
   # Race-condition safety: pg_advisory_xact_lock serialises concurrent requests
   # for the same session_id, eliminating the TOCTOU window in the naive
