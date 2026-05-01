@@ -214,6 +214,11 @@ RSpec.describe 'Api::V1::Events', type: :request do
       "/api/v1/organizations/#{organization.id}/events/export"
     end
 
+    # Column header row (after optional "Applied filters" preamble rows).
+    def csv_table_header_line(body)
+      body.each_line.map(&:chomp).find { |line| line.start_with?("occurred_at") }
+    end
+
     context "as a member" do
       it "returns a CSV response" do
         authenticated_get export_path, user: user, organization: organization
@@ -232,7 +237,7 @@ RSpec.describe 'Api::V1::Events', type: :request do
       it "does not include user_email in the header row" do
         authenticated_get export_path, user: user, organization: organization
 
-        header_row = response.body.lines.first
+        header_row = csv_table_header_line(response.body)
         expect(header_row).not_to include("user_email")
       end
 
@@ -264,20 +269,32 @@ RSpec.describe 'Api::V1::Events', type: :request do
       it "includes user_email in the header row" do
         authenticated_get export_path, user: user, organization: organization
 
-        header_row = response.body.lines.first
+        header_row = csv_table_header_line(response.body)
         expect(header_row).to include("user_email")
       end
 
       it "does not include model or session_id columns" do
         authenticated_get export_path, user: user, organization: organization
 
-        header_row = response.body.lines.first
+        header_row = csv_table_header_line(response.body)
         expect(header_row).not_to include("model")
         expect(header_row).not_to include("session_id")
       end
     end
 
     context "filter params" do
+      it "includes Applied filters preamble rows when query params are present" do
+        authenticated_get export_path, user: user, organization: organization,
+                          params: { tool_name: "claude_code", risk_level: "high" }
+
+        lines = response.body.each_line.map(&:chomp).reject(&:empty?)
+        title_idx = lines.index("Applied filters")
+        expect(title_idx).to be_present
+        expect(lines[title_idx + 1]).to eq("Tool: claude_code")
+        expect(lines[title_idx + 2]).to eq("Risk level: high")
+        expect(csv_table_header_line(response.body)).to start_with("occurred_at")
+      end
+
       it "respects tool_name filter" do
         authenticated_get export_path, user: user, organization: organization,
                           params: { tool_name: "claude_code" }

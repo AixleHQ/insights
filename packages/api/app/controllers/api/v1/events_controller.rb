@@ -105,7 +105,15 @@ module Api
         end
 
         # No respond_to — ActionController::API does not include MimeResponds
-        csv_data = ToolEventCsvExporter.generate(events.limit(EXPORT_ROW_CAP), export_role)
+        summary_lines = ToolEventCsvExporter.filter_summary_lines_for_export(
+          export_filter_params.to_h,
+          organization: current_organization
+        )
+        csv_data = ToolEventCsvExporter.generate(
+          events.limit(EXPORT_ROW_CAP),
+          export_role,
+          filter_summary_lines: summary_lines
+        )
         send_data csv_data, filename: export_filename, type: "text/csv", disposition: "attachment"
       end
 

@@ -30,7 +30,8 @@ class ToolEventExportJob
              .includes(:user, :project)
              .order(occurred_at: :desc)
 
-    csv = ToolEventCsvExporter.generate(events, role)
+    summary_lines = ToolEventCsvExporter.filter_summary_lines_for_export(fp, organization: org)
+    csv = ToolEventCsvExporter.generate(events, role, filter_summary_lines: summary_lines)
 
     REDIS.setex(data_key(user_id, org_id), JOB_TTL, csv)
     set_status(user_id, org_id, "complete")

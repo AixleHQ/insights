@@ -2583,7 +2583,9 @@ paths:
     get:
       summary: Export events as CSV
       description: >
-        Exports filtered events as a CSV file. Columns vary by role:
+        Exports filtered events as a CSV file. When any export query parameters
+        are present, the file begins with an "Applied filters" title row, then one
+        row per active filter, then a blank row, before the column headers. Columns vary by role:
         members receive base columns only; org admins add user_email;
         global admins also add model and session_id.
         If the result set exceeds 100,000 rows the export is queued as a
