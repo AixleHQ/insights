@@ -13,7 +13,7 @@ module Api
 
         # POST /api/v1/integrations/mcp/exchange
         def exchange
-          authorize! :mcp_exchange, to: :exchange?, with: ::Integrations::McpPolicy
+          authorize! current_user, to: :exchange?, with: ::Integrations::McpPolicy
 
           tool_name = params[:tool_name].to_s
           unless SUPPORTED_TOOLS.include?(tool_name)
@@ -24,13 +24,6 @@ module Api
           end
 
           membership = primary_membership
-          if membership.nil?
-            return render json: {
-              error: "Unprocessable Entity",
-              errors: { user: [ "has no organization membership" ] }
-            }, status: :unprocessable_entity
-          end
-
           tool_account = membership.user_tool_accounts.find_or_initialize_by(tool_name: tool_name)
           tool_account.is_active = true
 
