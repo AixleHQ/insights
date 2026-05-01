@@ -51,6 +51,11 @@ module Api
         # single Dualboot org; pick the oldest membership for stability across
         # repeat exchanges. When client-org support lands (deferred — Slack
         # 2026-04-27), this resolution will need an X-Organization-ID header.
+        #
+        # Safe to call without a nil-guard here because McpPolicy#exchange?
+        # checks organization_memberships.any? before the action body runs.
+        # AIX-164 will replace McpPolicy with UserToolAccountPolicy, which
+        # does NOT check membership existence — add a nil guard at that point.
         def primary_membership
           current_user.organization_memberships.order(:created_at).first
         end
