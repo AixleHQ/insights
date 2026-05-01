@@ -184,9 +184,8 @@ module Api
       def sync
         authorize! @connector, to: :sync?
 
+        @connector.mark_testing!
         ConnectorSyncService.enqueue(@connector)
-
-        @connector.mark_synced!
         OrganizationAuditLog.log(
           organization: current_organization,
           actor: current_user,

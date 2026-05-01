@@ -9,6 +9,8 @@ class ConnectorSyncService
     when "jira"           then JiraSyncJob.perform_later(connector.id, "sync")
     when "linear"         then LinearSyncJob.perform_later(connector.id, "sync")
     when "github_copilot" then GithubCopilotSyncJob.perform_later(connector.id)
+    when "openrouter", "anthropic", "openai", "gemini"
+      AiUsageSyncJob.perform_async(connector.organization_id, connector.connector_type)
     end
   end
 end

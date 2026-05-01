@@ -72,6 +72,12 @@ describe("IntegrationCard — connected integration", () => {
       expect(screen.getByText("Testing…")).toBeInTheDocument();
     });
 
+    it("shows Syncing… badge for testing status outside explicit test flow", () => {
+      render(<IntegrationCard integration={{ ...baseIntegration, status: "testing" }} />);
+      expect(screen.getByText("Syncing…")).toBeInTheDocument();
+      expect(screen.queryByText("Testing…")).not.toBeInTheDocument();
+    });
+
     it("does not show Connected badge while testing", () => {
       render(<IntegrationCard integration={baseIntegration} isTesting />);
       expect(screen.queryByText("Connected")).not.toBeInTheDocument();

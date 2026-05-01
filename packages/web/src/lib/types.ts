@@ -449,6 +449,9 @@ export interface ToolOverviewStats {
 
 export interface ToolModelStat {
   name: string;
+  provider?: string | null;
+  model?: string | null;
+  displayName?: string;
   eventCount: number;
   tokensIn: number;
   tokensOut: number;

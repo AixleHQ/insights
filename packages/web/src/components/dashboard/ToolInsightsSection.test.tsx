@@ -454,8 +454,8 @@ describe("ToolInsightsSection", () => {
         tool: "openrouter_api",
         timeRange: { start: "", end: "" },
         models: [
-          { name: "gpt-4o", eventCount: 5, tokensIn: 500, tokensOut: 200, costUsd: 1.2, price_per_million_input: null, price_per_million_output: null },
-          { name: "claude-3", eventCount: 3, tokensIn: 300, tokensOut: 100, costUsd: 0.8, price_per_million_input: null, price_per_million_output: null },
+          { name: "openai/gpt-4o", provider: "openai", model: "gpt-4o", displayName: "openai/gpt-4o", eventCount: 5, tokensIn: 500, tokensOut: 200, costUsd: 1.2, price_per_million_input: null, price_per_million_output: null },
+          { name: "anthropic/claude-3", provider: "anthropic", model: "claude-3", displayName: "anthropic/claude-3", eventCount: 3, tokensIn: 300, tokensOut: 100, costUsd: 0.8, price_per_million_input: null, price_per_million_output: null },
         ],
       },
       isLoading: false,
@@ -478,5 +478,6 @@ describe("ToolInsightsSection", () => {
     expect(screen.getByText("Models Used")).toBeInTheDocument();
     // 2 models in the response
     expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByText("openai/gpt-4o")).toBeInTheDocument();
   });
 });

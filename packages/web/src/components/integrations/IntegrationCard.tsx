@@ -200,6 +200,8 @@ export function IntegrationCard({
 
   const status = statusConfig[integration.status];
   const StatusIcon = status.icon;
+  const isSyncing = integration.status === "testing" && !isTesting;
+  const statusLabel = isSyncing ? "Syncing…" : status.label;
 
   return (
     <Card className={cn("group relative transition-all hover:shadow-md", className)}>
@@ -274,7 +276,7 @@ export function IntegrationCard({
                 <StatusIcon
                   className={cn("size-3", status.color, integration.status === "testing" && "animate-spin")}
                 />
-                <span className={status.color}>{status.label}</span>
+                <span className={status.color}>{statusLabel}</span>
               </Badge>
             )}
           </div>

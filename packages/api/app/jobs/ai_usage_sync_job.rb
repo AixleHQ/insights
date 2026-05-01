@@ -6,6 +6,8 @@ class AiUsageSyncJob
   sidekiq_options queue: "ai", retry: 3
 
   SUPPORTED_PROVIDERS = %w[openrouter anthropic openai gemini].freeze
+  OPENROUTER_INITIAL_SYNC_DAYS = 90
+  OPENROUTER_RECURRING_OVERLAP_DAYS = 1
 
   def perform(organization_id = nil, provider = nil)
     Rails.logger.info("[AiUsageSyncJob] Starting AI usage reconciliation...")
@@ -52,30 +54,38 @@ class AiUsageSyncJob
   end
 
   def reconcile_provider(org, connector, provider)
-    # Get usage from provider API
     usage_data = fetch_provider_usage(connector, provider)
-    return 0 unless usage_data
+    if usage_data.blank?
+      connector.mark_synced!
+      return 0
+    end
 
     reconciled = 0
-
-    # Compare with our recorded events
     usage_data.each do |usage|
       event = find_matching_event(org, provider, usage)
 
       if event
-        # Update if cost differs
-        if usage[:cost_usd] && event.cost_usd != usage[:cost_usd]
-          event.update!(cost_usd: usage[:cost_usd])
+        attributes = tool_event_attributes_for_usage(usage)
+        metadata = event.metadata.is_a?(Hash) ? event.metadata.deep_stringify_keys : {}
+        next_metadata = metadata.merge(attributes.delete(:metadata))
+
+        if sync_update_needed?(event, attributes, next_metadata)
+          event.update!(attributes.merge(metadata: next_metadata))
           reconciled += 1
         end
       else
-        # Create missing event
         create_event_from_usage(org, provider, usage)
         reconciled += 1
       end
     end
 
+    connector.mark_synced!
     reconciled
+  rescue StandardError => e
+    error_message = normalize_sync_error(provider, e.message)
+    connector.mark_error!(error_message)
+    Rails.logger.warn("[AiUsageSyncJob] Failed to reconcile #{provider} for org #{org.slug}: #{error_message}")
+    0
   end
 
   def fetch_provider_usage(connector, provider)
@@ -89,35 +99,20 @@ class AiUsageSyncJob
     else
       nil
     end
-  rescue StandardError => e
-    Rails.logger.warn("[AiUsageSyncJob] Failed to fetch usage from #{provider}: #{e.message}")
-    nil
   end
 
   def fetch_openrouter_usage(connector)
-    # OpenRouter provides usage in the Generation endpoint
-    uri = URI("https://openrouter.ai/api/v1/generation")
-    http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl = true
+    start_date = if connector.last_sync_at
+      connector.last_sync_at.to_date - OPENROUTER_RECURRING_OVERLAP_DAYS.days
+    else
+      OPENROUTER_INITIAL_SYNC_DAYS.days.ago.to_date
+    end
+    end_date = Date.current - 1.day
 
-    request = Net::HTTP::Get.new(uri)
-    request["Authorization"] = "Bearer #{connector.access_token}"
+    return [] if end_date < start_date
 
-    response = http.request(request)
-    return nil unless response.code.to_i == 200
-
-    data = JSON.parse(response.body)
-    generations = data["data"] || []
-
-    generations.map do |gen|
-      {
-        external_id: gen["id"],
-        model: gen["model"],
-        tokens_in: gen["tokens_prompt"],
-        tokens_out: gen["tokens_completion"],
-        cost_usd: gen["total_cost"].to_f,
-        occurred_at: Time.parse(gen["created_at"])
-      }
+    (start_date..end_date).flat_map do |date|
+      fetch_openrouter_activity_for_date(connector, date)
     end
   end
 
@@ -171,26 +166,100 @@ class AiUsageSyncJob
   def find_matching_event(org, provider, usage)
     scope = org.tool_events.where(tool_name: "#{provider}_api")
 
-    # Exact match on external_id (handles both old and new format)
     match = scope.where("metadata->>'external_id' = ?", usage[:external_id]).first
     return match if match
 
-    # Transition guard: if this entry has a workspace, also check the old
-    # aggregated format (without workspace in the ID) to prevent duplicates
-    # during the first sync after workspace support is deployed.
-    if usage[:workspace_name].present?
-      old_id = [ provider, usage[:model], usage[:occurred_at].to_date ].join("-")
-      scope.where("metadata->>'external_id' = ?", old_id).first
+    Array(usage[:legacy_external_ids]).each do |legacy_id|
+      legacy_match = scope.where("metadata->>'external_id' = ?", legacy_id).first
+      return legacy_match if legacy_match
     end
+
+    nil
   end
 
   def create_event_from_usage(org, provider, usage)
-    metadata = { external_id: usage[:external_id], reconciled: true }
-    metadata[:workspace_name] = usage[:workspace_name] if usage[:workspace_name].present?
-
     ToolEvent.create!(
-      organization_id: org.id,
-      tool_name: "#{provider}_api",
+      tool_event_attributes_for_usage(usage).merge(
+        organization_id: org.id,
+        tool_name: "#{provider}_api"
+      )
+    )
+  end
+
+  def fetch_openrouter_activity_for_date(connector, date)
+    uri = URI("https://openrouter.ai/api/v1/activity")
+    uri.query = URI.encode_www_form(date: date.iso8601)
+
+    response = perform_json_get(uri, connector.access_token)
+    rows = response.fetch("data", [])
+
+    rows.map do |row|
+      model = row["model"]
+      provider_slug = openrouter_provider_slug(row["provider_name"], model)
+      canonical_model = openrouter_canonical_model(model, provider_slug)
+      endpoint_id = row["endpoint_id"].presence || "unknown-endpoint"
+      cost = row["usage"]
+
+      {
+        external_id: [ "openrouter", date.iso8601, endpoint_id, canonical_model || "unknown-model" ].join(":"),
+        model: canonical_model,
+        tokens_in: row["prompt_tokens"],
+        tokens_out: row["completion_tokens"],
+        cost_usd: cost&.to_f,
+        occurred_at: Time.zone.parse("#{date.iso8601} 23:59:59 UTC"),
+        metadata: {
+          provider: provider_slug,
+          routed_model: model,
+          model_permaslug: row["model_permaslug"],
+          provider_name: row["provider_name"],
+          endpoint_id: row["endpoint_id"],
+          requests: row["requests"],
+          reasoning_tokens: row["reasoning_tokens"],
+          byok_usage_inference: row["byok_usage_inference"],
+          aggregation_level: "daily_endpoint_model",
+          synced_from: "activity_api",
+          usage_date: date.iso8601
+        }.compact
+      }
+    end
+  end
+
+  def perform_json_get(uri, access_token)
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = true
+
+    request = Net::HTTP::Get.new(uri)
+    request["Authorization"] = "Bearer #{access_token}"
+
+    response = http.request(request)
+    unless response.code.to_i == 200
+      raise "HTTP #{response.code}: #{response.body}"
+    end
+
+    JSON.parse(response.body)
+  end
+
+  def openrouter_provider_slug(provider_name, model)
+    return model.split("/").first.downcase if model.to_s.include?("/")
+    return if provider_name.blank?
+
+    provider_name.to_s.downcase.strip.gsub(/[^a-z0-9]+/, "_").gsub(/\A_|_\z/, "")
+  end
+
+  def openrouter_canonical_model(model, provider_slug)
+    return if model.blank?
+    return model if model.include?("/")
+
+    provider_slug.present? ? "#{provider_slug}/#{model}" : model
+  end
+
+  def tool_event_attributes_for_usage(usage)
+    metadata = {
+      external_id: usage[:external_id],
+      reconciled: true
+    }.merge(usage[:metadata] || {})
+
+    {
       event_type: "completion",
       model: usage[:model],
       tokens_in: usage[:tokens_in],
@@ -198,6 +267,27 @@ class AiUsageSyncJob
       cost_usd: usage[:cost_usd],
       occurred_at: usage[:occurred_at],
       metadata: metadata
-    )
+    }
+  end
+
+  def sync_update_needed?(event, attributes, metadata)
+    comparable_metadata = event.metadata.is_a?(Hash) ? event.metadata.deep_stringify_keys : {}
+
+    event.model != attributes[:model] ||
+      event.tokens_in != attributes[:tokens_in] ||
+      event.tokens_out != attributes[:tokens_out] ||
+      event.cost_usd.to_f != attributes[:cost_usd].to_f ||
+      event.occurred_at != attributes[:occurred_at] ||
+      comparable_metadata != metadata.deep_stringify_keys
+  end
+
+  def normalize_sync_error(provider, error_message)
+    return error_message unless provider == "openrouter"
+
+    if error_message.include?("Only management keys can fetch activity for an account")
+      "OpenRouter usage sync requires a management key. Reconnect this integration with a management key to fetch activity data."
+    else
+      error_message
+    end
   end
 end

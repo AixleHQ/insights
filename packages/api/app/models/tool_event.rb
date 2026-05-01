@@ -46,6 +46,6 @@ class ToolEvent < ApplicationRecord
   private
 
   def calculate_tokens_total
-    self.tokens_total = (tokens_in || 0) + (tokens_out || 0) if tokens_total.blank?
+    self.tokens_total = (tokens_in || 0) + (tokens_out || 0)
   end
 end

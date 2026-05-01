@@ -38,6 +38,7 @@ export function ApiKeyConnectSheet({
   const [apiKey, setApiKey] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isOpenRouter = provider?.id === "openrouter";
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
@@ -108,6 +109,12 @@ export function ApiKeyConnectSheet({
               onChange={(e) => setApiKey(e.target.value)}
               autoComplete="off"
             />
+            {isOpenRouter && (
+              <p className="text-sm text-muted-foreground">
+                Use an OpenRouter management key for usage sync. Standard API keys can proxy model
+                requests, but they cannot fetch activity data for the dashboard.
+              </p>
+            )}
             {error && (
               <p className="text-sm text-destructive">{error}</p>
             )}

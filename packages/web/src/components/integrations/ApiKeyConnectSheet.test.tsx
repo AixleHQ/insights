@@ -31,6 +31,15 @@ const anthropicProvider: ProviderInfo = {
   available: true,
 };
 
+const openrouterProvider: ProviderInfo = {
+  id: "openrouter",
+  name: "OpenRouter",
+  description: "Multi-model AI gateway integration",
+  category: "ai",
+  features: ["Usage monitoring", "Multi-model routing"],
+  available: true,
+};
+
 const defaultProps = {
   provider: anthropicProvider,
   open: true,
@@ -57,6 +66,13 @@ describe("ApiKeyConnectSheet", () => {
     it("renders provider description", () => {
       renderSheet();
       expect(screen.getByText("Direct Anthropic API integration")).toBeInTheDocument();
+    });
+
+    it("shows the management-key guidance for OpenRouter", () => {
+      renderSheet({ provider: openrouterProvider });
+      expect(
+        screen.getByText(/Use an OpenRouter management key for usage sync/i)
+      ).toBeInTheDocument();
     });
 
     it("renders the API key input as a password field", () => {
