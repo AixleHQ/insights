@@ -59,7 +59,8 @@ CREATE TYPE public.connector_type AS ENUM (
     'anthropic',
     'openai',
     'gemini',
-    'slack'
+    'slack',
+    'github_copilot'
 );
 
 
