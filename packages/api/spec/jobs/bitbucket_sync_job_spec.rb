@@ -22,7 +22,7 @@ RSpec.describe BitbucketSyncJob, type: :job do
 
     before do
       allow(Oauth::BaseProvider).to receive(:for).with(connector).and_return(provider)
-      allow(provider).to receive(:fetch_repositories).and_return([
+      allow(provider).to receive(:fetch_repositories).with(all_pages: true).and_return([
         {
           external_id: "{repo-uuid}",
           name: "repo",
@@ -34,7 +34,8 @@ RSpec.describe BitbucketSyncJob, type: :job do
           description: "Bitbucket repo"
         }
       ])
-      allow(provider).to receive(:fetch_commits).and_return([
+      allow(provider).to receive(:ensure_fresh_token!)
+      allow_any_instance_of(Oauth::BitbucketProvider).to receive(:fetch_commits).and_return([
         {
           "id" => "abc123",
           "message" => "Fix bug",
@@ -46,7 +47,7 @@ RSpec.describe BitbucketSyncJob, type: :job do
           }
         }
       ])
-      allow(provider).to receive(:fetch_pull_requests).and_return([
+      allow_any_instance_of(Oauth::BitbucketProvider).to receive(:fetch_pull_requests).and_return([
         {
           id: 7,
           title: "Improve analytics",
@@ -56,7 +57,7 @@ RSpec.describe BitbucketSyncJob, type: :job do
           author_username: "devuser"
         }
       ])
-      allow(provider).to receive(:fetch_pipelines).and_return([
+      allow_any_instance_of(Oauth::BitbucketProvider).to receive(:fetch_pipelines).and_return([
         {
           id: "{pipeline-uuid}",
           status: "COMPLETED",
@@ -84,6 +85,32 @@ RSpec.describe BitbucketSyncJob, type: :job do
       expect {
         described_class.new.perform(connector.id, "sync")
       }.not_to change(ToolEvent, :count)
+    end
+
+    context "when BITBUCKET_FANOUT is enabled" do
+      before { stub_const("ENV", ENV.to_hash.merge("BITBUCKET_FANOUT" => "true")) }
+
+      it "enqueues one BitbucketRepositoryActivitySyncJob per repository" do
+        expect {
+          described_class.new.perform(connector.id, "sync")
+        }.to have_enqueued_job(BitbucketRepositoryActivitySyncJob).with(connector.id, repository.id)
+      end
+
+      it "sets pending_activity_jobs counter on the connector" do
+        described_class.new.perform(connector.id, "sync")
+        expect(connector.reload.pending_activity_jobs).to eq(1)
+      end
+
+      it "does not call mark_synced! directly (deferred to child job)" do
+        expect_any_instance_of(OrganizationConnector).not_to receive(:mark_synced!)
+        described_class.new.perform(connector.id, "sync")
+      end
+
+      it "does not create tool events directly (delegated to child jobs)" do
+        expect {
+          described_class.new.perform(connector.id, "sync")
+        }.not_to change(ToolEvent, :count)
+      end
     end
   end
 

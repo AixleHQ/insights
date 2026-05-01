@@ -12,9 +12,9 @@ class BitbucketSyncJob < ApplicationJob
 
     case action
     when "sync"
-      sync_repositories
-    when "refresh_token"
-      refresh_token
+      fanout = sync_repositories
+      # When fan-out is active, mark_synced! is deferred to the last child job.
+      return if fanout
     when "webhook"
       process_webhook
     else
@@ -25,6 +25,8 @@ class BitbucketSyncJob < ApplicationJob
     Rails.logger.info("[BitbucketSyncJob] Completed #{action} for connector #{connector_id}")
   rescue ActiveRecord::RecordNotFound
     Rails.logger.error("[BitbucketSyncJob] Connector #{connector_id} not found")
+  rescue Oauth::TokenRefreshError => e
+    Rails.logger.error("[BitbucketSyncJob] Token refresh failed for connector #{connector_id}: #{e.message}")
   rescue StandardError => e
     Rails.logger.error("[BitbucketSyncJob] Failed: #{e.message}")
     raise
@@ -32,15 +34,42 @@ class BitbucketSyncJob < ApplicationJob
 
   private
 
+  # Returns true when fan-out mode is active (BITBUCKET_FANOUT=true env var).
+  # In fan-out mode, one BitbucketRepositoryActivitySyncJob is enqueued per repo;
+  # mark_synced! is deferred to the last child via a counter on the connector.
   def sync_repositories
     provider = Oauth::BaseProvider.for(@connector)
-    repos = provider.fetch_repositories
+    repos = provider.fetch_repositories(all_pages: true)
 
     repos.each do |repo_data|
       sync_repository(repo_data)
     end
 
+    if fanout_enabled?
+      enqueue_activity_jobs
+      return true
+    end
+
     sync_recent_activity(provider)
+    false
+  end
+
+  def fanout_enabled?
+    ENV["BITBUCKET_FANOUT"].to_s.downcase == "true"
+  end
+
+  # Sets the pending counter and enqueues one child job per repository.
+  # The counter is set atomically before any child starts so no race is possible.
+  def enqueue_activity_jobs
+    repo_ids = @connector.repositories.pluck(:id)
+    return if repo_ids.empty?
+
+    @connector.update_column(:pending_activity_jobs, repo_ids.size)
+    Rails.logger.info("[BitbucketSyncJob] Fan-out: enqueuing #{repo_ids.size} activity jobs for connector #{@connector.id}")
+
+    repo_ids.each do |repo_id|
+      BitbucketRepositoryActivitySyncJob.perform_later(@connector.id, repo_id)
+    end
   end
 
   def sync_repository(repo_data)
@@ -62,23 +91,56 @@ class BitbucketSyncJob < ApplicationJob
   end
 
   def sync_recent_activity(provider)
+    # Warm the token once before iterating so per-repo parallel futures don't race on refresh.
+    provider.send(:ensure_fresh_token!)
+    @connector.reload
+
     @connector.repositories.find_each do |repository|
-      sync_commits(provider, repository)
-      sync_pull_requests(provider, repository)
-      sync_pipelines(provider, repository)
+      sync_repository_activity(repository)
       repository.mark_synced!
     end
   end
 
-  def refresh_token
-    provider = Oauth::BaseProvider.for(@connector)
-    token_data = provider.refresh_access_token
+  # Fetches commits, PRs, and pipelines for a single repository in parallel.
+  # Each fetch spawns its own BitbucketProvider instance to avoid sharing the
+  # memoized Faraday connection across threads.
+  def sync_repository_activity(repository)
+    workspace, repo_slug = repository_coordinates(repository)
+    return if workspace.blank? || repo_slug.blank?
 
-    @connector.update!(
-      access_token: token_data[:access_token],
-      refresh_token: token_data[:refresh_token],
-      token_expires_at: token_data[:expires_at]
-    )
+    commits_future = Concurrent::Promises.future do
+      Oauth::BitbucketProvider.new(@connector).fetch_commits(
+        workspace,
+        repo_slug,
+        branch: repository.default_branch.presence || "main",
+        since: SYNC_WINDOW.ago
+      )
+    end
+
+    prs_future = Concurrent::Promises.future do
+      Oauth::BitbucketProvider.new(@connector).fetch_pull_requests(
+        workspace,
+        repo_slug,
+        updated_after: SYNC_WINDOW.ago
+      )
+    end
+
+    pipelines_future = Concurrent::Promises.future do
+      Oauth::BitbucketProvider.new(@connector).fetch_pipelines(
+        workspace,
+        repo_slug,
+        updated_after: SYNC_WINDOW.ago
+      )
+    end
+
+    commits   = commits_future.value!
+    prs       = prs_future.value!
+    pipelines = pipelines_future.value!
+
+    member_by_email = load_member_by_email
+    commits.each { |commit| create_commit_event(repository, commit, member_by_email) }
+    sync_pull_requests_data(repository, prs)
+    sync_pipelines_data(repository, pipelines)
   end
 
   def process_webhook
@@ -116,7 +178,7 @@ class BitbucketSyncJob < ApplicationJob
     pr = payload["pullrequest"]
     action = event_type.split(":").last
 
-    upsert_event!(
+    ToolEvents::ConnectorUpsert.call(
       unique_key: "pullrequest_id",
       unique_value: pr["id"],
       organization_id: @connector.organization_id,
@@ -124,7 +186,7 @@ class BitbucketSyncJob < ApplicationJob
       project_id: repository.project_id,
       tool_name: "bitbucket",
       event_type: "review",
-      occurred_at: Time.parse(pr["updated_on"]),
+      occurred_at: Time.parse(pr["updated_on"] || Time.current.iso8601),
       metadata: {
         action: action,
         pullrequest_id: pr["id"],
@@ -146,7 +208,7 @@ class BitbucketSyncJob < ApplicationJob
 
     pipeline_id = pipeline["uuid"] || pipeline["build_number"]
 
-    upsert_event!(
+    ToolEvents::ConnectorUpsert.call(
       unique_key: "pipeline_id",
       unique_value: pipeline_id,
       organization_id: @connector.organization_id,
@@ -154,7 +216,7 @@ class BitbucketSyncJob < ApplicationJob
       project_id: repository.project_id,
       tool_name: "bitbucket",
       event_type: "other",
-      occurred_at: Time.parse(pipeline["completed_on"] || pipeline["created_on"]),
+      occurred_at: Time.parse(pipeline["completed_on"] || pipeline["created_on"] || Time.current.iso8601),
       metadata: {
         pipeline_id: pipeline_id,
         status: pipeline.dig("state", "name"),
@@ -175,10 +237,10 @@ class BitbucketSyncJob < ApplicationJob
   end
 
   def create_commit_event(repository, commit, member_by_email = {})
-    author_email = commit.dig("author", "email") || extract_email(commit.dig("author", "raw"))
+    author_email = commit.dig("author", "email") || Oauth::BitbucketProvider.extract_email(commit.dig("author", "raw"))
     user = member_by_email[author_email] if author_email
 
-    upsert_event!(
+    ToolEvents::ConnectorUpsert.call(
       unique_key: "sha",
       unique_value: commit["hash"] || commit["id"],
       organization_id: @connector.organization_id,
@@ -187,7 +249,7 @@ class BitbucketSyncJob < ApplicationJob
       project_id: repository.project_id,
       tool_name: "bitbucket",
       event_type: "commit",
-      occurred_at: Time.parse(commit["date"] || commit["timestamp"]),
+      occurred_at: Time.parse(commit["date"] || commit["timestamp"] || Time.current.iso8601),
       metadata: {
         sha: commit["hash"] || commit["id"],
         message: commit["message"],
@@ -197,34 +259,9 @@ class BitbucketSyncJob < ApplicationJob
     )
   end
 
-  def sync_commits(provider, repository)
-    workspace, repo_slug = repository_coordinates(repository)
-    return if workspace.blank? || repo_slug.blank?
-
-    commits = provider.fetch_commits(
-      workspace,
-      repo_slug,
-      branch: repository.default_branch.presence || "main",
-      since: SYNC_WINDOW.ago
-    )
-    return if commits.empty?
-
-    member_by_email = load_member_by_email
-    commits.each { |commit| create_commit_event(repository, commit, member_by_email) }
-  end
-
-  def sync_pull_requests(provider, repository)
-    workspace, repo_slug = repository_coordinates(repository)
-    return if workspace.blank? || repo_slug.blank?
-
-    pull_requests = provider.fetch_pull_requests(
-      workspace,
-      repo_slug,
-      updated_after: SYNC_WINDOW.ago
-    )
-
+  def sync_pull_requests_data(repository, pull_requests)
     pull_requests.each do |pull_request|
-      upsert_event!(
+      ToolEvents::ConnectorUpsert.call(
         unique_key: "pullrequest_id",
         unique_value: pull_request[:id],
         organization_id: @connector.organization_id,
@@ -232,7 +269,7 @@ class BitbucketSyncJob < ApplicationJob
         project_id: repository.project_id,
         tool_name: "bitbucket",
         event_type: "review",
-        occurred_at: Time.parse(pull_request[:updated_at]),
+        occurred_at: Time.parse(pull_request[:updated_at] || Time.current.iso8601),
         metadata: {
           pullrequest_id: pull_request[:id],
           pr_title: pull_request[:title],
@@ -245,18 +282,9 @@ class BitbucketSyncJob < ApplicationJob
     end
   end
 
-  def sync_pipelines(provider, repository)
-    workspace, repo_slug = repository_coordinates(repository)
-    return if workspace.blank? || repo_slug.blank?
-
-    pipelines = provider.fetch_pipelines(
-      workspace,
-      repo_slug,
-      updated_after: SYNC_WINDOW.ago
-    )
-
+  def sync_pipelines_data(repository, pipelines)
     pipelines.each do |pipeline|
-      upsert_event!(
+      ToolEvents::ConnectorUpsert.call(
         unique_key: "pipeline_id",
         unique_value: pipeline[:id],
         organization_id: @connector.organization_id,
@@ -264,7 +292,7 @@ class BitbucketSyncJob < ApplicationJob
         project_id: repository.project_id,
         tool_name: "bitbucket",
         event_type: "other",
-        occurred_at: Time.parse(pipeline[:updated_at]),
+        occurred_at: Time.parse(pipeline[:updated_at] || Time.current.iso8601),
         metadata: {
           pipeline_id: pipeline[:id],
           status: pipeline[:status],
@@ -277,33 +305,7 @@ class BitbucketSyncJob < ApplicationJob
     end
   end
 
-  def extract_email(raw_author)
-    return nil if raw_author.blank?
-
-    match = raw_author.match(/<(.+)>/)
-    match ? match[1].downcase : nil
-  end
-
   def repository_coordinates(repository)
     repository.full_name.to_s.split("/", 2)
-  end
-
-  def upsert_event!(unique_key:, unique_value:, **attributes)
-    existing_event = ToolEvent
-      .where(
-        organization_id: attributes[:organization_id],
-        repository_id: attributes[:repository_id],
-        tool_name: attributes[:tool_name],
-        event_type: attributes[:event_type]
-      )
-      .where("metadata ->> ? = ?", unique_key.to_s, unique_value.to_s)
-      .order(occurred_at: :desc)
-      .first
-
-    if existing_event
-      existing_event.update!(attributes)
-    else
-      ToolEvent.create!(attributes)
-    end
   end
 end

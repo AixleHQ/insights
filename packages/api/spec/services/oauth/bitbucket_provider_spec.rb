@@ -3,7 +3,13 @@
 require 'rails_helper'
 
 RSpec.describe Oauth::BitbucketProvider, type: :service do
-  let(:connector) { instance_double('OrganizationConnector', access_token: 'bb-test123') }
+  let(:connector) do
+    instance_double(
+      'OrganizationConnector',
+      access_token: 'bb-test123',
+      token_expired?: false
+    )
+  end
   let(:provider) { described_class.new(connector) }
 
   describe '#test_connection' do
@@ -273,6 +279,46 @@ RSpec.describe Oauth::BitbucketProvider, type: :service do
           }
         }
       ])
+    end
+
+    it 'stops at the first commit older than since and does not include newer commits that follow it' do
+      commits = {
+        values: [
+          {
+            hash: 'new111',
+            date: '2026-04-29T11:00:00Z',
+            message: 'New commit',
+            author: { raw: 'Dev <dev@example.com>', user: { display_name: 'Dev' } },
+            links: { html: { href: 'https://bitbucket.org/ws/repo/commits/new111' } }
+          },
+          {
+            hash: 'old111',
+            date: '2026-03-01T10:00:00Z',
+            message: 'Old commit below threshold',
+            author: { raw: 'Dev <dev@example.com>', user: { display_name: 'Dev' } },
+            links: { html: { href: 'https://bitbucket.org/ws/repo/commits/old111' } }
+          },
+          {
+            hash: 'new222',
+            date: '2026-04-28T09:00:00Z',
+            message: 'Another new commit after old one (topological anomaly)',
+            author: { raw: 'Dev <dev@example.com>', user: { display_name: 'Dev' } },
+            links: { html: { href: 'https://bitbucket.org/ws/repo/commits/new222' } }
+          }
+        ]
+      }
+
+      stub_request(:get, 'https://api.bitbucket.org/2.0/repositories/ws/repo/commits/main')
+        .with(query: hash_including('page' => '1', 'pagelen' => '100', 'include' => 'main'))
+        .to_return(
+          status: 200,
+          body: commits.to_json,
+          headers: { 'Content-Type' => 'application/json' }
+        )
+
+      result = provider.fetch_commits('ws', 'repo', branch: 'main', since: Time.zone.parse('2026-04-01T00:00:00Z'))
+
+      expect(result.map { |c| c["id"] }).to eq([ 'new111' ])
     end
   end
 
