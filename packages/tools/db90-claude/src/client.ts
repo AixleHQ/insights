@@ -15,7 +15,7 @@ export async function postEvent(
   host: string,
   token: string
 ): Promise<boolean> {
-  return sdkPostEvent(event as unknown as Parameters<typeof sdkPostEvent>[0], host, token);
+  return sdkPostEvent(event, host, token);
 }
 
 /**

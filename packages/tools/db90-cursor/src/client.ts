@@ -24,7 +24,7 @@ export async function postEvents(
   const outcomes = await Promise.allSettled(
     events.map(async (event) => ({
       event,
-      ok: await sdkPostEvent(event as unknown as Parameters<typeof sdkPostEvent>[0], host, token),
+      ok: await sdkPostEvent(event, host, token),
     }))
   );
 

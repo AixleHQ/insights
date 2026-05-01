@@ -3,6 +3,7 @@ import { createInterface } from "node:readline";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { glob } from "glob";
+import type { IngestPayload } from "@db90/sdk";
 import { type PricingTable, calculateCost } from "./pricing.js";
 import { type RiskLevel, scanText } from "./risk-scanner.js";
 
@@ -52,7 +53,7 @@ export interface SessionAggregate {
 }
 
 /** Payload shape expected by the db90 ingest API. */
-export interface Db90Payload {
+export interface Db90Payload extends IngestPayload {
   tool_name: "claude_code";
   event_type: "chat";
   model?: string;

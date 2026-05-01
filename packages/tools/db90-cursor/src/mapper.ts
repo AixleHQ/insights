@@ -1,3 +1,5 @@
+import type { IngestPayload } from "@db90/sdk";
+
 const COST_MODEL = "estimated_line_count" as const;
 
 export interface PricingConfig {
@@ -40,7 +42,7 @@ export type Db90PayloadMetadata = {
   ai_percentage?: number;
 };
 
-export interface Db90Payload {
+export interface Db90Payload extends IngestPayload {
   tool_name: "cursor";
   event_type: "completion" | "chat";
   model: string;
