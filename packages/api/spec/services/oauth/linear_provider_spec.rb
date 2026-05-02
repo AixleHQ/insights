@@ -3,7 +3,7 @@
 require 'rails_helper'
 
 RSpec.describe Oauth::LinearProvider, type: :service do
-  let(:connector) { instance_double('OrganizationConnector', access_token: 'lin-test123') }
+  let(:connector) { instance_double('OrganizationConnector', access_token: 'lin-test123', token_expired?: false) }
   let(:provider) { described_class.new(connector) }
 
   describe '#test_connection' do

@@ -18,7 +18,7 @@ RSpec.describe LinearSyncJob, type: :job do
     allow(provider).to receive(:fetch_projects).and_return([
       { external_id: 'project-1', name: 'Platform', state: 'started', teams: [ { 'id' => 'team-1', 'name' => 'Engineering' } ] }
     ])
-    allow(provider).to receive(:fetch_cycles).with(team_id: 'team-1').and_return([
+    allow(provider).to receive(:fetch_cycles).and_return([
       {
         external_id: 'cycle-1',
         number: 42,
@@ -83,6 +83,40 @@ RSpec.describe LinearSyncJob, type: :job do
     expect(
       organization.tool_events.where(tool_name: 'linear', event_type: 'issue').count
     ).to eq(1)
+  end
+
+  it 'does not overwrite project_id of an issue already owned by another project' do
+    project_a = create(:project, organization: organization)
+    project_b = create(:project, organization: organization)
+
+    project_a.project_settings.create!(key: 'linear_connector_id', value: connector.id.to_s)
+    project_a.project_settings.create!(key: 'linear_project_id', value: 'project-1')
+    project_b.project_settings.create!(key: 'linear_connector_id', value: connector.id.to_s)
+    project_b.project_settings.create!(key: 'linear_project_id', value: 'project-1')
+
+    described_class.perform_now(connector.id, 'sync', project_id: project_a.id)
+    issue = Issue.find_by!(organization_connector: connector, external_id: 'issue-1')
+    expect(issue.project_id).to eq(project_a.id)
+
+    described_class.perform_now(connector.id, 'sync', project_id: project_b.id)
+    issue.reload
+    expect(issue.project_id).to eq(project_a.id), 'project_id must not be overwritten by a second sync'
+  end
+
+  it 'refreshes the token when it is about to expire' do
+    connector.update!(token_expires_at: 2.minutes.from_now)
+
+    described_class.perform_now(connector.id, 'sync')
+
+    expect(provider).to have_received(:refresh_token!)
+  end
+
+  it 'skips token refresh when the token is still valid' do
+    connector.update!(token_expires_at: 30.minutes.from_now)
+
+    described_class.perform_now(connector.id, 'sync')
+
+    expect(provider).not_to have_received(:refresh_token!)
   end
 
   it 'records state change webhook events' do

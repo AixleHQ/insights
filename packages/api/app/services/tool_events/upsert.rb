@@ -49,9 +49,7 @@ module ToolEvents
         # Advisory lock auto-released at transaction end — serialises concurrent
         # requests for the same session_id to eliminate the TOCTOU window.
         lock_key = Zlib.crc32(@session_id)
-        ToolEvent.connection.execute(
-          ToolEvent.connection.sanitize_sql_array([ "SELECT pg_advisory_xact_lock(?)", lock_key ])
-        )
+        ToolEvent.connection.execute("SELECT pg_advisory_xact_lock(#{Integer(lock_key)})")
 
         existing = ToolEvent
           .where(organization_id: @attributes[:organization_id])

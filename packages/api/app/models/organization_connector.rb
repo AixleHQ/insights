@@ -4,6 +4,7 @@ class OrganizationConnector < ApplicationRecord
 
   belongs_to :organization
   has_many :repositories, dependent: :destroy
+  has_many :issues, dependent: :destroy
 
   validates :connector_type, presence: true, inclusion: { in: CONNECTOR_TYPES }
   validates :connector_type, uniqueness: { scope: :organization_id, message: "already exists for this organization" }

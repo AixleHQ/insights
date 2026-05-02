@@ -112,6 +112,7 @@ class ProjectFullSerializer < ProjectSerializer
                     .where(tool_name: "linear", user_id: member_ids)
                     .where(event_type: %w[issue sprint])
                     .order(occurred_at: :desc)
+                    .limit(1000)
                     .to_a
 
     next [] if events.empty?

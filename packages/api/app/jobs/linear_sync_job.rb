@@ -3,6 +3,7 @@
 class LinearSyncJob < ApplicationJob
   queue_as :connectors
   retry_on StandardError, wait: :polynomially_longer, attempts: 3
+  retry_on Oauth::LinearApiError, wait: :polynomially_longer, attempts: 5
 
   SYNC_WINDOW = 30.days
 
@@ -48,7 +49,7 @@ class LinearSyncJob < ApplicationJob
   def sync_resources
     teams = provider.fetch_teams
     projects = provider.fetch_projects
-    cycles = teams.flat_map { |team| provider.fetch_cycles(team_id: team[:external_id]) }
+    cycles = provider.fetch_cycles
 
     @connector.config ||= {}
     @connector.config["teams"] = teams.index_by { |team| team[:external_id] }
@@ -278,7 +279,7 @@ class LinearSyncJob < ApplicationJob
       rows,
       unique_by: %i[organization_connector_id external_id],
       update_only: %i[
-        project_id assignee_id key summary status status_category issue_type priority
+        assignee_id key summary status status_category issue_type priority
         jira_project_key jira_project_id assignee_account_id assignee_name reporter_name
         metadata external_created_at external_updated_at synced_at updated_at
       ],
@@ -340,8 +341,6 @@ class LinearSyncJob < ApplicationJob
     return if @connector.token_expires_at && @connector.token_expires_at > 5.minutes.from_now
 
     provider.refresh_token!
-    @connector.reload
-    @provider = nil
   end
 
   def normalized_issue_action(action, payload)
@@ -404,23 +403,13 @@ class LinearSyncJob < ApplicationJob
   end
 
   def upsert_event!(unique_key:, unique_value:, **attributes)
-    existing_event = ToolEvent
-      .where(
-        organization_id: attributes[:organization_id],
-        tool_name: attributes[:tool_name],
-        event_type: attributes[:event_type]
-      )
-      .where("metadata ->> ? = ?", unique_key.to_s, unique_value.to_s)
-      .order(occurred_at: :desc)
-      .first
-
     metadata = attributes[:metadata] || {}
     attributes[:metadata] = metadata.merge(unique_key.to_s => unique_value.to_s)
 
-    if existing_event
-      existing_event.update!(attributes)
-    else
-      ToolEvent.create!(attributes)
-    end
+    ToolEvents::ConnectorUpsert.call(
+      unique_key: unique_key,
+      unique_value: unique_value,
+      **attributes
+    )
   end
 end

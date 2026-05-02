@@ -625,6 +625,35 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       expect(project.reload.project_settings.find_by(key: 'jira_connector_id')).to be_nil
       expect(project.project_settings.find_by(key: 'jira_project_key')).to be_nil
     end
+
+    it 'returns 403 for project members without admin permission' do
+      member_only = create(:user)
+      create(:organization_membership, user: member_only, organization: organization, role: 'member')
+      create(:project_membership, project: project, user: member_only, role: 'member')
+
+      authenticated_post "/api/v1/projects/#{project.id}/link_linear",
+                         user: member_only,
+                         params: { connector_id: connector.id, linear_project_id: 'project-1', linear_project_name: 'Platform' }
+
+      expect_forbidden
+    end
+
+    it 'returns 401 without authentication' do
+      post "/api/v1/projects/#{project.id}/link_linear",
+           params: { connector_id: connector.id, linear_project_id: 'project-1', linear_project_name: 'Platform' }
+
+      expect_unauthorized
+    end
+
+    it 'returns 422 when connector_id belongs to a non-linear connector' do
+      jira_connector = create(:organization_connector, :jira, organization: organization)
+
+      authenticated_post "/api/v1/projects/#{project.id}/link_linear",
+                         user: user,
+                         params: { connector_id: jira_connector.id, linear_project_id: 'project-1', linear_project_name: 'Platform' }
+
+      expect_unprocessable
+    end
   end
 
   describe 'POST /api/v1/projects/:id/sync_issues' do
@@ -671,6 +700,16 @@ RSpec.describe 'Api::V1::Projects', type: :request do
 
       expect_success
       expect(LinearSyncJob).to have_received(:perform_now).with(linear_connector.id, 'sync', project_id: project.id)
+    end
+
+    it 'returns 422 when the linked connector type is not supported' do
+      unsupported = create(:organization_connector, organization: organization, connector_type: 'github')
+      project.project_settings.where(key: %w[jira_connector_id jira_project_key]).destroy_all
+      project.project_settings.create!(key: 'jira_connector_id', value: unsupported.id.to_s)
+
+      authenticated_post "/api/v1/projects/#{project.id}/sync_issues", user: user
+
+      expect_unprocessable
     end
   end
 end

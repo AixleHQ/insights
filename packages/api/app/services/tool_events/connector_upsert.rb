@@ -58,9 +58,7 @@ module ToolEvents
       ].join("\x1f")
 
       lock_key = Zlib.crc32(seed)
-      ToolEvent.connection.execute(
-        ToolEvent.connection.sanitize_sql_array([ "SELECT pg_advisory_xact_lock(?)", lock_key ])
-      )
+      ToolEvent.connection.execute("SELECT pg_advisory_xact_lock(#{Integer(lock_key)})")
     end
 
     def mutable_attributes

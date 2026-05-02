@@ -6,6 +6,7 @@ module Oauth
     GRAPHQL_URL = "#{API_URL}/graphql"
 
     def test_connection
+      ensure_fresh_token!
       query = "{ viewer { id name email } }"
       response = graphql_request(query)
 
@@ -25,6 +26,7 @@ module Oauth
     end
 
     def fetch_teams
+      ensure_fresh_token!
       query = <<~GRAPHQL
         {
           teams {
@@ -53,6 +55,7 @@ module Oauth
     end
 
     def fetch_projects
+      ensure_fresh_token!
       query = <<~GRAPHQL
         {
           projects {
@@ -88,8 +91,8 @@ module Oauth
     end
 
     def fetch_cycles(team_id: nil)
-      filter = {}
-      filter[:team] = { id: { eq: team_id } } if team_id.present?
+      ensure_fresh_token!
+      filter = team_id.present? ? { team: { id: { eq: team_id } } } : nil
 
       query = <<~GRAPHQL
         query($filter: CycleFilter) {
@@ -110,7 +113,7 @@ module Oauth
         }
       GRAPHQL
 
-      data = graphql_data(query, variables: { filter: filter.presence })
+      data = graphql_data(query, variables: { filter: filter })
       return [] unless data.dig("cycles", "nodes")
 
       data["cycles"]["nodes"].map do |cycle|
@@ -128,6 +131,7 @@ module Oauth
     end
 
     def fetch_issues(updated_after: nil, team_ids: [], project_ids: [])
+      ensure_fresh_token!
       filter = {}
       filter[:updatedAt] = { gte: updated_after.iso8601 } if updated_after.present?
       filter[:team] = { id: { in: Array(team_ids) } } if team_ids.present?
@@ -278,16 +282,36 @@ module Oauth
 
     def graphql_data(query, variables: {})
       response = graphql_request(query, variables: variables.compact)
-      return {} unless response.success?
+
+      unless response.success?
+        raise LinearApiError, "Linear API HTTP #{response.status}: #{response.body.truncate(200)}"
+      end
 
       body = JSON.parse(response.body)
+
+      if body["errors"].present?
+        messages = body["errors"].filter_map { |e| e["message"] }.join(", ")
+        raise LinearApiError, "Linear GraphQL error: #{messages}"
+      end
+
       body["data"] || {}
     end
 
+    def graphql_client
+      @graphql_client ||= Faraday.new(GRAPHQL_URL) do |conn|
+        conn.headers["Authorization"] = "Bearer #{connector.access_token}"
+        conn.headers["Content-Type"] = "application/json"
+        conn.adapter Faraday.default_adapter
+      end
+    end
+
+    def reset_http_client!
+      super
+      @graphql_client = nil
+    end
+
     def graphql_request(query, variables: {})
-      Faraday.post(GRAPHQL_URL) do |req|
-        req.headers["Authorization"] = "Bearer #{connector.access_token}"
-        req.headers["Content-Type"] = "application/json"
+      graphql_client.post do |req|
         req.body = { query: query, variables: variables }.to_json
       end
     end
