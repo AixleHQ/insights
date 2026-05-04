@@ -252,4 +252,25 @@ RSpec.describe 'Api::V1::UserToolAccounts', type: :request do
       expect(response).to have_http_status(:not_found)
     end
   end
+
+  describe 'scope field in serialized response' do
+    it 'returns scope=persona for tool accounts' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/tool_accounts/#{tool_account.id}",
+                        user: user,
+                        organization: organization
+
+      expect_success
+      expect(json_data[:scope]).to eq('persona')
+    end
+
+    it 'includes scope in the list response' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/tool_accounts",
+                        user: user,
+                        organization: organization
+
+      expect_success
+      expect(json_data.first).to have_key(:scope)
+      expect(json_data.first[:scope]).to eq('persona')
+    end
+  end
 end

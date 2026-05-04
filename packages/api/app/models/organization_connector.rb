@@ -1,6 +1,15 @@
 class OrganizationConnector < ApplicationRecord
   CONNECTOR_TYPES = %w[github gitlab bitbucket jira linear openrouter anthropic openai gemini slack github_copilot].freeze
   STATUSES = %w[connected testing error disconnected].freeze
+  SCOPES = %w[org project persona].freeze
+
+  # Scope is fixed per provider — not user-configurable.
+  SCOPE_BY_TYPE = {
+    "github" => "project", "gitlab" => "project", "bitbucket" => "project",
+    "jira" => "org", "linear" => "org", "slack" => "org",
+    "anthropic" => "org", "openai" => "org", "openrouter" => "org",
+    "gemini" => "org", "github_copilot" => "org"
+  }.freeze
 
   belongs_to :organization
   has_many :repositories, dependent: :destroy
@@ -10,6 +19,9 @@ class OrganizationConnector < ApplicationRecord
   validates :connector_type, uniqueness: { scope: :organization_id, message: "already exists for this organization" }
   validates :is_active, inclusion: { in: [ true, false ] }
   validates :status, inclusion: { in: STATUSES }
+  validates :connector_scope, inclusion: { in: SCOPES }
+
+  before_validation :assign_scope, on: :create
 
   encrypts :access_token
   encrypts :refresh_token
@@ -98,6 +110,10 @@ class OrganizationConnector < ApplicationRecord
   end
 
   private
+
+  def assign_scope
+    self.connector_scope = SCOPE_BY_TYPE.fetch(connector_type.to_s, "org")
+  end
 
   def assign_webhook_token
     self.webhook_token = SecureRandom.hex(32)

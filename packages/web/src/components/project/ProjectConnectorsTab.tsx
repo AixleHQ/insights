@@ -7,10 +7,10 @@ import {
   useProjectTestConnector,
 } from "@/hooks/useApi";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   IntegrationCard,
+  IntegrationSkeleton,
   type IntegrationData,
   type IntegrationProvider,
   type IntegrationScope,
@@ -24,7 +24,7 @@ const PROVIDERS: ProviderInfo[] = [
   {
     id: "anthropic",
     name: "Anthropic API",
-    description: "Direct Anthropic API integration 1",
+    description: "Track Anthropic API usage, costs, and model analytics",
     category: "ai",
     scope: "project",
     features: [
@@ -94,21 +94,6 @@ const PROVIDERS: ProviderInfo[] = [
   },
 ];
 
-function IntegrationSkeleton() {
-  return (
-    <div className="rounded-lg border p-4 space-y-4">
-      <div className="flex items-center gap-3">
-        <Skeleton className="size-10 rounded-lg" />
-        <div className="space-y-2">
-          <Skeleton className="h-5 w-32" />
-          <Skeleton className="h-4 w-24" />
-        </div>
-      </div>
-      <Skeleton className="h-6 w-24" />
-      <Skeleton className="h-4 w-40" />
-    </div>
-  );
-}
 
 interface ProjectConnectorsTabProps {
   projectId: string;
@@ -152,7 +137,7 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
           account_name: externalAccountName || "",
           resources_count: 0,
         },
-        scope: (c.scope as IntegrationScope) ?? "project",
+        scope: c.scope as IntegrationScope,
       };
     });
   }, [connectorsData]);

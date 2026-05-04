@@ -11,9 +11,9 @@ import {
   useRegenerateIngestToken,
 } from "@/hooks/useApi";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   IntegrationCard,
+  IntegrationSkeleton,
   type IntegrationData,
   type IntegrationProvider,
   type ProviderInfo,
@@ -133,7 +133,7 @@ const availableProviders: ProviderInfo[] = [
   {
     id: "anthropic",
     name: "Anthropic API",
-    description: "Direct Anthropic API integration 2",
+    description: "Track Anthropic API usage, costs, and model analytics",
     category: "ai",
     scope: "org",
     features: [
@@ -251,21 +251,6 @@ const categoryLabels: Record<ProviderInfo["category"], string> = {
   communication: "Communication",
 };
 
-function IntegrationSkeleton() {
-  return (
-    <div className="rounded-lg border p-4 space-y-4">
-      <div className="flex items-center gap-3">
-        <Skeleton className="size-10 rounded-lg" />
-        <div className="space-y-2">
-          <Skeleton className="h-5 w-32" />
-          <Skeleton className="h-4 w-24" />
-        </div>
-      </div>
-      <Skeleton className="h-6 w-24" />
-      <Skeleton className="h-4 w-40" />
-    </div>
-  );
-}
 
 export function Integrations() {
   const { currentOrg } = useOrg();
@@ -336,7 +321,7 @@ export function Integrations() {
         webhookActive: connectorType === "openrouter" ? (c.webhookActive ?? false) : undefined,
         webhookToken: connectorType === "openrouter" ? c.webhookToken : undefined,
         webhookSecretSet: connectorType === "openrouter" ? (c.webhookSecretSet ?? false) : undefined,
-        scope: (c.scope as IntegrationScope) ?? "org",
+        scope: c.scope as IntegrationScope,
       };
     });
 

@@ -13,6 +13,9 @@ class UserToolAccount < ApplicationRecord
   validates :tool_name, presence: true, inclusion: { in: TOOL_NAMES }
   validates :tool_name, uniqueness: { scope: :organization_membership_id, message: "account already exists for this membership" }
   validates :is_active, inclusion: { in: [ true, false ] }
+  validates :connector_scope, inclusion: { in: %w[persona] }
+
+  before_validation :assign_scope, on: :create
 
   encrypts :access_token
   encrypts :refresh_token
@@ -46,6 +49,10 @@ class UserToolAccount < ApplicationRecord
   end
 
   private
+
+  def assign_scope
+    self.connector_scope = "persona"
+  end
 
   def ingest_tool?
     INGEST_TOOLS.include?(tool_name)

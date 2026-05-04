@@ -693,4 +693,69 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
       expect_unauthorized
     end
   end
+
+  describe 'scope field in serialized response' do
+    it 'returns scope=project for github connectors' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{connector.id}",
+                        user: member,
+                        organization: organization
+
+      expect_success
+      expect(json_data[:scope]).to eq('project')
+    end
+
+    it 'returns scope=project for gitlab connectors' do
+      gitlab = create(:organization_connector, organization: organization, connector_type: 'gitlab')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{gitlab.id}",
+                        user: member,
+                        organization: organization
+
+      expect_success
+      expect(json_data[:scope]).to eq('project')
+    end
+
+    it 'returns scope=project for bitbucket connectors' do
+      bitbucket = create(:organization_connector, organization: organization, connector_type: 'bitbucket')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{bitbucket.id}",
+                        user: member,
+                        organization: organization
+
+      expect_success
+      expect(json_data[:scope]).to eq('project')
+    end
+
+    it 'returns scope=org for jira connectors' do
+      jira = create(:organization_connector, organization: organization, connector_type: 'jira')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{jira.id}",
+                        user: member,
+                        organization: organization
+
+      expect_success
+      expect(json_data[:scope]).to eq('org')
+    end
+
+    it 'returns scope=org for anthropic connectors' do
+      anthropic = create(:organization_connector, organization: organization, connector_type: 'anthropic')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{anthropic.id}",
+                        user: member,
+                        organization: organization
+
+      expect_success
+      expect(json_data[:scope]).to eq('org')
+    end
+
+    it 'includes scope in the list response' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors",
+                        user: member,
+                        organization: organization
+
+      expect_success
+      expect(json_data.first).to have_key(:scope)
+      expect(json_data.first[:scope]).to eq('project')
+    end
+  end
 end
