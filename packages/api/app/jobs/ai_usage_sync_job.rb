@@ -6,7 +6,6 @@ class AiUsageSyncJob
   sidekiq_options queue: "ai", retry: 3
 
   SUPPORTED_PROVIDERS = %w[openrouter anthropic openai gemini].freeze
-  OPENROUTER_INITIAL_SYNC_DAYS = 90
   OPENROUTER_RECURRING_OVERLAP_DAYS = 1
   OPENROUTER_MAX_HISTORY_DAYS = 30
 
@@ -66,6 +65,108 @@ class AiUsageSyncJob
       return 0
     end
 
+    reconciled = if provider == "openrouter"
+      batch_upsert_openrouter_usage(org, usage_data)
+    else
+      upsert_usage_one_by_one(org, provider, usage_data)
+    end
+
+    connector.mark_synced!
+    reconciled
+  rescue StandardError => e
+    error_message = normalize_sync_error(provider, e.message)
+    connector.mark_error!(error_message)
+    Rails.logger.warn("[AiUsageSyncJob] Failed to reconcile #{provider} for org #{org.slug}: #{error_message}")
+    0
+  end
+
+  # Bulk upsert for OpenRouter daily-aggregate events.
+  #
+  # Uses BatchConnectorUpsert (3 SQL statements regardless of batch size) instead of
+  # the N×1 loop used for other providers. A lazy backfill step seeds
+  # connector_event_dedup from pre-existing tool_events so that events created before
+  # this path was introduced are not duplicated on the first batch run.
+  def batch_upsert_openrouter_usage(org, usage_data)
+    backfill_openrouter_dedup(org, usage_data)
+
+    records = usage_data.map do |usage|
+      tool_event_attributes_for_usage(usage).merge(
+        unique_value:    usage[:external_id],
+        organization_id: org.id,
+        tool_name:       "openrouter_api"
+      )
+    end
+
+    ToolEvents::BatchConnectorUpsert.call(unique_key: "external_id", records:)
+    records.size
+  end
+
+  # Seeds connector_event_dedup for any openrouter_api tool_events that were created
+  # by the old per-row path and are not yet tracked in the dedup table.
+  # Runs once per batch; subsequent runs are cheap because all rows already exist.
+  def backfill_openrouter_dedup(org, usage_data)
+    external_ids = usage_data.map { |u| u[:external_id].to_s }
+    return if external_ids.empty?
+
+    already_tracked = ConnectorEventDedup
+      .where(
+        organization_id: org.id,
+        tool_name:        "openrouter_api",
+        event_type:       "completion",
+        unique_key:       "external_id",
+        unique_value:     external_ids
+      )
+      .pluck(:unique_value)
+      .to_set
+
+    untracked_ids = external_ids.reject { |id| already_tracked.include?(id) }
+    return if untracked_ids.empty?
+
+    existing_events = org.tool_events
+      .where(tool_name: "openrouter_api")
+      .where("metadata->>'external_id' IN (?)", untracked_ids)
+      .pluck(Arel.sql("metadata->>'external_id'"), :id)
+
+    return if existing_events.empty?
+
+    now = Time.current
+    dedup_rows = existing_events.map do |external_id, event_id|
+      {
+        organization_id: org.id,
+        tool_name:        "openrouter_api",
+        event_type:       "completion",
+        unique_key:       "external_id",
+        unique_value:     external_id,
+        tool_event_id:    event_id,
+        updated_at:       now
+      }
+    end
+
+    # Use raw SQL for the same reason as BatchConnectorUpsert#bulk_upsert_dedup_rows:
+    # Rails upsert_all includes every column in the INSERT list, which causes
+    # `id = NULL` for the bigserial column (Rails 8.1 bug), triggering NOT NULL violation.
+    conn          = ConnectorEventDedup.connection
+    table         = ConnectorEventDedup.quoted_table_name
+    conflict_cols = %w[organization_id tool_name event_type unique_key unique_value]
+                      .map { |c| conn.quote_column_name(c) }.join(", ")
+    col_names     = dedup_rows.first.keys.map { |k| conn.quote_column_name(k) }.join(", ")
+
+    values_sql = dedup_rows.map do |row|
+      vals = row.values.map { |v| v.nil? ? "NULL" : conn.quote(v) }
+      "(#{vals.join(', ')})"
+    end.join(", ")
+
+    conn.execute(<<~SQL)
+      INSERT INTO #{table} (#{col_names})
+      VALUES #{values_sql}
+      ON CONFLICT (#{conflict_cols})
+      DO UPDATE SET
+        tool_event_id = EXCLUDED.tool_event_id,
+        updated_at    = EXCLUDED.updated_at
+    SQL
+  end
+
+  def upsert_usage_one_by_one(org, provider, usage_data)
     reconciled = 0
     usage_data.each do |usage|
       event = find_matching_event(org, provider, usage)
@@ -84,14 +185,7 @@ class AiUsageSyncJob
         reconciled += 1
       end
     end
-
-    connector.mark_synced!
     reconciled
-  rescue StandardError => e
-    error_message = normalize_sync_error(provider, e.message)
-    connector.mark_error!(error_message)
-    Rails.logger.warn("[AiUsageSyncJob] Failed to reconcile #{provider} for org #{org.slug}: #{error_message}")
-    0
   end
 
   def fetch_provider_usage(connector, provider)
@@ -122,7 +216,7 @@ class AiUsageSyncJob
     start_date = if connector.last_sync_at
       [ connector.last_sync_at.to_date - OPENROUTER_RECURRING_OVERLAP_DAYS.days, earliest_allowed ].max
     else
-      [ OPENROUTER_INITIAL_SYNC_DAYS.days.ago.to_date, earliest_allowed ].max
+      earliest_allowed
     end
     end_date = Date.current - 1.day
 
@@ -205,6 +299,9 @@ class AiUsageSyncJob
         tokens_in: row["prompt_tokens"],
         tokens_out: row["completion_tokens"],
         cost_usd: cost&.to_f,
+        # Activity API returns daily aggregates with no per-request timestamp.
+        # Anchor to end-of-day so the event sorts after any per-request events
+        # from the same date that may arrive via the webhook path.
         occurred_at: Time.zone.parse("#{date.iso8601} 23:59:59 UTC"),
         metadata: {
           provider: provider_slug,

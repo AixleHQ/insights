@@ -302,6 +302,49 @@ RSpec.describe AiUsageSyncJob, type: :job do
       expect(connector.last_sync_at).to be_present
     end
 
+    it "skips polling and does not create ToolEvents when webhook is active" do
+      connector.update!(webhook_active: true)
+
+      travel_to Time.zone.parse("2026-04-30 12:00:00 UTC") do
+        expect {
+          job.perform(organization.id, "openrouter")
+        }.not_to change(ToolEvent, :count)
+      end
+
+      expect(job).not_to have_received(:perform_json_get)
+    end
+
+    it "does not duplicate events that were created before BatchConnectorUpsert (lazy backfill)" do
+      # Simulate a pre-existing event created by the old per-row path (no dedup row).
+      pre_existing = ToolEvent.create!(
+        organization_id: organization.id,
+        tool_name:       "openrouter_api",
+        event_type:      "completion",
+        model:           "openai/gpt-4.1",
+        tokens_in:       50,
+        tokens_out:      125,
+        cost_usd:        0.015,
+        occurred_at:     Time.zone.parse("2026-04-29 23:59:59 UTC"),
+        metadata:        { "external_id" => external_id, "reconciled" => true }
+      )
+
+      expect {
+        travel_to Time.zone.parse("2026-04-30 12:00:00 UTC") do
+          job.perform(organization.id, "openrouter")
+        end
+      }.not_to change(ToolEvent, :count)
+
+      # The backfill must have seeded connector_event_dedup with the pre-existing event.
+      dedup = ConnectorEventDedup.find_by(
+        organization_id: organization.id,
+        tool_name:       "openrouter_api",
+        unique_key:      "external_id",
+        unique_value:    external_id
+      )
+      expect(dedup).to be_present
+      expect(dedup.tool_event_id).to eq(pre_existing.id)
+    end
+
     it "stores a friendly management-key error when OpenRouter activity sync is forbidden" do
       allow(job).to receive(:perform_json_get)
         .and_raise(StandardError, 'HTTP 403: {"error":{"message":"Only management keys can fetch activity for an account","code":403}}')
