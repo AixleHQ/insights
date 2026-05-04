@@ -55,6 +55,11 @@ class AiUsageSyncJob
 
   def reconcile_provider(org, connector, provider)
     usage_data = fetch_provider_usage(connector, provider)
+
+    # nil means the provider is not yet implemented — skip without touching the connector
+    # so its status doesn't falsely read as "connected / synced".
+    return 0 if usage_data.nil?
+
     if usage_data.blank?
       connector.mark_synced!
       return 0
@@ -96,12 +101,22 @@ class AiUsageSyncJob
       fetch_anthropic_usage(connector)
     when "openai"
       fetch_openai_usage(connector)
+    when "gemini"
+      nil # Not yet implemented — connector will be skipped without updating its status
     else
       nil
     end
   end
 
   def fetch_openrouter_usage(connector)
+    # When the OpenRouter Broadcast Webhook is active, per-request ToolEvents
+    # are created in real time by OpenrouterTraceJob. Skip Activity API polling
+    # to avoid creating duplicate daily-aggregate events alongside the per-request ones.
+    if connector.webhook_active?
+      Rails.logger.info("[AiUsageSyncJob] Skipping OpenRouter Activity poll for org #{connector.organization.slug} — webhook active")
+      return nil
+    end
+
     start_date = if connector.last_sync_at
       connector.last_sync_at.to_date - OPENROUTER_RECURRING_OVERLAP_DAYS.days
     else
@@ -127,9 +142,7 @@ class AiUsageSyncJob
     data = provider.fetch_usage(start_date: days_back.days.ago.to_date, end_date: Date.today)
     return nil unless data
 
-    Rails.logger.info("[Anthropic API] Raw usage data (#{data.size} entries): #{JSON.pretty_generate(data)}")
-
-    enriched = data.map do |entry|
+    data.map do |entry|
       cost = ModelPricingService.calculate_cost(
         tokens_in: entry[:tokens_in],
         tokens_out: entry[:tokens_out],
@@ -137,29 +150,12 @@ class AiUsageSyncJob
       )
       entry.merge(cost_usd: cost[:total_cost])
     end
-
-    Rails.logger.info("[Anthropic API] Enriched with cost (#{enriched.size} entries): #{JSON.pretty_generate(enriched)}")
-
-    enriched
   end
 
   def fetch_openai_usage(connector)
-    # OpenAI usage endpoint
-    uri = URI("https://api.openai.com/v1/usage")
-    uri.query = URI.encode_www_form(date: Date.today.to_s)
-
-    http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl = true
-
-    request = Net::HTTP::Get.new(uri)
-    request["Authorization"] = "Bearer #{connector.access_token}"
-
-    response = http.request(request)
-    return nil unless response.code.to_i == 200
-
-    data = JSON.parse(response.body)
-    # OpenAI returns aggregated usage, not individual requests
-    # This would need to be adapted based on actual API response
+    # Not yet implemented — OpenAI usage API returns aggregated data
+    # that requires additional mapping work. Returning nil so the connector
+    # status is not falsely updated. See reconcile_provider nil-guard.
     nil
   end
 
@@ -197,7 +193,8 @@ class AiUsageSyncJob
       model = row["model"]
       provider_slug = openrouter_provider_slug(row["provider_name"], model)
       canonical_model = openrouter_canonical_model(model, provider_slug)
-      endpoint_id = row["endpoint_id"].presence || "unknown-endpoint"
+      endpoint_id = row["endpoint_id"].presence ||
+        "unknown-#{Digest::SHA1.hexdigest(row.to_json)[0, 8]}"
       cost = row["usage"]
 
       {
@@ -227,6 +224,8 @@ class AiUsageSyncJob
   def perform_json_get(uri, access_token)
     http = Net::HTTP.new(uri.host, uri.port)
     http.use_ssl = true
+    http.open_timeout = 10
+    http.read_timeout = 30
 
     request = Net::HTTP::Get.new(uri)
     request["Authorization"] = "Bearer #{access_token}"

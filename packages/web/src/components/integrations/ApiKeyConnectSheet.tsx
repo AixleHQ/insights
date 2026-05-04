@@ -10,10 +10,12 @@ import {
   SheetDescription,
   SheetFooter,
 } from "@/components/ui/sheet";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ProviderLogo } from "@/components/icons";
+import { Check, Copy, ExternalLink, Zap } from "lucide-react";
 import type { ProviderInfo } from "./IntegrationCard";
 
 interface ApiKeyConnectSheetProps {
@@ -38,6 +40,15 @@ export function ApiKeyConnectSheet({
   const [apiKey, setApiKey] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const webhookUrl = `${window.location.origin}/api/v1/webhooks/openrouter_traces`;
+
+  const handleCopyWebhookUrl = async () => {
+    await navigator.clipboard.writeText(webhookUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
   const isOpenRouter = provider?.id === "openrouter";
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -119,6 +130,55 @@ export function ApiKeyConnectSheet({
               <p className="text-sm text-destructive">{error}</p>
             )}
           </div>
+
+          {isOpenRouter && (
+            <Alert>
+              <Zap className="size-4" />
+              <AlertTitle>Enable per-request tracking</AlertTitle>
+              <AlertDescription>
+                <p>
+                  After connecting, set up the OpenRouter Broadcast Webhook to
+                  get real-time per-request data instead of daily aggregates.
+                </p>
+                <ol className="mt-2 space-y-2 list-decimal list-inside">
+                  <li>
+                    Open{" "}
+                    <a
+                      href="https://openrouter.ai/settings/observability"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-0.5 underline underline-offset-2"
+                    >
+                      OpenRouter → Settings → Observability
+                      <ExternalLink className="size-3" />
+                    </a>
+                  </li>
+                  <li>Enable Broadcast and add a Webhook destination</li>
+                  <li className="list-item">
+                    <span>Set the URL to:</span>
+                    <div className="mt-1 flex items-stretch rounded bg-muted text-xs font-mono">
+                      <code className="flex-1 break-all px-2 py-1.5">
+                        {webhookUrl}
+                      </code>
+                      <button
+                        type="button"
+                        onClick={handleCopyWebhookUrl}
+                        className="shrink-0 border-l border-border px-2 text-muted-foreground transition-colors hover:text-foreground"
+                        aria-label="Copy webhook URL"
+                      >
+                        {copied ? (
+                          <Check className="size-3.5 text-green-500" />
+                        ) : (
+                          <Copy className="size-3.5" />
+                        )}
+                      </button>
+                    </div>
+                  </li>
+                  <li>Save and send a test request to verify</li>
+                </ol>
+              </AlertDescription>
+            </Alert>
+          )}
         </form>
 
         <SheetFooter>

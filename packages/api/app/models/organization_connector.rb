@@ -15,8 +15,11 @@ class OrganizationConnector < ApplicationRecord
   encrypts :refresh_token
   encrypts :webhook_secret
 
+  before_save :compute_key_hash, if: :access_token_changed?
+
   scope :active, -> { where.not(status: "disconnected") }
   scope :by_type, ->(type) { where(connector_type: type) }
+  scope :by_key_hash, ->(hash) { where(key_hash: hash) }
 
   def token_expired?
     return false if token_expires_at.nil?
@@ -88,5 +91,11 @@ class OrganizationConnector < ApplicationRecord
 
   def synced_event_last_occurred_at
     synced_event_scope.maximum(:occurred_at)
+  end
+
+  private
+
+  def compute_key_hash
+    self.key_hash = access_token.present? ? Digest::SHA256.hexdigest(access_token) : nil
   end
 end
