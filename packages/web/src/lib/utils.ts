@@ -59,6 +59,7 @@ const TOOL_NAME_MAP: Record<string, string> = {
   "claude-code": "Claude Code",
   "github_copilot": "GitHub Copilot",
   "github-copilot": "GitHub Copilot",
+  "gitlab": "GitLab",
   "cursor": "Cursor",
   "aider": "Aider",
   "codeium": "Codeium",

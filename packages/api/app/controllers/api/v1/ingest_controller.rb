@@ -35,7 +35,7 @@ module Api
         render json: { data: data }, status: :accepted
       rescue StandardError => e
         Rails.logger.error "[Ingest] Failed: #{e.message}"
-        render json: { error: "Processing failed", message: e.message }, status: :unprocessable_entity
+        render json: { error: "Processing failed", message: e.message }, status: :unprocessable_content
       end
 
       private

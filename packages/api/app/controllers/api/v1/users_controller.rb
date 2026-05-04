@@ -49,7 +49,7 @@ module Api
           render json: {
             error: "Unprocessable Entity",
             errors: format_validation_errors(current_user.errors)
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
       end
 
@@ -82,7 +82,7 @@ module Api
           return render json: {
             error: "Unprocessable Entity",
             errors: { value: [ error ] }
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
 
         setting = current_user.user_settings.find_or_initialize_by(key: params[:key])
@@ -94,7 +94,7 @@ module Api
           render json: {
             error: "Unprocessable Entity",
             errors: format_validation_errors(setting.errors)
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
       end
 

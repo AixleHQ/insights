@@ -55,6 +55,40 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       expect_success
       expect(json_data[:id]).to eq(project.id)
     end
+
+    it 'includes source control summary for linked gitlab repositories' do
+      connector = create(:organization_connector, organization: organization, connector_type: 'gitlab')
+      repository = create(:repository, organization_connector: connector, project: project)
+      create(:tool_event, organization: organization, project: project, repository: repository, tool_name: 'gitlab', event_type: 'commit')
+      create(:tool_event, organization: organization, project: project, repository: repository, tool_name: 'gitlab', event_type: 'review')
+      create(:tool_event, organization: organization, project: project, repository: repository, tool_name: 'gitlab', event_type: 'other', metadata: { pipeline_id: '123' })
+
+      authenticated_get "/api/v1/projects/#{project.id}", user: user
+
+      expect_success
+      summary = json_data[:sourceControlSummary].find { |item| item[:provider] == 'gitlab' }
+      expect(summary[:repositoryCount]).to eq(1)
+      expect(summary[:commitCount]).to eq(1)
+      expect(summary[:reviewCount]).to eq(1)
+      expect(summary[:pipelineCount]).to eq(1)
+      expect(summary).not_to have_key(:repository_count)
+      expect(summary).not_to have_key(:commit_count)
+      expect(summary).not_to have_key(:review_count)
+      expect(summary).not_to have_key(:pipeline_count)
+    end
+
+    it 'counts pipeline events only for the matching SCM tool_name' do
+      connector = create(:organization_connector, organization: organization, connector_type: 'gitlab')
+      repository = create(:repository, organization_connector: connector, project: project)
+      create(:tool_event, organization: organization, project: project, repository: repository, tool_name: 'gitlab', event_type: 'other', metadata: { pipeline_id: '1' })
+      create(:tool_event, organization: organization, project: project, repository: repository, tool_name: 'custom', event_type: 'other', metadata: { pipeline_id: '2' })
+
+      authenticated_get "/api/v1/projects/#{project.id}", user: user
+
+      expect_success
+      summary = json_data[:sourceControlSummary].find { |item| item[:provider] == 'gitlab' }
+      expect(summary[:pipelineCount]).to eq(1)
+    end
   end
 
   describe 'POST /api/v1/projects' do
@@ -434,7 +468,7 @@ RSpec.describe 'Api::V1::Projects', type: :request do
                           user: user,
                           params: { raw_event_ttl: 'invalid_value' }
 
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(json_response[:errors]).to be_present
     end
 

@@ -74,6 +74,44 @@ RSpec.describe 'Api::V1::Repositories', type: :request do
 
       expect_forbidden
     end
+
+    it 'links an existing org-level repository to the project' do
+      existing_repo = create(:repository, project: nil, organization_connector: connector, external_id: '12345')
+
+      expect {
+        authenticated_post "/api/v1/projects/#{project.id}/repositories",
+                           user: admin,
+                           params: {
+                             organization_connector_id: connector.id,
+                             external_id: '12345',
+                             name: existing_repo.name,
+                             full_name: existing_repo.full_name,
+                             url: existing_repo.url
+                           }
+      }.not_to change(Repository, :count)
+
+      expect_created
+      expect(existing_repo.reload.project_id).to eq(project.id)
+    end
+
+    it 'returns 422 when the repository is already linked to another project' do
+      other_project = create(:project, organization: organization, owner: nil)
+      create(:project_membership, user: admin, project: other_project, role: 'admin')
+      existing_repo = create(:repository, project: other_project, organization_connector: connector, external_id: '12345')
+
+      authenticated_post "/api/v1/projects/#{project.id}/repositories",
+                         user: admin,
+                         params: {
+                           organization_connector_id: connector.id,
+                           external_id: existing_repo.external_id,
+                           name: existing_repo.name,
+                           full_name: existing_repo.full_name,
+                           url: existing_repo.url
+                         }
+
+      expect_unprocessable
+      expect(json_response.dig(:errors, :external_id)).to include('repository is already linked to another project')
+    end
   end
 
   describe 'PATCH /api/v1/projects/:project_id/repositories/:id' do

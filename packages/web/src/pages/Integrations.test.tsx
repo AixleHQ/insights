@@ -42,11 +42,14 @@ import { useConnectors } from "@/hooks/useApi";
 
 const mockConnector = {
   id: "conn-1",
-  connector_type: "github",
+  connector_type: "gitlab",
   status: "connected" as const,
   external_account_name: "my-org",
   last_sync_at: null,
   last_error: null,
+  repository_count: 4,
+  synced_event_count: 12,
+  last_event_at: "2026-04-28T10:00:00Z",
 };
 
 function renderAt(path: string) {
@@ -152,6 +155,8 @@ describe("Integrations", () => {
 
       renderAt("/integrations/connected");
       expect(screen.getByText("my-org")).toBeInTheDocument();
+      expect(screen.getByText(/4 resources/i)).toBeInTheDocument();
+      expect(screen.getByText(/12 synced events/i)).toBeInTheDocument();
     });
   });
 
@@ -169,7 +174,7 @@ describe("Integrations", () => {
       } as ReturnType<typeof useConnectors>);
 
       renderAt("/integrations/available");
-      expect(screen.queryByText("GitHub")).not.toBeInTheDocument();
+      expect(screen.queryByText("GitLab")).not.toBeInTheDocument();
     });
   });
 });

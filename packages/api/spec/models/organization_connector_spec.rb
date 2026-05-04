@@ -149,6 +149,39 @@ RSpec.describe OrganizationConnector, type: :model do
     it 'returns nil for a source control connector' do
       expect(build(:organization_connector, connector_type: 'github').tool_event_name).to be_nil
     end
+
+    it 'returns nil for a project management connector' do
+      expect(build(:organization_connector, :jira).tool_event_name).to be_nil
+    end
+  end
+
+  describe '#synced_event_scope' do
+    let(:organization) { create(:organization) }
+
+    it 'scopes Jira connector events by tool_name jira' do
+      connector = create(:organization_connector, :jira, organization: organization)
+      create(:tool_event, organization: organization, tool_name: 'jira', event_type: 'issue')
+      create(:tool_event, organization: organization, tool_name: 'linear', event_type: 'issue')
+
+      expect(connector.synced_event_scope.count).to eq(1)
+      expect(connector.synced_event_scope.pick(:tool_name)).to eq('jira')
+    end
+
+    it 'scopes Linear connector events by tool_name linear' do
+      connector = create(:organization_connector, connector_type: 'linear', organization: organization)
+      create(:tool_event, organization: organization, tool_name: 'linear', event_type: 'issue')
+      create(:tool_event, organization: organization, tool_name: 'jira', event_type: 'issue')
+
+      expect(connector.synced_event_scope.count).to eq(1)
+      expect(connector.synced_event_scope.pick(:tool_name)).to eq('linear')
+    end
+
+    it 'returns none for connectors without a tool event mapping' do
+      connector = create(:organization_connector, :slack, organization: organization)
+      create(:tool_event, organization: organization, tool_name: 'claude_code')
+
+      expect(connector.synced_event_scope.count).to eq(0)
+    end
   end
 
   describe '#mark_synced!' do

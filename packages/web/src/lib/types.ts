@@ -83,6 +83,17 @@ export interface ProjectWithStats extends Project {
   connectors: { id: string; provider: string }[];
   jiraProjectKey?: string | null;
   jiraConnectorId?: string | null;
+  sourceControlSummary?: SourceControlSummary[];
+}
+
+export interface SourceControlSummary {
+  provider: string;
+  repositoryCount: number;
+  commitCount: number;
+  reviewCount: number;
+  pipelineCount: number;
+  lastActivityAt: string | null;
+  lastSyncAt: string | null;
 }
 
 // Connector types
@@ -106,6 +117,12 @@ export interface Connector {
   last_sync_at?: string | null;
   lastError?: string | null;
   last_error?: string | null;
+  repositoryCount?: number;
+  repository_count?: number;
+  syncedEventCount?: number;
+  synced_event_count?: number;
+  lastEventAt?: string | null;
+  last_event_at?: string | null;
   tokenExpired?: boolean;
   token_expired?: boolean;
   createdAt?: string;
@@ -165,7 +182,15 @@ export interface ToolAccount {
 
 // Event types
 export type RiskLevel = "none" | "low" | "medium" | "high" | "critical";
-export type EventType = "completion" | "prompt" | "chat" | "edit" | "generation";
+export type EventType =
+  | "completion"
+  | "prompt"
+  | "chat"
+  | "edit"
+  | "generation"
+  | "commit"
+  | "review"
+  | "other";
 
 export interface ToolEvent {
   id: string;

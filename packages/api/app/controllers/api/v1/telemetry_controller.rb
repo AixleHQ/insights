@@ -28,7 +28,7 @@ module Api
         }, status: :accepted
       rescue StandardError => e
         Rails.logger.error "[Telemetry] Ingest failed: #{e.message}"
-        render json: { error: "Processing failed", message: e.message }, status: :unprocessable_entity
+        render json: { error: "Processing failed", message: e.message }, status: :unprocessable_content
       end
 
       # POST /api/v1/organizations/:organization_id/telemetry/batch

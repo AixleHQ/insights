@@ -2,6 +2,7 @@
 
 module Oauth
   MissingCredentialsError = Class.new(StandardError)
+  TokenRefreshError = Class.new(StandardError)
 
   class BaseProvider
     attr_reader :connector
@@ -151,6 +152,22 @@ module Oauth
     end
 
     protected
+
+    def ensure_fresh_token!
+      return unless connector.token_expired?
+
+      refreshed = refresh_token!
+      unless refreshed
+        connector.mark_error!("Token expired and could not be refreshed. Please reconnect the integration.")
+        raise Oauth::TokenRefreshError, "Token expired and could not be refreshed. Please reconnect the integration."
+      end
+
+      reset_http_client!
+    end
+
+    def reset_http_client!
+      @http_client = nil
+    end
 
     def http_client
       @http_client ||= Faraday.new do |conn|

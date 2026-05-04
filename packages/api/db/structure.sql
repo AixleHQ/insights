@@ -194,7 +194,8 @@ CREATE TYPE public.tool_name AS ENUM (
     'custom',
     'jira',
     'linear',
-    'github'
+    'github',
+    'gitlab'
 );
 
 
@@ -1237,7 +1238,8 @@ CREATE TABLE public.organization_connectors (
     updated_at timestamp(6) without time zone NOT NULL,
     external_account_id character varying,
     external_account_name character varying,
-    status character varying DEFAULT 'connected'::character varying NOT NULL
+    status character varying DEFAULT 'connected'::character varying NOT NULL,
+    pending_activity_jobs integer
 );
 
 
@@ -4074,6 +4076,8 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260501151101'),
+('20260429123244'),
 ('20260429000001'),
 ('20260428125537'),
 ('20260424000003'),

@@ -40,7 +40,7 @@ module Api
           render json: {
             error: "Unprocessable Entity",
             errors: format_validation_errors(@tool_account.errors)
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
       end
 
@@ -54,7 +54,7 @@ module Api
           render json: {
             error: "Unprocessable Entity",
             errors: format_validation_errors(@tool_account.errors)
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
       end
 

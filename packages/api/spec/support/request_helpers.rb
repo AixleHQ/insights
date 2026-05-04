@@ -46,7 +46,7 @@ module RequestHelpers
   end
 
   def expect_unprocessable
-    expect(response).to have_http_status(:unprocessable_entity)
+    expect(response).to have_http_status(:unprocessable_content)
   end
 
   def expect_bad_request

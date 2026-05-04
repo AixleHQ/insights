@@ -343,7 +343,7 @@ module Api
       def set_tool_scope
         tool = params[:tool_name]
         unless ToolEvent::TOOL_NAMES.include?(tool)
-          return render json: { error: "Unknown tool: #{tool}" }, status: :unprocessable_entity
+          return render json: { error: "Unknown tool: #{tool}" }, status: :unprocessable_content
         end
 
         @tool_name = tool

@@ -34,6 +34,21 @@ describe("IntegrationCard — connected integration", () => {
       render(<IntegrationCard integration={baseIntegration} />);
       expect(screen.queryByText(/last synced/i)).not.toBeInTheDocument();
     });
+
+    it("shows synced event metadata when present", () => {
+      render(
+        <IntegrationCard
+          integration={{
+            ...baseIntegration,
+            metadata: { resources_count: 3, event_count: 27 },
+            last_event_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+          }}
+        />
+      );
+
+      expect(screen.getByText(/27 synced events/i)).toBeInTheDocument();
+      expect(screen.getByText(/3 resources/i)).toBeInTheDocument();
+    });
   });
 
   describe("status badge", () => {

@@ -775,6 +775,13 @@ export function useCreateConnector() {
       api.post<Connector>(`/organizations/${orgId}/connectors/callback`, {
         code,
         connector_type: connectorType,
+      }, {
+        // Rails sets current_organization from this header only (see ApplicationController#set_current_organization);
+        // the :organization_id path segment is not used for org context. Global api.ts also adds the header when
+        // currentOrgId is set — this explicit value covers OAuth return paths where OrgContext may not have synced yet.
+        headers: {
+          "X-Organization-ID": orgId,
+        },
       }),
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
