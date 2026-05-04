@@ -20,7 +20,7 @@ module Api
             return render json: {
               error: "Unprocessable Entity",
               errors: { tool_name: [ "must be one of: #{SUPPORTED_TOOLS.join(', ')}" ] }
-            }, status: :unprocessable_entity
+            }, status: :unprocessable_content
           end
 
           membership = primary_membership
@@ -32,7 +32,7 @@ module Api
               return render json: {
                 error: "Unprocessable Entity",
                 errors: format_validation_errors(tool_account.errors)
-              }, status: :unprocessable_entity
+              }, status: :unprocessable_content
             end
           else
             tool_account.rotate_ingest_token!
