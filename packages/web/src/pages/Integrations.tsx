@@ -316,9 +316,9 @@ export function Integrations() {
         copilotConnector: c.copilotConnector,
         seatCount: c.seatCount,
         activeUsersCount: c.activeUsersCount,
-        webhookActive: connectorType === "openrouter" ? (c.webhookActive ?? c.webhook_active ?? false) : undefined,
-        webhookToken: connectorType === "openrouter" ? (c.webhookToken ?? c.webhook_token ?? undefined) : undefined,
-        webhookSecretSet: connectorType === "openrouter" ? (c.webhookSecretSet ?? c.webhook_secret_set ?? false) : undefined,
+        webhookActive: connectorType === "openrouter" ? (c.webhookActive ?? false) : undefined,
+        webhookToken: connectorType === "openrouter" ? c.webhookToken : undefined,
+        webhookSecretSet: connectorType === "openrouter" ? (c.webhookSecretSet ?? false) : undefined,
       };
     });
 

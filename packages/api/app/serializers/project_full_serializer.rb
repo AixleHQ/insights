@@ -103,44 +103,25 @@ class ProjectFullSerializer < ProjectSerializer
   end
 
   attribute :issue_throughput_summary do |project|
-    next [] unless project.organization
+    # Use pre-loaded project_settings (via .to_a) to avoid extra queries.
+    linear_connector_id = project.project_settings.to_a.find { |s| s.key == "linear_connector_id" }&.value
+    next [] if linear_connector_id.blank?
 
-    member_ids = project.members.pluck(:id)
-    next [] if member_ids.empty?
+    # project.issues is already scoped to this project — no org-wide fan-out.
+    issues = project.issues.where(organization_connector_id: linear_connector_id).to_a
+    next [] if issues.empty?
 
-    events = project.organization.tool_events
-                    .where(tool_name: "linear", user_id: member_ids)
-                    .where(event_type: %w[issue sprint])
-                    .order(occurred_at: :desc)
-                    .limit(1000)
-                    .to_a
-
-    next [] if events.empty?
-
-    issue_events = events.select { |event| event.event_type == "issue" }
-    sprint_events = events.select { |event| event.event_type == "sprint" }
-
-    latest_issue_snapshots = issue_events.each_with_object({}) do |event, snapshots|
-      issue_id = event.metadata["issue_id"]
-      next if issue_id.blank?
-      next unless event.metadata["action"] == "synced"
-
-      snapshots[issue_id] ||= event
-    end
+    connector = project.organization&.organization_connectors&.find_by(id: linear_connector_id)
 
     [
       {
-        "provider" => "linear",
-        "issueCount" => latest_issue_snapshots.size,
-        "completedCount" => latest_issue_snapshots.values.count { |event| event.metadata["state_type"] == "completed" },
-        "stateChangeCount" => issue_events.count do |event|
-          event.metadata["action"] == "state_changed" ||
-            event.metadata["from_state_id"].present? ||
-            event.metadata["to_state_id"].present?
-        end,
-        "cycleCount" => sprint_events.map { |event| event.metadata["cycle_id"] }.compact.uniq.count,
-        "lastActivityAt" => events.max_by(&:occurred_at)&.occurred_at&.iso8601,
-        "lastSyncAt" => project.organization.organization_connectors.find_by(connector_type: "linear")&.last_sync_at&.iso8601
+        "provider"         => "linear",
+        "issueCount"       => issues.size,
+        "completedCount"   => issues.count { |i| i.status_category == "done" },
+        "stateChangeCount" => issues.count { |i| i.external_updated_at && i.external_created_at && i.external_updated_at != i.external_created_at },
+        "cycleCount"       => issues.filter_map { |i| i.metadata&.dig("cycle_id") }.uniq.size,
+        "lastActivityAt"   => issues.filter_map(&:external_updated_at).max&.iso8601,
+        "lastSyncAt"       => connector&.last_sync_at&.iso8601
       }
     ]
   end

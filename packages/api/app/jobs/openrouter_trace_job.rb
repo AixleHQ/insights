@@ -20,6 +20,7 @@
 # the webhook job overwrites it with precise per-request data.
 class OpenrouterTraceJob
   include Sidekiq::Job
+  include OpenrouterModelHelper
 
   sidekiq_options queue: "ai", retry: 3
 
@@ -46,7 +47,11 @@ class OpenrouterTraceJob
       event_data = build_event_data(span, attrs, connector)
       next if event_data.nil?
 
-      upsert_tool_event(event_data, connector)
+      ToolEvents::ConnectorUpsert.call(
+        unique_key:   "external_id",
+        unique_value: event_data.dig(:metadata, :external_id),
+        **event_data
+      )
       upserted += 1
     end
 
@@ -113,33 +118,6 @@ class OpenrouterTraceJob
     }
   end
 
-  def upsert_tool_event(event_data, connector)
-    external_id = event_data.dig(:metadata, :external_id)
-    existing = connector.organization.tool_events
-                        .where(tool_name: "openrouter_api")
-                        .where("metadata->>'external_id' = ?", external_id)
-                        .first
-
-    if existing
-      metadata = existing.metadata.is_a?(Hash) ? existing.metadata.deep_stringify_keys : {}
-      merged_metadata = metadata.merge(event_data[:metadata].stringify_keys)
-
-      existing.update!(
-        model: event_data[:model],
-        tokens_in: event_data[:tokens_in],
-        tokens_out: event_data[:tokens_out],
-        cost_usd: event_data[:cost_usd],
-        occurred_at: event_data[:occurred_at],
-        duration_ms: event_data[:duration_ms],
-        metadata: merged_metadata
-      )
-    else
-      ToolEvent.create!(event_data)
-    end
-  rescue ActiveRecord::RecordInvalid => e
-    Rails.logger.error("[OpenrouterTraceJob] Failed to upsert event (external_id=#{external_id}): #{e.message}")
-  end
-
   def extract_spans(payload)
     Array(payload["resourceSpans"]).flat_map do |rs|
       Array(rs["scopeSpans"]).flat_map { |ss| Array(ss["spans"]) }
@@ -168,19 +146,5 @@ class OpenrouterTraceJob
   def parse_duration_ms(start_nano, end_nano)
     return nil if start_nano.blank? || end_nano.blank?
     ((end_nano.to_i - start_nano.to_i) / 1_000_000.0).round
-  end
-
-  def openrouter_provider_slug(provider_name, model)
-    return model.split("/").first.downcase if model.to_s.include?("/")
-    return if provider_name.blank?
-
-    provider_name.to_s.downcase.strip.gsub(/[^a-z0-9]+/, "_").gsub(/\A_|_\z/, "")
-  end
-
-  def openrouter_canonical_model(model, provider_slug)
-    return if model.blank?
-    return model if model.include?("/")
-
-    provider_slug.present? ? "#{provider_slug}/#{model}" : model
   end
 end

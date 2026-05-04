@@ -2,6 +2,7 @@
 
 class AiUsageSyncJob
   include Sidekiq::Job
+  include OpenrouterModelHelper
 
   sidekiq_options queue: "ai", retry: 3
 
@@ -335,20 +336,6 @@ class AiUsageSyncJob
     end
 
     JSON.parse(response.body)
-  end
-
-  def openrouter_provider_slug(provider_name, model)
-    return model.split("/").first.downcase if model.to_s.include?("/")
-    return if provider_name.blank?
-
-    provider_name.to_s.downcase.strip.gsub(/[^a-z0-9]+/, "_").gsub(/\A_|_\z/, "")
-  end
-
-  def openrouter_canonical_model(model, provider_slug)
-    return if model.blank?
-    return model if model.include?("/")
-
-    provider_slug.present? ? "#{provider_slug}/#{model}" : model
   end
 
   def tool_event_attributes_for_usage(usage)
