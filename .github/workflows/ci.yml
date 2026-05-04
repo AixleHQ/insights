@@ -160,7 +160,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # Need >= 22.6 for `node --experimental-strip-types` (TS execution).
+          node-version: '22'
       - name: Verify all plans fit Sonnet's context window
         run: |
           set -euo pipefail
