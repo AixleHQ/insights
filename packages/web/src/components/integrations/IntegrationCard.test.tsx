@@ -15,6 +15,7 @@ const anthropicProvider: ProviderInfo = {
   name: "Anthropic API",
   description: "Direct Anthropic API integration",
   category: "ai",
+  scope: "org",
   features: ["API key management", "Usage monitoring", "Cost tracking"],
   available: true,
 };
