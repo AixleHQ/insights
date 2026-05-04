@@ -266,8 +266,8 @@ class LinearSyncJob < ApplicationJob
         status_category: map_status_category(issue[:state_type]),
         issue_type: "Issue",
         priority: issue[:priority]&.to_s,
-        jira_project_key: issue[:team_key].presence || issue[:project_name].presence || "LINEAR",
-        jira_project_id: issue[:project_id].presence || issue[:team_id].presence || issue[:external_id],
+        provider_project_key: issue[:team_key].presence || issue[:project_name].presence || "LINEAR",
+        provider_project_id: issue[:project_id].presence || issue[:team_id].presence || issue[:external_id],
         assignee_account_id: issue[:assignee_id],
         assignee_name: issue[:assignee_name],
         reporter_name: issue[:creator_name],
@@ -297,7 +297,7 @@ class LinearSyncJob < ApplicationJob
       unique_by: %i[organization_connector_id project_id external_id],
       update_only: %i[
         assignee_id key summary status status_category issue_type priority
-        jira_project_key jira_project_id assignee_account_id assignee_name reporter_name
+        provider_project_key provider_project_id assignee_account_id assignee_name reporter_name
         metadata external_created_at external_updated_at synced_at updated_at
       ],
       record_timestamps: false

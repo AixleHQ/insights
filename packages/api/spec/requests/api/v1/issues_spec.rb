@@ -110,7 +110,7 @@ RSpec.describe 'Api::V1::Issues', type: :request do
       expect(issue_data).to have_key(:statusCategory)
       expect(issue_data).to have_key(:issueType)
       expect(issue_data).to have_key(:priority)
-      expect(issue_data).to have_key(:jiraProjectKey)
+      expect(issue_data).to have_key(:providerProjectKey)
       expect(issue_data).to have_key(:labels)
     end
   end

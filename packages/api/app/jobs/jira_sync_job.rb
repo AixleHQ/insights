@@ -114,7 +114,7 @@ class JiraSyncJob < ApplicationJob
       unique_by: %i[organization_connector_id project_id external_id],
       update_only: %i[
         summary status status_category issue_type priority
-        assignee_id assignee_name reporter_name jira_project_key jira_project_id
+        assignee_id assignee_name reporter_name provider_project_key provider_project_id
         parent_key labels due_date external_created_at external_updated_at
         synced_at updated_at
       ],

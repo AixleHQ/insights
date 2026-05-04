@@ -1216,8 +1216,8 @@ CREATE TABLE public.issues (
     status_category character varying,
     issue_type character varying,
     priority character varying,
-    jira_project_key character varying NOT NULL,
-    jira_project_id character varying NOT NULL,
+    provider_project_key character varying NOT NULL,
+    provider_project_id character varying NOT NULL,
     assignee_account_id character varying,
     assignee_name character varying,
     reporter_name character varying,
@@ -4134,6 +4134,7 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260504082100'),
 ('20260502155716'),
 ('20260502121500'),
 ('20260501151101'),

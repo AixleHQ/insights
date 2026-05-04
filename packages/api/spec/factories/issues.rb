@@ -13,8 +13,8 @@ FactoryBot.define do
     status_category { "indeterminate" }
     issue_type { "Story" }
     priority { "Medium" }
-    jira_project_key { "PROJ" }
-    jira_project_id { "10000" }
+    provider_project_key { "PROJ" }
+    provider_project_id { "10000" }
     assignee_name { Faker::Name.name }
     reporter_name { Faker::Name.name }
     labels { [] }
