@@ -95,7 +95,7 @@ export function ConnectLinearSheet({ projectId, open, onOpenChange, onSuccess }:
             <SheetTitle>Connect Linear Project</SheetTitle>
           </div>
           <SheetDescription>
-            Select a Linear account and choose a project to link to this db90 project.
+            Select a Linear account and choose a project to link to this DB90 project.
           </SheetDescription>
         </SheetHeader>
 

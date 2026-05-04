@@ -318,8 +318,8 @@ module Api
       end
 
       # POST /api/v1/projects/:id/sync_issues
-      # Runs the Jira issue sync synchronously so the response returns only
-      # after issues are updated in the DB — no polling needed on the client.
+      # Enqueues the issue sync job and returns 202 immediately. Clients should
+      # poll the connector's last_synced_at to detect when the sync completes.
       def sync_issues
         authorize! @project, to: :update?
 
@@ -331,14 +331,14 @@ module Api
         connector = @project.organization.organization_connectors.find(connector_id)
         case connector.connector_type
         when "jira"
-          JiraSyncJob.perform_now(connector.id, "sync", project_id: @project.id)
+          JiraSyncJob.perform_later(connector.id, "sync", project_id: @project.id)
         when "linear"
-          LinearSyncJob.perform_now(connector.id, "sync", project_id: @project.id)
+          LinearSyncJob.perform_later(connector.id, "sync", project_id: @project.id)
         else
           return render json: { error: "Unsupported issue provider" }, status: :unprocessable_content
         end
 
-        render json: { data: { synced_at: Time.current } }
+        render json: { data: { queued: true } }, status: :accepted
       rescue ActiveRecord::RecordNotFound
         render json: { error: "Connector not found" }, status: :not_found
       rescue StandardError => e

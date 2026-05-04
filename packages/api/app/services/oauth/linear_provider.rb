@@ -189,14 +189,19 @@ module Oauth
 
       issues = []
       cursor = nil
+      pages_fetched = 0
+      max_pages = ENV.fetch("LINEAR_MAX_PAGES", 200).to_i
 
       loop do
         data = graphql_data(query, variables: { first: 50, after: cursor, filter: filter.presence })
         issue_nodes = data.dig("issues", "nodes") || []
         issues.concat(issue_nodes.map { |issue| map_issue(issue) })
 
+        pages_fetched += 1
+
         page_info = data.dig("issues", "pageInfo") || {}
         break unless page_info["hasNextPage"]
+        break if pages_fetched >= max_pages
 
         cursor = page_info["endCursor"]
         break if cursor.blank?

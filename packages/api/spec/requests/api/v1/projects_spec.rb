@@ -664,15 +664,15 @@ RSpec.describe 'Api::V1::Projects', type: :request do
     before do
       project.project_settings.create!(key: 'jira_connector_id', value: connector.id.to_s)
       project.project_settings.create!(key: 'jira_project_key', value: 'SCRUM')
-      allow(JiraSyncJob).to receive(:perform_now)
+      allow(JiraSyncJob).to receive(:perform_later)
     end
 
-    it 'runs the sync job synchronously and returns synced_at' do
+    it 'enqueues the sync job and returns 202 with queued: true' do
       authenticated_post "/api/v1/projects/#{project.id}/sync_issues", user: user
 
-      expect_success
-      expect(json_data[:synced_at]).to be_present
-      expect(JiraSyncJob).to have_received(:perform_now).with(connector.id, 'sync', project_id: project.id)
+      expect(response).to have_http_status(:accepted)
+      expect(json_data[:queued]).to be true
+      expect(JiraSyncJob).to have_received(:perform_later).with(connector.id, 'sync', project_id: project.id)
     end
 
     it 'returns 422 when no Jira project is linked' do
@@ -694,12 +694,12 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       project.project_settings.where(key: %w[jira_connector_id jira_project_key]).destroy_all
       project.project_settings.create!(key: 'linear_connector_id', value: linear_connector.id.to_s)
       project.project_settings.create!(key: 'linear_project_id', value: 'project-1')
-      allow(LinearSyncJob).to receive(:perform_now)
+      allow(LinearSyncJob).to receive(:perform_later)
 
       authenticated_post "/api/v1/projects/#{project.id}/sync_issues", user: user
 
-      expect_success
-      expect(LinearSyncJob).to have_received(:perform_now).with(linear_connector.id, 'sync', project_id: project.id)
+      expect(response).to have_http_status(:accepted)
+      expect(LinearSyncJob).to have_received(:perform_later).with(linear_connector.id, 'sync', project_id: project.id)
     end
 
     it 'returns 422 when the linked connector type is not supported' do

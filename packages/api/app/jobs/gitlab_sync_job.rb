@@ -247,49 +247,55 @@ class GitlabSyncJob < ApplicationJob
   end
 
   def persist_merge_requests(repository, merge_requests)
-    merge_requests.each do |mr|
-      ToolEvents::ConnectorUpsert.call(
-        unique_key: "mr_iid",
-        unique_value: mr[:iid],
+    return if merge_requests.empty?
+
+    records = merge_requests.map do |mr|
+      {
+        unique_value:    mr[:iid].to_s,
         organization_id: @connector.organization_id,
-        repository_id: repository.id,
-        project_id: repository.project_id,
-        tool_name: "gitlab",
-        event_type: "review",
-        occurred_at: Time.parse(mr[:updated_at]),
+        repository_id:   repository.id,
+        project_id:      repository.project_id,
+        tool_name:       "gitlab",
+        event_type:      "review",
+        occurred_at:     Time.parse(mr[:updated_at]),
         metadata: {
-          mr_iid: mr[:iid],
-          mr_title: mr[:title],
-          mr_state: mr[:state],
+          mr_iid:        mr[:iid],
+          mr_title:      mr[:title],
+          mr_state:      mr[:state],
           repository_id: repository.id,
-          author: mr[:author_username],
-          url: mr[:web_url]
+          author:        mr[:author_username],
+          url:           mr[:web_url]
         }
-      )
+      }
     end
+
+    ToolEvents::BatchConnectorUpsert.call(unique_key: "mr_iid", records:)
   end
 
   def persist_pipelines(repository, pipelines)
-    pipelines.each do |pipeline|
-      ToolEvents::ConnectorUpsert.call(
-        unique_key: "pipeline_id",
-        unique_value: pipeline[:id],
+    return if pipelines.empty?
+
+    records = pipelines.map do |pipeline|
+      {
+        unique_value:    pipeline[:id].to_s,
         organization_id: @connector.organization_id,
-        repository_id: repository.id,
-        project_id: repository.project_id,
-        tool_name: "gitlab",
-        event_type: "other",
-        occurred_at: Time.parse(pipeline[:updated_at]),
+        repository_id:   repository.id,
+        project_id:      repository.project_id,
+        tool_name:       "gitlab",
+        event_type:      "other",
+        occurred_at:     Time.parse(pipeline[:updated_at]),
         metadata: {
-          pipeline_id: pipeline[:id],
-          status: pipeline[:status],
-          ref: pipeline[:ref],
+          pipeline_id:   pipeline[:id],
+          status:        pipeline[:status],
+          ref:           pipeline[:ref],
           repository_id: repository.id,
-          duration: pipeline[:duration],
-          sha: pipeline[:sha],
-          url: pipeline[:web_url]
+          duration:      pipeline[:duration],
+          sha:           pipeline[:sha],
+          url:           pipeline[:web_url]
         }
-      )
+      }
     end
+
+    ToolEvents::BatchConnectorUpsert.call(unique_key: "pipeline_id", records:)
   end
 end

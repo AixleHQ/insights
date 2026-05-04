@@ -260,49 +260,55 @@ class BitbucketSyncJob < ApplicationJob
   end
 
   def sync_pull_requests_data(repository, pull_requests)
-    pull_requests.each do |pull_request|
-      ToolEvents::ConnectorUpsert.call(
-        unique_key: "pullrequest_id",
-        unique_value: pull_request[:id],
+    return if pull_requests.empty?
+
+    records = pull_requests.map do |pull_request|
+      {
+        unique_value:    pull_request[:id].to_s,
         organization_id: @connector.organization_id,
-        repository_id: repository.id,
-        project_id: repository.project_id,
-        tool_name: "bitbucket",
-        event_type: "review",
-        occurred_at: Time.parse(pull_request[:updated_at] || Time.current.iso8601),
+        repository_id:   repository.id,
+        project_id:      repository.project_id,
+        tool_name:       "bitbucket",
+        event_type:      "review",
+        occurred_at:     Time.parse(pull_request[:updated_at] || Time.current.iso8601),
         metadata: {
           pullrequest_id: pull_request[:id],
-          pr_title: pull_request[:title],
-          pr_state: pull_request[:state],
-          repository_id: repository.id,
-          author: pull_request[:author_username],
-          url: pull_request[:web_url]
+          pr_title:       pull_request[:title],
+          pr_state:       pull_request[:state],
+          repository_id:  repository.id,
+          author:         pull_request[:author_username],
+          url:            pull_request[:web_url]
         }
-      )
+      }
     end
+
+    ToolEvents::BatchConnectorUpsert.call(unique_key: "pullrequest_id", records:)
   end
 
   def sync_pipelines_data(repository, pipelines)
-    pipelines.each do |pipeline|
-      ToolEvents::ConnectorUpsert.call(
-        unique_key: "pipeline_id",
-        unique_value: pipeline[:id],
+    return if pipelines.empty?
+
+    records = pipelines.map do |pipeline|
+      {
+        unique_value:    pipeline[:id].to_s,
         organization_id: @connector.organization_id,
-        repository_id: repository.id,
-        project_id: repository.project_id,
-        tool_name: "bitbucket",
-        event_type: "other",
-        occurred_at: Time.parse(pipeline[:updated_at] || Time.current.iso8601),
+        repository_id:   repository.id,
+        project_id:      repository.project_id,
+        tool_name:       "bitbucket",
+        event_type:      "other",
+        occurred_at:     Time.parse(pipeline[:updated_at] || Time.current.iso8601),
         metadata: {
-          pipeline_id: pipeline[:id],
-          status: pipeline[:status],
-          ref: pipeline[:ref],
+          pipeline_id:   pipeline[:id],
+          status:        pipeline[:status],
+          ref:           pipeline[:ref],
           repository_id: repository.id,
-          sha: pipeline[:sha],
-          url: pipeline[:web_url]
+          sha:           pipeline[:sha],
+          url:           pipeline[:web_url]
         }
-      )
+      }
     end
+
+    ToolEvents::BatchConnectorUpsert.call(unique_key: "pipeline_id", records:)
   end
 
   def repository_coordinates(repository)

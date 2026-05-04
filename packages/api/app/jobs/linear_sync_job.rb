@@ -60,9 +60,7 @@ class LinearSyncJob < ApplicationJob
 
   def sync_recent_activity
     issues = provider.fetch_issues(updated_after: SYNC_WINDOW.ago)
-    issues.each do |issue|
-      create_or_update_issue_snapshot(issue)
-    end
+    batch_upsert_snapshots(issues)
   end
 
   def sync_single_project_issues(project_id)
@@ -214,6 +212,25 @@ class LinearSyncJob < ApplicationJob
     )
   end
 
+  def batch_upsert_snapshots(issues)
+    return if issues.empty?
+
+    records = issues.map do |issue|
+      user = resolve_issue_user(issue)
+      {
+        unique_value:    issue[:external_id],
+        organization_id: @connector.organization_id,
+        user_id:         user&.id,
+        tool_name:       "linear",
+        event_type:      "issue",
+        occurred_at:     parse_time(issue[:updated_at]) || parse_time(issue[:created_at]) || Time.current,
+        metadata:        issue_metadata(issue).merge(action: "synced", issue_snapshot_id: issue[:external_id])
+      }
+    end
+
+    ToolEvents::BatchConnectorUpsert.call(unique_key: "issue_snapshot_id", records:)
+  end
+
   def create_or_update_issue_snapshot(issue)
     user = resolve_issue_user(issue)
 
@@ -255,7 +272,7 @@ class LinearSyncJob < ApplicationJob
         assignee_name: issue[:assignee_name],
         reporter_name: issue[:creator_name],
         parent_key: nil,
-        labels: [],
+        labels: [], # TODO: fetch and map Linear labels (issue[:label_ids] via labelsForIssue query)
         due_date: nil,
         metadata: {
           provider: "linear",
@@ -277,7 +294,7 @@ class LinearSyncJob < ApplicationJob
 
     Issue.upsert_all(
       rows,
-      unique_by: %i[organization_connector_id external_id],
+      unique_by: %i[organization_connector_id project_id external_id],
       update_only: %i[
         assignee_id key summary status status_category issue_type priority
         jira_project_key jira_project_id assignee_account_id assignee_name reporter_name
@@ -338,6 +355,7 @@ class LinearSyncJob < ApplicationJob
   end
 
   def ensure_valid_token!
+    # nil means the provider didn't return expires_in → refresh defensively
     return if @connector.token_expires_at && @connector.token_expires_at > 5.minutes.from_now
 
     provider.refresh_token!

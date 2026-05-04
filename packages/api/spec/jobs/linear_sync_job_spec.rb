@@ -85,7 +85,7 @@ RSpec.describe LinearSyncJob, type: :job do
     ).to eq(1)
   end
 
-  it 'does not overwrite project_id of an issue already owned by another project' do
+  it 'creates a separate issue row per DB90 project when two projects link the same Linear project' do
     project_a = create(:project, organization: organization)
     project_b = create(:project, organization: organization)
 
@@ -95,12 +95,11 @@ RSpec.describe LinearSyncJob, type: :job do
     project_b.project_settings.create!(key: 'linear_project_id', value: 'project-1')
 
     described_class.perform_now(connector.id, 'sync', project_id: project_a.id)
-    issue = Issue.find_by!(organization_connector: connector, external_id: 'issue-1')
-    expect(issue.project_id).to eq(project_a.id)
-
     described_class.perform_now(connector.id, 'sync', project_id: project_b.id)
-    issue.reload
-    expect(issue.project_id).to eq(project_a.id), 'project_id must not be overwritten by a second sync'
+
+    rows = Issue.where(organization_connector: connector, external_id: 'issue-1')
+    expect(rows.count).to eq(2)
+    expect(rows.pluck(:project_id)).to contain_exactly(project_a.id, project_b.id)
   end
 
   it 'refreshes the token when it is about to expire' do

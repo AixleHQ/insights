@@ -1145,6 +1145,41 @@ CREATE TABLE public.audit_logs (
 
 
 --
+-- Name: connector_event_dedup; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.connector_event_dedup (
+    id bigint NOT NULL,
+    organization_id uuid NOT NULL,
+    tool_name character varying NOT NULL,
+    event_type character varying NOT NULL,
+    unique_key character varying NOT NULL,
+    unique_value character varying NOT NULL,
+    tool_event_id uuid NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: connector_event_dedup_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.connector_event_dedup_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: connector_event_dedup_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.connector_event_dedup_id_seq OWNED BY public.connector_event_dedup.id;
+
+
+--
 -- Name: invitations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2155,6 +2190,14 @@ ALTER TABLE ONLY public.audit_logs
 
 
 --
+-- Name: connector_event_dedup connector_event_dedup_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_event_dedup
+    ADD CONSTRAINT connector_event_dedup_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: invitations invitations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2932,6 +2975,20 @@ CREATE INDEX compress_hyper_2_1416_chunk_organization_id_user_id__ts_met_idx ON 
 
 
 --
+-- Name: idx_connector_event_dedup_event_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_connector_event_dedup_event_id ON public.connector_event_dedup USING btree (tool_event_id);
+
+
+--
+-- Name: idx_connector_event_dedup_lookup; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_connector_event_dedup_lookup ON public.connector_event_dedup USING btree (organization_id, tool_name, event_type, unique_key, unique_value);
+
+
+--
 -- Name: idx_on_organization_id_connector_type_ebd5fb8c77; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3044,6 +3101,13 @@ CREATE INDEX index_issues_on_assignee_id ON public.issues USING btree (assignee_
 
 
 --
+-- Name: index_issues_on_connector_project_external_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_issues_on_connector_project_external_id ON public.issues USING btree (organization_connector_id, project_id, external_id);
+
+
+--
 -- Name: index_issues_on_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3055,13 +3119,6 @@ CREATE INDEX index_issues_on_key ON public.issues USING btree (key);
 --
 
 CREATE INDEX index_issues_on_organization_connector_id ON public.issues USING btree (organization_connector_id);
-
-
---
--- Name: index_issues_on_organization_connector_id_and_external_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX index_issues_on_organization_connector_id_and_external_id ON public.issues USING btree (organization_connector_id, external_id);
 
 
 --
@@ -4077,8 +4134,10 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
-('20260429125535'),
+('20260502155716'),
+('20260502121500'),
 ('20260501151101'),
+('20260429125535'),
 ('20260429000002'),
 ('20260429123244'),
 ('20260429000001'),
