@@ -75,4 +75,8 @@ class OrganizationConnectorSerializer < BaseSerializer
   attribute :webhook_secret_set do |connector|
     connector.webhook_secret.present? if connector.openrouter?
   end
+
+  attribute :scope do |_connector|
+    "org"
+  end
 end

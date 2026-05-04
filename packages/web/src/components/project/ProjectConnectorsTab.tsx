@@ -13,6 +13,7 @@ import {
   IntegrationCard,
   type IntegrationData,
   type IntegrationProvider,
+  type IntegrationScope,
   type ProviderInfo,
 } from "@/components/integrations";
 import type { ConnectorStatus } from "@/lib/types";
@@ -25,6 +26,7 @@ const PROVIDERS: ProviderInfo[] = [
     name: "Anthropic API",
     description: "Direct Anthropic API integration 1",
     category: "ai",
+    scope: "project",
     features: [
       "API key management",
       "Usage monitoring",
@@ -38,6 +40,7 @@ const PROVIDERS: ProviderInfo[] = [
     name: "OpenAI",
     description: "Track OpenAI API usage and costs",
     category: "ai",
+    scope: "project",
     features: [
       "API usage tracking",
       "GPT model analytics",
@@ -51,6 +54,7 @@ const PROVIDERS: ProviderInfo[] = [
     name: "OpenRouter",
     description: "Multi-model AI gateway tracking",
     category: "ai",
+    scope: "project",
     features: [
       "Multi-provider analytics",
       "Model comparison",
@@ -64,6 +68,7 @@ const PROVIDERS: ProviderInfo[] = [
     name: "Gemini",
     description: "Track Google Gemini API usage and costs",
     category: "ai",
+    scope: "project",
     features: [
       "API usage tracking",
       "Model analytics",
@@ -77,6 +82,7 @@ const PROVIDERS: ProviderInfo[] = [
     name: "Slack",
     description: "Send project alerts and notifications to Slack",
     category: "communication",
+    scope: "project",
     features: [
       "Cost alerts",
       "Usage notifications",
@@ -146,6 +152,7 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
           account_name: externalAccountName || "",
           resources_count: 0,
         },
+        scope: (c.scope as IntegrationScope) ?? "project",
       };
     });
   }, [connectorsData]);

@@ -31,4 +31,8 @@ class ProjectConnectorSerializer < BaseSerializer
   attribute :ai_provider do |connector|
     connector.ai_provider?
   end
+
+  attribute :scope do |_connector|
+    "project"
+  end
 end

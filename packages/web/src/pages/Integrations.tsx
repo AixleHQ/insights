@@ -19,6 +19,7 @@ import {
   type ProviderInfo,
 } from "@/components/integrations";
 import type { ConnectorStatus } from "@/lib/types";
+import type { IntegrationScope } from "@/components/integrations";
 import { ApiKeyConnectSheet } from "@/components/integrations/ApiKeyConnectSheet";
 import { OrgSlackConnectSheet } from "@/components/integrations/OrgSlackConnectSheet";
 import { IngestTokenConnectSheet } from "@/components/integrations/IngestTokenConnectSheet";
@@ -40,6 +41,7 @@ const availableProviders: ProviderInfo[] = [
     name: "GitHub",
     description: "Connect repositories, pull requests, and commits",
     category: "code",
+    scope: "project",
     features: [
       "Repository tracking",
       "Pull request events",
@@ -53,6 +55,7 @@ const availableProviders: ProviderInfo[] = [
     name: "GitLab",
     description: "Connect projects, merge requests, and pipelines",
     category: "code",
+    scope: "project",
     features: [
       "Project tracking",
       "Merge request events",
@@ -66,6 +69,7 @@ const availableProviders: ProviderInfo[] = [
     name: "Bitbucket",
     description: "Connect workspaces, repositories, pull requests, and pipelines",
     category: "code",
+    scope: "project",
     features: [
       "Workspace sync",
       "Repository tracking",
@@ -82,6 +86,7 @@ const availableProviders: ProviderInfo[] = [
     name: "Jira",
     description: "Connect issues and projects for context",
     category: "project",
+    scope: "org",
     features: ["Issue tracking", "Project context", "Sprint monitoring"],
     available: true,
   },
@@ -90,6 +95,7 @@ const availableProviders: ProviderInfo[] = [
     name: "Linear",
     description: "Connect teams, projects, issues, and cycles",
     category: "project",
+    scope: "org",
     features: ["Team sync", "Project context", "Issue throughput", "Cycle monitoring"],
     available: true,
   },
@@ -100,6 +106,7 @@ const availableProviders: ProviderInfo[] = [
     name: "Claude",
     description: "Track Claude API usage and conversations",
     category: "ai",
+    scope: "org",
     features: [
       "API usage tracking",
       "Token consumption",
@@ -114,6 +121,7 @@ const availableProviders: ProviderInfo[] = [
     name: "Claude Code",
     description: "Monitor Claude Code CLI usage",
     category: "ai",
+    scope: "persona",
     features: [
       "Session tracking",
       "Code generation analytics",
@@ -127,6 +135,7 @@ const availableProviders: ProviderInfo[] = [
     name: "Anthropic API",
     description: "Direct Anthropic API integration 2",
     category: "ai",
+    scope: "org",
     features: [
       "API key management",
       "Usage monitoring",
@@ -140,6 +149,7 @@ const availableProviders: ProviderInfo[] = [
     name: "OpenAI",
     description: "Track OpenAI API usage and costs",
     category: "ai",
+    scope: "org",
     features: [
       "API usage tracking",
       "GPT model analytics",
@@ -153,6 +163,7 @@ const availableProviders: ProviderInfo[] = [
     name: "OpenRouter",
     description: "Multi-model AI gateway tracking",
     category: "ai",
+    scope: "org",
     features: [
       "Multi-provider analytics",
       "Model comparison",
@@ -166,6 +177,7 @@ const availableProviders: ProviderInfo[] = [
     name: "Gemini",
     description: "Track Google Gemini API usage and costs",
     category: "ai",
+    scope: "org",
     features: [
       "API usage tracking",
       "Model analytics",
@@ -179,6 +191,7 @@ const availableProviders: ProviderInfo[] = [
     name: "GitHub Copilot",
     description: "Track real Copilot seat counts, suggestion acceptance rates, and daily active users via the GitHub API",
     category: "ai",
+    scope: "org",
     features: [
       "Seat count & active users",
       "Acceptance rate tracking",
@@ -192,6 +205,7 @@ const availableProviders: ProviderInfo[] = [
     name: "Cursor",
     description: "Monitor Cursor IDE AI usage",
     category: "ai",
+    scope: "persona",
     features: [
       "AI completions tracking",
       "Chat usage analytics",
@@ -207,6 +221,7 @@ const availableProviders: ProviderInfo[] = [
     name: "Figma",
     description: "Track AI features in Figma",
     category: "design",
+    scope: "org",
     features: [
       "AI plugin usage",
       "Design generation",
@@ -222,6 +237,7 @@ const availableProviders: ProviderInfo[] = [
     name: "Slack",
     description: "Receive alerts and notifications",
     category: "communication",
+    scope: "org",
     features: ["Alert notifications", "Usage summaries", "Bot commands"],
     available: true,
   },
@@ -268,6 +284,7 @@ export function Integrations() {
   const regenerateIngestToken = useRegenerateIngestToken();
 
   const activeTab = status === "available" ? "available" : "connected";
+  const [scopeFilter, setScopeFilter] = useState<IntegrationScope | "all">("all");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [connectingProvider, setConnectingProvider] =
     useState<ProviderInfo | null>(null);
@@ -319,6 +336,7 @@ export function Integrations() {
         webhookActive: connectorType === "openrouter" ? (c.webhookActive ?? false) : undefined,
         webhookToken: connectorType === "openrouter" ? c.webhookToken : undefined,
         webhookSecretSet: connectorType === "openrouter" ? (c.webhookSecretSet ?? false) : undefined,
+        scope: (c.scope as IntegrationScope) ?? "org",
       };
     });
 
@@ -334,6 +352,7 @@ export function Integrations() {
           provider,
           name: providerInfo?.name ?? a.toolName,
           status: (a.isActive ? "connected" : "disconnected") as ConnectorStatus,
+          scope: "persona" as IntegrationScope,
         };
       });
 
@@ -433,6 +452,18 @@ export function Integrations() {
     setWebhookSheetOpen(true);
   };
 
+  // Filtered integrations by scope
+  const filteredIntegrations = scopeFilter === "all"
+    ? integrations
+    : integrations.filter((i) => i.scope === scopeFilter);
+
+  // Scope counts for filter pills
+  const scopeCounts = useMemo(() => ({
+    org: integrations.filter((i) => i.scope === "org").length,
+    project: integrations.filter((i) => i.scope === "project").length,
+    persona: integrations.filter((i) => i.scope === "persona").length,
+  }), [integrations]);
+
   // Get providers that are already connected
   const connectedProviders = new Set(integrations.map((c) => c.provider));
 
@@ -473,7 +504,7 @@ export function Integrations() {
       >
         <TabsList>
           <TabsTrigger value="connected">
-            Connected ({integrations.length})
+            Connected ({filteredIntegrations.length})
           </TabsTrigger>
           <TabsTrigger value="available">
             Available ({unconnectedProviders.length})
@@ -483,6 +514,33 @@ export function Integrations() {
         <TabsContent value="connected" className="space-y-4">
           {regenerateError && (
             <p className="text-sm text-destructive">{regenerateError}</p>
+          )}
+          {!isLoading && integrations.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {(["all", "org", "project", "persona"] as const).map((s) => {
+                const label = s === "all" ? "All" : s === "org" ? "Org" : s === "project" ? "Project" : "Personal";
+                const count = s === "all" ? integrations.length : scopeCounts[s];
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setScopeFilter(s)}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                      scopeFilter === s
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                    }`}
+                  >
+                    {label}
+                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] leading-none ${
+                      scopeFilter === s ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted"
+                    }`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           )}
           {isLoading ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -499,9 +557,15 @@ export function Integrations() {
                 Connect a service to get started
               </p>
             </div>
+          ) : filteredIntegrations.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-8">
+              <p className="text-muted-foreground text-sm">
+                No integrations in this scope
+              </p>
+            </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {integrations.map((integration) => (
+              {filteredIntegrations.map((integration) => (
                 <IntegrationCard
                   key={integration.id}
                   integration={integration}
