@@ -195,7 +195,8 @@ CREATE TYPE public.tool_name AS ENUM (
     'jira',
     'linear',
     'github',
-    'gitlab'
+    'gitlab',
+    'bitbucket'
 );
 
 
@@ -4076,7 +4077,9 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260429125535'),
 ('20260501151101'),
+('20260429000002'),
 ('20260429123244'),
 ('20260429000001'),
 ('20260428125537'),

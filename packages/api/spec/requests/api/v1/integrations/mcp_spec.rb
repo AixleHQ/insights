@@ -53,7 +53,7 @@ RSpec.describe "Api::V1::Integrations::Mcp", type: :request do
                            user: internal_user,
                            params: { tool_name: "github_copilot" }
 
-        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response).to have_http_status(:unprocessable_content)
         expect(JSON.parse(response.body)["errors"]).to include("tool_name")
       end
     end
@@ -64,7 +64,7 @@ RSpec.describe "Api::V1::Integrations::Mcp", type: :request do
                            user: internal_user,
                            params: {}
 
-        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response).to have_http_status(:unprocessable_content)
       end
     end
 
