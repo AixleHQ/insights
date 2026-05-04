@@ -841,6 +841,25 @@ export function useDeleteConnector() {
   });
 }
 
+export function useUpdateConnector() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      orgId,
+      connectorId,
+      data,
+    }: {
+      orgId: string;
+      connectorId: string;
+      data: Record<string, unknown>;
+    }) => api.patch(`/organizations/${orgId}/connectors/${connectorId}`, data),
+    onSuccess: (_, { orgId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
+    },
+  });
+}
+
 export function useConnectWithWebhook() {
   const queryClient = useQueryClient();
 

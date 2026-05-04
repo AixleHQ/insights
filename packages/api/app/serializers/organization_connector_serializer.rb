@@ -67,4 +67,12 @@ class OrganizationConnectorSerializer < BaseSerializer
   attribute :webhook_active do |connector|
     connector.webhook_active?
   end
+
+  attribute :webhook_token do |connector|
+    connector.webhook_token if connector.openrouter?
+  end
+
+  attribute :webhook_secret_set do |connector|
+    connector.webhook_secret.present? if connector.openrouter?
+  end
 end

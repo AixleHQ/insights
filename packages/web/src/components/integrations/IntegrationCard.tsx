@@ -62,6 +62,8 @@ export interface IntegrationData {
   activeUsersCount?: number | null;
   // OpenRouter-specific
   webhookActive?: boolean;
+  webhookToken?: string;
+  webhookSecretSet?: boolean;
 }
 
 export interface ProviderInfo {

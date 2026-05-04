@@ -9,45 +9,53 @@ module Api
     # The payload is an OTLP resourceSpans envelope; each span corresponds to
     # one generation (one API call).
     #
-    # Route: POST /api/v1/webhooks/openrouter_traces
+    # Route: POST /api/v1/webhooks/openrouter_traces/:webhook_token
     # Auth: public endpoint — no Keycloak JWT required.
-    #       Connector is resolved via SHA-256(api_key) present in span attributes.
+    #       Connector is resolved via :webhook_token in the URL path.
+    #       Each OpenRouter connector gets a unique webhook_token on creation.
     #       Optional HMAC signature verification when connector.webhook_secret is set.
     class OpenrouterTracesController < ApplicationController
       skip_before_action :authenticate_user!
       skip_before_action :set_current_organization
 
-      SIGNATURE_HEADER = "X-Openrouter-Signature"
+      # OpenRouter passes custom headers verbatim — no HMAC signing.
+      # Users set this header in OpenRouter's "Headers" field with their own secret value.
+      SIGNATURE_HEADER = "X-Webhook-Secret"
       TEST_CONNECTION_HEADER = "X-Test-Connection"
 
-      # POST /api/v1/webhooks/openrouter_traces
+      # POST /api/v1/webhooks/openrouter_traces/:webhook_token
       def receive
         # OpenRouter sends a test request on webhook setup — acknowledge and stop.
         if request.headers[TEST_CONNECTION_HEADER] == "true"
           return render json: { received: true }, status: :ok
         end
 
-        payload = parse_otlp_payload
-        return render json: { error: "Invalid payload" }, status: :bad_request if payload.nil?
-
-        key_hash = extract_key_hash(payload)
-        connector = OrganizationConnector.by_key_hash(key_hash)
-                                         .where(connector_type: "openrouter", is_active: true)
-                                         .first
+        connector = OrganizationConnector
+                      .by_webhook_token(params[:webhook_token])
+                      .where(connector_type: "openrouter", is_active: true)
+                      .first
 
         unless connector
-          # Return 200 so OpenRouter doesn't retry unknown-key payloads.
-          Rails.logger.warn("[OpenrouterTraces] No active connector found for key_hash=#{key_hash&.first(8)}...")
+          # Return 200 so OpenRouter doesn't retry unknown-token payloads.
+          Rails.logger.warn("[OpenrouterTraces] No active connector found for webhook_token=#{params[:webhook_token]&.first(8)}...")
           return render json: { received: true }, status: :ok
         end
 
-        verify_hmac!(connector) if connector.webhook_secret.present?
+        payload = parse_otlp_payload
+        return render json: { error: "Invalid payload" }, status: :bad_request if payload.nil?
+
+        # OpenRouter doesn't sign requests with HMAC — it forwards custom headers
+        # verbatim. If the connector has a webhook_secret configured, we expect it
+        # to arrive in X-Webhook-Secret (set by the user in OpenRouter's Headers field).
+        verify_secret!(connector) if connector.webhook_secret.present?
 
         OpenrouterTraceJob.perform_async(connector.id, payload.to_json)
 
         render json: { received: true }, status: :accepted
       rescue InvalidSignatureError => e
         render json: { error: "Invalid signature", message: e.message }, status: :unauthorized
+      rescue ActionDispatch::Http::Parameters::ParseError
+        render json: { error: "Invalid payload" }, status: :bad_request
       rescue StandardError => e
         Rails.logger.error("[OpenrouterTraces] Unexpected error: #{e.class} #{e.message}")
         render json: { error: "Processing failed" }, status: :internal_server_error
@@ -64,41 +72,12 @@ module Api
         nil
       end
 
-      # OpenRouter includes the SHA-256 hash of the API key that originated the
-      # request as a span attribute so the receiver can route to the right account.
-      def extract_key_hash(payload)
-        spans(payload).each do |span|
-          attrs = span_attributes(span)
-          hash = attrs["openrouter.api_key_hash"] || attrs["gen_ai.openrouter.api_key_hash"]
-          return hash if hash.present?
-        end
-        nil
-      end
+      def verify_secret!(connector)
+        incoming = request.headers[SIGNATURE_HEADER].to_s
+        raise InvalidSignatureError, "Missing #{SIGNATURE_HEADER} header" if incoming.blank?
 
-      def verify_hmac!(connector)
-        signature = request.headers[SIGNATURE_HEADER]
-        raise InvalidSignatureError, "Missing #{SIGNATURE_HEADER} header" if signature.blank?
-
-        expected = OpenSSL::HMAC.hexdigest("SHA256", connector.webhook_secret, request.raw_post)
-        unless ActiveSupport::SecurityUtils.secure_compare(expected, signature.to_s)
-          raise InvalidSignatureError, "Signature mismatch"
-        end
-      end
-
-      def spans(payload)
-        Array(payload["resourceSpans"]).flat_map do |rs|
-          Array(rs["scopeSpans"]).flat_map { |ss| Array(ss["spans"]) }
-        end
-      end
-
-      def span_attributes(span)
-        Array(span["attributes"]).each_with_object({}) do |attr, hash|
-          key = attr["key"]
-          value = attr.dig("value", "stringValue") ||
-                  attr.dig("value", "intValue") ||
-                  attr.dig("value", "doubleValue") ||
-                  attr.dig("value", "boolValue")
-          hash[key] = value if key
+        unless ActiveSupport::SecurityUtils.secure_compare(connector.webhook_secret, incoming)
+          raise InvalidSignatureError, "Secret mismatch"
         end
       end
     end

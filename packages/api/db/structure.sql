@@ -1276,8 +1276,8 @@ CREATE TABLE public.organization_connectors (
     external_account_name character varying,
     status character varying DEFAULT 'connected'::character varying NOT NULL,
     pending_activity_jobs integer,
-    key_hash character varying,
-    webhook_active boolean DEFAULT false NOT NULL
+    webhook_active boolean DEFAULT false NOT NULL,
+    webhook_token character varying
 );
 
 
@@ -3005,10 +3005,10 @@ CREATE UNIQUE INDEX idx_on_organization_id_connector_type_ebd5fb8c77 ON public.o
 
 
 --
--- Name: idx_organization_connectors_key_hash; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_organization_connectors_webhook_token; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_organization_connectors_key_hash ON public.organization_connectors USING btree (key_hash) WHERE (key_hash IS NOT NULL);
+CREATE UNIQUE INDEX idx_organization_connectors_webhook_token ON public.organization_connectors USING btree (webhook_token) WHERE (webhook_token IS NOT NULL);
 
 
 --
@@ -4159,6 +4159,7 @@ SET search_path TO "$user", public;
 INSERT INTO "schema_migrations" (version) VALUES
 ('20260504140050'),
 ('20260504135022'),
+('20260504125319'),
 ('20260504121614'),
 ('20260504082100'),
 ('20260502155716'),

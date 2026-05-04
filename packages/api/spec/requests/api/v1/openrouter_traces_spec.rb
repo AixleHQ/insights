@@ -4,17 +4,17 @@ require "rails_helper"
 
 RSpec.describe "Api::V1::OpenrouterTraces", type: :request do
   let(:organization) { create(:organization) }
-  let(:access_token) { "or-management-key-test-12345" }
-  let(:key_hash) { Digest::SHA256.hexdigest(access_token) }
 
   let(:connector) do
     create(:organization_connector,
       organization: organization,
       connector_type: "openrouter",
-      access_token: access_token,
+      access_token: "or-management-key-test-12345",
       is_active: true,
       webhook_active: true)
   end
+
+  let(:webhook_token) { connector.webhook_token }
 
   let(:valid_payload) do
     {
@@ -35,8 +35,7 @@ RSpec.describe "Api::V1::OpenrouterTraces", type: :request do
                     { key: "gen_ai.usage.prompt_tokens", value: { intValue: 150 } },
                     { key: "gen_ai.usage.completion_tokens", value: { intValue: 75 } },
                     { key: "openrouter.generation.cost", value: { doubleValue: 0.00225 } },
-                    { key: "gen_ai.openrouter.provider_name", value: { stringValue: "OpenAI" } },
-                    { key: "openrouter.api_key_hash", value: { stringValue: key_hash } }
+                    { key: "gen_ai.openrouter.provider_name", value: { stringValue: "OpenAI" } }
                   ]
                 }
               ]
@@ -47,15 +46,15 @@ RSpec.describe "Api::V1::OpenrouterTraces", type: :request do
     }
   end
 
-  def post_trace(payload: valid_payload, headers: {})
-    post "/api/v1/webhooks/openrouter_traces",
+  def post_trace(token: webhook_token, payload: valid_payload, headers: {})
+    post "/api/v1/webhooks/openrouter_traces/#{token}",
          params: payload.to_json,
          headers: { "Content-Type" => "application/json" }.merge(headers)
   end
 
   before { connector }
 
-  describe "POST /api/v1/webhooks/openrouter_traces" do
+  describe "POST /api/v1/webhooks/openrouter_traces/:webhook_token" do
     context "when OpenRouter sends a test connection request" do
       it "returns 200 without enqueuing a job" do
         expect(OpenrouterTraceJob).not_to receive(:perform_async)
@@ -95,44 +94,34 @@ RSpec.describe "Api::V1::OpenrouterTraces", type: :request do
 
       before { connector.update!(webhook_secret: secret) }
 
-      it "returns 202 when the signature is valid" do
-        body = valid_payload.to_json
-        sig = OpenSSL::HMAC.hexdigest("SHA256", secret, body)
-
-        post "/api/v1/webhooks/openrouter_traces",
-             params: body,
+      it "returns 202 when the secret header matches" do
+        post "/api/v1/webhooks/openrouter_traces/#{webhook_token}",
+             params: valid_payload.to_json,
              headers: {
                "Content-Type" => "application/json",
-               "X-Openrouter-Signature" => sig
+               "X-Webhook-Secret" => secret
              }
 
         expect(response).to have_http_status(:accepted)
       end
 
-      it "returns 401 when the signature is missing" do
+      it "returns 401 when the secret header is missing" do
         post_trace
 
         expect(response).to have_http_status(:unauthorized)
         expect(json_error).to eq("Invalid signature")
       end
 
-      it "returns 401 when the signature is wrong" do
-        post_trace(headers: { "X-Openrouter-Signature" => "bad-signature" })
+      it "returns 401 when the secret header is wrong" do
+        post_trace(headers: { "X-Webhook-Secret" => "wrong-secret" })
 
         expect(response).to have_http_status(:unauthorized)
       end
     end
 
-    context "when no connector matches the key_hash" do
-      let(:payload_unknown_key) do
-        valid_payload.tap do |p|
-          p[:resourceSpans][0][:scopeSpans][0][:spans][0][:attributes]
-            .find { |a| a[:key] == "openrouter.api_key_hash" }[:value][:stringValue] = "unknown-hash"
-        end
-      end
-
+    context "when no connector matches the webhook_token" do
       it "returns 200 so OpenRouter does not retry" do
-        post_trace(payload: payload_unknown_key)
+        post_trace(token: "unknown-token-that-does-not-exist")
 
         expect(response).to have_http_status(:ok)
         expect(json_response[:received]).to be true
@@ -141,13 +130,13 @@ RSpec.describe "Api::V1::OpenrouterTraces", type: :request do
       it "does not enqueue a job" do
         expect(OpenrouterTraceJob).not_to receive(:perform_async)
 
-        post_trace(payload: payload_unknown_key)
+        post_trace(token: "unknown-token-that-does-not-exist")
       end
     end
 
     context "when the payload is malformed JSON" do
       it "returns 400" do
-        post "/api/v1/webhooks/openrouter_traces",
+        post "/api/v1/webhooks/openrouter_traces/#{webhook_token}",
              params: "not-valid-json{{{",
              headers: { "Content-Type" => "application/json" }
 
@@ -155,16 +144,13 @@ RSpec.describe "Api::V1::OpenrouterTraces", type: :request do
       end
     end
 
-    context "when no key_hash attribute is present in spans" do
-      let(:payload_no_key_hash) do
-        payload = valid_payload.deep_dup
-        payload[:resourceSpans][0][:scopeSpans][0][:spans][0][:attributes]
-          .reject! { |a| a[:key] == "openrouter.api_key_hash" }
-        payload
-      end
+    context "when the connector is inactive" do
+      before { connector.update!(is_active: false) }
 
-      it "returns 200 gracefully" do
-        post_trace(payload: payload_no_key_hash)
+      it "returns 200 without enqueuing a job" do
+        expect(OpenrouterTraceJob).not_to receive(:perform_async)
+
+        post_trace
 
         expect(response).to have_http_status(:ok)
       end

@@ -51,6 +51,10 @@ class OpenrouterTraceJob
     end
 
     Rails.logger.info("[OpenrouterTraceJob] Upserted #{upserted} events for org #{connector.organization_id}")
+
+    # Mark webhook as active after the first successful delivery so AiUsageSyncJob
+    # stops polling the Activity API and avoids double-counting.
+    connector.update_column(:webhook_active, true) if upserted > 0 && !connector.webhook_active?
   end
 
   private

@@ -278,7 +278,12 @@ export function Integrations() {
   const [regenerateError, setRegenerateError] = useState<string | null>(null);
   const [testingConnectorId, setTestingConnectorId] = useState<string | null>(null);
   const [webhookSheetOpen, setWebhookSheetOpen] = useState(false);
-  const [webhookSheetData, setWebhookSheetData] = useState<{ webhookActive: boolean } | null>(null);
+  const [webhookSheetData, setWebhookSheetData] = useState<{
+    connectorId: string;
+    webhookActive: boolean;
+    webhookToken?: string;
+    webhookSecretSet?: boolean;
+  } | null>(null);
 
   const handleConnectSuccess = () => navigate("/integrations/connected");
 
@@ -312,6 +317,8 @@ export function Integrations() {
         seatCount: c.seatCount,
         activeUsersCount: c.activeUsersCount,
         webhookActive: connectorType === "openrouter" ? (c.webhookActive ?? c.webhook_active ?? false) : undefined,
+        webhookToken: connectorType === "openrouter" ? (c.webhookToken ?? c.webhook_token ?? undefined) : undefined,
+        webhookSecretSet: connectorType === "openrouter" ? (c.webhookSecretSet ?? c.webhook_secret_set ?? false) : undefined,
       };
     });
 
@@ -417,7 +424,12 @@ export function Integrations() {
   const handleSetupWebhook = (id: string) => {
     const integration = integrations.find((i) => i.id === id);
     if (!integration) return;
-    setWebhookSheetData({ webhookActive: integration.webhookActive ?? false });
+    setWebhookSheetData({
+      connectorId: id,
+      webhookActive: integration.webhookActive ?? false,
+      webhookToken: integration.webhookToken,
+      webhookSecretSet: integration.webhookSecretSet,
+    });
     setWebhookSheetOpen(true);
   };
 
@@ -558,7 +570,10 @@ export function Integrations() {
         <OpenrouterWebhookSheet
           open={webhookSheetOpen}
           onOpenChange={setWebhookSheetOpen}
+          connectorId={webhookSheetData.connectorId}
           webhookActive={webhookSheetData.webhookActive}
+          webhookToken={webhookSheetData.webhookToken}
+          webhookSecretSet={webhookSheetData.webhookSecretSet}
         />
       )}
     </div>
