@@ -22,6 +22,7 @@ import type { ConnectorStatus } from "@/lib/types";
 import { ApiKeyConnectSheet } from "@/components/integrations/ApiKeyConnectSheet";
 import { OrgSlackConnectSheet } from "@/components/integrations/OrgSlackConnectSheet";
 import { IngestTokenConnectSheet } from "@/components/integrations/IngestTokenConnectSheet";
+import { OpenrouterWebhookSheet } from "@/components/integrations/OpenrouterWebhookSheet";
 
 const AI_PROVIDERS = new Set(["anthropic", "openai", "openrouter", "gemini"]);
 const SLACK_PROVIDERS = new Set(["slack"]);
@@ -275,9 +276,9 @@ export function Integrations() {
   const [ingestProvider, setIngestProvider] = useState<ProviderInfo | null>(null);
   const [regeneratedToken, setRegeneratedToken] = useState<string | null>(null);
   const [regenerateError, setRegenerateError] = useState<string | null>(null);
-  const [testingConnectorId, setTestingConnectorId] = useState<string | null>(
-    null,
-  );
+  const [testingConnectorId, setTestingConnectorId] = useState<string | null>(null);
+  const [webhookSheetOpen, setWebhookSheetOpen] = useState(false);
+  const [webhookSheetData, setWebhookSheetData] = useState<{ webhookActive: boolean } | null>(null);
 
   const handleConnectSuccess = () => navigate("/integrations/connected");
 
@@ -310,6 +311,7 @@ export function Integrations() {
         copilotConnector: c.copilotConnector,
         seatCount: c.seatCount,
         activeUsersCount: c.activeUsersCount,
+        webhookActive: connectorType === "openrouter" ? (c.webhookActive ?? c.webhook_active ?? false) : undefined,
       };
     });
 
@@ -412,6 +414,13 @@ export function Integrations() {
     }
   };
 
+  const handleSetupWebhook = (id: string) => {
+    const integration = integrations.find((i) => i.id === id);
+    if (!integration) return;
+    setWebhookSheetData({ webhookActive: integration.webhookActive ?? false });
+    setWebhookSheetOpen(true);
+  };
+
   // Get providers that are already connected
   const connectedProviders = new Set(integrations.map((c) => c.provider));
 
@@ -490,6 +499,7 @@ export function Integrations() {
                   onTest={ingestAccountIds.has(integration.id) ? undefined : handleTest}
                   onDisconnect={handleDisconnect}
                   onRegenerateToken={ingestAccountIds.has(integration.id) ? handleRegenerateToken : undefined}
+                  onSetupWebhook={integration.provider === "openrouter" ? handleSetupWebhook : undefined}
                   isTesting={testingConnectorId === integration.id}
                 />
               ))}
@@ -543,6 +553,14 @@ export function Integrations() {
         onSuccess={handleConnectSuccess}
         initialToken={regeneratedToken ?? undefined}
       />
+
+      {webhookSheetData && (
+        <OpenrouterWebhookSheet
+          open={webhookSheetOpen}
+          onOpenChange={setWebhookSheetOpen}
+          webhookActive={webhookSheetData.webhookActive}
+        />
+      )}
     </div>
   );
 }
