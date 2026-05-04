@@ -2,7 +2,7 @@
  * Model pricing table and cost calculation for db90-claude.
  *
  * Default rates source: https://platform.claude.com/docs/en/about-claude/pricing
- * Rates last verified: 2026-04-25
+ * Rates last verified: 2026-05-04
  *
  * When Anthropic updates prices, a GitHub Actions workflow opens an issue
  * automatically (see .github/workflows/check-claude-pricing.yml).
@@ -31,7 +31,7 @@ export type PricingTable = Record<string, ModelPricing>;
  * breakdown is a future improvement.
  */
 export const DEFAULT_PRICING: PricingTable = {
-  // Opus 4.x family — $5 input / $25 output
+  // Opus 4.7/4.6/4.5 — $5 input / $25 output
   "claude-opus-4-7": {
     input_per_mtok: 5.0,
     output_per_mtok: 25.0,
@@ -50,7 +50,26 @@ export const DEFAULT_PRICING: PricingTable = {
     cache_write_per_mtok: 6.25,
     cache_read_per_mtok: 0.5,
   },
+  // Opus 4.1/4 — $15 input / $75 output
+  "claude-opus-4-1": {
+    input_per_mtok: 15.0,
+    output_per_mtok: 75.0,
+    cache_write_per_mtok: 18.75,
+    cache_read_per_mtok: 1.5,
+  },
+  "claude-opus-4": {
+    input_per_mtok: 15.0,
+    output_per_mtok: 75.0,
+    cache_write_per_mtok: 18.75,
+    cache_read_per_mtok: 1.5,
+  },
   // Sonnet 4.x family — $3 input / $15 output
+  "claude-sonnet-4": {
+    input_per_mtok: 3.0,
+    output_per_mtok: 15.0,
+    cache_write_per_mtok: 3.75,
+    cache_read_per_mtok: 0.3,
+  },
   "claude-sonnet-4-6": {
     input_per_mtok: 3.0,
     output_per_mtok: 15.0,

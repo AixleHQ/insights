@@ -33,11 +33,18 @@ jobs:
           # Keep this list in sync with DEFAULT_PRICING in
           # packages/tools/db90-claude/src/pricing.ts.
           declare -A RATES=(
-            ["Opus output (\$75/MTok)"]="75\.00"
-            ["Opus/Haiku cache-write (\$18.75/MTok)"]="18\.75"
-            ["Sonnet cache-write (\$3.75/MTok)"]="3\.75"
+            # Claude 3 Opus (legacy) rates
+            ["Claude 3 Opus output (\$75/MTok)"]="75\.00"
+            ["Claude 3 Opus cache-write (\$18.75/MTok)"]="18\.75"
+            # Opus 4.x rates
+            ["Opus 4 input (\$5/MTok)"]="5\.00"
+            ["Opus 4 output (\$25/MTok)"]="25\.00"
+            ["Opus 4 cache-write (\$6.25/MTok)"]="6\.25"
+            # Sonnet rates
             ["Sonnet input (\$3/MTok)"]="3\.00"
-            ["Haiku input (\$0.80/MTok)"]="0\.80"
+            ["Sonnet cache-write (\$3.75/MTok)"]="3\.75"
+            # Haiku 3.5 rates
+            ["Haiku 3.5 input (\$0.80/MTok)"]="0\.80"
           )
 
           for label in "${!RATES[@]}"; do
