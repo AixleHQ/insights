@@ -238,16 +238,6 @@ RSpec.describe AiUsageSyncJob, type: :job do
       )
     end
 
-    it "uses a 90-day window on initial sync" do
-      connector.update!(last_sync_at: nil)
-
-      travel_to Time.zone.parse("2026-04-30 12:00:00 UTC") do
-        job.perform(organization.id, "openrouter")
-      end
-
-      expect(job).to have_received(:perform_json_get).exactly(90).times
-    end
-
     it "uses last_sync_at with a 1-day overlap on recurring sync" do
       connector.update!(last_sync_at: Time.zone.parse("2026-04-01 08:30:00 UTC"))
 

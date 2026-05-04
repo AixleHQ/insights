@@ -1180,13 +1180,6 @@ ALTER SEQUENCE public.connector_event_dedup_id_seq OWNED BY public.connector_eve
 
 
 --
--- Name: connector_event_dedup id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.connector_event_dedup ALTER COLUMN id SET DEFAULT nextval('public.connector_event_dedup_id_seq'::regclass);
-
-
---
 -- Name: invitations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2092,6 +2085,13 @@ ALTER TABLE ONLY _timescaledb_internal._hyper_1_1406_chunk ALTER COLUMN metadata
 --
 
 ALTER TABLE ONLY _timescaledb_internal._hyper_1_1406_chunk ALTER COLUMN created_at SET DEFAULT now();
+
+
+--
+-- Name: connector_event_dedup id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_event_dedup ALTER COLUMN id SET DEFAULT nextval('public.connector_event_dedup_id_seq'::regclass);
 
 
 --
@@ -4159,6 +4159,7 @@ SET search_path TO "$user", public;
 INSERT INTO "schema_migrations" (version) VALUES
 ('20260504140050'),
 ('20260504135022'),
+('20260504121614'),
 ('20260504082100'),
 ('20260502155716'),
 ('20260502121500'),

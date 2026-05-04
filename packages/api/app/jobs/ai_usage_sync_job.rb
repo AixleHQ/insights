@@ -8,6 +8,7 @@ class AiUsageSyncJob
   SUPPORTED_PROVIDERS = %w[openrouter anthropic openai gemini].freeze
   OPENROUTER_INITIAL_SYNC_DAYS = 90
   OPENROUTER_RECURRING_OVERLAP_DAYS = 1
+  OPENROUTER_MAX_HISTORY_DAYS = 30
 
   def perform(organization_id = nil, provider = nil)
     Rails.logger.info("[AiUsageSyncJob] Starting AI usage reconciliation...")
@@ -117,10 +118,11 @@ class AiUsageSyncJob
       return nil
     end
 
+    earliest_allowed = OPENROUTER_MAX_HISTORY_DAYS.days.ago.to_date
     start_date = if connector.last_sync_at
-      connector.last_sync_at.to_date - OPENROUTER_RECURRING_OVERLAP_DAYS.days
+      [ connector.last_sync_at.to_date - OPENROUTER_RECURRING_OVERLAP_DAYS.days, earliest_allowed ].max
     else
-      OPENROUTER_INITIAL_SYNC_DAYS.days.ago.to_date
+      [ OPENROUTER_INITIAL_SYNC_DAYS.days.ago.to_date, earliest_allowed ].max
     end
     end_date = Date.current - 1.day
 

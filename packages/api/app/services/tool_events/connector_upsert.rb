@@ -43,15 +43,26 @@ module ToolEvents
         # Optimistically try to claim the dedup slot with a placeholder event_id.
         # We'll backfill the real event_id immediately after creating the ToolEvent.
         #
-        # NOTE: PostgreSQL does not return conflicting rows in RETURNING when
-        # ON CONFLICT DO NOTHING fires, so result may be empty even though the
-        # row already exists. In that case we re-read the existing dedup row.
-        result = ConnectorEventDedup.upsert(
-          dedup_attributes.merge(tool_event_id: "00000000-0000-0000-0000-000000000000", updated_at: Time.current),
-          unique_by: %i[organization_id tool_name event_type unique_key unique_value],
-          on_duplicate: :skip,
-          returning: %w[id tool_event_id]
+        # NOTE: Rails upsert with on_duplicate: :skip on Rails 8+ may include `id`
+        # in the SET clause as EXCLUDED.id which is NULL (bigserial not passed in
+        # the hash), causing a NOT NULL violation. Use raw SQL INSERT ... ON CONFLICT
+        # DO NOTHING RETURNING to avoid touching the id column entirely.
+        conn = ConnectorEventDedup.connection
+        row  = dedup_attributes.merge(
+          tool_event_id: "00000000-0000-0000-0000-000000000000",
+          updated_at: Time.current
         )
+        conflict_cols = %w[organization_id tool_name event_type unique_key unique_value]
+          .map { |c| conn.quote_column_name(c) }.join(", ")
+        col_names = row.keys.map { |k| conn.quote_column_name(k) }.join(", ")
+        values    = row.values.map { |v| v.nil? ? "NULL" : conn.quote(v) }.join(", ")
+        sql = <<~SQL
+          INSERT INTO #{ConnectorEventDedup.quoted_table_name} (#{col_names})
+          VALUES (#{values})
+          ON CONFLICT (#{conflict_cols}) DO NOTHING
+          RETURNING id, tool_event_id
+        SQL
+        result = conn.execute(sql)
 
         existing_event_id = result.first&.fetch("tool_event_id", nil)
 
