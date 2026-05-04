@@ -1180,6 +1180,13 @@ ALTER SEQUENCE public.connector_event_dedup_id_seq OWNED BY public.connector_eve
 
 
 --
+-- Name: connector_event_dedup id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_event_dedup ALTER COLUMN id SET DEFAULT nextval('public.connector_event_dedup_id_seq'::regclass);
+
+
+--
 -- Name: invitations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -4139,8 +4146,8 @@ INSERT INTO "schema_migrations" (version) VALUES
 ('20260502121500'),
 ('20260501151101'),
 ('20260429125535'),
-('20260429000002'),
 ('20260429123244'),
+('20260429000002'),
 ('20260429000001'),
 ('20260428125537'),
 ('20260424000003'),
