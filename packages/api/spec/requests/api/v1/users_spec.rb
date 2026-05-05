@@ -259,5 +259,36 @@ RSpec.describe 'Api::V1::Users', type: :request do
         expect(json_response[:error]).to eq('Not in impersonation mode')
       end
     end
+
+    context 'token revocation' do
+      let(:jti) { SecureRandom.uuid }
+
+      after { REDIS.del("impersonation:jti:#{jti}") }
+
+      it 'adds the jti to the Redis blocklist' do
+        impersonated_post_with_jti '/api/v1/users/me/stop_impersonation',
+                                   user: user,
+                                   impersonator: admin,
+                                   jti: jti
+
+        expect_success
+        expect(ImpersonationService.revoked?(jti)).to be true
+      end
+    end
+
+    context 'when claims are missing jti' do
+      it 'returns unprocessable_entity' do
+        # Uses the special test-impersonation-nojti- token which the TestJwtAuthMiddleware
+        # sets jwt.impersonation = true but omits the jti claim.
+        headers = {
+          'Authorization' => "Bearer test-impersonation-nojti-#{user.id}-by-#{admin.id}",
+          'Content-Type' => 'application/json'
+        }
+        post '/api/v1/users/me/stop_impersonation', headers: headers
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(json_response[:error]).to eq('Token missing jti claim')
+      end
+    end
   end
 end

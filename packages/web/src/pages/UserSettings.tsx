@@ -77,8 +77,8 @@ function ProfileSection() {
   const [error, setError] = useState<string | null>(null);
 
   const myMemberId = useMemo(
-    () => members?.find((m) => m.user.email === profile?.email)?.id,
-    [members, profile?.email]
+    () => members?.find((m) => m.user.email === (currentUser?.email || profile?.email))?.id,
+    [members, currentUser?.email, profile?.email]
   );
 
   function handleEdit() {
@@ -161,7 +161,7 @@ function ProfileSection() {
               </div>
               <div className="space-y-1">
                 <p className="text-sm font-medium">Email</p>
-                <p className="text-sm text-muted-foreground">{profile?.email || "—"}</p>
+                <p className="text-sm text-muted-foreground">{currentUser?.email || profile?.email || "—"}</p>
               </div>
               {error && <p className="text-sm text-destructive">{error}</p>}
               <div className="flex gap-2">
@@ -188,7 +188,7 @@ function ProfileSection() {
               </div>
               <div className="space-y-1">
                 <p className="text-sm font-medium">Email</p>
-                <p className="text-sm text-muted-foreground">{profile?.email || "—"}</p>
+                <p className="text-sm text-muted-foreground">{currentUser?.email || profile?.email || "—"}</p>
               </div>
             </>
           )}

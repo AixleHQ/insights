@@ -7,7 +7,8 @@ import {
   type ReactNode,
 } from "react";
 import { useAuth } from "./AuthContext";
-import { setCurrentOrganizationId } from "../lib/api";
+import { useImpersonation } from "./ImpersonationContext";
+import { setCurrentOrganizationId, getAuthToken } from "../lib/api";
 
 export type MemberRole = "owner" | "admin" | "member" | "viewer";
 
@@ -54,7 +55,8 @@ interface OrgProviderProps {
 }
 
 export function OrgProvider({ children, apiBaseUrl = "/api/v1" }: OrgProviderProps) {
-  const { isAuthenticated, isLoading: authLoading, getAccessToken } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isImpersonating } = useImpersonation();
 
   const [state, setState] = useState<OrgState>({
     currentOrg: null,
@@ -80,7 +82,7 @@ export function OrgProvider({ children, apiBaseUrl = "/api/v1" }: OrgProviderPro
     setState((prev) => ({ ...prev, isLoading: true, isInitialized: false, error: null }));
 
     try {
-      const token = await getAccessToken();
+      const token = await getAuthToken();
       const headers = {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
@@ -158,19 +160,17 @@ export function OrgProvider({ children, apiBaseUrl = "/api/v1" }: OrgProviderPro
         error: error instanceof Error ? error : new Error("Failed to fetch organizations"),
       }));
     }
-  }, [isAuthenticated, getAccessToken, apiBaseUrl]);
+  }, [isAuthenticated, apiBaseUrl]);
 
-  // Fetch organizations when auth state changes
+  // Fetch organizations when auth state changes or impersonation toggles
   useEffect(() => {
     if (authLoading) {
-      // Auth is still loading, don't do anything yet
       return;
     }
 
     if (isAuthenticated) {
       refreshOrganizations();
     } else {
-      // Only set initialized when auth is done AND user is not authenticated
       setState({
         currentOrg: null,
         organizations: [],
@@ -180,7 +180,8 @@ export function OrgProvider({ children, apiBaseUrl = "/api/v1" }: OrgProviderPro
         error: null,
       });
     }
-  }, [authLoading, isAuthenticated, refreshOrganizations]);
+    // isImpersonating toggles when impersonation starts/stops — re-fetch orgs as the right user
+  }, [authLoading, isAuthenticated, isImpersonating, refreshOrganizations]);
 
   // Set current organization
   const setCurrentOrg = useCallback((org: Organization | null) => {

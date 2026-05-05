@@ -64,6 +64,13 @@ KNOWN_DEV_USERS = [
     keycloak_sub: 'edsger.dijkstra@example.com',
     global_admin: true,
     org_role: 'admin'
+  },
+  {
+    email: 'linu.valds@example.com',
+    name: 'Line Valds',
+    keycloak_sub: 'linu.valds@example.com',
+    global_admin: true,
+    org_role: 'admin'
   }
 ].freeze
 

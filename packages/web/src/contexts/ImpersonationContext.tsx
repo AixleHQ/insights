@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import { api } from "@/lib/api";
+import { queryClient } from "@/lib/queryClient";
 
 interface ImpersonationState {
   isImpersonating: boolean;
@@ -23,27 +24,7 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
     token: null,
   });
 
-  // Check for impersonation token on mount
-  useEffect(() => {
-    // Check URL for impersonation token
-    const params = new URLSearchParams(window.location.search);
-    const urlToken = params.get("impersonate");
-
-    if (urlToken) {
-      // Store the token and remove from URL
-      localStorage.setItem(STORAGE_KEY, urlToken);
-      window.history.replaceState({}, "", window.location.pathname);
-      decodeAndSetToken(urlToken);
-    } else {
-      // Check localStorage for existing token
-      const storedToken = localStorage.getItem(STORAGE_KEY);
-      if (storedToken) {
-        decodeAndSetToken(storedToken);
-      }
-    }
-  }, []);
-
-  const decodeAndSetToken = (token: string) => {
+  const decodeAndSetToken = useCallback((token: string) => {
     try {
       // Decode JWT to get impersonator info
       const parts = token.split(".");
@@ -64,16 +45,38 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
         impersonatorEmail: payload.impersonator_email || null,
         token,
       });
+      // Flush all cached data so subsequent queries fetch as the impersonated user
+      queryClient.clear();
     } catch (error) {
       console.error("Failed to decode impersonation token:", error);
       localStorage.removeItem(STORAGE_KEY);
     }
-  };
+  }, []);
+
+  // Check for impersonation token on mount
+  useEffect(() => {
+    // Check URL for impersonation token
+    const params = new URLSearchParams(window.location.search);
+    const urlToken = params.get("impersonate");
+
+    if (urlToken) {
+      // Store the token and remove from URL
+      localStorage.setItem(STORAGE_KEY, urlToken);
+      window.history.replaceState({}, "", window.location.pathname);
+      decodeAndSetToken(urlToken);
+    } else {
+      // Check localStorage for existing token
+      const storedToken = localStorage.getItem(STORAGE_KEY);
+      if (storedToken) {
+        decodeAndSetToken(storedToken);
+      }
+    }
+  }, [decodeAndSetToken]);
 
   const startImpersonation = useCallback((token: string) => {
     localStorage.setItem(STORAGE_KEY, token);
     decodeAndSetToken(token);
-  }, []);
+  }, [decodeAndSetToken]);
 
   const stopImpersonation = useCallback(async () => {
     try {
@@ -87,8 +90,11 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
       impersonatorEmail: null,
       token: null,
     });
-    // Reload to get fresh auth state
-    window.location.href = "/";
+    // Redirect back to admin panel so the admin's Keycloak session is preserved.
+    // Navigating to "/" would trigger an OIDC flow as the impersonated user.
+    // Falls back to a relative path that works in any environment if VITE_ADMIN_URL is not set.
+    const adminUrl = import.meta.env.VITE_ADMIN_URL ?? "/admin/users";
+    window.location.href = adminUrl;
   }, []);
 
   return (
