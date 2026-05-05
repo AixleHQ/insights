@@ -157,14 +157,10 @@ class AiUsageSyncJob
       "(#{vals.join(', ')})"
     end.join(", ")
 
-    conn.execute(<<~SQL)
-      INSERT INTO #{table} (#{col_names})
-      VALUES #{values_sql}
-      ON CONFLICT (#{conflict_cols})
-      DO UPDATE SET
-        tool_event_id = EXCLUDED.tool_event_id,
-        updated_at    = EXCLUDED.updated_at
-    SQL
+    sql_template = "INSERT INTO %s (%s) VALUES %s ON CONFLICT (%s) DO UPDATE SET tool_event_id = EXCLUDED.tool_event_id, updated_at = EXCLUDED.updated_at"
+    sql = format(sql_template, table, col_names, values_sql, conflict_cols)
+
+    conn.execute(sql)
   end
 
   def upsert_usage_one_by_one(org, provider, usage_data)

@@ -56,12 +56,10 @@ module ToolEvents
           .map { |c| conn.quote_column_name(c) }.join(", ")
         col_names = row.keys.map { |k| conn.quote_column_name(k) }.join(", ")
         values    = row.values.map { |v| v.nil? ? "NULL" : conn.quote(v) }.join(", ")
-        sql = <<~SQL
-          INSERT INTO #{ConnectorEventDedup.quoted_table_name} (#{col_names})
-          VALUES (#{values})
-          ON CONFLICT (#{conflict_cols}) DO NOTHING
-          RETURNING id, tool_event_id
-        SQL
+
+        sql_template = "INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) DO NOTHING RETURNING id, tool_event_id"
+        sql = format(sql_template, ConnectorEventDedup.quoted_table_name, col_names, values, conflict_cols)
+
         result = conn.execute(sql)
 
         existing_event_id = result.first&.fetch("tool_event_id", nil)
