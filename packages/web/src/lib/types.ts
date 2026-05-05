@@ -211,6 +211,8 @@ export interface ToolEvent {
   project: { id: string; name: string } | null;
   createdAt: string;
   occurredAt: string;
+  correlationMethod?: string | null;
+  correlationConfidence?: number | null;
   // Detail-only fields (returned by the show endpoint, not the list endpoint)
   sanitizedContent?: string | null;
   metadata?: Record<string, unknown> | null;

@@ -2516,7 +2516,10 @@ paths:
   /api/v1/organizations/{organization_id}/events/unattributed:
     get:
       summary: List unattributed events
-      description: Returns events with no assigned user (user_id is null). Used for the attribution assignment UI.
+      description: >
+        Returns events with no assigned user (user_id is null). Used for the attribution assignment UI.
+        Each event includes correlation_method and correlation_confidence from metadata (populated by
+        AttributionJob when a candidate was found but below the confidence threshold).
       tags:
         - Events
       parameters:
@@ -2533,6 +2536,14 @@ paths:
           in: query
           schema:
             type: string
+        - name: min_confidence
+          in: query
+          description: Filter to events where the best-attempt correlation_confidence is at least this value (0.0–1.0). Events never processed by AttributionJob are excluded when this filter is active.
+          schema:
+            type: number
+            format: float
+            minimum: 0
+            maximum: 1
       responses:
         '200':
           description: Paginated list of unattributed events
@@ -2551,6 +2562,105 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/events/{id}/attribute:
+    post:
+      summary: Manually attribute an event to a user
+      description: >
+        Assigns a user to an unattributed event. Sets correlation_method to "manual" and
+        correlation_confidence to 1.0 in metadata. Restricted to org admins and above.
+        The action is audit-logged.
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - user_id
+              properties:
+                user_id:
+                  type: string
+                  format: uuid
+                  description: ID of the organization member to assign the event to
+      responses:
+        '200':
+          description: Event successfully attributed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ToolEvent'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /api/v1/organizations/{organization_id}/events/attribute_bulk:
+    post:
+      summary: Bulk attribute events to a user
+      description: >
+        Assigns up to 500 events to a single user in one request. All event IDs must belong to
+        the organization. Sets correlation_method to "manual" and correlation_confidence to 1.0
+        for each event. Restricted to org admins and above. The action is audit-logged.
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - event_ids
+                - user_id
+              properties:
+                event_ids:
+                  type: array
+                  maxItems: 500
+                  items:
+                    type: string
+                    format: uuid
+                  description: List of event IDs to attribute (max 500)
+                user_id:
+                  type: string
+                  format: uuid
+                  description: ID of the organization member to assign the events to
+      responses:
+        '200':
+          description: Bulk attribution result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      updated:
+                        type: integer
+                        description: Number of events successfully attributed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
 
   /api/v1/organizations/{organization_id}/events/{id}/audit_trail:
     get:

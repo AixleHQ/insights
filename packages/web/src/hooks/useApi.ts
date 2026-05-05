@@ -1151,6 +1151,28 @@ export function useUnattributedEvents(orgId: string) {
   });
 }
 
+export function useAttributeEvent(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ eventId, userId }: { eventId: string; userId: string }) =>
+      api.post(`/organizations/${orgId}/events/${eventId}/attribute`, { user_id: userId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.events.unattributed(orgId) });
+    },
+  });
+}
+
+export function useBulkAttributeEvents(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ eventIds, userId }: { eventIds: string[]; userId: string }) =>
+      api.post(`/organizations/${orgId}/events/attribute_bulk`, { event_ids: eventIds, user_id: userId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.events.unattributed(orgId) });
+    },
+  });
+}
+
 // ============================================================================
 // Stats Hooks
 // ============================================================================

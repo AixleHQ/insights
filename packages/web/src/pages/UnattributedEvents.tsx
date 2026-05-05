@@ -7,14 +7,21 @@ import {
   User,
   RefreshCw,
   HelpCircle,
+  CheckSquare,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useOrg } from "@/contexts/OrgContext";
-import { useUnattributedEvents, useOrganizationMembers, queryKeys } from "@/hooks/useApi";
-import { api } from "@/lib/api";
+import {
+  useUnattributedEvents,
+  useOrganizationMembers,
+  useAttributeEvent,
+  useBulkAttributeEvents,
+  queryKeys,
+} from "@/hooks/useApi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { SortButton, type SortDirection } from "@/components/ui/sort-button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
@@ -42,6 +49,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { RiskBadge } from "@/components/dashboard";
+import { formatCost } from "@/lib/formatters";
 import { formatDistanceToNow } from "@/lib/utils";
 
 type UnattributedSortField = "tool_name" | "risk_level" | "cost_usd" | "created_at";
@@ -54,9 +62,22 @@ const riskLevelOrder: Record<string, number> = {
   none: 0,
 };
 
+const CORRELATION_METHOD_LABELS: Record<string, string> = {
+  direct_user_id: "Direct ID",
+  email: "Email",
+  tool_account: "Tool Account",
+  git_email: "Git Email",
+  machine_id: "Machine ID",
+  ip_address: "IP Address",
+  manual: "Manual",
+};
+
 function EventSkeleton() {
   return (
     <TableRow>
+      <TableCell>
+        <Skeleton className="h-4 w-4" />
+      </TableCell>
       <TableCell>
         <Skeleton className="h-4 w-24" />
       </TableCell>
@@ -73,6 +94,9 @@ function EventSkeleton() {
         <Skeleton className="h-4 w-24" />
       </TableCell>
       <TableCell>
+        <Skeleton className="h-4 w-20" />
+      </TableCell>
+      <TableCell>
         <Skeleton className="h-8 w-32" />
       </TableCell>
     </TableRow>
@@ -86,12 +110,14 @@ export function UnattributedEvents() {
   const [sortField, setSortField] = useState<UnattributedSortField>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
-  const [selectedUser, setSelectedUser] = useState<string>("");
-  const [isAssigning, setIsAssigning] = useState(false);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string>("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const { data: events, isLoading, isFetching } = useUnattributedEvents(currentOrg?.id || "");
   const { data: members } = useOrganizationMembers(currentOrg?.id || "");
+  const attributeEvent = useAttributeEvent(currentOrg?.id || "");
+  const bulkAttributeEvents = useBulkAttributeEvents(currentOrg?.id || "");
 
   const handleSort = (field: UnattributedSortField) => {
     if (sortField === field) {
@@ -107,7 +133,6 @@ export function UnattributedEvents() {
 
     let result = [...events];
 
-    // Apply search filter
     if (search) {
       const searchLower = search.toLowerCase();
       result = result.filter(
@@ -117,7 +142,6 @@ export function UnattributedEvents() {
       );
     }
 
-    // Apply sorting
     result.sort((a, b) => {
       let comparison = 0;
       switch (sortField) {
@@ -125,13 +149,17 @@ export function UnattributedEvents() {
           comparison = (a.toolName || "").localeCompare(b.toolName || "");
           break;
         case "risk_level":
-          comparison = (riskLevelOrder[a.riskLevel || "none"] || 0) - (riskLevelOrder[b.riskLevel || "none"] || 0);
+          comparison =
+            (riskLevelOrder[a.riskLevel || "none"] || 0) -
+            (riskLevelOrder[b.riskLevel || "none"] || 0);
           break;
         case "cost_usd":
           comparison = (Number(a.costUsd) || 0) - (Number(b.costUsd) || 0);
           break;
         case "created_at":
-          comparison = new Date(a.occurredAt || a.createdAt || 0).getTime() - new Date(b.occurredAt || b.createdAt || 0).getTime();
+          comparison =
+            new Date(a.occurredAt || a.createdAt || 0).getTime() -
+            new Date(b.occurredAt || b.createdAt || 0).getTime();
           break;
       }
       return sortDirection === "asc" ? comparison : -comparison;
@@ -140,38 +168,62 @@ export function UnattributedEvents() {
     return result;
   }, [events, search, sortField, sortDirection]);
 
+  const allFilteredSelected =
+    filteredEvents.length > 0 && filteredEvents.every((e) => selectedIds.has(e.id));
+
+  const handleSelectAll = () => {
+    if (allFilteredSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredEvents.map((e) => e.id)));
+    }
+  };
+
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
   const handleRefresh = () => {
     queryClient.invalidateQueries({
       queryKey: queryKeys.events.unattributed(currentOrg?.id || ""),
     });
+    setSelectedIds(new Set());
+  };
+
+  const openAssignDialog = (eventId: string | null) => {
+    setSelectedEventId(eventId);
+    setSelectedUserId("");
+    setAssignDialogOpen(true);
   };
 
   const handleAssign = async () => {
-    if (!currentOrg || !selectedEvent || !selectedUser) return;
+    if (!currentOrg || !selectedUserId) return;
 
-    setIsAssigning(true);
-    try {
-      // In production, this would be a real API call to assign the event
-      await api.patch(`/organizations/${currentOrg.id}/events/${selectedEvent}`, {
-        user_id: selectedUser,
+    if (selectedEventId) {
+      await attributeEvent.mutateAsync({ eventId: selectedEventId, userId: selectedUserId });
+    } else {
+      await bulkAttributeEvents.mutateAsync({
+        eventIds: Array.from(selectedIds),
+        userId: selectedUserId,
       });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.events.unattributed(currentOrg.id),
-      });
-      setAssignDialogOpen(false);
-      setSelectedEvent(null);
-      setSelectedUser("");
-    } catch (error) {
-      console.error("Failed to assign event:", error);
-    } finally {
-      setIsAssigning(false);
+      setSelectedIds(new Set());
     }
+
+    setAssignDialogOpen(false);
+    setSelectedEventId(null);
+    setSelectedUserId("");
   };
 
-  const openAssignDialog = (eventId: string) => {
-    setSelectedEvent(eventId);
-    setAssignDialogOpen(true);
-  };
+  const isAssigning = attributeEvent.isPending || bulkAttributeEvents.isPending;
+  const isBulkMode = selectedEventId === null;
 
   return (
     <div className="space-y-6">
@@ -189,7 +241,13 @@ export function UnattributedEvents() {
             </p>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isFetching} className="self-start sm:self-auto">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRefresh}
+          disabled={isFetching}
+          className="self-start sm:self-auto"
+        >
           <RefreshCw className={`mr-2 size-4 ${isFetching ? "animate-spin" : ""}`} />
           Refresh
         </Button>
@@ -225,12 +283,30 @@ export function UnattributedEvents() {
           <UserX className="size-3" />
           {events?.length || 0} unattributed
         </Badge>
+        {selectedIds.size > 0 && (
+          <Button
+            size="sm"
+            onClick={() => openAssignDialog(null)}
+            className="self-start sm:self-auto"
+          >
+            <CheckSquare className="mr-2 size-4" />
+            Assign {selectedIds.size} selected
+          </Button>
+        )}
       </div>
 
       <div className="rounded-md border overflow-x-auto">
-        <Table className="min-w-[600px]">
+        <Table className="min-w-[750px]">
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10">
+                <Checkbox
+                  checked={allFilteredSelected}
+                  onCheckedChange={handleSelectAll}
+                  aria-label="Select all"
+                  disabled={filteredEvents.length === 0}
+                />
+              </TableHead>
               <TableHead>
                 <SortButton
                   field="tool_name"
@@ -262,6 +338,7 @@ export function UnattributedEvents() {
                   Cost
                 </SortButton>
               </TableHead>
+              <TableHead className="hidden md:table-cell">Attribution Attempt</TableHead>
               <TableHead>
                 <SortButton
                   field="created_at"
@@ -280,7 +357,7 @@ export function UnattributedEvents() {
               Array.from({ length: 5 }).map((_, i) => <EventSkeleton key={i} />)
             ) : filteredEvents.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">
+                <TableCell colSpan={8} className="h-24 text-center">
                   <div className="flex flex-col items-center gap-2">
                     <User className="size-8 text-muted-foreground" />
                     <p className="text-muted-foreground">
@@ -291,7 +368,17 @@ export function UnattributedEvents() {
               </TableRow>
             ) : (
               filteredEvents.map((event) => (
-                <TableRow key={event.id}>
+                <TableRow
+                  key={event.id}
+                  data-state={selectedIds.has(event.id) ? "selected" : undefined}
+                >
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedIds.has(event.id)}
+                      onCheckedChange={() => handleToggleSelect(event.id)}
+                      aria-label={`Select event ${event.id}`}
+                    />
+                  </TableCell>
                   <TableCell>
                     <div>
                       <p className="font-medium">{event.toolName || "Unknown"}</p>
@@ -309,7 +396,24 @@ export function UnattributedEvents() {
                     <RiskBadge level={event.riskLevel || "none"} />
                   </TableCell>
                   <TableCell className="hidden sm:table-cell font-mono text-sm">
-                    ${Number(event.costUsd ?? 0).toFixed(4)}
+                    {formatCost(event.costUsd ?? 0)}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {event.correlationMethod ? (
+                      <div className="flex flex-col gap-0.5">
+                        <Badge variant="outline" className="text-xs w-fit">
+                          {CORRELATION_METHOD_LABELS[event.correlationMethod] ??
+                            event.correlationMethod}
+                        </Badge>
+                        {event.correlationConfidence != null && (
+                          <span className="text-xs text-muted-foreground">
+                            {Math.round(event.correlationConfidence * 100)}% confidence
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {formatDistanceToNow(event.occurredAt || event.createdAt)}
@@ -334,13 +438,19 @@ export function UnattributedEvents() {
       <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Assign Event to User</DialogTitle>
+            <DialogTitle>
+              {isBulkMode
+                ? `Assign ${selectedIds.size} Events to User`
+                : "Assign Event to User"}
+            </DialogTitle>
             <DialogDescription>
-              Select a team member to attribute this event to.
+              {isBulkMode
+                ? `Select a team member to attribute ${selectedIds.size} selected events to.`
+                : "Select a team member to attribute this event to."}
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <Select value={selectedUser} onValueChange={setSelectedUser}>
+            <Select value={selectedUserId} onValueChange={setSelectedUserId}>
               <SelectTrigger>
                 <SelectValue placeholder="Select a team member" />
               </SelectTrigger>
@@ -350,9 +460,7 @@ export function UnattributedEvents() {
                     <div className="flex items-center gap-2">
                       <span>{member.user.name || member.user.email}</span>
                       {member.user.name && (
-                        <span className="text-muted-foreground">
-                          ({member.user.email})
-                        </span>
+                        <span className="text-muted-foreground">({member.user.email})</span>
                       )}
                     </div>
                   </SelectItem>
@@ -364,8 +472,12 @@ export function UnattributedEvents() {
             <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleAssign} disabled={!selectedUser || isAssigning}>
-              {isAssigning ? "Assigning..." : "Assign Event"}
+            <Button onClick={handleAssign} disabled={!selectedUserId || isAssigning}>
+              {isAssigning
+                ? "Assigning..."
+                : isBulkMode
+                  ? `Assign ${selectedIds.size} Events`
+                  : "Assign Event"}
             </Button>
           </DialogFooter>
         </DialogContent>

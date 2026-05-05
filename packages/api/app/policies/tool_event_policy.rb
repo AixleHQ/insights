@@ -21,6 +21,10 @@ class ToolEventPolicy < ApplicationPolicy
     org_admin?(record_organization) || global_admin?
   end
 
+  def attribute?
+    org_admin?(record_organization) || global_admin?
+  end
+
   # Scoped query for authorized events
   relation_scope do |scope|
     if global_admin?

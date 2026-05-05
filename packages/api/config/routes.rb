@@ -83,12 +83,14 @@ Rails.application.routes.draw do
         # Events
         resources :events, only: [ :index, :show ] do
           collection do
-            get :summary
-            get :unattributed
-            get :export
+            get  :summary
+            get  :unattributed
+            get  :export
+            post :attribute_bulk
           end
           member do
-            get :audit_trail
+            get  :audit_trail
+            post :attribute
           end
         end
 
