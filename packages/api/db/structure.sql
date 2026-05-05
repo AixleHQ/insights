@@ -1230,6 +1230,13 @@ CREATE INDEX index_audit_logs_on_organization_id ON public.audit_logs USING btre
 
 
 --
+-- Name: index_audit_logs_on_organization_id_and_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_audit_logs_on_organization_id_and_created_at ON public.audit_logs USING btree (organization_id, created_at DESC);
+
+
+--
 -- Name: index_audit_logs_on_policy_version_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1692,6 +1699,13 @@ CREATE INDEX idx_tool_events_org_occurred ON timeseries.tool_events USING btree 
 
 
 --
+-- Name: idx_tool_events_org_tool_occurred; Type: INDEX; Schema: timeseries; Owner: -
+--
+
+CREATE INDEX idx_tool_events_org_tool_occurred ON timeseries.tool_events USING btree (organization_id, tool_name, occurred_at DESC);
+
+
+--
 -- Name: idx_tool_events_project_occurred; Type: INDEX; Schema: timeseries; Owner: -
 --
 
@@ -2013,6 +2027,7 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260505123328'),
 ('20260504180000'),
 ('20260504140050'),
 ('20260504135022'),
