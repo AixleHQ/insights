@@ -153,6 +153,10 @@ export interface Connector {
   activeUsersCount?: number | null;
   copilotConnector?: boolean;
   config?: Record<string, unknown>;
+  // Webhook fields (OpenRouter-specific)
+  webhookActive?: boolean;
+  webhookToken?: string;
+  webhookSecretSet?: boolean;
 }
 
 // Project connector types
