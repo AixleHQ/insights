@@ -161,6 +161,7 @@ export function UnattributedEvents() {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [assignError, setAssignError] = useState<string | null>(null);
 
   // Server-side filters
   const [toolFilter, setToolFilter] = useState("");
@@ -272,25 +273,31 @@ export function UnattributedEvents() {
   const openAssignDialog = (eventId: string | null) => {
     setSelectedEventId(eventId);
     setSelectedUserId("");
+    setAssignError(null);
     setAssignDialogOpen(true);
   };
 
   const handleAssign = async () => {
     if (!currentOrg || !selectedUserId) return;
+    setAssignError(null);
 
-    if (selectedEventId) {
-      await attributeEvent.mutateAsync({ eventId: selectedEventId, userId: selectedUserId });
-    } else {
-      await bulkAttributeEvents.mutateAsync({
-        eventIds: Array.from(selectedIds),
-        userId: selectedUserId,
-      });
-      setSelectedIds(new Set());
+    try {
+      if (selectedEventId) {
+        await attributeEvent.mutateAsync({ eventId: selectedEventId, userId: selectedUserId });
+      } else {
+        await bulkAttributeEvents.mutateAsync({
+          eventIds: Array.from(selectedIds),
+          userId: selectedUserId,
+        });
+        setSelectedIds(new Set());
+      }
+
+      setAssignDialogOpen(false);
+      setSelectedEventId(null);
+      setSelectedUserId("");
+    } catch (err) {
+      setAssignError(err instanceof Error ? err.message : "Attribution failed");
     }
-
-    setAssignDialogOpen(false);
-    setSelectedEventId(null);
-    setSelectedUserId("");
   };
 
   const isAssigning = attributeEvent.isPending || bulkAttributeEvents.isPending;
@@ -681,6 +688,9 @@ export function UnattributedEvents() {
               </SelectContent>
             </Select>
           </div>
+          {assignError && (
+            <p className="text-sm text-destructive px-1">{assignError}</p>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>
               Cancel

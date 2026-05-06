@@ -303,14 +303,20 @@ function PolicySettings() {
     newLabel: string;
   } | null>(null);
 
-  const [confidenceInput, setConfidenceInput] = useState("");
   const [confidenceError, setConfidenceError] = useState("");
-  const [confidenceSaving, setConfidenceSaving] = useState(false);
 
   const getSetting = (key: string) =>
     (settings as { data: Array<{ key: string; value: string }> })?.data?.find(
       (s) => s.key === key
     )?.value;
+
+  const savedConfidence = getSetting("min_attribution_confidence");
+  const [prevSavedConfidence, setPrevSavedConfidence] = useState(savedConfidence);
+  const [confidenceInput, setConfidenceInput] = useState(savedConfidence ?? "0.7");
+  if (prevSavedConfidence !== savedConfidence && savedConfidence !== undefined) {
+    setPrevSavedConfidence(savedConfidence);
+    setConfidenceInput(savedConfidence);
+  }
 
   // Parse settings from API or use defaults
   const policies = {
@@ -323,17 +329,6 @@ function PolicySettings() {
   };
 
   const isLoading = isLoadingRetention || isLoadingSettings;
-
-  // Sync confidence input when settings load
-  useEffect(() => {
-    const saved = getSetting("min_attribution_confidence");
-    if (saved !== undefined) {
-      setConfidenceInput(saved);
-    } else {
-      setConfidenceInput("0.7");
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings]);
 
   const togglePolicy = async (key: keyof typeof policies) => {
     if (!currentOrg) return;
@@ -357,7 +352,6 @@ function PolicySettings() {
       return;
     }
     setConfidenceError("");
-    setConfidenceSaving(true);
     try {
       await updateSetting.mutateAsync({
         orgId: currentOrg.id,
@@ -366,8 +360,6 @@ function PolicySettings() {
       });
     } catch (error) {
       console.error("Failed to update attribution confidence:", error);
-    } finally {
-      setConfidenceSaving(false);
     }
   };
 
@@ -658,9 +650,9 @@ function PolicySettings() {
               <Button
                 size="sm"
                 onClick={handleConfidenceSave}
-                disabled={confidenceSaving}
+                disabled={updateSetting.isPending}
               >
-                {confidenceSaving ? (
+                {updateSetting.isPending ? (
                   <Loader2 className="size-4 animate-spin" />
                 ) : (
                   <Save className="mr-2 size-4" />

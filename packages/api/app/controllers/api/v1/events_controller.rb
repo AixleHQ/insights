@@ -110,22 +110,13 @@ module Api
           return
         end
 
-        # Only update events that are still unattributed
-        unattributed_events = events.where(user_id: nil)
-
-        updated = 0
-        ToolEvent.transaction do
-          unattributed_events.find_each do |ev|
-            ev.update!(
-              user_id: user.id,
-              metadata: (ev.metadata || {}).merge(
-                "correlation_method" => "manual",
-                "correlation_confidence" => 1.0
-              )
-            )
-            updated += 1
-          end
-        end
+        updated = current_organization.tool_events
+          .where(id: event_ids, user_id: nil)
+          .update_all([
+            "user_id = ?, metadata = COALESCE(metadata, '{}'::jsonb) || ?::jsonb",
+            user.id,
+            '{"correlation_method":"manual","correlation_confidence":1.0}'
+          ])
 
         OrganizationAuditLog.log(
           organization: current_organization,
