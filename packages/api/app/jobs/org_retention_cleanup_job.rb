@@ -31,6 +31,9 @@ class OrgRetentionCleanupJob
     # Clean up tool_events
     total_deleted += cleanup_tool_events(org)
 
+    # Clean up webhook deliveries older than 30 days
+    total_deleted += cleanup_webhook_deliveries(org)
+
     # Clean up hourly aggregates (if we had direct access - normally handled by TimescaleDB)
     # total_deleted += cleanup_hourly_aggregates(org)
 
@@ -48,6 +51,20 @@ class OrgRetentionCleanupJob
 
     if deleted > 0
       Rails.logger.info("[OrgRetentionCleanupJob] Org #{org.slug}: deleted #{deleted} tool_events older than #{cutoff}")
+    end
+
+    deleted
+  end
+
+  def cleanup_webhook_deliveries(org)
+    deleted = WebhookDelivery
+      .joins(:organization_connector)
+      .where(organization_connectors: { organization: org })
+      .where("webhook_deliveries.created_at < ?", 30.days.ago)
+      .delete_all
+
+    if deleted > 0
+      Rails.logger.info("[OrgRetentionCleanupJob] Org #{org.slug}: deleted #{deleted} webhook_deliveries older than 30 days")
     end
 
     deleted

@@ -2,11 +2,18 @@
 
 class JiraSyncJob < ApplicationJob
   queue_as :connectors
-  retry_on StandardError, wait: :polynomially_longer, attempts: 3
+
+  retry_on StandardError, wait: :polynomially_longer, attempts: 3 do |job, error|
+    opts = job.arguments.last.to_h.symbolize_keys
+    WebhookDelivery.find_by(id: opts[:delivery_id])&.mark_failed!(error.message)
+  end
 
   def perform(connector_id, action = "sync", options = {})
+    @options   = options.symbolize_keys
+    delivery   = action == "webhook" ? WebhookDelivery.find_by(id: @options[:delivery_id]) : nil
+    delivery&.mark_processing!
+
     @connector = OrganizationConnector.find(connector_id)
-    @options = options.symbolize_keys
 
     Rails.logger.info("[JiraSyncJob] Starting #{action} for connector #{connector_id}")
 
@@ -28,11 +35,14 @@ class JiraSyncJob < ApplicationJob
       Rails.logger.warn("[JiraSyncJob] Unknown action: #{action}")
     end
 
+    delivery&.mark_delivered!
     Rails.logger.info("[JiraSyncJob] Completed #{action} for connector #{connector_id}")
   rescue ActiveRecord::RecordNotFound
     Rails.logger.error("[JiraSyncJob] Connector #{connector_id} not found")
+    delivery&.mark_failed!("Connector not found")
   rescue StandardError => e
     Rails.logger.error("[JiraSyncJob] Failed: #{e.message}")
+    delivery&.update!(last_error: e.message)
     raise
   end
 
@@ -159,7 +169,7 @@ class JiraSyncJob < ApplicationJob
 
   def process_webhook
     event_type = @options[:event_type]
-    payload = @options[:payload]
+    payload    = @options[:payload]
 
     case event_type
     when "jira:issue_created", "jira:issue_updated"
@@ -181,20 +191,20 @@ class JiraSyncJob < ApplicationJob
 
     ToolEvent.create!(
       organization_id: @connector.organization_id,
-      tool_name: "jira",
-      event_type: "issue",
-      occurred_at: Time.current,
+      tool_name:       "jira",
+      event_type:      "issue",
+      occurred_at:     Time.current,
       metadata: {
-        action: action,
-        issue_key: issue_data["key"],
-        issue_id: issue_data["id"],
-        summary: issue_data.dig("fields", "summary"),
-        status: issue_data.dig("fields", "status", "name"),
-        issue_type: issue_data.dig("fields", "issuetype", "name"),
+        action:      action,
+        issue_key:   issue_data["key"],
+        issue_id:    issue_data["id"],
+        summary:     issue_data.dig("fields", "summary"),
+        status:      issue_data.dig("fields", "status", "name"),
+        issue_type:  issue_data.dig("fields", "issuetype", "name"),
         project_key: issue_data.dig("fields", "project", "key"),
-        assignee: issue_data.dig("fields", "assignee", "displayName"),
-        reporter: issue_data.dig("fields", "reporter", "displayName"),
-        changelog: extract_changelog(payload)
+        assignee:    issue_data.dig("fields", "assignee", "displayName"),
+        reporter:    issue_data.dig("fields", "reporter", "displayName"),
+        changelog:   extract_changelog(payload)
       }
     )
 
@@ -205,7 +215,7 @@ class JiraSyncJob < ApplicationJob
 
   def process_comment_event(payload, event_type)
     comment = payload["comment"]
-    issue = payload["issue"]
+    issue   = payload["issue"]
     return unless comment && issue
 
     action = event_type.gsub("comment_", "")
@@ -217,14 +227,14 @@ class JiraSyncJob < ApplicationJob
 
     ToolEvent.create!(
       organization_id: @connector.organization_id,
-      tool_name: "jira",
-      event_type: "comment",
-      occurred_at: occurred_at,
+      tool_name:       "jira",
+      event_type:      "comment",
+      occurred_at:     occurred_at,
       metadata: {
-        action: action,
+        action:     action,
         comment_id: comment["id"],
-        issue_key: issue["key"],
-        author: comment.dig("author", "displayName")
+        issue_key:  issue["key"],
+        author:     comment.dig("author", "displayName")
       }
     )
   end
@@ -237,15 +247,15 @@ class JiraSyncJob < ApplicationJob
 
     ToolEvent.create!(
       organization_id: @connector.organization_id,
-      tool_name: "jira",
-      event_type: "sprint",
-      occurred_at: Time.current,
+      tool_name:       "jira",
+      event_type:      "sprint",
+      occurred_at:     Time.current,
       metadata: {
-        action: action,
-        sprint_id: sprint["id"],
-        sprint_name: sprint["name"],
+        action:       action,
+        sprint_id:    sprint["id"],
+        sprint_name:  sprint["name"],
         sprint_state: sprint["state"],
-        board_id: sprint["originBoardId"]
+        board_id:     sprint["originBoardId"]
       }
     )
   end
@@ -258,8 +268,8 @@ class JiraSyncJob < ApplicationJob
     items.map do |item|
       {
         field: item["field"],
-        from: item["fromString"],
-        to: item["toString"]
+        from:  item["fromString"],
+        to:    item["toString"]
       }
     end
   end

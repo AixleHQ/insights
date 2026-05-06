@@ -3,9 +3,17 @@
 class GithubSyncJob < ApplicationJob
   queue_as :connectors
 
+  retry_on StandardError, wait: :polynomially_longer, attempts: 3 do |job, error|
+    opts = job.arguments.last.to_h.symbolize_keys
+    WebhookDelivery.find_by(id: opts[:delivery_id])&.mark_failed!(error.message)
+  end
+
   def perform(connector_id, action = "sync", options = {})
+    @options   = options.symbolize_keys
+    delivery   = action == "webhook" ? WebhookDelivery.find_by(id: @options[:delivery_id]) : nil
+    delivery&.mark_processing!
+
     @connector = OrganizationConnector.find(connector_id)
-    @options = options.symbolize_keys
 
     Rails.logger.info("[GithubSyncJob] Starting #{action} for connector #{connector_id}")
 
@@ -20,12 +28,15 @@ class GithubSyncJob < ApplicationJob
       Rails.logger.warn("[GithubSyncJob] Unknown action: #{action}")
     end
 
+    delivery&.mark_delivered!
     @connector.mark_synced!
     Rails.logger.info("[GithubSyncJob] Completed #{action} for connector #{connector_id}")
   rescue ActiveRecord::RecordNotFound
     Rails.logger.error("[GithubSyncJob] Connector #{connector_id} not found")
+    delivery&.mark_failed!("Connector not found")
   rescue StandardError => e
     Rails.logger.error("[GithubSyncJob] Failed: #{e.message}")
+    delivery&.update!(last_error: e.message)
     raise
   end
 
@@ -46,15 +57,15 @@ class GithubSyncJob < ApplicationJob
     )
 
     repository.update!(
-      name: repo_data[:name],
-      full_name: repo_data[:full_name],
-      url: repo_data[:html_url],
+      name:           repo_data[:name],
+      full_name:      repo_data[:full_name],
+      url:            repo_data[:html_url],
       default_branch: repo_data[:default_branch],
-      is_private: repo_data[:is_private],
+      is_private:     repo_data[:is_private],
       metadata: {
-        language: repo_data[:language],
+        language:    repo_data[:language],
         description: repo_data[:description],
-        updated_at: repo_data[:updated_at]
+        updated_at:  repo_data[:updated_at]
       }
     )
   end
@@ -64,15 +75,15 @@ class GithubSyncJob < ApplicationJob
     token_data = provider.refresh_access_token
 
     @connector.update!(
-      access_token: token_data[:access_token],
-      refresh_token: token_data[:refresh_token],
+      access_token:     token_data[:access_token],
+      refresh_token:    token_data[:refresh_token],
       token_expires_at: token_data[:expires_at]
     )
   end
 
   def process_webhook
     event_type = @options[:event_type]
-    payload = @options[:payload]
+    payload    = @options[:payload]
 
     case event_type
     when "push"
@@ -101,21 +112,21 @@ class GithubSyncJob < ApplicationJob
     repository = find_repository(payload.dig("repository", "id"))
     return unless repository
 
-    pr = payload["pull_request"]
+    pr     = payload["pull_request"]
     action = payload["action"]
 
     ToolEvent.create!(
       organization_id: @connector.organization_id,
-      tool_name: "github",
-      event_type: "review",
-      occurred_at: Time.parse(pr["updated_at"]),
+      tool_name:       "github",
+      event_type:      "review",
+      occurred_at:     Time.parse(pr["updated_at"]),
       metadata: {
-        action: action,
-        pr_number: pr["number"],
-        pr_title: pr["title"],
-        pr_state: pr["state"],
+        action:        action,
+        pr_number:     pr["number"],
+        pr_title:      pr["title"],
+        pr_state:      pr["state"],
         repository_id: repository.id,
-        author: pr.dig("user", "login")
+        author:        pr.dig("user", "login")
       }
     )
   end
@@ -134,18 +145,18 @@ class GithubSyncJob < ApplicationJob
 
     ToolEvent.create!(
       organization_id: @connector.organization_id,
-      user_id: user&.id,
-      repository_id: repository.id,
-      project_id: repository.project_id,
-      tool_name: "github",
-      event_type: "commit",
-      occurred_at: Time.parse(commit["timestamp"]),
+      user_id:         user&.id,
+      repository_id:   repository.id,
+      project_id:      repository.project_id,
+      tool_name:       "github",
+      event_type:      "commit",
+      occurred_at:     Time.parse(commit["timestamp"]),
       metadata: {
-        sha: commit["id"],
-        message: commit["message"],
-        author_name: commit.dig("author", "name"),
+        sha:              commit["id"],
+        message:          commit["message"],
+        author_name:      commit.dig("author", "name"),
         git_author_email: author_email,
-        url: commit["url"]
+        url:              commit["url"]
       }
     )
   end
