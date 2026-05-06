@@ -2,13 +2,14 @@
 
 class AiUsageSyncJob
   include Sidekiq::Job
-  include OpenrouterModelHelper
 
   sidekiq_options queue: "ai", retry: 3
 
   SUPPORTED_PROVIDERS = %w[openrouter anthropic openai gemini].freeze
-  OPENROUTER_RECURRING_OVERLAP_DAYS = 1
-  OPENROUTER_MAX_HISTORY_DAYS = 30
+  # OpenRouter Activity API only retains the last 30 completed UTC days.
+  # Use 29 days to stay safely within that window.
+  OPENROUTER_INITIAL_SYNC_DAYS = 29
+  OPENROUTER_RECURRING_SYNC_DAYS = 7
 
   def perform(organization_id = nil, provider = nil)
     Rails.logger.info("[AiUsageSyncJob] Starting AI usage reconciliation...")
@@ -215,19 +216,9 @@ class AiUsageSyncJob
       return nil
     end
 
-    earliest_allowed = OPENROUTER_MAX_HISTORY_DAYS.days.ago.to_date
-    start_date = if connector.last_sync_at
-      [ connector.last_sync_at.to_date - OPENROUTER_RECURRING_OVERLAP_DAYS.days, earliest_allowed ].max
-    else
-      earliest_allowed
-    end
-    end_date = Date.current - 1.day
-
-    return [] if end_date < start_date
-
-    (start_date..end_date).flat_map do |date|
-      fetch_openrouter_activity_for_date(connector, date)
-    end
+    days_back = connector.last_sync_at ? OPENROUTER_RECURRING_SYNC_DAYS : OPENROUTER_INITIAL_SYNC_DAYS
+    provider = Oauth::OpenrouterProvider.new(connector)
+    provider.fetch_activity(start_date: days_back.days.ago.to_date, end_date: Date.yesterday)
   end
 
   # How far back to sync on the first pull vs recurring syncs.
@@ -282,65 +273,6 @@ class AiUsageSyncJob
     )
   end
 
-  def fetch_openrouter_activity_for_date(connector, date)
-    uri = URI("https://openrouter.ai/api/v1/activity")
-    uri.query = URI.encode_www_form(date: date.iso8601)
-
-    response = perform_json_get(uri, connector.access_token)
-    rows = response.fetch("data", [])
-
-    rows.map do |row|
-      model = row["model"]
-      provider_slug = openrouter_provider_slug(row["provider_name"], model)
-      canonical_model = openrouter_canonical_model(model, provider_slug)
-      endpoint_id = row["endpoint_id"].presence ||
-        "unknown-#{Digest::SHA1.hexdigest(row.to_json)[0, 8]}"
-      cost = row["usage"]
-
-      {
-        external_id: [ "openrouter", date.iso8601, endpoint_id, canonical_model || "unknown-model" ].join(":"),
-        model: canonical_model,
-        tokens_in: row["prompt_tokens"],
-        tokens_out: row["completion_tokens"],
-        cost_usd: cost&.to_f,
-        # Activity API returns daily aggregates with no per-request timestamp.
-        # Anchor to end-of-day so the event sorts after any per-request events
-        # from the same date that may arrive via the webhook path.
-        occurred_at: Time.zone.parse("#{date.iso8601} 23:59:59 UTC"),
-        metadata: {
-          provider: provider_slug,
-          routed_model: model,
-          model_permaslug: row["model_permaslug"],
-          provider_name: row["provider_name"],
-          endpoint_id: row["endpoint_id"],
-          requests: row["requests"],
-          reasoning_tokens: row["reasoning_tokens"],
-          byok_usage_inference: row["byok_usage_inference"],
-          aggregation_level: "daily_endpoint_model",
-          synced_from: "activity_api",
-          usage_date: date.iso8601
-        }.compact
-      }
-    end
-  end
-
-  def perform_json_get(uri, access_token)
-    http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl = true
-    http.open_timeout = 10
-    http.read_timeout = 30
-
-    request = Net::HTTP::Get.new(uri)
-    request["Authorization"] = "Bearer #{access_token}"
-
-    response = http.request(request)
-    unless response.code.to_i == 200
-      raise "HTTP #{response.code}: #{response.body}"
-    end
-
-    JSON.parse(response.body)
-  end
-
   def tool_event_attributes_for_usage(usage)
     metadata = {
       external_id: usage[:external_id],
@@ -374,6 +306,8 @@ class AiUsageSyncJob
 
     if error_message.include?("Only management keys can fetch activity for an account")
       "OpenRouter usage sync requires a management key. Reconnect this integration with a management key to fetch activity data."
+    elsif error_message.include?("Date must be within the last 30")
+      "OpenRouter Activity API only provides data for the last 30 days. Sync window has been adjusted automatically — please retry."
     else
       error_message
     end
