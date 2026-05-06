@@ -47,8 +47,8 @@ export function WebhookDeliveriesPage() {
 
   const filters: WebhookDeliveriesFilters = useMemo(() => {
     return {
-      status: searchParams.get("status") || undefined,
-      provider: searchParams.get("provider") || undefined,
+      status: (searchParams.get("status") || undefined) as WebhookDeliveriesFilters["status"],
+      provider: (searchParams.get("provider") || undefined) as WebhookDeliveriesFilters["provider"],
       dateFrom: searchParams.get("date_from") || undefined,
       dateTo: searchParams.get("date_to") || undefined,
       page: parsePage(searchParams.get("page")),

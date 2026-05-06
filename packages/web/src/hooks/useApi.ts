@@ -132,7 +132,7 @@ export const queryKeys = {
   },
   webhookDeliveries: {
     all: (orgId: string) => ["admin", "webhook_deliveries", orgId] as const,
-    list: (orgId: string, filters: Record<string, unknown>) =>
+    list: (orgId: string, filters: object) =>
       ["admin", "webhook_deliveries", orgId, "list", filters] as const,
   },
 };
