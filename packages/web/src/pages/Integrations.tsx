@@ -87,9 +87,9 @@ const availableProviders: ProviderInfo[] = [
   {
     id: "linear",
     name: "Linear",
-    description: "Connect issues and teams",
+    description: "Connect teams, projects, issues, and cycles",
     category: "project",
-    features: ["Issue tracking", "Team context", "Cycle monitoring"],
+    features: ["Team sync", "Project context", "Issue throughput", "Cycle monitoring"],
     available: true,
   },
 

@@ -111,12 +111,12 @@ class JiraSyncJob < ApplicationJob
 
     Issue.upsert_all(
       rows,
-      unique_by: %i[organization_connector_id external_id],
+      unique_by: %i[organization_connector_id project_id external_id],
       update_only: %i[
         summary status status_category issue_type priority
-        assignee_id assignee_name reporter_name jira_project_key jira_project_id
+        assignee_id assignee_name reporter_name provider_project_key provider_project_id
         parent_key labels due_date external_created_at external_updated_at
-        project_id synced_at updated_at
+        synced_at updated_at
       ],
       record_timestamps: false
     )
@@ -144,6 +144,7 @@ class JiraSyncJob < ApplicationJob
   # When token_expires_at is nil the token has never been refreshed — treat it
   # as expired so we always start with a valid token.
   def ensure_valid_token!
+    # nil means the provider didn't return expires_in → refresh defensively
     return if @connector.token_expires_at && @connector.token_expires_at > 5.minutes.from_now
 
     Rails.logger.info("[JiraSyncJob] Token expired or expiring soon, refreshing...")

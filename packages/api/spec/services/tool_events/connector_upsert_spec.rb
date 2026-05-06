@@ -25,26 +25,35 @@ RSpec.describe ToolEvents::ConnectorUpsert do
       }
     end
 
-    it "creates then updates without duplicating rows" do
+    it "creates a ToolEvent and a ConnectorEventDedup row on first call" do
       expect {
         described_class.call(unique_key: :sha, unique_value: "abc123", **base_attributes)
       }.to change(ToolEvent, :count).by(1)
+        .and change(ConnectorEventDedup, :count).by(1)
+    end
+
+    it "updates without duplicating rows on second call" do
+      described_class.call(unique_key: :sha, unique_value: "abc123", **base_attributes)
 
       described_class.call(
         unique_key: :sha,
         unique_value: "abc123",
         **base_attributes.merge(
           occurred_at: Time.zone.parse("2025-03-02 12:00:00"),
-          metadata: {
-            sha: "abc123",
-            message: "updated"
-          }
+          metadata: { sha: "abc123", message: "updated" }
         )
       )
 
       expect(ToolEvent.where(tool_name: "gitlab", event_type: "commit").count).to eq(1)
       row = ToolEvent.where("metadata ->> 'sha' = ?", "abc123").first
       expect(row.metadata["message"]).to eq("updated")
+    end
+
+    it "does not create a duplicate ConnectorEventDedup row on second call" do
+      described_class.call(unique_key: :sha, unique_value: "abc123", **base_attributes)
+      expect {
+        described_class.call(unique_key: :sha, unique_value: "abc123", **base_attributes)
+      }.not_to change(ConnectorEventDedup, :count)
     end
   end
 
@@ -72,6 +81,7 @@ RSpec.describe ToolEvents::ConnectorUpsert do
 
     after do
       ToolEvent.where(organization_id: organization.id).delete_all
+      ConnectorEventDedup.where(organization_id: organization.id).delete_all
       organization.reload.destroy!
     end
 

@@ -88,7 +88,11 @@ export interface ProjectWithStats extends Project {
   connectors: { id: string; provider: string }[];
   jiraProjectKey?: string | null;
   jiraConnectorId?: string | null;
+  linearProjectId?: string | null;
+  linearProjectName?: string | null;
+  linearConnectorId?: string | null;
   sourceControlSummary?: SourceControlSummary[];
+  issueThroughputSummary?: IssueThroughputSummary[];
 }
 
 export interface SourceControlSummary {
@@ -97,6 +101,16 @@ export interface SourceControlSummary {
   commitCount: number;
   reviewCount: number;
   pipelineCount: number;
+  lastActivityAt: string | null;
+  lastSyncAt: string | null;
+}
+
+export interface IssueThroughputSummary {
+  provider: string;
+  issueCount: number;
+  completedCount: number;
+  stateChangeCount: number;
+  cycleCount: number;
   lastActivityAt: string | null;
   lastSyncAt: string | null;
 }
@@ -411,6 +425,14 @@ export interface JiraProject {
   key: string;
   name: string;
   avatarUrl?: string;
+}
+
+export interface IssueProviderProject {
+  externalId: string;
+  key?: string;
+  name: string;
+  avatarUrl?: string;
+  state?: string;
 }
 
 // Tool analytics types (shared by Cursor & OpenRouter pages)

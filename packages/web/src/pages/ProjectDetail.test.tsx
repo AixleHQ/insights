@@ -63,6 +63,17 @@ const mockProject = {
       lastSyncAt: "2026-03-20T11:00:00Z",
     },
   ],
+  issueThroughputSummary: [
+    {
+      provider: "linear",
+      issueCount: 8,
+      completedCount: 3,
+      stateChangeCount: 5,
+      cycleCount: 2,
+      lastActivityAt: "2026-03-20T10:30:00Z",
+      lastSyncAt: "2026-03-20T11:00:00Z",
+    },
+  ],
 };
 
 const mockMembers = [
@@ -144,7 +155,15 @@ describe("ProjectDetail", () => {
 
     expect(screen.getByText("Source Control Activity")).toBeInTheDocument();
     expect(screen.getByText("14")).toBeInTheDocument();
-    expect(screen.getByText("5")).toBeInTheDocument();
+    expect(screen.getByText("Pipelines")).toBeInTheDocument();
+  });
+
+  it("renders issue throughput summary when available", () => {
+    render(<ProjectDetail />);
+
+    expect(screen.getByText("Issue Throughput")).toBeInTheDocument();
+    expect(screen.getByText("State Changes")).toBeInTheDocument();
+    expect(screen.getByText("8")).toBeInTheDocument();
   });
 
   it("does not render Team section on the overview", () => {

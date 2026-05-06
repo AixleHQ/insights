@@ -1940,6 +1940,128 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /api/v1/projects/{id}/link_jira:
+    post:
+      summary: Link a Jira project to this DB90 project
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                connector_id:
+                  type: integer
+                  description: ID of the Jira OrganizationConnector
+                jira_project_key:
+                  type: string
+                  description: Jira project key (e.g. SCRUM)
+              required:
+                - connector_id
+                - jira_project_key
+      responses:
+        '200':
+          description: Jira project linked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      linked:
+                        type: boolean
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/projects/{id}/link_linear:
+    post:
+      summary: Link a Linear project to this DB90 project
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                connector_id:
+                  type: integer
+                  description: ID of the Linear OrganizationConnector
+                linear_project_id:
+                  type: string
+                  description: External Linear project ID (UUID)
+                linear_project_name:
+                  type: string
+                  description: Display name of the Linear project
+              required:
+                - connector_id
+                - linear_project_id
+                - linear_project_name
+      responses:
+        '200':
+          description: Linear project linked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      linked:
+                        type: boolean
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/projects/{id}/sync_issues:
+    post:
+      summary: Trigger synchronous issue sync for Jira or Linear connector
+      description: >
+        Runs the connector sync job inline (perform_now) and returns only after issues
+        are written to the database. Supports both Jira and Linear connectors — whichever
+        is currently linked to the project.
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Sync completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      synced_at:
+                        type: string
+                        format: date-time
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
   /api/v1/projects/{id}/settings:
     get:
       summary: Get project settings

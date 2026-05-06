@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { Search, Layers } from "lucide-react";
 import { useOrg } from "@/contexts/OrgContext";
-import { useConnectors, useAvailableJiraProjects, useLinkJira, useSyncProjectIssues } from "@/hooks/useApi";
+import { useConnectors, useAvailableLinearProjects, useLinkLinear, useSyncProjectIssues } from "@/hooks/useApi";
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
-  SheetDescription,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,33 +21,33 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 
-interface ConnectJiraSheetProps {
+interface ConnectLinearSheetProps {
   projectId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
 }
 
-export function ConnectJiraSheet({ projectId, open, onOpenChange, onSuccess }: ConnectJiraSheetProps) {
+export function ConnectLinearSheet({ projectId, open, onOpenChange, onSuccess }: ConnectLinearSheetProps) {
   const { currentOrg } = useOrg();
   const [selectedConnectorId, setSelectedConnectorId] = useState("");
   const [search, setSearch] = useState("");
-  const [connectingKey, setConnectingKey] = useState<string | null>(null);
+  const [connectingProjectId, setConnectingProjectId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const { data: connectors } = useConnectors(currentOrg?.id || "");
-  const jiraConnectors = (connectors || []).filter((c) => c.connectorType === "jira");
+  const linearConnectors = (connectors || []).filter((connector) => connector.connectorType === "linear");
 
-  const { data: jiraProjects, isLoading: isLoadingProjects } = useAvailableJiraProjects(
+  const { data: linearProjects, isLoading: isLoadingProjects } = useAvailableLinearProjects(
     currentOrg?.id || "",
     selectedConnectorId
   );
 
-  const linkJira = useLinkJira(projectId);
+  const linkLinear = useLinkLinear(projectId);
   const syncIssues = useSyncProjectIssues(projectId);
 
-  const filteredProjects = (jiraProjects || []).filter((p) =>
-    `${p.name} ${p.key}`.toLowerCase().includes(search.toLowerCase())
+  const filteredProjects = (linearProjects || []).filter((project) =>
+    `${project.name} ${project.key || ""}`.toLowerCase().includes(search.toLowerCase())
   );
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -59,23 +59,29 @@ export function ConnectJiraSheet({ projectId, open, onOpenChange, onSuccess }: C
     onOpenChange(nextOpen);
   };
 
-  const handleLinkProject = async (key: string) => {
+  const handleLinkProject = async (projectIdToLink: string, projectName: string) => {
     if (!selectedConnectorId) return;
-    setConnectingKey(key);
+    setConnectingProjectId(projectIdToLink);
     setError(null);
     try {
-      await linkJira.mutateAsync({ connector_id: selectedConnectorId, jira_project_key: key });
+      await linkLinear.mutateAsync({
+        connector_id: selectedConnectorId,
+        linear_project_id: projectIdToLink,
+        linear_project_name: projectName,
+      });
     } catch {
-      setError("Failed to link Jira project. Please try again.");
-      setConnectingKey(null);
+      setError("Failed to link Linear project. Please try again.");
+      setConnectingProjectId(null);
       return;
     }
+
     try {
       await syncIssues.mutateAsync();
     } catch {
-      // Link succeeded but sync failed — close anyway, user can retry sync manually
+      // Linking succeeded; user can retry sync manually.
     }
-    setConnectingKey(null);
+
+    setConnectingProjectId(null);
     handleOpenChange(false);
     onSuccess();
   };
@@ -86,29 +92,29 @@ export function ConnectJiraSheet({ projectId, open, onOpenChange, onSuccess }: C
         <SheetHeader>
           <div className="flex items-center gap-2">
             <Layers className="size-5 text-muted-foreground" />
-            <SheetTitle>Connect Jira Project</SheetTitle>
+            <SheetTitle>Connect Linear Project</SheetTitle>
           </div>
           <SheetDescription>
-            Select a Jira account and choose a project to link to this DB90 project.
+            Select a Linear account and choose a project to link to this DB90 project.
           </SheetDescription>
         </SheetHeader>
 
         <div className="flex flex-col gap-4 flex-1 overflow-hidden px-4 pb-4">
           <div className="space-y-2">
-            <Label htmlFor="jira-connector-select">Jira Account</Label>
-            {jiraConnectors.length === 0 ? (
+            <Label htmlFor="linear-connector-select">Linear Account</Label>
+            {linearConnectors.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No Jira accounts connected. Add one in Integrations first.
+                No Linear accounts connected. Add one in Integrations first.
               </p>
             ) : (
               <Select value={selectedConnectorId} onValueChange={setSelectedConnectorId}>
-                <SelectTrigger id="jira-connector-select">
+                <SelectTrigger id="linear-connector-select">
                   <SelectValue placeholder="Select account…" />
                 </SelectTrigger>
                 <SelectContent>
-                  {jiraConnectors.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.externalAccountName || "Jira"}
+                  {linearConnectors.map((connector) => (
+                    <SelectItem key={connector.id} value={connector.id}>
+                      {connector.externalAccountName || "Linear"}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -130,36 +136,29 @@ export function ConnectJiraSheet({ projectId, open, onOpenChange, onSuccess }: C
 
               <div className="flex-1 overflow-y-auto space-y-1">
                 {isLoadingProjects ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <Skeleton key={i} className="h-14" />
+                  Array.from({ length: 5 }).map((_, index) => (
+                    <Skeleton key={index} className="h-14" />
                   ))
                 ) : filteredProjects.length === 0 ? (
                   <p className="text-sm text-muted-foreground py-4 text-center">
-                    {search ? "No projects match your search." : "No Jira projects found."}
+                    {search ? "No projects match your search." : "No Linear projects found."}
                   </p>
                 ) : (
                   filteredProjects.map((project) => (
                     <button
-                      key={project.key}
+                      key={project.externalId}
                       type="button"
-                      disabled={connectingKey === project.key}
-                      onClick={() => handleLinkProject(project.key)}
+                      disabled={connectingProjectId === project.externalId}
+                      onClick={() => handleLinkProject(project.externalId, project.name)}
                       className="w-full flex items-center justify-between rounded-lg border p-3 text-left transition-colors hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      <div className="flex items-center gap-3 min-w-0">
-                        {project.avatarUrl && (
-                          <img
-                            src={project.avatarUrl}
-                            alt=""
-                            className="size-6 rounded shrink-0"
-                          />
-                        )}
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium">{project.name}</p>
-                          <p className="text-xs text-muted-foreground">{project.key}</p>
-                        </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{project.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {project.key || project.state || project.externalId}
+                        </p>
                       </div>
-                      {connectingKey === project.key && (
+                      {connectingProjectId === project.externalId && (
                         <span className="text-xs text-muted-foreground shrink-0 ml-2">
                           {syncIssues.isPending ? "Syncing…" : "Linking…"}
                         </span>

@@ -8,4 +8,5 @@ export { ProjectNotFound } from "./ProjectNotFound";
 export { ProjectRetentionPolicySection } from "./ProjectRetentionPolicySection";
 export { ProjectAlertsSection } from "./ProjectAlertsSection";
 export { ConnectJiraSheet } from "./ConnectJiraSheet";
+export { ConnectLinearSheet } from "./ConnectLinearSheet";
 export { ProjectIssuesTab } from "./ProjectIssuesTab";

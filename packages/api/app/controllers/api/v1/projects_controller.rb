@@ -3,7 +3,7 @@
 module Api
   module V1
     class ProjectsController < BaseController
-      before_action :set_project, only: %i[show update destroy settings update_setting destroy_setting stats daily_by_tool commits_by_user members retention_policy update_retention_policy link_jira sync_issues]
+      before_action :set_project, only: %i[show update destroy settings update_setting destroy_setting stats daily_by_tool commits_by_user members retention_policy update_retention_policy link_jira link_linear sync_issues]
 
       # GET /api/v1/projects
       # GET /api/v1/organizations/:organization_id/projects
@@ -288,24 +288,57 @@ module Api
         ApplicationRecord.transaction do
           @project.project_settings.find_or_initialize_by(key: "jira_connector_id").update!(value: connector.id.to_s)
           @project.project_settings.find_or_initialize_by(key: "jira_project_key").update!(value: jira_project_key)
+          @project.project_settings.where(key: %w[linear_connector_id linear_project_id linear_project_name]).destroy_all
+        end
+
+        render json: { data: { linked: true } }
+      end
+
+      # POST /api/v1/projects/:id/link_linear
+      def link_linear
+        authorize! @project, to: :link_linear?
+
+        connector_id = params.require(:connector_id)
+        linear_project_id = params.require(:linear_project_id)
+        linear_project_name = params.require(:linear_project_name)
+
+        connector = @project.organization.organization_connectors.find(connector_id)
+        if connector.connector_type != "linear"
+          return render json: { error: "Connector must be a Linear integration" }, status: :unprocessable_content
+        end
+
+        ApplicationRecord.transaction do
+          @project.project_settings.find_or_initialize_by(key: "linear_connector_id").update!(value: connector.id.to_s)
+          @project.project_settings.find_or_initialize_by(key: "linear_project_id").update!(value: linear_project_id)
+          @project.project_settings.find_or_initialize_by(key: "linear_project_name").update!(value: linear_project_name)
+          @project.project_settings.where(key: %w[jira_connector_id jira_project_key]).destroy_all
         end
 
         render json: { data: { linked: true } }
       end
 
       # POST /api/v1/projects/:id/sync_issues
-      # Runs the Jira issue sync synchronously so the response returns only
-      # after issues are updated in the DB — no polling needed on the client.
+      # Enqueues the issue sync job and returns 202 immediately. Clients should
+      # poll the connector's last_synced_at to detect when the sync completes.
       def sync_issues
-        authorize! @project, to: :link_jira?
+        authorize! @project, to: :update?
 
-        connector_id = @project.project_settings.find_by(key: "jira_connector_id")&.value
-        return render json: { error: "No Jira project linked" }, status: :unprocessable_content if connector_id.blank?
+        jira_connector_id = @project.project_settings.find_by(key: "jira_connector_id")&.value
+        linear_connector_id = @project.project_settings.find_by(key: "linear_connector_id")&.value
+        connector_id = jira_connector_id.presence || linear_connector_id.presence
+        return render json: { error: "No issue provider linked" }, status: :unprocessable_content if connector_id.blank?
 
         connector = @project.organization.organization_connectors.find(connector_id)
-        JiraSyncJob.perform_now(connector.id, "sync", project_id: @project.id)
+        case connector.connector_type
+        when "jira"
+          JiraSyncJob.perform_later(connector.id, "sync", project_id: @project.id)
+        when "linear"
+          LinearSyncJob.perform_later(connector.id, "sync", project_id: @project.id)
+        else
+          return render json: { error: "Unsupported issue provider" }, status: :unprocessable_content
+        end
 
-        render json: { data: { synced_at: Time.current } }
+        render json: { data: { queued: true } }, status: :accepted
       rescue ActiveRecord::RecordNotFound
         render json: { error: "Connector not found" }, status: :not_found
       rescue StandardError => e

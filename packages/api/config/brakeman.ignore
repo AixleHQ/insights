@@ -54,8 +54,38 @@
       "line": 76,
       "code": "params.permit(:role)",
       "note": "Role is validated against ROLES whitelist in ProjectMembership model and protected by authorization"
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "2afb900b4fd3c52dcfbf154636ef7348f60c649865fff526098ee51aa46a76ec",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/services/tool_events/batch_connector_upsert.rb",
+      "line": 153,
+      "note": "False positive: quoted_table_name escapes the table name, quote_column_name escapes column names, and conn.quote escapes all values. No user input reaches this query."
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "6acf8c2feaf20a2586456ef8add9e7cf3c728702d22f342971488e65fc200d47",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/services/tool_events/batch_connector_upsert.rb",
+      "line": 79,
+      "note": "False positive: @unique_key is set from a developer-controlled symbol (e.g. :issue_snapshot_id), never from user input."
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "e4d5570ef139d91cfa37724598fdec32fd5cb907ff51ac78484b4acdeb0c93c2",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/services/tool_events/upsert.rb",
+      "line": 52,
+      "note": "False positive: Integer(Zlib.crc32(...)) always produces a numeric literal, SQL injection is impossible."
     }
   ],
-  "updated": "2026-03-02 15:00:00 +0000",
+  "updated": "2026-05-04 09:01:00 +0000",
   "brakeman_version": "7.1.2"
 }
