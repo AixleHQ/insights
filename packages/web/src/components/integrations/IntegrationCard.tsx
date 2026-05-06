@@ -10,6 +10,10 @@ import {
   ChevronDown,
   KeyRound,
   Zap,
+  Building2,
+  FolderKanban,
+  User,
+  type LucideIcon,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,6 +28,8 @@ import {
 import { cn, formatDistanceToNow } from "@/lib/utils";
 import { ProviderLogo } from "@/components/icons";
 import type { ConnectorStatus } from "@/lib/types";
+
+export type IntegrationScope = "org" | "project" | "persona";
 
 export type IntegrationProvider =
   | "github"
@@ -64,6 +70,7 @@ export interface IntegrationData {
   webhookActive?: boolean;
   webhookToken?: string;
   webhookSecretSet?: boolean;
+  scope?: IntegrationScope;
 }
 
 export interface ProviderInfo {
@@ -77,6 +84,7 @@ export interface ProviderInfo {
   inputLabel?: string;
   inputPlaceholder?: string;
   connectSheet?: "webhook";
+  scope: IntegrationScope;
 }
 
 interface IntegrationCardProps {
@@ -90,6 +98,22 @@ interface IntegrationCardProps {
   onSetupWebhook?: (id: string) => void;
   isTesting?: boolean;
   className?: string;
+}
+
+const scopeConfig: Record<IntegrationScope, { label: string; Icon: LucideIcon }> = {
+  org: { label: "Org", Icon: Building2 },
+  project: { label: "Project", Icon: FolderKanban },
+  persona: { label: "Personal", Icon: User },
+};
+
+function ScopeBadge({ scope }: { scope: IntegrationScope }) {
+  const { label, Icon } = scopeConfig[scope];
+  return (
+    <Badge variant="secondary" className="gap-1 text-xs font-normal">
+      <Icon className="size-3" />
+      {label}
+    </Badge>
+  );
 }
 
 const statusConfig = {
@@ -179,6 +203,7 @@ export function IntegrationCard({
                 </CardDescription>
               </div>
             </div>
+            <ScopeBadge scope={provider.scope} />
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -223,6 +248,11 @@ export function IntegrationCard({
                 {integration.metadata?.account_name &&
                   ` · ${integration.metadata.account_name}`}
               </CardDescription>
+              {integration.scope && (
+                <div className="mt-1">
+                  <ScopeBadge scope={integration.scope} />
+                </div>
+              )}
             </div>
           </div>
           <DropdownMenu>

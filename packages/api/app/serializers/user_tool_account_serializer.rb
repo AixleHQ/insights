@@ -14,4 +14,8 @@ class UserToolAccountSerializer < BaseSerializer
   attribute :token_expired do |account|
     account.token_expired?
   end
+
+  attribute :scope do |account|
+    account.connector_scope
+  end
 end

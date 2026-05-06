@@ -3731,6 +3731,10 @@ components:
           type: string
           format: date-time
           nullable: true
+        scope:
+          type: string
+          enum: [org, project, persona]
+          example: org
         createdAt:
           type: string
           format: date-time
@@ -3742,6 +3746,7 @@ components:
         - organizationId
         - connectorType
         - isActive
+        - scope
         - createdAt
         - updatedAt
 
@@ -3802,6 +3807,10 @@ components:
           nullable: true
         tokenExpired:
           type: boolean
+        scope:
+          type: string
+          enum: [org, project, persona]
+          example: persona
         createdAt:
           type: string
           format: date-time
@@ -3813,6 +3822,7 @@ components:
         - organizationMembershipId
         - toolName
         - isActive
+        - scope
         - createdAt
         - updatedAt
 

@@ -118,6 +118,7 @@ export interface IssueThroughputSummary {
 // Connector types
 export type ConnectorProvider = "github" | "gitlab" | "bitbucket" | "jira" | "linear" | "anthropic" | "openai" | "openrouter" | "gemini" | "slack" | "github_copilot";
 export type ConnectorStatus = "connected" | "testing" | "error" | "disconnected";
+export type ConnectorScope = "org" | "project" | "persona";
 
 export interface Connector {
   id: string;
@@ -128,6 +129,7 @@ export interface Connector {
   isActive: boolean;
   is_active?: boolean;
   status: ConnectorStatus;
+  scope: ConnectorScope;
   externalAccountId?: string | null;
   external_account_id?: string | null;
   externalAccountName?: string | null;
@@ -171,6 +173,7 @@ export interface ProjectConnector {
   isActive: boolean;
   is_active?: boolean;
   status: ConnectorStatus;
+  scope: ConnectorScope;
   externalAccountId?: string | null;
   external_account_id?: string | null;
   externalAccountName?: string | null;
@@ -200,6 +203,7 @@ export interface ToolAccount {
   tokenExpiresAt: string | null;
   createdAt: string;
   updatedAt: string;
+  scope: ConnectorScope;
   ingestToken?: string; // one-time, only present immediately after create/regenerate
 }
 
