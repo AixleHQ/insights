@@ -13,22 +13,40 @@ RSpec.describe WebhookRouter do
     let(:delivery_id) { SecureRandom.uuid }
 
     shared_examples "dispatches a webhook job" do |job_class_name|
+      let(:job_class) { job_class_name.constantize }
+
       it "enqueues the correct job" do
-        expect(job_class_name.constantize).to receive(:perform_later).with(
-          connector.id,
-          "webhook",
-          hash_including(event_type: event_type, raw_key: raw_key, delivery_id: delivery_id)
-        )
-        described_class.dispatch(connector, event_type, raw_key, payload: payload, delivery_id: delivery_id)
+        if job_class < ActiveJob::Base
+          expect(job_class).to receive(:perform_later).with(
+            connector.id,
+            "webhook",
+            hash_including(event_type: event_type, raw_key: raw_key, delivery_id: delivery_id)
+          )
+        else
+          expect(job_class).to receive(:perform_async).with(
+            connector.id,
+            "webhook",
+            hash_including(event_type: event_type, raw_key: raw_key, delivery_id: delivery_id)
+          )
+        end
+        expect(described_class.dispatch(connector, event_type, raw_key, payload: payload, delivery_id: delivery_id)).to be true
       end
 
       it "includes payload in options" do
-        expect(job_class_name.constantize).to receive(:perform_later).with(
-          connector.id,
-          "webhook",
-          hash_including(payload: payload)
-        )
-        described_class.dispatch(connector, event_type, raw_key, payload: payload, delivery_id: delivery_id)
+        if job_class < ActiveJob::Base
+          expect(job_class).to receive(:perform_later).with(
+            connector.id,
+            "webhook",
+            hash_including(payload: payload)
+          )
+        else
+          expect(job_class).to receive(:perform_async).with(
+            connector.id,
+            "webhook",
+            hash_including(payload: payload)
+          )
+        end
+        expect(described_class.dispatch(connector, event_type, raw_key, payload: payload, delivery_id: delivery_id)).to be true
       end
     end
 
@@ -60,9 +78,18 @@ RSpec.describe WebhookRouter do
     context "unsupported connector type" do
       let(:connector) { create(:organization_connector, organization: organization, connector_type: "anthropic") }
 
-      it "does not enqueue any job" do
+      it "does not enqueue any job and returns false" do
         expect(GithubSyncJob).not_to receive(:perform_later)
-        described_class.dispatch(connector, event_type, raw_key)
+        expect(described_class.dispatch(connector, event_type, raw_key)).to be false
+      end
+    end
+
+    context "slack connector (no inbound webhook job)" do
+      let(:connector) { create(:organization_connector, organization: organization, connector_type: "slack") }
+
+      it "returns false" do
+        expect(GithubSyncJob).not_to receive(:perform_later)
+        expect(described_class.dispatch(connector, event_type, raw_key)).to be false
       end
     end
 
@@ -75,7 +102,7 @@ RSpec.describe WebhookRouter do
           "webhook",
           { event_type: event_type, raw_key: raw_key }
         )
-        described_class.dispatch(connector, event_type, raw_key)
+        expect(described_class.dispatch(connector, event_type, raw_key)).to be true
       end
     end
   end

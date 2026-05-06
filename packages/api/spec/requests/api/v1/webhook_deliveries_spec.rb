@@ -28,7 +28,7 @@ RSpec.describe "Api::V1::WebhookDeliveries", type: :request do
 
       expect_success
       expect(json_data.length).to eq(3)
-      ids = json_data.map { |d| d["id"] }
+      ids = json_data.map { |d| d[:id] }
       expect(ids).not_to include(delivery_other_org.id)
     end
 
@@ -46,7 +46,7 @@ RSpec.describe "Api::V1::WebhookDeliveries", type: :request do
 
         expect_success
         expect(json_data.length).to eq(1)
-        expect(json_data.first["id"]).to eq(delivery_github_failed.id)
+        expect(json_data.first[:id]).to eq(delivery_github_failed.id)
       end
     end
 
@@ -57,7 +57,7 @@ RSpec.describe "Api::V1::WebhookDeliveries", type: :request do
 
         expect_success
         expect(json_data.length).to eq(1)
-        expect(json_data.first["id"]).to eq(delivery_jira_delivered.id)
+        expect(json_data.first[:id]).to eq(delivery_jira_delivered.id)
       end
     end
 
@@ -71,7 +71,7 @@ RSpec.describe "Api::V1::WebhookDeliveries", type: :request do
                           params: { date_from: 5.days.ago.iso8601 }
 
         expect_success
-        ids = json_data.map { |d| d["id"] }
+        ids = json_data.map { |d| d[:id] }
         expect(ids).not_to include(old_delivery.id)
       end
     end
@@ -86,7 +86,7 @@ RSpec.describe "Api::V1::WebhookDeliveries", type: :request do
                           params: { date_to: 1.day.from_now.iso8601 }
 
         expect_success
-        ids = json_data.map { |d| d["id"] }
+        ids = json_data.map { |d| d[:id] }
         expect(ids).not_to include(future_delivery.id)
       end
     end
@@ -106,10 +106,10 @@ RSpec.describe "Api::V1::WebhookDeliveries", type: :request do
                         user: admin, organization: organization
 
       expect_success
-      record = json_data.find { |d| d["id"] == delivery_github_failed.id }
-      expect(record).to include("organizationConnectorId", "eventType", "rawEventKey",
-                                "lastAttemptedAt", "lastError", "deliveredAt",
-                                "createdAt", "updatedAt")
+      record = json_data.find { |d| d[:id] == delivery_github_failed.id }
+      expect(record).to include(:organizationConnectorId, :eventType, :rawEventKey,
+                                :lastAttemptedAt, :lastError, :deliveredAt,
+                                :createdAt, :updatedAt)
     end
   end
 

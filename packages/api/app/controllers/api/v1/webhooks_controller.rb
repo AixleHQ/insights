@@ -31,7 +31,9 @@ module Api
           status:         "pending"
         )
 
-        WebhookRouter.dispatch(connector, event_type, raw_key, payload: payload, delivery_id: delivery.id)
+        unless WebhookRouter.dispatch(connector, event_type, raw_key, payload: payload, delivery_id: delivery.id)
+          delivery.mark_failed!("No webhook sync job is registered for connector type #{connector.connector_type.inspect}")
+        end
 
         render json: {
           data: {
@@ -86,10 +88,12 @@ module Api
 
       def store_raw_webhook(connector, payload)
         RawEventStore.store(
+          payload,
           organization_id: connector.organization_id,
-          payload:         payload.to_json,
-          content_type:    "application/json",
-          prefix:          "webhooks/#{connector.connector_type}"
+          metadata: {
+            content_type: "application/json",
+            source: "webhooks/#{connector.connector_type}"
+          }
         )
       end
 
