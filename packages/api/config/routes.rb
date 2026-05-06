@@ -55,6 +55,13 @@ Rails.application.routes.draw do
         # Organization audit logs
         resources :audit_logs, controller: "organization_audit_logs", only: [ :index ]
 
+        # Webhook delivery history and retry
+        resources :webhook_deliveries, only: [ :index ] do
+          member do
+            post :retry, action: :retry_action
+          end
+        end
+
         # Organization connectors
         resources :connectors, controller: "organization_connectors" do
           member do
