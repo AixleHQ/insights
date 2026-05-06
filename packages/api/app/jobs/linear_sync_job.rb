@@ -31,7 +31,6 @@ class LinearSyncJob < ApplicationJob
       else
         sync_all_linked_project_issues
       end
-      @connector.mark_synced!
     when "refresh_token"
       refresh_token
     when "webhook"
@@ -40,11 +39,8 @@ class LinearSyncJob < ApplicationJob
       Rails.logger.warn("[LinearSyncJob] Unknown action: #{action}")
     end
 
-<<<<<<< HEAD
-=======
     delivery&.mark_delivered!
     @connector.mark_synced!
->>>>>>> edb7083 ([AIX-148] Wire WebhookDelivery tracking into webhooks + sync jobs)
     Rails.logger.info("[LinearSyncJob] Completed #{action} for connector #{connector_id}")
   rescue ActiveRecord::RecordNotFound
     Rails.logger.error("[LinearSyncJob] Connector #{connector_id} not found")
@@ -62,7 +58,6 @@ class LinearSyncJob < ApplicationJob
     @provider ||= Oauth::BaseProvider.for(@connector)
   end
 
-<<<<<<< HEAD
   def sync_resources
     teams = provider.fetch_teams
     projects = provider.fetch_projects
@@ -72,16 +67,6 @@ class LinearSyncJob < ApplicationJob
     @connector.config["teams"] = teams.index_by { |team| team[:external_id] }
     @connector.config["projects"] = projects.index_by { |project| project[:external_id] }
     @connector.config["cycles"] = cycles.index_by { |cycle| cycle[:external_id] }
-=======
-    @connector.metadata ||= {}
-    @connector.metadata["teams"] = teams.map do |team|
-      {
-        id:   team[:id],
-        name: team[:name],
-        key:  team[:key]
-      }
-    end
->>>>>>> edb7083 ([AIX-148] Wire WebhookDelivery tracking into webhooks + sync jobs)
     @connector.save!
   end
 
@@ -90,7 +75,6 @@ class LinearSyncJob < ApplicationJob
     batch_upsert_snapshots(issues)
   end
 
-<<<<<<< HEAD
   def sync_single_project_issues(project_id)
     project = Project.find(project_id)
     linear_project_id = project.project_settings.find_by(key: "linear_project_id")&.value
@@ -117,18 +101,6 @@ class LinearSyncJob < ApplicationJob
 
   def process_webhook
     payload = @options[:payload]
-=======
-    @connector.update!(
-      access_token:     token_data[:access_token],
-      refresh_token:    token_data[:refresh_token],
-      token_expires_at: token_data[:expires_at]
-    )
-  end
-
-  def process_webhook
-    event_type = @options[:event_type]
-    payload    = @options[:payload]
->>>>>>> edb7083 ([AIX-148] Wire WebhookDelivery tracking into webhooks + sync jobs)
 
     entity_type = payload["type"]
     action      = payload["action"]
@@ -168,32 +140,11 @@ class LinearSyncJob < ApplicationJob
       unique_key: "issue_event_key",
       unique_value: "#{issue[:external_id]}:#{metadata[:action]}:#{payload['createdAt'] || issue[:updated_at]}",
       organization_id: @connector.organization_id,
-<<<<<<< HEAD
       user_id: user&.id,
       tool_name: "linear",
       event_type: "issue",
       occurred_at: parse_time(payload["createdAt"]) || parse_time(issue[:updated_at]) || Time.current,
       metadata: metadata
-=======
-      tool_name:       "linear",
-      event_type:      "issue",
-      occurred_at:     Time.parse(payload["createdAt"]),
-      metadata: {
-        action:            action,
-        issue_id:          data["id"],
-        issue_identifier:  data["identifier"],
-        title:             data["title"],
-        state:             data.dig("state", "name"),
-        priority:          data["priority"],
-        team_id:           data.dig("team", "id"),
-        team_name:         data.dig("team", "name"),
-        assignee_id:       data.dig("assignee", "id"),
-        assignee_name:     data.dig("assignee", "name"),
-        creator_id:        data.dig("creator", "id"),
-        creator_name:      data.dig("creator", "name"),
-        labels:            extract_labels(data)
-      }
->>>>>>> edb7083 ([AIX-148] Wire WebhookDelivery tracking into webhooks + sync jobs)
     )
 
     create_or_update_issue_snapshot(issue)
@@ -212,16 +163,10 @@ class LinearSyncJob < ApplicationJob
       unique_key: "comment_id",
       unique_value: data["id"],
       organization_id: @connector.organization_id,
-<<<<<<< HEAD
       user_id: user&.id,
       tool_name: "linear",
       event_type: "comment",
       occurred_at: parse_time(payload["createdAt"]) || Time.current,
-=======
-      tool_name:       "linear",
-      event_type:      "comment",
-      occurred_at:     Time.parse(payload["createdAt"]),
->>>>>>> edb7083 ([AIX-148] Wire WebhookDelivery tracking into webhooks + sync jobs)
       metadata: {
         action:           action,
         comment_id:       data["id"],
@@ -241,15 +186,9 @@ class LinearSyncJob < ApplicationJob
       unique_key: "linear_project_event_key",
       unique_value: "#{data['id']}:#{action}:#{payload['createdAt'] || data['updatedAt']}",
       organization_id: @connector.organization_id,
-<<<<<<< HEAD
       tool_name: "linear",
       event_type: "other",
       occurred_at: parse_time(payload["createdAt"]) || Time.current,
-=======
-      tool_name:       "linear",
-      event_type:      "project",
-      occurred_at:     Time.parse(payload["createdAt"]),
->>>>>>> edb7083 ([AIX-148] Wire WebhookDelivery tracking into webhooks + sync jobs)
       metadata: {
         action:       action,
         project_id:   data["id"],
@@ -269,15 +208,9 @@ class LinearSyncJob < ApplicationJob
       unique_key: "cycle_id",
       unique_value: data["id"],
       organization_id: @connector.organization_id,
-<<<<<<< HEAD
       tool_name: "linear",
       event_type: "sprint",
       occurred_at: parse_time(payload["createdAt"]) || parse_time(data["updatedAt"]) || Time.current,
-=======
-      tool_name:       "linear",
-      event_type:      "cycle",
-      occurred_at:     Time.parse(payload["createdAt"]),
->>>>>>> edb7083 ([AIX-148] Wire WebhookDelivery tracking into webhooks + sync jobs)
       metadata: {
         action:        action,
         cycle_id:      data["id"],
