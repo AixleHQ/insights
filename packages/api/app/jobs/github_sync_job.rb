@@ -3,6 +3,9 @@
 class GithubSyncJob < ApplicationJob
   queue_as :connectors
 
+  # Recent commits pulled from the GitHub API during connector sync (matches GitLab sync window).
+  SYNC_WINDOW = 30.days
+
   retry_on StandardError, wait: :polynomially_longer, attempts: 3 do |job, error|
     opts = ApplicationJob.symbolized_job_options(job)
     WebhookDelivery.find_by(id: opts[:delivery_id])&.mark_failed!(error.message)
@@ -49,6 +52,8 @@ class GithubSyncJob < ApplicationJob
     repos.each do |repo_data|
       sync_repository(repo_data)
     end
+
+    sync_recent_activity(provider)
   end
 
   def sync_repository(repo_data)
@@ -135,6 +140,54 @@ class GithubSyncJob < ApplicationJob
 
   def load_member_by_email
     @connector.organization.members.index_by { |m| m.email.downcase }
+  end
+
+  # Backfills recent commits for repositories linked to a project. Push webhooks still drive
+  # live updates; this makes history visible immediately after linking a repo (GitLab parity).
+  def sync_recent_activity(provider)
+    member_by_email = load_member_by_email
+
+    @connector.repositories.where.not(project_id: nil).find_each do |repository|
+      next if repository.full_name.blank?
+
+      commits = provider.fetch_commits(
+        repository.full_name,
+        branch: repository.default_branch,
+        since: self.class::SYNC_WINDOW.ago
+      )
+
+      commits.each do |commit|
+        next if commit["timestamp"].blank?
+
+        upsert_commit_event(repository, commit, member_by_email)
+      end
+
+      repository.mark_synced!
+    end
+  end
+
+  def upsert_commit_event(repository, commit, member_by_email)
+    author_email = commit.dig("author", "email")&.downcase
+    user = member_by_email[author_email] if author_email
+
+    ToolEvents::ConnectorUpsert.call(
+      unique_key:       "sha",
+      unique_value:     commit["id"],
+      organization_id:  @connector.organization_id,
+      user_id:          user&.id,
+      repository_id:    repository.id,
+      project_id:       repository.project_id,
+      tool_name:        "github",
+      event_type:       "commit",
+      occurred_at:      Time.zone.parse(commit["timestamp"]),
+      metadata:         {
+        sha:              commit["id"],
+        message:          commit["message"],
+        author_name:      commit.dig("author", "name"),
+        git_author_email: author_email,
+        url:              commit["url"]
+      }
+    )
   end
 
   def create_commit_event(repository, commit, member_by_email = {})

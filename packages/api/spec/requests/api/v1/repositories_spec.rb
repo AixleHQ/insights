@@ -135,11 +135,13 @@ RSpec.describe 'Api::V1::Repositories', type: :request do
   end
 
   describe 'POST /api/v1/projects/:project_id/repositories/:id/sync' do
-    it 'triggers a sync' do
-      authenticated_post "/api/v1/projects/#{project.id}/repositories/#{repository.id}/sync", user: admin
+    it 'enqueues the organization connector sync job' do
+      expect do
+        authenticated_post "/api/v1/projects/#{project.id}/repositories/#{repository.id}/sync", user: admin
+      end.to have_enqueued_job(GithubSyncJob).with(connector.id)
 
       expect_success
-      expect(repository.reload.last_sync_at).to be_present
+      expect(connector.reload.status).to eq('testing')
     end
   end
 end

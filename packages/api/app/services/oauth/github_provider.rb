@@ -40,6 +40,40 @@ module Oauth
       end
     end
 
+    # Lists commits on the default branch (or +branch+) since +since+.
+    # Maps each GitHub API commit to the same shape as webhook push payloads for GithubSyncJob.
+    def fetch_commits(full_name, branch:, since:, per_page: 100, max_pages: 5)
+      ensure_fresh_token!
+
+      owner, repo = full_name.to_s.split("/", 2)
+      return [] if owner.blank? || repo.blank?
+
+      all = []
+      page = 1
+      loop do
+        response = http_client.get("#{API_URL}/repos/#{owner}/#{repo}/commits") do |req|
+          req.params[:sha] = branch if branch.present?
+          req.params[:since] = since.iso8601 if since
+          req.params[:per_page] = per_page
+          req.params[:page] = page
+        end
+
+        break unless response.success?
+
+        batch = JSON.parse(response.body)
+        break if batch.empty?
+
+        batch.each { |c| all << normalize_commit_payload(c) }
+
+        break if batch.size < per_page
+
+        page += 1
+        break if page > max_pages
+      end
+
+      all
+    end
+
     class << self
       def client_id
         Rails.application.credentials.dig(:github, :client_id) ||
@@ -77,6 +111,25 @@ module Oauth
           account_name: data["login"]
         }
       end
+    end
+
+    private
+
+    def normalize_commit_payload(api_commit)
+      sha = api_commit["sha"]
+      commit_obj = api_commit["commit"] || {}
+      author = commit_obj["author"] || {}
+      timestamp = author["date"].presence || commit_obj.dig("committer", "date")
+      {
+        "id" => sha,
+        "timestamp" => timestamp,
+        "message" => commit_obj["message"],
+        "author" => {
+          "name" => author["name"],
+          "email" => author["email"]
+        },
+        "url" => api_commit["html_url"]
+      }
     end
   end
 end

@@ -2578,7 +2578,9 @@ paths:
   /api/v1/projects/{project_id}/repositories/{id}/sync:
     post:
       summary: Trigger repository sync
-      description: Triggers a sync operation for the repository
+      description: >
+        Queues a sync for the repository's organization connector (metadata refresh and,
+        for GitHub/GitLab/Bitbucket, recent activity backfill). Matches POST …/connectors/:id/sync.
       tags:
         - Repositories
       parameters:

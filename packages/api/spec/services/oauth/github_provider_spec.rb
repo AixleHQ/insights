@@ -3,7 +3,14 @@
 require 'rails_helper'
 
 RSpec.describe Oauth::GithubProvider, type: :service do
-  let(:connector) { instance_double('OrganizationConnector', access_token: 'gho_test123') }
+  let(:connector) do
+    instance_double(
+      'OrganizationConnector',
+      access_token: 'gho_test123',
+      token_expired?: false,
+      refresh_token: nil
+    )
+  end
   let(:provider) { described_class.new(connector) }
 
   describe '#test_connection' do
@@ -92,6 +99,51 @@ RSpec.describe Oauth::GithubProvider, type: :service do
 
         expect(provider.fetch_repositories).to eq([])
       end
+    end
+  end
+
+  describe '#fetch_commits' do
+    let(:since_time) { 2.days.ago }
+
+    it 'returns commits normalized like webhook push payloads' do
+      stub_request(:get, 'https://api.github.com/repos/octocat/hello-world/commits')
+        .with(
+          headers: { 'Authorization' => 'Bearer gho_test123' },
+          query: hash_including('per_page' => '100', 'page' => '1', 'sha' => 'main')
+        )
+        .to_return(
+          status: 200,
+          body: [ {
+            sha: 'abc123',
+            html_url: 'https://github.com/octocat/hello-world/commit/abc123',
+            commit: {
+              message: 'Fix bug',
+              author: { name: 'Octocat', email: 'octocat@github.com', date: '2024-06-01T12:00:00Z' }
+            }
+          } ].to_json,
+          headers: { 'Content-Type' => 'application/json' }
+        )
+
+      result = provider.fetch_commits('octocat/hello-world', branch: 'main', since: since_time)
+
+      expect(result.size).to eq(1)
+      commit = result.first
+      expect(commit['id']).to eq('abc123')
+      expect(commit['message']).to eq('Fix bug')
+      expect(commit['timestamp']).to eq('2024-06-01T12:00:00Z')
+      expect(commit.dig('author', 'email')).to eq('octocat@github.com')
+      expect(commit['url']).to eq('https://github.com/octocat/hello-world/commit/abc123')
+    end
+
+    it 'returns an empty array when full_name is invalid' do
+      expect(provider.fetch_commits('', branch: 'main', since: since_time)).to eq([])
+    end
+
+    it 'returns an empty array when the request fails' do
+      stub_request(:get, %r{\Ahttps://api\.github\.com/repos/octocat/hello-world/commits})
+        .to_return(status: 404, body: '{}')
+
+      expect(provider.fetch_commits('octocat/hello-world', branch: 'main', since: since_time)).to eq([])
     end
   end
 

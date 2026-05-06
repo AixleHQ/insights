@@ -702,7 +702,7 @@ export function useConnectRepo(projectId: string) {
       is_private: boolean;
     }) => api.post<{ data: ProjectRepository }>(`/projects/${projectId}/repositories`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "repositories"] });
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId] });
     },
   });
 }
@@ -713,7 +713,7 @@ export function useDisconnectRepo(projectId: string) {
   return useMutation({
     mutationFn: (repoId: string) => api.delete(`/projects/${projectId}/repositories/${repoId}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "repositories"] });
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId] });
     },
   });
 }
@@ -832,6 +832,8 @@ export function useSyncConnector() {
       api.post(`/organizations/${orgId}/connectors/${connectorId}/sync`),
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
     },
   });
 }
