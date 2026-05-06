@@ -130,6 +130,11 @@ export const queryKeys = {
     all: (projectId: string, params?: Record<string, unknown>) =>
       ["projects", projectId, "audit_logs", params] as const,
   },
+  webhookDeliveries: {
+    all: (orgId: string) => ["admin", "webhook_deliveries", orgId] as const,
+    list: (orgId: string, filters: Record<string, unknown>) =>
+      ["admin", "webhook_deliveries", orgId, "list", filters] as const,
+  },
 };
 
 // ============================================================================

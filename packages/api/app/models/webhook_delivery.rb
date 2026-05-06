@@ -1,8 +1,9 @@
 # frozen_string_literal: true
 
 class WebhookDelivery < ApplicationRecord
-  STATUSES  = %w[pending processing delivered failed].freeze
-  PROVIDERS = %w[github gitlab bitbucket jira linear slack].freeze
+  STATUSES         = %w[pending processing delivered failed].freeze
+  PROVIDERS        = %w[github gitlab bitbucket jira linear slack].freeze
+  RETENTION_WINDOW = 30.days
 
   belongs_to :organization_connector
   has_one :organization, through: :organization_connector

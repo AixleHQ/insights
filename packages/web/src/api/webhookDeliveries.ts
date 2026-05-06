@@ -1,18 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
-
+import { queryKeys } from "@/hooks/useApi";
 import type { WebhookDeliveriesListResponse } from "@/types/webhookDelivery";
-
-export const webhookDeliveryKeys = {
-  all: (orgId: string) => ["admin", "webhook_deliveries", orgId] as const,
-  list: (orgId: string, filters: WebhookDeliveriesFilters) =>
-    [...webhookDeliveryKeys.all(orgId), "list", filters] as const,
-};
+import type { WebhookDeliveryProvider, WebhookDeliveryStatus } from "@/types/webhookDelivery";
 
 export interface WebhookDeliveriesFilters {
-  status?: string;
-  provider?: string;
+  status?: WebhookDeliveryStatus;
+  provider?: WebhookDeliveryProvider;
   dateFrom?: string;
   dateTo?: string;
   page?: number;
@@ -44,7 +39,7 @@ export function useWebhookDeliveries(
   filters: WebhookDeliveriesFilters
 ) {
   return useQuery({
-    queryKey: webhookDeliveryKeys.list(organizationId, filters),
+    queryKey: queryKeys.webhookDeliveries.list(organizationId, filters),
     queryFn: () =>
       api.get<WebhookDeliveriesListResponse>(
         buildListPath(organizationId, filters),
@@ -66,7 +61,7 @@ export function useRetryWebhookDelivery(organizationId: string) {
       );
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: webhookDeliveryKeys.all(organizationId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.webhookDeliveries.all(organizationId) });
     },
   });
 }

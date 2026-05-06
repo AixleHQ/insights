@@ -133,7 +133,7 @@ export function WebhookDeliveriesPage() {
         <div className="space-y-2">
           <Label htmlFor="wd-status">Status</Label>
           <Select
-            value={searchParams.get("status") ?? "all"}
+            value={filters.status ?? "all"}
             onValueChange={(v) => {
               updateSearch({ status: v === "all" ? undefined : v, page: "1" });
             }}
@@ -154,7 +154,7 @@ export function WebhookDeliveriesPage() {
         <div className="space-y-2">
           <Label htmlFor="wd-provider">Provider</Label>
           <Select
-            value={searchParams.get("provider") ?? "all"}
+            value={filters.provider ?? "all"}
             onValueChange={(v) => {
               updateSearch({ provider: v === "all" ? undefined : v, page: "1" });
             }}

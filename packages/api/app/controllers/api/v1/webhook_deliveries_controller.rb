@@ -36,7 +36,8 @@ module Api
       def retry_action
         authorize! @delivery, to: :retry?
 
-        unless RawEventStore.exists?(@delivery.raw_event_key)
+        payload = RawEventStore.fetch(@delivery.raw_event_key)
+        if payload.nil?
           return render json: { error: "Raw payload has expired and cannot be retried" },
                         status: :unprocessable_entity
         end
@@ -49,8 +50,8 @@ module Api
                         status: :unprocessable_entity
         end
 
-        @delivery.reload
-        payload = RawEventStore.fetch(@delivery.raw_event_key)
+        @delivery.status     = "pending"
+        @delivery.updated_at = Time.current
 
         WebhookRouter.dispatch(
           @delivery.organization_connector,

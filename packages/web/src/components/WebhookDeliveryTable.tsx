@@ -47,6 +47,53 @@ function statusBadgeVariant(status: WebhookDeliveryStatus): {
   }
 }
 
+function RetryButton({
+  delivery,
+  retryingDeliveryId,
+  onRetry,
+}: {
+  delivery: WebhookDelivery;
+  retryingDeliveryId: string | null;
+  onRetry: (id: string) => void;
+}) {
+  if (delivery.status !== "failed") return null;
+
+  const expired = payloadLikelyExpired(delivery.createdAt);
+
+  if (expired) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex">
+            <Button size="sm" variant="outline" disabled className="gap-1">
+              <RefreshCw className="size-3.5" />
+              Retry
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>Payload may have expired — retry unavailable via API</TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      className="gap-1"
+      disabled={retryingDeliveryId === delivery.id}
+      onClick={() => onRetry(delivery.id)}
+    >
+      {retryingDeliveryId === delivery.id ? (
+        <Loader2 className="size-3.5 animate-spin" />
+      ) : (
+        <RefreshCw className="size-3.5" />
+      )}
+      Retry
+    </Button>
+  );
+}
+
 function payloadLikelyExpired(createdAt: string): boolean {
   const created = new Date(createdAt).getTime();
   return Number.isFinite(created) && Date.now() - created > MS_72H;
@@ -99,8 +146,6 @@ export function WebhookDeliveryTable({
           <TableBody>
             {deliveries.map((d) => {
               const badge = statusBadgeVariant(d.status);
-              const expiredGuess = payloadLikelyExpired(d.createdAt);
-              const showExpiredHint = d.status === "failed" && expiredGuess;
 
               return (
                 <TableRow key={d.id}>
@@ -132,38 +177,11 @@ export function WebhookDeliveryTable({
                     )}
                   </TableCell>
                   <TableCell className="text-right">
-                    {d.status === "failed" ? (
-                      showExpiredHint ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="inline-flex">
-                              <Button size="sm" variant="outline" disabled className="gap-1">
-                                <RefreshCw className="size-3.5" />
-                                Retry
-                              </Button>
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            Payload may have expired — retry unavailable via API
-                          </TooltipContent>
-                        </Tooltip>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="gap-1"
-                          disabled={retryingDeliveryId === d.id}
-                          onClick={() => onRetry(d.id)}
-                        >
-                          {retryingDeliveryId === d.id ? (
-                            <Loader2 className="size-3.5 animate-spin" />
-                          ) : (
-                            <RefreshCw className="size-3.5" />
-                          )}
-                          Retry
-                        </Button>
-                      )
-                    ) : null}
+                    <RetryButton
+                      delivery={d}
+                      retryingDeliveryId={retryingDeliveryId}
+                      onRetry={onRetry}
+                    />
                   </TableCell>
                 </TableRow>
               );
