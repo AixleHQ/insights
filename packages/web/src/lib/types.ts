@@ -524,3 +524,14 @@ export interface ConnectorSyncStatus {
   last_error: string | null;
   total_events: number;
 }
+
+export interface PricingEntry {
+  name: string;
+  input_per_mtok: number;
+  output_per_mtok: number;
+}
+
+export interface ModelPricingResponse {
+  models: PricingEntry[];
+  tools: PricingEntry[];
+}

@@ -41,6 +41,7 @@ import type {
   ToolDailyResponse,
   ToolEventTypesResponse,
   ConnectorSyncStatus,
+  ModelPricingResponse,
 } from "@/lib/types";
 
 // Query keys factory
@@ -1608,5 +1609,14 @@ export function useLinkLinear(projectId: string) {
       queryClient.invalidateQueries({ queryKey: queryKeys.projects.detail(projectId) });
       queryClient.invalidateQueries({ queryKey: ["projects", projectId, "issues"] });
     },
+  });
+}
+
+// Model Pricing
+export function useModelPricing(orgId: string) {
+  return useQuery({
+    queryKey: ["organizations", orgId, "model_pricing"],
+    queryFn: () => api.get<ModelPricingResponse>(`/organizations/${orgId}/model_pricing`),
+    enabled: !!orgId,
   });
 }

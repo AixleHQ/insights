@@ -36,6 +36,11 @@ class OrganizationPolicy < ApplicationPolicy
     org_admin?(record) || global_admin?
   end
 
+  # Admins can view the model pricing table
+  def model_pricing?
+    org_admin?(record) || global_admin?
+  end
+
   # Members can create events (telemetry ingestion)
   def create_event?
     org_member?(record) || global_admin?

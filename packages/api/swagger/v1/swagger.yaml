@@ -407,6 +407,34 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /api/v1/organizations/{id}/model_pricing:
+    get:
+      summary: Get model and tool pricing table
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Pricing table (static list prices per million tokens)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  models:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PricingEntry'
+                  tools:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PricingEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   # ============================================
   # ORGANIZATION MEMBERS ENDPOINTS
   # ============================================
@@ -3516,6 +3544,27 @@ components:
             $ref: '#/components/schemas/ValidationError'
 
   schemas:
+    PricingEntry:
+      type: object
+      properties:
+        name:
+          type: string
+          example: gpt-4o
+        input_per_mtok:
+          type: number
+          format: float
+          description: Input price in USD per million tokens
+          example: 2.5
+        output_per_mtok:
+          type: number
+          format: float
+          description: Output price in USD per million tokens
+          example: 10.0
+      required:
+        - name
+        - input_per_mtok
+        - output_per_mtok
+
     Error:
       type: object
       properties:
