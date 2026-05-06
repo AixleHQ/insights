@@ -57,6 +57,13 @@ KNOWN_DEV_USERS = [
     keycloak_sub: 'grace.hopper@example.com',
     global_admin: true,
     org_role: 'admin'
+  },
+  {
+    email: 'edsger.dijkstra@example.com',
+    name: 'Edsger Dijkstra',
+    keycloak_sub: 'edsger.dijkstra@example.com',
+    global_admin: true,
+    org_role: 'admin'
   }
 ].freeze
 
@@ -461,6 +468,57 @@ if real_users.any?
         m.role = 'member'
       end
     end
+  end
+end
+
+# Idempotent demo rows: user_id nil + correlation metadata for Unattributed Events UI / manual attribution QA
+if (Rails.env.development? || Rails.env.staging?) && org
+  demo_tag = "unattributed_demo"
+  unless ToolEvent.where(organization: org).where("metadata->>'seed_batch' = ?", demo_tag).exists?
+    puts "\nCreating seed unattributed tool events (manual attribution demo, metadata.seed_batch=#{demo_tag})..."
+    project = org.projects.first
+    scenario_time = Time.current
+
+    scenarios = [
+      { tool_name: "cursor", event_type: "completion", model: "claude-3-5-sonnet",
+        metadata: { "correlation_method" => "machine_id", "correlation_confidence" => 0.55, "seed_batch" => demo_tag } },
+      { tool_name: "github_copilot", event_type: "completion", model: "gpt-4o",
+        metadata: { "correlation_method" => "email", "correlation_confidence" => 0.62, "seed_batch" => demo_tag } },
+      { tool_name: "claude_code", event_type: "chat", model: "claude-sonnet-4",
+        metadata: { "correlation_method" => "tool_account", "correlation_confidence" => 0.68, "seed_batch" => demo_tag } },
+      { tool_name: "windsurf", event_type: "edit", model: "gpt-4o",
+        metadata: { "correlation_method" => "git_email", "correlation_confidence" => 0.48, "seed_batch" => demo_tag } },
+      { tool_name: "cody", event_type: "chat", model: "claude-3-5-sonnet",
+        metadata: { "correlation_method" => "ip_address", "correlation_confidence" => 0.35, "seed_batch" => demo_tag } },
+      { tool_name: "cursor", event_type: "debug", model: "gpt-4o",
+        metadata: { "correlation_method" => "direct_user_id", "correlation_confidence" => 0.45, "seed_batch" => demo_tag } },
+      { tool_name: "aider", event_type: "commit", model: "claude-3-5-sonnet",
+        metadata: { "seed_batch" => demo_tag } },
+      { tool_name: "continue", event_type: "completion", model: "gpt-4o",
+        metadata: { "seed_batch" => demo_tag } },
+      { tool_name: "anthropic_api", event_type: "completion", model: "claude-opus-4",
+        metadata: { "correlation_method" => "machine_id", "correlation_confidence" => 0.71, "seed_batch" => demo_tag } },
+      { tool_name: "openai_api", event_type: "chat", model: "gpt-4o",
+        metadata: { "correlation_method" => "email", "correlation_confidence" => 0.69, "seed_batch" => demo_tag } }
+    ]
+
+    scenarios.each_with_index do |row, i|
+      ToolEvent.create!(
+        user: nil,
+        organization: org,
+        project: project,
+        tool_name: row[:tool_name],
+        event_type: row[:event_type],
+        model: row[:model],
+        tokens_in: 400 + (i * 12),
+        tokens_out: 180 + (i * 8),
+        cost_usd: (0.003 + (i * 0.0007)).round(6),
+        duration_ms: 600 + (i * 40),
+        metadata: row[:metadata],
+        occurred_at: scenario_time - (i * 90).minutes - i.hours
+      )
+    end
+    puts "  Created #{scenarios.size} unattributed events for #{org.slug}"
   end
 end
 
