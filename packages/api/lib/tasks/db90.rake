@@ -36,7 +36,8 @@ namespace :db90 do
           tokens_in:  event.tokens_in,
           tokens_out: event.tokens_out.to_i,
           model:      event.model,
-          tool:       event.tool_name
+          tool:       event.tool_name,
+          organization: event.organization
         )
         total_cost = result[:total_cost]
 

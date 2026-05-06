@@ -190,10 +190,12 @@ class AiUsageSyncJob
   def fetch_provider_usage(connector, provider, org)
     case provider
     when "openrouter"
+      # org not passed — OpenRouter returns pre-billed costs; pricing overrides don't apply
       fetch_openrouter_usage(connector)
     when "anthropic"
       fetch_anthropic_usage(connector, org)
     when "openai"
+      # org not passed — OpenAI returns pre-billed costs; pricing overrides don't apply
       fetch_openai_usage(connector)
     when "gemini"
       nil # Not yet implemented — connector will be skipped without updating its status
@@ -230,7 +232,7 @@ class AiUsageSyncJob
   ANTHROPIC_INITIAL_SYNC_DAYS = 90
   ANTHROPIC_RECURRING_SYNC_DAYS = 7
 
-  def fetch_anthropic_usage(connector, org)
+  def fetch_anthropic_usage(connector, organization)
     # Requires an Admin API key (sk-ant-admin...) stored in connector.access_token
     days_back = connector.last_sync_at ? ANTHROPIC_RECURRING_SYNC_DAYS : ANTHROPIC_INITIAL_SYNC_DAYS
     provider = Oauth::AnthropicProvider.new(connector)
@@ -242,7 +244,7 @@ class AiUsageSyncJob
         tokens_in: entry[:tokens_in],
         tokens_out: entry[:tokens_out],
         model: entry[:model],
-        organization: org
+        organization: organization
       )
       entry.merge(cost_usd: cost[:total_cost])
     end

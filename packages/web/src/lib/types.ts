@@ -538,17 +538,17 @@ export interface ModelPricingResponse {
 
 export interface ModelPricingOverride {
   id: string;
-  model_pattern: string;
-  input_per_mtok: number;
-  output_per_mtok: number;
-  created_at: string;
-  updated_at: string;
+  modelPattern: string;
+  inputPerMtok: number;
+  outputPerMtok: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ModelPricingOverrideInput {
-  model_pattern: string;
-  input_per_mtok: number;
-  output_per_mtok: number;
+  modelPattern: string;
+  inputPerMtok: number;
+  outputPerMtok: number;
 }
 
 export interface ModelPricingOverridesResponse {

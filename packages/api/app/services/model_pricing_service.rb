@@ -79,7 +79,7 @@ class ModelPricingService
 
       ModelPricingOverride
         .where(organization: organization)
-        .find { |o| model_name.include?(o.model_pattern.downcase) }
+        .find_by("? ILIKE '%' || model_pattern || '%'", model_name)
     end
 
     def pricing_for_tool(tool_name)

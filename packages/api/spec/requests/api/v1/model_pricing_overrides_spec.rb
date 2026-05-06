@@ -36,10 +36,10 @@ RSpec.describe 'Api::V1::ModelPricingOverrides', type: :request do
 
         expect_success
         entry = json_response[:data].first
-        expect(entry).to include(:id, :model_pattern, :input_per_mtok, :output_per_mtok)
-        expect(entry[:model_pattern]).to eq('gpt-4o-ft-acme')
-        expect(entry[:input_per_mtok]).to be_a(Numeric)
-        expect(entry[:output_per_mtok]).to be_a(Numeric)
+        expect(entry).to include(:id, :modelPattern, :inputPerMtok, :outputPerMtok)
+        expect(entry[:modelPattern]).to eq('gpt-4o-ft-acme')
+        expect(entry[:inputPerMtok]).to be_a(Numeric)
+        expect(entry[:outputPerMtok]).to be_a(Numeric)
       end
     end
 
@@ -88,9 +88,9 @@ RSpec.describe 'Api::V1::ModelPricingOverrides', type: :request do
         }.to change { organization.model_pricing_overrides.count }.by(1)
 
         expect_created
-        expect(json_response[:data][:model_pattern]).to eq('gpt-4o-ft-acme')
-        expect(json_response[:data][:input_per_mtok]).to eq(1.5)
-        expect(json_response[:data][:output_per_mtok]).to eq(6.0)
+        expect(json_response[:data][:modelPattern]).to eq('gpt-4o-ft-acme')
+        expect(json_response[:data][:inputPerMtok]).to eq(1.5)
+        expect(json_response[:data][:outputPerMtok]).to eq(6.0)
       end
     end
 
@@ -157,8 +157,8 @@ RSpec.describe 'Api::V1::ModelPricingOverrides', type: :request do
                                 user: owner, organization: organization
 
         expect_success
-        expect(json_response[:data][:input_per_mtok]).to eq(2.0)
-        expect(json_response[:data][:output_per_mtok]).to eq(8.0)
+        expect(json_response[:data][:inputPerMtok]).to eq(2.0)
+        expect(json_response[:data][:outputPerMtok]).to eq(8.0)
         expect(override.reload.input_per_mtok.to_f).to eq(2.0)
       end
     end

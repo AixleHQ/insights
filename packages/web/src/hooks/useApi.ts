@@ -1634,13 +1634,21 @@ export function useModelPricingOverrides(orgId: string) {
   });
 }
 
+function toOverridePayload(input: ModelPricingOverrideInput) {
+  return {
+    model_pattern: input.modelPattern,
+    input_per_mtok: input.inputPerMtok,
+    output_per_mtok: input.outputPerMtok,
+  };
+}
+
 export function useCreateModelPricingOverride(orgId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: ModelPricingOverrideInput) =>
       api.post<{ data: ModelPricingOverride }>(
         `/organizations/${orgId}/model_pricing/overrides`,
-        input,
+        toOverridePayload(input),
       ),
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -1656,7 +1664,7 @@ export function useUpdateModelPricingOverride(orgId: string) {
     mutationFn: ({ id, ...input }: ModelPricingOverrideInput & { id: string }) =>
       api.put<{ data: ModelPricingOverride }>(
         `/organizations/${orgId}/model_pricing/overrides/${id}`,
-        input,
+        toOverridePayload(input),
       ),
     onSuccess: () => {
       queryClient.invalidateQueries({

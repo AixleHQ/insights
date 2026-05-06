@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useOrg } from "@/contexts/OrgContext";
 import {
   useModelPricing,
@@ -43,6 +43,16 @@ import {
 import { Info, Plus, Pencil, Trash2, X, Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PricingEntry, ModelPricingOverride } from "@/lib/types";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 function PricingTable({
   entries,
@@ -130,6 +140,10 @@ function ModelPatternCombobox({
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState(value);
 
+  useEffect(() => {
+    setInputValue(value);
+  }, [value]);
+
   const filtered = suggestions.filter((s) =>
     s.toLowerCase().includes(inputValue.toLowerCase())
   );
@@ -216,6 +230,8 @@ function OverridesSection({ orgId }: { orgId: string }) {
   const [editForm, setEditForm] = useState<OverrideFormState>(emptyForm());
   const [editError, setEditError] = useState<string | null>(null);
 
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+
   const overrides = data?.data ?? [];
 
   function handleAddSubmit(e: React.FormEvent) {
@@ -225,9 +241,9 @@ function OverridesSection({ orgId }: { orgId: string }) {
     setAddError(null);
     createMutation.mutate(
       {
-        model_pattern: addForm.model_pattern.trim(),
-        input_per_mtok: parseFloat(addForm.input_per_mtok),
-        output_per_mtok: parseFloat(addForm.output_per_mtok),
+        modelPattern: addForm.model_pattern.trim(),
+        inputPerMtok: parseFloat(addForm.input_per_mtok),
+        outputPerMtok: parseFloat(addForm.output_per_mtok),
       },
       {
         onSuccess: () => { setAddForm(emptyForm()); setShowAddForm(false); },
@@ -242,9 +258,9 @@ function OverridesSection({ orgId }: { orgId: string }) {
   function handleEditStart(override: ModelPricingOverride) {
     setEditingId(override.id);
     setEditForm({
-      model_pattern: override.model_pattern,
-      input_per_mtok: String(override.input_per_mtok),
-      output_per_mtok: String(override.output_per_mtok),
+      model_pattern: override.modelPattern,
+      input_per_mtok: String(override.inputPerMtok),
+      output_per_mtok: String(override.outputPerMtok),
     });
     setEditError(null);
   }
@@ -258,9 +274,9 @@ function OverridesSection({ orgId }: { orgId: string }) {
     updateMutation.mutate(
       {
         id: editingId,
-        model_pattern: editForm.model_pattern.trim(),
-        input_per_mtok: parseFloat(editForm.input_per_mtok),
-        output_per_mtok: parseFloat(editForm.output_per_mtok),
+        modelPattern: editForm.model_pattern.trim(),
+        inputPerMtok: parseFloat(editForm.input_per_mtok),
+        outputPerMtok: parseFloat(editForm.output_per_mtok),
       },
       {
         onSuccess: () => { setEditingId(null); },
@@ -273,7 +289,14 @@ function OverridesSection({ orgId }: { orgId: string }) {
   }
 
   function handleDelete(id: string) {
-    deleteMutation.mutate(id);
+    setDeleteTargetId(id);
+  }
+
+  function confirmDelete() {
+    if (!deleteTargetId) return;
+    deleteMutation.mutate(deleteTargetId, {
+      onSuccess: () => setDeleteTargetId(null),
+    });
   }
 
   if (isLoading) {
@@ -348,12 +371,12 @@ function OverridesSection({ orgId }: { orgId: string }) {
                 </TableRow>
               ) : (
                 <TableRow key={override.id}>
-                  <TableCell className="font-mono text-sm">{override.model_pattern}</TableCell>
+                  <TableCell className="font-mono text-sm">{override.modelPattern}</TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {formatCost(override.input_per_mtok)}
+                    {formatCost(override.inputPerMtok)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {formatCost(override.output_per_mtok)}
+                    {formatCost(override.outputPerMtok)}
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1 justify-end">
@@ -370,7 +393,6 @@ function OverridesSection({ orgId }: { orgId: string }) {
                         variant="ghost"
                         className="h-8 w-8 text-destructive hover:text-destructive"
                         onClick={() => handleDelete(override.id)}
-                        disabled={deleteMutation.isPending}
                       >
                         <Trash2 className="size-4" />
                       </Button>
@@ -450,6 +472,31 @@ function OverridesSection({ orgId }: { orgId: string }) {
           Add override
         </Button>
       )}
+
+      <AlertDialog
+        open={!!deleteTargetId}
+        onOpenChange={(open) => { if (!open) setDeleteTargetId(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete pricing override?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This override will be removed and cost calculations will fall back to list prices.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
