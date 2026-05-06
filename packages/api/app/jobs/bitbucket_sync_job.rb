@@ -4,9 +4,17 @@ class BitbucketSyncJob < ApplicationJob
   queue_as :connectors
   SYNC_WINDOW = 30.days
 
+  retry_on StandardError, wait: :polynomially_longer, attempts: 3 do |job, error|
+    opts = ApplicationJob.symbolized_job_options(job)
+    WebhookDelivery.find_by(id: opts[:delivery_id])&.mark_failed!(error.message)
+  end
+
   def perform(connector_id, action = "sync", options = {})
+    @options   = options.symbolize_keys
+    delivery   = action == "webhook" ? WebhookDelivery.find_by(id: @options[:delivery_id]) : nil
+    delivery&.mark_processing!
+
     @connector = OrganizationConnector.find(connector_id)
-    @options = options.symbolize_keys
 
     Rails.logger.info("[BitbucketSyncJob] Starting #{action} for connector #{connector_id}")
 
@@ -21,14 +29,18 @@ class BitbucketSyncJob < ApplicationJob
       Rails.logger.warn("[BitbucketSyncJob] Unknown action: #{action}")
     end
 
+    delivery&.mark_delivered!
     @connector.mark_synced!
     Rails.logger.info("[BitbucketSyncJob] Completed #{action} for connector #{connector_id}")
   rescue ActiveRecord::RecordNotFound
     Rails.logger.error("[BitbucketSyncJob] Connector #{connector_id} not found")
+    delivery&.mark_failed!("Connector not found")
   rescue Oauth::TokenRefreshError => e
     Rails.logger.error("[BitbucketSyncJob] Token refresh failed for connector #{connector_id}: #{e.message}")
+    delivery&.mark_failed!(e.message)
   rescue StandardError => e
     Rails.logger.error("[BitbucketSyncJob] Failed: #{e.message}")
+    delivery&.update!(last_error: e.message)
     raise
   end
 
@@ -75,18 +87,18 @@ class BitbucketSyncJob < ApplicationJob
   def sync_repository(repo_data)
     repository = Repository.find_or_initialize_by(
       organization_connector: @connector,
-      external_id: repo_data[:external_id].to_s
+      external_id:            repo_data[:external_id].to_s
     )
 
     repository.update!(
-      name: repo_data[:name],
-      full_name: repo_data[:full_name],
-      url: repo_data[:html_url],
-      html_url: repo_data[:html_url],
-      clone_url: repo_data[:clone_url],
+      name:           repo_data[:name],
+      full_name:      repo_data[:full_name],
+      url:            repo_data[:html_url],
+      html_url:       repo_data[:html_url],
+      clone_url:      repo_data[:clone_url],
       default_branch: repo_data[:default_branch],
-      is_private: repo_data[:is_private],
-      description: repo_data[:description]
+      is_private:     repo_data[:is_private],
+      description:    repo_data[:description]
     )
   end
 
@@ -113,7 +125,7 @@ class BitbucketSyncJob < ApplicationJob
         workspace,
         repo_slug,
         branch: repository.default_branch.presence || "main",
-        since: SYNC_WINDOW.ago
+        since:  SYNC_WINDOW.ago
       )
     end
 
@@ -145,7 +157,7 @@ class BitbucketSyncJob < ApplicationJob
 
   def process_webhook
     event_type = @options[:event_type]
-    payload = @options[:payload]
+    payload    = @options[:payload]
 
     case event_type
     when "repo:push"
@@ -175,26 +187,26 @@ class BitbucketSyncJob < ApplicationJob
     repository = find_repository(payload.dig("repository", "uuid"))
     return unless repository
 
-    pr = payload["pullrequest"]
+    pr     = payload["pullrequest"]
     action = event_type.split(":").last
 
     ToolEvents::ConnectorUpsert.call(
-      unique_key: "pullrequest_id",
-      unique_value: pr["id"],
+      unique_key:      "pullrequest_id",
+      unique_value:    pr["id"],
       organization_id: @connector.organization_id,
-      repository_id: repository.id,
-      project_id: repository.project_id,
-      tool_name: "bitbucket",
-      event_type: "review",
-      occurred_at: Time.parse(pr["updated_on"] || Time.current.iso8601),
+      repository_id:   repository.id,
+      project_id:      repository.project_id,
+      tool_name:       "bitbucket",
+      event_type:      "review",
+      occurred_at:     Time.parse(pr["updated_on"] || Time.current.iso8601),
       metadata: {
-        action: action,
-        pullrequest_id: pr["id"],
-        pr_title: pr["title"],
-        pr_state: pr["state"],
-        repository_id: repository.id,
-        author: pr.dig("author", "display_name"),
-        url: pr.dig("links", "html", "href")
+        action:          action,
+        pullrequest_id:  pr["id"],
+        pr_title:        pr["title"],
+        pr_state:        pr["state"],
+        repository_id:   repository.id,
+        author:          pr.dig("author", "display_name"),
+        url:             pr.dig("links", "html", "href")
       }
     )
   end
@@ -209,21 +221,21 @@ class BitbucketSyncJob < ApplicationJob
     pipeline_id = pipeline["uuid"] || pipeline["build_number"]
 
     ToolEvents::ConnectorUpsert.call(
-      unique_key: "pipeline_id",
-      unique_value: pipeline_id,
+      unique_key:      "pipeline_id",
+      unique_value:    pipeline_id,
       organization_id: @connector.organization_id,
-      repository_id: repository.id,
-      project_id: repository.project_id,
-      tool_name: "bitbucket",
-      event_type: "other",
-      occurred_at: Time.parse(pipeline["completed_on"] || pipeline["created_on"] || Time.current.iso8601),
+      repository_id:   repository.id,
+      project_id:      repository.project_id,
+      tool_name:       "bitbucket",
+      event_type:      "other",
+      occurred_at:     Time.parse(pipeline["completed_on"] || pipeline["created_on"] || Time.current.iso8601),
       metadata: {
-        pipeline_id: pipeline_id,
-        status: pipeline.dig("state", "name"),
-        ref: pipeline.dig("target", "ref_name"),
+        pipeline_id:   pipeline_id,
+        status:        pipeline.dig("state", "name"),
+        ref:           pipeline.dig("target", "ref_name"),
         repository_id: repository.id,
-        sha: pipeline.dig("target", "commit", "hash"),
-        url: pipeline.dig("links", "html", "href")
+        sha:           pipeline.dig("target", "commit", "hash"),
+        url:           pipeline.dig("links", "html", "href")
       }
     )
   end
@@ -241,19 +253,19 @@ class BitbucketSyncJob < ApplicationJob
     user = member_by_email[author_email] if author_email
 
     ToolEvents::ConnectorUpsert.call(
-      unique_key: "sha",
-      unique_value: commit["hash"] || commit["id"],
+      unique_key:      "sha",
+      unique_value:    commit["hash"] || commit["id"],
       organization_id: @connector.organization_id,
-      user_id: user&.id,
-      repository_id: repository.id,
-      project_id: repository.project_id,
-      tool_name: "bitbucket",
-      event_type: "commit",
-      occurred_at: Time.parse(commit["date"] || commit["timestamp"] || Time.current.iso8601),
+      user_id:         user&.id,
+      repository_id:   repository.id,
+      project_id:      repository.project_id,
+      tool_name:       "bitbucket",
+      event_type:      "commit",
+      occurred_at:     Time.parse(commit["date"] || commit["timestamp"] || Time.current.iso8601),
       metadata: {
-        sha: commit["hash"] || commit["id"],
-        message: commit["message"],
-        author_name: commit.dig("author", "user", "display_name") || commit.dig("author", "name"),
+        sha:              commit["hash"] || commit["id"],
+        message:          commit["message"],
+        author_name:      commit.dig("author", "user", "display_name") || commit.dig("author", "name"),
         git_author_email: author_email
       }
     )

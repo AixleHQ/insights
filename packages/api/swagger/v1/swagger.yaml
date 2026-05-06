@@ -1811,6 +1811,113 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /api/v1/organizations/{organization_id}/webhook_deliveries:
+    get:
+      summary: List webhook deliveries
+      description: >
+        Returns paginated webhook delivery history for the organization.
+        Requires org admin or global admin role. Filterable by status, provider, and date range.
+      tags:
+        - Webhook Deliveries
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - name: status
+          in: query
+          description: Filter by delivery status
+          schema:
+            type: string
+            enum: [pending, processing, delivered, failed]
+        - name: provider
+          in: query
+          description: Filter by provider
+          schema:
+            type: string
+            enum: [github, gitlab, bitbucket, jira, linear, slack]
+        - name: date_from
+          in: query
+          description: Filter deliveries created on or after this ISO 8601 datetime
+          schema:
+            type: string
+            format: date-time
+        - name: date_to
+          in: query
+          description: Filter deliveries created on or before this ISO 8601 datetime
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Paginated webhook delivery list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WebhookDelivery'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/webhook_deliveries/{id}/retry:
+    post:
+      summary: Retry a failed webhook delivery
+      description: >
+        Re-enqueues a failed webhook delivery using the stored raw payload from MinIO.
+        Only allowed for deliveries with status "failed". Returns 422 if the delivery
+        is not in a failed state or if the raw payload has expired (MinIO TTL).
+      tags:
+        - Webhook Deliveries
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: id
+          in: path
+          required: true
+          description: Webhook delivery UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '202':
+          description: Delivery re-enqueued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/WebhookDelivery'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Delivery is not retryable (not failed, or payload expired)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
   /api/v1/organizations/{organization_id}/projects:
     get:
       summary: List organization projects
@@ -2471,7 +2578,9 @@ paths:
   /api/v1/projects/{project_id}/repositories/{id}/sync:
     post:
       summary: Trigger repository sync
-      description: Triggers a sync operation for the repository
+      description: >
+        Queues a sync for the repository's organization connector (metadata refresh and,
+        for GitHub/GitLab/Bitbucket, recent activity backfill). Matches POST …/connectors/:id/sync.
       tags:
         - Repositories
       parameters:
@@ -3465,6 +3574,50 @@ components:
       required:
         - id
         - email
+
+    WebhookDelivery:
+      type: object
+      description: A single webhook delivery tracking record. Captures lifecycle from receipt through sync job completion.
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationConnectorId:
+          type: string
+          format: uuid
+        provider:
+          type: string
+          enum: [github, gitlab, bitbucket, jira, linear, slack]
+        eventType:
+          type: string
+          description: Webhook event type (e.g. push, pull_request, jira:issue_created)
+        rawEventKey:
+          type: string
+          description: MinIO key for the stored raw payload
+        status:
+          type: string
+          enum: [pending, processing, delivered, failed]
+        attempts:
+          type: integer
+          minimum: 0
+        lastAttemptedAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastError:
+          type: string
+          nullable: true
+          description: Error message from the most recent failed attempt
+        deliveredAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
 
     OrganizationAuditLog:
       type: object

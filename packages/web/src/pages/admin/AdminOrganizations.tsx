@@ -402,6 +402,11 @@ export function AdminOrganizations() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem asChild>
+                          <Link to={`/admin/organizations/${org.id}/webhook-deliveries`}>
+                            Webhook deliveries
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
                           <Link to={`/admin/organizations/${org.id}`}>
                             View Details
                           </Link>

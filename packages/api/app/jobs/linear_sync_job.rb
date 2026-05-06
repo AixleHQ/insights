@@ -7,9 +7,17 @@ class LinearSyncJob < ApplicationJob
 
   SYNC_WINDOW = 30.days
 
+  sidekiq_retries_exhausted do |msg, ex|
+    opts = (msg["args"][2] || {}).transform_keys(&:to_sym)
+    WebhookDelivery.find_by(id: opts[:delivery_id])&.mark_failed!(ex.message)
+  end
+
   def perform(connector_id, action = "sync", options = {})
+    @options   = options.symbolize_keys
+    delivery   = action == "webhook" ? WebhookDelivery.find_by(id: @options[:delivery_id]) : nil
+    delivery&.mark_processing!
+
     @connector = OrganizationConnector.find(connector_id)
-    @options = options.symbolize_keys
 
     Rails.logger.info("[LinearSyncJob] Starting #{action} for connector #{connector_id}")
 
@@ -23,7 +31,6 @@ class LinearSyncJob < ApplicationJob
       else
         sync_all_linked_project_issues
       end
-      @connector.mark_synced!
     when "refresh_token"
       refresh_token
     when "webhook"
@@ -32,12 +39,16 @@ class LinearSyncJob < ApplicationJob
       Rails.logger.warn("[LinearSyncJob] Unknown action: #{action}")
     end
 
+    delivery&.mark_delivered!
+    @connector.mark_synced!
     Rails.logger.info("[LinearSyncJob] Completed #{action} for connector #{connector_id}")
   rescue ActiveRecord::RecordNotFound
     Rails.logger.error("[LinearSyncJob] Connector #{connector_id} not found")
+    delivery&.mark_failed!("Connector not found")
   rescue StandardError => e
     @connector&.mark_error!(e.message)
     Rails.logger.error("[LinearSyncJob] Failed: #{e.message}")
+    delivery&.update!(last_error: e.message)
     raise
   end
 
@@ -92,7 +103,7 @@ class LinearSyncJob < ApplicationJob
     payload = @options[:payload]
 
     entity_type = payload["type"]
-    action = payload["action"]
+    action      = payload["action"]
 
     case entity_type
     when "Issue"
@@ -157,12 +168,12 @@ class LinearSyncJob < ApplicationJob
       event_type: "comment",
       occurred_at: parse_time(payload["createdAt"]) || Time.current,
       metadata: {
-        action: action,
-        comment_id: data["id"],
-        issue_id: data.dig("issue", "id"),
+        action:           action,
+        comment_id:       data["id"],
+        issue_id:         data.dig("issue", "id"),
         issue_identifier: data.dig("issue", "identifier"),
-        user_id: data.dig("user", "id"),
-        user_name: data.dig("user", "name")
+        user_id:          data.dig("user", "id"),
+        user_name:        data.dig("user", "name")
       }
     )
   end
@@ -179,12 +190,12 @@ class LinearSyncJob < ApplicationJob
       event_type: "other",
       occurred_at: parse_time(payload["createdAt"]) || Time.current,
       metadata: {
-        action: action,
-        project_id: data["id"],
+        action:       action,
+        project_id:   data["id"],
         project_name: data["name"],
-        state: data["state"],
-        progress: data["progress"],
-        team_ids: data["teamIds"]
+        state:        data["state"],
+        progress:     data["progress"],
+        team_ids:     data["teamIds"]
       }
     )
   end
@@ -201,14 +212,14 @@ class LinearSyncJob < ApplicationJob
       event_type: "sprint",
       occurred_at: parse_time(payload["createdAt"]) || parse_time(data["updatedAt"]) || Time.current,
       metadata: {
-        action: action,
-        cycle_id: data["id"],
-        cycle_name: data["name"],
-        cycle_number: data["number"],
-        starts_at: data["startsAt"],
-        ends_at: data["endsAt"],
-        team_id: data.dig("team", "id"),
-        team_name: data.dig("team", "name")
+        action:        action,
+        cycle_id:      data["id"],
+        cycle_name:    data["name"],
+        cycle_number:  data["number"],
+        starts_at:     data["startsAt"],
+        ends_at:       data["endsAt"],
+        team_id:       data.dig("team", "id"),
+        team_name:     data.dig("team", "name")
       }
     )
   end

@@ -13,6 +13,7 @@ class OrganizationConnector < ApplicationRecord
 
   belongs_to :organization
   has_many :repositories, dependent: :destroy
+  has_many :webhook_deliveries, dependent: :destroy
   has_many :issues, dependent: :destroy
 
   validates :connector_type, presence: true, inclusion: { in: CONNECTOR_TYPES }

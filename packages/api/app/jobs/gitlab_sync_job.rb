@@ -4,9 +4,17 @@ class GitlabSyncJob < ApplicationJob
   queue_as :connectors
   SYNC_WINDOW = 30.days
 
+  retry_on StandardError, wait: :polynomially_longer, attempts: 3 do |job, error|
+    opts = ApplicationJob.symbolized_job_options(job)
+    WebhookDelivery.find_by(id: opts[:delivery_id])&.mark_failed!(error.message)
+  end
+
   def perform(connector_id, action = "sync", options = {})
+    @options   = options.symbolize_keys
+    delivery   = action == "webhook" ? WebhookDelivery.find_by(id: @options[:delivery_id]) : nil
+    delivery&.mark_processing!
+
     @connector = OrganizationConnector.find(connector_id)
-    @options = options.symbolize_keys
 
     Rails.logger.info("[GitlabSyncJob] Starting #{action} for connector #{connector_id}")
 
@@ -21,14 +29,18 @@ class GitlabSyncJob < ApplicationJob
       Rails.logger.warn("[GitlabSyncJob] Unknown action: #{action}")
     end
 
+    delivery&.mark_delivered!
     @connector.mark_synced!
     Rails.logger.info("[GitlabSyncJob] Completed #{action} for connector #{connector_id}")
   rescue ActiveRecord::RecordNotFound
     Rails.logger.error("[GitlabSyncJob] Connector #{connector_id} not found")
+    delivery&.mark_failed!("Connector not found")
   rescue Oauth::TokenRefreshError => e
     Rails.logger.error("[GitlabSyncJob] Token refresh failed for connector #{connector_id}: #{e.message}")
+    delivery&.mark_failed!(e.message)
   rescue StandardError => e
     Rails.logger.error("[GitlabSyncJob] Failed: #{e.message}")
+    delivery&.update!(last_error: e.message)
     raise
   end
 
@@ -75,18 +87,18 @@ class GitlabSyncJob < ApplicationJob
   def sync_project(project_data)
     repository = Repository.find_or_initialize_by(
       organization_connector: @connector,
-      external_id: project_data[:external_id].to_s
+      external_id:            project_data[:external_id].to_s
     )
 
     repository.update!(
-      name: project_data[:name],
-      full_name: project_data[:full_name],
-      url: project_data[:html_url],
-      html_url: project_data[:html_url],
-      clone_url: project_data[:clone_url],
+      name:           project_data[:name],
+      full_name:      project_data[:full_name],
+      url:            project_data[:html_url],
+      html_url:       project_data[:html_url],
+      clone_url:      project_data[:clone_url],
       default_branch: project_data[:default_branch],
-      is_private: project_data[:is_private],
-      description: project_data[:description]
+      is_private:     project_data[:is_private],
+      description:    project_data[:description]
     )
   end
 
@@ -107,7 +119,7 @@ class GitlabSyncJob < ApplicationJob
       Oauth::GitlabProvider.new(@connector).fetch_commits(
         repository.external_id,
         ref_name: repository.default_branch,
-        since: SYNC_WINDOW.ago
+        since:    SYNC_WINDOW.ago
       )
     end
 
@@ -136,7 +148,7 @@ class GitlabSyncJob < ApplicationJob
 
   def process_webhook
     event_type = @options[:event_type]
-    payload = @options[:payload]
+    payload    = @options[:payload]
 
     case event_type
     when "Push Hook"
@@ -168,22 +180,22 @@ class GitlabSyncJob < ApplicationJob
     mr = payload["object_attributes"]
 
     ToolEvents::ConnectorUpsert.call(
-      unique_key: "mr_iid",
-      unique_value: mr["iid"],
+      unique_key:      "mr_iid",
+      unique_value:    mr["iid"],
       organization_id: @connector.organization_id,
-      repository_id: repository.id,
-      project_id: repository.project_id,
-      tool_name: "gitlab",
-      event_type: "review",
-      occurred_at: Time.parse(mr["updated_at"]),
+      repository_id:   repository.id,
+      project_id:      repository.project_id,
+      tool_name:       "gitlab",
+      event_type:      "review",
+      occurred_at:     Time.parse(mr["updated_at"]),
       metadata: {
-        action: mr["action"],
-        mr_iid: mr["iid"],
-        mr_title: mr["title"],
-        mr_state: mr["state"],
+        action:        mr["action"],
+        mr_iid:        mr["iid"],
+        mr_title:      mr["title"],
+        mr_state:      mr["state"],
         repository_id: repository.id,
-        author: payload.dig("user", "username"),
-        url: mr["url"] || mr["last_commit"]&.dig("url")
+        author:        payload.dig("user", "username"),
+        url:           mr["url"] || mr["last_commit"]&.dig("url")
       }
     )
   end
@@ -195,21 +207,21 @@ class GitlabSyncJob < ApplicationJob
     pipeline = payload["object_attributes"]
 
     ToolEvents::ConnectorUpsert.call(
-      unique_key: "pipeline_id",
-      unique_value: pipeline["id"],
+      unique_key:      "pipeline_id",
+      unique_value:    pipeline["id"],
       organization_id: @connector.organization_id,
-      repository_id: repository.id,
-      project_id: repository.project_id,
-      tool_name: "gitlab",
-      event_type: "other",
-      occurred_at: Time.parse(pipeline["created_at"] || pipeline["updated_at"]),
+      repository_id:   repository.id,
+      project_id:      repository.project_id,
+      tool_name:       "gitlab",
+      event_type:      "other",
+      occurred_at:     Time.parse(pipeline["created_at"] || pipeline["updated_at"]),
       metadata: {
         pipeline_id: pipeline["id"],
-        status: pipeline["status"],
-        ref: pipeline["ref"],
+        status:      pipeline["status"],
+        ref:         pipeline["ref"],
         repository_id: repository.id,
-        duration: pipeline["duration"],
-        sha: pipeline["sha"]
+        duration:    pipeline["duration"],
+        sha:         pipeline["sha"]
       }
     )
   end
@@ -227,21 +239,21 @@ class GitlabSyncJob < ApplicationJob
     user = member_by_email[author_email] if author_email
 
     ToolEvents::ConnectorUpsert.call(
-      unique_key: "sha",
-      unique_value: commit["id"],
+      unique_key:      "sha",
+      unique_value:    commit["id"],
       organization_id: @connector.organization_id,
-      user_id: user&.id,
-      repository_id: repository.id,
-      project_id: repository.project_id,
-      tool_name: "gitlab",
-      event_type: "commit",
-      occurred_at: Time.parse(commit["timestamp"]),
+      user_id:         user&.id,
+      repository_id:   repository.id,
+      project_id:      repository.project_id,
+      tool_name:       "gitlab",
+      event_type:      "commit",
+      occurred_at:     Time.parse(commit["timestamp"]),
       metadata: {
-        sha: commit["id"],
-        message: commit["message"],
-        author_name: commit.dig("author", "name"),
+        sha:              commit["id"],
+        message:          commit["message"],
+        author_name:      commit.dig("author", "name"),
         git_author_email: author_email,
-        url: commit["url"]
+        url:              commit["url"]
       }
     )
   end

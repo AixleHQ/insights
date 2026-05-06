@@ -35,6 +35,7 @@ import {
   AdminOverview,
   AdminUsers,
   AdminOrganizations,
+  WebhookDeliveriesPage,
 } from "./pages/admin";
 
 function TeamIdRedirect() {
@@ -129,6 +130,10 @@ function App() {
                     <Route index element={<AdminOverview />} />
                     <Route path="users" element={<AdminUsers />} />
                     <Route path="organizations" element={<AdminOrganizations />} />
+                    <Route
+                      path="organizations/:organizationId/webhook-deliveries"
+                      element={<WebhookDeliveriesPage />}
+                    />
                   </Route>
                 </Route>
               </Routes>

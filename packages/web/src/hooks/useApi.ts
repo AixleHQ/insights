@@ -130,6 +130,11 @@ export const queryKeys = {
     all: (projectId: string, params?: Record<string, unknown>) =>
       ["projects", projectId, "audit_logs", params] as const,
   },
+  webhookDeliveries: {
+    all: (orgId: string) => ["admin", "webhook_deliveries", orgId] as const,
+    list: (orgId: string, filters: object) =>
+      ["admin", "webhook_deliveries", orgId, "list", filters] as const,
+  },
 };
 
 // ============================================================================
@@ -702,7 +707,7 @@ export function useConnectRepo(projectId: string) {
       is_private: boolean;
     }) => api.post<{ data: ProjectRepository }>(`/projects/${projectId}/repositories`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "repositories"] });
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId] });
     },
   });
 }
@@ -713,7 +718,7 @@ export function useDisconnectRepo(projectId: string) {
   return useMutation({
     mutationFn: (repoId: string) => api.delete(`/projects/${projectId}/repositories/${repoId}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "repositories"] });
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId] });
     },
   });
 }
@@ -752,6 +757,13 @@ export function useConnectors(orgId: string) {
       return response.data;
     },
     enabled: !!orgId,
+    // POST /sync returns before the Sidekiq job finishes; status stays "testing" until mark_synced!.
+    // Poll so /integrations/connected updates when the job completes (or errors).
+    refetchInterval: (query) => {
+      const data = query.state.data as Connector[] | undefined;
+      if (!data?.length) return false;
+      return data.some((c) => c.status === "testing") ? 3_000 : false;
+    },
   });
 }
 
@@ -825,6 +837,8 @@ export function useSyncConnector() {
       api.post(`/organizations/${orgId}/connectors/${connectorId}/sync`),
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
     },
   });
 }
