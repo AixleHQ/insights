@@ -4,7 +4,7 @@ class GithubSyncJob < ApplicationJob
   queue_as :connectors
 
   retry_on StandardError, wait: :polynomially_longer, attempts: 3 do |job, error|
-    opts = job.arguments.last.to_h.symbolize_keys
+    opts = ApplicationJob.symbolized_job_options(job)
     WebhookDelivery.find_by(id: opts[:delivery_id])&.mark_failed!(error.message)
   end
 
@@ -60,13 +60,11 @@ class GithubSyncJob < ApplicationJob
       name:           repo_data[:name],
       full_name:      repo_data[:full_name],
       url:            repo_data[:html_url],
+      html_url:       repo_data[:html_url],
+      clone_url:      repo_data[:clone_url],
       default_branch: repo_data[:default_branch],
       is_private:     repo_data[:is_private],
-      metadata: {
-        language:    repo_data[:language],
-        description: repo_data[:description],
-        updated_at:  repo_data[:updated_at]
-      }
+      description:    repo_data[:description]
     )
   end
 

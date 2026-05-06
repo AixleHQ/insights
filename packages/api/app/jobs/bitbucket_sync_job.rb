@@ -5,7 +5,7 @@ class BitbucketSyncJob < ApplicationJob
   SYNC_WINDOW = 30.days
 
   retry_on StandardError, wait: :polynomially_longer, attempts: 3 do |job, error|
-    opts = job.arguments.last.to_h.symbolize_keys
+    opts = ApplicationJob.symbolized_job_options(job)
     WebhookDelivery.find_by(id: opts[:delivery_id])&.mark_failed!(error.message)
   end
 
