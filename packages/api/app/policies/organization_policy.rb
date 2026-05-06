@@ -41,6 +41,11 @@ class OrganizationPolicy < ApplicationPolicy
     org_admin?(record) || global_admin?
   end
 
+  # Admins can manage per-org pricing overrides (index, create, update, destroy)
+  def manage_pricing_override?
+    org_admin?(record) || global_admin?
+  end
+
   # Members can create events (telemetry ingestion)
   def create_event?
     org_member?(record) || global_admin?

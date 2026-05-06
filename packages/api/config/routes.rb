@@ -38,6 +38,11 @@ Rails.application.routes.draw do
           get :model_pricing, to: "model_pricing#index"
         end
 
+        # Pricing overrides (CRUD)
+        resources :model_pricing_overrides,
+          path: "model_pricing/overrides",
+          only: %i[index create update destroy]
+
         # Organization members
         resources :members, controller: "organization_members" do
           member do

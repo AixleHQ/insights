@@ -1,5 +1,12 @@
+import { useState } from "react";
 import { useOrg } from "@/contexts/OrgContext";
-import { useModelPricing } from "@/hooks/useApi";
+import {
+  useModelPricing,
+  useModelPricingOverrides,
+  useCreateModelPricingOverride,
+  useUpdateModelPricingOverride,
+  useDeleteModelPricingOverride,
+} from "@/hooks/useApi";
 import { formatCost } from "@/lib/formatters";
 import {
   Card,
@@ -18,8 +25,24 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert } from "@/components/ui/alert";
-import { Info } from "lucide-react";
-import type { PricingEntry } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Info, Plus, Pencil, Trash2, X, Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+import type { PricingEntry, ModelPricingOverride } from "@/lib/types";
 
 function PricingTable({
   entries,
@@ -70,9 +93,371 @@ function PricingTable({
   );
 }
 
+interface OverrideFormState {
+  model_pattern: string;
+  input_per_mtok: string;
+  output_per_mtok: string;
+}
+
+const emptyForm = (): OverrideFormState => ({
+  model_pattern: "",
+  input_per_mtok: "",
+  output_per_mtok: "",
+});
+
+function validateOverrideForm(form: OverrideFormState): string | null {
+  if (!form.model_pattern.trim()) return "Model pattern is required.";
+  const input = parseFloat(form.input_per_mtok);
+  const output = parseFloat(form.output_per_mtok);
+  if (isNaN(input) || input <= 0) return "Input price must be a positive number.";
+  if (isNaN(output) || output <= 0) return "Output price must be a positive number.";
+  return null;
+}
+
+function ModelPatternCombobox({
+  value,
+  onChange,
+  suggestions,
+  placeholder = "gpt-4o-ft-acme",
+  className,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  suggestions: string[];
+  placeholder?: string;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [inputValue, setInputValue] = useState(value);
+
+  const filtered = suggestions.filter((s) =>
+    s.toLowerCase().includes(inputValue.toLowerCase())
+  );
+
+  function handleInputChange(v: string) {
+    setInputValue(v);
+    onChange(v);
+  }
+
+  function handleSelect(selected: string) {
+    setInputValue(selected);
+    onChange(selected);
+    setOpen(false);
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className={cn(
+            "h-9 w-full justify-between font-mono text-sm font-normal",
+            !value && "text-muted-foreground",
+            className,
+          )}
+        >
+          <span className="truncate">{value || placeholder}</span>
+          <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder="Search or type a model pattern…"
+            value={inputValue}
+            onValueChange={handleInputChange}
+          />
+          <CommandList>
+            {inputValue && !suggestions.includes(inputValue) && (
+              <CommandGroup heading="Custom">
+                <CommandItem value={inputValue} onSelect={() => handleSelect(inputValue)}>
+                  <Check className={cn("mr-2 size-4", value === inputValue ? "opacity-100" : "opacity-0")} />
+                  <span className="font-mono">{inputValue}</span>
+                </CommandItem>
+              </CommandGroup>
+            )}
+            {filtered.length > 0 && (
+              <CommandGroup heading="Known models">
+                {filtered.map((model) => (
+                  <CommandItem key={model} value={model} onSelect={() => handleSelect(model)}>
+                    <Check className={cn("mr-2 size-4", value === model ? "opacity-100" : "opacity-0")} />
+                    <span className="font-mono text-sm">{model}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+            {filtered.length === 0 && !inputValue && (
+              <CommandEmpty>Type to search or enter a custom pattern.</CommandEmpty>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function OverridesSection({ orgId }: { orgId: string }) {
+  const { data, isLoading } = useModelPricingOverrides(orgId);
+  const { data: pricingData } = useModelPricing(orgId);
+  const createMutation = useCreateModelPricingOverride(orgId);
+  const updateMutation = useUpdateModelPricingOverride(orgId);
+  const deleteMutation = useDeleteModelPricingOverride(orgId);
+
+  const modelSuggestions = pricingData?.models.map((m) => m.name) ?? [];
+
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [addForm, setAddForm] = useState<OverrideFormState>(emptyForm());
+  const [addError, setAddError] = useState<string | null>(null);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<OverrideFormState>(emptyForm());
+  const [editError, setEditError] = useState<string | null>(null);
+
+  const overrides = data?.data ?? [];
+
+  function handleAddSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const err = validateOverrideForm(addForm);
+    if (err) { setAddError(err); return; }
+    setAddError(null);
+    createMutation.mutate(
+      {
+        model_pattern: addForm.model_pattern.trim(),
+        input_per_mtok: parseFloat(addForm.input_per_mtok),
+        output_per_mtok: parseFloat(addForm.output_per_mtok),
+      },
+      {
+        onSuccess: () => { setAddForm(emptyForm()); setShowAddForm(false); },
+        onError: (err: unknown) => {
+          const msg = err instanceof Error ? err.message : "Failed to create override.";
+          setAddError(msg);
+        },
+      }
+    );
+  }
+
+  function handleEditStart(override: ModelPricingOverride) {
+    setEditingId(override.id);
+    setEditForm({
+      model_pattern: override.model_pattern,
+      input_per_mtok: String(override.input_per_mtok),
+      output_per_mtok: String(override.output_per_mtok),
+    });
+    setEditError(null);
+  }
+
+  function handleEditSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingId) return;
+    const err = validateOverrideForm(editForm);
+    if (err) { setEditError(err); return; }
+    setEditError(null);
+    updateMutation.mutate(
+      {
+        id: editingId,
+        model_pattern: editForm.model_pattern.trim(),
+        input_per_mtok: parseFloat(editForm.input_per_mtok),
+        output_per_mtok: parseFloat(editForm.output_per_mtok),
+      },
+      {
+        onSuccess: () => { setEditingId(null); },
+        onError: (err: unknown) => {
+          const msg = err instanceof Error ? err.message : "Failed to update override.";
+          setEditError(msg);
+        },
+      }
+    );
+  }
+
+  function handleDelete(id: string) {
+    deleteMutation.mutate(id);
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-2">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-9 w-full" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {overrides.length > 0 && (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Model Pattern</TableHead>
+              <TableHead className="text-right">Input / M tokens</TableHead>
+              <TableHead className="text-right">Output / M tokens</TableHead>
+              <TableHead className="w-20" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {overrides.map((override) =>
+              editingId === override.id ? (
+                <TableRow key={override.id}>
+                  <TableCell>
+                    <Input
+                      value={editForm.model_pattern}
+                      onChange={(e) => setEditForm((f) => ({ ...f, model_pattern: e.target.value }))}
+                      className="h-8 font-mono text-sm"
+                      placeholder="gpt-4o-ft-acme"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={editForm.input_per_mtok}
+                      onChange={(e) => setEditForm((f) => ({ ...f, input_per_mtok: e.target.value }))}
+                      className="h-8 text-right tabular-nums"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={editForm.output_per_mtok}
+                      onChange={(e) => setEditForm((f) => ({ ...f, output_per_mtok: e.target.value }))}
+                      className="h-8 text-right tabular-nums"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <form onSubmit={handleEditSubmit} className="flex gap-1 justify-end">
+                      <Button type="submit" size="icon" variant="ghost" className="h-8 w-8"
+                        disabled={updateMutation.isPending}>
+                        <Check className="size-4 text-green-600" />
+                      </Button>
+                      <Button type="button" size="icon" variant="ghost" className="h-8 w-8"
+                        onClick={() => setEditingId(null)}>
+                        <X className="size-4" />
+                      </Button>
+                    </form>
+                    {editError && (
+                      <p className="mt-1 text-xs text-destructive">{editError}</p>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                <TableRow key={override.id}>
+                  <TableCell className="font-mono text-sm">{override.model_pattern}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatCost(override.input_per_mtok)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatCost(override.output_per_mtok)}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-1 justify-end">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        onClick={() => handleEditStart(override)}
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => handleDelete(override.id)}
+                        disabled={deleteMutation.isPending}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )
+            )}
+          </TableBody>
+        </Table>
+      )}
+
+      {overrides.length === 0 && !showAddForm && (
+        <p className="py-2 text-sm text-muted-foreground">
+          No overrides configured. Add one to apply custom pricing for specific models.
+        </p>
+      )}
+
+      {showAddForm ? (
+        <form onSubmit={handleAddSubmit} className="flex flex-col gap-3 rounded-md border p-4">
+          <p className="text-sm font-medium">New override</p>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-1 space-y-1">
+              <label className="text-xs text-muted-foreground">Model pattern</label>
+              <ModelPatternCombobox
+                value={addForm.model_pattern}
+                onChange={(v) => setAddForm((f) => ({ ...f, model_pattern: v }))}
+                suggestions={modelSuggestions}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Input ($/MTok)</label>
+              <Input
+                type="number"
+                step="any"
+                min="0"
+                value={addForm.input_per_mtok}
+                onChange={(e) => setAddForm((f) => ({ ...f, input_per_mtok: e.target.value }))}
+                placeholder="1.50"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Output ($/MTok)</label>
+              <Input
+                type="number"
+                step="any"
+                min="0"
+                value={addForm.output_per_mtok}
+                onChange={(e) => setAddForm((f) => ({ ...f, output_per_mtok: e.target.value }))}
+                placeholder="6.00"
+              />
+            </div>
+          </div>
+          {addError && <p className="text-xs text-destructive">{addError}</p>}
+          <div className="flex gap-2">
+            <Button type="submit" size="sm" disabled={createMutation.isPending}>
+              {createMutation.isPending ? "Saving…" : "Save override"}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => { setShowAddForm(false); setAddForm(emptyForm()); setAddError(null); }}
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-1.5"
+          onClick={() => setShowAddForm(true)}
+        >
+          <Plus className="size-4" />
+          Add override
+        </Button>
+      )}
+    </div>
+  );
+}
+
 export function ModelPricingSettings() {
-  const { currentOrg } = useOrg();
+  const { currentOrg, hasRole } = useOrg();
   const { data, isLoading } = useModelPricing(currentOrg?.id ?? "");
+  const isAdmin = hasRole(["owner", "admin"]);
 
   const models = data?.models;
   const tools = data?.tools;
@@ -112,6 +497,21 @@ export function ModelPricingSettings() {
           <PricingTable entries={tools} isLoading={isLoading} />
         </CardContent>
       </Card>
+
+      {isAdmin && currentOrg && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Pricing Overrides</CardTitle>
+            <CardDescription>
+              Custom prices for org-specific or fine-tuned models. Overrides take precedence over
+              list prices above.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <OverridesSection orgId={currentOrg.id} />
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

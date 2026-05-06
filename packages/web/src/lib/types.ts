@@ -535,3 +535,22 @@ export interface ModelPricingResponse {
   models: PricingEntry[];
   tools: PricingEntry[];
 }
+
+export interface ModelPricingOverride {
+  id: string;
+  model_pattern: string;
+  input_per_mtok: number;
+  output_per_mtok: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ModelPricingOverrideInput {
+  model_pattern: string;
+  input_per_mtok: number;
+  output_per_mtok: number;
+}
+
+export interface ModelPricingOverridesResponse {
+  data: ModelPricingOverride[];
+}

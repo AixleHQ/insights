@@ -42,6 +42,9 @@ import type {
   ToolEventTypesResponse,
   ConnectorSyncStatus,
   ModelPricingResponse,
+  ModelPricingOverride,
+  ModelPricingOverrideInput,
+  ModelPricingOverridesResponse,
 } from "@/lib/types";
 
 // Query keys factory
@@ -1618,5 +1621,60 @@ export function useModelPricing(orgId: string) {
     queryKey: ["organizations", orgId, "model_pricing"],
     queryFn: () => api.get<ModelPricingResponse>(`/organizations/${orgId}/model_pricing`),
     enabled: !!orgId,
+  });
+}
+
+// Model Pricing Overrides
+export function useModelPricingOverrides(orgId: string) {
+  return useQuery({
+    queryKey: ["organizations", orgId, "model_pricing_overrides"],
+    queryFn: () =>
+      api.get<ModelPricingOverridesResponse>(`/organizations/${orgId}/model_pricing/overrides`),
+    enabled: !!orgId,
+  });
+}
+
+export function useCreateModelPricingOverride(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ModelPricingOverrideInput) =>
+      api.post<{ data: ModelPricingOverride }>(
+        `/organizations/${orgId}/model_pricing/overrides`,
+        input,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["organizations", orgId, "model_pricing_overrides"],
+      });
+    },
+  });
+}
+
+export function useUpdateModelPricingOverride(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...input }: ModelPricingOverrideInput & { id: string }) =>
+      api.put<{ data: ModelPricingOverride }>(
+        `/organizations/${orgId}/model_pricing/overrides/${id}`,
+        input,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["organizations", orgId, "model_pricing_overrides"],
+      });
+    },
+  });
+}
+
+export function useDeleteModelPricingOverride(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api.delete(`/organizations/${orgId}/model_pricing/overrides/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["organizations", orgId, "model_pricing_overrides"],
+      });
+    },
   });
 }

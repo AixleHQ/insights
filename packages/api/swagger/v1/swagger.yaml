@@ -436,6 +436,114 @@ paths:
           $ref: '#/components/responses/Forbidden'
 
   # ============================================
+  # MODEL PRICING OVERRIDES ENDPOINTS
+  # ============================================
+  /api/v1/organizations/{organization_id}/model_pricing/overrides:
+    get:
+      summary: List per-org model pricing overrides
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      responses:
+        '200':
+          description: List of pricing overrides for the organization
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ModelPricingOverride'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      summary: Create a per-org model pricing override
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelPricingOverrideInput'
+      responses:
+        '201':
+          description: Override created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ModelPricingOverride'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /api/v1/organizations/{organization_id}/model_pricing/overrides/{id}:
+    put:
+      summary: Update a per-org model pricing override
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelPricingOverrideInput'
+      responses:
+        '200':
+          description: Override updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ModelPricingOverride'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    delete:
+      summary: Delete a per-org model pricing override
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      responses:
+        '204':
+          description: Override deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================
   # ORGANIZATION MEMBERS ENDPOINTS
   # ============================================
   /api/v1/organizations/{organization_id}/members:
@@ -3562,6 +3670,60 @@ components:
           example: 10.0
       required:
         - name
+        - input_per_mtok
+        - output_per_mtok
+
+    ModelPricingOverride:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        model_pattern:
+          type: string
+          description: Substring pattern matched against the model name (e.g. "gpt-4o-ft-acme")
+          example: gpt-4o-ft-acme
+        input_per_mtok:
+          type: number
+          format: float
+          description: Override input price in USD per million tokens
+          example: 1.5
+        output_per_mtok:
+          type: number
+          format: float
+          description: Override output price in USD per million tokens
+          example: 6.0
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - model_pattern
+        - input_per_mtok
+        - output_per_mtok
+
+    ModelPricingOverrideInput:
+      type: object
+      properties:
+        model_pattern:
+          type: string
+          description: Substring pattern matched against the model name
+          example: gpt-4o-ft-acme
+        input_per_mtok:
+          type: number
+          format: float
+          description: Override input price in USD per million tokens
+          example: 1.5
+        output_per_mtok:
+          type: number
+          format: float
+          description: Override output price in USD per million tokens
+          example: 6.0
+      required:
+        - model_pattern
         - input_per_mtok
         - output_per_mtok
 
