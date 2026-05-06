@@ -3848,6 +3848,15 @@ components:
         attribution:
           type: string
           enum: [user, organization, unknown]
+        correlationMethod:
+          type: string
+          nullable: true
+          description: Method used (or attempted) to correlate the event to a user (e.g. "email", "machine_id", "manual")
+        correlationConfidence:
+          type: number
+          format: float
+          nullable: true
+          description: Confidence score (0.0–1.0) for the best correlation attempt
         securityFindings:
           type: array
           items:

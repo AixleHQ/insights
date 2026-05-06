@@ -69,6 +69,11 @@ module Api
       def attribute
         authorize! @event, to: :attribute?
 
+        if @event.user_id.present?
+          render json: { error: "Event is already attributed to a user" }, status: :unprocessable_content
+          return
+        end
+
         user = current_organization.members.find(params[:user_id])
 
         @event.update!(
@@ -105,9 +110,12 @@ module Api
           return
         end
 
+        # Only update events that are still unattributed
+        unattributed_events = events.where(user_id: nil)
+
         updated = 0
         ToolEvent.transaction do
-          events.find_each do |ev|
+          unattributed_events.find_each do |ev|
             ev.update!(
               user_id: user.id,
               metadata: (ev.metadata || {}).merge(

@@ -8,6 +8,7 @@ import {
   RefreshCw,
   HelpCircle,
   CheckSquare,
+  SlidersHorizontal,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useOrg } from "@/contexts/OrgContext";
@@ -17,6 +18,7 @@ import {
   useAttributeEvent,
   useBulkAttributeEvents,
   queryKeys,
+  type UnattributedEventsParams,
 } from "@/hooks/useApi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,6 +74,30 @@ const CORRELATION_METHOD_LABELS: Record<string, string> = {
   manual: "Manual",
 };
 
+const TOOL_OPTIONS = [
+  "claude_code",
+  "cursor",
+  "windsurf",
+  "github_copilot",
+  "aider",
+  "continue",
+  "cody",
+  "tabnine",
+  "amazon_q",
+  "openrouter_api",
+  "anthropic_api",
+  "openai_api",
+  "gemini_api",
+];
+
+const MIN_CONFIDENCE_OPTIONS = [
+  { label: "Any", value: "" },
+  { label: "≥ 50%", value: "0.5" },
+  { label: "≥ 70%", value: "0.7" },
+  { label: "≥ 85%", value: "0.85" },
+  { label: "≥ 90%", value: "0.9" },
+];
+
 function EventSkeleton() {
   return (
     <TableRow>
@@ -114,7 +140,23 @@ export function UnattributedEvents() {
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  const { data: events, isLoading, isFetching } = useUnattributedEvents(currentOrg?.id || "");
+  // Server-side filters
+  const [toolFilter, setToolFilter] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [minConfidence, setMinConfidence] = useState("");
+
+  const apiParams: UnattributedEventsParams = {
+    toolName: toolFilter || undefined,
+    startDate: startDate || undefined,
+    endDate: endDate || undefined,
+    minConfidence: minConfidence ? parseFloat(minConfidence) : undefined,
+  };
+
+  const { data: events, isLoading, isFetching } = useUnattributedEvents(
+    currentOrg?.id || "",
+    apiParams
+  );
   const { data: members } = useOrganizationMembers(currentOrg?.id || "");
   const attributeEvent = useAttributeEvent(currentOrg?.id || "");
   const bulkAttributeEvents = useBulkAttributeEvents(currentOrg?.id || "");
@@ -269,6 +311,49 @@ export function UnattributedEvents() {
         </CardContent>
       </Card>
 
+      {/* Server-side filters */}
+      <div className="flex flex-wrap gap-3 items-end">
+        <div className="flex items-center gap-1.5 text-sm text-muted-foreground shrink-0">
+          <SlidersHorizontal className="size-4" />
+          Filters
+        </div>
+        <Select value={toolFilter} onValueChange={(v) => { setToolFilter(v === "all" ? "" : v); setSelectedIds(new Set()); }}>
+          <SelectTrigger className="w-44 h-8 text-sm">
+            <SelectValue placeholder="All tools" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All tools</SelectItem>
+            {TOOL_OPTIONS.map((t) => (
+              <SelectItem key={t} value={t}>{t.replace(/_/g, " ")}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Input
+          type="date"
+          value={startDate}
+          onChange={(e) => { setStartDate(e.target.value); setSelectedIds(new Set()); }}
+          className="w-36 h-8 text-sm"
+          aria-label="Start date"
+        />
+        <Input
+          type="date"
+          value={endDate}
+          onChange={(e) => { setEndDate(e.target.value); setSelectedIds(new Set()); }}
+          className="w-36 h-8 text-sm"
+          aria-label="End date"
+        />
+        <Select value={minConfidence} onValueChange={(v) => { setMinConfidence(v === "any" ? "" : v); setSelectedIds(new Set()); }}>
+          <SelectTrigger className="w-36 h-8 text-sm">
+            <SelectValue placeholder="Any confidence" />
+          </SelectTrigger>
+          <SelectContent>
+            {MIN_CONFIDENCE_OPTIONS.map((o) => (
+              <SelectItem key={o.value || "any"} value={o.value || "any"}>{o.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1 sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -349,7 +434,7 @@ export function UnattributedEvents() {
                   Time
                 </SortButton>
               </TableHead>
-              <TableHead className="w-[100px] sm:w-[140px]">Actions</TableHead>
+              <TableHead className="w-[120px] sm:w-[150px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -425,7 +510,7 @@ export function UnattributedEvents() {
                       onClick={() => openAssignDialog(event.id)}
                     >
                       <User className="mr-2 size-3" />
-                      Assign
+                      Assign to…
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -477,7 +562,7 @@ export function UnattributedEvents() {
                 ? "Assigning..."
                 : isBulkMode
                   ? `Assign ${selectedIds.size} Events`
-                  : "Assign Event"}
+                  : "Assign to…"}
             </Button>
           </DialogFooter>
         </DialogContent>

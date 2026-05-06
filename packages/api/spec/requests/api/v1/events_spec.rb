@@ -251,6 +251,17 @@ RSpec.describe 'Api::V1::Events', type: :request do
 
       expect_not_found
     end
+
+    it 'returns 422 when event is already attributed' do
+      attributed_event = create(:tool_event, organization: organization, user: user)
+
+      authenticated_post "/api/v1/organizations/#{organization.id}/events/#{attributed_event.id}/attribute",
+                         user: admin,
+                         organization: organization,
+                         params: { user_id: user.id }
+
+      expect(response).to have_http_status(:unprocessable_content)
+    end
   end
 
   describe 'POST /api/v1/organizations/:organization_id/events/attribute_bulk' do
@@ -280,12 +291,37 @@ RSpec.describe 'Api::V1::Events', type: :request do
       end
     end
 
-    it 'caps at 500 events (only first 500 are processed)' do
-      ids = Array.new(501) { SecureRandom.uuid }
-      existing_ids = unattributed_events.map(&:id)
-      # Pass more than 500 but all real IDs so count mismatch triggers first
-      # This test verifies the cap param slicing behaviour
-      expect(Array(ids).first(500).size).to eq(500)
+    it 'silently ignores event_ids beyond the 500 limit' do
+      # Build a 502-element list: 3 real IDs at the front, then 499 fake UUIDs.
+      # After first(500), the last 2 fake UUIDs are dropped. The 497 fake UUIDs
+      # in positions 3-499 cause a count mismatch → 422, proving the slice happened.
+      padded_ids = unattributed_events.map(&:id) +
+                   Array.new(499) { SecureRandom.uuid }   # 502 total
+      extra_id   = SecureRandom.uuid
+
+      authenticated_post bulk_attribute_path,
+                         user: admin,
+                         organization: organization,
+                         params: { event_ids: padded_ids + [ extra_id ], user_id: user.id }
+
+      # Count mismatch because fake UUIDs in positions 3–499 don't exist in the org.
+      # The key is the extra_id (position 502) was silently dropped before the DB check.
+      expect(response).to have_http_status(:unprocessable_content)
+      unattributed_events.each { |ev| expect(ev.reload.user_id).to be_nil }
+    end
+
+    it 'skips already-attributed events and returns updated count' do
+      attributed = create(:tool_event, organization: organization, user: user)
+      mixed_ids  = unattributed_events.map(&:id) + [ attributed.id ]
+
+      authenticated_post bulk_attribute_path,
+                         user: admin,
+                         organization: organization,
+                         params: { event_ids: mixed_ids, user_id: user.id }
+
+      expect_success
+      expect(json_data[:updated]).to eq(3)   # only the 3 unattributed ones
+      expect(attributed.reload.user_id).to eq(user.id)   # unchanged (already attributed)
     end
 
     it 'returns 403 for a non-admin member' do

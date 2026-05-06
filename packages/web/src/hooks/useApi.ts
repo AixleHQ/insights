@@ -1140,11 +1140,26 @@ export function useEventAuditTrail(orgId: string, id: string) {
   });
 }
 
-export function useUnattributedEvents(orgId: string) {
+export interface UnattributedEventsParams {
+  toolName?: string;
+  startDate?: string;
+  endDate?: string;
+  minConfidence?: number;
+}
+
+export function useUnattributedEvents(orgId: string, params?: UnattributedEventsParams) {
   return useQuery({
-    queryKey: queryKeys.events.unattributed(orgId),
+    queryKey: [...queryKeys.events.unattributed(orgId), params] as const,
     queryFn: async () => {
-      const response = await api.get<{ data: ToolEvent[] }>(`/organizations/${orgId}/events/unattributed`);
+      const query = new URLSearchParams();
+      if (params?.toolName) query.set("tool_name", params.toolName);
+      if (params?.startDate) query.set("start_date", params.startDate);
+      if (params?.endDate) query.set("end_date", params.endDate);
+      if (params?.minConfidence != null) query.set("min_confidence", String(params.minConfidence));
+      const qs = query.toString();
+      const response = await api.get<{ data: ToolEvent[] }>(
+        `/organizations/${orgId}/events/unattributed${qs ? `?${qs}` : ""}`
+      );
       return response.data;
     },
     enabled: !!orgId,
