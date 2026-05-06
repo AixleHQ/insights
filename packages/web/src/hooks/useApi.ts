@@ -1169,7 +1169,8 @@ export function useUnattributedEvents(
       const response = await api.get<{ data: ToolEvent[] }>(
         `/organizations/${orgId}/events/unattributed${qs ? `?${qs}` : ""}`
       );
-      return response.data;
+      const rows = response.data;
+      return Array.isArray(rows) ? rows : [];
     },
     enabled,
   });

@@ -100,6 +100,16 @@ const MIN_CONFIDENCE_OPTIONS = [
   { label: "≥ 90%", value: "0.9" },
 ];
 
+const ALLOWED_CONFIDENCE_VALUES = new Set(MIN_CONFIDENCE_OPTIONS.map((o) => o.value || "any"));
+
+function memberAssigneeId(m: {
+  userId?: string;
+  user_id?: string;
+  user?: { id?: string };
+}): string | undefined {
+  return m.userId ?? m.user_id ?? m.user?.id;
+}
+
 function EventSkeleton({ showAdminColumns }: { showAdminColumns: boolean }) {
   return (
     <TableRow>
@@ -190,7 +200,7 @@ export function UnattributedEvents() {
   };
 
   const filteredEvents = useMemo(() => {
-    if (!events) return [];
+    if (!events || !Array.isArray(events)) return [];
 
     let result = [...events];
 
@@ -292,6 +302,14 @@ export function UnattributedEvents() {
   );
 
   const tableColumnCount = canManageAttribution ? 8 : 6;
+
+  const toolSelectValue =
+    toolFilter && TOOL_OPTIONS.includes(toolFilter) ? toolFilter : "all";
+
+  const confidenceSelectValue =
+    minConfidence && ALLOWED_CONFIDENCE_VALUES.has(minConfidence)
+      ? minConfidence
+      : "any";
 
   if (permissionLoading) {
     return (
@@ -400,7 +418,13 @@ export function UnattributedEvents() {
           <SlidersHorizontal className="size-4" />
           Filters
         </div>
-        <Select value={toolFilter} onValueChange={(v) => { setToolFilter(v === "all" ? "" : v); setSelectedIds(new Set()); }}>
+        <Select
+          value={toolSelectValue}
+          onValueChange={(v) => {
+            setToolFilter(v === "all" ? "" : v);
+            setSelectedIds(new Set());
+          }}
+        >
           <SelectTrigger className="w-44 h-8 text-sm">
             <SelectValue placeholder="All tools" />
           </SelectTrigger>
@@ -425,7 +449,13 @@ export function UnattributedEvents() {
           className="w-36 h-8 text-sm"
           aria-label="End date"
         />
-        <Select value={minConfidence} onValueChange={(v) => { setMinConfidence(v === "any" ? "" : v); setSelectedIds(new Set()); }}>
+        <Select
+          value={confidenceSelectValue}
+          onValueChange={(v) => {
+            setMinConfidence(v === "any" ? "" : v);
+            setSelectedIds(new Set());
+          }}
+        >
           <SelectTrigger className="w-36 h-8 text-sm">
             <SelectValue placeholder="Any confidence" />
           </SelectTrigger>
@@ -583,7 +613,7 @@ export function UnattributedEvents() {
                         </Badge>
                         {event.correlationConfidence != null && (
                           <span className="text-xs text-muted-foreground">
-                            {Math.round(event.correlationConfidence * 100)}% confidence
+                            {Math.round(Number(event.correlationConfidence) * 100)}% confidence
                           </span>
                         )}
                       </div>
@@ -628,21 +658,26 @@ export function UnattributedEvents() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+            <Select
+              value={selectedUserId || undefined}
+              onValueChange={setSelectedUserId}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Select a team member" />
               </SelectTrigger>
               <SelectContent>
-                {members?.map((member) => (
-                  <SelectItem key={member.id} value={member.user_id}>
-                    <div className="flex items-center gap-2">
-                      <span>{member.user.name || member.user.email}</span>
-                      {member.user.name && (
-                        <span className="text-muted-foreground">({member.user.email})</span>
-                      )}
-                    </div>
-                  </SelectItem>
-                ))}
+                {members?.flatMap((member) => {
+                  const uid = memberAssigneeId(member);
+                  if (!uid) return [];
+                  const label = member.user?.name
+                    ? `${member.user.name} (${member.user.email ?? uid})`
+                    : (member.user?.email ?? uid);
+                  return [
+                    <SelectItem key={member.id} value={uid}>
+                      {label}
+                    </SelectItem>,
+                  ];
+                })}
               </SelectContent>
             </Select>
           </div>

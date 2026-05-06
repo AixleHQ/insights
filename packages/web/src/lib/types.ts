@@ -47,7 +47,9 @@ export interface OrganizationWithStats extends Organization {
 // Organization member types
 export interface OrganizationMember {
   id: string;
-  user_id: string;
+  /** API JSON uses camelCase (`userId`). */
+  userId?: string;
+  user_id?: string;
   organization_id: string;
   role: "owner" | "admin" | "member" | "viewer";
   user: User;
