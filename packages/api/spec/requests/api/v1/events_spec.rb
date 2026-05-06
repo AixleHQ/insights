@@ -156,16 +156,27 @@ RSpec.describe 'Api::V1::Events', type: :request do
   end
 
   describe 'GET /api/v1/organizations/:organization_id/events/unattributed' do
-    it 'returns events without user attribution' do
+    let(:admin) { create(:user) }
+    let!(:admin_membership) { create(:organization_membership, user: admin, organization: organization, role: 'admin') }
+
+    it 'returns events without user attribution for an admin' do
       unattributed_event = create(:tool_event, organization: organization, user: nil)
 
       authenticated_get "/api/v1/organizations/#{organization.id}/events/unattributed",
-                        user: user,
+                        user: admin,
                         organization: organization
 
       expect_success
       expect(json_data.map { |e| e[:id] }).to include(unattributed_event.id)
       expect(json_data.map { |e| e[:id] }).not_to include(tool_event.id)
+    end
+
+    it 'returns 403 for a plain member' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/events/unattributed",
+                        user: user,
+                        organization: organization
+
+      expect_forbidden
     end
 
     it 'includes correlation_method and correlation_confidence from metadata' do
@@ -175,7 +186,7 @@ RSpec.describe 'Api::V1::Events', type: :request do
                                   metadata: { "correlation_method" => "machine_id", "correlation_confidence" => 0.7 })
 
       authenticated_get "/api/v1/organizations/#{organization.id}/events/unattributed",
-                        user: user,
+                        user: admin,
                         organization: organization
 
       expect_success
@@ -191,7 +202,7 @@ RSpec.describe 'Api::V1::Events', type: :request do
                                metadata: { "correlation_confidence" => 0.85 })
 
       authenticated_get "/api/v1/organizations/#{organization.id}/events/unattributed",
-                        user: user,
+                        user: admin,
                         organization: organization,
                         params: { min_confidence: 0.8 }
 

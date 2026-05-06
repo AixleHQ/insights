@@ -51,7 +51,7 @@ module Api
 
       # GET /api/v1/organizations/:organization_id/events/unattributed
       def unattributed
-        authorize! current_organization, to: :show?
+        authorize! current_organization, to: :list_unattributed?
 
         events = current_organization.tool_events.where(user_id: nil)
         events = apply_filters(events)

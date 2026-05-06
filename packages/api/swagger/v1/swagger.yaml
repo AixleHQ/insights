@@ -2517,7 +2517,7 @@ paths:
     get:
       summary: List unattributed events
       description: >
-        Returns events with no assigned user (user_id is null). Used for the attribution assignment UI.
+        Returns events with no assigned user (user_id is null). Restricted to org admins and above.
         Each event includes correlation_method and correlation_confidence from metadata (populated by
         AttributionJob when a candidate was found but below the confidence threshold).
       tags:

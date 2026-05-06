@@ -131,6 +131,7 @@ function EventSkeleton() {
 
 export function UnattributedEvents() {
   const { currentOrg } = useOrg();
+  const isAdmin = ["owner", "admin"].includes(currentOrg?.user_role ?? "");
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [sortField, setSortField] = useState<UnattributedSortField>("created_at");
@@ -368,7 +369,7 @@ export function UnattributedEvents() {
           <UserX className="size-3" />
           {events?.length || 0} unattributed
         </Badge>
-        {selectedIds.size > 0 && (
+        {isAdmin && selectedIds.size > 0 && (
           <Button
             size="sm"
             onClick={() => openAssignDialog(null)}
@@ -384,14 +385,16 @@ export function UnattributedEvents() {
         <Table className="min-w-[750px]">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-10">
-                <Checkbox
-                  checked={allFilteredSelected}
-                  onCheckedChange={handleSelectAll}
-                  aria-label="Select all"
-                  disabled={filteredEvents.length === 0}
-                />
-              </TableHead>
+              {isAdmin && (
+                <TableHead className="w-10">
+                  <Checkbox
+                    checked={allFilteredSelected}
+                    onCheckedChange={handleSelectAll}
+                    aria-label="Select all"
+                    disabled={filteredEvents.length === 0}
+                  />
+                </TableHead>
+              )}
               <TableHead>
                 <SortButton
                   field="tool_name"
@@ -442,7 +445,7 @@ export function UnattributedEvents() {
               Array.from({ length: 5 }).map((_, i) => <EventSkeleton key={i} />)
             ) : filteredEvents.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-24 text-center">
+                <TableCell colSpan={isAdmin ? 8 : 7} className="h-24 text-center">
                   <div className="flex flex-col items-center gap-2">
                     <User className="size-8 text-muted-foreground" />
                     <p className="text-muted-foreground">
@@ -457,13 +460,15 @@ export function UnattributedEvents() {
                   key={event.id}
                   data-state={selectedIds.has(event.id) ? "selected" : undefined}
                 >
-                  <TableCell>
-                    <Checkbox
-                      checked={selectedIds.has(event.id)}
-                      onCheckedChange={() => handleToggleSelect(event.id)}
-                      aria-label={`Select event ${event.id}`}
-                    />
-                  </TableCell>
+                  {isAdmin && (
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIds.has(event.id)}
+                        onCheckedChange={() => handleToggleSelect(event.id)}
+                        aria-label={`Select event ${event.id}`}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell>
                     <div>
                       <p className="font-medium">{event.toolName || "Unknown"}</p>
@@ -503,16 +508,18 @@ export function UnattributedEvents() {
                   <TableCell className="text-sm text-muted-foreground">
                     {formatDistanceToNow(event.occurredAt || event.createdAt)}
                   </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openAssignDialog(event.id)}
-                    >
-                      <User className="mr-2 size-3" />
-                      Assign to…
-                    </Button>
-                  </TableCell>
+                  {isAdmin && (
+                    <TableCell>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openAssignDialog(event.id)}
+                      >
+                        <User className="mr-2 size-3" />
+                        Assign to…
+                      </Button>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))
             )}

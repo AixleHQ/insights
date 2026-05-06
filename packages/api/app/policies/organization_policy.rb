@@ -41,6 +41,11 @@ class OrganizationPolicy < ApplicationPolicy
     org_member?(record) || global_admin?
   end
 
+  # Only admins can view the unattributed event queue
+  def list_unattributed?
+    org_admin?(record) || global_admin?
+  end
+
   # Only admins can bulk-attribute events
   def attribute_bulk?
     org_admin?(record) || global_admin?
