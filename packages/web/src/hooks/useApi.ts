@@ -752,6 +752,13 @@ export function useConnectors(orgId: string) {
       return response.data;
     },
     enabled: !!orgId,
+    // POST /sync returns before the Sidekiq job finishes; status stays "testing" until mark_synced!.
+    // Poll so /integrations/connected updates when the job completes (or errors).
+    refetchInterval: (query) => {
+      const data = query.state.data as Connector[] | undefined;
+      if (!data?.length) return false;
+      return data.some((c) => c.status === "testing") ? 3_000 : false;
+    },
   });
 }
 
