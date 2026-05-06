@@ -81,4 +81,19 @@ RSpec.describe OrganizationPolicy, type: :policy do
       expect(policy(organization, current_user: member).apply(:retention_policy?)).to be false
     end
   end
+
+  describe '#list_unattributed?' do
+    it 'allows owners and admins' do
+      expect(policy(organization, current_user: owner).apply(:list_unattributed?)).to be true
+      expect(policy(organization, current_user: admin).apply(:list_unattributed?)).to be true
+    end
+
+    it 'denies regular members' do
+      expect(policy(organization, current_user: member).apply(:list_unattributed?)).to be false
+    end
+
+    it 'allows global admins' do
+      expect(policy(organization, current_user: global_admin).apply(:list_unattributed?)).to be true
+    end
+  end
 end

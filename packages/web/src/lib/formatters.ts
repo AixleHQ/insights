@@ -1,13 +1,14 @@
-export function formatCost(n: number): string {
-  if (n === 0) return "$0.00";
-  if (n < 0.001) return `$${n.toFixed(6)}`;
-  if (n < 0.01) return `$${n.toFixed(4)}`;
+export function formatCost(n: number | string | null | undefined): string {
+  const num = typeof n === "number" ? n : Number(n);
+  if (!Number.isFinite(num) || num === 0) return "$0.00";
+  if (num < 0.001) return `$${num.toFixed(6)}`;
+  if (num < 0.01) return `$${num.toFixed(4)}`;
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(n);
+  }).format(num);
 }
 
 export function formatTokens(n: number): string {

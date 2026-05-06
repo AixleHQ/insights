@@ -17,6 +17,10 @@ describe("formatCost", () => {
   it("returns US locale currency for normal amounts", () => {
     expect(formatCost(1234.56)).toBe("$1,234.56");
   });
+
+  it("coerces string amounts from JSON", () => {
+    expect(formatCost("12.34")).toBe("$12.34");
+  });
 });
 
 describe("formatTokens", () => {

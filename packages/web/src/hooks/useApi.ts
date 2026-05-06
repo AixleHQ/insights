@@ -362,14 +362,18 @@ export function useDeleteProjectSetting() {
 // Organization Members Hooks
 // ============================================================================
 
-export function useOrganizationMembers(orgId: string) {
+export function useOrganizationMembers(
+  orgId: string,
+  options?: { enabled?: boolean }
+) {
+  const enabled = (options?.enabled ?? true) && !!orgId;
   return useQuery({
     queryKey: queryKeys.members.all(orgId),
     queryFn: async () => {
       const response = await api.get<{ data: OrganizationMember[] }>(`/organizations/${orgId}/members`);
       return response.data;
     },
-    enabled: !!orgId,
+    enabled,
   });
 }
 
@@ -1140,14 +1144,57 @@ export function useEventAuditTrail(orgId: string, id: string) {
   });
 }
 
-export function useUnattributedEvents(orgId: string) {
+export interface UnattributedEventsParams {
+  toolName?: string;
+  startDate?: string;
+  endDate?: string;
+  minConfidence?: number;
+}
+
+export function useUnattributedEvents(
+  orgId: string,
+  params?: UnattributedEventsParams,
+  options?: { enabled?: boolean }
+) {
+  const enabled = (options?.enabled ?? true) && !!orgId;
   return useQuery({
-    queryKey: queryKeys.events.unattributed(orgId),
+    queryKey: [...queryKeys.events.unattributed(orgId), params] as const,
     queryFn: async () => {
-      const response = await api.get<{ data: ToolEvent[] }>(`/organizations/${orgId}/events/unattributed`);
-      return response.data;
+      const query = new URLSearchParams();
+      if (params?.toolName) query.set("tool_name", params.toolName);
+      if (params?.startDate) query.set("start_date", params.startDate);
+      if (params?.endDate) query.set("end_date", params.endDate);
+      if (params?.minConfidence != null) query.set("min_confidence", String(params.minConfidence));
+      const qs = query.toString();
+      const response = await api.get<{ data: ToolEvent[] }>(
+        `/organizations/${orgId}/events/unattributed${qs ? `?${qs}` : ""}`
+      );
+      const rows = response.data;
+      return Array.isArray(rows) ? rows : [];
     },
-    enabled: !!orgId,
+    enabled,
+  });
+}
+
+export function useAttributeEvent(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ eventId, userId }: { eventId: string; userId: string }) =>
+      api.post(`/organizations/${orgId}/events/${eventId}/attribute`, { user_id: userId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.events.unattributed(orgId) });
+    },
+  });
+}
+
+export function useBulkAttributeEvents(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ eventIds, userId }: { eventIds: string[]; userId: string }) =>
+      api.post(`/organizations/${orgId}/events/attribute_bulk`, { event_ids: eventIds, user_id: userId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.events.unattributed(orgId) });
+    },
   });
 }
 

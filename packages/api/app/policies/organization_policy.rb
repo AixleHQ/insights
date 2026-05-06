@@ -41,6 +41,14 @@ class OrganizationPolicy < ApplicationPolicy
     org_member?(record) || global_admin?
   end
 
+  def list_unattributed?
+    org_admin?(record) || global_admin?
+  end
+
+  def attribute_bulk?
+    org_admin?(record) || global_admin?
+  end
+
   relation_scope do |scope|
     if global_admin?
       scope.all

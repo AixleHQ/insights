@@ -35,5 +35,13 @@ module ToolEventAttributes
     attribute :security_findings do |_event|
       []
     end
+
+    attribute :correlation_method do |event|
+      event.metadata&.dig("correlation_method")
+    end
+
+    attribute :correlation_confidence do |event|
+      event.metadata&.dig("correlation_confidence")
+    end
   end
 end

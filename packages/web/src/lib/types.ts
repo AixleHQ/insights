@@ -11,7 +11,10 @@ export interface User {
   name: string | null;
   avatarUrl: string | null;
   role: "admin" | "member" | "viewer";
-  super_admin: boolean;
+  /** Platform-wide admin (API key `global_admin`, Alba camelCase `globalAdmin`). */
+  globalAdmin?: boolean;
+  /** Alternate naming used in some mocks / legacy code paths. */
+  super_admin?: boolean;
   created_at: string;
   updated_at: string;
   lastSignInAt: string | null;
@@ -44,7 +47,9 @@ export interface OrganizationWithStats extends Organization {
 // Organization member types
 export interface OrganizationMember {
   id: string;
-  user_id: string;
+  /** API JSON uses camelCase (`userId`). */
+  userId?: string;
+  user_id?: string;
   organization_id: string;
   role: "owner" | "admin" | "member" | "viewer";
   user: User;
@@ -211,6 +216,8 @@ export interface ToolEvent {
   project: { id: string; name: string } | null;
   createdAt: string;
   occurredAt: string;
+  correlationMethod?: string | null;
+  correlationConfidence?: number | null;
   // Detail-only fields (returned by the show endpoint, not the list endpoint)
   sanitizedContent?: string | null;
   metadata?: Record<string, unknown> | null;

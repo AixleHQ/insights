@@ -6,7 +6,7 @@ module Api
       include ToolEventFilterable
 
       before_action :require_organization!
-      before_action :set_event, only: %i[show audit_trail]
+      before_action :set_event, only: %i[show audit_trail attribute]
 
       EXPORT_ROW_CAP = 100_000
 
@@ -51,13 +51,82 @@ module Api
 
       # GET /api/v1/organizations/:organization_id/events/unattributed
       def unattributed
-        authorize! current_organization, to: :show?
+        authorize! current_organization, to: :list_unattributed?
 
         events = current_organization.tool_events.where(user_id: nil)
         events = apply_filters(events)
+
+        if params[:min_confidence].present?
+          events = events.where("(metadata->>'correlation_confidence')::float >= ?", params[:min_confidence].to_f)
+        end
+
         events = events.includes(:project).order(occurred_at: :desc)
 
         render_collection(events, ToolEventSerializer)
+      end
+
+      # POST /api/v1/organizations/:organization_id/events/:id/attribute
+      def attribute
+        authorize! @event, to: :attribute?
+
+        if @event.user_id.present?
+          render json: { error: "Event is already attributed to a user" }, status: :unprocessable_content
+          return
+        end
+
+        user = current_organization.members.find(params[:user_id])
+
+        @event.update!(
+          user_id: user.id,
+          metadata: (@event.metadata || {}).merge(
+            "correlation_method" => "manual",
+            "correlation_confidence" => 1.0
+          )
+        )
+
+        OrganizationAuditLog.log(
+          organization: current_organization,
+          actor: current_user,
+          action: "event.attribute",
+          resource: @event,
+          tracked_changes: { user_id: { before: nil, after: user.id } },
+          request: request
+        )
+
+        render_resource(@event, ToolEventSerializer)
+      end
+
+      # POST /api/v1/organizations/:organization_id/events/attribute_bulk
+      def attribute_bulk
+        authorize! current_organization, to: :attribute_bulk?
+
+        event_ids = Array(params[:event_ids]).first(500)
+        user = current_organization.members.find(params[:user_id])
+
+        events = current_organization.tool_events.where(id: event_ids)
+
+        if events.count != event_ids.uniq.size
+          render json: { error: "One or more events not found in this organization" }, status: :unprocessable_content
+          return
+        end
+
+        updated = current_organization.tool_events
+          .where(id: event_ids, user_id: nil)
+          .update_all([
+            "user_id = ?, metadata = COALESCE(metadata, '{}'::jsonb) || ?::jsonb",
+            user.id,
+            '{"correlation_method":"manual","correlation_confidence":1.0}'
+          ])
+
+        OrganizationAuditLog.log(
+          organization: current_organization,
+          actor: current_user,
+          action: "event.attribute_bulk",
+          tracked_changes: { user_id: user.id, event_count: updated },
+          request: request
+        )
+
+        render json: { data: { updated: updated } }
       end
 
       # GET /api/v1/organizations/:organization_id/events/:id/audit_trail

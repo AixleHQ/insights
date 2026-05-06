@@ -303,6 +303,21 @@ function PolicySettings() {
     newLabel: string;
   } | null>(null);
 
+  const [confidenceError, setConfidenceError] = useState("");
+
+  const getSetting = (key: string) =>
+    (settings as { data: Array<{ key: string; value: string }> })?.data?.find(
+      (s) => s.key === key
+    )?.value;
+
+  const savedConfidence = getSetting("min_attribution_confidence");
+  const [prevSavedConfidence, setPrevSavedConfidence] = useState(savedConfidence);
+  const [confidenceInput, setConfidenceInput] = useState(savedConfidence ?? "0.7");
+  if (prevSavedConfidence !== savedConfidence && savedConfidence !== undefined) {
+    setPrevSavedConfidence(savedConfidence);
+    setConfidenceInput(savedConfidence);
+  }
+
   // Parse settings from API or use defaults
   const policies = {
     sanitizeApiKeys: (settings as Record<string, boolean>)?.sanitize_api_keys ?? true,
@@ -326,6 +341,25 @@ function PolicySettings() {
       });
     } catch (error) {
       console.error("Failed to update setting:", error);
+    }
+  };
+
+  const handleConfidenceSave = async () => {
+    if (!currentOrg) return;
+    const val = parseFloat(confidenceInput);
+    if (isNaN(val) || val < 0 || val > 1) {
+      setConfidenceError("Must be a number between 0.0 and 1.0");
+      return;
+    }
+    setConfidenceError("");
+    try {
+      await updateSetting.mutateAsync({
+        orgId: currentOrg.id,
+        key: "min_attribution_confidence",
+        value: val,
+      });
+    } catch (error) {
+      console.error("Failed to update attribution confidence:", error);
     }
   };
 
@@ -579,6 +613,56 @@ function PolicySettings() {
               checked={policies.requireReview}
               onCheckedChange={() => togglePolicy("requireReview")}
             />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Event Attribution</CardTitle>
+          <CardDescription>
+            Configure the automatic attribution confidence threshold for this organisation
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="min-attribution-confidence">
+              Minimum attribution confidence
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Events where the best correlation candidate scores below this threshold
+              are left unattributed for manual review. Default: 0.7. Range: 0.0 – 1.0.
+            </p>
+            <div className="flex items-center gap-2">
+              <Input
+                id="min-attribution-confidence"
+                type="number"
+                min={0}
+                max={1}
+                step={0.05}
+                value={confidenceInput}
+                onChange={(e) => {
+                  setConfidenceInput(e.target.value);
+                  setConfidenceError("");
+                }}
+                className="w-28"
+              />
+              <Button
+                size="sm"
+                onClick={handleConfidenceSave}
+                disabled={updateSetting.isPending}
+              >
+                {updateSetting.isPending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Save className="mr-2 size-4" />
+                )}
+                Save
+              </Button>
+            </div>
+            {confidenceError && (
+              <p className="text-xs text-destructive">{confidenceError}</p>
+            )}
           </div>
         </CardContent>
       </Card>
