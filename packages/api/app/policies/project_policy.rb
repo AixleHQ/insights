@@ -60,6 +60,10 @@ class ProjectPolicy < ApplicationPolicy
     update?
   end
 
+  def sync_issues?
+    update?
+  end
+
   # Only project admins/owners can view audit logs
   def audit_logs?
     return true if global_admin?

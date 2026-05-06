@@ -127,6 +127,12 @@ Rails.application.routes.draw do
         end
       end
 
+      # OpenRouter Broadcast Webhook — receives OTLP per-request traces.
+      # Each connector gets a unique webhook_token embedded in the URL for routing.
+      # Public endpoint: no Keycloak JWT required.
+      # Must be declared before the wildcard webhooks route.
+      post "webhooks/openrouter_traces/:webhook_token", to: "openrouter_traces#receive"
+
       # Webhooks (outside organization scope, uses connector_id)
       post "webhooks/:provider/:connector_id", to: "webhooks#receive"
 

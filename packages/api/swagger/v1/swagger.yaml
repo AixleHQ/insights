@@ -3138,6 +3138,112 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  # ============================================
+  # OPENROUTER WEBHOOK
+  # ============================================
+  /api/v1/webhooks/openrouter_traces:
+    post:
+      summary: Receive OpenRouter Broadcast Webhook OTLP traces
+      description: |
+        Public endpoint that receives per-request telemetry from OpenRouter's
+        Broadcast Webhook feature (Settings > Observability > Webhook).
+
+        OpenRouter sends an OTLP JSON payload after each API call made through a
+        connected account. The connector is resolved via the SHA-256 hash of the
+        API key embedded as a span attribute (`openrouter.api_key_hash`).
+
+        Optional HMAC verification: if `connector.webhook_secret` is set, the
+        request must include a matching `X-Openrouter-Signature` header
+        (HMAC-SHA256 of the raw body).
+
+        Returns 200 for test-connection requests (`X-Test-Connection: true`),
+        202 for accepted payloads, and 200 when the connector is not found
+        (to prevent OpenRouter from retrying unknown-account payloads).
+      tags:
+        - Webhooks
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: OTLP resourceSpans envelope
+              properties:
+                resourceSpans:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      resource:
+                        type: object
+                      scopeSpans:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            spans:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  traceId:
+                                    type: string
+                                  spanId:
+                                    type: string
+                                  name:
+                                    type: string
+                                  startTimeUnixNano:
+                                    type: string
+                                  endTimeUnixNano:
+                                    type: string
+                                  attributes:
+                                    type: array
+                                    items:
+                                      type: object
+                                      properties:
+                                        key:
+                                          type: string
+                                        value:
+                                          type: object
+      responses:
+        '200':
+          description: Test connection acknowledged or connector not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received:
+                    type: boolean
+        '202':
+          description: Trace accepted and queued for processing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received:
+                    type: boolean
+        '400':
+          description: Invalid JSON payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid HMAC signature
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unexpected server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /api/v1/integrations/mcp/exchange:
     post:
       summary: Exchange OIDC session for an MCP ingest token

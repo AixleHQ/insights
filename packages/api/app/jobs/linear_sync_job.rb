@@ -36,6 +36,7 @@ class LinearSyncJob < ApplicationJob
   rescue ActiveRecord::RecordNotFound
     Rails.logger.error("[LinearSyncJob] Connector #{connector_id} not found")
   rescue StandardError => e
+    @connector&.mark_error!(e.message)
     Rails.logger.error("[LinearSyncJob] Failed: #{e.message}")
     raise
   end

@@ -26,6 +26,10 @@ function formatPerMillion(n: number | null): string {
   return `$${n.toFixed(2)}`;
 }
 
+function modelLabel(model: ToolModelStat): string {
+  return model.displayName || model.name;
+}
+
 function SortButton({
   label,
   sortKey,
@@ -135,7 +139,7 @@ export function ToolModelTable({ models, isLoading }: ToolModelTableProps) {
           ) : (
             sorted.map((row) => (
               <TableRow key={row.name}>
-                <TableCell className="font-medium font-mono text-sm">{row.name}</TableCell>
+                <TableCell className="font-medium font-mono text-sm">{modelLabel(row)}</TableCell>
                 <TableCell className="text-right font-mono text-sm">
                   {row.eventCount.toLocaleString()}
                 </TableCell>

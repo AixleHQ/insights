@@ -63,4 +63,16 @@ class OrganizationConnectorSerializer < BaseSerializer
   attribute :last_event_at do |connector|
     connector.synced_event_last_occurred_at&.iso8601
   end
+
+  attribute :webhook_active do |connector|
+    connector.webhook_active?
+  end
+
+  attribute :webhook_token do |connector|
+    connector.webhook_token if connector.openrouter?
+  end
+
+  attribute :webhook_secret_set do |connector|
+    connector.webhook_secret.present? if connector.openrouter?
+  end
 end

@@ -1180,13 +1180,6 @@ ALTER SEQUENCE public.connector_event_dedup_id_seq OWNED BY public.connector_eve
 
 
 --
--- Name: connector_event_dedup id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.connector_event_dedup ALTER COLUMN id SET DEFAULT nextval('public.connector_event_dedup_id_seq'::regclass);
-
-
---
 -- Name: invitations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1282,7 +1275,9 @@ CREATE TABLE public.organization_connectors (
     external_account_id character varying,
     external_account_name character varying,
     status character varying DEFAULT 'connected'::character varying NOT NULL,
-    pending_activity_jobs integer
+    pending_activity_jobs integer,
+    webhook_active boolean DEFAULT false NOT NULL,
+    webhook_token character varying
 );
 
 
@@ -2090,6 +2085,13 @@ ALTER TABLE ONLY _timescaledb_internal._hyper_1_1406_chunk ALTER COLUMN metadata
 --
 
 ALTER TABLE ONLY _timescaledb_internal._hyper_1_1406_chunk ALTER COLUMN created_at SET DEFAULT now();
+
+
+--
+-- Name: connector_event_dedup id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_event_dedup ALTER COLUMN id SET DEFAULT nextval('public.connector_event_dedup_id_seq'::regclass);
 
 
 --
@@ -3003,6 +3005,13 @@ CREATE UNIQUE INDEX idx_on_organization_id_connector_type_ebd5fb8c77 ON public.o
 
 
 --
+-- Name: idx_organization_connectors_webhook_token; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_organization_connectors_webhook_token ON public.organization_connectors USING btree (webhook_token) WHERE (webhook_token IS NOT NULL);
+
+
+--
 -- Name: idx_repositories_connector_external; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3490,6 +3499,13 @@ CREATE UNIQUE INDEX index_users_on_email ON public.users USING btree (email);
 --
 
 CREATE UNIQUE INDEX index_users_on_keycloak_sub ON public.users USING btree (keycloak_sub);
+
+
+--
+-- Name: idx_tool_events_external_id; Type: INDEX; Schema: timeseries; Owner: -
+--
+
+CREATE INDEX idx_tool_events_external_id ON timeseries.tool_events USING btree (organization_id, ((metadata ->> 'external_id'::text))) WHERE ((metadata ->> 'external_id'::text) IS NOT NULL);
 
 
 --
@@ -4141,6 +4157,10 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260504140050'),
+('20260504135022'),
+('20260504125319'),
+('20260504121614'),
 ('20260504082100'),
 ('20260502155716'),
 ('20260502121500'),

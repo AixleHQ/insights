@@ -19,7 +19,8 @@ class JwtAuth
   ].freeze
 
   EXCLUDED_PATTERNS = [
-    /\A\/api\/v1\/invitations\/(?!check\z)[^\/]+\z/
+    /\A\/api\/v1\/invitations\/(?!check\z)[^\/]+\z/,
+    /\A\/api\/v1\/webhooks\/openrouter_traces\/[^\/]+\z/
   ].freeze
 
   def initialize(app)

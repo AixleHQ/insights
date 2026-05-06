@@ -331,7 +331,7 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
                          organization: organization
 
       expect_success
-      expect(connector.reload.last_sync_at).to be_present
+      expect(connector.reload.status).to eq('testing')
       expect(GithubSyncJob).to have_received(:perform_later).with(connector.id)
     end
   end

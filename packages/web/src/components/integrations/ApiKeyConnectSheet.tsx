@@ -10,10 +10,12 @@ import {
   SheetDescription,
   SheetFooter,
 } from "@/components/ui/sheet";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ProviderLogo } from "@/components/icons";
+import { Zap } from "lucide-react";
 import type { ProviderInfo } from "./IntegrationCard";
 
 interface ApiKeyConnectSheetProps {
@@ -38,6 +40,7 @@ export function ApiKeyConnectSheet({
   const [apiKey, setApiKey] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isOpenRouter = provider?.id === "openrouter";
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
@@ -108,10 +111,28 @@ export function ApiKeyConnectSheet({
               onChange={(e) => setApiKey(e.target.value)}
               autoComplete="off"
             />
+            {isOpenRouter && (
+              <p className="text-sm text-muted-foreground">
+                Use an OpenRouter management key for usage sync. Standard API keys can proxy model
+                requests, but they cannot fetch activity data for the dashboard.
+              </p>
+            )}
             {error && (
               <p className="text-sm text-destructive">{error}</p>
             )}
           </div>
+
+          {isOpenRouter && (
+            <Alert>
+              <Zap className="size-4" />
+              <AlertTitle>Enable per-request tracking</AlertTitle>
+              <AlertDescription>
+                After connecting, use <strong>Setup webhook</strong> from the
+                integration menu to get a unique webhook URL and configure
+                real-time per-request tracking in OpenRouter.
+              </AlertDescription>
+            </Alert>
+          )}
         </form>
 
         <SheetFooter>

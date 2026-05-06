@@ -60,10 +60,10 @@ RSpec.describe ToolEvent, type: :model do
         expect(event.tokens_total).to eq(300)
       end
 
-      it 'does not override existing tokens_total' do
+      it 'recalculates tokens_total from the current token fields' do
         event = build(:tool_event, tokens_in: 100, tokens_out: 200, tokens_total: 500)
         event.valid?
-        expect(event.tokens_total).to eq(500)
+        expect(event.tokens_total).to eq(300)
       end
 
       it 'handles nil values' do
@@ -136,23 +136,27 @@ RSpec.describe ToolEvent, type: :model do
 
   describe '.total_tokens_in_range' do
     it 'returns the sum of tokens in the range' do
-      create(:tool_event, occurred_at: 1.day.ago, tokens_total: 100)
-      create(:tool_event, occurred_at: 1.day.ago, tokens_total: 200)
-      create(:tool_event, occurred_at: 1.week.ago, tokens_total: 1000)
+      travel_to Time.zone.parse("2030-01-15 12:00:00 UTC") do
+        create(:tool_event, occurred_at: 2.hours.ago, tokens_in: 40, tokens_out: 60)
+        create(:tool_event, occurred_at: 1.hour.ago, tokens_in: 80, tokens_out: 120)
+        create(:tool_event, occurred_at: 2.days.ago, tokens_in: 400, tokens_out: 600)
 
-      total = ToolEvent.total_tokens_in_range(2.days.ago, Time.current)
-      expect(total).to eq(300)
+        total = ToolEvent.total_tokens_in_range(3.hours.ago, Time.current)
+        expect(total).to eq(300)
+      end
     end
   end
 
   describe '.total_cost_in_range' do
     it 'returns the sum of cost in the range' do
-      create(:tool_event, occurred_at: 1.day.ago, cost_usd: 0.01)
-      create(:tool_event, occurred_at: 1.day.ago, cost_usd: 0.02)
-      create(:tool_event, occurred_at: 1.week.ago, cost_usd: 1.00)
+      travel_to Time.zone.parse("2030-01-15 12:00:00 UTC") do
+        create(:tool_event, occurred_at: 2.hours.ago, cost_usd: 0.01)
+        create(:tool_event, occurred_at: 1.hour.ago, cost_usd: 0.02)
+        create(:tool_event, occurred_at: 2.days.ago, cost_usd: 1.00)
 
-      total = ToolEvent.total_cost_in_range(2.days.ago, Time.current)
-      expect(total).to eq(0.03)
+        total = ToolEvent.total_cost_in_range(3.hours.ago, Time.current)
+        expect(total).to eq(0.03)
+      end
     end
   end
 end

@@ -321,7 +321,7 @@ module Api
       # Enqueues the issue sync job and returns 202 immediately. Clients should
       # poll the connector's last_synced_at to detect when the sync completes.
       def sync_issues
-        authorize! @project, to: :update?
+        authorize! @project, to: :sync_issues?
 
         jira_connector_id = @project.project_settings.find_by(key: "jira_connector_id")&.value
         linear_connector_id = @project.project_settings.find_by(key: "linear_connector_id")&.value
@@ -383,7 +383,7 @@ module Api
       private
 
       def set_project
-        @project = Project.includes(:retention_policy, :project_settings).find(params[:id])
+        @project = Project.includes(:retention_policy, :project_settings, :issues).find(params[:id])
       end
 
       def project_params

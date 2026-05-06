@@ -5,7 +5,10 @@ import type { ToolModelStat } from "@/lib/types";
 
 const mockModels: ToolModelStat[] = [
   {
-    name: "gpt-4o",
+    name: "openai/gpt-4o",
+    provider: "openai",
+    model: "gpt-4o",
+    displayName: "openai/gpt-4o",
     eventCount: 200,
     tokensIn: 80000,
     tokensOut: 20000,
@@ -14,7 +17,10 @@ const mockModels: ToolModelStat[] = [
     price_per_million_output: 15.0,
   },
   {
-    name: "gpt-3.5-turbo",
+    name: "openai/gpt-3.5-turbo",
+    provider: "openai",
+    model: "gpt-3.5-turbo",
+    displayName: "openai/gpt-3.5-turbo",
     eventCount: 500,
     tokensIn: 150000,
     tokensOut: 50000,
@@ -23,7 +29,10 @@ const mockModels: ToolModelStat[] = [
     price_per_million_output: 1.5,
   },
   {
-    name: "claude-3-haiku",
+    name: "anthropic/claude-3-haiku",
+    provider: "anthropic",
+    model: "claude-3-haiku",
+    displayName: "anthropic/claude-3-haiku",
     eventCount: 100,
     tokensIn: 30000,
     tokensOut: 10000,
@@ -47,9 +56,9 @@ describe("ToolModelTable", () => {
 
   it("renders model names", () => {
     render(<ToolModelTable models={mockModels} isLoading={false} />);
-    expect(screen.getByText("gpt-4o")).toBeInTheDocument();
-    expect(screen.getByText("gpt-3.5-turbo")).toBeInTheDocument();
-    expect(screen.getByText("claude-3-haiku")).toBeInTheDocument();
+    expect(screen.getByText("openai/gpt-4o")).toBeInTheDocument();
+    expect(screen.getByText("openai/gpt-3.5-turbo")).toBeInTheDocument();
+    expect(screen.getByText("anthropic/claude-3-haiku")).toBeInTheDocument();
   });
 
   it("shows — for null pricing columns", () => {
@@ -68,8 +77,8 @@ describe("ToolModelTable", () => {
   it("defaults to sorting by cost descending (highest cost first)", () => {
     render(<ToolModelTable models={mockModels} isLoading={false} />);
     const rows = screen.getAllByRole("row");
-    // First data row (index 1, after header) should be gpt-4o (costUsd 2.4)
-    expect(rows[1]).toHaveTextContent("gpt-4o");
+    // First data row (index 1, after header) should be openai/gpt-4o (costUsd 2.4)
+    expect(rows[1]).toHaveTextContent("openai/gpt-4o");
   });
 
   it("toggles sort to ascending when same sort column is clicked twice", () => {
@@ -78,8 +87,8 @@ describe("ToolModelTable", () => {
     // First click: already desc — switches to asc (lowest first)
     fireEvent.click(costButton);
     const rows = screen.getAllByRole("row");
-    // Lowest cost (claude-3-haiku at 0.08) should be first
-    expect(rows[1]).toHaveTextContent("claude-3-haiku");
+    // Lowest cost (anthropic/claude-3-haiku at 0.08) should be first
+    expect(rows[1]).toHaveTextContent("anthropic/claude-3-haiku");
   });
 
   it("sorts by request count when Requests button is clicked", () => {
@@ -87,7 +96,7 @@ describe("ToolModelTable", () => {
     const requestsButton = screen.getByRole("button", { name: /requests/i });
     fireEvent.click(requestsButton);
     const rows = screen.getAllByRole("row");
-    // Highest eventCount is gpt-3.5-turbo (500)
-    expect(rows[1]).toHaveTextContent("gpt-3.5-turbo");
+    // Highest eventCount is openai/gpt-3.5-turbo (500)
+    expect(rows[1]).toHaveTextContent("openai/gpt-3.5-turbo");
   });
 });

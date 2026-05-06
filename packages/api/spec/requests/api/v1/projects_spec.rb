@@ -79,46 +79,19 @@ RSpec.describe 'Api::V1::Projects', type: :request do
 
     it 'includes linear issue throughput summary for project members' do
       connector = create(:organization_connector, :linear, organization: organization, last_sync_at: Time.zone.parse('2026-04-29T11:22:58Z'))
-      create(:project_membership, project: project, user: user, role: 'member')
+      project.project_settings.create!(key: 'linear_connector_id', value: connector.id.to_s)
+
+      # One completed issue that has been updated (stateChangeCount = 1)
       create(
-        :tool_event,
+        :issue, :done,
         organization: organization,
-        user: user,
-        tool_name: 'linear',
-        event_type: 'issue',
-        occurred_at: Time.zone.parse('2026-04-29T11:21:47Z'),
-        metadata: {
-          issue_id: 'issue-1',
-          issue_identifier: 'ENG-101',
-          state_type: 'completed',
-          action: 'synced'
-        }
-      )
-      create(
-        :tool_event,
-        organization: organization,
-        user: user,
-        tool_name: 'linear',
-        event_type: 'issue',
-        occurred_at: Time.zone.parse('2026-04-29T11:20:00Z'),
-        metadata: {
-          issue_id: 'issue-1',
-          action: 'state_changed',
-          from_state_id: 'state-0',
-          to_state_id: 'state-1'
-        }
-      )
-      create(
-        :tool_event,
-        organization: organization,
-        user: user,
-        tool_name: 'linear',
-        event_type: 'sprint',
-        occurred_at: Time.zone.parse('2026-04-29T11:19:00Z'),
-        metadata: {
-          cycle_id: 'cycle-1',
-          cycle_name: 'Sprint 42'
-        }
+        project: project,
+        organization_connector: connector,
+        external_id: 'issue-1',
+        key: 'ENG-101',
+        external_created_at: Time.zone.parse('2026-04-28T10:00:00Z'),
+        external_updated_at: Time.zone.parse('2026-04-29T11:00:00Z'),
+        metadata: { 'cycle_id' => 'cycle-1', 'provider' => 'linear' }
       )
 
       authenticated_get "/api/v1/projects/#{project.id}", user: user

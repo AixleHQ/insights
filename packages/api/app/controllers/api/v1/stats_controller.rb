@@ -256,7 +256,12 @@ module Api
 
         models = aggregate_by_column(events, :model).map do |row|
           pricing = ModelPricingService.pricing_for_model(row[:name])
+          provider_slug, routed_model = split_model_key(row[:name])
+
           row.merge(
+            provider: provider_slug,
+            model: routed_model,
+            displayName: display_name_for_model(row[:name], provider_slug, routed_model),
             price_per_million_input: pricing&.dig(:input),
             price_per_million_output: pricing&.dig(:output)
           )
@@ -418,6 +423,20 @@ module Api
               costUsd: (row.cost_usd || 0).to_f
             }
           end
+      end
+
+      def split_model_key(name)
+        return [ nil, nil ] if name.blank?
+        return [ nil, name ] unless @tool_name == "openrouter_api" && name.include?("/")
+
+        provider, routed_model = name.split("/", 2)
+        [ provider, routed_model ]
+      end
+
+      def display_name_for_model(name, provider_slug, routed_model)
+        return name if provider_slug.blank? || routed_model.blank?
+
+        "#{provider_slug}/#{routed_model}"
       end
 
       def risk_summary(time_range)

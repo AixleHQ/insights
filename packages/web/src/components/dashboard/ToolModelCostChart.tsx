@@ -22,12 +22,16 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
+function modelLabel(model: ToolModelStat): string {
+  return model.displayName || model.name;
+}
+
 export function ToolModelCostChart({ models, isLoading }: ToolModelCostChartProps) {
   const chartData = [...models]
     .sort((a, b) => b.costUsd - a.costUsd)
     .slice(0, 10)
     .map((m) => ({
-      name: truncateModelName(m.name),
+      name: truncateModelName(modelLabel(m)),
       costUsd: m.costUsd,
     }));
 

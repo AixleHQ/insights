@@ -153,6 +153,10 @@ export interface Connector {
   activeUsersCount?: number | null;
   copilotConnector?: boolean;
   config?: Record<string, unknown>;
+  // Webhook fields (OpenRouter-specific)
+  webhookActive?: boolean;
+  webhookToken?: string;
+  webhookSecretSet?: boolean;
 }
 
 // Project connector types
@@ -449,6 +453,9 @@ export interface ToolOverviewStats {
 
 export interface ToolModelStat {
   name: string;
+  provider?: string | null;
+  model?: string | null;
+  displayName?: string;
   eventCount: number;
   tokensIn: number;
   tokensOut: number;

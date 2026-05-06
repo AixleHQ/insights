@@ -101,12 +101,7 @@ module ToolEvents
           }
         end
 
-        ConnectorEventDedup.upsert_all(
-          dedup_rows,
-          unique_by: %i[organization_id tool_name event_type unique_key unique_value],
-          update_only: %i[tool_event_id updated_at],
-          record_timestamps: false
-        )
+        bulk_upsert_dedup_rows(dedup_rows)
       end
 
       # --- Step 3: update mutable fields on existing ToolEvents ---
@@ -122,6 +117,29 @@ module ToolEvents
     end
 
     private
+
+    # Rails upsert_all includes every column in the INSERT list, which causes
+    # `id = NULL` for bigserial columns not present in the hash (Rails 8.1 bug).
+    # Use raw SQL so that `id` is omitted entirely and the sequence fires naturally.
+    def bulk_upsert_dedup_rows(rows)
+      return if rows.empty?
+
+      conn          = ConnectorEventDedup.connection
+      table         = ConnectorEventDedup.quoted_table_name
+      conflict_cols = %w[organization_id tool_name event_type unique_key unique_value]
+                        .map { |c| conn.quote_column_name(c) }.join(", ")
+      col_names     = rows.first.keys.map { |k| conn.quote_column_name(k) }.join(", ")
+
+      values_sql = rows.map do |row|
+        vals = row.values.map { |v| v.nil? ? "NULL" : conn.quote(v) }
+        "(#{vals.join(', ')})"
+      end.join(", ")
+
+      sql_template = "INSERT INTO %s (%s) VALUES %s ON CONFLICT (%s) DO UPDATE SET tool_event_id = EXCLUDED.tool_event_id, updated_at = EXCLUDED.updated_at"
+      sql = format(sql_template, table, col_names, values_sql, conflict_cols)
+
+      conn.execute(sql)
+    end
 
     # Rails insert_all/insert_all! cannot be used on TimescaleDB hypertables
     # because schema_cache.primary_keys returns [] for hypertables (no standard PK

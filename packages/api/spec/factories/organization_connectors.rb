@@ -27,6 +27,12 @@ FactoryBot.define do
       access_token { 'sk-ant-admin-test-key' }
     end
 
+    trait :openrouter do
+      connector_type { 'openrouter' }
+      access_token { "or-#{SecureRandom.hex(24)}" }
+      status { 'connected' }
+    end
+
     trait :slack do
       connector_type { 'slack' }
       access_token { 'https://hooks.slack.com/services/T12345678/B12345678/EXAMPLE-WEBHOOK-SECRET' }

@@ -15,8 +15,11 @@ class OrganizationConnector < ApplicationRecord
   encrypts :refresh_token
   encrypts :webhook_secret
 
+  before_create :assign_webhook_token, if: :openrouter?
+
   scope :active, -> { where.not(status: "disconnected") }
   scope :by_type, ->(type) { where(connector_type: type) }
+  scope :by_webhook_token, ->(token) { where(webhook_token: token) }
 
   def token_expired?
     return false if token_expires_at.nil?
@@ -37,6 +40,10 @@ class OrganizationConnector < ApplicationRecord
 
   def copilot?
     connector_type == "github_copilot"
+  end
+
+  def openrouter?
+    connector_type == "openrouter"
   end
 
   def slack_webhook?
@@ -88,5 +95,11 @@ class OrganizationConnector < ApplicationRecord
 
   def synced_event_last_occurred_at
     synced_event_scope.maximum(:occurred_at)
+  end
+
+  private
+
+  def assign_webhook_token
+    self.webhook_token = SecureRandom.hex(32)
   end
 end

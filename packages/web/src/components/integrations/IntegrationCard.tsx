@@ -9,6 +9,7 @@ import {
   FlaskConical,
   ChevronDown,
   KeyRound,
+  Zap,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -59,6 +60,10 @@ export interface IntegrationData {
   copilotConnector?: boolean;
   seatCount?: number | null;
   activeUsersCount?: number | null;
+  // OpenRouter-specific
+  webhookActive?: boolean;
+  webhookToken?: string;
+  webhookSecretSet?: boolean;
 }
 
 export interface ProviderInfo {
@@ -82,6 +87,7 @@ interface IntegrationCardProps {
   onDisconnect?: (id: string) => void;
   onRegenerateToken?: (id: string) => void;
   onConnect?: (providerId: string) => void;
+  onSetupWebhook?: (id: string) => void;
   isTesting?: boolean;
   className?: string;
 }
@@ -147,6 +153,7 @@ export function IntegrationCard({
   onDisconnect,
   onRegenerateToken,
   onConnect,
+  onSetupWebhook,
   isTesting = false,
   className,
 }: IntegrationCardProps) {
@@ -200,6 +207,8 @@ export function IntegrationCard({
 
   const status = statusConfig[integration.status];
   const StatusIcon = status.icon;
+  const isSyncing = integration.status === "testing" && !isTesting;
+  const statusLabel = isSyncing ? "Syncing…" : status.label;
 
   return (
     <Card className={cn("group relative transition-all hover:shadow-md", className)}>
@@ -249,7 +258,13 @@ export function IntegrationCard({
                   Regenerate token
                 </DropdownMenuItem>
               )}
-              {(onSync || onTest || onRegenerateToken) && <DropdownMenuSeparator />}
+              {onSetupWebhook && (
+                <DropdownMenuItem onClick={() => onSetupWebhook(integration.id)}>
+                  <Zap className="mr-2 size-4" />
+                  Setup webhook
+                </DropdownMenuItem>
+              )}
+              {(onSync || onTest || onRegenerateToken || onSetupWebhook) && <DropdownMenuSeparator />}
               <DropdownMenuItem
                 className="text-destructive"
                 onClick={() => onDisconnect?.(integration.id)}
@@ -263,7 +278,7 @@ export function IntegrationCard({
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {isTesting ? (
               <Badge variant="outline" className="gap-1 bg-primary/10">
                 <RefreshCw className="size-3 animate-spin text-primary" />
@@ -274,8 +289,26 @@ export function IntegrationCard({
                 <StatusIcon
                   className={cn("size-3", status.color, integration.status === "testing" && "animate-spin")}
                 />
-                <span className={status.color}>{status.label}</span>
+                <span className={status.color}>{statusLabel}</span>
               </Badge>
+            )}
+            {integration.webhookActive !== undefined && (
+              integration.webhookActive ? (
+                <Badge variant="outline" className="gap-1 bg-success/10">
+                  <Zap className="size-3 text-success" />
+                  <span className="text-success">Webhook active</span>
+                </Badge>
+              ) : (
+                <Badge
+                  variant="outline"
+                  className="cursor-pointer gap-1 bg-muted transition-colors hover:bg-amber-500/10"
+                  onClick={() => onSetupWebhook?.(integration.id)}
+                  title="Click to set up webhook for per-request tracking"
+                >
+                  <Zap className="size-3 text-muted-foreground" />
+                  <span className="text-muted-foreground">Webhook inactive</span>
+                </Badge>
+              )
             )}
           </div>
           {integration.metadata?.resources_count !== undefined && (
