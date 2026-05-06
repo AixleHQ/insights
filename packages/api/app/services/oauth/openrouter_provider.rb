@@ -15,6 +15,10 @@ module Oauth
     # Requires a Management API key stored in connector.access_token.
     # Raises on API errors so that the caller (reconcile_provider) can mark_error!
     # and surface the failure rather than silently leaving the connector in "testing" status.
+    #
+    # Fetches one page per calendar day — sequential by design.
+    # At 29 days that is 29 HTTP round-trips (~1–2 s total on fast connections).
+    # Parallelisation is possible but adds error-handling complexity; defer until needed.
     def fetch_activity(start_date:, end_date:)
       return [] if end_date < start_date
 
@@ -53,15 +57,14 @@ module Oauth
         canonical_model = openrouter_canonical_model(model, provider_slug)
         endpoint_id = row["endpoint_id"].presence ||
           "unknown-#{Digest::SHA1.hexdigest(row.to_json)[0, 8]}"
-        cost = row["usage"]
 
         {
           external_id: [ "openrouter", date.iso8601, endpoint_id, canonical_model || "unknown-model" ].join(":"),
           model: canonical_model,
           tokens_in: row["prompt_tokens"],
           tokens_out: row["completion_tokens"],
-          cost_usd: cost&.to_f,
-          occurred_at: Time.zone.parse("#{date.iso8601} 23:59:59 UTC"),
+          cost_usd: row["usage"]&.to_f,
+          occurred_at: date.end_of_day.utc,
           metadata: {
             provider: provider_slug,
             routed_model: model,
@@ -85,6 +88,8 @@ module Oauth
         response = http_client.get(uri.to_s)
         if response.status == 429 && retries < MAX_RETRIES
           retries += 1
+          # Intentional blocking sleep: MAX_RETRIES=2 caps total delay at 1 + 2 = 3 s.
+          # Sidekiq's default thread pool (10 threads) absorbs this for typical sync volumes.
           sleep(BASE_RETRY_DELAY * (2**(retries - 1)))
           next
         end

@@ -6,10 +6,17 @@ class AiUsageSyncJob
   sidekiq_options queue: "ai", retry: 3
 
   SUPPORTED_PROVIDERS = %w[openrouter anthropic openai gemini].freeze
+
   # OpenRouter Activity API only retains the last 30 completed UTC days.
   # Use 29 days to stay safely within that window.
   OPENROUTER_INITIAL_SYNC_DAYS = 29
   OPENROUTER_RECURRING_SYNC_DAYS = 7
+
+  ANTHROPIC_INITIAL_SYNC_DAYS = 90
+  ANTHROPIC_RECURRING_SYNC_DAYS = 7
+
+  OPENROUTER_MGMT_KEY_ERROR_FRAGMENT = "Only management keys can fetch activity for an account"
+  OPENROUTER_DATE_RANGE_ERROR_FRAGMENT = "Date must be within the last 30"
 
   def perform(organization_id = nil, provider = nil)
     Rails.logger.info("[AiUsageSyncJob] Starting AI usage reconciliation...")
@@ -66,7 +73,8 @@ class AiUsageSyncJob
     # so its status doesn't falsely read as "connected / synced".
     return 0 if usage_data.nil?
 
-    if usage_data.blank?
+    # nil already handled above; empty array means no new data — still mark synced.
+    if usage_data.empty?
       connector.mark_synced!(sync_started_at: sync_started_at)
       return 0
     end
@@ -97,9 +105,9 @@ class AiUsageSyncJob
 
     records = usage_data.map do |usage|
       tool_event_attributes_for_usage(usage).merge(
-        unique_value:    usage[:external_id],
+        unique_value: usage[:external_id],
         organization_id: org.id,
-        tool_name:       "openrouter_api"
+        tool_name: "openrouter_api"
       )
     end
 
@@ -117,10 +125,10 @@ class AiUsageSyncJob
     already_tracked = ConnectorEventDedup
       .where(
         organization_id: org.id,
-        tool_name:        "openrouter_api",
-        event_type:       "completion",
-        unique_key:       "external_id",
-        unique_value:     external_ids
+        tool_name: "openrouter_api",
+        event_type: "completion",
+        unique_key: "external_id",
+        unique_value: external_ids
       )
       .pluck(:unique_value)
       .to_set
@@ -139,33 +147,16 @@ class AiUsageSyncJob
     dedup_rows = existing_events.map do |external_id, event_id|
       {
         organization_id: org.id,
-        tool_name:        "openrouter_api",
-        event_type:       "completion",
-        unique_key:       "external_id",
-        unique_value:     external_id,
-        tool_event_id:    event_id,
-        updated_at:       now
+        tool_name: "openrouter_api",
+        event_type: "completion",
+        unique_key: "external_id",
+        unique_value: external_id,
+        tool_event_id: event_id,
+        updated_at: now
       }
     end
 
-    # Use raw SQL for the same reason as BatchConnectorUpsert#bulk_upsert_dedup_rows:
-    # Rails upsert_all includes every column in the INSERT list, which causes
-    # `id = NULL` for the bigserial column (Rails 8.1 bug), triggering NOT NULL violation.
-    conn          = ConnectorEventDedup.connection
-    table         = ConnectorEventDedup.quoted_table_name
-    conflict_cols = %w[organization_id tool_name event_type unique_key unique_value]
-                      .map { |c| conn.quote_column_name(c) }.join(", ")
-    col_names     = dedup_rows.first.keys.map { |k| conn.quote_column_name(k) }.join(", ")
-
-    values_sql = dedup_rows.map do |row|
-      vals = row.values.map { |v| v.nil? ? "NULL" : conn.quote(v) }
-      "(#{vals.join(', ')})"
-    end.join(", ")
-
-    sql_template = "INSERT INTO %s (%s) VALUES %s ON CONFLICT (%s) DO UPDATE SET tool_event_id = EXCLUDED.tool_event_id, updated_at = EXCLUDED.updated_at"
-    sql = format(sql_template, table, col_names, values_sql, conflict_cols)
-
-    conn.execute(sql)
+    upsert_dedup_rows(dedup_rows)
   end
 
   def upsert_usage_one_by_one(org, provider, usage_data)
@@ -221,11 +212,7 @@ class AiUsageSyncJob
     provider.fetch_activity(start_date: days_back.days.ago.to_date, end_date: Date.yesterday)
   end
 
-  # How far back to sync on the first pull vs recurring syncs.
-  ANTHROPIC_INITIAL_SYNC_DAYS = 90
-  ANTHROPIC_RECURRING_SYNC_DAYS = 7
-
-  def fetch_anthropic_usage(connector, organization)
+def fetch_anthropic_usage(connector, organization)
     # Requires an Admin API key (sk-ant-admin...) stored in connector.access_token
     days_back = connector.last_sync_at ? ANTHROPIC_RECURRING_SYNC_DAYS : ANTHROPIC_INITIAL_SYNC_DAYS
     provider = Oauth::AnthropicProvider.new(connector)
@@ -304,12 +291,33 @@ class AiUsageSyncJob
   def normalize_sync_error(provider, error_message)
     return error_message unless provider == "openrouter"
 
-    if error_message.include?("Only management keys can fetch activity for an account")
+    if error_message.include?(OPENROUTER_MGMT_KEY_ERROR_FRAGMENT)
       "OpenRouter usage sync requires a management key. Reconnect this integration with a management key to fetch activity data."
-    elsif error_message.include?("Date must be within the last 30")
+    elsif error_message.include?(OPENROUTER_DATE_RANGE_ERROR_FRAGMENT)
       "OpenRouter Activity API only provides data for the last 30 days. Sync window has been adjusted automatically — please retry."
     else
       error_message
     end
+  end
+
+  # Mirrors BatchConnectorUpsert#bulk_upsert_dedup_rows — raw SQL required
+  # because Rails upsert_all sets id = NULL on bigserial columns (Rails 8.1 bug),
+  # triggering NOT NULL violation.
+  def upsert_dedup_rows(rows)
+    return if rows.empty?
+
+    conn = ConnectorEventDedup.connection
+    table = ConnectorEventDedup.quoted_table_name
+    conflict_cols = %w[organization_id tool_name event_type unique_key unique_value]
+                      .map { |c| conn.quote_column_name(c) }.join(", ")
+    col_names = rows.first.keys.map { |k| conn.quote_column_name(k) }.join(", ")
+
+    values_sql = rows.map do |row|
+      vals = row.values.map { |v| v.nil? ? "NULL" : conn.quote(v) }
+      "(#{vals.join(', ')})"
+    end.join(", ")
+
+    sql_template = "INSERT INTO %s (%s) VALUES %s ON CONFLICT (%s) DO UPDATE SET tool_event_id = EXCLUDED.tool_event_id, updated_at = EXCLUDED.updated_at"
+    conn.execute(format(sql_template, table, col_names, values_sql, conflict_cols))
   end
 end
