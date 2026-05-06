@@ -362,14 +362,18 @@ export function useDeleteProjectSetting() {
 // Organization Members Hooks
 // ============================================================================
 
-export function useOrganizationMembers(orgId: string) {
+export function useOrganizationMembers(
+  orgId: string,
+  options?: { enabled?: boolean }
+) {
+  const enabled = (options?.enabled ?? true) && !!orgId;
   return useQuery({
     queryKey: queryKeys.members.all(orgId),
     queryFn: async () => {
       const response = await api.get<{ data: OrganizationMember[] }>(`/organizations/${orgId}/members`);
       return response.data;
     },
-    enabled: !!orgId,
+    enabled,
   });
 }
 
@@ -1147,7 +1151,12 @@ export interface UnattributedEventsParams {
   minConfidence?: number;
 }
 
-export function useUnattributedEvents(orgId: string, params?: UnattributedEventsParams) {
+export function useUnattributedEvents(
+  orgId: string,
+  params?: UnattributedEventsParams,
+  options?: { enabled?: boolean }
+) {
+  const enabled = (options?.enabled ?? true) && !!orgId;
   return useQuery({
     queryKey: [...queryKeys.events.unattributed(orgId), params] as const,
     queryFn: async () => {
@@ -1162,7 +1171,7 @@ export function useUnattributedEvents(orgId: string, params?: UnattributedEvents
       );
       return response.data;
     },
-    enabled: !!orgId,
+    enabled,
   });
 }
 

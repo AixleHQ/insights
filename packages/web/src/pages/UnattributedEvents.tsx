@@ -9,6 +9,7 @@ import {
   HelpCircle,
   CheckSquare,
   SlidersHorizontal,
+  ShieldX,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useOrg } from "@/contexts/OrgContext";
@@ -17,6 +18,7 @@ import {
   useOrganizationMembers,
   useAttributeEvent,
   useBulkAttributeEvents,
+  useCurrentUser,
   queryKeys,
   type UnattributedEventsParams,
 } from "@/hooks/useApi";
@@ -98,12 +100,14 @@ const MIN_CONFIDENCE_OPTIONS = [
   { label: "≥ 90%", value: "0.9" },
 ];
 
-function EventSkeleton() {
+function EventSkeleton({ showAdminColumns }: { showAdminColumns: boolean }) {
   return (
     <TableRow>
-      <TableCell>
-        <Skeleton className="h-4 w-4" />
-      </TableCell>
+      {showAdminColumns && (
+        <TableCell>
+          <Skeleton className="h-4 w-4" />
+        </TableCell>
+      )}
       <TableCell>
         <Skeleton className="h-4 w-24" />
       </TableCell>
@@ -122,16 +126,23 @@ function EventSkeleton() {
       <TableCell>
         <Skeleton className="h-4 w-20" />
       </TableCell>
-      <TableCell>
-        <Skeleton className="h-8 w-32" />
-      </TableCell>
+      {showAdminColumns && (
+        <TableCell>
+          <Skeleton className="h-8 w-32" />
+        </TableCell>
+      )}
     </TableRow>
   );
 }
 
 export function UnattributedEvents() {
-  const { currentOrg } = useOrg();
-  const isAdmin = ["owner", "admin"].includes(currentOrg?.user_role ?? "");
+  const { currentOrg, hasRole } = useOrg();
+  const { data: currentUser, isLoading: isLoadingMe } = useCurrentUser();
+  const isOrgAdmin = hasRole(["owner", "admin"]);
+  const isPlatformAdmin = Boolean(
+    currentUser?.globalAdmin ?? currentUser?.super_admin
+  );
+  const canManageAttribution = isOrgAdmin || (!isLoadingMe && isPlatformAdmin);
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [sortField, setSortField] = useState<UnattributedSortField>("created_at");
@@ -154,11 +165,18 @@ export function UnattributedEvents() {
     minConfidence: minConfidence ? parseFloat(minConfidence) : undefined,
   };
 
+  const canFetchUnattributed =
+    !!currentOrg?.id &&
+    (isOrgAdmin || (!isLoadingMe && isPlatformAdmin));
+
   const { data: events, isLoading, isFetching } = useUnattributedEvents(
     currentOrg?.id || "",
-    apiParams
+    apiParams,
+    { enabled: canFetchUnattributed }
   );
-  const { data: members } = useOrganizationMembers(currentOrg?.id || "");
+  const { data: members } = useOrganizationMembers(currentOrg?.id || "", {
+    enabled: canManageAttribution && !!currentOrg?.id,
+  });
   const attributeEvent = useAttributeEvent(currentOrg?.id || "");
   const bulkAttributeEvents = useBulkAttributeEvents(currentOrg?.id || "");
 
@@ -268,6 +286,70 @@ export function UnattributedEvents() {
   const isAssigning = attributeEvent.isPending || bulkAttributeEvents.isPending;
   const isBulkMode = selectedEventId === null;
 
+  const permissionLoading = Boolean(currentOrg && !isOrgAdmin && isLoadingMe);
+  const accessDenied = Boolean(
+    currentOrg && !isOrgAdmin && !isLoadingMe && !isPlatformAdmin
+  );
+
+  const tableColumnCount = canManageAttribution ? 8 : 6;
+
+  if (permissionLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button asChild variant="ghost" size="icon">
+            <Link to="/events">
+              <ArrowLeft className="size-4" />
+            </Link>
+          </Button>
+          <h1 className="text-xl font-semibold">Unattributed Events</h1>
+        </div>
+        <div className="rounded-md border overflow-x-auto">
+          <Table>
+            <TableBody>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <EventSkeleton key={i} showAdminColumns={false} />
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    );
+  }
+
+  if (accessDenied) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button asChild variant="ghost" size="icon">
+            <Link to="/events">
+              <ArrowLeft className="size-4" />
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-xl font-semibold">Unattributed Events</h1>
+            <p className="text-sm text-muted-foreground">Restricted to organization admins</p>
+          </div>
+        </div>
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardContent className="flex items-start gap-4 p-6">
+            <ShieldX className="size-10 shrink-0 text-destructive" />
+            <div className="space-y-2">
+              <p className="font-medium">You don&apos;t have access to this page</p>
+              <p className="text-sm text-muted-foreground">
+                Manual attribution and the unattributed queue are limited to organization owners and
+                admins (and platform administrators).
+              </p>
+              <Button asChild variant="outline" size="sm" className="mt-2">
+                <Link to="/events">Back to Events</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
@@ -369,7 +451,7 @@ export function UnattributedEvents() {
           <UserX className="size-3" />
           {events?.length || 0} unattributed
         </Badge>
-        {isAdmin && selectedIds.size > 0 && (
+        {canManageAttribution && selectedIds.size > 0 && (
           <Button
             size="sm"
             onClick={() => openAssignDialog(null)}
@@ -385,7 +467,7 @@ export function UnattributedEvents() {
         <Table className="min-w-[750px]">
           <TableHeader>
             <TableRow>
-              {isAdmin && (
+              {canManageAttribution && (
                 <TableHead className="w-10">
                   <Checkbox
                     checked={allFilteredSelected}
@@ -437,15 +519,19 @@ export function UnattributedEvents() {
                   Time
                 </SortButton>
               </TableHead>
-              <TableHead className="w-[120px] sm:w-[150px]">Actions</TableHead>
+              {canManageAttribution && (
+                <TableHead className="w-[120px] sm:w-[150px]">Actions</TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => <EventSkeleton key={i} />)
+              Array.from({ length: 5 }).map((_, i) => (
+                <EventSkeleton key={i} showAdminColumns={canManageAttribution} />
+              ))
             ) : filteredEvents.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={isAdmin ? 8 : 7} className="h-24 text-center">
+                <TableCell colSpan={tableColumnCount} className="h-24 text-center">
                   <div className="flex flex-col items-center gap-2">
                     <User className="size-8 text-muted-foreground" />
                     <p className="text-muted-foreground">
@@ -460,7 +546,7 @@ export function UnattributedEvents() {
                   key={event.id}
                   data-state={selectedIds.has(event.id) ? "selected" : undefined}
                 >
-                  {isAdmin && (
+                  {canManageAttribution && (
                     <TableCell>
                       <Checkbox
                         checked={selectedIds.has(event.id)}
@@ -508,7 +594,7 @@ export function UnattributedEvents() {
                   <TableCell className="text-sm text-muted-foreground">
                     {formatDistanceToNow(event.occurredAt || event.createdAt)}
                   </TableCell>
-                  {isAdmin && (
+                  {canManageAttribution && (
                     <TableCell>
                       <Button
                         variant="outline"

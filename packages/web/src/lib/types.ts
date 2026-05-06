@@ -11,7 +11,10 @@ export interface User {
   name: string | null;
   avatarUrl: string | null;
   role: "admin" | "member" | "viewer";
-  super_admin: boolean;
+  /** Platform-wide admin (API key `global_admin`, Alba camelCase `globalAdmin`). */
+  globalAdmin?: boolean;
+  /** Alternate naming used in some mocks / legacy code paths. */
+  super_admin?: boolean;
   created_at: string;
   updated_at: string;
   lastSignInAt: string | null;

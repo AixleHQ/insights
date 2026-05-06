@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Download, Loader2, RefreshCw, UserX } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useOrg } from "@/contexts/OrgContext";
-import { useEvents, useExportEvents, useProjects, queryKeys } from "@/hooks/useApi";
+import { useEvents, useExportEvents, useProjects, useCurrentUser, queryKeys } from "@/hooks/useApi";
 import { useEventsPageUpdates } from "@/hooks/useWebSocket";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,7 +27,12 @@ const riskLevelOrder = {
 };
 
 export function Events() {
-  const { currentOrg } = useOrg();
+  const { currentOrg, hasRole } = useOrg();
+  const { data: me, isLoading: isLoadingMe } = useCurrentUser();
+  const showUnattributedNav =
+    Boolean(currentOrg) &&
+    (hasRole(["owner", "admin"]) ||
+      (!isLoadingMe && Boolean(me?.globalAdmin ?? me?.super_admin)));
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<EventFiltersState>({});
   const [sortField, setSortField] = useState<SortField>("created_at");
@@ -198,12 +203,14 @@ export function Events() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button asChild variant="outline" size="sm">
-            <Link to="/events/unattributed">
-              <UserX className="mr-2 size-4" />
-              <span className="hidden sm:inline">Unattributed</span>
-            </Link>
-          </Button>
+          {showUnattributedNav && (
+            <Button asChild variant="outline" size="sm">
+              <Link to="/events/unattributed">
+                <UserX className="mr-2 size-4" />
+                <span className="hidden sm:inline">Unattributed</span>
+              </Link>
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isFetching}>
             <RefreshCw className={`mr-2 size-4 ${isFetching ? "animate-spin" : ""}`} />
             <span className="hidden sm:inline">Refresh</span>
