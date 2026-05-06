@@ -166,7 +166,7 @@ RSpec.describe "Api::V1::WebhookDeliveries", type: :request do
     end
 
     context "when the raw payload has expired" do
-      before { allow(RawEventStore).to receive(:exists?).and_return(false) }
+      before { allow(RawEventStore).to receive(:fetch).and_return(nil) }
 
       it "returns 422 with an expiry message" do
         authenticated_post(
