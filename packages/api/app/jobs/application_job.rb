@@ -10,12 +10,12 @@ class ApplicationJob < ActiveJob::Base
   # argument is the action String — do not call String#to_h on it.
   def self.symbolized_job_options(job)
     arg = job.arguments[2]
-    hash = case arg
-           when Hash then arg
-           when ActionController::Parameters then arg.to_unsafe_h
-           else
-             {}
-           end
+    hash =
+      case arg
+      when Hash then arg
+      when ActionController::Parameters then arg.to_unsafe_h
+      else {}
+      end
     hash.symbolize_keys
   end
 end
