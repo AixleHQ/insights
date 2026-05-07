@@ -35,7 +35,13 @@ Rails.application.routes.draw do
           get :settings
           put "settings/:key", action: :update_setting
           delete "settings/:key", action: :destroy_setting
+          get :model_pricing, to: "model_pricing#index"
         end
+
+        # Pricing overrides (CRUD)
+        resources :model_pricing_overrides,
+          path: "model_pricing/overrides",
+          only: %i[index create update destroy]
 
         # Organization members
         resources :members, controller: "organization_members" do

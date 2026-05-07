@@ -16,13 +16,11 @@ SET row_security = off;
 
 CREATE EXTENSION IF NOT EXISTS timescaledb WITH SCHEMA public;
 
-
 --
 -- Name: EXTENSION timescaledb; Type: COMMENT; Schema: -; Owner: -
 --
 
 COMMENT ON EXTENSION timescaledb IS 'Enables scalable inserts and complex queries for time-series data (Community Edition)';
-
 
 --
 -- Name: timeseries; Type: SCHEMA; Schema: -; Owner: -
@@ -30,20 +28,17 @@ COMMENT ON EXTENSION timescaledb IS 'Enables scalable inserts and complex querie
 
 CREATE SCHEMA timeseries;
 
-
 --
 -- Name: pgcrypto; Type: EXTENSION; Schema: -; Owner: -
 --
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
 
-
 --
 -- Name: EXTENSION pgcrypto; Type: COMMENT; Schema: -; Owner: -
 --
 
 COMMENT ON EXTENSION pgcrypto IS 'cryptographic functions';
-
 
 --
 -- Name: connector_type; Type: TYPE; Schema: public; Owner: -
@@ -63,7 +58,6 @@ CREATE TYPE public.connector_type AS ENUM (
     'github_copilot'
 );
 
-
 --
 -- Name: daily_aggregate_retention; Type: TYPE; Schema: public; Owner: -
 --
@@ -74,7 +68,6 @@ CREATE TYPE public.daily_aggregate_retention AS ENUM (
     '1095_days',
     'forever'
 );
-
 
 --
 -- Name: event_type; Type: TYPE; Schema: public; Owner: -
@@ -96,7 +89,6 @@ CREATE TYPE public.event_type AS ENUM (
     'sprint'
 );
 
-
 --
 -- Name: hourly_aggregate_retention; Type: TYPE; Schema: public; Owner: -
 --
@@ -107,7 +99,6 @@ CREATE TYPE public.hourly_aggregate_retention AS ENUM (
     '365_days',
     '730_days'
 );
-
 
 --
 -- Name: invitation_status; Type: TYPE; Schema: public; Owner: -
@@ -120,7 +111,6 @@ CREATE TYPE public.invitation_status AS ENUM (
     'expired'
 );
 
-
 --
 -- Name: member_role; Type: TYPE; Schema: public; Owner: -
 --
@@ -131,7 +121,6 @@ CREATE TYPE public.member_role AS ENUM (
     'member',
     'viewer'
 );
-
 
 --
 -- Name: raw_event_ttl; Type: TYPE; Schema: public; Owner: -
@@ -145,7 +134,6 @@ CREATE TYPE public.raw_event_ttl AS ENUM (
     '72_hours'
 );
 
-
 --
 -- Name: risk_level; Type: TYPE; Schema: public; Owner: -
 --
@@ -157,7 +145,6 @@ CREATE TYPE public.risk_level AS ENUM (
     'critical',
     'none'
 );
-
 
 --
 -- Name: tool_events_retention; Type: TYPE; Schema: public; Owner: -
@@ -171,7 +158,6 @@ CREATE TYPE public.tool_events_retention AS ENUM (
     '365_days',
     '730_days'
 );
-
 
 --
 -- Name: tool_name; Type: TYPE; Schema: public; Owner: -
@@ -199,7 +185,6 @@ CREATE TYPE public.tool_name AS ENUM (
     'bitbucket'
 );
 
-
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -210,7 +195,6 @@ SET default_table_access_method = heap;
 
 CREATE TABLE _timescaledb_internal._compressed_hypertable_2 (
 );
-
 
 --
 -- Name: tool_events; Type: TABLE; Schema: timeseries; Owner: -
@@ -235,7 +219,6 @@ CREATE TABLE timeseries.tool_events (
     duration_ms integer
 );
 
-
 --
 -- Name: _direct_view_3; Type: VIEW; Schema: _timescaledb_internal; Owner: -
 --
@@ -254,7 +237,6 @@ CREATE VIEW _timescaledb_internal._direct_view_3 AS
     sum(cost_usd) AS total_cost
    FROM timeseries.tool_events
   GROUP BY (public.time_bucket('01:00:00'::interval, occurred_at)), organization_id, user_id, project_id, tool_name, event_type;
-
 
 --
 -- Name: _direct_view_4; Type: VIEW; Schema: _timescaledb_internal; Owner: -
@@ -275,107 +257,6 @@ CREATE VIEW _timescaledb_internal._direct_view_4 AS
    FROM timeseries.tool_events
   GROUP BY (public.time_bucket('1 day'::interval, occurred_at)), organization_id, user_id, project_id, tool_name, event_type;
 
-
---
--- Name: _hyper_1_1397_chunk; Type: TABLE; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE TABLE _timescaledb_internal._hyper_1_1397_chunk (
-    CONSTRAINT constraint_1397 CHECK (((occurred_at >= '2026-03-23 00:00:00+00'::timestamp with time zone) AND (occurred_at < '2026-03-24 00:00:00+00'::timestamp with time zone)))
-)
-INHERITS (timeseries.tool_events);
-
-
---
--- Name: _hyper_1_1398_chunk; Type: TABLE; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE TABLE _timescaledb_internal._hyper_1_1398_chunk (
-    CONSTRAINT constraint_1398 CHECK (((occurred_at >= '2026-02-23 00:00:00+00'::timestamp with time zone) AND (occurred_at < '2026-02-24 00:00:00+00'::timestamp with time zone)))
-)
-INHERITS (timeseries.tool_events);
-
-
---
--- Name: _hyper_1_1399_chunk; Type: TABLE; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE TABLE _timescaledb_internal._hyper_1_1399_chunk (
-    CONSTRAINT constraint_1399 CHECK (((occurred_at >= '2026-04-01 00:00:00+00'::timestamp with time zone) AND (occurred_at < '2026-04-02 00:00:00+00'::timestamp with time zone)))
-)
-INHERITS (timeseries.tool_events);
-
-
---
--- Name: _hyper_1_1400_chunk; Type: TABLE; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE TABLE _timescaledb_internal._hyper_1_1400_chunk (
-    CONSTRAINT constraint_1400 CHECK (((occurred_at >= '2026-04-08 00:00:00+00'::timestamp with time zone) AND (occurred_at < '2026-04-09 00:00:00+00'::timestamp with time zone)))
-)
-INHERITS (timeseries.tool_events);
-
-
---
--- Name: _hyper_1_1401_chunk; Type: TABLE; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE TABLE _timescaledb_internal._hyper_1_1401_chunk (
-    CONSTRAINT constraint_1401 CHECK (((occurred_at >= '2026-04-15 00:00:00+00'::timestamp with time zone) AND (occurred_at < '2026-04-16 00:00:00+00'::timestamp with time zone)))
-)
-INHERITS (timeseries.tool_events);
-
-
---
--- Name: _hyper_1_1402_chunk; Type: TABLE; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE TABLE _timescaledb_internal._hyper_1_1402_chunk (
-    CONSTRAINT constraint_1402 CHECK (((occurred_at >= '2026-04-02 00:00:00+00'::timestamp with time zone) AND (occurred_at < '2026-04-03 00:00:00+00'::timestamp with time zone)))
-)
-INHERITS (timeseries.tool_events);
-
-
---
--- Name: _hyper_1_1403_chunk; Type: TABLE; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE TABLE _timescaledb_internal._hyper_1_1403_chunk (
-    CONSTRAINT constraint_1403 CHECK (((occurred_at >= '2026-04-17 00:00:00+00'::timestamp with time zone) AND (occurred_at < '2026-04-18 00:00:00+00'::timestamp with time zone)))
-)
-INHERITS (timeseries.tool_events);
-
-
---
--- Name: _hyper_1_1404_chunk; Type: TABLE; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE TABLE _timescaledb_internal._hyper_1_1404_chunk (
-    CONSTRAINT constraint_1404 CHECK (((occurred_at >= '2026-04-28 00:00:00+00'::timestamp with time zone) AND (occurred_at < '2026-04-29 00:00:00+00'::timestamp with time zone)))
-)
-INHERITS (timeseries.tool_events);
-
-
---
--- Name: _hyper_1_1405_chunk; Type: TABLE; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE TABLE _timescaledb_internal._hyper_1_1405_chunk (
-    CONSTRAINT constraint_1405 CHECK (((occurred_at >= '2026-03-31 00:00:00+00'::timestamp with time zone) AND (occurred_at < '2026-04-01 00:00:00+00'::timestamp with time zone)))
-)
-INHERITS (timeseries.tool_events);
-
-
---
--- Name: _hyper_1_1406_chunk; Type: TABLE; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE TABLE _timescaledb_internal._hyper_1_1406_chunk (
-    CONSTRAINT constraint_1406 CHECK (((occurred_at >= '2026-04-09 00:00:00+00'::timestamp with time zone) AND (occurred_at < '2026-04-10 00:00:00+00'::timestamp with time zone)))
-)
-INHERITS (timeseries.tool_events);
-
-
 --
 -- Name: _materialized_hypertable_3; Type: TABLE; Schema: _timescaledb_internal; Owner: -
 --
@@ -394,17 +275,6 @@ CREATE TABLE _timescaledb_internal._materialized_hypertable_3 (
     total_cost numeric
 );
 
-
---
--- Name: _hyper_3_1407_chunk; Type: TABLE; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE TABLE _timescaledb_internal._hyper_3_1407_chunk (
-    CONSTRAINT constraint_1407 CHECK (((bucket >= '2026-04-27 00:00:00+00'::timestamp with time zone) AND (bucket < '2026-05-07 00:00:00+00'::timestamp with time zone)))
-)
-INHERITS (_timescaledb_internal._materialized_hypertable_3);
-
-
 --
 -- Name: _materialized_hypertable_4; Type: TABLE; Schema: _timescaledb_internal; Owner: -
 --
@@ -422,7 +292,6 @@ CREATE TABLE _timescaledb_internal._materialized_hypertable_4 (
     total_tokens bigint,
     total_cost numeric
 );
-
 
 --
 -- Name: _partial_view_3; Type: VIEW; Schema: _timescaledb_internal; Owner: -
@@ -443,7 +312,6 @@ CREATE VIEW _timescaledb_internal._partial_view_3 AS
    FROM timeseries.tool_events
   GROUP BY (public.time_bucket('01:00:00'::interval, occurred_at)), organization_id, user_id, project_id, tool_name, event_type;
 
-
 --
 -- Name: _partial_view_4; Type: VIEW; Schema: _timescaledb_internal; Owner: -
 --
@@ -463,637 +331,6 @@ CREATE VIEW _timescaledb_internal._partial_view_4 AS
    FROM timeseries.tool_events
   GROUP BY (public.time_bucket('1 day'::interval, occurred_at)), organization_id, user_id, project_id, tool_name, event_type;
 
-
---
--- Name: compress_hyper_2_1408_chunk; Type: TABLE; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE TABLE _timescaledb_internal.compress_hyper_2_1408_chunk (
-    _ts_meta_count integer,
-    user_id uuid,
-    organization_id uuid,
-    _ts_meta_v2_bloomg_id _timescaledb_internal.bloom1,
-    id _timescaledb_internal.compressed_data,
-    _ts_meta_v2_bloomg_project_id _timescaledb_internal.bloom1,
-    project_id _timescaledb_internal.compressed_data,
-    repository_id _timescaledb_internal.compressed_data,
-    _ts_meta_v2_bloomg_tool_name _timescaledb_internal.bloom1,
-    tool_name _timescaledb_internal.compressed_data,
-    event_type _timescaledb_internal.compressed_data,
-    model _timescaledb_internal.compressed_data,
-    tokens_in _timescaledb_internal.compressed_data,
-    tokens_out _timescaledb_internal.compressed_data,
-    tokens_total _timescaledb_internal.compressed_data,
-    cost_usd _timescaledb_internal.compressed_data,
-    metadata _timescaledb_internal.compressed_data,
-    _ts_meta_min_1 timestamp with time zone,
-    _ts_meta_max_1 timestamp with time zone,
-    occurred_at _timescaledb_internal.compressed_data,
-    created_at _timescaledb_internal.compressed_data,
-    duration_ms _timescaledb_internal.compressed_data,
-    _ts_meta_v2_bloomg_id_occurred_at _timescaledb_internal.bloom1,
-    _ts_meta_v2_bloomg_project_id_occurred_at _timescaledb_internal.bloom1,
-    _ts_meta_v2_bloomg_tool_name_occurred_at _timescaledb_internal.bloom1
-)
-WITH (toast_tuple_target='128');
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN _ts_meta_count SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN user_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN organization_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN _ts_meta_v2_bloomg_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN _ts_meta_v2_bloomg_id SET STORAGE EXTERNAL;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN id SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id SET STORAGE EXTERNAL;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN project_id SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN repository_id SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name SET STORAGE EXTERNAL;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN tool_name SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN tool_name SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN event_type SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN event_type SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN model SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN model SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN tokens_in SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN tokens_out SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN tokens_total SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN cost_usd SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN cost_usd SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN metadata SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN metadata SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN _ts_meta_min_1 SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN _ts_meta_max_1 SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN occurred_at SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN created_at SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN duration_ms SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN _ts_meta_v2_bloomg_id_occurred_at SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN _ts_meta_v2_bloomg_id_occurred_at SET STORAGE MAIN;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id_occurred_at SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id_occurred_at SET STORAGE MAIN;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name_occurred_at SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1408_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name_occurred_at SET STORAGE MAIN;
-
-
---
--- Name: compress_hyper_2_1409_chunk; Type: TABLE; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE TABLE _timescaledb_internal.compress_hyper_2_1409_chunk (
-    _ts_meta_count integer,
-    user_id uuid,
-    organization_id uuid,
-    _ts_meta_v2_bloomg_id _timescaledb_internal.bloom1,
-    id _timescaledb_internal.compressed_data,
-    _ts_meta_v2_bloomg_project_id _timescaledb_internal.bloom1,
-    project_id _timescaledb_internal.compressed_data,
-    repository_id _timescaledb_internal.compressed_data,
-    _ts_meta_v2_bloomg_tool_name _timescaledb_internal.bloom1,
-    tool_name _timescaledb_internal.compressed_data,
-    event_type _timescaledb_internal.compressed_data,
-    model _timescaledb_internal.compressed_data,
-    tokens_in _timescaledb_internal.compressed_data,
-    tokens_out _timescaledb_internal.compressed_data,
-    tokens_total _timescaledb_internal.compressed_data,
-    cost_usd _timescaledb_internal.compressed_data,
-    metadata _timescaledb_internal.compressed_data,
-    _ts_meta_min_1 timestamp with time zone,
-    _ts_meta_max_1 timestamp with time zone,
-    occurred_at _timescaledb_internal.compressed_data,
-    created_at _timescaledb_internal.compressed_data,
-    duration_ms _timescaledb_internal.compressed_data,
-    _ts_meta_v2_bloomg_id_occurred_at _timescaledb_internal.bloom1,
-    _ts_meta_v2_bloomg_project_id_occurred_at _timescaledb_internal.bloom1,
-    _ts_meta_v2_bloomg_tool_name_occurred_at _timescaledb_internal.bloom1
-)
-WITH (toast_tuple_target='128');
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN _ts_meta_count SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN user_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN organization_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN _ts_meta_v2_bloomg_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN _ts_meta_v2_bloomg_id SET STORAGE EXTERNAL;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN id SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id SET STORAGE EXTERNAL;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN project_id SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN repository_id SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name SET STORAGE EXTERNAL;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN tool_name SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN tool_name SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN event_type SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN event_type SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN model SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN model SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN tokens_in SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN tokens_out SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN tokens_total SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN cost_usd SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN cost_usd SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN metadata SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN metadata SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN _ts_meta_min_1 SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN _ts_meta_max_1 SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN occurred_at SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN created_at SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN duration_ms SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN _ts_meta_v2_bloomg_id_occurred_at SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN _ts_meta_v2_bloomg_id_occurred_at SET STORAGE MAIN;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id_occurred_at SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id_occurred_at SET STORAGE MAIN;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name_occurred_at SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1409_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name_occurred_at SET STORAGE MAIN;
-
-
---
--- Name: compress_hyper_2_1410_chunk; Type: TABLE; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE TABLE _timescaledb_internal.compress_hyper_2_1410_chunk (
-    _ts_meta_count integer,
-    user_id uuid,
-    organization_id uuid,
-    _ts_meta_v2_bloomg_id _timescaledb_internal.bloom1,
-    id _timescaledb_internal.compressed_data,
-    _ts_meta_v2_bloomg_project_id _timescaledb_internal.bloom1,
-    project_id _timescaledb_internal.compressed_data,
-    repository_id _timescaledb_internal.compressed_data,
-    _ts_meta_v2_bloomg_tool_name _timescaledb_internal.bloom1,
-    tool_name _timescaledb_internal.compressed_data,
-    event_type _timescaledb_internal.compressed_data,
-    model _timescaledb_internal.compressed_data,
-    tokens_in _timescaledb_internal.compressed_data,
-    tokens_out _timescaledb_internal.compressed_data,
-    tokens_total _timescaledb_internal.compressed_data,
-    cost_usd _timescaledb_internal.compressed_data,
-    metadata _timescaledb_internal.compressed_data,
-    _ts_meta_min_1 timestamp with time zone,
-    _ts_meta_max_1 timestamp with time zone,
-    occurred_at _timescaledb_internal.compressed_data,
-    created_at _timescaledb_internal.compressed_data,
-    duration_ms _timescaledb_internal.compressed_data,
-    _ts_meta_v2_bloomg_id_occurred_at _timescaledb_internal.bloom1,
-    _ts_meta_v2_bloomg_project_id_occurred_at _timescaledb_internal.bloom1,
-    _ts_meta_v2_bloomg_tool_name_occurred_at _timescaledb_internal.bloom1
-)
-WITH (toast_tuple_target='128');
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN _ts_meta_count SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN user_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN organization_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN _ts_meta_v2_bloomg_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN _ts_meta_v2_bloomg_id SET STORAGE EXTERNAL;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN id SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id SET STORAGE EXTERNAL;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN project_id SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN repository_id SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name SET STORAGE EXTERNAL;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN tool_name SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN tool_name SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN event_type SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN event_type SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN model SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN model SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN tokens_in SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN tokens_out SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN tokens_total SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN cost_usd SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN cost_usd SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN metadata SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN metadata SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN _ts_meta_min_1 SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN _ts_meta_max_1 SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN occurred_at SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN created_at SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN duration_ms SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN _ts_meta_v2_bloomg_id_occurred_at SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN _ts_meta_v2_bloomg_id_occurred_at SET STORAGE MAIN;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id_occurred_at SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id_occurred_at SET STORAGE MAIN;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name_occurred_at SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1410_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name_occurred_at SET STORAGE MAIN;
-
-
---
--- Name: compress_hyper_2_1411_chunk; Type: TABLE; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE TABLE _timescaledb_internal.compress_hyper_2_1411_chunk (
-    _ts_meta_count integer,
-    user_id uuid,
-    organization_id uuid,
-    _ts_meta_v2_bloomg_id _timescaledb_internal.bloom1,
-    id _timescaledb_internal.compressed_data,
-    _ts_meta_v2_bloomg_project_id _timescaledb_internal.bloom1,
-    project_id _timescaledb_internal.compressed_data,
-    repository_id _timescaledb_internal.compressed_data,
-    _ts_meta_v2_bloomg_tool_name _timescaledb_internal.bloom1,
-    tool_name _timescaledb_internal.compressed_data,
-    event_type _timescaledb_internal.compressed_data,
-    model _timescaledb_internal.compressed_data,
-    tokens_in _timescaledb_internal.compressed_data,
-    tokens_out _timescaledb_internal.compressed_data,
-    tokens_total _timescaledb_internal.compressed_data,
-    cost_usd _timescaledb_internal.compressed_data,
-    metadata _timescaledb_internal.compressed_data,
-    _ts_meta_min_1 timestamp with time zone,
-    _ts_meta_max_1 timestamp with time zone,
-    occurred_at _timescaledb_internal.compressed_data,
-    created_at _timescaledb_internal.compressed_data,
-    duration_ms _timescaledb_internal.compressed_data,
-    _ts_meta_v2_bloomg_id_occurred_at _timescaledb_internal.bloom1,
-    _ts_meta_v2_bloomg_project_id_occurred_at _timescaledb_internal.bloom1,
-    _ts_meta_v2_bloomg_tool_name_occurred_at _timescaledb_internal.bloom1
-)
-WITH (toast_tuple_target='128');
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN _ts_meta_count SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN user_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN organization_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN _ts_meta_v2_bloomg_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN _ts_meta_v2_bloomg_id SET STORAGE EXTERNAL;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN id SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id SET STORAGE EXTERNAL;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN project_id SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN repository_id SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name SET STORAGE EXTERNAL;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN tool_name SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN tool_name SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN event_type SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN event_type SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN model SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN model SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN tokens_in SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN tokens_out SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN tokens_total SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN cost_usd SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN cost_usd SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN metadata SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN metadata SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN _ts_meta_min_1 SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN _ts_meta_max_1 SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN occurred_at SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN created_at SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN duration_ms SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN _ts_meta_v2_bloomg_id_occurred_at SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN _ts_meta_v2_bloomg_id_occurred_at SET STORAGE MAIN;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id_occurred_at SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id_occurred_at SET STORAGE MAIN;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name_occurred_at SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1411_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name_occurred_at SET STORAGE MAIN;
-
-
---
--- Name: compress_hyper_2_1412_chunk; Type: TABLE; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE TABLE _timescaledb_internal.compress_hyper_2_1412_chunk (
-    _ts_meta_count integer,
-    user_id uuid,
-    organization_id uuid,
-    _ts_meta_v2_bloomg_id _timescaledb_internal.bloom1,
-    id _timescaledb_internal.compressed_data,
-    _ts_meta_v2_bloomg_project_id _timescaledb_internal.bloom1,
-    project_id _timescaledb_internal.compressed_data,
-    repository_id _timescaledb_internal.compressed_data,
-    _ts_meta_v2_bloomg_tool_name _timescaledb_internal.bloom1,
-    tool_name _timescaledb_internal.compressed_data,
-    event_type _timescaledb_internal.compressed_data,
-    model _timescaledb_internal.compressed_data,
-    tokens_in _timescaledb_internal.compressed_data,
-    tokens_out _timescaledb_internal.compressed_data,
-    tokens_total _timescaledb_internal.compressed_data,
-    cost_usd _timescaledb_internal.compressed_data,
-    metadata _timescaledb_internal.compressed_data,
-    _ts_meta_min_1 timestamp with time zone,
-    _ts_meta_max_1 timestamp with time zone,
-    occurred_at _timescaledb_internal.compressed_data,
-    created_at _timescaledb_internal.compressed_data,
-    duration_ms _timescaledb_internal.compressed_data,
-    _ts_meta_v2_bloomg_id_occurred_at _timescaledb_internal.bloom1,
-    _ts_meta_v2_bloomg_project_id_occurred_at _timescaledb_internal.bloom1,
-    _ts_meta_v2_bloomg_tool_name_occurred_at _timescaledb_internal.bloom1
-)
-WITH (toast_tuple_target='128');
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN _ts_meta_count SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN user_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN organization_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN _ts_meta_v2_bloomg_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN _ts_meta_v2_bloomg_id SET STORAGE EXTERNAL;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN id SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id SET STORAGE EXTERNAL;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN project_id SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN repository_id SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name SET STORAGE EXTERNAL;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN tool_name SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN tool_name SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN event_type SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN event_type SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN model SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN model SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN tokens_in SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN tokens_out SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN tokens_total SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN cost_usd SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN cost_usd SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN metadata SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN metadata SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN _ts_meta_min_1 SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN _ts_meta_max_1 SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN occurred_at SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN created_at SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN duration_ms SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN _ts_meta_v2_bloomg_id_occurred_at SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN _ts_meta_v2_bloomg_id_occurred_at SET STORAGE MAIN;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id_occurred_at SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id_occurred_at SET STORAGE MAIN;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name_occurred_at SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1412_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name_occurred_at SET STORAGE MAIN;
-
-
---
--- Name: compress_hyper_2_1413_chunk; Type: TABLE; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE TABLE _timescaledb_internal.compress_hyper_2_1413_chunk (
-    _ts_meta_count integer,
-    user_id uuid,
-    organization_id uuid,
-    _ts_meta_v2_bloomg_id _timescaledb_internal.bloom1,
-    id _timescaledb_internal.compressed_data,
-    _ts_meta_v2_bloomg_project_id _timescaledb_internal.bloom1,
-    project_id _timescaledb_internal.compressed_data,
-    repository_id _timescaledb_internal.compressed_data,
-    _ts_meta_v2_bloomg_tool_name _timescaledb_internal.bloom1,
-    tool_name _timescaledb_internal.compressed_data,
-    event_type _timescaledb_internal.compressed_data,
-    model _timescaledb_internal.compressed_data,
-    tokens_in _timescaledb_internal.compressed_data,
-    tokens_out _timescaledb_internal.compressed_data,
-    tokens_total _timescaledb_internal.compressed_data,
-    cost_usd _timescaledb_internal.compressed_data,
-    metadata _timescaledb_internal.compressed_data,
-    _ts_meta_min_1 timestamp with time zone,
-    _ts_meta_max_1 timestamp with time zone,
-    occurred_at _timescaledb_internal.compressed_data,
-    created_at _timescaledb_internal.compressed_data,
-    duration_ms _timescaledb_internal.compressed_data,
-    _ts_meta_v2_bloomg_id_occurred_at _timescaledb_internal.bloom1,
-    _ts_meta_v2_bloomg_project_id_occurred_at _timescaledb_internal.bloom1,
-    _ts_meta_v2_bloomg_tool_name_occurred_at _timescaledb_internal.bloom1
-)
-WITH (toast_tuple_target='128');
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN _ts_meta_count SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN user_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN organization_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN _ts_meta_v2_bloomg_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN _ts_meta_v2_bloomg_id SET STORAGE EXTERNAL;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN id SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id SET STORAGE EXTERNAL;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN project_id SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN repository_id SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name SET STORAGE EXTERNAL;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN tool_name SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN tool_name SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN event_type SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN event_type SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN model SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN model SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN tokens_in SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN tokens_out SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN tokens_total SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN cost_usd SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN cost_usd SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN metadata SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN metadata SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN _ts_meta_min_1 SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN _ts_meta_max_1 SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN occurred_at SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN created_at SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN duration_ms SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN _ts_meta_v2_bloomg_id_occurred_at SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN _ts_meta_v2_bloomg_id_occurred_at SET STORAGE MAIN;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id_occurred_at SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id_occurred_at SET STORAGE MAIN;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name_occurred_at SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1413_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name_occurred_at SET STORAGE MAIN;
-
-
---
--- Name: compress_hyper_2_1414_chunk; Type: TABLE; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE TABLE _timescaledb_internal.compress_hyper_2_1414_chunk (
-    _ts_meta_count integer,
-    user_id uuid,
-    organization_id uuid,
-    _ts_meta_v2_bloomg_id _timescaledb_internal.bloom1,
-    id _timescaledb_internal.compressed_data,
-    _ts_meta_v2_bloomg_project_id _timescaledb_internal.bloom1,
-    project_id _timescaledb_internal.compressed_data,
-    repository_id _timescaledb_internal.compressed_data,
-    _ts_meta_v2_bloomg_tool_name _timescaledb_internal.bloom1,
-    tool_name _timescaledb_internal.compressed_data,
-    event_type _timescaledb_internal.compressed_data,
-    model _timescaledb_internal.compressed_data,
-    tokens_in _timescaledb_internal.compressed_data,
-    tokens_out _timescaledb_internal.compressed_data,
-    tokens_total _timescaledb_internal.compressed_data,
-    cost_usd _timescaledb_internal.compressed_data,
-    metadata _timescaledb_internal.compressed_data,
-    _ts_meta_min_1 timestamp with time zone,
-    _ts_meta_max_1 timestamp with time zone,
-    occurred_at _timescaledb_internal.compressed_data,
-    created_at _timescaledb_internal.compressed_data,
-    duration_ms _timescaledb_internal.compressed_data,
-    _ts_meta_v2_bloomg_id_occurred_at _timescaledb_internal.bloom1,
-    _ts_meta_v2_bloomg_project_id_occurred_at _timescaledb_internal.bloom1,
-    _ts_meta_v2_bloomg_tool_name_occurred_at _timescaledb_internal.bloom1
-)
-WITH (toast_tuple_target='128');
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN _ts_meta_count SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN user_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN organization_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN _ts_meta_v2_bloomg_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN _ts_meta_v2_bloomg_id SET STORAGE EXTERNAL;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN id SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id SET STORAGE EXTERNAL;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN project_id SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN repository_id SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name SET STORAGE EXTERNAL;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN tool_name SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN tool_name SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN event_type SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN event_type SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN model SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN model SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN tokens_in SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN tokens_out SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN tokens_total SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN cost_usd SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN cost_usd SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN metadata SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN metadata SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN _ts_meta_min_1 SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN _ts_meta_max_1 SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN occurred_at SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN created_at SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN duration_ms SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN _ts_meta_v2_bloomg_id_occurred_at SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN _ts_meta_v2_bloomg_id_occurred_at SET STORAGE MAIN;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id_occurred_at SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id_occurred_at SET STORAGE MAIN;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name_occurred_at SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1414_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name_occurred_at SET STORAGE MAIN;
-
-
---
--- Name: compress_hyper_2_1415_chunk; Type: TABLE; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE TABLE _timescaledb_internal.compress_hyper_2_1415_chunk (
-    _ts_meta_count integer,
-    user_id uuid,
-    organization_id uuid,
-    _ts_meta_v2_bloomg_id _timescaledb_internal.bloom1,
-    id _timescaledb_internal.compressed_data,
-    _ts_meta_v2_bloomg_project_id _timescaledb_internal.bloom1,
-    project_id _timescaledb_internal.compressed_data,
-    repository_id _timescaledb_internal.compressed_data,
-    _ts_meta_v2_bloomg_tool_name _timescaledb_internal.bloom1,
-    tool_name _timescaledb_internal.compressed_data,
-    event_type _timescaledb_internal.compressed_data,
-    model _timescaledb_internal.compressed_data,
-    tokens_in _timescaledb_internal.compressed_data,
-    tokens_out _timescaledb_internal.compressed_data,
-    tokens_total _timescaledb_internal.compressed_data,
-    cost_usd _timescaledb_internal.compressed_data,
-    metadata _timescaledb_internal.compressed_data,
-    _ts_meta_min_1 timestamp with time zone,
-    _ts_meta_max_1 timestamp with time zone,
-    occurred_at _timescaledb_internal.compressed_data,
-    created_at _timescaledb_internal.compressed_data,
-    duration_ms _timescaledb_internal.compressed_data,
-    _ts_meta_v2_bloomg_id_occurred_at _timescaledb_internal.bloom1,
-    _ts_meta_v2_bloomg_project_id_occurred_at _timescaledb_internal.bloom1,
-    _ts_meta_v2_bloomg_tool_name_occurred_at _timescaledb_internal.bloom1
-)
-WITH (toast_tuple_target='128');
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN _ts_meta_count SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN user_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN organization_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN _ts_meta_v2_bloomg_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN _ts_meta_v2_bloomg_id SET STORAGE EXTERNAL;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN id SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id SET STORAGE EXTERNAL;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN project_id SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN repository_id SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name SET STORAGE EXTERNAL;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN tool_name SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN tool_name SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN event_type SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN event_type SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN model SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN model SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN tokens_in SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN tokens_out SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN tokens_total SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN cost_usd SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN cost_usd SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN metadata SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN metadata SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN _ts_meta_min_1 SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN _ts_meta_max_1 SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN occurred_at SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN created_at SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN duration_ms SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN _ts_meta_v2_bloomg_id_occurred_at SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN _ts_meta_v2_bloomg_id_occurred_at SET STORAGE MAIN;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id_occurred_at SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id_occurred_at SET STORAGE MAIN;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name_occurred_at SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1415_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name_occurred_at SET STORAGE MAIN;
-
-
---
--- Name: compress_hyper_2_1416_chunk; Type: TABLE; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE TABLE _timescaledb_internal.compress_hyper_2_1416_chunk (
-    _ts_meta_count integer,
-    user_id uuid,
-    organization_id uuid,
-    _ts_meta_v2_bloomg_id _timescaledb_internal.bloom1,
-    id _timescaledb_internal.compressed_data,
-    _ts_meta_v2_bloomg_project_id _timescaledb_internal.bloom1,
-    project_id _timescaledb_internal.compressed_data,
-    repository_id _timescaledb_internal.compressed_data,
-    _ts_meta_v2_bloomg_tool_name _timescaledb_internal.bloom1,
-    tool_name _timescaledb_internal.compressed_data,
-    event_type _timescaledb_internal.compressed_data,
-    model _timescaledb_internal.compressed_data,
-    tokens_in _timescaledb_internal.compressed_data,
-    tokens_out _timescaledb_internal.compressed_data,
-    tokens_total _timescaledb_internal.compressed_data,
-    cost_usd _timescaledb_internal.compressed_data,
-    metadata _timescaledb_internal.compressed_data,
-    _ts_meta_min_1 timestamp with time zone,
-    _ts_meta_max_1 timestamp with time zone,
-    occurred_at _timescaledb_internal.compressed_data,
-    created_at _timescaledb_internal.compressed_data,
-    duration_ms _timescaledb_internal.compressed_data,
-    _ts_meta_v2_bloomg_id_occurred_at _timescaledb_internal.bloom1,
-    _ts_meta_v2_bloomg_project_id_occurred_at _timescaledb_internal.bloom1,
-    _ts_meta_v2_bloomg_tool_name_occurred_at _timescaledb_internal.bloom1
-)
-WITH (toast_tuple_target='128');
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN _ts_meta_count SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN user_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN organization_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN _ts_meta_v2_bloomg_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN _ts_meta_v2_bloomg_id SET STORAGE EXTERNAL;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN id SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id SET STORAGE EXTERNAL;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN project_id SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN repository_id SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name SET STORAGE EXTERNAL;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN tool_name SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN tool_name SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN event_type SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN event_type SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN model SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN model SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN tokens_in SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN tokens_out SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN tokens_total SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN cost_usd SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN cost_usd SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN metadata SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN metadata SET STORAGE EXTENDED;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN _ts_meta_min_1 SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN _ts_meta_max_1 SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN occurred_at SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN created_at SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN duration_ms SET STATISTICS 0;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN _ts_meta_v2_bloomg_id_occurred_at SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN _ts_meta_v2_bloomg_id_occurred_at SET STORAGE MAIN;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id_occurred_at SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN _ts_meta_v2_bloomg_project_id_occurred_at SET STORAGE MAIN;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name_occurred_at SET STATISTICS 1000;
-ALTER TABLE ONLY _timescaledb_internal.compress_hyper_2_1416_chunk ALTER COLUMN _ts_meta_v2_bloomg_tool_name_occurred_at SET STORAGE MAIN;
-
-
 --
 -- Name: admin_audit_logs; Type: TABLE; Schema: public; Owner: -
 --
@@ -1111,7 +348,6 @@ CREATE TABLE public.admin_audit_logs (
     created_at timestamp(6) without time zone NOT NULL
 );
 
-
 --
 -- Name: ar_internal_metadata; Type: TABLE; Schema: public; Owner: -
 --
@@ -1122,7 +358,6 @@ CREATE TABLE public.ar_internal_metadata (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL
 );
-
 
 --
 -- Name: audit_logs; Type: TABLE; Schema: public; Owner: -
@@ -1143,7 +378,6 @@ CREATE TABLE public.audit_logs (
     created_at timestamp(6) without time zone NOT NULL
 );
 
-
 --
 -- Name: connector_event_dedup; Type: TABLE; Schema: public; Owner: -
 --
@@ -1159,7 +393,6 @@ CREATE TABLE public.connector_event_dedup (
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
-
 --
 -- Name: connector_event_dedup_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
@@ -1171,13 +404,11 @@ CREATE SEQUENCE public.connector_event_dedup_id_seq
     NO MAXVALUE
     CACHE 1;
 
-
 --
 -- Name: connector_event_dedup_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.connector_event_dedup_id_seq OWNED BY public.connector_event_dedup.id;
-
 
 --
 -- Name: invitations; Type: TABLE; Schema: public; Owner: -
@@ -1196,7 +427,6 @@ CREATE TABLE public.invitations (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL
 );
-
 
 --
 -- Name: issues; Type: TABLE; Schema: public; Owner: -
@@ -1232,6 +462,19 @@ CREATE TABLE public.issues (
     updated_at timestamp(6) without time zone NOT NULL
 );
 
+--
+-- Name: model_pricing_overrides; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.model_pricing_overrides (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    model_pattern character varying NOT NULL,
+    input_per_mtok numeric(10,6) NOT NULL,
+    output_per_mtok numeric(10,6) NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
 
 --
 -- Name: organization_audit_logs; Type: TABLE; Schema: public; Owner: -
@@ -1249,7 +492,6 @@ CREATE TABLE public.organization_audit_logs (
     ip_address character varying,
     created_at timestamp(6) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
-
 
 --
 -- Name: organization_connectors; Type: TABLE; Schema: public; Owner: -
@@ -1282,7 +524,6 @@ CREATE TABLE public.organization_connectors (
     connector_scope character varying DEFAULT 'org'::character varying NOT NULL
 );
 
-
 --
 -- Name: organization_memberships; Type: TABLE; Schema: public; Owner: -
 --
@@ -1295,7 +536,6 @@ CREATE TABLE public.organization_memberships (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL
 );
-
 
 --
 -- Name: organization_retention_policies; Type: TABLE; Schema: public; Owner: -
@@ -1314,7 +554,6 @@ CREATE TABLE public.organization_retention_policies (
     updated_at timestamp(6) without time zone NOT NULL
 );
 
-
 --
 -- Name: organization_settings; Type: TABLE; Schema: public; Owner: -
 --
@@ -1327,7 +566,6 @@ CREATE TABLE public.organization_settings (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL
 );
-
 
 --
 -- Name: organizations; Type: TABLE; Schema: public; Owner: -
@@ -1342,7 +580,6 @@ CREATE TABLE public.organizations (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL
 );
-
 
 --
 -- Name: project_audit_logs; Type: TABLE; Schema: public; Owner: -
@@ -1360,7 +597,6 @@ CREATE TABLE public.project_audit_logs (
     ip_address character varying,
     created_at timestamp(6) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
-
 
 --
 -- Name: project_connectors; Type: TABLE; Schema: public; Owner: -
@@ -1387,7 +623,6 @@ CREATE TABLE public.project_connectors (
     connector_scope character varying DEFAULT 'project'::character varying NOT NULL
 );
 
-
 --
 -- Name: project_memberships; Type: TABLE; Schema: public; Owner: -
 --
@@ -1400,7 +635,6 @@ CREATE TABLE public.project_memberships (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL
 );
-
 
 --
 -- Name: project_retention_policies; Type: TABLE; Schema: public; Owner: -
@@ -1419,7 +653,6 @@ CREATE TABLE public.project_retention_policies (
     updated_at timestamp(6) without time zone NOT NULL
 );
 
-
 --
 -- Name: project_settings; Type: TABLE; Schema: public; Owner: -
 --
@@ -1432,7 +665,6 @@ CREATE TABLE public.project_settings (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL
 );
-
 
 --
 -- Name: projects; Type: TABLE; Schema: public; Owner: -
@@ -1451,7 +683,6 @@ CREATE TABLE public.projects (
     repository_url character varying,
     git_remote_url character varying
 );
-
 
 --
 -- Name: repositories; Type: TABLE; Schema: public; Owner: -
@@ -1475,7 +706,6 @@ CREATE TABLE public.repositories (
     html_url character varying
 );
 
-
 --
 -- Name: sanitization_policies; Type: TABLE; Schema: public; Owner: -
 --
@@ -1497,7 +727,6 @@ CREATE TABLE public.sanitization_policies (
     priority integer DEFAULT 0 NOT NULL
 );
 
-
 --
 -- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
 --
@@ -1505,7 +734,6 @@ CREATE TABLE public.sanitization_policies (
 CREATE TABLE public.schema_migrations (
     version character varying NOT NULL
 );
-
 
 --
 -- Name: user_settings; Type: TABLE; Schema: public; Owner: -
@@ -1519,7 +747,6 @@ CREATE TABLE public.user_settings (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL
 );
-
 
 --
 -- Name: user_tool_accounts; Type: TABLE; Schema: public; Owner: -
@@ -1544,7 +771,6 @@ CREATE TABLE public.user_tool_accounts (
     connector_scope character varying DEFAULT 'persona'::character varying NOT NULL
 );
 
-
 --
 -- Name: users; Type: TABLE; Schema: public; Owner: -
 --
@@ -1561,7 +787,6 @@ CREATE TABLE public.users (
     last_sign_in_at timestamp(6) without time zone,
     last_login_at timestamp(6) without time zone
 );
-
 
 --
 -- Name: webhook_deliveries; Type: TABLE; Schema: public; Owner: -
@@ -1582,7 +807,6 @@ CREATE TABLE public.webhook_deliveries (
     updated_at timestamp(6) without time zone NOT NULL
 );
 
-
 --
 -- Name: daily_token_usage; Type: VIEW; Schema: timeseries; Owner: -
 --
@@ -1600,7 +824,6 @@ CREATE VIEW timeseries.daily_token_usage AS
     total_tokens,
     total_cost
    FROM _timescaledb_internal._materialized_hypertable_4;
-
 
 --
 -- Name: hourly_token_usage; Type: VIEW; Schema: timeseries; Owner: -
@@ -1620,583 +843,11 @@ CREATE VIEW timeseries.hourly_token_usage AS
     total_cost
    FROM _timescaledb_internal._materialized_hypertable_3;
 
-
---
--- Name: _hyper_1_1397_chunk id; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1397_chunk ALTER COLUMN id SET DEFAULT gen_random_uuid();
-
-
---
--- Name: _hyper_1_1397_chunk tokens_in; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1397_chunk ALTER COLUMN tokens_in SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1397_chunk tokens_out; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1397_chunk ALTER COLUMN tokens_out SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1397_chunk tokens_total; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1397_chunk ALTER COLUMN tokens_total SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1397_chunk cost_usd; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1397_chunk ALTER COLUMN cost_usd SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1397_chunk metadata; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1397_chunk ALTER COLUMN metadata SET DEFAULT '{}'::jsonb;
-
-
---
--- Name: _hyper_1_1397_chunk created_at; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1397_chunk ALTER COLUMN created_at SET DEFAULT now();
-
-
---
--- Name: _hyper_1_1398_chunk id; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1398_chunk ALTER COLUMN id SET DEFAULT gen_random_uuid();
-
-
---
--- Name: _hyper_1_1398_chunk tokens_in; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1398_chunk ALTER COLUMN tokens_in SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1398_chunk tokens_out; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1398_chunk ALTER COLUMN tokens_out SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1398_chunk tokens_total; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1398_chunk ALTER COLUMN tokens_total SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1398_chunk cost_usd; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1398_chunk ALTER COLUMN cost_usd SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1398_chunk metadata; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1398_chunk ALTER COLUMN metadata SET DEFAULT '{}'::jsonb;
-
-
---
--- Name: _hyper_1_1398_chunk created_at; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1398_chunk ALTER COLUMN created_at SET DEFAULT now();
-
-
---
--- Name: _hyper_1_1399_chunk id; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1399_chunk ALTER COLUMN id SET DEFAULT gen_random_uuid();
-
-
---
--- Name: _hyper_1_1399_chunk tokens_in; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1399_chunk ALTER COLUMN tokens_in SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1399_chunk tokens_out; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1399_chunk ALTER COLUMN tokens_out SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1399_chunk tokens_total; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1399_chunk ALTER COLUMN tokens_total SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1399_chunk cost_usd; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1399_chunk ALTER COLUMN cost_usd SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1399_chunk metadata; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1399_chunk ALTER COLUMN metadata SET DEFAULT '{}'::jsonb;
-
-
---
--- Name: _hyper_1_1399_chunk created_at; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1399_chunk ALTER COLUMN created_at SET DEFAULT now();
-
-
---
--- Name: _hyper_1_1400_chunk id; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1400_chunk ALTER COLUMN id SET DEFAULT gen_random_uuid();
-
-
---
--- Name: _hyper_1_1400_chunk tokens_in; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1400_chunk ALTER COLUMN tokens_in SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1400_chunk tokens_out; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1400_chunk ALTER COLUMN tokens_out SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1400_chunk tokens_total; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1400_chunk ALTER COLUMN tokens_total SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1400_chunk cost_usd; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1400_chunk ALTER COLUMN cost_usd SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1400_chunk metadata; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1400_chunk ALTER COLUMN metadata SET DEFAULT '{}'::jsonb;
-
-
---
--- Name: _hyper_1_1400_chunk created_at; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1400_chunk ALTER COLUMN created_at SET DEFAULT now();
-
-
---
--- Name: _hyper_1_1401_chunk id; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1401_chunk ALTER COLUMN id SET DEFAULT gen_random_uuid();
-
-
---
--- Name: _hyper_1_1401_chunk tokens_in; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1401_chunk ALTER COLUMN tokens_in SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1401_chunk tokens_out; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1401_chunk ALTER COLUMN tokens_out SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1401_chunk tokens_total; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1401_chunk ALTER COLUMN tokens_total SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1401_chunk cost_usd; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1401_chunk ALTER COLUMN cost_usd SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1401_chunk metadata; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1401_chunk ALTER COLUMN metadata SET DEFAULT '{}'::jsonb;
-
-
---
--- Name: _hyper_1_1401_chunk created_at; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1401_chunk ALTER COLUMN created_at SET DEFAULT now();
-
-
---
--- Name: _hyper_1_1402_chunk id; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1402_chunk ALTER COLUMN id SET DEFAULT gen_random_uuid();
-
-
---
--- Name: _hyper_1_1402_chunk tokens_in; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1402_chunk ALTER COLUMN tokens_in SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1402_chunk tokens_out; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1402_chunk ALTER COLUMN tokens_out SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1402_chunk tokens_total; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1402_chunk ALTER COLUMN tokens_total SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1402_chunk cost_usd; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1402_chunk ALTER COLUMN cost_usd SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1402_chunk metadata; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1402_chunk ALTER COLUMN metadata SET DEFAULT '{}'::jsonb;
-
-
---
--- Name: _hyper_1_1402_chunk created_at; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1402_chunk ALTER COLUMN created_at SET DEFAULT now();
-
-
---
--- Name: _hyper_1_1403_chunk id; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1403_chunk ALTER COLUMN id SET DEFAULT gen_random_uuid();
-
-
---
--- Name: _hyper_1_1403_chunk tokens_in; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1403_chunk ALTER COLUMN tokens_in SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1403_chunk tokens_out; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1403_chunk ALTER COLUMN tokens_out SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1403_chunk tokens_total; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1403_chunk ALTER COLUMN tokens_total SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1403_chunk cost_usd; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1403_chunk ALTER COLUMN cost_usd SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1403_chunk metadata; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1403_chunk ALTER COLUMN metadata SET DEFAULT '{}'::jsonb;
-
-
---
--- Name: _hyper_1_1403_chunk created_at; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1403_chunk ALTER COLUMN created_at SET DEFAULT now();
-
-
---
--- Name: _hyper_1_1404_chunk id; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1404_chunk ALTER COLUMN id SET DEFAULT gen_random_uuid();
-
-
---
--- Name: _hyper_1_1404_chunk tokens_in; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1404_chunk ALTER COLUMN tokens_in SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1404_chunk tokens_out; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1404_chunk ALTER COLUMN tokens_out SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1404_chunk tokens_total; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1404_chunk ALTER COLUMN tokens_total SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1404_chunk cost_usd; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1404_chunk ALTER COLUMN cost_usd SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1404_chunk metadata; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1404_chunk ALTER COLUMN metadata SET DEFAULT '{}'::jsonb;
-
-
---
--- Name: _hyper_1_1404_chunk created_at; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1404_chunk ALTER COLUMN created_at SET DEFAULT now();
-
-
---
--- Name: _hyper_1_1405_chunk id; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1405_chunk ALTER COLUMN id SET DEFAULT gen_random_uuid();
-
-
---
--- Name: _hyper_1_1405_chunk tokens_in; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1405_chunk ALTER COLUMN tokens_in SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1405_chunk tokens_out; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1405_chunk ALTER COLUMN tokens_out SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1405_chunk tokens_total; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1405_chunk ALTER COLUMN tokens_total SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1405_chunk cost_usd; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1405_chunk ALTER COLUMN cost_usd SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1405_chunk metadata; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1405_chunk ALTER COLUMN metadata SET DEFAULT '{}'::jsonb;
-
-
---
--- Name: _hyper_1_1405_chunk created_at; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1405_chunk ALTER COLUMN created_at SET DEFAULT now();
-
-
---
--- Name: _hyper_1_1406_chunk id; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1406_chunk ALTER COLUMN id SET DEFAULT gen_random_uuid();
-
-
---
--- Name: _hyper_1_1406_chunk tokens_in; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1406_chunk ALTER COLUMN tokens_in SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1406_chunk tokens_out; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1406_chunk ALTER COLUMN tokens_out SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1406_chunk tokens_total; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1406_chunk ALTER COLUMN tokens_total SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1406_chunk cost_usd; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1406_chunk ALTER COLUMN cost_usd SET DEFAULT 0;
-
-
---
--- Name: _hyper_1_1406_chunk metadata; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1406_chunk ALTER COLUMN metadata SET DEFAULT '{}'::jsonb;
-
-
---
--- Name: _hyper_1_1406_chunk created_at; Type: DEFAULT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1406_chunk ALTER COLUMN created_at SET DEFAULT now();
-
-
 --
 -- Name: connector_event_dedup id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.connector_event_dedup ALTER COLUMN id SET DEFAULT nextval('public.connector_event_dedup_id_seq'::regclass);
-
-
---
--- Name: _hyper_1_1397_chunk 1397_6982_tool_events_pkey; Type: CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1397_chunk
-    ADD CONSTRAINT "1397_6982_tool_events_pkey" PRIMARY KEY (id, occurred_at);
-
-
---
--- Name: _hyper_1_1398_chunk 1398_6987_tool_events_pkey; Type: CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1398_chunk
-    ADD CONSTRAINT "1398_6987_tool_events_pkey" PRIMARY KEY (id, occurred_at);
-
-
---
--- Name: _hyper_1_1399_chunk 1399_6992_tool_events_pkey; Type: CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1399_chunk
-    ADD CONSTRAINT "1399_6992_tool_events_pkey" PRIMARY KEY (id, occurred_at);
-
-
---
--- Name: _hyper_1_1400_chunk 1400_6997_tool_events_pkey; Type: CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1400_chunk
-    ADD CONSTRAINT "1400_6997_tool_events_pkey" PRIMARY KEY (id, occurred_at);
-
-
---
--- Name: _hyper_1_1401_chunk 1401_7002_tool_events_pkey; Type: CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1401_chunk
-    ADD CONSTRAINT "1401_7002_tool_events_pkey" PRIMARY KEY (id, occurred_at);
-
-
---
--- Name: _hyper_1_1402_chunk 1402_7007_tool_events_pkey; Type: CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1402_chunk
-    ADD CONSTRAINT "1402_7007_tool_events_pkey" PRIMARY KEY (id, occurred_at);
-
-
---
--- Name: _hyper_1_1403_chunk 1403_7012_tool_events_pkey; Type: CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1403_chunk
-    ADD CONSTRAINT "1403_7012_tool_events_pkey" PRIMARY KEY (id, occurred_at);
-
-
---
--- Name: _hyper_1_1404_chunk 1404_7017_tool_events_pkey; Type: CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1404_chunk
-    ADD CONSTRAINT "1404_7017_tool_events_pkey" PRIMARY KEY (id, occurred_at);
-
-
---
--- Name: _hyper_1_1405_chunk 1405_7022_tool_events_pkey; Type: CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1405_chunk
-    ADD CONSTRAINT "1405_7022_tool_events_pkey" PRIMARY KEY (id, occurred_at);
-
-
---
--- Name: _hyper_1_1406_chunk 1406_7027_tool_events_pkey; Type: CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1406_chunk
-    ADD CONSTRAINT "1406_7027_tool_events_pkey" PRIMARY KEY (id, occurred_at);
-
 
 --
 -- Name: admin_audit_logs admin_audit_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -2205,14 +856,12 @@ ALTER TABLE ONLY _timescaledb_internal._hyper_1_1406_chunk
 ALTER TABLE ONLY public.admin_audit_logs
     ADD CONSTRAINT admin_audit_logs_pkey PRIMARY KEY (id);
 
-
 --
 -- Name: ar_internal_metadata ar_internal_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.ar_internal_metadata
     ADD CONSTRAINT ar_internal_metadata_pkey PRIMARY KEY (key);
-
 
 --
 -- Name: audit_logs audit_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -2221,14 +870,12 @@ ALTER TABLE ONLY public.ar_internal_metadata
 ALTER TABLE ONLY public.audit_logs
     ADD CONSTRAINT audit_logs_pkey PRIMARY KEY (id);
 
-
 --
 -- Name: connector_event_dedup connector_event_dedup_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.connector_event_dedup
     ADD CONSTRAINT connector_event_dedup_pkey PRIMARY KEY (id);
-
 
 --
 -- Name: invitations invitations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -2237,7 +884,6 @@ ALTER TABLE ONLY public.connector_event_dedup
 ALTER TABLE ONLY public.invitations
     ADD CONSTRAINT invitations_pkey PRIMARY KEY (id);
 
-
 --
 -- Name: issues issues_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
@@ -2245,6 +891,12 @@ ALTER TABLE ONLY public.invitations
 ALTER TABLE ONLY public.issues
     ADD CONSTRAINT issues_pkey PRIMARY KEY (id);
 
+--
+-- Name: model_pricing_overrides model_pricing_overrides_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.model_pricing_overrides
+    ADD CONSTRAINT model_pricing_overrides_pkey PRIMARY KEY (id);
 
 --
 -- Name: organization_audit_logs organization_audit_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -2253,14 +905,12 @@ ALTER TABLE ONLY public.issues
 ALTER TABLE ONLY public.organization_audit_logs
     ADD CONSTRAINT organization_audit_logs_pkey PRIMARY KEY (id);
 
-
 --
 -- Name: organization_connectors organization_connectors_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.organization_connectors
     ADD CONSTRAINT organization_connectors_pkey PRIMARY KEY (id);
-
 
 --
 -- Name: organization_memberships organization_memberships_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -2269,14 +919,12 @@ ALTER TABLE ONLY public.organization_connectors
 ALTER TABLE ONLY public.organization_memberships
     ADD CONSTRAINT organization_memberships_pkey PRIMARY KEY (id);
 
-
 --
 -- Name: organization_retention_policies organization_retention_policies_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.organization_retention_policies
     ADD CONSTRAINT organization_retention_policies_pkey PRIMARY KEY (id);
-
 
 --
 -- Name: organization_settings organization_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -2285,14 +933,12 @@ ALTER TABLE ONLY public.organization_retention_policies
 ALTER TABLE ONLY public.organization_settings
     ADD CONSTRAINT organization_settings_pkey PRIMARY KEY (id);
 
-
 --
 -- Name: organizations organizations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.organizations
     ADD CONSTRAINT organizations_pkey PRIMARY KEY (id);
-
 
 --
 -- Name: project_audit_logs project_audit_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -2301,14 +947,12 @@ ALTER TABLE ONLY public.organizations
 ALTER TABLE ONLY public.project_audit_logs
     ADD CONSTRAINT project_audit_logs_pkey PRIMARY KEY (id);
 
-
 --
 -- Name: project_connectors project_connectors_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.project_connectors
     ADD CONSTRAINT project_connectors_pkey PRIMARY KEY (id);
-
 
 --
 -- Name: project_memberships project_memberships_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -2317,14 +961,12 @@ ALTER TABLE ONLY public.project_connectors
 ALTER TABLE ONLY public.project_memberships
     ADD CONSTRAINT project_memberships_pkey PRIMARY KEY (id);
 
-
 --
 -- Name: project_retention_policies project_retention_policies_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.project_retention_policies
     ADD CONSTRAINT project_retention_policies_pkey PRIMARY KEY (id);
-
 
 --
 -- Name: project_settings project_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -2333,14 +975,12 @@ ALTER TABLE ONLY public.project_retention_policies
 ALTER TABLE ONLY public.project_settings
     ADD CONSTRAINT project_settings_pkey PRIMARY KEY (id);
 
-
 --
 -- Name: projects projects_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.projects
     ADD CONSTRAINT projects_pkey PRIMARY KEY (id);
-
 
 --
 -- Name: repositories repositories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -2349,14 +989,12 @@ ALTER TABLE ONLY public.projects
 ALTER TABLE ONLY public.repositories
     ADD CONSTRAINT repositories_pkey PRIMARY KEY (id);
 
-
 --
 -- Name: sanitization_policies sanitization_policies_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.sanitization_policies
     ADD CONSTRAINT sanitization_policies_pkey PRIMARY KEY (id);
-
 
 --
 -- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -2365,14 +1003,12 @@ ALTER TABLE ONLY public.sanitization_policies
 ALTER TABLE ONLY public.schema_migrations
     ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
 
-
 --
 -- Name: user_settings user_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.user_settings
     ADD CONSTRAINT user_settings_pkey PRIMARY KEY (id);
-
 
 --
 -- Name: user_tool_accounts user_tool_accounts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -2381,14 +1017,12 @@ ALTER TABLE ONLY public.user_settings
 ALTER TABLE ONLY public.user_tool_accounts
     ADD CONSTRAINT user_tool_accounts_pkey PRIMARY KEY (id);
 
-
 --
 -- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT users_pkey PRIMARY KEY (id);
-
 
 --
 -- Name: webhook_deliveries webhook_deliveries_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -2397,7 +1031,6 @@ ALTER TABLE ONLY public.users
 ALTER TABLE ONLY public.webhook_deliveries
     ADD CONSTRAINT webhook_deliveries_pkey PRIMARY KEY (id);
 
-
 --
 -- Name: tool_events tool_events_pkey; Type: CONSTRAINT; Schema: timeseries; Owner: -
 --
@@ -2405,475 +1038,11 @@ ALTER TABLE ONLY public.webhook_deliveries
 ALTER TABLE ONLY timeseries.tool_events
     ADD CONSTRAINT tool_events_pkey PRIMARY KEY (id, occurred_at);
 
-
---
--- Name: _hyper_1_1397_chunk_idx_tool_events_org_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1397_chunk_idx_tool_events_org_occurred ON _timescaledb_internal._hyper_1_1397_chunk USING btree (organization_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1397_chunk_idx_tool_events_project_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1397_chunk_idx_tool_events_project_occurred ON _timescaledb_internal._hyper_1_1397_chunk USING btree (project_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1397_chunk_idx_tool_events_session_id; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1397_chunk_idx_tool_events_session_id ON _timescaledb_internal._hyper_1_1397_chunk USING btree (((metadata ->> 'session_id'::text))) WHERE ((metadata ->> 'session_id'::text) IS NOT NULL);
-
-
---
--- Name: _hyper_1_1397_chunk_idx_tool_events_tool_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1397_chunk_idx_tool_events_tool_occurred ON _timescaledb_internal._hyper_1_1397_chunk USING btree (tool_name, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1397_chunk_idx_tool_events_user_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1397_chunk_idx_tool_events_user_occurred ON _timescaledb_internal._hyper_1_1397_chunk USING btree (user_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1397_chunk_tool_events_occurred_at_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1397_chunk_tool_events_occurred_at_idx ON _timescaledb_internal._hyper_1_1397_chunk USING btree (occurred_at DESC);
-
-
---
--- Name: _hyper_1_1398_chunk_idx_tool_events_org_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1398_chunk_idx_tool_events_org_occurred ON _timescaledb_internal._hyper_1_1398_chunk USING btree (organization_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1398_chunk_idx_tool_events_project_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1398_chunk_idx_tool_events_project_occurred ON _timescaledb_internal._hyper_1_1398_chunk USING btree (project_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1398_chunk_idx_tool_events_session_id; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1398_chunk_idx_tool_events_session_id ON _timescaledb_internal._hyper_1_1398_chunk USING btree (((metadata ->> 'session_id'::text))) WHERE ((metadata ->> 'session_id'::text) IS NOT NULL);
-
-
---
--- Name: _hyper_1_1398_chunk_idx_tool_events_tool_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1398_chunk_idx_tool_events_tool_occurred ON _timescaledb_internal._hyper_1_1398_chunk USING btree (tool_name, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1398_chunk_idx_tool_events_user_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1398_chunk_idx_tool_events_user_occurred ON _timescaledb_internal._hyper_1_1398_chunk USING btree (user_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1398_chunk_tool_events_occurred_at_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1398_chunk_tool_events_occurred_at_idx ON _timescaledb_internal._hyper_1_1398_chunk USING btree (occurred_at DESC);
-
-
---
--- Name: _hyper_1_1399_chunk_idx_tool_events_org_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1399_chunk_idx_tool_events_org_occurred ON _timescaledb_internal._hyper_1_1399_chunk USING btree (organization_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1399_chunk_idx_tool_events_project_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1399_chunk_idx_tool_events_project_occurred ON _timescaledb_internal._hyper_1_1399_chunk USING btree (project_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1399_chunk_idx_tool_events_session_id; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1399_chunk_idx_tool_events_session_id ON _timescaledb_internal._hyper_1_1399_chunk USING btree (((metadata ->> 'session_id'::text))) WHERE ((metadata ->> 'session_id'::text) IS NOT NULL);
-
-
---
--- Name: _hyper_1_1399_chunk_idx_tool_events_tool_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1399_chunk_idx_tool_events_tool_occurred ON _timescaledb_internal._hyper_1_1399_chunk USING btree (tool_name, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1399_chunk_idx_tool_events_user_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1399_chunk_idx_tool_events_user_occurred ON _timescaledb_internal._hyper_1_1399_chunk USING btree (user_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1399_chunk_tool_events_occurred_at_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1399_chunk_tool_events_occurred_at_idx ON _timescaledb_internal._hyper_1_1399_chunk USING btree (occurred_at DESC);
-
-
---
--- Name: _hyper_1_1400_chunk_idx_tool_events_org_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1400_chunk_idx_tool_events_org_occurred ON _timescaledb_internal._hyper_1_1400_chunk USING btree (organization_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1400_chunk_idx_tool_events_project_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1400_chunk_idx_tool_events_project_occurred ON _timescaledb_internal._hyper_1_1400_chunk USING btree (project_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1400_chunk_idx_tool_events_session_id; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1400_chunk_idx_tool_events_session_id ON _timescaledb_internal._hyper_1_1400_chunk USING btree (((metadata ->> 'session_id'::text))) WHERE ((metadata ->> 'session_id'::text) IS NOT NULL);
-
-
---
--- Name: _hyper_1_1400_chunk_idx_tool_events_tool_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1400_chunk_idx_tool_events_tool_occurred ON _timescaledb_internal._hyper_1_1400_chunk USING btree (tool_name, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1400_chunk_idx_tool_events_user_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1400_chunk_idx_tool_events_user_occurred ON _timescaledb_internal._hyper_1_1400_chunk USING btree (user_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1400_chunk_tool_events_occurred_at_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1400_chunk_tool_events_occurred_at_idx ON _timescaledb_internal._hyper_1_1400_chunk USING btree (occurred_at DESC);
-
-
---
--- Name: _hyper_1_1401_chunk_idx_tool_events_org_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1401_chunk_idx_tool_events_org_occurred ON _timescaledb_internal._hyper_1_1401_chunk USING btree (organization_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1401_chunk_idx_tool_events_project_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1401_chunk_idx_tool_events_project_occurred ON _timescaledb_internal._hyper_1_1401_chunk USING btree (project_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1401_chunk_idx_tool_events_session_id; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1401_chunk_idx_tool_events_session_id ON _timescaledb_internal._hyper_1_1401_chunk USING btree (((metadata ->> 'session_id'::text))) WHERE ((metadata ->> 'session_id'::text) IS NOT NULL);
-
-
---
--- Name: _hyper_1_1401_chunk_idx_tool_events_tool_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1401_chunk_idx_tool_events_tool_occurred ON _timescaledb_internal._hyper_1_1401_chunk USING btree (tool_name, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1401_chunk_idx_tool_events_user_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1401_chunk_idx_tool_events_user_occurred ON _timescaledb_internal._hyper_1_1401_chunk USING btree (user_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1401_chunk_tool_events_occurred_at_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1401_chunk_tool_events_occurred_at_idx ON _timescaledb_internal._hyper_1_1401_chunk USING btree (occurred_at DESC);
-
-
---
--- Name: _hyper_1_1402_chunk_idx_tool_events_org_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1402_chunk_idx_tool_events_org_occurred ON _timescaledb_internal._hyper_1_1402_chunk USING btree (organization_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1402_chunk_idx_tool_events_project_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1402_chunk_idx_tool_events_project_occurred ON _timescaledb_internal._hyper_1_1402_chunk USING btree (project_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1402_chunk_idx_tool_events_session_id; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1402_chunk_idx_tool_events_session_id ON _timescaledb_internal._hyper_1_1402_chunk USING btree (((metadata ->> 'session_id'::text))) WHERE ((metadata ->> 'session_id'::text) IS NOT NULL);
-
-
---
--- Name: _hyper_1_1402_chunk_idx_tool_events_tool_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1402_chunk_idx_tool_events_tool_occurred ON _timescaledb_internal._hyper_1_1402_chunk USING btree (tool_name, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1402_chunk_idx_tool_events_user_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1402_chunk_idx_tool_events_user_occurred ON _timescaledb_internal._hyper_1_1402_chunk USING btree (user_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1402_chunk_tool_events_occurred_at_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1402_chunk_tool_events_occurred_at_idx ON _timescaledb_internal._hyper_1_1402_chunk USING btree (occurred_at DESC);
-
-
---
--- Name: _hyper_1_1403_chunk_idx_tool_events_org_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1403_chunk_idx_tool_events_org_occurred ON _timescaledb_internal._hyper_1_1403_chunk USING btree (organization_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1403_chunk_idx_tool_events_project_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1403_chunk_idx_tool_events_project_occurred ON _timescaledb_internal._hyper_1_1403_chunk USING btree (project_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1403_chunk_idx_tool_events_session_id; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1403_chunk_idx_tool_events_session_id ON _timescaledb_internal._hyper_1_1403_chunk USING btree (((metadata ->> 'session_id'::text))) WHERE ((metadata ->> 'session_id'::text) IS NOT NULL);
-
-
---
--- Name: _hyper_1_1403_chunk_idx_tool_events_tool_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1403_chunk_idx_tool_events_tool_occurred ON _timescaledb_internal._hyper_1_1403_chunk USING btree (tool_name, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1403_chunk_idx_tool_events_user_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1403_chunk_idx_tool_events_user_occurred ON _timescaledb_internal._hyper_1_1403_chunk USING btree (user_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1403_chunk_tool_events_occurred_at_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1403_chunk_tool_events_occurred_at_idx ON _timescaledb_internal._hyper_1_1403_chunk USING btree (occurred_at DESC);
-
-
---
--- Name: _hyper_1_1404_chunk_idx_tool_events_org_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1404_chunk_idx_tool_events_org_occurred ON _timescaledb_internal._hyper_1_1404_chunk USING btree (organization_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1404_chunk_idx_tool_events_project_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1404_chunk_idx_tool_events_project_occurred ON _timescaledb_internal._hyper_1_1404_chunk USING btree (project_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1404_chunk_idx_tool_events_session_id; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1404_chunk_idx_tool_events_session_id ON _timescaledb_internal._hyper_1_1404_chunk USING btree (((metadata ->> 'session_id'::text))) WHERE ((metadata ->> 'session_id'::text) IS NOT NULL);
-
-
---
--- Name: _hyper_1_1404_chunk_idx_tool_events_tool_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1404_chunk_idx_tool_events_tool_occurred ON _timescaledb_internal._hyper_1_1404_chunk USING btree (tool_name, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1404_chunk_idx_tool_events_user_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1404_chunk_idx_tool_events_user_occurred ON _timescaledb_internal._hyper_1_1404_chunk USING btree (user_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1404_chunk_tool_events_occurred_at_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1404_chunk_tool_events_occurred_at_idx ON _timescaledb_internal._hyper_1_1404_chunk USING btree (occurred_at DESC);
-
-
---
--- Name: _hyper_1_1405_chunk_idx_tool_events_org_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1405_chunk_idx_tool_events_org_occurred ON _timescaledb_internal._hyper_1_1405_chunk USING btree (organization_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1405_chunk_idx_tool_events_project_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1405_chunk_idx_tool_events_project_occurred ON _timescaledb_internal._hyper_1_1405_chunk USING btree (project_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1405_chunk_idx_tool_events_session_id; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1405_chunk_idx_tool_events_session_id ON _timescaledb_internal._hyper_1_1405_chunk USING btree (((metadata ->> 'session_id'::text))) WHERE ((metadata ->> 'session_id'::text) IS NOT NULL);
-
-
---
--- Name: _hyper_1_1405_chunk_idx_tool_events_tool_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1405_chunk_idx_tool_events_tool_occurred ON _timescaledb_internal._hyper_1_1405_chunk USING btree (tool_name, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1405_chunk_idx_tool_events_user_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1405_chunk_idx_tool_events_user_occurred ON _timescaledb_internal._hyper_1_1405_chunk USING btree (user_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1405_chunk_tool_events_occurred_at_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1405_chunk_tool_events_occurred_at_idx ON _timescaledb_internal._hyper_1_1405_chunk USING btree (occurred_at DESC);
-
-
---
--- Name: _hyper_1_1406_chunk_idx_tool_events_org_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1406_chunk_idx_tool_events_org_occurred ON _timescaledb_internal._hyper_1_1406_chunk USING btree (organization_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1406_chunk_idx_tool_events_project_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1406_chunk_idx_tool_events_project_occurred ON _timescaledb_internal._hyper_1_1406_chunk USING btree (project_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1406_chunk_idx_tool_events_session_id; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1406_chunk_idx_tool_events_session_id ON _timescaledb_internal._hyper_1_1406_chunk USING btree (((metadata ->> 'session_id'::text))) WHERE ((metadata ->> 'session_id'::text) IS NOT NULL);
-
-
---
--- Name: _hyper_1_1406_chunk_idx_tool_events_tool_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1406_chunk_idx_tool_events_tool_occurred ON _timescaledb_internal._hyper_1_1406_chunk USING btree (tool_name, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1406_chunk_idx_tool_events_user_occurred; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1406_chunk_idx_tool_events_user_occurred ON _timescaledb_internal._hyper_1_1406_chunk USING btree (user_id, occurred_at DESC);
-
-
---
--- Name: _hyper_1_1406_chunk_tool_events_occurred_at_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_1_1406_chunk_tool_events_occurred_at_idx ON _timescaledb_internal._hyper_1_1406_chunk USING btree (occurred_at DESC);
-
-
---
--- Name: _hyper_3_1407_chunk__materialized_hypertable_3_bucket_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_3_1407_chunk__materialized_hypertable_3_bucket_idx ON _timescaledb_internal._hyper_3_1407_chunk USING btree (bucket DESC);
-
-
---
--- Name: _hyper_3_1407_chunk__materialized_hypertable_3_event_type_bucke; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_3_1407_chunk__materialized_hypertable_3_event_type_bucke ON _timescaledb_internal._hyper_3_1407_chunk USING btree (event_type, bucket DESC);
-
-
---
--- Name: _hyper_3_1407_chunk__materialized_hypertable_3_organization_id_; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_3_1407_chunk__materialized_hypertable_3_organization_id_ ON _timescaledb_internal._hyper_3_1407_chunk USING btree (organization_id, bucket DESC);
-
-
---
--- Name: _hyper_3_1407_chunk__materialized_hypertable_3_project_id_bucke; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_3_1407_chunk__materialized_hypertable_3_project_id_bucke ON _timescaledb_internal._hyper_3_1407_chunk USING btree (project_id, bucket DESC);
-
-
---
--- Name: _hyper_3_1407_chunk__materialized_hypertable_3_tool_name_bucket; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_3_1407_chunk__materialized_hypertable_3_tool_name_bucket ON _timescaledb_internal._hyper_3_1407_chunk USING btree (tool_name, bucket DESC);
-
-
---
--- Name: _hyper_3_1407_chunk__materialized_hypertable_3_user_id_bucket_i; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX _hyper_3_1407_chunk__materialized_hypertable_3_user_id_bucket_i ON _timescaledb_internal._hyper_3_1407_chunk USING btree (user_id, bucket DESC);
-
-
 --
 -- Name: _materialized_hypertable_3_bucket_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
 --
 
 CREATE INDEX _materialized_hypertable_3_bucket_idx ON _timescaledb_internal._materialized_hypertable_3 USING btree (bucket DESC);
-
 
 --
 -- Name: _materialized_hypertable_3_event_type_bucket_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
@@ -2881,13 +1050,11 @@ CREATE INDEX _materialized_hypertable_3_bucket_idx ON _timescaledb_internal._mat
 
 CREATE INDEX _materialized_hypertable_3_event_type_bucket_idx ON _timescaledb_internal._materialized_hypertable_3 USING btree (event_type, bucket DESC);
 
-
 --
 -- Name: _materialized_hypertable_3_organization_id_bucket_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
 --
 
 CREATE INDEX _materialized_hypertable_3_organization_id_bucket_idx ON _timescaledb_internal._materialized_hypertable_3 USING btree (organization_id, bucket DESC);
-
 
 --
 -- Name: _materialized_hypertable_3_project_id_bucket_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
@@ -2895,13 +1062,11 @@ CREATE INDEX _materialized_hypertable_3_organization_id_bucket_idx ON _timescale
 
 CREATE INDEX _materialized_hypertable_3_project_id_bucket_idx ON _timescaledb_internal._materialized_hypertable_3 USING btree (project_id, bucket DESC);
 
-
 --
 -- Name: _materialized_hypertable_3_tool_name_bucket_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
 --
 
 CREATE INDEX _materialized_hypertable_3_tool_name_bucket_idx ON _timescaledb_internal._materialized_hypertable_3 USING btree (tool_name, bucket DESC);
-
 
 --
 -- Name: _materialized_hypertable_3_user_id_bucket_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
@@ -2909,13 +1074,11 @@ CREATE INDEX _materialized_hypertable_3_tool_name_bucket_idx ON _timescaledb_int
 
 CREATE INDEX _materialized_hypertable_3_user_id_bucket_idx ON _timescaledb_internal._materialized_hypertable_3 USING btree (user_id, bucket DESC);
 
-
 --
 -- Name: _materialized_hypertable_4_bucket_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
 --
 
 CREATE INDEX _materialized_hypertable_4_bucket_idx ON _timescaledb_internal._materialized_hypertable_4 USING btree (bucket DESC);
-
 
 --
 -- Name: _materialized_hypertable_4_event_type_bucket_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
@@ -2923,13 +1086,11 @@ CREATE INDEX _materialized_hypertable_4_bucket_idx ON _timescaledb_internal._mat
 
 CREATE INDEX _materialized_hypertable_4_event_type_bucket_idx ON _timescaledb_internal._materialized_hypertable_4 USING btree (event_type, bucket DESC);
 
-
 --
 -- Name: _materialized_hypertable_4_organization_id_bucket_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
 --
 
 CREATE INDEX _materialized_hypertable_4_organization_id_bucket_idx ON _timescaledb_internal._materialized_hypertable_4 USING btree (organization_id, bucket DESC);
-
 
 --
 -- Name: _materialized_hypertable_4_project_id_bucket_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
@@ -2937,13 +1098,11 @@ CREATE INDEX _materialized_hypertable_4_organization_id_bucket_idx ON _timescale
 
 CREATE INDEX _materialized_hypertable_4_project_id_bucket_idx ON _timescaledb_internal._materialized_hypertable_4 USING btree (project_id, bucket DESC);
 
-
 --
 -- Name: _materialized_hypertable_4_tool_name_bucket_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
 --
 
 CREATE INDEX _materialized_hypertable_4_tool_name_bucket_idx ON _timescaledb_internal._materialized_hypertable_4 USING btree (tool_name, bucket DESC);
-
 
 --
 -- Name: _materialized_hypertable_4_user_id_bucket_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
@@ -2951,76 +1110,11 @@ CREATE INDEX _materialized_hypertable_4_tool_name_bucket_idx ON _timescaledb_int
 
 CREATE INDEX _materialized_hypertable_4_user_id_bucket_idx ON _timescaledb_internal._materialized_hypertable_4 USING btree (user_id, bucket DESC);
 
-
---
--- Name: compress_hyper_2_1408_chunk_organization_id_user_id__ts_met_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX compress_hyper_2_1408_chunk_organization_id_user_id__ts_met_idx ON _timescaledb_internal.compress_hyper_2_1408_chunk USING btree (organization_id, user_id, _ts_meta_min_1 DESC, _ts_meta_max_1 DESC);
-
-
---
--- Name: compress_hyper_2_1409_chunk_organization_id_user_id__ts_met_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX compress_hyper_2_1409_chunk_organization_id_user_id__ts_met_idx ON _timescaledb_internal.compress_hyper_2_1409_chunk USING btree (organization_id, user_id, _ts_meta_min_1 DESC, _ts_meta_max_1 DESC);
-
-
---
--- Name: compress_hyper_2_1410_chunk_organization_id_user_id__ts_met_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX compress_hyper_2_1410_chunk_organization_id_user_id__ts_met_idx ON _timescaledb_internal.compress_hyper_2_1410_chunk USING btree (organization_id, user_id, _ts_meta_min_1 DESC, _ts_meta_max_1 DESC);
-
-
---
--- Name: compress_hyper_2_1411_chunk_organization_id_user_id__ts_met_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX compress_hyper_2_1411_chunk_organization_id_user_id__ts_met_idx ON _timescaledb_internal.compress_hyper_2_1411_chunk USING btree (organization_id, user_id, _ts_meta_min_1 DESC, _ts_meta_max_1 DESC);
-
-
---
--- Name: compress_hyper_2_1412_chunk_organization_id_user_id__ts_met_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX compress_hyper_2_1412_chunk_organization_id_user_id__ts_met_idx ON _timescaledb_internal.compress_hyper_2_1412_chunk USING btree (organization_id, user_id, _ts_meta_min_1 DESC, _ts_meta_max_1 DESC);
-
-
---
--- Name: compress_hyper_2_1413_chunk_organization_id_user_id__ts_met_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX compress_hyper_2_1413_chunk_organization_id_user_id__ts_met_idx ON _timescaledb_internal.compress_hyper_2_1413_chunk USING btree (organization_id, user_id, _ts_meta_min_1 DESC, _ts_meta_max_1 DESC);
-
-
---
--- Name: compress_hyper_2_1414_chunk_organization_id_user_id__ts_met_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX compress_hyper_2_1414_chunk_organization_id_user_id__ts_met_idx ON _timescaledb_internal.compress_hyper_2_1414_chunk USING btree (organization_id, user_id, _ts_meta_min_1 DESC, _ts_meta_max_1 DESC);
-
-
---
--- Name: compress_hyper_2_1415_chunk_organization_id_user_id__ts_met_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX compress_hyper_2_1415_chunk_organization_id_user_id__ts_met_idx ON _timescaledb_internal.compress_hyper_2_1415_chunk USING btree (organization_id, user_id, _ts_meta_min_1 DESC, _ts_meta_max_1 DESC);
-
-
---
--- Name: compress_hyper_2_1416_chunk_organization_id_user_id__ts_met_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE INDEX compress_hyper_2_1416_chunk_organization_id_user_id__ts_met_idx ON _timescaledb_internal.compress_hyper_2_1416_chunk USING btree (organization_id, user_id, _ts_meta_min_1 DESC, _ts_meta_max_1 DESC);
-
-
 --
 -- Name: idx_connector_event_dedup_event_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_connector_event_dedup_event_id ON public.connector_event_dedup USING btree (tool_event_id);
-
 
 --
 -- Name: idx_connector_event_dedup_lookup; Type: INDEX; Schema: public; Owner: -
@@ -3028,13 +1122,11 @@ CREATE INDEX idx_connector_event_dedup_event_id ON public.connector_event_dedup 
 
 CREATE UNIQUE INDEX idx_connector_event_dedup_lookup ON public.connector_event_dedup USING btree (organization_id, tool_name, event_type, unique_key, unique_value);
 
-
 --
 -- Name: idx_on_organization_connector_id_created_at_49b9e3dabf; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_on_organization_connector_id_created_at_49b9e3dabf ON public.webhook_deliveries USING btree (organization_connector_id, created_at);
-
 
 --
 -- Name: idx_on_organization_connector_id_status_35942419d4; Type: INDEX; Schema: public; Owner: -
@@ -3042,13 +1134,11 @@ CREATE INDEX idx_on_organization_connector_id_created_at_49b9e3dabf ON public.we
 
 CREATE INDEX idx_on_organization_connector_id_status_35942419d4 ON public.webhook_deliveries USING btree (organization_connector_id, status);
 
-
 --
 -- Name: idx_on_organization_id_connector_type_ebd5fb8c77; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX idx_on_organization_id_connector_type_ebd5fb8c77 ON public.organization_connectors USING btree (organization_id, connector_type);
-
 
 --
 -- Name: idx_organization_connectors_key_hash; Type: INDEX; Schema: public; Owner: -
@@ -3056,13 +1146,11 @@ CREATE UNIQUE INDEX idx_on_organization_id_connector_type_ebd5fb8c77 ON public.o
 
 CREATE INDEX idx_organization_connectors_key_hash ON public.organization_connectors USING btree (key_hash) WHERE (key_hash IS NOT NULL);
 
-
 --
 -- Name: idx_organization_connectors_webhook_token; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX idx_organization_connectors_webhook_token ON public.organization_connectors USING btree (webhook_token) WHERE (webhook_token IS NOT NULL);
-
 
 --
 -- Name: idx_repositories_connector_external; Type: INDEX; Schema: public; Owner: -
@@ -3070,13 +1158,11 @@ CREATE UNIQUE INDEX idx_organization_connectors_webhook_token ON public.organiza
 
 CREATE UNIQUE INDEX idx_repositories_connector_external ON public.repositories USING btree (organization_connector_id, external_id);
 
-
 --
 -- Name: idx_user_tool_accounts_membership_tool; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX idx_user_tool_accounts_membership_tool ON public.user_tool_accounts USING btree (organization_membership_id, tool_name);
-
 
 --
 -- Name: index_admin_audit_logs_on_admin_user_id; Type: INDEX; Schema: public; Owner: -
@@ -3084,13 +1170,11 @@ CREATE UNIQUE INDEX idx_user_tool_accounts_membership_tool ON public.user_tool_a
 
 CREATE INDEX index_admin_audit_logs_on_admin_user_id ON public.admin_audit_logs USING btree (admin_user_id);
 
-
 --
 -- Name: index_admin_audit_logs_on_created_at; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_admin_audit_logs_on_created_at ON public.admin_audit_logs USING btree (created_at);
-
 
 --
 -- Name: index_admin_audit_logs_on_resource_type_and_resource_id; Type: INDEX; Schema: public; Owner: -
@@ -3098,13 +1182,11 @@ CREATE INDEX index_admin_audit_logs_on_created_at ON public.admin_audit_logs USI
 
 CREATE INDEX index_admin_audit_logs_on_resource_type_and_resource_id ON public.admin_audit_logs USING btree (resource_type, resource_id);
 
-
 --
 -- Name: index_audit_logs_on_organization_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_audit_logs_on_organization_id ON public.audit_logs USING btree (organization_id);
-
 
 --
 -- Name: index_audit_logs_on_organization_id_and_created_at; Type: INDEX; Schema: public; Owner: -
@@ -3112,13 +1194,11 @@ CREATE INDEX index_audit_logs_on_organization_id ON public.audit_logs USING btre
 
 CREATE INDEX index_audit_logs_on_organization_id_and_created_at ON public.audit_logs USING btree (organization_id, created_at DESC);
 
-
 --
 -- Name: index_audit_logs_on_policy_version_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_audit_logs_on_policy_version_id ON public.audit_logs USING btree (policy_version_id);
-
 
 --
 -- Name: index_audit_logs_on_raw_event_key; Type: INDEX; Schema: public; Owner: -
@@ -3126,13 +1206,11 @@ CREATE INDEX index_audit_logs_on_policy_version_id ON public.audit_logs USING bt
 
 CREATE INDEX index_audit_logs_on_raw_event_key ON public.audit_logs USING btree (raw_event_key);
 
-
 --
 -- Name: index_audit_logs_on_temporal_workflow_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_audit_logs_on_temporal_workflow_id ON public.audit_logs USING btree (temporal_workflow_id);
-
 
 --
 -- Name: index_audit_logs_on_tool_event_id; Type: INDEX; Schema: public; Owner: -
@@ -3140,13 +1218,11 @@ CREATE INDEX index_audit_logs_on_temporal_workflow_id ON public.audit_logs USING
 
 CREATE INDEX index_audit_logs_on_tool_event_id ON public.audit_logs USING btree (tool_event_id);
 
-
 --
 -- Name: index_invitations_on_invited_by_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_invitations_on_invited_by_id ON public.invitations USING btree (invited_by_id);
-
 
 --
 -- Name: index_invitations_on_organization_id; Type: INDEX; Schema: public; Owner: -
@@ -3154,13 +1230,11 @@ CREATE INDEX index_invitations_on_invited_by_id ON public.invitations USING btre
 
 CREATE INDEX index_invitations_on_organization_id ON public.invitations USING btree (organization_id);
 
-
 --
 -- Name: index_invitations_on_organization_id_and_email; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX index_invitations_on_organization_id_and_email ON public.invitations USING btree (organization_id, email) WHERE (status = 'pending'::public.invitation_status);
-
 
 --
 -- Name: index_invitations_on_token; Type: INDEX; Schema: public; Owner: -
@@ -3168,13 +1242,11 @@ CREATE UNIQUE INDEX index_invitations_on_organization_id_and_email ON public.inv
 
 CREATE UNIQUE INDEX index_invitations_on_token ON public.invitations USING btree (token);
 
-
 --
 -- Name: index_issues_on_assignee_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_issues_on_assignee_id ON public.issues USING btree (assignee_id);
-
 
 --
 -- Name: index_issues_on_connector_project_external_id; Type: INDEX; Schema: public; Owner: -
@@ -3182,13 +1254,11 @@ CREATE INDEX index_issues_on_assignee_id ON public.issues USING btree (assignee_
 
 CREATE UNIQUE INDEX index_issues_on_connector_project_external_id ON public.issues USING btree (organization_connector_id, project_id, external_id);
 
-
 --
 -- Name: index_issues_on_key; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_issues_on_key ON public.issues USING btree (key);
-
 
 --
 -- Name: index_issues_on_organization_connector_id; Type: INDEX; Schema: public; Owner: -
@@ -3196,13 +1266,11 @@ CREATE INDEX index_issues_on_key ON public.issues USING btree (key);
 
 CREATE INDEX index_issues_on_organization_connector_id ON public.issues USING btree (organization_connector_id);
 
-
 --
 -- Name: index_issues_on_organization_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_issues_on_organization_id ON public.issues USING btree (organization_id);
-
 
 --
 -- Name: index_issues_on_organization_id_and_external_updated_at; Type: INDEX; Schema: public; Owner: -
@@ -3210,13 +1278,11 @@ CREATE INDEX index_issues_on_organization_id ON public.issues USING btree (organ
 
 CREATE INDEX index_issues_on_organization_id_and_external_updated_at ON public.issues USING btree (organization_id, external_updated_at);
 
-
 --
 -- Name: index_issues_on_project_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_issues_on_project_id ON public.issues USING btree (project_id);
-
 
 --
 -- Name: index_issues_on_project_id_and_status; Type: INDEX; Schema: public; Owner: -
@@ -3224,6 +1290,17 @@ CREATE INDEX index_issues_on_project_id ON public.issues USING btree (project_id
 
 CREATE INDEX index_issues_on_project_id_and_status ON public.issues USING btree (project_id, status);
 
+--
+-- Name: index_model_pricing_overrides_on_org_and_pattern; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_model_pricing_overrides_on_org_and_pattern ON public.model_pricing_overrides USING btree (organization_id, model_pattern);
+
+--
+-- Name: index_model_pricing_overrides_on_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_model_pricing_overrides_on_organization_id ON public.model_pricing_overrides USING btree (organization_id);
 
 --
 -- Name: index_organization_audit_logs_on_action; Type: INDEX; Schema: public; Owner: -
@@ -3231,13 +1308,11 @@ CREATE INDEX index_issues_on_project_id_and_status ON public.issues USING btree 
 
 CREATE INDEX index_organization_audit_logs_on_action ON public.organization_audit_logs USING btree (action);
 
-
 --
 -- Name: index_organization_audit_logs_on_actor_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_organization_audit_logs_on_actor_id ON public.organization_audit_logs USING btree (actor_id);
-
 
 --
 -- Name: index_organization_audit_logs_on_created_at; Type: INDEX; Schema: public; Owner: -
@@ -3245,13 +1320,11 @@ CREATE INDEX index_organization_audit_logs_on_actor_id ON public.organization_au
 
 CREATE INDEX index_organization_audit_logs_on_created_at ON public.organization_audit_logs USING btree (created_at);
 
-
 --
 -- Name: index_organization_audit_logs_on_organization_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_organization_audit_logs_on_organization_id ON public.organization_audit_logs USING btree (organization_id);
-
 
 --
 -- Name: index_organization_audit_logs_on_resource_type; Type: INDEX; Schema: public; Owner: -
@@ -3259,13 +1332,11 @@ CREATE INDEX index_organization_audit_logs_on_organization_id ON public.organiza
 
 CREATE INDEX index_organization_audit_logs_on_resource_type ON public.organization_audit_logs USING btree (resource_type);
 
-
 --
 -- Name: index_organization_audit_logs_on_resource_type_and_resource_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_organization_audit_logs_on_resource_type_and_resource_id ON public.organization_audit_logs USING btree (resource_type, resource_id);
-
 
 --
 -- Name: index_organization_connectors_on_organization_id; Type: INDEX; Schema: public; Owner: -
@@ -3273,13 +1344,11 @@ CREATE INDEX index_organization_audit_logs_on_resource_type_and_resource_id ON p
 
 CREATE INDEX index_organization_connectors_on_organization_id ON public.organization_connectors USING btree (organization_id);
 
-
 --
 -- Name: index_organization_connectors_on_status; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_organization_connectors_on_status ON public.organization_connectors USING btree (status);
-
 
 --
 -- Name: index_organization_memberships_on_organization_id; Type: INDEX; Schema: public; Owner: -
@@ -3287,13 +1356,11 @@ CREATE INDEX index_organization_connectors_on_status ON public.organization_conn
 
 CREATE INDEX index_organization_memberships_on_organization_id ON public.organization_memberships USING btree (organization_id);
 
-
 --
 -- Name: index_organization_memberships_on_user_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_organization_memberships_on_user_id ON public.organization_memberships USING btree (user_id);
-
 
 --
 -- Name: index_organization_memberships_on_user_id_and_organization_id; Type: INDEX; Schema: public; Owner: -
@@ -3301,13 +1368,11 @@ CREATE INDEX index_organization_memberships_on_user_id ON public.organization_me
 
 CREATE UNIQUE INDEX index_organization_memberships_on_user_id_and_organization_id ON public.organization_memberships USING btree (user_id, organization_id);
 
-
 --
 -- Name: index_organization_retention_policies_on_organization_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX index_organization_retention_policies_on_organization_id ON public.organization_retention_policies USING btree (organization_id);
-
 
 --
 -- Name: index_organization_retention_policies_on_updated_by_id; Type: INDEX; Schema: public; Owner: -
@@ -3315,13 +1380,11 @@ CREATE UNIQUE INDEX index_organization_retention_policies_on_organization_id ON 
 
 CREATE INDEX index_organization_retention_policies_on_updated_by_id ON public.organization_retention_policies USING btree (updated_by_id);
 
-
 --
 -- Name: index_organization_settings_on_organization_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_organization_settings_on_organization_id ON public.organization_settings USING btree (organization_id);
-
 
 --
 -- Name: index_organization_settings_on_organization_id_and_key; Type: INDEX; Schema: public; Owner: -
@@ -3329,13 +1392,11 @@ CREATE INDEX index_organization_settings_on_organization_id ON public.organizati
 
 CREATE UNIQUE INDEX index_organization_settings_on_organization_id_and_key ON public.organization_settings USING btree (organization_id, key);
 
-
 --
 -- Name: index_organizations_on_slug; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX index_organizations_on_slug ON public.organizations USING btree (slug);
-
 
 --
 -- Name: index_project_audit_logs_on_action; Type: INDEX; Schema: public; Owner: -
@@ -3343,13 +1404,11 @@ CREATE UNIQUE INDEX index_organizations_on_slug ON public.organizations USING bt
 
 CREATE INDEX index_project_audit_logs_on_action ON public.project_audit_logs USING btree (action);
 
-
 --
 -- Name: index_project_audit_logs_on_actor_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_project_audit_logs_on_actor_id ON public.project_audit_logs USING btree (actor_id);
-
 
 --
 -- Name: index_project_audit_logs_on_created_at; Type: INDEX; Schema: public; Owner: -
@@ -3357,13 +1416,11 @@ CREATE INDEX index_project_audit_logs_on_actor_id ON public.project_audit_logs U
 
 CREATE INDEX index_project_audit_logs_on_created_at ON public.project_audit_logs USING btree (created_at);
 
-
 --
 -- Name: index_project_audit_logs_on_project_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_project_audit_logs_on_project_id ON public.project_audit_logs USING btree (project_id);
-
 
 --
 -- Name: index_project_audit_logs_on_resource_type; Type: INDEX; Schema: public; Owner: -
@@ -3371,13 +1428,11 @@ CREATE INDEX index_project_audit_logs_on_project_id ON public.project_audit_logs
 
 CREATE INDEX index_project_audit_logs_on_resource_type ON public.project_audit_logs USING btree (resource_type);
 
-
 --
 -- Name: index_project_audit_logs_on_resource_type_and_resource_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_project_audit_logs_on_resource_type_and_resource_id ON public.project_audit_logs USING btree (resource_type, resource_id);
-
 
 --
 -- Name: index_project_connectors_on_project_id; Type: INDEX; Schema: public; Owner: -
@@ -3385,13 +1440,11 @@ CREATE INDEX index_project_audit_logs_on_resource_type_and_resource_id ON public
 
 CREATE INDEX index_project_connectors_on_project_id ON public.project_connectors USING btree (project_id);
 
-
 --
 -- Name: index_project_connectors_on_project_id_and_connector_type; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX index_project_connectors_on_project_id_and_connector_type ON public.project_connectors USING btree (project_id, connector_type);
-
 
 --
 -- Name: index_project_memberships_on_project_id; Type: INDEX; Schema: public; Owner: -
@@ -3399,13 +1452,11 @@ CREATE UNIQUE INDEX index_project_connectors_on_project_id_and_connector_type ON
 
 CREATE INDEX index_project_memberships_on_project_id ON public.project_memberships USING btree (project_id);
 
-
 --
 -- Name: index_project_memberships_on_user_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_project_memberships_on_user_id ON public.project_memberships USING btree (user_id);
-
 
 --
 -- Name: index_project_memberships_on_user_id_and_project_id; Type: INDEX; Schema: public; Owner: -
@@ -3413,13 +1464,11 @@ CREATE INDEX index_project_memberships_on_user_id ON public.project_memberships 
 
 CREATE UNIQUE INDEX index_project_memberships_on_user_id_and_project_id ON public.project_memberships USING btree (user_id, project_id);
 
-
 --
 -- Name: index_project_retention_policies_on_project_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX index_project_retention_policies_on_project_id ON public.project_retention_policies USING btree (project_id);
-
 
 --
 -- Name: index_project_retention_policies_on_updated_by_id; Type: INDEX; Schema: public; Owner: -
@@ -3427,13 +1476,11 @@ CREATE UNIQUE INDEX index_project_retention_policies_on_project_id ON public.pro
 
 CREATE INDEX index_project_retention_policies_on_updated_by_id ON public.project_retention_policies USING btree (updated_by_id);
 
-
 --
 -- Name: index_project_settings_on_allowed_email_domain; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_project_settings_on_allowed_email_domain ON public.project_settings USING btree (value) WHERE ((key)::text = 'allowed_email_domain'::text);
-
 
 --
 -- Name: index_project_settings_on_project_id; Type: INDEX; Schema: public; Owner: -
@@ -3441,13 +1488,11 @@ CREATE INDEX index_project_settings_on_allowed_email_domain ON public.project_se
 
 CREATE INDEX index_project_settings_on_project_id ON public.project_settings USING btree (project_id);
 
-
 --
 -- Name: index_project_settings_on_project_id_and_key; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX index_project_settings_on_project_id_and_key ON public.project_settings USING btree (project_id, key);
-
 
 --
 -- Name: index_projects_on_org_and_git_remote_url; Type: INDEX; Schema: public; Owner: -
@@ -3455,13 +1500,11 @@ CREATE UNIQUE INDEX index_project_settings_on_project_id_and_key ON public.proje
 
 CREATE UNIQUE INDEX index_projects_on_org_and_git_remote_url ON public.projects USING btree (organization_id, git_remote_url) WHERE ((organization_id IS NOT NULL) AND (git_remote_url IS NOT NULL));
 
-
 --
 -- Name: index_projects_on_organization_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_projects_on_organization_id ON public.projects USING btree (organization_id);
-
 
 --
 -- Name: index_projects_on_organization_id_and_slug; Type: INDEX; Schema: public; Owner: -
@@ -3469,13 +1512,11 @@ CREATE INDEX index_projects_on_organization_id ON public.projects USING btree (o
 
 CREATE UNIQUE INDEX index_projects_on_organization_id_and_slug ON public.projects USING btree (organization_id, slug) WHERE (organization_id IS NOT NULL);
 
-
 --
 -- Name: index_projects_on_owner_and_git_remote_url; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX index_projects_on_owner_and_git_remote_url ON public.projects USING btree (owner_id, git_remote_url) WHERE ((owner_id IS NOT NULL) AND (git_remote_url IS NOT NULL));
-
 
 --
 -- Name: index_projects_on_owner_id; Type: INDEX; Schema: public; Owner: -
@@ -3483,13 +1524,11 @@ CREATE UNIQUE INDEX index_projects_on_owner_and_git_remote_url ON public.project
 
 CREATE INDEX index_projects_on_owner_id ON public.projects USING btree (owner_id);
 
-
 --
 -- Name: index_projects_on_owner_id_and_slug; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX index_projects_on_owner_id_and_slug ON public.projects USING btree (owner_id, slug) WHERE (owner_id IS NOT NULL);
-
 
 --
 -- Name: index_repositories_on_organization_connector_id; Type: INDEX; Schema: public; Owner: -
@@ -3497,13 +1536,11 @@ CREATE UNIQUE INDEX index_projects_on_owner_id_and_slug ON public.projects USING
 
 CREATE INDEX index_repositories_on_organization_connector_id ON public.repositories USING btree (organization_connector_id);
 
-
 --
 -- Name: index_repositories_on_project_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_repositories_on_project_id ON public.repositories USING btree (project_id);
-
 
 --
 -- Name: index_sanitization_policies_on_is_active; Type: INDEX; Schema: public; Owner: -
@@ -3511,13 +1548,11 @@ CREATE INDEX index_repositories_on_project_id ON public.repositories USING btree
 
 CREATE INDEX index_sanitization_policies_on_is_active ON public.sanitization_policies USING btree (is_active) WHERE (is_active = true);
 
-
 --
 -- Name: index_sanitization_policies_on_version; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX index_sanitization_policies_on_version ON public.sanitization_policies USING btree (version);
-
 
 --
 -- Name: index_user_settings_on_user_id; Type: INDEX; Schema: public; Owner: -
@@ -3525,13 +1560,11 @@ CREATE UNIQUE INDEX index_sanitization_policies_on_version ON public.sanitizatio
 
 CREATE INDEX index_user_settings_on_user_id ON public.user_settings USING btree (user_id);
 
-
 --
 -- Name: index_user_settings_on_user_id_and_key; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX index_user_settings_on_user_id_and_key ON public.user_settings USING btree (user_id, key);
-
 
 --
 -- Name: index_user_tool_accounts_on_organization_membership_id; Type: INDEX; Schema: public; Owner: -
@@ -3539,13 +1572,11 @@ CREATE UNIQUE INDEX index_user_settings_on_user_id_and_key ON public.user_settin
 
 CREATE INDEX index_user_tool_accounts_on_organization_membership_id ON public.user_tool_accounts USING btree (organization_membership_id);
 
-
 --
 -- Name: index_user_tool_accounts_on_token_hash; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX index_user_tool_accounts_on_token_hash ON public.user_tool_accounts USING btree (token_hash);
-
 
 --
 -- Name: index_users_on_email; Type: INDEX; Schema: public; Owner: -
@@ -3553,13 +1584,11 @@ CREATE UNIQUE INDEX index_user_tool_accounts_on_token_hash ON public.user_tool_a
 
 CREATE UNIQUE INDEX index_users_on_email ON public.users USING btree (email);
 
-
 --
 -- Name: index_users_on_keycloak_sub; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX index_users_on_keycloak_sub ON public.users USING btree (keycloak_sub);
-
 
 --
 -- Name: index_webhook_deliveries_on_organization_connector_id; Type: INDEX; Schema: public; Owner: -
@@ -3567,13 +1596,11 @@ CREATE UNIQUE INDEX index_users_on_keycloak_sub ON public.users USING btree (key
 
 CREATE INDEX index_webhook_deliveries_on_organization_connector_id ON public.webhook_deliveries USING btree (organization_connector_id);
 
-
 --
 -- Name: idx_tool_events_external_id; Type: INDEX; Schema: timeseries; Owner: -
 --
 
 CREATE INDEX idx_tool_events_external_id ON timeseries.tool_events USING btree (organization_id, ((metadata ->> 'external_id'::text))) WHERE ((metadata ->> 'external_id'::text) IS NOT NULL);
-
 
 --
 -- Name: idx_tool_events_org_occurred; Type: INDEX; Schema: timeseries; Owner: -
@@ -3581,13 +1608,11 @@ CREATE INDEX idx_tool_events_external_id ON timeseries.tool_events USING btree (
 
 CREATE INDEX idx_tool_events_org_occurred ON timeseries.tool_events USING btree (organization_id, occurred_at DESC);
 
-
 --
 -- Name: idx_tool_events_org_tool_occurred; Type: INDEX; Schema: timeseries; Owner: -
 --
 
 CREATE INDEX idx_tool_events_org_tool_occurred ON timeseries.tool_events USING btree (organization_id, tool_name, occurred_at DESC);
-
 
 --
 -- Name: idx_tool_events_project_occurred; Type: INDEX; Schema: timeseries; Owner: -
@@ -3595,13 +1620,11 @@ CREATE INDEX idx_tool_events_org_tool_occurred ON timeseries.tool_events USING b
 
 CREATE INDEX idx_tool_events_project_occurred ON timeseries.tool_events USING btree (project_id, occurred_at DESC);
 
-
 --
 -- Name: idx_tool_events_session_id; Type: INDEX; Schema: timeseries; Owner: -
 --
 
 CREATE INDEX idx_tool_events_session_id ON timeseries.tool_events USING btree (((metadata ->> 'session_id'::text))) WHERE ((metadata ->> 'session_id'::text) IS NOT NULL);
-
 
 --
 -- Name: idx_tool_events_tool_occurred; Type: INDEX; Schema: timeseries; Owner: -
@@ -3609,340 +1632,17 @@ CREATE INDEX idx_tool_events_session_id ON timeseries.tool_events USING btree ((
 
 CREATE INDEX idx_tool_events_tool_occurred ON timeseries.tool_events USING btree (tool_name, occurred_at DESC);
 
-
 --
 -- Name: idx_tool_events_user_occurred; Type: INDEX; Schema: timeseries; Owner: -
 --
 
 CREATE INDEX idx_tool_events_user_occurred ON timeseries.tool_events USING btree (user_id, occurred_at DESC);
 
-
 --
 -- Name: tool_events_occurred_at_idx; Type: INDEX; Schema: timeseries; Owner: -
 --
 
 CREATE INDEX tool_events_occurred_at_idx ON timeseries.tool_events USING btree (occurred_at DESC);
-
-
---
--- Name: _hyper_1_1397_chunk 1397_6981_tool_events_organization_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1397_chunk
-    ADD CONSTRAINT "1397_6981_tool_events_organization_id_fkey" FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
-
-
---
--- Name: _hyper_1_1397_chunk 1397_6983_tool_events_project_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1397_chunk
-    ADD CONSTRAINT "1397_6983_tool_events_project_id_fkey" FOREIGN KEY (project_id) REFERENCES public.projects(id);
-
-
---
--- Name: _hyper_1_1397_chunk 1397_6984_tool_events_repository_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1397_chunk
-    ADD CONSTRAINT "1397_6984_tool_events_repository_id_fkey" FOREIGN KEY (repository_id) REFERENCES public.repositories(id);
-
-
---
--- Name: _hyper_1_1397_chunk 1397_6985_tool_events_user_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1397_chunk
-    ADD CONSTRAINT "1397_6985_tool_events_user_id_fkey" FOREIGN KEY (user_id) REFERENCES public.users(id);
-
-
---
--- Name: _hyper_1_1398_chunk 1398_6986_tool_events_organization_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1398_chunk
-    ADD CONSTRAINT "1398_6986_tool_events_organization_id_fkey" FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
-
-
---
--- Name: _hyper_1_1398_chunk 1398_6988_tool_events_project_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1398_chunk
-    ADD CONSTRAINT "1398_6988_tool_events_project_id_fkey" FOREIGN KEY (project_id) REFERENCES public.projects(id);
-
-
---
--- Name: _hyper_1_1398_chunk 1398_6989_tool_events_repository_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1398_chunk
-    ADD CONSTRAINT "1398_6989_tool_events_repository_id_fkey" FOREIGN KEY (repository_id) REFERENCES public.repositories(id);
-
-
---
--- Name: _hyper_1_1398_chunk 1398_6990_tool_events_user_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1398_chunk
-    ADD CONSTRAINT "1398_6990_tool_events_user_id_fkey" FOREIGN KEY (user_id) REFERENCES public.users(id);
-
-
---
--- Name: _hyper_1_1399_chunk 1399_6991_tool_events_organization_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1399_chunk
-    ADD CONSTRAINT "1399_6991_tool_events_organization_id_fkey" FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
-
-
---
--- Name: _hyper_1_1399_chunk 1399_6993_tool_events_project_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1399_chunk
-    ADD CONSTRAINT "1399_6993_tool_events_project_id_fkey" FOREIGN KEY (project_id) REFERENCES public.projects(id);
-
-
---
--- Name: _hyper_1_1399_chunk 1399_6994_tool_events_repository_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1399_chunk
-    ADD CONSTRAINT "1399_6994_tool_events_repository_id_fkey" FOREIGN KEY (repository_id) REFERENCES public.repositories(id);
-
-
---
--- Name: _hyper_1_1399_chunk 1399_6995_tool_events_user_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1399_chunk
-    ADD CONSTRAINT "1399_6995_tool_events_user_id_fkey" FOREIGN KEY (user_id) REFERENCES public.users(id);
-
-
---
--- Name: _hyper_1_1400_chunk 1400_6996_tool_events_organization_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1400_chunk
-    ADD CONSTRAINT "1400_6996_tool_events_organization_id_fkey" FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
-
-
---
--- Name: _hyper_1_1400_chunk 1400_6998_tool_events_project_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1400_chunk
-    ADD CONSTRAINT "1400_6998_tool_events_project_id_fkey" FOREIGN KEY (project_id) REFERENCES public.projects(id);
-
-
---
--- Name: _hyper_1_1400_chunk 1400_6999_tool_events_repository_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1400_chunk
-    ADD CONSTRAINT "1400_6999_tool_events_repository_id_fkey" FOREIGN KEY (repository_id) REFERENCES public.repositories(id);
-
-
---
--- Name: _hyper_1_1400_chunk 1400_7000_tool_events_user_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1400_chunk
-    ADD CONSTRAINT "1400_7000_tool_events_user_id_fkey" FOREIGN KEY (user_id) REFERENCES public.users(id);
-
-
---
--- Name: _hyper_1_1401_chunk 1401_7001_tool_events_organization_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1401_chunk
-    ADD CONSTRAINT "1401_7001_tool_events_organization_id_fkey" FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
-
-
---
--- Name: _hyper_1_1401_chunk 1401_7003_tool_events_project_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1401_chunk
-    ADD CONSTRAINT "1401_7003_tool_events_project_id_fkey" FOREIGN KEY (project_id) REFERENCES public.projects(id);
-
-
---
--- Name: _hyper_1_1401_chunk 1401_7004_tool_events_repository_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1401_chunk
-    ADD CONSTRAINT "1401_7004_tool_events_repository_id_fkey" FOREIGN KEY (repository_id) REFERENCES public.repositories(id);
-
-
---
--- Name: _hyper_1_1401_chunk 1401_7005_tool_events_user_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1401_chunk
-    ADD CONSTRAINT "1401_7005_tool_events_user_id_fkey" FOREIGN KEY (user_id) REFERENCES public.users(id);
-
-
---
--- Name: _hyper_1_1402_chunk 1402_7006_tool_events_organization_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1402_chunk
-    ADD CONSTRAINT "1402_7006_tool_events_organization_id_fkey" FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
-
-
---
--- Name: _hyper_1_1402_chunk 1402_7008_tool_events_project_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1402_chunk
-    ADD CONSTRAINT "1402_7008_tool_events_project_id_fkey" FOREIGN KEY (project_id) REFERENCES public.projects(id);
-
-
---
--- Name: _hyper_1_1402_chunk 1402_7009_tool_events_repository_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1402_chunk
-    ADD CONSTRAINT "1402_7009_tool_events_repository_id_fkey" FOREIGN KEY (repository_id) REFERENCES public.repositories(id);
-
-
---
--- Name: _hyper_1_1402_chunk 1402_7010_tool_events_user_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1402_chunk
-    ADD CONSTRAINT "1402_7010_tool_events_user_id_fkey" FOREIGN KEY (user_id) REFERENCES public.users(id);
-
-
---
--- Name: _hyper_1_1403_chunk 1403_7011_tool_events_organization_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1403_chunk
-    ADD CONSTRAINT "1403_7011_tool_events_organization_id_fkey" FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
-
-
---
--- Name: _hyper_1_1403_chunk 1403_7013_tool_events_project_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1403_chunk
-    ADD CONSTRAINT "1403_7013_tool_events_project_id_fkey" FOREIGN KEY (project_id) REFERENCES public.projects(id);
-
-
---
--- Name: _hyper_1_1403_chunk 1403_7014_tool_events_repository_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1403_chunk
-    ADD CONSTRAINT "1403_7014_tool_events_repository_id_fkey" FOREIGN KEY (repository_id) REFERENCES public.repositories(id);
-
-
---
--- Name: _hyper_1_1403_chunk 1403_7015_tool_events_user_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1403_chunk
-    ADD CONSTRAINT "1403_7015_tool_events_user_id_fkey" FOREIGN KEY (user_id) REFERENCES public.users(id);
-
-
---
--- Name: _hyper_1_1404_chunk 1404_7016_tool_events_organization_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1404_chunk
-    ADD CONSTRAINT "1404_7016_tool_events_organization_id_fkey" FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
-
-
---
--- Name: _hyper_1_1404_chunk 1404_7018_tool_events_project_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1404_chunk
-    ADD CONSTRAINT "1404_7018_tool_events_project_id_fkey" FOREIGN KEY (project_id) REFERENCES public.projects(id);
-
-
---
--- Name: _hyper_1_1404_chunk 1404_7019_tool_events_repository_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1404_chunk
-    ADD CONSTRAINT "1404_7019_tool_events_repository_id_fkey" FOREIGN KEY (repository_id) REFERENCES public.repositories(id);
-
-
---
--- Name: _hyper_1_1404_chunk 1404_7020_tool_events_user_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1404_chunk
-    ADD CONSTRAINT "1404_7020_tool_events_user_id_fkey" FOREIGN KEY (user_id) REFERENCES public.users(id);
-
-
---
--- Name: _hyper_1_1405_chunk 1405_7021_tool_events_organization_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1405_chunk
-    ADD CONSTRAINT "1405_7021_tool_events_organization_id_fkey" FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
-
-
---
--- Name: _hyper_1_1405_chunk 1405_7023_tool_events_project_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1405_chunk
-    ADD CONSTRAINT "1405_7023_tool_events_project_id_fkey" FOREIGN KEY (project_id) REFERENCES public.projects(id);
-
-
---
--- Name: _hyper_1_1405_chunk 1405_7024_tool_events_repository_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1405_chunk
-    ADD CONSTRAINT "1405_7024_tool_events_repository_id_fkey" FOREIGN KEY (repository_id) REFERENCES public.repositories(id);
-
-
---
--- Name: _hyper_1_1405_chunk 1405_7025_tool_events_user_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1405_chunk
-    ADD CONSTRAINT "1405_7025_tool_events_user_id_fkey" FOREIGN KEY (user_id) REFERENCES public.users(id);
-
-
---
--- Name: _hyper_1_1406_chunk 1406_7026_tool_events_organization_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1406_chunk
-    ADD CONSTRAINT "1406_7026_tool_events_organization_id_fkey" FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
-
-
---
--- Name: _hyper_1_1406_chunk 1406_7028_tool_events_project_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1406_chunk
-    ADD CONSTRAINT "1406_7028_tool_events_project_id_fkey" FOREIGN KEY (project_id) REFERENCES public.projects(id);
-
-
---
--- Name: _hyper_1_1406_chunk 1406_7029_tool_events_repository_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1406_chunk
-    ADD CONSTRAINT "1406_7029_tool_events_repository_id_fkey" FOREIGN KEY (repository_id) REFERENCES public.repositories(id);
-
-
---
--- Name: _hyper_1_1406_chunk 1406_7030_tool_events_user_id_fkey; Type: FK CONSTRAINT; Schema: _timescaledb_internal; Owner: -
---
-
-ALTER TABLE ONLY _timescaledb_internal._hyper_1_1406_chunk
-    ADD CONSTRAINT "1406_7030_tool_events_user_id_fkey" FOREIGN KEY (user_id) REFERENCES public.users(id);
-
 
 --
 -- Name: webhook_deliveries fk_rails_0afb2cd61a; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -3951,14 +1651,12 @@ ALTER TABLE ONLY _timescaledb_internal._hyper_1_1406_chunk
 ALTER TABLE ONLY public.webhook_deliveries
     ADD CONSTRAINT fk_rails_0afb2cd61a FOREIGN KEY (organization_connector_id) REFERENCES public.organization_connectors(id);
 
-
 --
 -- Name: invitations fk_rails_0fe4c14f0e; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.invitations
     ADD CONSTRAINT fk_rails_0fe4c14f0e FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
-
 
 --
 -- Name: audit_logs fk_rails_13aa3bd6ad; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -3967,14 +1665,12 @@ ALTER TABLE ONLY public.invitations
 ALTER TABLE ONLY public.audit_logs
     ADD CONSTRAINT fk_rails_13aa3bd6ad FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
 
-
 --
 -- Name: project_memberships fk_rails_18b611e244; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.project_memberships
     ADD CONSTRAINT fk_rails_18b611e244 FOREIGN KEY (project_id) REFERENCES public.projects(id);
-
 
 --
 -- Name: projects fk_rails_219ef9bf7d; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -3983,14 +1679,12 @@ ALTER TABLE ONLY public.project_memberships
 ALTER TABLE ONLY public.projects
     ADD CONSTRAINT fk_rails_219ef9bf7d FOREIGN KEY (owner_id) REFERENCES public.users(id);
 
-
 --
 -- Name: organization_retention_policies fk_rails_273baa1ecd; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.organization_retention_policies
     ADD CONSTRAINT fk_rails_273baa1ecd FOREIGN KEY (updated_by_id) REFERENCES public.users(id);
-
 
 --
 -- Name: repositories fk_rails_36d1823ddd; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -3999,14 +1693,12 @@ ALTER TABLE ONLY public.organization_retention_policies
 ALTER TABLE ONLY public.repositories
     ADD CONSTRAINT fk_rails_36d1823ddd FOREIGN KEY (project_id) REFERENCES public.projects(id);
 
-
 --
 -- Name: issues fk_rails_4b8ef071a8; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.issues
     ADD CONSTRAINT fk_rails_4b8ef071a8 FOREIGN KEY (organization_connector_id) REFERENCES public.organization_connectors(id);
-
 
 --
 -- Name: project_audit_logs fk_rails_525d91a68d; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -4015,14 +1707,12 @@ ALTER TABLE ONLY public.issues
 ALTER TABLE ONLY public.project_audit_logs
     ADD CONSTRAINT fk_rails_525d91a68d FOREIGN KEY (project_id) REFERENCES public.projects(id);
 
-
 --
 -- Name: organization_memberships fk_rails_57cf70d280; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.organization_memberships
     ADD CONSTRAINT fk_rails_57cf70d280 FOREIGN KEY (user_id) REFERENCES public.users(id);
-
 
 --
 -- Name: organization_audit_logs fk_rails_6b6833732b; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -4031,14 +1721,12 @@ ALTER TABLE ONLY public.organization_memberships
 ALTER TABLE ONLY public.organization_audit_logs
     ADD CONSTRAINT fk_rails_6b6833732b FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
 
-
 --
 -- Name: project_audit_logs fk_rails_6fe27c573a; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.project_audit_logs
     ADD CONSTRAINT fk_rails_6fe27c573a FOREIGN KEY (actor_id) REFERENCES public.users(id);
-
 
 --
 -- Name: audit_logs fk_rails_7145b2958f; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -4047,14 +1735,12 @@ ALTER TABLE ONLY public.project_audit_logs
 ALTER TABLE ONLY public.audit_logs
     ADD CONSTRAINT fk_rails_7145b2958f FOREIGN KEY (policy_version_id) REFERENCES public.sanitization_policies(id);
 
-
 --
 -- Name: organization_memberships fk_rails_715ab7f4fe; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.organization_memberships
     ADD CONSTRAINT fk_rails_715ab7f4fe FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
-
 
 --
 -- Name: organization_connectors fk_rails_7f3b48aa2e; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -4063,14 +1749,12 @@ ALTER TABLE ONLY public.organization_memberships
 ALTER TABLE ONLY public.organization_connectors
     ADD CONSTRAINT fk_rails_7f3b48aa2e FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
 
-
 --
 -- Name: project_retention_policies fk_rails_81cdd6d032; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.project_retention_policies
     ADD CONSTRAINT fk_rails_81cdd6d032 FOREIGN KEY (project_id) REFERENCES public.projects(id);
-
 
 --
 -- Name: project_memberships fk_rails_86b046ec96; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -4079,14 +1763,12 @@ ALTER TABLE ONLY public.project_retention_policies
 ALTER TABLE ONLY public.project_memberships
     ADD CONSTRAINT fk_rails_86b046ec96 FOREIGN KEY (user_id) REFERENCES public.users(id);
 
-
 --
 -- Name: issues fk_rails_899c8f3231; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.issues
     ADD CONSTRAINT fk_rails_899c8f3231 FOREIGN KEY (project_id) REFERENCES public.projects(id);
-
 
 --
 -- Name: project_connectors fk_rails_8c7a35259d; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -4095,14 +1777,12 @@ ALTER TABLE ONLY public.issues
 ALTER TABLE ONLY public.project_connectors
     ADD CONSTRAINT fk_rails_8c7a35259d FOREIGN KEY (project_id) REFERENCES public.projects(id);
 
-
 --
 -- Name: user_tool_accounts fk_rails_8ccfbe393d; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.user_tool_accounts
     ADD CONSTRAINT fk_rails_8ccfbe393d FOREIGN KEY (organization_membership_id) REFERENCES public.organization_memberships(id);
-
 
 --
 -- Name: organization_audit_logs fk_rails_8d2e99ef05; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -4111,14 +1791,12 @@ ALTER TABLE ONLY public.user_tool_accounts
 ALTER TABLE ONLY public.organization_audit_logs
     ADD CONSTRAINT fk_rails_8d2e99ef05 FOREIGN KEY (actor_id) REFERENCES public.users(id);
 
-
 --
 -- Name: repositories fk_rails_92dbde9f4f; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.repositories
     ADD CONSTRAINT fk_rails_92dbde9f4f FOREIGN KEY (organization_connector_id) REFERENCES public.organization_connectors(id);
-
 
 --
 -- Name: projects fk_rails_9aee26923d; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -4127,14 +1805,12 @@ ALTER TABLE ONLY public.repositories
 ALTER TABLE ONLY public.projects
     ADD CONSTRAINT fk_rails_9aee26923d FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
 
-
 --
 -- Name: organization_retention_policies fk_rails_aea4165a3f; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.organization_retention_policies
     ADD CONSTRAINT fk_rails_aea4165a3f FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
-
 
 --
 -- Name: project_retention_policies fk_rails_b240657e32; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -4143,6 +1819,12 @@ ALTER TABLE ONLY public.organization_retention_policies
 ALTER TABLE ONLY public.project_retention_policies
     ADD CONSTRAINT fk_rails_b240657e32 FOREIGN KEY (updated_by_id) REFERENCES public.users(id);
 
+--
+-- Name: model_pricing_overrides fk_rails_bb19157c26; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.model_pricing_overrides
+    ADD CONSTRAINT fk_rails_bb19157c26 FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
 
 --
 -- Name: organization_settings fk_rails_c56e4690c0; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -4151,14 +1833,12 @@ ALTER TABLE ONLY public.project_retention_policies
 ALTER TABLE ONLY public.organization_settings
     ADD CONSTRAINT fk_rails_c56e4690c0 FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
 
-
 --
 -- Name: project_settings fk_rails_c6df6e6328; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.project_settings
     ADD CONSTRAINT fk_rails_c6df6e6328 FOREIGN KEY (project_id) REFERENCES public.projects(id);
-
 
 --
 -- Name: issues fk_rails_ccc5514bad; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -4167,14 +1847,12 @@ ALTER TABLE ONLY public.project_settings
 ALTER TABLE ONLY public.issues
     ADD CONSTRAINT fk_rails_ccc5514bad FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
 
-
 --
 -- Name: user_settings fk_rails_d1371c6356; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.user_settings
     ADD CONSTRAINT fk_rails_d1371c6356 FOREIGN KEY (user_id) REFERENCES public.users(id);
-
 
 --
 -- Name: invitations fk_rails_d799c974a1; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -4183,14 +1861,12 @@ ALTER TABLE ONLY public.user_settings
 ALTER TABLE ONLY public.invitations
     ADD CONSTRAINT fk_rails_d799c974a1 FOREIGN KEY (invited_by_id) REFERENCES public.users(id);
 
-
 --
 -- Name: admin_audit_logs fk_rails_f48ad7fa19; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.admin_audit_logs
     ADD CONSTRAINT fk_rails_f48ad7fa19 FOREIGN KEY (admin_user_id) REFERENCES public.users(id);
-
 
 --
 -- Name: issues fk_rails_ff669b5916; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -4199,14 +1875,12 @@ ALTER TABLE ONLY public.admin_audit_logs
 ALTER TABLE ONLY public.issues
     ADD CONSTRAINT fk_rails_ff669b5916 FOREIGN KEY (assignee_id) REFERENCES public.users(id);
 
-
 --
 -- Name: tool_events tool_events_organization_id_fkey; Type: FK CONSTRAINT; Schema: timeseries; Owner: -
 --
 
 ALTER TABLE ONLY timeseries.tool_events
     ADD CONSTRAINT tool_events_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
-
 
 --
 -- Name: tool_events tool_events_project_id_fkey; Type: FK CONSTRAINT; Schema: timeseries; Owner: -
@@ -4215,14 +1889,12 @@ ALTER TABLE ONLY timeseries.tool_events
 ALTER TABLE ONLY timeseries.tool_events
     ADD CONSTRAINT tool_events_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(id);
 
-
 --
 -- Name: tool_events tool_events_repository_id_fkey; Type: FK CONSTRAINT; Schema: timeseries; Owner: -
 --
 
 ALTER TABLE ONLY timeseries.tool_events
     ADD CONSTRAINT tool_events_repository_id_fkey FOREIGN KEY (repository_id) REFERENCES public.repositories(id);
-
 
 --
 -- Name: tool_events tool_events_user_id_fkey; Type: FK CONSTRAINT; Schema: timeseries; Owner: -
@@ -4231,7 +1903,6 @@ ALTER TABLE ONLY timeseries.tool_events
 ALTER TABLE ONLY timeseries.tool_events
     ADD CONSTRAINT tool_events_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
 
-
 --
 -- PostgreSQL database dump complete
 --
@@ -4239,6 +1910,7 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260506113501'),
 ('20260506102849'),
 ('20260505123328'),
 ('20260504180000'),
@@ -4252,6 +1924,7 @@ INSERT INTO "schema_migrations" (version) VALUES
 ('20260501151101'),
 ('20260429125535'),
 ('20260429123244'),
+('20260429000002'),
 ('20260429000001'),
 ('20260428125537'),
 ('20260424000003'),

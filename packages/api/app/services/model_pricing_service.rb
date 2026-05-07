@@ -53,10 +53,15 @@ class ModelPricingService
   }.freeze
 
   class << self
-    def pricing_for_model(model_name)
+    def pricing_for_model(model_name, organization: nil)
       return MODEL_PRICING["default"] if model_name.blank?
 
       normalized = model_name.to_s.downcase
+
+      # Check per-org overrides before falling back to hardcoded rates
+      override = pricing_override_for_model(normalized, organization: organization)
+
+      return { input: override.input_per_mtok.to_f, output: override.output_per_mtok.to_f } if override.present?
 
       # Try exact match first
       return MODEL_PRICING[normalized] if MODEL_PRICING.key?(normalized)
@@ -69,13 +74,21 @@ class ModelPricingService
       MODEL_PRICING["default"]
     end
 
+    def pricing_override_for_model(model_name, organization: nil)
+      return nil if organization.blank?
+
+      ModelPricingOverride
+        .where(organization: organization)
+        .find_by("? ILIKE '%' || model_pattern || '%'", model_name)
+    end
+
     def pricing_for_tool(tool_name)
       TOOL_PRICING[tool_name.to_s] || TOOL_PRICING["custom"]
     end
 
-    def calculate_cost(tokens_in:, tokens_out:, model: nil, tool: nil)
+    def calculate_cost(tokens_in:, tokens_out:, model: nil, tool: nil, organization: nil)
       pricing = if model.present?
-                  pricing_for_model(model)
+                  pricing_for_model(model, organization: organization)
       elsif tool.present?
                   pricing_for_tool(tool)
       else

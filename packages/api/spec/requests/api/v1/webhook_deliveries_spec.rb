@@ -161,7 +161,7 @@ RSpec.describe "Api::V1::WebhookDeliveries", type: :request do
           user: admin, organization: organization
         )
 
-        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response).to have_http_status(:unprocessable_content)
       end
     end
 
@@ -174,7 +174,7 @@ RSpec.describe "Api::V1::WebhookDeliveries", type: :request do
           user: admin, organization: organization
         )
 
-        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response).to have_http_status(:unprocessable_content)
         expect(response.body).to include("expired")
       end
     end
@@ -190,7 +190,7 @@ RSpec.describe "Api::V1::WebhookDeliveries", type: :request do
           user: admin, organization: organization
         )
 
-        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response).to have_http_status(:unprocessable_content)
       end
     end
   end

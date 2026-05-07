@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { validateCostInput as validateCostInputLib } from "@/lib/validation";
 import { Routes, Route, Link, useLocation, Navigate } from "react-router-dom";
+import { ModelPricingSettings } from "./ModelPricingSettings";
 import { Team } from "./Team";
 import {
   Building2,
@@ -15,6 +16,7 @@ import {
   X,
   FileSearch,
   Users,
+  DollarSign,
 } from "lucide-react";
 import { retentionOrder, formatRetentionLabel } from "@/lib/retention-utils";
 import { useOrg } from "@/contexts/OrgContext";
@@ -81,6 +83,7 @@ const navItems = [
   { title: "Policies", href: "/settings/policies", icon: Shield },
   { title: "Alerts", href: "/settings/alerts", icon: Bell },
   { title: "Billing", href: "/settings/billing", icon: CreditCard },
+  { title: "Model Pricing", href: "/settings/pricing", icon: DollarSign },
   { title: "Security & Audit", href: "/settings/security", icon: FileSearch },
 ];
 
@@ -1254,6 +1257,7 @@ export function Settings() {
             <Route path="policies" element={<PolicySettings />} />
             <Route path="alerts" element={<AlertSettings />} />
             <Route path="billing" element={<BillingSettings />} />
+            <Route path="pricing" element={<ModelPricingSettings />} />
             <Route path="security" element={<SecuritySettings />} />
             <Route path="*" element={<Navigate to="/settings" replace />} />
           </Routes>
