@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useOrg } from "@/contexts/OrgContext";
 import {
   useConnectors,
+  useConnectorHealth,
   useSyncConnector,
   useDeleteConnector,
   useTestConnector,
@@ -261,7 +262,15 @@ export function Integrations() {
     currentOrg?.id || "",
   );
   const { data: toolAccountsData, isLoading: toolAccountsLoading } = useToolAccounts(currentOrg?.id || "");
+  const { data: healthData } = useConnectorHealth(currentOrg?.id || "");
   const isLoading = connectorsLoading || toolAccountsLoading;
+
+  const healthStatsById = useMemo(() => {
+    const map = new Map(
+      (healthData?.connectors ?? []).map((s) => [s.id, s])
+    );
+    return map;
+  }, [healthData]);
   const syncConnector = useSyncConnector();
   const deleteConnector = useDeleteConnector();
   const deleteToolAccount = useDeleteToolAccount();
@@ -554,7 +563,8 @@ export function Integrations() {
                 <IntegrationCard
                   key={integration.id}
                   integration={integration}
-                  onSync={ingestAccountIds.has(integration.id) || 
+                  healthStats={healthStatsById.get(integration.id) ?? null}
+                  onSync={ingestAccountIds.has(integration.id) ||
                     integration.provider === "slack" ? undefined : handleSync
                   }
                   onTest={ingestAccountIds.has(integration.id) ? undefined : handleTest}

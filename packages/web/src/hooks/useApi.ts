@@ -41,6 +41,7 @@ import type {
   ToolDailyResponse,
   ToolEventTypesResponse,
   ConnectorSyncStatus,
+  ConnectorHealthRollup,
   ModelPricingResponse,
   ModelPricingOverride,
   ModelPricingOverrideInput,
@@ -78,6 +79,8 @@ export const queryKeys = {
       ["organizations", orgId, "connectors", connectorId, "available_projects"] as const,
     syncStatus: (orgId: string, connectorId: string) =>
       ["organizations", orgId, "connectors", connectorId, "sync_status"] as const,
+    health: (orgId: string) =>
+      ["organizations", orgId, "connectors", "health"] as const,
   },
   issues: {
     all: (projectId: string, filters?: Record<string, unknown>) =>
@@ -768,6 +771,20 @@ export function useConnectors(orgId: string) {
       if (!data?.length) return false;
       return data.some((c) => c.status === "testing") ? 3_000 : false;
     },
+  });
+}
+
+export function useConnectorHealth(orgId: string) {
+  return useQuery({
+    queryKey: queryKeys.connectors.health(orgId),
+    queryFn: async () => {
+      const response = await api.get<{ data: ConnectorHealthRollup }>(
+        `/organizations/${orgId}/connectors/health`
+      );
+      return response.data;
+    },
+    enabled: !!orgId,
+    staleTime: 60_000,
   });
 }
 
