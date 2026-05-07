@@ -55,6 +55,8 @@ class AiUsageSyncJob
   end
 
   def reconcile_provider(org, connector, provider)
+    sync_started_at = Time.current
+
     # Get usage from provider API
     usage_data = fetch_provider_usage(connector, provider, org)
     return 0 unless usage_data
@@ -64,7 +66,7 @@ class AiUsageSyncJob
     return 0 if usage_data.nil?
 
     if usage_data.blank?
-      connector.mark_synced!
+      connector.mark_synced!(sync_started_at: sync_started_at)
       return 0
     end
 
@@ -74,11 +76,11 @@ class AiUsageSyncJob
       upsert_usage_one_by_one(org, provider, usage_data)
     end
 
-    connector.mark_synced!
+    connector.mark_synced!(sync_started_at: sync_started_at)
     reconciled
   rescue StandardError => e
     error_message = normalize_sync_error(provider, e.message)
-    connector.mark_error!(error_message)
+    connector.mark_error!(error_message, sync_started_at: sync_started_at)
     Rails.logger.warn("[AiUsageSyncJob] Failed to reconcile #{provider} for org #{org.slug}: #{error_message}")
     0
   end

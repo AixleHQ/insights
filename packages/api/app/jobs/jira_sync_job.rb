@@ -9,6 +9,7 @@ class JiraSyncJob < ApplicationJob
   end
 
   def perform(connector_id, action = "sync", options = {})
+    @sync_started_at = (Time.current if action.to_s == "sync")
     @options   = options.symbolize_keys
     delivery   = action == "webhook" ? WebhookDelivery.find_by(id: @options[:delivery_id]) : nil
     delivery&.mark_processing!
@@ -26,7 +27,7 @@ class JiraSyncJob < ApplicationJob
       else
         sync_all_issues
       end
-      @connector.mark_synced!
+      @connector.mark_synced!(sync_started_at: @sync_started_at)
     when "refresh_token"
       refresh_token
     when "webhook"
@@ -41,6 +42,7 @@ class JiraSyncJob < ApplicationJob
     Rails.logger.error("[JiraSyncJob] Connector #{connector_id} not found")
     delivery&.mark_failed!("Connector not found")
   rescue StandardError => e
+    @connector&.mark_error!(e.message, sync_started_at: @sync_started_at)
     Rails.logger.error("[JiraSyncJob] Failed: #{e.message}")
     delivery&.update!(last_error: e.message)
     raise
