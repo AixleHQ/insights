@@ -393,7 +393,6 @@ CREATE TABLE public.connector_event_dedup (
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
-
 --
 -- Name: connector_event_dedup_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
@@ -405,13 +404,11 @@ CREATE SEQUENCE public.connector_event_dedup_id_seq
     NO MAXVALUE
     CACHE 1;
 
-
 --
 -- Name: connector_event_dedup_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.connector_event_dedup_id_seq OWNED BY public.connector_event_dedup.id;
-
 
 --
 -- Name: invitations; Type: TABLE; Schema: public; Owner: -
@@ -810,7 +807,6 @@ CREATE TABLE public.webhook_deliveries (
     updated_at timestamp(6) without time zone NOT NULL
 );
 
-
 --
 -- Name: daily_token_usage; Type: VIEW; Schema: timeseries; Owner: -
 --
@@ -848,6 +844,12 @@ CREATE VIEW timeseries.hourly_token_usage AS
    FROM _timescaledb_internal._materialized_hypertable_3;
 
 --
+-- Name: connector_event_dedup id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_event_dedup ALTER COLUMN id SET DEFAULT nextval('public.connector_event_dedup_id_seq'::regclass);
+
+--
 -- Name: admin_audit_logs admin_audit_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -874,7 +876,6 @@ ALTER TABLE ONLY public.audit_logs
 
 ALTER TABLE ONLY public.connector_event_dedup
     ADD CONSTRAINT connector_event_dedup_pkey PRIMARY KEY (id);
-
 
 --
 -- Name: invitations invitations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1030,7 +1031,6 @@ ALTER TABLE ONLY public.users
 ALTER TABLE ONLY public.webhook_deliveries
     ADD CONSTRAINT webhook_deliveries_pkey PRIMARY KEY (id);
 
-
 --
 -- Name: tool_events tool_events_pkey; Type: CONSTRAINT; Schema: timeseries; Owner: -
 --
@@ -1116,13 +1116,11 @@ CREATE INDEX _materialized_hypertable_4_user_id_bucket_idx ON _timescaledb_inter
 
 CREATE INDEX idx_connector_event_dedup_event_id ON public.connector_event_dedup USING btree (tool_event_id);
 
-
 --
 -- Name: idx_connector_event_dedup_lookup; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX idx_connector_event_dedup_lookup ON public.connector_event_dedup USING btree (organization_id, tool_name, event_type, unique_key, unique_value);
-
 
 --
 -- Name: idx_on_organization_connector_id_created_at_49b9e3dabf; Type: INDEX; Schema: public; Owner: -
@@ -1130,13 +1128,11 @@ CREATE UNIQUE INDEX idx_connector_event_dedup_lookup ON public.connector_event_d
 
 CREATE INDEX idx_on_organization_connector_id_created_at_49b9e3dabf ON public.webhook_deliveries USING btree (organization_connector_id, created_at);
 
-
 --
 -- Name: idx_on_organization_connector_id_status_35942419d4; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_on_organization_connector_id_status_35942419d4 ON public.webhook_deliveries USING btree (organization_connector_id, status);
-
 
 --
 -- Name: idx_on_organization_id_connector_type_ebd5fb8c77; Type: INDEX; Schema: public; Owner: -
@@ -1150,13 +1146,11 @@ CREATE UNIQUE INDEX idx_on_organization_id_connector_type_ebd5fb8c77 ON public.o
 
 CREATE INDEX idx_organization_connectors_key_hash ON public.organization_connectors USING btree (key_hash) WHERE (key_hash IS NOT NULL);
 
-
 --
 -- Name: idx_organization_connectors_webhook_token; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX idx_organization_connectors_webhook_token ON public.organization_connectors USING btree (webhook_token) WHERE (webhook_token IS NOT NULL);
-
 
 --
 -- Name: idx_repositories_connector_external; Type: INDEX; Schema: public; Owner: -
@@ -1199,7 +1193,6 @@ CREATE INDEX index_audit_logs_on_organization_id ON public.audit_logs USING btre
 --
 
 CREATE INDEX index_audit_logs_on_organization_id_and_created_at ON public.audit_logs USING btree (organization_id, created_at DESC);
-
 
 --
 -- Name: index_audit_logs_on_policy_version_id; Type: INDEX; Schema: public; Owner: -
@@ -1261,7 +1254,6 @@ CREATE INDEX index_issues_on_assignee_id ON public.issues USING btree (assignee_
 
 CREATE UNIQUE INDEX index_issues_on_connector_project_external_id ON public.issues USING btree (organization_connector_id, project_id, external_id);
 
-
 --
 -- Name: index_issues_on_key; Type: INDEX; Schema: public; Owner: -
 --
@@ -1273,12 +1265,6 @@ CREATE INDEX index_issues_on_key ON public.issues USING btree (key);
 --
 
 CREATE INDEX index_issues_on_organization_connector_id ON public.issues USING btree (organization_connector_id);
-
---
--- Name: index_issues_on_organization_connector_id_and_external_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX index_issues_on_organization_connector_id_and_external_id ON public.issues USING btree (organization_connector_id, external_id);
 
 --
 -- Name: index_issues_on_organization_id; Type: INDEX; Schema: public; Owner: -
@@ -1610,13 +1596,11 @@ CREATE UNIQUE INDEX index_users_on_keycloak_sub ON public.users USING btree (key
 
 CREATE INDEX index_webhook_deliveries_on_organization_connector_id ON public.webhook_deliveries USING btree (organization_connector_id);
 
-
 --
 -- Name: idx_tool_events_external_id; Type: INDEX; Schema: timeseries; Owner: -
 --
 
 CREATE INDEX idx_tool_events_external_id ON timeseries.tool_events USING btree (organization_id, ((metadata ->> 'external_id'::text))) WHERE ((metadata ->> 'external_id'::text) IS NOT NULL);
-
 
 --
 -- Name: idx_tool_events_org_occurred; Type: INDEX; Schema: timeseries; Owner: -
@@ -1629,7 +1613,6 @@ CREATE INDEX idx_tool_events_org_occurred ON timeseries.tool_events USING btree 
 --
 
 CREATE INDEX idx_tool_events_org_tool_occurred ON timeseries.tool_events USING btree (organization_id, tool_name, occurred_at DESC);
-
 
 --
 -- Name: idx_tool_events_project_occurred; Type: INDEX; Schema: timeseries; Owner: -
@@ -1667,7 +1650,6 @@ CREATE INDEX tool_events_occurred_at_idx ON timeseries.tool_events USING btree (
 
 ALTER TABLE ONLY public.webhook_deliveries
     ADD CONSTRAINT fk_rails_0afb2cd61a FOREIGN KEY (organization_connector_id) REFERENCES public.organization_connectors(id);
-
 
 --
 -- Name: invitations fk_rails_0fe4c14f0e; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1928,6 +1910,7 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260506113501'),
 ('20260506102849'),
 ('20260505123328'),
 ('20260504180000'),
@@ -1938,7 +1921,6 @@ INSERT INTO "schema_migrations" (version) VALUES
 ('20260504082100'),
 ('20260502155716'),
 ('20260502121500'),
-('20260506113501'),
 ('20260501151101'),
 ('20260429125535'),
 ('20260429123244'),

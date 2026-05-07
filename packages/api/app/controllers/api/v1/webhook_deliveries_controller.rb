@@ -39,7 +39,7 @@ module Api
         payload = RawEventStore.fetch(@delivery.raw_event_key)
         if payload.nil?
           return render json: { error: "Raw payload has expired and cannot be retried" },
-                        status: :unprocessable_entity
+                        status: :unprocessable_content
         end
 
         rows = WebhookDelivery.where(id: @delivery.id, status: "failed")
@@ -47,7 +47,7 @@ module Api
 
         if rows.zero?
           return render json: { error: "Only failed deliveries can be retried" },
-                        status: :unprocessable_entity
+                        status: :unprocessable_content
         end
 
         @delivery.status     = "pending"
