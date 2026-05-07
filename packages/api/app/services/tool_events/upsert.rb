@@ -34,6 +34,8 @@ module ToolEvents
     end
 
     def call
+      enrich_cost!
+
       if @session_id.present?
         upsert_with_lock
       else
@@ -43,6 +45,31 @@ module ToolEvents
     end
 
     private
+
+    def enrich_cost!
+      cost  = @attributes[:cost_usd]
+      t_in  = @attributes[:tokens_in]
+      t_out = @attributes[:tokens_out]
+
+      if (cost.nil? || cost.to_f.zero?) && (t_in.present? || t_out.present?)
+        result = ModelPricingService.calculate_cost(
+          tokens_in:    t_in.to_i,
+          tokens_out:   t_out.to_i,
+          model:        @attributes[:model],
+          tool:         @attributes[:tool_name],
+          organization: organization
+        )
+        @attributes[:cost_usd] = result[:total_cost]
+
+        set_cost_source("server_estimated")
+      else
+        set_cost_source("client")
+      end
+    end
+
+    def set_cost_source(source)
+      @attributes[:metadata] = (@attributes[:metadata] || {}).merge("cost_source" => source)
+    end
 
     def upsert_with_lock
       ToolEvent.transaction do
@@ -68,6 +95,10 @@ module ToolEvents
 
     def mutable_attributes
       @attributes.slice(*MUTABLE_FIELDS)
+    end
+
+    def organization
+      @organization ||= Organization.find(@attributes[:organization_id])
     end
   end
 end

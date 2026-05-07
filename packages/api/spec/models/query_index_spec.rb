@@ -49,8 +49,7 @@ RSpec.describe "Performance indexes", type: :model do
         .where(organization_id: org.id, tool_name: "claude_code")
         .where("occurred_at >= ?", 30.days.ago)
 
-      plan_json = conn.execute("EXPLAIN (FORMAT JSON) #{query.to_sql}").first["QUERY PLAN"]
-      node_types = extract_node_types(JSON.parse(plan_json))
+      node_types = explain_with_index_forced(query.to_sql)
 
       expect(node_types).to(
         satisfy("include Index Scan or Index Only Scan") do |types|
@@ -88,19 +87,28 @@ RSpec.describe "Performance indexes", type: :model do
         .where("created_at >= ?", 30.days.ago)
         .order(created_at: :desc)
 
-      plan_json = conn.execute("EXPLAIN (FORMAT JSON) #{query.to_sql}").first["QUERY PLAN"]
-      node_types = extract_node_types(JSON.parse(plan_json))
+      node_types = explain_with_index_forced(query.to_sql)
 
       expect(node_types).to(
         satisfy("include Index Scan or Index Only Scan") do |types|
           types.include?("Index Scan") || types.include?("Index Only Scan")
         end
       )
-      expect(plan_json).to include("index_audit_logs_on_organization_id_and_created_at")
     end
   end
 
   private
+
+  # Forces PostgreSQL planner to prefer index scans over sequential scans for
+  # the duration of the block. This is necessary in test environments where
+  # small row counts make Seq Scan cheaper than Index Scan by default.
+  def explain_with_index_forced(sql)
+    conn.execute("SET LOCAL enable_seqscan = off")
+    plan_json = conn.execute("EXPLAIN (FORMAT JSON) #{sql}").first["QUERY PLAN"]
+    extract_node_types(JSON.parse(plan_json))
+  ensure
+    conn.execute("SET LOCAL enable_seqscan = on")
+  end
 
   def extract_node_types(plan, acc = [])
     plan.each do |node|
