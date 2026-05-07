@@ -15,6 +15,7 @@ const mockMutateAsync = vi.fn();
 
 vi.mock("@/hooks/useApi", () => ({
   useConnectors: vi.fn(() => ({ data: [], isLoading: false })),
+  useConnectorHealth: vi.fn(() => ({ data: undefined })),
   useSyncConnector: () => ({ mutateAsync: mockMutateAsync }),
   useDeleteConnector: () => ({ mutateAsync: mockMutateAsync }),
   useTestConnector: () => ({ mutateAsync: mockMutateAsync }),
