@@ -28,7 +28,7 @@ let currentOrgId: string | null = null;
 /**
  * Get the auth token - uses impersonation token if active, otherwise regular token
  */
-async function getAuthToken(): Promise<string | null> {
+export async function getAuthToken(): Promise<string | null> {
   // Check for impersonation token first
   const impersonationToken = localStorage.getItem(IMPERSONATION_STORAGE_KEY);
   if (impersonationToken) {

@@ -109,9 +109,19 @@ module Api
 
       # POST /api/v1/users/me/stop_impersonation
       def stop_impersonation
+        authorize! current_user, to: :stop_impersonation?
+
         unless request.env["jwt.impersonation"]
           return render json: { error: "Not in impersonation mode" }, status: :bad_request
         end
+
+        claims = request.env["jwt.claims"]
+
+        unless claims["jti"].present?
+          return render json: { error: "Token missing jti claim" }, status: :unprocessable_entity
+        end
+
+        ImpersonationService.revoke_token(claims["jti"], claims["exp"])
 
         impersonator = User.find_by(id: request.env["jwt.impersonator_id"])
 

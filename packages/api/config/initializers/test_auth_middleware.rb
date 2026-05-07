@@ -20,13 +20,12 @@ if Rails.env.test?
 
       auth_header = env["HTTP_AUTHORIZATION"]
 
-      if auth_header&.start_with?("Bearer test-impersonation-")
-        # Format: test-impersonation-<user_id>-by-<impersonator_id>
-        match = auth_header.match(/Bearer test-impersonation-(.+)-by-([a-f0-9-]+)\z/)
-        if match
-          user = User.find_by(id: match[1])
-          impersonator = User.find_by(id: match[2])
-
+      if auth_header&.start_with?("Bearer test-impersonation-nojti-")
+        # Special token for testing missing-jti guard: test-impersonation-nojti-<user_id>-by-<impersonator_id>
+        nojti_match = auth_header.match(/Bearer test-impersonation-nojti-(.+)-by-([a-f0-9-]+)\z/)
+        if nojti_match
+          user = User.find_by(id: nojti_match[1])
+          impersonator = User.find_by(id: nojti_match[2])
           if user && impersonator
             env["jwt.claims"] = {
               "sub" => user.keycloak_sub,
@@ -34,6 +33,32 @@ if Rails.env.test?
               "name" => user.name,
               "iat" => Time.current.to_i,
               "exp" => 1.hour.from_now.to_i
+              # jti intentionally absent
+            }
+            env["jwt.impersonation"] = true
+            env["jwt.impersonator_id"] = impersonator.id
+            env["jwt.impersonator_email"] = impersonator.email
+          end
+        end
+      elsif auth_header&.start_with?("Bearer test-impersonation-")
+        # Formats:
+        #   test-impersonation-<user_id>-by-<impersonator_id>
+        #   test-impersonation-<user_id>-by-<impersonator_id>-jti-<jti>
+        match = auth_header.match(/Bearer test-impersonation-(.+)-by-([a-f0-9-]+?)(?:-jti-([a-f0-9-]+))?\z/)
+        if match
+          user = User.find_by(id: match[1])
+          impersonator = User.find_by(id: match[2])
+
+          if user && impersonator
+            exp = 1.hour.from_now.to_i
+            jti = match[3] || SecureRandom.uuid
+            env["jwt.claims"] = {
+              "sub" => user.keycloak_sub,
+              "email" => user.email,
+              "name" => user.name,
+              "iat" => Time.current.to_i,
+              "exp" => exp,
+              "jti" => jti
             }
             env["jwt.impersonation"] = true
             env["jwt.impersonator_id"] = impersonator.id

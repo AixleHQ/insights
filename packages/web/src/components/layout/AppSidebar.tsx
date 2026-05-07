@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrg, type MemberRole } from "@/contexts/OrgContext";
+import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useCreateOrganization, useCurrentUser } from "@/hooks/useApi";
 import {
   Sidebar,
@@ -322,9 +323,12 @@ function UserMenu() {
   const { profile, logout } = useAuth();
   const { data: currentUser } = useCurrentUser();
   const { state } = useSidebar();
+  const { isImpersonating } = useImpersonation();
 
   const displayName = currentUser?.name || profile?.name || "User";
-  const avatarSrc = currentUser?.avatarUrl || profile?.picture;
+  const displayEmail = currentUser?.email || profile?.email;
+  // During impersonation, don't fall back to the admin's Keycloak picture
+  const avatarSrc = currentUser?.avatarUrl || (isImpersonating ? undefined : profile?.picture);
 
   const getInitials = (name?: string, email?: string) => {
     if (name) {
@@ -354,7 +358,7 @@ function UserMenu() {
           <div className="grid flex-1 text-left text-sm leading-tight">
             <span className="truncate font-semibold">{displayName}</span>
             <span className="truncate text-xs text-sidebar-foreground/60">
-              {profile?.email}
+              {displayEmail}
             </span>
           </div>
           <ChevronDown className="ml-auto size-4" />
@@ -369,7 +373,7 @@ function UserMenu() {
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium">{displayName}</p>
-            <p className="text-xs text-muted-foreground">{profile?.email}</p>
+            <p className="text-xs text-muted-foreground">{displayEmail}</p>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />

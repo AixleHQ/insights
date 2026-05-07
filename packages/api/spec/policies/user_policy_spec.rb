@@ -58,4 +58,18 @@ RSpec.describe UserPolicy, type: :policy do
       expect(policy(nil, current_user: global_admin).apply(:index?)).to be true
     end
   end
+
+  describe '#stop_impersonation?' do
+    it 'allows users to stop their own impersonation session' do
+      expect(policy(user, current_user: user).apply(:stop_impersonation?)).to be true
+    end
+
+    it 'denies stopping another user\'s impersonation session' do
+      expect(policy(other_user, current_user: user).apply(:stop_impersonation?)).to be false
+    end
+
+    it 'allows global admins to stop any impersonation session' do
+      expect(policy(other_user, current_user: global_admin).apply(:stop_impersonation?)).to be true
+    end
+  end
 end

@@ -46,12 +46,6 @@ module Admin
       redirect_to "#{frontend_url}/?impersonate=#{token}", allow_other_host: true
     end
 
-    def stop_impersonation
-      session.delete(:impersonated_user_id)
-      session.delete(:admin_user_id)
-      redirect_to admin_users_path, notice: "Stopped impersonating user."
-    end
-
     def export
       users = User.all
       respond_to do |format|

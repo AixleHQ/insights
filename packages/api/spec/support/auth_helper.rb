@@ -76,6 +76,15 @@ module AuthHelper
     headers['X-Organization-ID'] = organization.id.to_s if organization
     post path, params: params.to_json, headers: headers
   end
+
+  # Like impersonated_post but embeds a specific jti into the test token so
+  # revocation via ImpersonationService.revoke_token can be verified in request specs.
+  def impersonated_post_with_jti(path, user:, impersonator:, jti:, organization: nil, params: {})
+    token = "Bearer test-impersonation-#{user.id}-by-#{impersonator.id}-jti-#{jti}"
+    headers = { 'Authorization' => token, 'Content-Type' => 'application/json' }
+    headers['X-Organization-ID'] = organization.id.to_s if organization
+    post path, params: params.to_json, headers: headers
+  end
 end
 
 RSpec.configure do |config|
