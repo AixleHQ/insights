@@ -212,6 +212,40 @@ module Api
         }
       end
 
+      # GET /api/v1/organizations/:organization_id/connectors/health
+      def health
+        authorize! current_organization.organization_connectors.new, to: :health?
+
+        all_connectors    = current_organization.organization_connectors
+        active_connectors = all_connectors.active.order(:connector_type).to_a
+        status_counts     = all_connectors.group(:status).count
+        snapshot_stats    = ConnectorHealthSnapshot.stats_for_org(current_organization.id, since: 7.days.ago)
+
+        summary = {
+          total:        status_counts.values.sum,
+          connected:    status_counts.fetch("connected", 0),
+          testing:      status_counts.fetch("testing", 0),
+          error:        status_counts.fetch("error", 0),
+          disconnected: status_counts.fetch("disconnected", 0)
+        }
+
+        connectors_data = active_connectors.map do |c|
+          st    = snapshot_stats[c.id] || {}
+          total = st[:success_count].to_i + st[:failure_count].to_i
+          {
+            id:                      c.id,
+            connector_type:          c.connector_type,
+            status:                  c.status,
+            last_sync_at:            c.last_sync_at&.iso8601,
+            last_error:              c.last_error,
+            success_rate_7d:         total > 0 ? (st[:success_count].to_f / total).round(4) : nil,
+            avg_sync_duration_ms_7d: st[:avg_duration_ms]&.round(1)
+          }
+        end
+
+        render json: { data: { summary:, connectors: connectors_data } }
+      end
+
       # GET /api/v1/organizations/:organization_id/connectors/authorize/:type
       def authorize_url
         authorize! current_organization.organization_connectors.new(connector_type: params[:type]), to: :authorize?

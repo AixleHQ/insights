@@ -758,4 +758,99 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
       expect(json_data.first[:scope]).to eq('project')
     end
   end
+
+  describe 'GET /api/v1/organizations/:organization_id/connectors/health' do
+    let!(:error_connector) do
+      create(:organization_connector, organization: organization, connector_type: 'gitlab',
+             status: 'error', last_error: 'Token expired')
+    end
+    let!(:disconnected_connector) do
+      create(:organization_connector, organization: organization, connector_type: 'linear',
+             status: 'disconnected')
+    end
+
+    it 'returns summary counts for org admin' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/health",
+                        user: admin,
+                        organization: organization
+
+      expect_success
+      summary = json_response.dig(:data, :summary)
+      # connector (github/connected) + error_connector + disconnected_connector = 3 total
+      expect(summary[:total]).to eq(3)
+      expect(summary[:connected]).to eq(1)
+      expect(summary[:error]).to eq(1)
+      expect(summary[:disconnected]).to eq(1)
+      expect(summary[:testing]).to eq(0)
+    end
+
+    it 'returns per-connector list excluding disconnected connectors' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/health",
+                        user: admin,
+                        organization: organization
+
+      expect_success
+      connectors = json_response.dig(:data, :connectors)
+      connector_types = connectors.map { |c| c[:connector_type] }
+      expect(connector_types).to include('github', 'gitlab')
+      expect(connector_types).not_to include('linear')
+    end
+
+    it 'includes health stats fields on each connector' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/health",
+                        user: admin,
+                        organization: organization
+
+      expect_success
+      c = json_response.dig(:data, :connectors).first
+      expect(c).to have_key(:success_rate_7d)
+      expect(c).to have_key(:avg_sync_duration_ms_7d)
+      expect(c).to have_key(:last_sync_at)
+      expect(c).to have_key(:last_error)
+    end
+
+    it 'returns computed success_rate_7d when snapshots exist' do
+      now = Time.current
+      create(:connector_health_snapshot, organization_connector: connector,
+             status: 'success', snapshotted_at: now, sync_duration_ms: 1000)
+      create(:connector_health_snapshot, organization_connector: connector,
+             status: 'success', snapshotted_at: now - 1.hour, sync_duration_ms: 2000)
+      create(:connector_health_snapshot, organization_connector: connector,
+             status: 'failure', snapshotted_at: now - 2.hours, sync_duration_ms: 500)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/health",
+                        user: admin,
+                        organization: organization
+
+      expect_success
+      github_data = json_response.dig(:data, :connectors).find { |c| c[:connector_type] == 'github' }
+      expect(github_data[:success_rate_7d]).to be_within(0.001).of(0.6667)
+      expect(github_data[:avg_sync_duration_ms_7d]).to be_present
+    end
+
+    it 'returns null success_rate_7d when no snapshots exist' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/health",
+                        user: admin,
+                        organization: organization
+
+      expect_success
+      github_data = json_response.dig(:data, :connectors).find { |c| c[:connector_type] == 'github' }
+      expect(github_data[:success_rate_7d]).to be_nil
+    end
+
+    it 'returns 403 for non-admin members' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/health",
+                        user: member,
+                        organization: organization
+
+      expect_forbidden
+    end
+
+    it 'returns 401 without authentication' do
+      get "/api/v1/organizations/#{organization.id}/connectors/health",
+          headers: { 'X-Organization-ID' => organization.id }
+
+      expect_unauthorized
+    end
+  end
 end
