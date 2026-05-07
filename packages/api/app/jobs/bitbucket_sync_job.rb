@@ -20,6 +20,8 @@ class BitbucketSyncJob < ApplicationJob
 
     case action
     when "sync"
+      @sync_started_at = Time.current
+      @connector.update_column(:activity_sync_started_at, @sync_started_at)
       fanout = sync_repositories
       # When fan-out is active, mark_synced! is deferred to the last child job.
       return if fanout
@@ -30,16 +32,18 @@ class BitbucketSyncJob < ApplicationJob
     end
 
     delivery&.mark_delivered!
-    @connector.mark_synced!
+    @connector.mark_synced!(sync_started_at: @sync_started_at)
     Rails.logger.info("[BitbucketSyncJob] Completed #{action} for connector #{connector_id}")
   rescue ActiveRecord::RecordNotFound
     Rails.logger.error("[BitbucketSyncJob] Connector #{connector_id} not found")
     delivery&.mark_failed!("Connector not found")
   rescue Oauth::TokenRefreshError => e
     Rails.logger.error("[BitbucketSyncJob] Token refresh failed for connector #{connector_id}: #{e.message}")
+    @connector&.mark_error!(e.message, sync_started_at: @sync_started_at)
     delivery&.mark_failed!(e.message)
   rescue StandardError => e
     Rails.logger.error("[BitbucketSyncJob] Failed: #{e.message}")
+    @connector&.mark_error!(e.message, sync_started_at: @sync_started_at)
     delivery&.update!(last_error: e.message)
     raise
   end

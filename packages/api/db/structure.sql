@@ -256,7 +256,6 @@ CREATE VIEW _timescaledb_internal._direct_view_4 AS
     sum(cost_usd) AS total_cost
    FROM timeseries.tool_events
   GROUP BY (public.time_bucket('1 day'::interval, occurred_at)), organization_id, user_id, project_id, tool_name, event_type;
-
 --
 -- Name: _materialized_hypertable_3; Type: TABLE; Schema: _timescaledb_internal; Owner: -
 --
@@ -274,7 +273,6 @@ CREATE TABLE _timescaledb_internal._materialized_hypertable_3 (
     total_tokens bigint,
     total_cost numeric
 );
-
 --
 -- Name: _materialized_hypertable_4; Type: TABLE; Schema: _timescaledb_internal; Owner: -
 --
@@ -330,7 +328,6 @@ CREATE VIEW _timescaledb_internal._partial_view_4 AS
     sum(cost_usd) AS total_cost
    FROM timeseries.tool_events
   GROUP BY (public.time_bucket('1 day'::interval, occurred_at)), organization_id, user_id, project_id, tool_name, event_type;
-
 --
 -- Name: admin_audit_logs; Type: TABLE; Schema: public; Owner: -
 --
@@ -409,6 +406,22 @@ CREATE SEQUENCE public.connector_event_dedup_id_seq
 --
 
 ALTER SEQUENCE public.connector_event_dedup_id_seq OWNED BY public.connector_event_dedup.id;
+
+--
+-- Name: connector_health_snapshots; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.connector_health_snapshots (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_connector_id uuid NOT NULL,
+    status character varying NOT NULL,
+    sync_duration_ms integer,
+    error_message text,
+    snapshotted_at timestamp(6) without time zone NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT connector_health_snapshots_status_check CHECK (((status)::text = ANY ((ARRAY['success'::character varying, 'failure'::character varying])::text[])))
+);
 
 --
 -- Name: invitations; Type: TABLE; Schema: public; Owner: -
@@ -521,7 +534,8 @@ CREATE TABLE public.organization_connectors (
     webhook_token character varying,
     key_hash character varying,
     webhook_active boolean DEFAULT false NOT NULL,
-    connector_scope character varying DEFAULT 'org'::character varying NOT NULL
+    connector_scope character varying DEFAULT 'org'::character varying NOT NULL,
+    activity_sync_started_at timestamp(6) without time zone
 );
 
 --
@@ -842,13 +856,11 @@ CREATE VIEW timeseries.hourly_token_usage AS
     total_tokens,
     total_cost
    FROM _timescaledb_internal._materialized_hypertable_3;
-
 --
 -- Name: connector_event_dedup id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.connector_event_dedup ALTER COLUMN id SET DEFAULT nextval('public.connector_event_dedup_id_seq'::regclass);
-
 --
 -- Name: admin_audit_logs admin_audit_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
@@ -876,6 +888,13 @@ ALTER TABLE ONLY public.audit_logs
 
 ALTER TABLE ONLY public.connector_event_dedup
     ADD CONSTRAINT connector_event_dedup_pkey PRIMARY KEY (id);
+
+--
+-- Name: connector_health_snapshots connector_health_snapshots_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_health_snapshots
+    ADD CONSTRAINT connector_health_snapshots_pkey PRIMARY KEY (id);
 
 --
 -- Name: invitations invitations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1037,7 +1056,6 @@ ALTER TABLE ONLY public.webhook_deliveries
 
 ALTER TABLE ONLY timeseries.tool_events
     ADD CONSTRAINT tool_events_pkey PRIMARY KEY (id, occurred_at);
-
 --
 -- Name: _materialized_hypertable_3_bucket_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
 --
@@ -1109,7 +1127,6 @@ CREATE INDEX _materialized_hypertable_4_tool_name_bucket_idx ON _timescaledb_int
 --
 
 CREATE INDEX _materialized_hypertable_4_user_id_bucket_idx ON _timescaledb_internal._materialized_hypertable_4 USING btree (user_id, bucket DESC);
-
 --
 -- Name: idx_connector_event_dedup_event_id; Type: INDEX; Schema: public; Owner: -
 --
@@ -1127,6 +1144,12 @@ CREATE UNIQUE INDEX idx_connector_event_dedup_lookup ON public.connector_event_d
 --
 
 CREATE INDEX idx_on_organization_connector_id_created_at_49b9e3dabf ON public.webhook_deliveries USING btree (organization_connector_id, created_at);
+
+--
+-- Name: idx_on_organization_connector_id_snapshotted_at_80163c96c9; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_on_organization_connector_id_snapshotted_at_80163c96c9 ON public.connector_health_snapshots USING btree (organization_connector_id, snapshotted_at);
 
 --
 -- Name: idx_on_organization_connector_id_status_35942419d4; Type: INDEX; Schema: public; Owner: -
@@ -1217,6 +1240,18 @@ CREATE INDEX index_audit_logs_on_temporal_workflow_id ON public.audit_logs USING
 --
 
 CREATE INDEX index_audit_logs_on_tool_event_id ON public.audit_logs USING btree (tool_event_id);
+
+--
+-- Name: index_connector_health_snapshots_on_organization_connector_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_connector_health_snapshots_on_organization_connector_id ON public.connector_health_snapshots USING btree (organization_connector_id);
+
+--
+-- Name: index_connector_health_snapshots_on_snapshotted_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_connector_health_snapshots_on_snapshotted_at ON public.connector_health_snapshots USING btree (snapshotted_at);
 
 --
 -- Name: index_invitations_on_invited_by_id; Type: INDEX; Schema: public; Owner: -
@@ -1643,7 +1678,6 @@ CREATE INDEX idx_tool_events_user_occurred ON timeseries.tool_events USING btree
 --
 
 CREATE INDEX tool_events_occurred_at_idx ON timeseries.tool_events USING btree (occurred_at DESC);
-
 --
 -- Name: webhook_deliveries fk_rails_0afb2cd61a; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
@@ -1713,6 +1747,13 @@ ALTER TABLE ONLY public.project_audit_logs
 
 ALTER TABLE ONLY public.organization_memberships
     ADD CONSTRAINT fk_rails_57cf70d280 FOREIGN KEY (user_id) REFERENCES public.users(id);
+
+--
+-- Name: connector_health_snapshots fk_rails_5fe169f99b; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_health_snapshots
+    ADD CONSTRAINT fk_rails_5fe169f99b FOREIGN KEY (organization_connector_id) REFERENCES public.organization_connectors(id);
 
 --
 -- Name: organization_audit_logs fk_rails_6b6833732b; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1910,6 +1951,8 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260507130000'),
+('20260507120000'),
 ('20260506113501'),
 ('20260506102849'),
 ('20260505123328'),
@@ -1924,7 +1967,6 @@ INSERT INTO "schema_migrations" (version) VALUES
 ('20260501151101'),
 ('20260429125535'),
 ('20260429123244'),
-('20260429000002'),
 ('20260429000001'),
 ('20260428125537'),
 ('20260424000003'),

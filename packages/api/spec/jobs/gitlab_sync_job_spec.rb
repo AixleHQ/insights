@@ -108,6 +108,19 @@ RSpec.describe GitlabSyncJob, type: :job do
 
       expect(instance_count).to eq(3)
     end
+
+    it "sets activity_sync_started_at on the connector at sync start" do
+      described_class.new.perform(connector.id, "sync")
+      expect(connector.reload.activity_sync_started_at).to be_present
+    end
+
+    it "records a success health snapshot after a non-fanout sync" do
+      expect {
+        described_class.new.perform(connector.id, "sync")
+      }.to change(ConnectorHealthSnapshot, :count).by(1)
+
+      expect(ConnectorHealthSnapshot.last.status).to eq("success")
+    end
   end
 
   describe "#perform — fan-out mode (GITLAB_FANOUT=true)" do
@@ -133,6 +146,11 @@ RSpec.describe GitlabSyncJob, type: :job do
       allow(connector).to receive(:mark_synced!).and_call_original
       described_class.new.perform(connector.id, "sync")
       expect(connector).not_to have_received(:mark_synced!)
+    end
+
+    it "sets activity_sync_started_at on the connector before enqueueing child jobs" do
+      described_class.new.perform(connector.id, "sync")
+      expect(connector.reload.activity_sync_started_at).to be_present
     end
   end
 
@@ -165,6 +183,30 @@ RSpec.describe GitlabSyncJob, type: :job do
         .first
       expect(event.user_id).to eq(user.id)
       expect(event.tool_name).to eq("gitlab")
+    end
+
+    it "does not record a health snapshot (webhook action bypasses health tracking)" do
+      expect {
+        described_class.new.perform(connector.id, "webhook", {
+          "event_type" => "Push Hook",
+          "payload" => push_payload
+        })
+      }.not_to change(ConnectorHealthSnapshot, :count)
+    end
+  end
+
+  describe "#perform — health snapshot error handling" do
+    it "records a failure snapshot when sync raises StandardError" do
+      allow(Oauth::BaseProvider).to receive(:for).with(connector).and_raise(RuntimeError, "API down")
+
+      expect {
+        described_class.new.perform(connector.id, "sync")
+      }.to raise_error(RuntimeError, "API down")
+
+      snapshot = ConnectorHealthSnapshot.last
+      expect(snapshot).to be_present
+      expect(snapshot.status).to eq("failure")
+      expect(snapshot.error_message).to eq("API down")
     end
   end
 end

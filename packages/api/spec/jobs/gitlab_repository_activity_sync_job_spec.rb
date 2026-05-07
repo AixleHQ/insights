@@ -91,6 +91,19 @@ RSpec.describe GitlabRepositoryActivitySyncJob, type: :job do
         # mark_synced! sets status to "connected" and updates last_sync_at
         expect(connector.reload.status).to eq("connected")
       end
+
+      it "records a success health snapshot using activity_sync_started_at" do
+        connector.update_column(:activity_sync_started_at, 5.minutes.ago)
+        connector.update_column(:pending_activity_jobs, 1)
+
+        expect {
+          described_class.new.perform(connector.id, repository.id)
+        }.to change(ConnectorHealthSnapshot, :count).by(1)
+
+        snapshot = ConnectorHealthSnapshot.last
+        expect(snapshot.status).to eq("success")
+        expect(snapshot.sync_duration_ms).to be > 0
+      end
     end
 
     context "when there are still other pending jobs (counter > 1)" do
@@ -99,6 +112,14 @@ RSpec.describe GitlabRepositoryActivitySyncJob, type: :job do
         described_class.new.perform(connector.id, repository.id)
         expect(connector.reload.pending_activity_jobs).to eq(2)
         expect(connector.reload.last_sync_at).to be_nil
+      end
+
+      it "does not record a health snapshot" do
+        connector.update_column(:pending_activity_jobs, 3)
+
+        expect {
+          described_class.new.perform(connector.id, repository.id)
+        }.not_to change(ConnectorHealthSnapshot, :count)
       end
     end
   end

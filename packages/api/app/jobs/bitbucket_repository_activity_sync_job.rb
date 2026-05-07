@@ -148,7 +148,7 @@ class BitbucketRepositoryActivitySyncJob < ApplicationJob
       remaining = connector.pending_activity_jobs.to_i - 1
       remaining = 0 if remaining < 0
       connector.update_column(:pending_activity_jobs, remaining)
-      connector.mark_synced! if remaining.zero?
+      connector.mark_synced!(sync_started_at: connector.activity_sync_started_at) if remaining.zero?
     end
   rescue StandardError => e
     Rails.logger.error("[BitbucketRepositoryActivitySyncJob] Counter decrement failed: #{e.message}")
