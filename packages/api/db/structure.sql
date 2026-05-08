@@ -256,6 +256,7 @@ CREATE VIEW _timescaledb_internal._direct_view_4 AS
     sum(cost_usd) AS total_cost
    FROM timeseries.tool_events
   GROUP BY (public.time_bucket('1 day'::interval, occurred_at)), organization_id, user_id, project_id, tool_name, event_type;
+
 --
 -- Name: _materialized_hypertable_3; Type: TABLE; Schema: _timescaledb_internal; Owner: -
 --
@@ -273,6 +274,7 @@ CREATE TABLE _timescaledb_internal._materialized_hypertable_3 (
     total_tokens bigint,
     total_cost numeric
 );
+
 --
 -- Name: _materialized_hypertable_4; Type: TABLE; Schema: _timescaledb_internal; Owner: -
 --
@@ -328,6 +330,7 @@ CREATE VIEW _timescaledb_internal._partial_view_4 AS
     sum(cost_usd) AS total_cost
    FROM timeseries.tool_events
   GROUP BY (public.time_bucket('1 day'::interval, occurred_at)), organization_id, user_id, project_id, tool_name, event_type;
+
 --
 -- Name: admin_audit_logs; Type: TABLE; Schema: public; Owner: -
 --
@@ -856,11 +859,13 @@ CREATE VIEW timeseries.hourly_token_usage AS
     total_tokens,
     total_cost
    FROM _timescaledb_internal._materialized_hypertable_3;
+
 --
 -- Name: connector_event_dedup id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.connector_event_dedup ALTER COLUMN id SET DEFAULT nextval('public.connector_event_dedup_id_seq'::regclass);
+
 --
 -- Name: admin_audit_logs admin_audit_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
@@ -1056,6 +1061,7 @@ ALTER TABLE ONLY public.webhook_deliveries
 
 ALTER TABLE ONLY timeseries.tool_events
     ADD CONSTRAINT tool_events_pkey PRIMARY KEY (id, occurred_at);
+
 --
 -- Name: _materialized_hypertable_3_bucket_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
 --
@@ -1127,6 +1133,7 @@ CREATE INDEX _materialized_hypertable_4_tool_name_bucket_idx ON _timescaledb_int
 --
 
 CREATE INDEX _materialized_hypertable_4_user_id_bucket_idx ON _timescaledb_internal._materialized_hypertable_4 USING btree (user_id, bucket DESC);
+
 --
 -- Name: idx_connector_event_dedup_event_id; Type: INDEX; Schema: public; Owner: -
 --
@@ -1678,6 +1685,7 @@ CREATE INDEX idx_tool_events_user_occurred ON timeseries.tool_events USING btree
 --
 
 CREATE INDEX tool_events_occurred_at_idx ON timeseries.tool_events USING btree (occurred_at DESC);
+
 --
 -- Name: webhook_deliveries fk_rails_0afb2cd61a; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
