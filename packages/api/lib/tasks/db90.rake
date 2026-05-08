@@ -304,4 +304,59 @@ namespace :db90 do
 
     puts "[db90:cleanup_seed_users] Done."
   end
+
+  desc <<~DESC
+    Delete ALL tool events for one organization. Use to wipe synthetic/seed usage data
+    from staging when events have been reassigned to real user accounts and cannot be
+    identified by metadata alone.
+
+    This is destructive and irreversible — any real usage captured for the org is also
+    removed. Intended for staging/development environments only.
+
+    Usage (from packages/api):
+      rails 'db90:wipe_org_events[dry_run]'
+      rails db90:wipe_org_events
+      rails 'db90:wipe_org_events[my-org-slug]'
+      rails 'db90:wipe_org_events[my-org-slug,dry_run]'
+
+    Allowed environments: development, staging (set ALLOW_PRODUCTION_CLEANUP=1 to override).
+  DESC
+  task :wipe_org_events, [ :organization_slug, :dry_run ] => :environment do |_t, args|
+    first  = args[:organization_slug].to_s.strip
+    second = args[:dry_run].to_s.strip
+
+    dry_run = second.casecmp("dry_run").zero? || first.casecmp("dry_run").zero?
+
+    unless Rails.env.development? || Rails.env.staging? || ENV["ALLOW_PRODUCTION_CLEANUP"].present?
+      abort "[db90:wipe_org_events] Refusing to run in #{Rails.env} " \
+            "(set ALLOW_PRODUCTION_CLEANUP=1 only if you intend this)."
+    end
+
+    org_slug = first
+    org_slug = "dualboot-partners" if org_slug.blank? || org_slug.casecmp("dry_run").zero?
+
+    org = Organization.find_by(slug: org_slug)
+    unless org
+      abort "[db90:wipe_org_events] Organization not found: slug=#{org_slug.inspect}"
+    end
+
+    count = ToolEvent.where(organization: org).count
+
+    puts "[db90:wipe_org_events] #{dry_run ? '[DRY RUN] ' : ''}org=#{org.slug} (#{org.name})"
+    puts "[db90:wipe_org_events] Tool events to delete: #{count}"
+
+    if count == 0
+      puts "[db90:wipe_org_events] Nothing to do."
+      next
+    end
+
+    if dry_run
+      puts "[db90:wipe_org_events] DRY RUN — no rows deleted. Run without dry_run to destroy."
+      next
+    end
+
+    deleted = ToolEvent.where(organization: org).delete_all
+    puts "[db90:wipe_org_events] Deleted #{deleted} tool event(s)."
+    puts "[db90:wipe_org_events] Done."
+  end
 end
