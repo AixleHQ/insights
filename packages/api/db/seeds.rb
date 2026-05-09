@@ -3,6 +3,16 @@
 
 puts "Seeding database..."
 
+# Controls whether the bulk simulation seed runs.
+#   development: always runs (unconditional)
+#   staging:     opt-in via RUN_HEAVY_SEED=1
+#   production:  NEVER runs, even if RUN_HEAVY_SEED is set
+def heavy_seed_enabled?
+  return false if Rails.env.production?
+  return true  if Rails.env.development?
+  ENV["RUN_HEAVY_SEED"].present?
+end
+
 # Create a default sanitization policy
 if SanitizationPolicy.count == 0
   puts "Creating default sanitization policy..."
@@ -74,8 +84,51 @@ KNOWN_DEV_USERS = [
   }
 ].freeze
 
-# Only seed sample data in development
-if Rails.env.development? || Rails.env.staging?
+# Minimal seed: org + known team users + org settings.
+# Runs on all non-production environments so staging team members can log in via Keycloak
+# and the organization has working defaults — independent of heavy simulation data.
+org = nil
+unless Rails.env.production?
+  org = Organization.find_or_create_by!(slug: 'dualboot-partners') do |o|
+    o.name = 'Acme Corp'
+  end
+  puts "Organization: #{org.name}"
+
+  puts "Creating known development users..."
+  known_users = []
+  KNOWN_DEV_USERS.each do |user_data|
+    user = User.find_or_create_by!(email: user_data[:email]) do |u|
+      u.keycloak_sub = user_data[:keycloak_sub]
+      u.name = user_data[:name]
+      u.global_admin = user_data[:global_admin] || false
+    end
+
+    # Update keycloak_sub if it changed (in case user logged in with different sub)
+    user.update!(keycloak_sub: user_data[:keycloak_sub]) if user.keycloak_sub != user_data[:keycloak_sub]
+
+    # Add to organization with specified role
+    OrganizationMembership.find_or_create_by!(user: user, organization: org) do |m|
+      m.role = user_data[:org_role] || 'member'
+    end
+
+    known_users << user
+    puts "  Created/updated: #{user.email} (#{user_data[:org_role]})"
+  end
+
+  OrganizationSetting.set(org, 'alert_cost_daily', '500')
+  OrganizationSetting.set(org, 'alert_cost_monthly', '5000')
+  OrganizationSetting.set(org, 'alert_risk_critical', 'true')
+  OrganizationSetting.set(org, 'alert_risk_high', 'true')
+  OrganizationSetting.set(org, 'alert_usage_spike', 'true')
+  OrganizationSetting.set(org, 'alert_email', 'true')
+  OrganizationSetting.set(org, 'sanitize_api_keys', 'true')
+  OrganizationSetting.set(org, 'sanitize_secrets', 'true')
+  puts "Created organization settings"
+end
+
+# Heavy simulation seed: 100 engineers, ~50k ToolEvents, 7 projects, GitHub connector.
+# development: always runs | staging: set RUN_HEAVY_SEED=1 to opt in | production: never runs
+if heavy_seed_enabled?
   puts "Seeding development data with realistic usage simulation..."
   puts "This simulates 100 engineers over 45 days"
 
@@ -185,34 +238,6 @@ if Rails.env.development? || Rails.env.staging?
       return item if r <= 0
     end
     items_with_weights.keys.first
-  end
-
-  # Create organization
-  org = Organization.find_or_create_by!(slug: 'dualboot-partners') do |o|
-    o.name = 'Acme Corp'
-  end
-  puts "Organization: #{org.name}"
-
-  # Create known development users first (so they get events)
-  puts "Creating known development users..."
-  known_users = []
-  KNOWN_DEV_USERS.each do |user_data|
-    user = User.find_or_create_by!(email: user_data[:email]) do |u|
-      u.keycloak_sub = user_data[:keycloak_sub]
-      u.name = user_data[:name]
-      u.global_admin = user_data[:global_admin] || false
-    end
-
-    # Update keycloak_sub if it changed (in case user logged in with different sub)
-    user.update!(keycloak_sub: user_data[:keycloak_sub]) if user.keycloak_sub != user_data[:keycloak_sub]
-
-    # Add to organization with specified role
-    OrganizationMembership.find_or_create_by!(user: user, organization: org) do |m|
-      m.role = user_data[:org_role] || 'member'
-    end
-
-    known_users << user
-    puts "  Created/updated: #{user.email} (#{user_data[:org_role]})"
   end
 
   # Create 100 engineers
@@ -357,17 +382,6 @@ if Rails.env.development? || Rails.env.staging?
   end
   puts "Created #{total_events} tool events"
 
-  # Create organization settings
-  OrganizationSetting.set(org, 'alert_cost_daily', '500')
-  OrganizationSetting.set(org, 'alert_cost_monthly', '5000')
-  OrganizationSetting.set(org, 'alert_risk_critical', 'true')
-  OrganizationSetting.set(org, 'alert_risk_high', 'true')
-  OrganizationSetting.set(org, 'alert_usage_spike', 'true')
-  OrganizationSetting.set(org, 'alert_email', 'true')
-  OrganizationSetting.set(org, 'sanitize_api_keys', 'true')
-  OrganizationSetting.set(org, 'sanitize_secrets', 'true')
-  puts "Created organization settings"
-
   # Create some user settings
   engineers.first(10).each do |engineer|
     UserSetting.set(engineer, 'theme', %w[dark light system].sample)
@@ -409,7 +423,6 @@ if Rails.env.development? || Rails.env.staging?
 end
 
 # Assign events to known dev users (these should have substantial data)
-org = Organization.find_by(slug: 'dualboot-partners')
 if org && KNOWN_DEV_USERS.any?
   puts "\nGenerating events for known development users..."
 
@@ -479,7 +492,7 @@ if real_users.any?
 end
 
 # Idempotent demo rows: user_id nil + correlation metadata for Unattributed Events UI / manual attribution QA
-if (Rails.env.development? || Rails.env.staging?) && org
+if heavy_seed_enabled? && org
   demo_tag = "unattributed_demo"
   unless ToolEvent.where(organization: org).where("metadata->>'seed_batch' = ?", demo_tag).exists?
     puts "\nCreating seed unattributed tool events (manual attribution demo, metadata.seed_batch=#{demo_tag})..."
