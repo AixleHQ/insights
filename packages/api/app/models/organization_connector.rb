@@ -15,6 +15,7 @@ class OrganizationConnector < ApplicationRecord
   has_many :repositories, dependent: :destroy
   has_many :webhook_deliveries, dependent: :destroy
   has_many :issues, dependent: :destroy
+  has_many :connector_health_snapshots, dependent: :destroy
 
   validates :connector_type, presence: true, inclusion: { in: CONNECTOR_TYPES }
   validates :connector_type, uniqueness: { scope: :organization_id, message: "already exists for this organization" }
@@ -71,12 +72,14 @@ class OrganizationConnector < ApplicationRecord
     update!(status: "connected", last_error: nil, last_sync_at: Time.current, is_active: true)
   end
 
-  def mark_synced!
+  def mark_synced!(sync_started_at: nil)
     update!(status: "connected", last_sync_at: Time.current, last_error: nil, is_active: true)
+    record_health_snapshot!("success", sync_started_at) if sync_started_at
   end
 
-  def mark_error!(error_message)
+  def mark_error!(error_message, sync_started_at: nil)
     update!(status: "error", last_error: error_message)
+    record_health_snapshot!("failure", sync_started_at, error_message: error_message) if sync_started_at
   end
 
   def mark_disconnected!
@@ -111,6 +114,18 @@ class OrganizationConnector < ApplicationRecord
   end
 
   private
+
+  def record_health_snapshot!(status, sync_started_at, error_message: nil)
+    duration_ms = ((Time.current - sync_started_at) * 1000).round
+    connector_health_snapshots.create!(
+      status: status,
+      sync_duration_ms: duration_ms,
+      error_message: error_message,
+      snapshotted_at: Time.current
+    )
+  rescue => e
+    Rails.logger.error("[ConnectorHealthSnapshot] Failed to record snapshot for connector #{id}: #{e.message}")
+  end
 
   def assign_scope
     self.connector_scope = SCOPE_BY_TYPE.fetch(connector_type.to_s, "org")

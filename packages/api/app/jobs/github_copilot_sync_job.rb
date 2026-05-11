@@ -10,19 +10,20 @@ class GithubCopilotSyncJob < ApplicationJob
   end
 
   def perform(connector_id)
+    @sync_started_at = Time.current
     @connector = OrganizationConnector.find(connector_id)
     provider   = Oauth::GithubCopilotProvider.new(@connector)
 
     sync_usage(provider)
     sync_seats(provider)
-    @connector.mark_synced!
+    @connector.mark_synced!(sync_started_at: @sync_started_at)
 
     Rails.logger.info("[GithubCopilotSyncJob] Completed for connector #{connector_id}")
   rescue ActiveRecord::RecordNotFound
     Rails.logger.error("[GithubCopilotSyncJob] Connector #{connector_id} not found")
   rescue StandardError => e
     Rails.logger.error("[GithubCopilotSyncJob] Failed for connector #{connector_id}: #{e.message}")
-    @connector&.mark_error!(e.message)
+    @connector&.mark_error!(e.message, sync_started_at: @sync_started_at)
     raise
   end
 

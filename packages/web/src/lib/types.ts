@@ -525,6 +525,29 @@ export interface ConnectorSyncStatus {
   total_events: number;
 }
 
+export interface ConnectorHealthStats {
+  id: string;
+  connector_type: string;
+  status: ConnectorStatus;
+  last_sync_at: string | null;
+  last_error: string | null;
+  success_rate_7d: number | null;
+  avg_sync_duration_ms_7d: number | null;
+}
+
+export interface ConnectorHealthSummary {
+  total: number;
+  connected: number;
+  testing: number;
+  error: number;
+  disconnected: number;
+}
+
+export interface ConnectorHealthRollup {
+  summary: ConnectorHealthSummary;
+  connectors: ConnectorHealthStats[];
+}
+
 export interface PricingEntry {
   name: string;
   input_per_mtok: number;

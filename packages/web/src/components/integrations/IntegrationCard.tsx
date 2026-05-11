@@ -27,7 +27,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn, formatDistanceToNow } from "@/lib/utils";
 import { ProviderLogo } from "@/components/icons";
-import type { ConnectorStatus } from "@/lib/types";
+import type { ConnectorStatus, ConnectorHealthStats } from "@/lib/types";
+import { formatPercentage } from "@/lib/formatters";
 
 export type IntegrationScope = "org" | "project" | "persona";
 
@@ -90,6 +91,7 @@ export interface ProviderInfo {
 interface IntegrationCardProps {
   integration?: IntegrationData;
   provider?: ProviderInfo;
+  healthStats?: ConnectorHealthStats | null;
   onSync?: (id: string) => void;
   onTest?: (id: string) => void;
   onDisconnect?: (id: string) => void;
@@ -172,6 +174,7 @@ function ErrorPanel({ error }: { error: string }) {
 export function IntegrationCard({
   integration,
   provider,
+  healthStats,
   onSync,
   onTest,
   onDisconnect,
@@ -370,6 +373,30 @@ export function IntegrationCard({
 
         {integration.sync_error && (
           <ErrorPanel error={integration.sync_error} />
+        )}
+
+        {healthStats && (healthStats.success_rate_7d != null || healthStats.avg_sync_duration_ms_7d != null) && (
+          <div className="flex items-center gap-3 rounded-md bg-muted/50 px-2.5 py-1.5 text-xs text-muted-foreground">
+            {healthStats.success_rate_7d != null && (
+              <span
+                className={cn(
+                  "font-medium",
+                  healthStats.success_rate_7d >= 0.9 ? "text-success" :
+                  healthStats.success_rate_7d >= 0.7 ? "text-amber-500" :
+                  "text-destructive"
+                )}
+              >
+                {formatPercentage(healthStats.success_rate_7d)} success
+              </span>
+            )}
+            {healthStats.success_rate_7d != null && healthStats.avg_sync_duration_ms_7d != null && (
+              <span className="text-muted-foreground/40">·</span>
+            )}
+            {healthStats.avg_sync_duration_ms_7d != null && (
+              <span>avg {(healthStats.avg_sync_duration_ms_7d / 1000).toFixed(1)}s</span>
+            )}
+            <span className="ml-auto opacity-60">7d</span>
+          </div>
         )}
       </CardContent>
     </Card>

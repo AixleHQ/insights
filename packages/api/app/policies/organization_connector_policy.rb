@@ -60,6 +60,11 @@ class OrganizationConnectorPolicy < ApplicationPolicy
     org_admin?(record.organization) || global_admin?
   end
 
+  # Only admins can view health rollup (contains error details)
+  def health?
+    org_admin?(record.organization) || global_admin?
+  end
+
   # Members can use AI connectors (proxy requests)
   def use?
     org_member?(record.organization) || global_admin?

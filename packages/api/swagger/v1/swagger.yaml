@@ -941,6 +941,73 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /api/v1/organizations/{organization_id}/connectors/health:
+    get:
+      summary: Get connector health rollup
+      description: Returns aggregated 7-day health metrics for all connectors in the organization. Summary counts use all connectors; per-connector list excludes disconnected.
+      tags:
+        - Organization Connectors
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      responses:
+        '200':
+          description: Connector health rollup
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      summary:
+                        type: object
+                        properties:
+                          total:
+                            type: integer
+                          connected:
+                            type: integer
+                          testing:
+                            type: integer
+                          error:
+                            type: integer
+                          disconnected:
+                            type: integer
+                      connectors:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            connector_type:
+                              type: string
+                            status:
+                              type: string
+                              enum: [connected, testing, error]
+                            last_sync_at:
+                              type: string
+                              format: date-time
+                              nullable: true
+                            last_error:
+                              type: string
+                              nullable: true
+                            success_rate_7d:
+                              type: number
+                              format: float
+                              nullable: true
+                              description: Fraction of successful syncs in the last 7 days (0.0–1.0). Null if no snapshots exist.
+                            avg_sync_duration_ms_7d:
+                              type: number
+                              format: float
+                              nullable: true
+                              description: Average sync duration in milliseconds over the last 7 days. Null if no snapshots exist.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   /api/v1/organizations/{organization_id}/connectors/authorize/{type}:
     get:
       summary: Get OAuth authorization URL

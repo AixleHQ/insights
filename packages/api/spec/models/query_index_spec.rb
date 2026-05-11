@@ -41,6 +41,10 @@ RSpec.describe "Performance indexes", type: :model do
       create_list(:tool_event, 5, organization: org, tool_name: "claude_code",
                                   occurred_at: 7.days.ago)
 
+      # Disable seq scan so the planner is forced to use an index when one exists.
+      # Without this, tiny test datasets always trigger Seq Scan regardless of indexes.
+      conn.execute("SET LOCAL enable_seqscan = off")
+
       query = ToolEvent
         .where(organization_id: org.id, tool_name: "claude_code")
         .where("occurred_at >= ?", 30.days.ago)

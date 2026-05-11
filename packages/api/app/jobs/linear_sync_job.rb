@@ -13,6 +13,7 @@ class LinearSyncJob < ApplicationJob
   end
 
   def perform(connector_id, action = "sync", options = {})
+    @sync_started_at = (Time.current if action.to_s == "sync")
     @options   = options.symbolize_keys
     delivery   = action == "webhook" ? WebhookDelivery.find_by(id: @options[:delivery_id]) : nil
     delivery&.mark_processing!
@@ -40,13 +41,13 @@ class LinearSyncJob < ApplicationJob
     end
 
     delivery&.mark_delivered!
-    @connector.mark_synced!
+    @connector.mark_synced!(sync_started_at: @sync_started_at)
     Rails.logger.info("[LinearSyncJob] Completed #{action} for connector #{connector_id}")
   rescue ActiveRecord::RecordNotFound
     Rails.logger.error("[LinearSyncJob] Connector #{connector_id} not found")
     delivery&.mark_failed!("Connector not found")
   rescue StandardError => e
-    @connector&.mark_error!(e.message)
+    @connector&.mark_error!(e.message, sync_started_at: @sync_started_at)
     Rails.logger.error("[LinearSyncJob] Failed: #{e.message}")
     delivery&.update!(last_error: e.message)
     raise

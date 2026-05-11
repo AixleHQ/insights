@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useOrg } from "@/contexts/OrgContext";
 import {
   useConnectors,
+  useConnectorHealth,
   useSyncConnector,
   useDeleteConnector,
   useTestConnector,
@@ -253,15 +254,25 @@ const categoryLabels: Record<ProviderInfo["category"], string> = {
 
 
 export function Integrations() {
-  const { currentOrg } = useOrg();
+  const { currentOrg, hasRole } = useOrg();
   const navigate = useNavigate();
   const { status } = useParams<{ status: string }>();
+
+  const isAdmin = hasRole(["owner", "admin"]);
 
   const { data: connectorsData, isLoading: connectorsLoading } = useConnectors(
     currentOrg?.id || "",
   );
   const { data: toolAccountsData, isLoading: toolAccountsLoading } = useToolAccounts(currentOrg?.id || "");
+  const { data: healthData } = useConnectorHealth(currentOrg?.id || "", { enabled: isAdmin });
   const isLoading = connectorsLoading || toolAccountsLoading;
+
+  const healthStatsById = useMemo(() => {
+    const map = new Map(
+      (healthData?.connectors ?? []).map((s) => [s.id, s])
+    );
+    return map;
+  }, [healthData]);
   const syncConnector = useSyncConnector();
   const deleteConnector = useDeleteConnector();
   const deleteToolAccount = useDeleteToolAccount();
@@ -500,6 +511,25 @@ export function Integrations() {
           {regenerateError && (
             <p className="text-sm text-destructive">{regenerateError}</p>
           )}
+          {isAdmin && healthData?.summary && healthData.summary.total > 0 && (
+            <div className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
+              <span className="text-muted-foreground">Connector health:</span>
+              {healthData.summary.error > 0 ? (
+                <span className="font-medium text-destructive">
+                  {healthData.summary.error} of {healthData.summary.total} failing
+                </span>
+              ) : (
+                <span className="font-medium text-success">
+                  All {healthData.summary.total} connectors healthy
+                </span>
+              )}
+              {healthData.summary.disconnected > 0 && (
+                <span className="text-muted-foreground">
+                  · {healthData.summary.disconnected} disconnected
+                </span>
+              )}
+            </div>
+          )}
           {!isLoading && integrations.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {(["all", "org", "project", "persona"] as const).map((s) => {
@@ -554,7 +584,8 @@ export function Integrations() {
                 <IntegrationCard
                   key={integration.id}
                   integration={integration}
-                  onSync={ingestAccountIds.has(integration.id) || 
+                  healthStats={healthStatsById.get(integration.id) ?? null}
+                  onSync={ingestAccountIds.has(integration.id) ||
                     integration.provider === "slack" ? undefined : handleSync
                   }
                   onTest={ingestAccountIds.has(integration.id) ? undefined : handleTest}

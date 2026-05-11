@@ -17,6 +17,11 @@ export function formatTokens(n: number): string {
   return String(n);
 }
 
+export function formatPercentage(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return "—";
+  return `${(n * 100).toFixed(1)}%`;
+}
+
 export function truncateModelName(name: string): string {
   return name.length > 30 ? `${name.slice(0, 30)}…` : name;
 }

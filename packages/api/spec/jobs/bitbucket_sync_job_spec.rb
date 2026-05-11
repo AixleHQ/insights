@@ -87,6 +87,19 @@ RSpec.describe BitbucketSyncJob, type: :job do
       }.not_to change(ToolEvent, :count)
     end
 
+    it "sets activity_sync_started_at on the connector at sync start" do
+      described_class.new.perform(connector.id, "sync")
+      expect(connector.reload.activity_sync_started_at).to be_present
+    end
+
+    it "records a success health snapshot after a non-fanout sync" do
+      expect {
+        described_class.new.perform(connector.id, "sync")
+      }.to change(ConnectorHealthSnapshot, :count).by(1)
+
+      expect(ConnectorHealthSnapshot.last.status).to eq("success")
+    end
+
     context "when BITBUCKET_FANOUT is enabled" do
       before { stub_const("ENV", ENV.to_hash.merge("BITBUCKET_FANOUT" => "true")) }
 
@@ -110,6 +123,11 @@ RSpec.describe BitbucketSyncJob, type: :job do
         expect {
           described_class.new.perform(connector.id, "sync")
         }.not_to change(ToolEvent, :count)
+      end
+
+      it "sets activity_sync_started_at on the connector before enqueueing child jobs" do
+        described_class.new.perform(connector.id, "sync")
+        expect(connector.reload.activity_sync_started_at).to be_present
       end
     end
   end
@@ -151,6 +169,32 @@ RSpec.describe BitbucketSyncJob, type: :job do
         .first
       expect(event.user_id).to eq(user.id)
       expect(event.tool_name).to eq("bitbucket")
+    end
+
+    it "does not record a health snapshot (webhook action bypasses health tracking)" do
+      expect {
+        described_class.new.perform(connector.id, "webhook", {
+          "event_type" => "repo:push",
+          "payload" => push_payload
+        })
+      }.not_to change(ConnectorHealthSnapshot, :count)
+    end
+  end
+
+  describe "#perform — health snapshot error handling" do
+    before do
+      allow(Oauth::BaseProvider).to receive(:for).with(connector).and_raise(RuntimeError, "API down")
+    end
+
+    it "records a failure snapshot when sync raises StandardError" do
+      expect {
+        described_class.new.perform(connector.id, "sync")
+      }.to raise_error(RuntimeError, "API down")
+
+      snapshot = ConnectorHealthSnapshot.last
+      expect(snapshot).to be_present
+      expect(snapshot.status).to eq("failure")
+      expect(snapshot.error_message).to eq("API down")
     end
   end
 end

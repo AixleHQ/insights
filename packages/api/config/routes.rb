@@ -78,6 +78,7 @@ Rails.application.routes.draw do
             get  :sync_status
           end
           collection do
+            get :health
             get "authorize/:type", action: :authorize_url
             post :callback
           end

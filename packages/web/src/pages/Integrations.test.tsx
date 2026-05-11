@@ -1,13 +1,16 @@
+import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { Integrations } from "./Integrations";
+import { useConnectors } from "../hooks/useApi";
 
 vi.mock("@/contexts/OrgContext", () => ({
   useOrg: () => ({
     currentOrg: { id: "test-org-id", name: "Test Org", slug: "test-org" },
     isLoading: false,
+    hasRole: () => true,
   }),
 }));
 
@@ -15,6 +18,7 @@ const mockMutateAsync = vi.fn();
 
 vi.mock("@/hooks/useApi", () => ({
   useConnectors: vi.fn(() => ({ data: [], isLoading: false })),
+  useConnectorHealth: vi.fn(() => ({ data: undefined })),
   useSyncConnector: () => ({ mutateAsync: mockMutateAsync }),
   useDeleteConnector: () => ({ mutateAsync: mockMutateAsync }),
   useTestConnector: () => ({ mutateAsync: mockMutateAsync }),
@@ -37,8 +41,6 @@ vi.mock("@/components/integrations/ApiKeyConnectSheet", () => ({
     <button onClick={onSuccess}>api-key-connect-success</button>
   ),
 }));
-
-import { useConnectors } from "@/hooks/useApi";
 
 const mockConnector = {
   id: "conn-1",
