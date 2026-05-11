@@ -91,8 +91,8 @@ RSpec.describe User, type: :model do
     let(:organization) { create(:organization) }
 
     it 'returns the role when user is a member' do
-      create(:organization_membership, user: user, organization: organization, role: 'admin')
-      expect(user.role_in(organization)).to eq('admin')
+      create(:organization_membership, user: user, organization: organization, role: 'member')
+      expect(user.role_in(organization)).to eq('member')
     end
 
     it 'returns nil when user is not a member' do
@@ -106,11 +106,6 @@ RSpec.describe User, type: :model do
 
     it 'returns true for owner' do
       create(:organization_membership, user: user, organization: organization, role: 'owner')
-      expect(user.admin_of?(organization)).to be true
-    end
-
-    it 'returns true for admin' do
-      create(:organization_membership, user: user, organization: organization, role: 'admin')
       expect(user.admin_of?(organization)).to be true
     end
 

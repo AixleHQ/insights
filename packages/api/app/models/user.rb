@@ -29,8 +29,9 @@ class User < ApplicationRecord
   end
 
   def admin_of?(organization)
+    # post-AIX-201: admin org role removed; admin_of? now means owner-only
     membership = organization_memberships.find_by(organization: organization)
-    membership&.role.in?(%w[owner admin])
+    membership&.role == "owner"
   end
 
   def global_admin?

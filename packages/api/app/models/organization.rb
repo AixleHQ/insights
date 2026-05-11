@@ -61,7 +61,7 @@ class Organization < ApplicationRecord
   end
 
   def admins
-    members.joins(:organization_memberships).where(organization_memberships: { role: %w[owner admin] })
+    members.joins(:organization_memberships).where(organization_memberships: { role: "owner" }) # post-AIX-201: admin removed
   end
 
   private

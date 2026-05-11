@@ -86,28 +86,28 @@ RSpec.describe Organization, type: :model do
     it 'returns members with owner role' do
       org = create(:organization)
       owner = create(:user)
-      admin = create(:user)
+      member = create(:user)
       create(:organization_membership, organization: org, user: owner, role: 'owner')
-      create(:organization_membership, organization: org, user: admin, role: 'admin')
+      create(:organization_membership, organization: org, user: member, role: 'member')
 
       expect(org.owners).to include(owner)
-      expect(org.owners).not_to include(admin)
+      expect(org.owners).not_to include(member)
     end
   end
 
   describe '#admins' do
-    it 'returns members with owner or admin role' do
+    it 'returns only owners (post-AIX-201: admin role removed)' do
       org = create(:organization)
       owner = create(:user)
-      admin = create(:user)
       member = create(:user)
+      viewer = create(:user)
       create(:organization_membership, organization: org, user: owner, role: 'owner')
-      create(:organization_membership, organization: org, user: admin, role: 'admin')
       create(:organization_membership, organization: org, user: member, role: 'member')
+      create(:organization_membership, organization: org, user: viewer, role: 'viewer')
 
       expect(org.admins).to include(owner)
-      expect(org.admins).to include(admin)
       expect(org.admins).not_to include(member)
+      expect(org.admins).not_to include(viewer)
     end
   end
 

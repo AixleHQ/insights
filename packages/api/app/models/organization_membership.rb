@@ -1,5 +1,6 @@
 class OrganizationMembership < ApplicationRecord
-  ROLES = %w[owner admin member viewer].freeze
+  # post-AIX-201: admin removed as org role; admin is platform-only (User#global_admin)
+  ROLES = %w[owner member viewer].freeze
 
   belongs_to :user
   belongs_to :organization
@@ -12,7 +13,7 @@ class OrganizationMembership < ApplicationRecord
   before_destroy :ensure_not_last_owner
 
   scope :owners, -> { where(role: "owner") }
-  scope :admins, -> { where(role: %w[owner admin]) }
+  scope :admins, -> { where(role: "owner") } # post-AIX-201: admin removed; admins scope == owners
   scope :members, -> { where(role: "member") }
   scope :viewers, -> { where(role: "viewer") }
 
@@ -21,15 +22,15 @@ class OrganizationMembership < ApplicationRecord
   end
 
   def admin?
-    role.in?(%w[owner admin])
+    owner? # post-AIX-201: admin org role removed; semantically equivalent to owner
   end
 
   def can_manage_members?
-    admin?
+    owner?
   end
 
   def can_manage_projects?
-    role.in?(%w[owner admin member])
+    role.in?(%w[owner member])
   end
 
   private

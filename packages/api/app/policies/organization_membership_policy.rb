@@ -21,12 +21,12 @@ class OrganizationMembershipPolicy < ApplicationPolicy
     org_member?(record.organization) || global_admin?
   end
 
-  # Only admins can add members
+  # Only owners can add members (post-AIX-201: admin org role removed)
   def create?
     org_admin?(record.organization) || global_admin?
   end
 
-  # Admins can update memberships, but can't demote owners unless they're also an owner
+  # Owners can update memberships, but can't demote owners unless they're also an owner (post-AIX-201)
   def update?
     return true if global_admin?
     return false unless org_admin?(record.organization)
@@ -39,7 +39,7 @@ class OrganizationMembershipPolicy < ApplicationPolicy
     end
   end
 
-  # Only admins can remove members, but can't remove owners unless they're also an owner
+  # Only owners can remove members, but can't remove owners unless they're also an owner (post-AIX-201)
   def destroy?
     return true if global_admin?
     return false unless org_admin?(record.organization)

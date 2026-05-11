@@ -14,6 +14,7 @@ class ApplicationPolicy < ActionPolicy::Base
   end
 
   def org_admin?(org = organization)
+    # post-AIX-201: delegates to admin_of? which now means owner-only
     return false unless user && org
     user.admin_of?(org)
   end
