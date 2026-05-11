@@ -64,7 +64,7 @@ class OrganizationDashboard < Administrate::BaseDashboard
     organization.name
   end
 
-  def permitted_attributes
+  def permitted_attributes(action = nil)
     super + [ :ingest_rate_limit_per_minute, :ingest_monthly_event_quota ]
   end
 end
