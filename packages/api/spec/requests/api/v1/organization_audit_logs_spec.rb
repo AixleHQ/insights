@@ -12,7 +12,7 @@ RSpec.describe "Api::V1::OrganizationAuditLogs", type: :request do
 
   before do
     create(:organization_membership, user: owner, organization: organization, role: "owner")
-    create(:organization_membership, user: admin, organization: organization, role: "admin")
+    create(:organization_membership, user: admin, organization: organization, role: "owner")
     create(:organization_membership, user: member, organization: organization, role: "member")
     create(:organization_membership, user: viewer, organization: organization, role: "viewer")
     create(:organization_membership, user: global_admin, organization: organization, role: "member")

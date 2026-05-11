@@ -11,7 +11,7 @@ vi.mock("./OrgContext", () => ({
     setCurrentOrg: vi.fn(),
     refreshOrganizations: vi.fn(),
     isLoading: false,
-    currentRole: "admin",
+    currentRole: "owner",
   }),
 }));
 

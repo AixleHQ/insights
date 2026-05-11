@@ -73,5 +73,5 @@ export const mockOrgContext = {
   setCurrentOrg: vi.fn(),
   refreshOrganizations: vi.fn(),
   isLoading: false,
-  currentRole: "admin" as const,
+  currentRole: "owner" as const,
 };

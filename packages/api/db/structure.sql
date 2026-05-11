@@ -423,7 +423,7 @@ CREATE TABLE public.connector_health_snapshots (
     snapshotted_at timestamp(6) without time zone NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT connector_health_snapshots_status_check CHECK (((status)::text = ANY ((ARRAY['success'::character varying, 'failure'::character varying])::text[])))
+    CONSTRAINT connector_health_snapshots_status_check CHECK (((status)::text = ANY (ARRAY[('success'::character varying)::text, ('failure'::character varying)::text])))
 );
 
 --
@@ -1959,6 +1959,7 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260511120000'),
 ('20260507130000'),
 ('20260507120000'),
 ('20260506113501'),

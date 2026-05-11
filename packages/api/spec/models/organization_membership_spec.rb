@@ -3,7 +3,7 @@ require 'rails_helper'
 RSpec.describe OrganizationMembership, type: :model do
   describe 'constants' do
     it 'defines valid roles' do
-      expect(OrganizationMembership::ROLES).to eq(%w[owner admin member viewer])
+      expect(OrganizationMembership::ROLES).to eq(%w[owner member viewer])
     end
   end
 
@@ -31,7 +31,7 @@ RSpec.describe OrganizationMembership, type: :model do
 
       it 'prevents downgrading the last owner' do
         owner_membership = create(:organization_membership, organization: organization, role: 'owner')
-        owner_membership.role = 'admin'
+        owner_membership.role = 'member'
         expect(owner_membership).not_to be_valid
         expect(owner_membership.errors[:role]).to include('Cannot downgrade the last owner of an organization')
       end
@@ -39,7 +39,7 @@ RSpec.describe OrganizationMembership, type: :model do
       it 'allows downgrading an owner when another owner exists' do
         owner_membership = create(:organization_membership, organization: organization, role: 'owner')
         create(:organization_membership, organization: organization, role: 'owner')
-        owner_membership.role = 'admin'
+        owner_membership.role = 'member'
         expect(owner_membership).to be_valid
       end
     end
@@ -75,22 +75,22 @@ RSpec.describe OrganizationMembership, type: :model do
     describe '.owners' do
       it 'returns only owner memberships' do
         owner_membership = create(:organization_membership, organization: organization, role: 'owner')
-        admin_membership = create(:organization_membership, organization: organization, role: 'admin')
+        member_membership = create(:organization_membership, organization: organization, role: 'member')
 
         expect(OrganizationMembership.owners).to include(owner_membership)
-        expect(OrganizationMembership.owners).not_to include(admin_membership)
+        expect(OrganizationMembership.owners).not_to include(member_membership)
       end
     end
 
     describe '.admins' do
-      it 'returns owner and admin memberships' do
+      it 'returns only owner memberships (post-AIX-201: admin role removed)' do
         owner_membership = create(:organization_membership, organization: organization, role: 'owner')
-        admin_membership = create(:organization_membership, organization: organization, role: 'admin')
         member_membership = create(:organization_membership, organization: organization, role: 'member')
+        viewer_membership = create(:organization_membership, organization: organization, role: 'viewer')
 
         expect(OrganizationMembership.admins).to include(owner_membership)
-        expect(OrganizationMembership.admins).to include(admin_membership)
         expect(OrganizationMembership.admins).not_to include(member_membership)
+        expect(OrganizationMembership.admins).not_to include(viewer_membership)
       end
     end
   end
@@ -102,7 +102,7 @@ RSpec.describe OrganizationMembership, type: :model do
     end
 
     it 'returns false for non-owner role' do
-      membership = build(:organization_membership, role: 'admin')
+      membership = build(:organization_membership, role: 'member')
       expect(membership.owner?).to be false
     end
   end
@@ -113,37 +113,20 @@ RSpec.describe OrganizationMembership, type: :model do
       expect(membership.admin?).to be true
     end
 
-    it 'returns true for admin role' do
-      membership = build(:organization_membership, role: 'admin')
-      expect(membership.admin?).to be true
-    end
-
     it 'returns false for member role' do
       membership = build(:organization_membership, role: 'member')
       expect(membership.admin?).to be false
     end
-  end
 
-  describe '#can_manage_members?' do
-    it 'returns true for admins' do
-      membership = build(:organization_membership, role: 'admin')
-      expect(membership.can_manage_members?).to be true
-    end
-
-    it 'returns false for members' do
-      membership = build(:organization_membership, role: 'member')
-      expect(membership.can_manage_members?).to be false
+    it 'returns false for viewer role' do
+      membership = build(:organization_membership, role: 'viewer')
+      expect(membership.admin?).to be false
     end
   end
 
   describe '#can_manage_projects?' do
     it 'returns true for owner' do
       membership = build(:organization_membership, role: 'owner')
-      expect(membership.can_manage_projects?).to be true
-    end
-
-    it 'returns true for admin' do
-      membership = build(:organization_membership, role: 'admin')
       expect(membership.can_manage_projects?).to be true
     end
 

@@ -65,8 +65,7 @@ function MemberSkeleton() {
 type MemberSortField = "name" | "role" | "status" | "joined_at" | "total_tokens";
 
 const roleOrder: Record<MemberRole, number> = {
-  owner: 4,
-  admin: 3,
+  owner: 3,
   member: 2,
   viewer: 1,
 };
@@ -179,7 +178,7 @@ export function Team() {
     }
   };
 
-  const canManageInvitations = currentMembership?.role === "owner" || currentMembership?.role === "admin";
+  const canManageInvitations = currentMembership?.role === "owner";
 
   return (
     <div className="space-y-6">

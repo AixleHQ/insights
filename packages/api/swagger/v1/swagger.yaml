@@ -237,7 +237,7 @@ paths:
           $ref: '#/components/responses/NotFound'
     patch:
       summary: Update organization
-      description: Requires admin role in the organization
+      description: Requires owner role in the organization
       tags:
         - Organizations
       parameters:
@@ -560,7 +560,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [owner, admin, member, viewer]
+            enum: [owner, member, viewer]
       responses:
         '200':
           description: Members list
@@ -579,7 +579,7 @@ paths:
           $ref: '#/components/responses/BadRequest'
     post:
       summary: Add organization member
-      description: Requires admin role. Adds a user as a member of the organization.
+      description: Requires owner role. Adds a user as a member of the organization.
       tags:
         - Organization Members
       parameters:
@@ -597,7 +597,7 @@ paths:
                   format: uuid
                 role:
                   type: string
-                  enum: [owner, admin, member, viewer]
+                  enum: [owner, member, viewer]
               required:
                 - user_id
                 - role
@@ -639,7 +639,7 @@ paths:
           $ref: '#/components/responses/NotFound'
     patch:
       summary: Update organization member role
-      description: Requires admin role. Cannot demote owners unless you are also an owner.
+      description: Requires owner role. Cannot demote owners unless you are also an owner.
       tags:
         - Organization Members
       parameters:
@@ -655,7 +655,7 @@ paths:
               properties:
                 role:
                   type: string
-                  enum: [owner, admin, member, viewer]
+                  enum: [owner, member, viewer]
               required:
                 - role
       responses:
@@ -667,7 +667,7 @@ paths:
           $ref: '#/components/responses/ValidationError'
     delete:
       summary: Remove organization member
-      description: Requires admin role. Cannot remove owners unless you are also an owner.
+      description: Requires owner role. Cannot remove owners unless you are also an owner.
       tags:
         - Organization Members
       parameters:
@@ -720,7 +720,7 @@ paths:
                     $ref: '#/components/schemas/PaginationMeta'
     post:
       summary: Create organization connector
-      description: Requires admin role. Creates a new connector for the organization.
+      description: Requires owner role. Creates a new connector for the organization.
       tags:
         - Organization Connectors
       parameters:
@@ -4222,7 +4222,7 @@ components:
           properties:
             userRole:
               type: string
-              enum: [owner, admin, member, viewer]
+              enum: [owner, member, viewer]
 
     OrganizationMembership:
       type: object
@@ -4235,7 +4235,7 @@ components:
           format: uuid
         role:
           type: string
-          enum: [owner, admin, member, viewer]
+          enum: [owner, member, viewer]
         user:
           $ref: '#/components/schemas/UserMinimal'
         createdAt:

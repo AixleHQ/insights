@@ -7,7 +7,7 @@ RSpec.describe 'Api::V1::Issues', type: :request do
   let(:member) { create(:user) }
   let(:outsider) { create(:user) }
   let(:organization) { create(:organization) }
-  let!(:admin_membership) { create(:organization_membership, user: admin, organization: organization, role: 'admin') }
+  let!(:admin_membership) { create(:organization_membership, user: admin, organization: organization, role: 'owner') }
   let!(:member_membership) { create(:organization_membership, user: member, organization: organization, role: 'member') }
 
   let!(:project) { create(:project, organization: organization, owner: nil) }

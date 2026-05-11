@@ -12,7 +12,7 @@ RSpec.describe OrganizationPolicy, type: :policy do
 
   before do
     create(:organization_membership, user: owner, organization: organization, role: 'owner')
-    create(:organization_membership, user: admin, organization: organization, role: 'admin')
+    create(:organization_membership, user: admin, organization: organization, role: 'owner')
     create(:organization_membership, user: member, organization: organization, role: 'member')
   end
 
@@ -53,8 +53,8 @@ RSpec.describe OrganizationPolicy, type: :policy do
       expect(policy(organization, current_user: owner).apply(:destroy?)).to be true
     end
 
-    it 'denies admins' do
-      expect(policy(organization, current_user: admin).apply(:destroy?)).to be false
+    it 'denies members' do
+      expect(policy(organization, current_user: member).apply(:destroy?)).to be false
     end
 
     it 'allows global admins' do

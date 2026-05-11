@@ -88,11 +88,11 @@ RSpec.describe 'Api::V1::Organizations', type: :request do
       expect(Organization.find_by(id: organization.id)).to be_nil
     end
 
-    it 'returns 403 for admins (non-owners)' do
-      admin = create(:user)
-      create(:organization_membership, user: admin, organization: organization, role: 'admin')
+    it 'returns 403 for members' do
+      member = create(:user)
+      create(:organization_membership, user: member, organization: organization, role: 'member')
 
-      authenticated_delete "/api/v1/organizations/#{organization.id}", user: admin
+      authenticated_delete "/api/v1/organizations/#{organization.id}", user: member
 
       expect_forbidden
     end

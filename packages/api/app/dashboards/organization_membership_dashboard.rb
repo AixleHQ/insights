@@ -39,7 +39,7 @@ class OrganizationMembershipDashboard < Administrate::BaseDashboard
 
   COLLECTION_FILTERS = {
     owners: ->(resources) { resources.where(role: "owner") },
-    admins: ->(resources) { resources.where(role: %w[owner admin]) }
+    admins: ->(resources) { resources.where(role: "owner") } # post-AIX-201: admin removed
   }.freeze
 
   def display_resource(membership)

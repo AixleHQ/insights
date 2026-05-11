@@ -59,28 +59,28 @@ KNOWN_DEV_USERS = [
     name: 'Alan Turing',
     keycloak_sub: 'alan.turing@example.com',
     global_admin: true,
-    org_role: 'admin'
+    org_role: 'owner'
   },
   {
     email: 'grace.hopper@example.com',
     name: 'Grace Hopper',
     keycloak_sub: 'grace.hopper@example.com',
     global_admin: true,
-    org_role: 'admin'
+    org_role: 'owner'
   },
   {
     email: 'edsger.dijkstra@example.com',
     name: 'Edsger Dijkstra',
     keycloak_sub: 'edsger.dijkstra@example.com',
     global_admin: true,
-    org_role: 'admin'
+    org_role: 'owner'
   },
   {
     email: 'linu.valds@example.com',
     name: 'Line Valds',
     keycloak_sub: 'linu.valds@example.com',
     global_admin: true,
-    org_role: 'admin'
+    org_role: 'owner'
   }
 ].freeze
 
@@ -254,10 +254,10 @@ if heavy_seed_enabled?
       u.global_admin = (i == 0) # First user is admin
     end
 
-    # Assign role based on position
+    # Assign role based on position (post-AIX-201: admin removed as org role)
     role = case i
     when 0 then 'owner'
-    when 1..4 then 'admin'
+    when 1..4 then 'member'
     else 'member'
     end
 

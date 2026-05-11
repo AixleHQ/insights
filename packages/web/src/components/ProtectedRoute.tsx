@@ -77,11 +77,3 @@ export function OrgRoute({ children, ...props }: Omit<ProtectedRouteProps, "requ
   );
 }
 
-// Convenience wrapper for admin-only routes
-export function AdminRoute({ children, ...props }: Omit<ProtectedRouteProps, "requireRoles">) {
-  return (
-    <ProtectedRoute requireOrg requireRoles={["owner", "admin"]} {...props}>
-      {children}
-    </ProtectedRoute>
-  );
-}

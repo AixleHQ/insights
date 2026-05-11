@@ -11,7 +11,7 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
   let!(:connector) { create(:project_connector, project: project, connector_type: 'anthropic') }
 
   before do
-    create(:organization_membership, user: org_admin, organization: organization, role: 'admin')
+    create(:organization_membership, user: org_admin, organization: organization, role: 'owner')
     create(:organization_membership, user: project_member, organization: organization, role: 'member')
     create(:project_membership, user: org_admin, project: project, role: 'admin')
     create(:project_membership, user: project_member, project: project, role: 'member')

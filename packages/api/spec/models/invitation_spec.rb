@@ -228,11 +228,11 @@ RSpec.describe Invitation, type: :model do
     end
 
     it 'assigns the correct role from the invitation' do
-      admin_invitation = create(:invitation, :admin, organization: organization)
+      viewer_invitation = create(:invitation, :viewer, organization: organization)
 
-      membership = admin_invitation.accept!(user)
+      membership = viewer_invitation.accept!(user)
 
-      expect(membership.role).to eq('admin')
+      expect(membership.role).to eq('viewer')
     end
   end
 

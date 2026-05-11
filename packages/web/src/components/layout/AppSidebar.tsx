@@ -11,7 +11,6 @@ import {
   ChevronsUpDown,
   Plus,
   Check,
-  Shield,
   Crown,
   Eye,
   User,
@@ -65,14 +64,12 @@ const navItems = [
 
 const roleIcons: Record<MemberRole, typeof Crown> = {
   owner: Crown,
-  admin: Shield,
   member: User,
   viewer: Eye,
 };
 
 const roleColors: Record<MemberRole, string> = {
   owner: "text-amber-500",
-  admin: "text-blue-500",
   member: "text-emerald-500",
   viewer: "text-muted-foreground",
 };
@@ -405,9 +402,9 @@ export function AppSidebar() {
 
   // Filter nav items based on role - hide Dashboard for members/viewers
   const visibleNavItems = navItems.filter((item) => {
-    // Dashboard (href: '/') is only visible to owners and admins
+    // Dashboard (href: '/') is only visible to owners
     if (item.href === "/") {
-      return currentRole === "owner" || currentRole === "admin";
+      return currentRole === "owner";
     }
     return true;
   });
@@ -420,8 +417,7 @@ export function AppSidebar() {
   };
 
   // Determine home link based on role
-  const homeLink =
-    currentRole === "owner" || currentRole === "admin" ? "/" : "/profile";
+  const homeLink = currentRole === "owner" ? "/" : "/profile";
 
   return (
     <Sidebar collapsible="icon" variant="sidebar">

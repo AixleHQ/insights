@@ -17,7 +17,7 @@ RSpec.describe "Api::V1::ProjectAuditLogs", type: :request do
 
   before do
     create(:organization_membership, user: org_owner, organization: organization, role: "owner")
-    create(:organization_membership, user: org_admin, organization: organization, role: "admin")
+    create(:organization_membership, user: org_admin, organization: organization, role: "owner")
     create(:organization_membership, user: global_admin, organization: organization, role: "member")
 
     # Project-only users are org members, not org admins

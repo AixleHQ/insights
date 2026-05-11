@@ -43,16 +43,16 @@ RSpec.describe InvitationMailer, type: :mailer do
     end
 
     context 'with different roles' do
-      let(:admin_invitation) do
-        create(:invitation, :admin,
+      let(:owner_invitation) do
+        create(:invitation, :owner,
                organization: organization,
                invited_by: inviter,
-               email: 'admin@example.com')
+               email: 'owner@example.com')
       end
 
-      it 'shows admin role' do
-        admin_mail = described_class.invite(admin_invitation)
-        expect(admin_mail.body.encoded).to include('admin')
+      it 'shows owner role' do
+        owner_mail = described_class.invite(owner_invitation)
+        expect(owner_mail.body.encoded).to include('owner')
       end
     end
 

@@ -8,7 +8,6 @@ import {
   Activity,
   Code2,
   TrendingUp,
-  Shield,
   ShieldCheck,
   User,
   Eye,
@@ -43,11 +42,10 @@ import { SortButton, type SortDirection } from "@/components/ui/sort-button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn, humanizeToolName, toEventRow } from "@/lib/utils";
 
-type MemberRole = "owner" | "admin" | "member" | "viewer";
+type MemberRole = "owner" | "member" | "viewer";
 
-const roleConfig: Record<MemberRole, { label: string; icon: typeof Shield; color: string; bg: string }> = {
+const roleConfig: Record<MemberRole, { label: string; icon: typeof ShieldCheck; color: string; bg: string }> = {
   owner: { label: "Owner", icon: ShieldCheck, color: "text-violet-400", bg: "bg-violet-500/10" },
-  admin: { label: "Admin", icon: Shield, color: "text-amber-400", bg: "bg-amber-500/10" },
   member: { label: "Member", icon: User, color: "text-blue-400", bg: "bg-blue-500/10" },
   viewer: { label: "Viewer", icon: Eye, color: "text-slate-400", bg: "bg-slate-500/10" },
 };

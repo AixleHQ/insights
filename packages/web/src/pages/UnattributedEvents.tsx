@@ -148,11 +148,11 @@ function EventSkeleton({ showAdminColumns }: { showAdminColumns: boolean }) {
 export function UnattributedEvents() {
   const { currentOrg, hasRole } = useOrg();
   const { data: currentUser, isLoading: isLoadingMe } = useCurrentUser();
-  const isOrgAdmin = hasRole(["owner", "admin"]);
+  const isOrgOwner = hasRole(["owner"]);
   const isPlatformAdmin = Boolean(
     currentUser?.globalAdmin ?? currentUser?.super_admin
   );
-  const canManageAttribution = isOrgAdmin || (!isLoadingMe && isPlatformAdmin);
+  const canManageAttribution = isOrgOwner || (!isLoadingMe && isPlatformAdmin);
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [sortField, setSortField] = useState<UnattributedSortField>("created_at");
@@ -178,7 +178,7 @@ export function UnattributedEvents() {
 
   const canFetchUnattributed =
     !!currentOrg?.id &&
-    (isOrgAdmin || (!isLoadingMe && isPlatformAdmin));
+    (isOrgOwner || (!isLoadingMe && isPlatformAdmin));
 
   const { data: events, isLoading, isFetching } = useUnattributedEvents(
     currentOrg?.id || "",
@@ -303,9 +303,9 @@ export function UnattributedEvents() {
   const isAssigning = attributeEvent.isPending || bulkAttributeEvents.isPending;
   const isBulkMode = selectedEventId === null;
 
-  const permissionLoading = Boolean(currentOrg && !isOrgAdmin && isLoadingMe);
+  const permissionLoading = Boolean(currentOrg && !isOrgOwner && isLoadingMe);
   const accessDenied = Boolean(
-    currentOrg && !isOrgAdmin && !isLoadingMe && !isPlatformAdmin
+    currentOrg && !isOrgOwner && !isLoadingMe && !isPlatformAdmin
   );
 
   const tableColumnCount = canManageAttribution ? 8 : 6;
