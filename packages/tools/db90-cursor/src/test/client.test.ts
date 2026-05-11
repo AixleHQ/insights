@@ -89,6 +89,45 @@ describe("postEvents", () => {
     expect(result.failed).toBe(1);
   });
 
+  it("forwards on429 callback and counts 429 as failed", async () => {
+    const on429 = vi.fn();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        statusText: "Too Many Requests",
+        headers: { get: (h: string) => (h === "Retry-After" ? "60" : null) },
+        json: () => Promise.resolve({ error: "Rate Limited", code: "rate_limit_exceeded", retry_after: 60 }),
+      })
+    );
+    const result = await postEvents([sampleEvent], "https://app.db90.io", "token", { on429 });
+    expect(result.sent).toBe(0);
+    expect(result.failed).toBe(1);
+    expect(result.lastSentAt).toBeNull();
+    expect(on429).toHaveBeenCalledWith(60, false);
+  });
+
+  it("forwards on429 with quotaExceeded=true for quota_exceeded code", async () => {
+    const on429 = vi.fn();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        statusText: "Too Many Requests",
+        headers: { get: (h: string) => (h === "Retry-After" ? "3600" : null) },
+        json: () =>
+          Promise.resolve({ error: "Quota Exceeded", code: "quota_exceeded", retry_after: 3600 }),
+      })
+    );
+    const result = await postEvents([sampleEvent], "https://app.db90.io", "token", { on429 });
+    expect(result.sent).toBe(0);
+    expect(result.failed).toBe(1);
+    expect(result.lastSentAt).toBeNull();
+    expect(on429).toHaveBeenCalledWith(3600, true);
+  });
+
   it("handles mixed success and failure", async () => {
     let callCount = 0;
     const mockFetch = vi.fn().mockImplementation(() => {
