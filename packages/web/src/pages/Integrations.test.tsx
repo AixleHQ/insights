@@ -10,6 +10,7 @@ vi.mock("@/contexts/OrgContext", () => ({
   useOrg: () => ({
     currentOrg: { id: "test-org-id", name: "Test Org", slug: "test-org" },
     isLoading: false,
+    hasRole: () => true,
   }),
 }));
 

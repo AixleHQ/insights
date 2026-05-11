@@ -774,7 +774,7 @@ export function useConnectors(orgId: string) {
   });
 }
 
-export function useConnectorHealth(orgId: string) {
+export function useConnectorHealth(orgId: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.connectors.health(orgId),
     queryFn: async () => {
@@ -783,7 +783,7 @@ export function useConnectorHealth(orgId: string) {
       );
       return response.data;
     },
-    enabled: !!orgId,
+    enabled: !!orgId && (options?.enabled ?? true),
     staleTime: 60_000,
   });
 }
