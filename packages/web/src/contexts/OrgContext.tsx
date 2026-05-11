@@ -10,7 +10,7 @@ import { useAuth } from "./AuthContext";
 import { useImpersonation } from "./ImpersonationContext";
 import { setCurrentOrganizationId, getAuthToken } from "../lib/api";
 
-export type MemberRole = "owner" | "admin" | "member" | "viewer";
+export type MemberRole = "owner" | "member" | "viewer";
 
 // Organization type matching the Rails API response
 export interface Organization {

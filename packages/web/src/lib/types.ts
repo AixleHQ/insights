@@ -10,7 +10,7 @@ export interface User {
   email: string;
   name: string | null;
   avatarUrl: string | null;
-  role: "admin" | "member" | "viewer";
+  role: "owner" | "member" | "viewer";
   /** Platform-wide admin (API key `global_admin`, Alba camelCase `globalAdmin`). */
   globalAdmin?: boolean;
   /** Alternate naming used in some mocks / legacy code paths. */
@@ -51,7 +51,7 @@ export interface OrganizationMember {
   userId?: string;
   user_id?: string;
   organization_id: string;
-  role: "owner" | "admin" | "member" | "viewer";
+  role: "owner" | "member" | "viewer";
   user: User;
   created_at: string;
   updated_at: string;
@@ -370,7 +370,7 @@ export interface ProjectRetentionPolicy {
 
 // Invitation types
 export type InvitationStatus = "pending" | "accepted" | "revoked" | "expired";
-export type MemberRole = "owner" | "admin" | "member" | "viewer";
+export type MemberRole = "owner" | "member" | "viewer";
 
 export interface Invitation {
   id: string;

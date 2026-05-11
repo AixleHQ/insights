@@ -77,10 +77,10 @@ export function OrgRoute({ children, ...props }: Omit<ProtectedRouteProps, "requ
   );
 }
 
-// Convenience wrapper for admin-only routes
+// AdminRoute gates on global_admin (platform admin); org-role check removed per AIX-201
 export function AdminRoute({ children, ...props }: Omit<ProtectedRouteProps, "requireRoles">) {
   return (
-    <ProtectedRoute requireOrg requireRoles={["owner", "admin"]} {...props}>
+    <ProtectedRoute requireOrg {...props}>
       {children}
     </ProtectedRoute>
   );

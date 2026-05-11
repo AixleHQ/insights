@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { MoreHorizontal, Shield, ShieldCheck, User, Eye, Trash2 } from "lucide-react";
+import { MoreHorizontal, ShieldCheck, User, Eye, Trash2 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "@/lib/utils";
 
-export type MemberRole = "owner" | "admin" | "member" | "viewer";
+export type MemberRole = "owner" | "member" | "viewer";
 
 export interface MemberData {
   id: string;
@@ -45,10 +45,9 @@ interface MemberRowProps {
 
 const roleConfig: Record<
   MemberRole,
-  { label: string; icon: typeof Shield; color: string }
+  { label: string; icon: typeof ShieldCheck; color: string }
 > = {
   owner: { label: "Owner", icon: ShieldCheck, color: "text-primary" },
-  admin: { label: "Admin", icon: Shield, color: "text-warning" },
   member: { label: "Member", icon: User, color: "text-muted-foreground" },
   viewer: { label: "Viewer", icon: Eye, color: "text-muted-foreground" },
 };
@@ -86,12 +85,8 @@ export function MemberRow({
   const role = roleConfig[member.role];
   const RoleIcon = role.icon;
 
-  const canManageMembers =
-    currentUserRole === "owner" || currentUserRole === "admin";
-  const canEditRole =
-    canManageMembers &&
-    member.role !== "owner" &&
-    (currentUserRole === "owner" || member.role !== "admin");
+  const canManageMembers = currentUserRole === "owner";
+  const canEditRole = canManageMembers && member.role !== "owner";
   const canRemove = canEditRole;
 
   const handleRoleChange = (newRole: MemberRole) => {
@@ -134,7 +129,6 @@ export function MemberRow({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="admin">Admin</SelectItem>
               <SelectItem value="member">Member</SelectItem>
               <SelectItem value="viewer">Viewer</SelectItem>
             </SelectContent>
