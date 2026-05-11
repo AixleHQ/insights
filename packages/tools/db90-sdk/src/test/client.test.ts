@@ -113,6 +113,94 @@ describe("postEvent — error callbacks", () => {
   });
 });
 
+describe("postEvent — 429 rate limiting", () => {
+  it("returns false and calls on429 with rate_limit_exceeded", async () => {
+    const on429 = vi.fn();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        statusText: "Too Many Requests",
+        headers: { get: (h: string) => (h === "Retry-After" ? "60" : null) },
+        json: () => Promise.resolve({ error: "Rate Limited", code: "rate_limit_exceeded", retry_after: 60 }),
+      })
+    );
+    expect(await postEvent(payload, "http://localhost:3000", "tok", { on429 })).toBe(false);
+    expect(on429).toHaveBeenCalledWith(60, false);
+  });
+
+  it("returns false and calls on429 with quota_exceeded=true when code matches", async () => {
+    const on429 = vi.fn();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        statusText: "Too Many Requests",
+        headers: { get: (h: string) => (h === "Retry-After" ? "3600" : null) },
+        json: () =>
+          Promise.resolve({
+            error: "Quota Exceeded",
+            code: "quota_exceeded",
+            retry_after: 3600,
+            quota_resets_at: "2026-06-01T00:00:00Z",
+          }),
+      })
+    );
+    expect(await postEvent(payload, "http://localhost:3000", "tok", { on429 })).toBe(false);
+    expect(on429).toHaveBeenCalledWith(3600, true);
+  });
+
+  it("falls back to retryAfter=60 when Retry-After header is missing or malformed", async () => {
+    const on429 = vi.fn();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        statusText: "Too Many Requests",
+        headers: { get: () => null },
+        json: () => Promise.resolve({}),
+      })
+    );
+    await postEvent(payload, "http://localhost:3000", "tok", { on429 });
+    expect(on429).toHaveBeenCalledWith(60, false);
+  });
+
+  it("gracefully handles 429 with unparseable body — on429 still called", async () => {
+    const on429 = vi.fn();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        statusText: "Too Many Requests",
+        headers: { get: (h: string) => (h === "Retry-After" ? "60" : null) },
+        json: () => Promise.reject(new Error("invalid json")),
+      })
+    );
+    expect(await postEvent(payload, "http://localhost:3000", "tok", { on429 })).toBe(false);
+    expect(on429).toHaveBeenCalledWith(60, false);
+  });
+
+  it("does not call on429 for non-429 errors", async () => {
+    const on429 = vi.fn();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        statusText: "Unauthorized",
+        text: () => Promise.resolve("denied"),
+      })
+    );
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await postEvent(payload, "http://localhost:3000", "tok", { on429 });
+    expect(on429).not.toHaveBeenCalled();
+  });
+});
+
 describe("postEvent — security", () => {
   it("Bearer token is not echoed to console on failure", async () => {
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});

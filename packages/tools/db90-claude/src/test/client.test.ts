@@ -108,6 +108,49 @@ describe("postEvents", () => {
   });
 });
 
+describe("postEvents — on429 propagation", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("forwards on429 callback and counts 429 as failed", async () => {
+    const on429 = vi.fn();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        statusText: "Too Many Requests",
+        headers: { get: (h: string) => (h === "Retry-After" ? "60" : null) },
+        json: () => Promise.resolve({ error: "Rate Limited", code: "rate_limit_exceeded", retry_after: 60 }),
+      })
+    );
+    const result = await postEvents([samplePayload], "http://localhost:3000", "tok", { on429 });
+    expect(result.sent).toBe(0);
+    expect(result.failed).toBe(1);
+    expect(on429).toHaveBeenCalledWith(60, false);
+  });
+
+  it("forwards on429 with quotaExceeded=true for quota_exceeded code", async () => {
+    const on429 = vi.fn();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        statusText: "Too Many Requests",
+        headers: { get: (h: string) => (h === "Retry-After" ? "3600" : null) },
+        json: () =>
+          Promise.resolve({ error: "Quota Exceeded", code: "quota_exceeded", retry_after: 3600 }),
+      })
+    );
+    const result = await postEvents([samplePayload], "http://localhost:3000", "tok", { on429 });
+    expect(result.sent).toBe(0);
+    expect(result.failed).toBe(1);
+    expect(on429).toHaveBeenCalledWith(3600, true);
+  });
+});
+
 describe("postEvent — security", () => {
   afterEach(() => {
     vi.unstubAllGlobals();

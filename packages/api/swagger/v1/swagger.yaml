@@ -3609,6 +3609,123 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationError'
 
+  # ============================================
+  # INGEST ENDPOINT (ingest token auth)
+  # ============================================
+  /api/v1/ingest/events:
+    post:
+      summary: Ingest a tool event
+      description: |
+        Accepts a single tool-usage event from a CLI connector (`db90-claude`, `db90-cursor`).
+        Authenticated with a per-`UserToolAccount` Bearer ingest token (not a Keycloak JWT).
+
+        The endpoint also accepts raw Claude Code hook payloads (`PostToolUse` and `Stop`),
+        which are mapped to structured events server-side.
+
+        On success the event is stored in MinIO and queued for sanitization via a Temporal
+        workflow. A `202 Accepted` is returned immediately — the event may not be persisted
+        to `tool_events` yet.
+
+        **Rate limiting:** Each organization is limited to 1,000 events/minute by default
+        (configurable per org via `OrganizationSetting`). Excess requests receive `429` with
+        a `Retry-After: 60` header.
+
+        **Monthly quota:** Organizations may have a monthly event quota set. Once the quota
+        is reached, all further requests return `429` with `code: "quota_exceeded"` until the
+        next calendar month.
+      tags:
+        - Ingest
+      security:
+        - ingest_token_auth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: |
+                Standard event payload. Also accepts raw Claude Code hook payloads
+                (`session_id` + `tool_input`/`tool_response` for PostToolUse, or
+                `session_id` + `stop_hook_active` for Stop hooks).
+              properties:
+                event_type:
+                  type: string
+                  example: completion
+                model:
+                  type: string
+                  example: claude-3-5-sonnet
+                tokens_in:
+                  type: integer
+                  example: 1024
+                tokens_out:
+                  type: integer
+                  example: 512
+                tokens_total:
+                  type: integer
+                  example: 1536
+                cost_usd:
+                  type: number
+                  format: float
+                  example: 0.0042
+                duration_ms:
+                  type: integer
+                  example: 1200
+                occurred_at:
+                  type: string
+                  format: date-time
+                  example: "2026-05-11T14:00:00Z"
+                project_id:
+                  type: string
+                  format: uuid
+                  description: Optional. Stripped silently if not accessible to the token's org/user.
+                metadata:
+                  type: object
+                  additionalProperties: true
+      responses:
+        '202':
+          description: Event accepted for processing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      accepted:
+                        type: boolean
+                        example: true
+                      rawEventKey:
+                        type: string
+                        description: MinIO object key for the raw event payload
+                        example: events/2026/05/11/abc123.json
+                      workflowId:
+                        type: string
+                        description: Temporal workflow ID (absent if Temporal unavailable)
+                      fallback:
+                        type: boolean
+                        description: Present and true when Temporal unavailable and event was inserted directly
+                    required:
+                      - accepted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          description: |
+            Rate limit exceeded or monthly quota reached.
+            Check the `code` field to distinguish the two cases.
+            Respect the `Retry-After` header before retrying.
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait before retrying. Capped at 3600 for quota exceeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+
 # ============================================
 # COMPONENTS
 # ============================================
@@ -3803,6 +3920,34 @@ components:
           type: string
       required:
         - error
+
+    RateLimitError:
+      type: object
+      description: |
+        Returned with HTTP 429. The `code` field distinguishes rate-limit from quota errors.
+        `rate_limit_exceeded` — per-minute request rate exceeded; retry after 60 seconds.
+        `quota_exceeded` — monthly event quota reached; retry after `retry_after` seconds (capped at 3600).
+      properties:
+        error:
+          type: string
+          example: Rate Limited
+        code:
+          type: string
+          enum: [rate_limit_exceeded, quota_exceeded]
+          example: rate_limit_exceeded
+        retry_after:
+          type: integer
+          description: Seconds to wait before retrying. Matches the Retry-After response header.
+          example: 60
+        quota_resets_at:
+          type: string
+          format: date-time
+          description: ISO8601 timestamp of when the monthly quota resets. Present only when code is quota_exceeded.
+          example: "2026-06-01T00:00:00Z"
+      required:
+        - error
+        - code
+        - retry_after
 
     ValidationError:
       type: object

@@ -13,6 +13,12 @@ export interface PostEventOptions {
   onHttpError?: (status: number, statusText: string, body: string) => void;
   /** Override default console.error on network-level failure. */
   onNetworkError?: (err: unknown) => void;
+  /**
+   * Called when the server responds with 429 Too Many Requests.
+   * @param retryAfter - seconds to wait before retrying (from Retry-After header, capped at 3600).
+   * @param quotaExceeded - true when the monthly event quota is exhausted (code: "quota_exceeded").
+   */
+  on429?: (retryAfter: number, quotaExceeded: boolean) => void;
 }
 
 /**
@@ -47,6 +53,17 @@ export async function postEvent(
     if (response.ok) {
       return true;
     }
+
+    if (response.status === 429) {
+      const raw = response.headers.get("Retry-After") ?? "60";
+      const parsed = parseInt(raw, 10);
+      const retryAfter = Number.isFinite(parsed) && parsed > 0 ? parsed : 60;
+      const bodyJson = await response.json().catch(() => ({})) as Record<string, unknown>;
+      const quotaExceeded = bodyJson?.code === "quota_exceeded";
+      options.on429?.(retryAfter, quotaExceeded);
+      return false;
+    }
+
     const body = await response.text().catch(() => "");
     const onHttpError =
       options.onHttpError ??

@@ -4,6 +4,7 @@ module Api
   module V1
     class IngestController < ActionController::API
       include IngestTokenAuthentication
+      include IngestRateLimiter
 
       # POST /api/v1/ingest/events
       def create

@@ -28,8 +28,19 @@ export interface SyncOptions {
   pricing?: PricingConfig;
 }
 
+let backoffUntil: Date | null = null;
+
 export async function syncOnce(options: SyncOptions): Promise<SyncResult> {
   const { token, host, dryRun, verbose, projectId, since: explicitSince, pricing } = options;
+
+  if (backoffUntil && new Date() < backoffUntil) {
+    if (verbose) {
+      console.log(`[verbose] Rate limited — skipping until ${backoffUntil.toISOString()}`);
+    } else {
+      console.warn(`[db90-cursor] Rate limited — skipping until ${backoffUntil.toISOString()}`);
+    }
+    return { sent: 0, failed: 0, skipped: 0 };
+  }
 
   let since: Date | null;
   let sinceFromState: boolean;
@@ -83,7 +94,16 @@ export async function syncOnce(options: SyncOptions): Promise<SyncResult> {
     return { sent: mappedEvents.length, failed: 0, skipped: 0 };
   }
 
-  const result = await postEvents(mappedEvents, host, token);
+  const result = await postEvents(mappedEvents, host, token, {
+    on429: (retryAfter, quotaExceeded) => {
+      backoffUntil = new Date(Math.max(
+        backoffUntil?.getTime() ?? 0,
+        Date.now() + retryAfter * 1000
+      ));
+      const reason = quotaExceeded ? "Monthly quota exceeded" : "Rate limited";
+      console.warn(`[db90-cursor] ${reason}. Pausing until ${backoffUntil.toISOString()}.`);
+    }
+  });
 
   // Advance watermark to the max occurred_at of sent events, not wall-clock "now".
   // This avoids skipping rows with timestamps earlier than "now" (backfills, clock skew).

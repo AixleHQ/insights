@@ -1,4 +1,4 @@
-import { postEvent as sdkPostEvent } from "@db90/sdk";
+import { postEvent as sdkPostEvent, type PostEventOptions } from "@db90/sdk";
 import type { Db90Payload } from "./mapper.js";
 
 export interface PostResult {
@@ -17,14 +17,15 @@ export interface PostResult {
 export async function postEvents(
   events: Db90Payload[],
   host: string,
-  token: string
+  token: string,
+  options: PostEventOptions = {}
 ): Promise<PostResult> {
   if (events.length === 0) return { sent: 0, failed: 0, lastSentAt: null };
 
   const outcomes = await Promise.allSettled(
     events.map(async (event) => ({
       event,
-      ok: await sdkPostEvent(event, host, token),
+      ok: await sdkPostEvent(event, host, token, options),
     }))
   );
 
