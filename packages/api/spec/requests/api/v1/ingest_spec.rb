@@ -24,6 +24,15 @@ RSpec.describe 'Api::V1::Ingest', type: :request do
     allow(RawEventStore).to receive(:ensure_bucket_exists!).and_return(nil)
     allow(RawEventStore).to receive(:store).and_return('events/test-key.json')
     allow(Temporal::Client).to receive(:start_workflow).and_return({ workflow_id: 'test-workflow-id' })
+
+    # Use a real in-memory cache so Rails.cache.increment works in specs.
+    # The default test environment uses :null_store which returns nil from #increment.
+    @original_cache = Rails.cache
+    Rails.cache = ActiveSupport::Cache::MemoryStore.new
+  end
+
+  after do
+    Rails.cache = @original_cache
   end
 
   def ingest_post(payload: valid_payload, token: raw_token)
@@ -227,6 +236,90 @@ RSpec.describe 'Api::V1::Ingest', type: :request do
         expect(event.organization_id).to eq(organization.id)
         expect(event.user_id).to eq(user.id)
         expect(event.tool_name).to eq('cursor')
+      end
+    end
+
+    context 'with rate limiting' do
+      it 'returns 202 when under the per-minute limit' do
+        OrganizationSetting.set(organization, 'ingest_rate_limit_per_minute', '3')
+        2.times { ingest_post }
+        ingest_post
+        expect(response).to have_http_status(:accepted)
+      end
+
+      it 'returns 429 when per-minute limit is exceeded' do
+        OrganizationSetting.set(organization, 'ingest_rate_limit_per_minute', '2')
+        2.times { ingest_post }
+        ingest_post
+        expect(response).to have_http_status(:too_many_requests)
+        expect(response.parsed_body.dig('code')).to eq('rate_limit_exceeded')
+        expect(response.headers['Retry-After']).to eq('60')
+      end
+
+      it 'includes retry_after in the 429 body' do
+        OrganizationSetting.set(organization, 'ingest_rate_limit_per_minute', '1')
+        ingest_post
+        ingest_post
+        expect(response.parsed_body.dig('retry_after')).to eq(60)
+      end
+
+      it 'falls back to ENV default when no org setting exists' do
+        stub_const('ENV', ENV.to_h.merge('INGEST_RATE_LIMIT_DEFAULT' => '2'))
+        2.times { ingest_post }
+        ingest_post
+        expect(response).to have_http_status(:too_many_requests)
+      end
+
+      it 'fails open when Redis returns nil (cache unavailable)' do
+        allow(Rails.cache).to receive(:increment).and_return(nil)
+        ingest_post
+        expect(response).to have_http_status(:accepted)
+      end
+    end
+
+    context 'with monthly quota' do
+      it 'returns 202 when under the monthly quota' do
+        OrganizationSetting.set(organization, 'ingest_monthly_event_quota', '3')
+        2.times { ingest_post }
+        ingest_post
+        expect(response).to have_http_status(:accepted)
+      end
+
+      it 'returns 429 with quota_exceeded when monthly quota is reached' do
+        OrganizationSetting.set(organization, 'ingest_monthly_event_quota', '2')
+        2.times { ingest_post }
+        ingest_post
+        expect(response).to have_http_status(:too_many_requests)
+        expect(response.parsed_body.dig('code')).to eq('quota_exceeded')
+      end
+
+      it 'includes quota_resets_at in the quota_exceeded body' do
+        OrganizationSetting.set(organization, 'ingest_monthly_event_quota', '1')
+        ingest_post
+        ingest_post
+        body = response.parsed_body
+        expect(body['quota_resets_at']).to be_present
+        resets_at = Time.parse(body['quota_resets_at'])
+        expect(resets_at).to be >= Time.current.end_of_month
+      end
+
+      it 'caps Retry-After at 3600 seconds' do
+        OrganizationSetting.set(organization, 'ingest_monthly_event_quota', '1')
+        ingest_post
+        ingest_post
+        expect(response.headers['Retry-After'].to_i).to be <= 3600
+      end
+
+      it 'returns 202 when no quota setting exists (unlimited)' do
+        100.times { ingest_post }
+        expect(response).to have_http_status(:accepted)
+      end
+
+      it 'fails open when Redis returns nil for quota check' do
+        OrganizationSetting.set(organization, 'ingest_monthly_event_quota', '1')
+        allow(Rails.cache).to receive(:increment).and_return(nil)
+        ingest_post
+        expect(response).to have_http_status(:accepted)
       end
     end
 

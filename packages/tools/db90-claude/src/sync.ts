@@ -23,8 +23,20 @@ export interface SyncOptions {
   pricing: PricingTable;
 }
 
+let backoffUntil: Date | null = null;
+
 export async function syncOnce(options: SyncOptions): Promise<SyncResult> {
   const { token, host, dryRun, verbose, projectId, pricing } = options;
+
+  if (backoffUntil && new Date() < backoffUntil) {
+    if (verbose) {
+      console.log(`[verbose] Rate limited — skipping until ${backoffUntil.toISOString()}`);
+    } else {
+      console.warn(`[db90-claude] Rate limited — skipping until ${backoffUntil.toISOString()}`);
+    }
+    return { sent: 0, failed: 0, skipped: 0 };
+  }
+
   const files = findTranscriptFiles();
 
   if (verbose) {
@@ -95,7 +107,16 @@ export async function syncOnce(options: SyncOptions): Promise<SyncResult> {
       console.log(`[verbose] Sending session ${sessionId} (${agg.tokensIn + agg.tokensOut} tokens)`);
     }
 
-    const ok = await postEvent(payload, host, token);
+    const ok = await postEvent(payload, host, token, {
+      on429: (retryAfter, quotaExceeded) => {
+        backoffUntil = new Date(Math.max(
+          backoffUntil?.getTime() ?? 0,
+          Date.now() + retryAfter * 1000
+        ));
+        const reason = quotaExceeded ? "Monthly quota exceeded" : "Rate limited";
+        console.warn(`[db90-claude] ${reason}. Pausing until ${backoffUntil.toISOString()}.`);
+      }
+    });
     if (ok) {
       state = markSessionSent(state, sessionId, agg.fileSize);
       writeState(state, APP_DIR, host, token);

@@ -9,6 +9,9 @@ class OrganizationDashboard < Administrate::BaseDashboard
     slug: Field::String,
     description: Field::Text,
     is_active: Field::Boolean,
+    ingest_rate_limit_per_minute: Field::Number,
+    ingest_monthly_event_quota: Field::Number,
+    ingest_monthly_event_count: Field::Number,
     organization_memberships: Field::HasMany,
     members: Field::HasMany.with_options(class_name: "User"),
     organization_settings: Field::HasMany,
@@ -33,6 +36,9 @@ class OrganizationDashboard < Administrate::BaseDashboard
     slug
     description
     is_active
+    ingest_rate_limit_per_minute
+    ingest_monthly_event_quota
+    ingest_monthly_event_count
     retention_policy
     organization_connectors
     projects
@@ -45,6 +51,8 @@ class OrganizationDashboard < Administrate::BaseDashboard
     slug
     description
     is_active
+    ingest_rate_limit_per_minute
+    ingest_monthly_event_quota
   ].freeze
 
   COLLECTION_FILTERS = {
@@ -54,5 +62,9 @@ class OrganizationDashboard < Administrate::BaseDashboard
 
   def display_resource(organization)
     organization.name
+  end
+
+  def permitted_attributes
+    super + [ :ingest_rate_limit_per_minute, :ingest_monthly_event_quota ]
   end
 end

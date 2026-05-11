@@ -1,4 +1,4 @@
-import { postEvent as sdkPostEvent } from "@db90/sdk";
+import { postEvent as sdkPostEvent, type PostEventOptions } from "@db90/sdk";
 import type { Db90Payload } from "./claude-reader.js";
 
 export interface PostResult {
@@ -13,9 +13,10 @@ export interface PostResult {
 export async function postEvent(
   event: Db90Payload,
   host: string,
-  token: string
+  token: string,
+  options: PostEventOptions = {}
 ): Promise<boolean> {
-  return sdkPostEvent(event, host, token);
+  return sdkPostEvent(event, host, token, options);
 }
 
 /**
@@ -26,12 +27,13 @@ export async function postEvent(
 export async function postEvents(
   events: Db90Payload[],
   host: string,
-  token: string
+  token: string,
+  options: PostEventOptions = {}
 ): Promise<PostResult> {
   if (events.length === 0) return { sent: 0, failed: 0 };
 
   const outcomes = await Promise.allSettled(
-    events.map((event) => postEvent(event, host, token))
+    events.map((event) => postEvent(event, host, token, options))
   );
 
   let sent = 0;
