@@ -25,10 +25,6 @@ class OrganizationMembership < ApplicationRecord
     owner? # post-AIX-201: admin org role removed; semantically equivalent to owner
   end
 
-  def can_manage_members?
-    owner?
-  end
-
   def can_manage_projects?
     role.in?(%w[owner member])
   end

@@ -237,7 +237,7 @@ paths:
           $ref: '#/components/responses/NotFound'
     patch:
       summary: Update organization
-      description: Requires admin role in the organization
+      description: Requires owner role in the organization
       tags:
         - Organizations
       parameters:
@@ -720,7 +720,7 @@ paths:
                     $ref: '#/components/schemas/PaginationMeta'
     post:
       summary: Create organization connector
-      description: Requires admin role. Creates a new connector for the organization.
+      description: Requires owner role. Creates a new connector for the organization.
       tags:
         - Organization Connectors
       parameters:

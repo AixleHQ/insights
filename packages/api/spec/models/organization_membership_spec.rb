@@ -124,18 +124,6 @@ RSpec.describe OrganizationMembership, type: :model do
     end
   end
 
-  describe '#can_manage_members?' do
-    it 'returns true for owner' do
-      membership = build(:organization_membership, role: 'owner')
-      expect(membership.can_manage_members?).to be true
-    end
-
-    it 'returns false for members' do
-      membership = build(:organization_membership, role: 'member')
-      expect(membership.can_manage_members?).to be false
-    end
-  end
-
   describe '#can_manage_projects?' do
     it 'returns true for owner' do
       membership = build(:organization_membership, role: 'owner')
