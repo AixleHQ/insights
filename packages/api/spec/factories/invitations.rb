@@ -7,10 +7,6 @@ FactoryBot.define do
     status { 'pending' }
     expires_at { 7.days.from_now }
 
-    trait :admin do
-      role { 'admin' }
-    end
-
     trait :owner do
       role { 'owner' }
     end

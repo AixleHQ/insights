@@ -157,7 +157,7 @@ RSpec.describe 'Api::V1::Events', type: :request do
 
   describe 'GET /api/v1/organizations/:organization_id/events/unattributed' do
     let(:admin) { create(:user) }
-    let!(:admin_membership) { create(:organization_membership, user: admin, organization: organization, role: 'admin') }
+    let!(:admin_membership) { create(:organization_membership, user: admin, organization: organization, role: 'owner') }
 
     it 'returns events without user attribution for an admin' do
       unattributed_event = create(:tool_event, organization: organization, user: nil)
@@ -215,7 +215,7 @@ RSpec.describe 'Api::V1::Events', type: :request do
 
   describe 'POST /api/v1/organizations/:organization_id/events/:id/attribute' do
     let(:admin) { create(:user) }
-    let!(:admin_membership) { create(:organization_membership, user: admin, organization: organization, role: 'admin') }
+    let!(:admin_membership) { create(:organization_membership, user: admin, organization: organization, role: 'owner') }
     let!(:unattributed_event) { create(:tool_event, organization: organization, user: nil) }
 
     it 'assigns the event to a user when called by an admin' do
@@ -277,7 +277,7 @@ RSpec.describe 'Api::V1::Events', type: :request do
 
   describe 'POST /api/v1/organizations/:organization_id/events/attribute_bulk' do
     let(:admin) { create(:user) }
-    let!(:admin_membership) { create(:organization_membership, user: admin, organization: organization, role: 'admin') }
+    let!(:admin_membership) { create(:organization_membership, user: admin, organization: organization, role: 'owner') }
     let!(:unattributed_events) { create_list(:tool_event, 3, organization: organization, user: nil) }
 
     def bulk_attribute_path
@@ -454,9 +454,8 @@ RSpec.describe 'Api::V1::Events', type: :request do
       end
     end
 
-    context "as an admin" do
-      before { membership.update!(role: "admin") }
-      after  { membership.update!(role: "member") }
+    context "as an owner" do
+      before { membership.update!(role: "owner") }
 
       it "returns all org events" do
         authenticated_get export_path, user: user, organization: organization

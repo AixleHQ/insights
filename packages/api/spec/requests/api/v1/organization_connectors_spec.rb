@@ -6,7 +6,7 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
   let(:admin) { create(:user) }
   let(:member) { create(:user) }
   let(:organization) { create(:organization) }
-  let!(:admin_membership) { create(:organization_membership, user: admin, organization: organization, role: 'admin') }
+  let!(:admin_membership) { create(:organization_membership, user: admin, organization: organization, role: 'owner') }
   let!(:member_membership) { create(:organization_membership, user: member, organization: organization, role: 'member') }
   let!(:connector) { create(:organization_connector, organization: organization, connector_type: 'github') }
 

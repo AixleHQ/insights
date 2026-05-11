@@ -8,16 +8,16 @@ RSpec.describe 'Api::V1::Invitations', type: :request do
   let(:member) { create(:user) }
   let(:organization) { create(:organization) }
   let!(:owner_membership) { create(:organization_membership, user: owner, organization: organization, role: 'owner') }
-  let!(:admin_membership) { create(:organization_membership, user: admin, organization: organization, role: 'admin') }
+  let!(:admin_membership) { create(:organization_membership, user: admin, organization: organization, role: 'owner') }
   let!(:member_membership) { create(:organization_membership, user: member, organization: organization, role: 'member') }
 
   describe 'GET /api/v1/organizations/:organization_id/invitations' do
-    let!(:invitation1) { create(:invitation, organization: organization, invited_by: admin) }
-    let!(:invitation2) { create(:invitation, organization: organization, invited_by: admin, status: 'accepted') }
+    let!(:invitation1) { create(:invitation, organization: organization, invited_by: owner) }
+    let!(:invitation2) { create(:invitation, organization: organization, invited_by: owner, status: 'accepted') }
 
-    it 'returns all invitations for admins' do
+    it 'returns all invitations for owners' do
       authenticated_get "/api/v1/organizations/#{organization.id}/invitations",
-                        user: admin,
+                        user: owner,
                         organization: organization
 
       expect_success
@@ -26,7 +26,7 @@ RSpec.describe 'Api::V1::Invitations', type: :request do
 
     it 'filters by status' do
       authenticated_get "/api/v1/organizations/#{organization.id}/invitations",
-                        user: admin,
+                        user: owner,
                         organization: organization,
                         params: { status: 'pending' }
 
@@ -35,7 +35,7 @@ RSpec.describe 'Api::V1::Invitations', type: :request do
       expect(json_data.first[:status]).to eq('pending')
     end
 
-    it 'returns 403 for non-admins' do
+    it 'returns 403 for non-owners' do
       authenticated_get "/api/v1/organizations/#{organization.id}/invitations",
                         user: member,
                         organization: organization
@@ -44,18 +44,18 @@ RSpec.describe 'Api::V1::Invitations', type: :request do
     end
 
     it 'requires organization context' do
-      authenticated_get "/api/v1/organizations/#{organization.id}/invitations", user: admin
+      authenticated_get "/api/v1/organizations/#{organization.id}/invitations", user: owner
 
       expect_bad_request
     end
   end
 
   describe 'GET /api/v1/organizations/:organization_id/invitations/:id' do
-    let!(:invitation) { create(:invitation, organization: organization, invited_by: admin) }
+    let!(:invitation) { create(:invitation, organization: organization, invited_by: owner) }
 
-    it 'returns the invitation for admins' do
+    it 'returns the invitation for owners' do
       authenticated_get "/api/v1/organizations/#{organization.id}/invitations/#{invitation.id}",
-                        user: admin,
+                        user: owner,
                         organization: organization
 
       expect_success
@@ -63,7 +63,7 @@ RSpec.describe 'Api::V1::Invitations', type: :request do
       expect(json_data[:email]).to eq(invitation.email)
     end
 
-    it 'returns 403 for non-admins' do
+    it 'returns 403 for non-owners' do
       authenticated_get "/api/v1/organizations/#{organization.id}/invitations/#{invitation.id}",
                         user: member,
                         organization: organization
@@ -75,10 +75,10 @@ RSpec.describe 'Api::V1::Invitations', type: :request do
   describe 'POST /api/v1/organizations/:organization_id/invitations' do
     let(:new_email) { 'newuser@example.com' }
 
-    it 'creates an invitation as admin' do
+    it 'creates an invitation as owner' do
       expect {
         authenticated_post "/api/v1/organizations/#{organization.id}/invitations",
-                           user: admin,
+                           user: owner,
                            organization: organization,
                            params: { email: new_email, role: 'member' }
       }.to change(Invitation, :count).by(1)
@@ -89,19 +89,16 @@ RSpec.describe 'Api::V1::Invitations', type: :request do
       expect(json_data[:status]).to eq('pending')
     end
 
-    it 'creates an invitation as owner' do
-      expect {
-        authenticated_post "/api/v1/organizations/#{organization.id}/invitations",
-                           user: owner,
-                           organization: organization,
-                           params: { email: new_email, role: 'admin' }
-      }.to change(Invitation, :count).by(1)
+    it 'returns 422 when role is admin' do
+      authenticated_post "/api/v1/organizations/#{organization.id}/invitations",
+                         user: owner,
+                         organization: organization,
+                         params: { email: new_email, role: 'admin' }
 
-      expect_created
-      expect(json_data[:role]).to eq('admin')
+      expect_unprocessable
     end
 
-    it 'returns 403 for non-admins' do
+    it 'returns 403 for non-owners' do
       authenticated_post "/api/v1/organizations/#{organization.id}/invitations",
                          user: member,
                          organization: organization,
@@ -115,7 +112,7 @@ RSpec.describe 'Api::V1::Invitations', type: :request do
       create(:organization_membership, user: existing_member, organization: organization)
 
       authenticated_post "/api/v1/organizations/#{organization.id}/invitations",
-                         user: admin,
+                         user: owner,
                          organization: organization,
                          params: { email: existing_member.email, role: 'member' }
 
@@ -124,10 +121,10 @@ RSpec.describe 'Api::V1::Invitations', type: :request do
     end
 
     it 'returns error for duplicate pending invitation' do
-      create(:invitation, organization: organization, email: new_email, invited_by: admin)
+      create(:invitation, organization: organization, email: new_email, invited_by: owner)
 
       authenticated_post "/api/v1/organizations/#{organization.id}/invitations",
-                         user: admin,
+                         user: owner,
                          organization: organization,
                          params: { email: new_email, role: 'member' }
 
@@ -138,7 +135,7 @@ RSpec.describe 'Api::V1::Invitations', type: :request do
     it 'sends invitation email' do
       expect {
         authenticated_post "/api/v1/organizations/#{organization.id}/invitations",
-                           user: admin,
+                           user: owner,
                            organization: organization,
                            params: { email: new_email, role: 'member' }
       }.to have_enqueued_mail(InvitationMailer, :invite)
@@ -146,18 +143,18 @@ RSpec.describe 'Api::V1::Invitations', type: :request do
   end
 
   describe 'DELETE /api/v1/organizations/:organization_id/invitations/:id' do
-    let!(:invitation) { create(:invitation, organization: organization, invited_by: admin) }
+    let!(:invitation) { create(:invitation, organization: organization, invited_by: owner) }
 
-    it 'revokes pending invitation as admin' do
+    it 'revokes pending invitation as owner' do
       authenticated_delete "/api/v1/organizations/#{organization.id}/invitations/#{invitation.id}",
-                           user: admin,
+                           user: owner,
                            organization: organization
 
       expect_no_content
       expect(invitation.reload.status).to eq('revoked')
     end
 
-    it 'returns 403 for non-admins' do
+    it 'returns 403 for non-owners' do
       authenticated_delete "/api/v1/organizations/#{organization.id}/invitations/#{invitation.id}",
                            user: member,
                            organization: organization
@@ -169,7 +166,7 @@ RSpec.describe 'Api::V1::Invitations', type: :request do
       invitation.update!(status: 'accepted')
 
       authenticated_delete "/api/v1/organizations/#{organization.id}/invitations/#{invitation.id}",
-                           user: admin,
+                           user: owner,
                            organization: organization
 
       expect_forbidden
@@ -177,14 +174,14 @@ RSpec.describe 'Api::V1::Invitations', type: :request do
   end
 
   describe 'POST /api/v1/organizations/:organization_id/invitations/:id/resend' do
-    let!(:invitation) { create(:invitation, organization: organization, invited_by: admin, expires_at: 1.day.from_now) }
+    let!(:invitation) { create(:invitation, organization: organization, invited_by: owner, expires_at: 1.day.from_now) }
 
     it 'resends invitation email and updates expiration' do
       original_expiry = invitation.expires_at
 
       expect {
         authenticated_post "/api/v1/organizations/#{organization.id}/invitations/#{invitation.id}/resend",
-                           user: admin,
+                           user: owner,
                            organization: organization
       }.to have_enqueued_mail(InvitationMailer, :invite)
 
@@ -192,7 +189,7 @@ RSpec.describe 'Api::V1::Invitations', type: :request do
       expect(invitation.reload.expires_at).to be > original_expiry
     end
 
-    it 'returns 403 for non-admins' do
+    it 'returns 403 for non-owners' do
       authenticated_post "/api/v1/organizations/#{organization.id}/invitations/#{invitation.id}/resend",
                          user: member,
                          organization: organization
@@ -204,7 +201,7 @@ RSpec.describe 'Api::V1::Invitations', type: :request do
       invitation.update!(status: 'accepted')
 
       authenticated_post "/api/v1/organizations/#{organization.id}/invitations/#{invitation.id}/resend",
-                         user: admin,
+                         user: owner,
                          organization: organization
 
       # Policy denies resend for non-pending invitations
@@ -271,15 +268,15 @@ RSpec.describe 'Api::V1::PublicInvitations', type: :request do
     end
 
     it 'assigns the correct role' do
-      admin_invitation = create(:invitation, :admin, organization: organization, invited_by: inviter)
-      admin_user = create(:user, email: admin_invitation.email)
+      viewer_invitation = create(:invitation, :viewer, organization: organization, invited_by: inviter)
+      viewer_user = create(:user, email: viewer_invitation.email)
 
-      authenticated_post "/api/v1/invitations/#{admin_invitation.token}/accept",
-                         user: admin_user
+      authenticated_post "/api/v1/invitations/#{viewer_invitation.token}/accept",
+                         user: viewer_user
 
       expect_success
-      membership = admin_user.organization_memberships.find_by(organization: organization)
-      expect(membership.role).to eq('admin')
+      membership = viewer_user.organization_memberships.find_by(organization: organization)
+      expect(membership.role).to eq('viewer')
     end
 
     it 'requires authentication' do

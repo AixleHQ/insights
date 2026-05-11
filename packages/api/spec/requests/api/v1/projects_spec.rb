@@ -6,7 +6,7 @@ RSpec.describe 'Api::V1::Projects', type: :request do
   let(:user) { create(:user) }
   let(:other_user) { create(:user) }
   let(:organization) { create(:organization) }
-  let!(:membership) { create(:organization_membership, user: user, organization: organization, role: 'admin') }
+  let!(:membership) { create(:organization_membership, user: user, organization: organization, role: 'owner') }
 
   describe 'GET /api/v1/projects' do
     let!(:personal_project) { create(:project, owner: user, organization: nil) }

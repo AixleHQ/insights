@@ -99,10 +99,10 @@ RSpec.describe ProjectPolicy, type: :policy do
         expect(policy(org_project, current_user: org_owner).apply(:destroy?)).to be true
       end
 
-      it 'denies org admins from destroying' do
-        org_admin = create(:user)
-        create(:organization_membership, user: org_admin, organization: organization, role: 'admin')
-        expect(policy(org_project, current_user: org_admin).apply(:destroy?)).to be false
+      it 'denies org members without project ownership from destroying' do
+        org_member = create(:user)
+        create(:organization_membership, user: org_member, organization: organization, role: 'member')
+        expect(policy(org_project, current_user: org_member).apply(:destroy?)).to be false
       end
 
       it 'allows global admins' do

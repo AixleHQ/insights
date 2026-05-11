@@ -9,7 +9,7 @@ RSpec.describe "Api::V1::WebhookDeliveries", type: :request do
   let(:connector)    { create(:organization_connector, organization: organization) }
 
   before do
-    create(:organization_membership, user: admin,  organization: organization, role: "admin")
+    create(:organization_membership, user: admin,  organization: organization, role: 'owner')
     create(:organization_membership, user: member, organization: organization, role: "member")
   end
 

@@ -10,7 +10,7 @@ RSpec.describe OrganizationMembershipPolicy, type: :policy do
   let(:global_admin) { create(:user, :global_admin) }
   let(:organization) { create(:organization) }
   let!(:owner_membership) { create(:organization_membership, user: owner, organization: organization, role: 'owner') }
-  let!(:admin_membership) { create(:organization_membership, user: admin, organization: organization, role: 'admin') }
+  let!(:admin_membership) { create(:organization_membership, user: admin, organization: organization, role: 'owner') }
   let!(:member_membership) { create(:organization_membership, user: member, organization: organization, role: 'member') }
 
   def policy(record, current_user:, org: nil)
@@ -44,8 +44,8 @@ RSpec.describe OrganizationMembershipPolicy, type: :policy do
       expect(policy(member_membership, current_user: admin).apply(:update?)).to be true
     end
 
-    it 'denies admins from updating owner memberships' do
-      expect(policy(owner_membership, current_user: admin).apply(:update?)).to be false
+    it 'denies members from updating any memberships' do
+      expect(policy(member_membership, current_user: member).apply(:update?)).to be false
     end
 
     it 'allows owners to update owner memberships' do
@@ -65,8 +65,8 @@ RSpec.describe OrganizationMembershipPolicy, type: :policy do
       expect(policy(member_membership, current_user: admin).apply(:destroy?)).to be true
     end
 
-    it 'denies admins from removing owners' do
-      expect(policy(owner_membership, current_user: admin).apply(:destroy?)).to be false
+    it 'denies members from removing any members' do
+      expect(policy(member_membership, current_user: member).apply(:destroy?)).to be false
     end
 
     it 'allows owners to remove other owners' do

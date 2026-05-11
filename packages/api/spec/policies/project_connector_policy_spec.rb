@@ -13,7 +13,7 @@ RSpec.describe ProjectConnectorPolicy, type: :policy do
   let(:connector) { create(:project_connector, project: project) }
 
   before do
-    create(:organization_membership, user: org_admin, organization: organization, role: 'admin')
+    create(:organization_membership, user: org_admin, organization: organization, role: 'owner')
     create(:organization_membership, user: org_member, organization: organization, role: 'member')
     create(:project_membership, user: org_member, project: project, role: 'member')
   end

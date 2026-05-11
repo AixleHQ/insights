@@ -7,7 +7,7 @@ RSpec.describe "Api::V1::AiGateway", type: :request do
   let(:organization) { create(:organization) }
 
   before do
-    create(:organization_membership, user: user, organization: organization, role: "admin")
+    create(:organization_membership, user: user, organization: organization, role: "owner")
   end
 
   describe "POLLING_ONLY_PROVIDERS deny-list" do
