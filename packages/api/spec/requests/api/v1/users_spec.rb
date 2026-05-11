@@ -277,7 +277,7 @@ RSpec.describe 'Api::V1::Users', type: :request do
     end
 
     context 'when claims are missing jti' do
-      it 'returns unprocessable_entity' do
+      it 'returns unprocessable_content' do
         # Uses the special test-impersonation-nojti- token which the TestJwtAuthMiddleware
         # sets jwt.impersonation = true but omits the jti claim.
         headers = {
@@ -286,7 +286,7 @@ RSpec.describe 'Api::V1::Users', type: :request do
         }
         post '/api/v1/users/me/stop_impersonation', headers: headers
 
-        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response).to have_http_status(:unprocessable_content)
         expect(json_response[:error]).to eq('Token missing jti claim')
       end
     end
