@@ -131,7 +131,6 @@ function getStatusVariant(
 function getRoleBadgeVariant(role: MemberRole): "default" | "secondary" | "outline" {
   switch (role) {
     case "owner":
-    case "admin":
       return "default";
     case "member":
       return "secondary";
@@ -374,14 +373,6 @@ function InviteDialog({
                 <SelectValue placeholder="Select a role" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="admin">
-                  <div className="flex flex-col items-start">
-                    <span>Admin</span>
-                    <span className="text-xs text-muted-foreground">
-                      Manage organization settings and members
-                    </span>
-                  </div>
-                </SelectItem>
                 <SelectItem value="member">
                   <div className="flex flex-col items-start">
                     <span>Member</span>

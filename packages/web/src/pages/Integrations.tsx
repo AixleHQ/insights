@@ -258,13 +258,13 @@ export function Integrations() {
   const navigate = useNavigate();
   const { status } = useParams<{ status: string }>();
 
-  const isAdmin = hasRole(["owner", "admin"]);
+  const isOwner = hasRole(["owner"]);
 
   const { data: connectorsData, isLoading: connectorsLoading } = useConnectors(
     currentOrg?.id || "",
   );
   const { data: toolAccountsData, isLoading: toolAccountsLoading } = useToolAccounts(currentOrg?.id || "");
-  const { data: healthData } = useConnectorHealth(currentOrg?.id || "", { enabled: isAdmin });
+  const { data: healthData } = useConnectorHealth(currentOrg?.id || "", { enabled: isOwner });
   const isLoading = connectorsLoading || toolAccountsLoading;
 
   const healthStatsById = useMemo(() => {
@@ -511,7 +511,7 @@ export function Integrations() {
           {regenerateError && (
             <p className="text-sm text-destructive">{regenerateError}</p>
           )}
-          {isAdmin && healthData?.summary && healthData.summary.total > 0 && (
+          {isOwner && healthData?.summary && healthData.summary.total > 0 && (
             <div className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
               <span className="text-muted-foreground">Connector health:</span>
               {healthData.summary.error > 0 ? (

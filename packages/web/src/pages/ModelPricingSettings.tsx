@@ -504,7 +504,7 @@ function OverridesSection({ orgId }: { orgId: string }) {
 export function ModelPricingSettings() {
   const { currentOrg, hasRole } = useOrg();
   const { data, isLoading } = useModelPricing(currentOrg?.id ?? "");
-  const isAdmin = hasRole(["owner", "admin"]);
+  const isOwner = hasRole(["owner"]);
 
   const models = data?.models;
   const tools = data?.tools;
@@ -545,7 +545,7 @@ export function ModelPricingSettings() {
         </CardContent>
       </Card>
 
-      {isAdmin && currentOrg && (
+      {isOwner && currentOrg && (
         <Card>
           <CardHeader>
             <CardTitle>Pricing Overrides</CardTitle>

@@ -43,7 +43,6 @@ function formatExpirationDate(dateString: string): string {
 function getRoleBadgeVariant(role: string): "default" | "secondary" | "outline" {
   switch (role) {
     case "owner":
-    case "admin":
       return "default";
     case "member":
       return "secondary";
@@ -56,8 +55,6 @@ function getRoleDescription(role: string): string {
   switch (role) {
     case "owner":
       return "Full control over organization settings, billing, and member management";
-    case "admin":
-      return "Manage projects, members, and organization settings";
     case "member":
       return "View dashboards and contribute to projects";
     case "viewer":

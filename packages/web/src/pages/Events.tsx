@@ -31,7 +31,7 @@ export function Events() {
   const { data: me, isLoading: isLoadingMe } = useCurrentUser();
   const showUnattributedNav =
     Boolean(currentOrg) &&
-    (hasRole(["owner", "admin"]) ||
+    (hasRole(["owner"]) ||
       (!isLoadingMe && Boolean(me?.globalAdmin ?? me?.super_admin)));
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<EventFiltersState>({});
