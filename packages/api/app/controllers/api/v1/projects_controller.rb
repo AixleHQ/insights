@@ -3,7 +3,7 @@
 module Api
   module V1
     class ProjectsController < BaseController
-      before_action :set_project, only: %i[show update destroy settings update_setting destroy_setting stats daily_by_tool commits_by_user members retention_policy update_retention_policy link_jira link_linear sync_issues]
+      before_action :set_project, only: %i[show update destroy settings update_setting destroy_setting stats daily_by_tool commits_by_user retention_policy update_retention_policy link_jira link_linear sync_issues]
 
       # GET /api/v1/projects
       # GET /api/v1/organizations/:organization_id/projects
@@ -246,29 +246,6 @@ module Api
 
         paged = paginate(Kaminari.paginate_array(data))
         render json: { data: paged, meta: pagination_meta(paged) }
-      end
-
-      # GET /api/v1/projects/:id/members
-      def members
-        authorize! @project, to: :show?
-
-        project_members = @project.project_memberships.includes(:user)
-        project_members = project_members.where(role: params[:role]) if params[:role].present?
-
-        members_data = project_members.map do |pm|
-          user = pm.user
-          {
-            id: pm.id,
-            userId: user.id,
-            email: user.email,
-            name: user.name,
-            avatarUrl: user.avatar_url,
-            role: pm.role,
-            joinedAt: pm.created_at.iso8601
-          }
-        end
-
-        render json: { data: members_data }
       end
 
       # POST /api/v1/projects/:id/link_jira

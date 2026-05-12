@@ -50,7 +50,11 @@ RSpec.describe "Api::V1::ProjectMembers", type: :request do
     end
 
     it "returns 403 for regular project members" do
-      authenticated_get "/api/v1/projects/#{project.id}/members", user: member
+      member_only = create(:user)
+      create(:organization_membership, user: member_only, organization: organization, role: "member")
+      create(:project_membership, user: member_only, project: project, role: "member")
+
+      authenticated_get "/api/v1/projects/#{project.id}/members", user: member_only
 
       expect_forbidden
     end

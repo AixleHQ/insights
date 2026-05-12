@@ -29,8 +29,10 @@ RSpec.describe ProjectMembership, type: :model do
     end
 
     it "validates uniqueness of user per project" do
-      membership = create(:project_membership)
-      duplicate = build(:project_membership, user: membership.user, project: membership.project)
+      user = create(:user)
+      personal_project = create(:project, owner: user, organization: nil)
+      membership = create(:project_membership, user: user, project: personal_project, role: "owner")
+      duplicate = build(:project_membership, user: user, project: personal_project)
       expect(duplicate).not_to be_valid
       expect(duplicate.errors[:user_id]).to include("is already a member of this project")
     end
@@ -40,10 +42,12 @@ RSpec.describe ProjectMembership, type: :model do
       let(:project) { create(:project, organization: organization) }
       let(:org_member) { create(:user) }
       let(:outsider) { create(:user) }
+      let(:existing_owner) { create(:user) }
 
       before do
         create(:organization_membership, user: org_member, organization: organization)
-        create(:project_membership, project: project, role: "owner") # satisfy last-owner guard
+        create(:organization_membership, user: existing_owner, organization: organization)
+        create(:project_membership, user: existing_owner, project: project, role: "owner") # satisfy last-owner guard
       end
 
       it "allows adding an org member" do
@@ -66,18 +70,27 @@ RSpec.describe ProjectMembership, type: :model do
     end
 
     describe "last owner protection on role downgrade" do
-      let(:project) { create(:project) }
+      let(:organization) { create(:organization) }
+      let(:project) { create(:project, organization: organization) }
+
+      def create_org_project_membership(user, role)
+        create(:organization_membership, user: user, organization: organization)
+        create(:project_membership, user: user, project: project, role: role)
+      end
 
       it "prevents downgrading the last owner" do
-        owner_membership = create(:project_membership, project: project, role: "owner")
+        owner_user = create(:user)
+        owner_membership = create_org_project_membership(owner_user, "owner")
         owner_membership.role = "member"
         expect(owner_membership).not_to be_valid
         expect(owner_membership.errors[:role]).to include("Cannot downgrade the last owner of a project")
       end
 
       it "allows downgrading an owner when another owner exists" do
-        owner_membership = create(:project_membership, project: project, role: "owner")
-        create(:project_membership, project: project, role: "owner")
+        owner_user = create(:user)
+        second_owner = create(:user)
+        owner_membership = create_org_project_membership(owner_user, "owner")
+        create_org_project_membership(second_owner, "owner")
         owner_membership.role = "member"
         expect(owner_membership).to be_valid
       end
@@ -85,41 +98,61 @@ RSpec.describe ProjectMembership, type: :model do
   end
 
   describe "last owner protection on destroy" do
-    let(:project) { create(:project) }
+    let(:organization) { create(:organization) }
+    let(:project) { create(:project, organization: organization) }
+
+    def create_org_project_membership(user, role)
+      create(:organization_membership, user: user, organization: organization)
+      create(:project_membership, user: user, project: project, role: role)
+    end
 
     it "prevents destroying the last owner membership" do
-      owner_membership = create(:project_membership, project: project, role: "owner")
+      owner_user = create(:user)
+      owner_membership = create_org_project_membership(owner_user, "owner")
       expect(owner_membership.destroy).to be_falsey
       expect(owner_membership.errors[:base]).to include("Cannot remove the last owner of a project")
       expect(described_class.exists?(owner_membership.id)).to be true
     end
 
     it "allows destroying an owner membership when another owner exists" do
-      owner_membership = create(:project_membership, project: project, role: "owner")
-      create(:project_membership, project: project, role: "owner")
+      owner_user = create(:user)
+      second_owner = create(:user)
+      owner_membership = create_org_project_membership(owner_user, "owner")
+      create_org_project_membership(second_owner, "owner")
       expect(owner_membership.destroy).to be_truthy
     end
 
     it "allows destroying a non-owner membership regardless" do
-      create(:project_membership, project: project, role: "owner")
-      member_membership = create(:project_membership, project: project, role: "member")
+      owner_user = create(:user)
+      member_user = create(:user)
+      create_org_project_membership(owner_user, "owner")
+      member_membership = create_org_project_membership(member_user, "member")
       expect(member_membership.destroy).to be_truthy
     end
 
     it "allows cascaded destroy when project itself is being destroyed" do
-      owner_membership = create(:project_membership, project: project, role: "owner")
+      owner_user = create(:user)
+      owner_membership = create_org_project_membership(owner_user, "owner")
       expect { project.destroy! }.not_to raise_error
       expect(described_class.exists?(owner_membership.id)).to be false
     end
   end
 
   describe "scopes" do
-    let(:project) { create(:project) }
+    let(:organization) { create(:organization) }
+    let(:project) { create(:project, organization: organization) }
+
+    def create_org_project_membership(user, role)
+      create(:organization_membership, user: user, organization: organization)
+      create(:project_membership, user: user, project: project, role: role)
+    end
 
     describe ".owners" do
       it "returns only owner memberships" do
-        owner_membership = create(:project_membership, project: project, role: "owner")
-        member_membership = create(:project_membership, project: project, role: "member")
+        owner_user = create(:user)
+        member_user = create(:user)
+        owner_membership = create_org_project_membership(owner_user, "owner")
+        member_membership = create_org_project_membership(member_user, "member")
         expect(described_class.owners).to include(owner_membership)
         expect(described_class.owners).not_to include(member_membership)
       end
@@ -127,8 +160,10 @@ RSpec.describe ProjectMembership, type: :model do
 
     describe ".admins" do
       it "is an alias for .owners post-admin-removal" do
-        owner_membership = create(:project_membership, project: project, role: "owner")
-        member_membership = create(:project_membership, project: project, role: "member")
+        owner_user = create(:user)
+        member_user = create(:user)
+        owner_membership = create_org_project_membership(owner_user, "owner")
+        member_membership = create_org_project_membership(member_user, "member")
         expect(described_class.admins).to include(owner_membership)
         expect(described_class.admins).not_to include(member_membership)
       end

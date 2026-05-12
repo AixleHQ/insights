@@ -89,8 +89,11 @@ RSpec.describe ProjectPolicy, type: :policy do
         expect(policy(org_project, current_user: user).apply(:destroy?)).to be true
       end
 
-      it 'denies project admins from destroying' do
-        expect(policy(org_project, current_user: user).apply(:destroy?)).to be false
+      it 'denies project members who are not org owners from destroying' do
+        member_actor = create(:user)
+        create(:organization_membership, user: member_actor, organization: organization, role: 'member')
+        create(:project_membership, user: member_actor, project: org_project, role: 'member')
+        expect(policy(org_project, current_user: member_actor).apply(:destroy?)).to be false
       end
 
       it 'allows org owners to destroy' do
