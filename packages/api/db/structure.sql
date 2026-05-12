@@ -650,7 +650,8 @@ CREATE TABLE public.project_memberships (
     project_id uuid NOT NULL,
     role public.member_role DEFAULT 'member'::public.member_role NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    created_by_id uuid
 );
 
 --
@@ -1507,6 +1508,12 @@ CREATE INDEX index_project_memberships_on_user_id ON public.project_memberships 
 CREATE UNIQUE INDEX index_project_memberships_on_user_id_and_project_id ON public.project_memberships USING btree (user_id, project_id);
 
 --
+-- Name: index_project_memberships_on_created_by_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_project_memberships_on_created_by_id ON public.project_memberships USING btree (created_by_id);
+
+--
 -- Name: index_project_retention_policies_on_project_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1813,6 +1820,13 @@ ALTER TABLE ONLY public.project_memberships
     ADD CONSTRAINT fk_rails_86b046ec96 FOREIGN KEY (user_id) REFERENCES public.users(id);
 
 --
+-- Name: project_memberships fk_project_memberships_created_by_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.project_memberships
+    ADD CONSTRAINT fk_project_memberships_created_by_id FOREIGN KEY (created_by_id) REFERENCES public.users(id);
+
+--
 -- Name: issues fk_rails_899c8f3231; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1959,6 +1973,7 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260512120000'),
 ('20260511120000'),
 ('20260507130000'),
 ('20260507120000'),

@@ -27,7 +27,7 @@ RSpec.describe "Api::V1::ProjectAuditLogs", type: :request do
     create(:organization_membership, user: viewer_user, organization: organization, role: "viewer")
 
     create(:project_membership, user: owner_user, project: project, role: "owner")
-    create(:project_membership, user: admin_user, project: project, role: "admin")
+    create(:project_membership, user: admin_user, project: project, role: "owner")
     create(:project_membership, user: member_user, project: project, role: "member")
     create(:project_membership, user: viewer_user, project: project, role: "viewer")
   end

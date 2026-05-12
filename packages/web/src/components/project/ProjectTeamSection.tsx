@@ -29,7 +29,6 @@ function getInitials(name?: string | null, email?: string): string {
 
 const roleColors: Record<string, string> = {
   owner: "bg-violet-500/10 text-violet-400",
-  admin: "bg-amber-500/10 text-amber-400",
   member: "bg-blue-500/10 text-blue-400",
   viewer: "bg-slate-500/10 text-slate-400",
 };

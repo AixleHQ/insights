@@ -62,7 +62,7 @@ RSpec.describe ProjectConnectorPolicy, type: :policy do
 
       before do
         create(:organization_membership, user: project_admin_user, organization: organization, role: 'member')
-        create(:project_membership, user: project_admin_user, project: project, role: 'admin')
+        create(:project_membership, user: project_admin_user, project: project, role: "owner")
       end
 
       it 'allows a project admin to create' do

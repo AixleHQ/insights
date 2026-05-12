@@ -57,7 +57,7 @@ RSpec.describe ProjectPolicy, type: :policy do
 
   describe 'organization projects' do
     let(:org_project) { create(:project, organization: organization, owner: nil) }
-    let!(:project_membership) { create(:project_membership, user: user, project: org_project, role: 'admin') }
+    let!(:project_membership) { create(:project_membership, user: user, project: org_project, role: "owner") }
 
     describe '#show?' do
       it 'allows org members to view' do

@@ -642,6 +642,7 @@ export interface ProjectMember {
   avatarUrl: string | null;
   role: string;
   joinedAt: string;
+  createdById?: string | null;
 }
 
 export function useProjectMembers(projectId: string) {
