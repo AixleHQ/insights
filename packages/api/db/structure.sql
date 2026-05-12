@@ -423,7 +423,7 @@ CREATE TABLE public.connector_health_snapshots (
     snapshotted_at timestamp(6) without time zone NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT connector_health_snapshots_status_check CHECK (((status)::text = ANY (ARRAY[('success'::character varying)::text, ('failure'::character varying)::text])))
+    CONSTRAINT connector_health_snapshots_status_check CHECK (((status)::text = ANY ((ARRAY['success'::character varying, 'failure'::character varying])::text[])))
 );
 
 --
@@ -1490,6 +1490,12 @@ CREATE INDEX index_project_connectors_on_project_id ON public.project_connectors
 CREATE UNIQUE INDEX index_project_connectors_on_project_id_and_connector_type ON public.project_connectors USING btree (project_id, connector_type);
 
 --
+-- Name: index_project_memberships_on_created_by_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_project_memberships_on_created_by_id ON public.project_memberships USING btree (created_by_id);
+
+--
 -- Name: index_project_memberships_on_project_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1506,12 +1512,6 @@ CREATE INDEX index_project_memberships_on_user_id ON public.project_memberships 
 --
 
 CREATE UNIQUE INDEX index_project_memberships_on_user_id_and_project_id ON public.project_memberships USING btree (user_id, project_id);
-
---
--- Name: index_project_memberships_on_created_by_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX index_project_memberships_on_created_by_id ON public.project_memberships USING btree (created_by_id);
 
 --
 -- Name: index_project_retention_policies_on_project_id; Type: INDEX; Schema: public; Owner: -
@@ -1694,6 +1694,13 @@ CREATE INDEX idx_tool_events_user_occurred ON timeseries.tool_events USING btree
 CREATE INDEX tool_events_occurred_at_idx ON timeseries.tool_events USING btree (occurred_at DESC);
 
 --
+-- Name: project_memberships fk_project_memberships_created_by_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.project_memberships
+    ADD CONSTRAINT fk_project_memberships_created_by_id FOREIGN KEY (created_by_id) REFERENCES public.users(id);
+
+--
 -- Name: webhook_deliveries fk_rails_0afb2cd61a; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1818,13 +1825,6 @@ ALTER TABLE ONLY public.project_retention_policies
 
 ALTER TABLE ONLY public.project_memberships
     ADD CONSTRAINT fk_rails_86b046ec96 FOREIGN KEY (user_id) REFERENCES public.users(id);
-
---
--- Name: project_memberships fk_project_memberships_created_by_id; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.project_memberships
-    ADD CONSTRAINT fk_project_memberships_created_by_id FOREIGN KEY (created_by_id) REFERENCES public.users(id);
 
 --
 -- Name: issues fk_rails_899c8f3231; Type: FK CONSTRAINT; Schema: public; Owner: -
