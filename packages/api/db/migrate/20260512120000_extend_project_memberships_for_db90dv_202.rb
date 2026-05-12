@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class ExtendProjectMembershipsForAIX202 < ActiveRecord::Migration[8.1]
+class ExtendProjectMembershipsForDb90dv202 < ActiveRecord::Migration[8.1]
   def up
     execute <<-SQL.squish
       UPDATE project_memberships
