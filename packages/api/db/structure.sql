@@ -117,7 +117,6 @@ CREATE TYPE public.invitation_status AS ENUM (
 
 CREATE TYPE public.member_role AS ENUM (
     'owner',
-    'admin',
     'member',
     'viewer'
 );
@@ -1973,6 +1972,7 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260513120000'),
 ('20260512120000'),
 ('20260511120000'),
 ('20260507130000'),
