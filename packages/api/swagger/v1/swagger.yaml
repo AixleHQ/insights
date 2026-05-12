@@ -2531,7 +2531,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [owner, admin, member, viewer]
+            enum: [owner, member, viewer]
       responses:
         '200':
           description: Project members
@@ -2548,7 +2548,7 @@ paths:
                     $ref: '#/components/schemas/PaginationMeta'
     post:
       summary: Add project member
-      description: Requires admin role in the project
+      description: Requires organization owner (or personal project owner) for org projects
       tags:
         - Project Members
       parameters:
@@ -2565,7 +2565,7 @@ paths:
                   format: uuid
                 role:
                   type: string
-                  enum: [owner, admin, member, viewer]
+                  enum: [owner, member, viewer]
               required:
                 - user_id
                 - role
@@ -2613,7 +2613,7 @@ paths:
               properties:
                 role:
                   type: string
-                  enum: [owner, admin, member, viewer]
+                  enum: [owner, member, viewer]
               required:
                 - role
       responses:
@@ -4517,9 +4517,27 @@ components:
           format: uuid
         role:
           type: string
-          enum: [owner, admin, member, viewer]
-        user:
-          $ref: '#/components/schemas/UserMinimal'
+          enum: [owner, member, viewer]
+        userId:
+          type: string
+          format: uuid
+        email:
+          type: string
+          nullable: true
+        name:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+        joinedAt:
+          type: string
+          format: date-time
+        createdById:
+          type: string
+          format: uuid
+          nullable: true
+          description: UUID of the user who granted this membership (typically an org owner)
         createdAt:
           type: string
           format: date-time
@@ -4529,8 +4547,8 @@ components:
       required:
         - id
         - projectId
+        - userId
         - role
-        - user
         - createdAt
         - updatedAt
 

@@ -10,7 +10,7 @@ RSpec.describe 'Api::V1::Repositories', type: :request do
   let(:connector) { create(:organization_connector, organization: organization, connector_type: 'github') }
   let!(:admin_org_membership) { create(:organization_membership, user: admin, organization: organization) }
   let!(:member_org_membership) { create(:organization_membership, user: member, organization: organization) }
-  let!(:admin_project_membership) { create(:project_membership, user: admin, project: project, role: 'admin') }
+  let!(:admin_project_membership) { create(:project_membership, user: admin, project: project, role: "owner") }
   let!(:member_project_membership) { create(:project_membership, user: member, project: project, role: 'member') }
   let!(:repository) { create(:repository, project: project, organization_connector: connector) }
 
@@ -96,7 +96,7 @@ RSpec.describe 'Api::V1::Repositories', type: :request do
 
     it 'returns 422 when the repository is already linked to another project' do
       other_project = create(:project, organization: organization, owner: nil)
-      create(:project_membership, user: admin, project: other_project, role: 'admin')
+      create(:project_membership, user: admin, project: other_project, role: "owner")
       existing_repo = create(:repository, project: other_project, organization_connector: connector, external_id: '12345')
 
       authenticated_post "/api/v1/projects/#{project.id}/repositories",

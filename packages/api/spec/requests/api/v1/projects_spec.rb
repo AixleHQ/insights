@@ -356,7 +356,7 @@ RSpec.describe 'Api::V1::Projects', type: :request do
 
   describe 'GET /api/v1/projects/:id/retention_policy' do
     let!(:project) { create(:project, organization: organization, owner: nil) }
-    let!(:project_membership) { create(:project_membership, project: project, user: user, role: 'admin') }
+    let!(:project_membership) { create(:project_membership, project: project, user: user, role: "owner") }
 
     it 'returns the retention policy with camelCase keys' do
       authenticated_get "/api/v1/projects/#{project.id}/retention_policy", user: user
@@ -458,7 +458,7 @@ RSpec.describe 'Api::V1::Projects', type: :request do
 
   describe 'PATCH /api/v1/projects/:id/retention_policy' do
     let!(:project) { create(:project, organization: organization, owner: nil) }
-    let!(:project_membership) { create(:project_membership, project: project, user: user, role: 'admin') }
+    let!(:project_membership) { create(:project_membership, project: project, user: user, role: "owner") }
 
     it 'updates the retention policy and returns 200' do
       authenticated_patch "/api/v1/projects/#{project.id}/retention_policy",
@@ -503,7 +503,7 @@ RSpec.describe 'Api::V1::Projects', type: :request do
 
   describe 'POST /api/v1/projects/:id/link_jira' do
     let!(:project) { create(:project, organization: organization, owner: nil) }
-    let!(:project_membership) { create(:project_membership, project: project, user: user, role: 'admin') }
+    let!(:project_membership) { create(:project_membership, project: project, user: user, role: "owner") }
     let!(:connector) { create(:organization_connector, :jira, organization: organization) }
 
     it 'saves jira_connector_id and jira_project_key settings' do
@@ -570,7 +570,7 @@ RSpec.describe 'Api::V1::Projects', type: :request do
 
   describe 'POST /api/v1/projects/:id/link_linear' do
     let!(:project) { create(:project, organization: organization, owner: nil) }
-    let!(:project_membership) { create(:project_membership, project: project, user: user, role: 'admin') }
+    let!(:project_membership) { create(:project_membership, project: project, user: user, role: "owner") }
     let!(:connector) { create(:organization_connector, :linear, organization: organization) }
 
     it 'saves linear connector and project settings' do
@@ -631,7 +631,7 @@ RSpec.describe 'Api::V1::Projects', type: :request do
 
   describe 'POST /api/v1/projects/:id/sync_issues' do
     let!(:project) { create(:project, organization: organization, owner: nil) }
-    let!(:project_membership) { create(:project_membership, project: project, user: user, role: 'admin') }
+    let!(:project_membership) { create(:project_membership, project: project, user: user, role: "owner") }
     let!(:connector) { create(:organization_connector, :jira, organization: organization) }
 
     before do

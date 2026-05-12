@@ -117,7 +117,6 @@ CREATE TYPE public.invitation_status AS ENUM (
 
 CREATE TYPE public.member_role AS ENUM (
     'owner',
-    'admin',
     'member',
     'viewer'
 );
@@ -423,7 +422,7 @@ CREATE TABLE public.connector_health_snapshots (
     snapshotted_at timestamp(6) without time zone NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT connector_health_snapshots_status_check CHECK (((status)::text = ANY (ARRAY[('success'::character varying)::text, ('failure'::character varying)::text])))
+    CONSTRAINT connector_health_snapshots_status_check CHECK (((status)::text = ANY ((ARRAY['success'::character varying, 'failure'::character varying])::text[])))
 );
 
 --
@@ -650,7 +649,8 @@ CREATE TABLE public.project_memberships (
     project_id uuid NOT NULL,
     role public.member_role DEFAULT 'member'::public.member_role NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    created_by_id uuid
 );
 
 --
@@ -1489,6 +1489,12 @@ CREATE INDEX index_project_connectors_on_project_id ON public.project_connectors
 CREATE UNIQUE INDEX index_project_connectors_on_project_id_and_connector_type ON public.project_connectors USING btree (project_id, connector_type);
 
 --
+-- Name: index_project_memberships_on_created_by_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_project_memberships_on_created_by_id ON public.project_memberships USING btree (created_by_id);
+
+--
 -- Name: index_project_memberships_on_project_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1685,6 +1691,13 @@ CREATE INDEX idx_tool_events_user_occurred ON timeseries.tool_events USING btree
 --
 
 CREATE INDEX tool_events_occurred_at_idx ON timeseries.tool_events USING btree (occurred_at DESC);
+
+--
+-- Name: project_memberships fk_project_memberships_created_by_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.project_memberships
+    ADD CONSTRAINT fk_project_memberships_created_by_id FOREIGN KEY (created_by_id) REFERENCES public.users(id);
 
 --
 -- Name: webhook_deliveries fk_rails_0afb2cd61a; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1959,6 +1972,8 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260513120000'),
+('20260512120000'),
 ('20260511120000'),
 ('20260507130000'),
 ('20260507120000'),

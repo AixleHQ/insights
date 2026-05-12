@@ -24,7 +24,7 @@ RSpec.describe ProjectAuditLogPolicy, type: :policy do
     create(:organization_membership, user: project_member_user, organization: organization, role: "member")
     create(:organization_membership, user: project_viewer_user, organization: organization, role: "viewer")
 
-    create(:project_membership, user: project_admin_user, project: project, role: "admin")
+    create(:project_membership, user: project_admin_user, project: project, role: "owner")
     create(:project_membership, user: project_member_user, project: project, role: "member")
     create(:project_membership, user: project_viewer_user, project: project, role: "viewer")
   end

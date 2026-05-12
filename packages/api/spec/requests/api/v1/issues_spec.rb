@@ -11,7 +11,7 @@ RSpec.describe 'Api::V1::Issues', type: :request do
   let!(:member_membership) { create(:organization_membership, user: member, organization: organization, role: 'member') }
 
   let!(:project) { create(:project, organization: organization, owner: nil) }
-  let!(:project_membership_admin) { create(:project_membership, project: project, user: admin, role: 'admin') }
+  let!(:project_membership_admin) { create(:project_membership, project: project, user: admin, role: "owner") }
   let!(:project_membership_member) { create(:project_membership, project: project, user: member, role: 'member') }
 
   let!(:connector) { create(:organization_connector, :jira, organization: organization) }

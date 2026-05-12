@@ -152,17 +152,6 @@ describe("ProjectTeamSection", () => {
       expect(memberBadge).toHaveClass("text-blue-400");
     });
 
-    it("handles admin role", () => {
-      const adminMember: ProjectMember = {
-        ...mockMembers[0],
-        id: "3",
-        role: "admin",
-      };
-      renderComponent({ members: [adminMember] });
-      const adminBadge = screen.getByText("admin");
-      expect(adminBadge).toHaveClass("text-amber-400");
-    });
-
     it("handles viewer role", () => {
       const viewerMember: ProjectMember = {
         ...mockMembers[0],

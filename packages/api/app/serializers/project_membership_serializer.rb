@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class ProjectMembershipSerializer < BaseSerializer
-  attributes :id, :role, :user_id, :project_id
+  attributes :id, :role, :user_id, :project_id, :created_by_id
 
   attribute :email do |membership|
     membership.user.email

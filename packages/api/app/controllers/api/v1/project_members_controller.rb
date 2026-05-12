@@ -28,6 +28,7 @@ module Api
       def create
         @membership = @project.project_memberships.new(membership_params)
         authorize! @membership
+        @membership.created_by = current_user
 
         if @membership.save
           ProjectAuditLog.log(

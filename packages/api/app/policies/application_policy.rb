@@ -41,14 +41,15 @@ class ApplicationPolicy < ActionPolicy::Base
   end
 
   def project_admin?(project)
-    return false unless user && project
-    membership = project.project_memberships.find_by(user: user)
-    membership&.admin?
+    project_owner?(project) # post-AIX-202: admin == owner; delegate to project_owner?
   end
 
   def project_owner?(project)
     return false unless user && project
     return true if project.personal? && project.owner_id == user.id
+    # Org owners are implicit project owners — no project_memberships row required (AIX-202)
+    return true if project.organization_project? && org_owner?(project.organization)
+
     membership = project.project_memberships.find_by(user: user)
     membership&.owner?
   end

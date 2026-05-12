@@ -173,7 +173,6 @@ Rails.application.routes.draw do
           get :stats
           get "stats/daily_by_tool", action: :daily_by_tool
           get "stats/commits_by_user", action: :commits_by_user
-          get :members
           get :retention_policy
           patch :retention_policy, action: :update_retention_policy
           post :link_jira

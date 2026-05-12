@@ -433,7 +433,7 @@ if org && KNOWN_DEV_USERS.any?
     # Assign this user to all projects as a member or admin
     org.projects.each do |project|
       ProjectMembership.find_or_create_by!(user: user, project: project) do |m|
-        m.role = user_data[:org_role] == 'owner' ? 'admin' : 'member'
+        m.role = user_data[:org_role] == "owner" ? "owner" : "member"
       end
     end
 

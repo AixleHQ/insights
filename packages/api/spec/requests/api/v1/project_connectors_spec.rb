@@ -13,7 +13,7 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
   before do
     create(:organization_membership, user: org_admin, organization: organization, role: 'owner')
     create(:organization_membership, user: project_member, organization: organization, role: 'member')
-    create(:project_membership, user: org_admin, project: project, role: 'admin')
+    create(:project_membership, user: org_admin, project: project, role: "owner")
     create(:project_membership, user: project_member, project: project, role: 'member')
   end
 
@@ -103,7 +103,7 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
     # Use a fresh project with no existing connectors to avoid uniqueness conflicts
     let(:fresh_project) { create(:project, organization: organization) }
     before do
-      create(:project_membership, user: org_admin, project: fresh_project, role: 'admin')
+      create(:project_membership, user: org_admin, project: fresh_project, role: "owner")
     end
 
     context 'with Slack connector' do
