@@ -4,6 +4,7 @@ vendor/bundle/
 
 .playwright-mcp/
 settings.local.json
+CLAUDE.local.md
 
 # Build outputs
 dist/

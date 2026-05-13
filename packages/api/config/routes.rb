@@ -58,6 +58,9 @@ Rails.application.routes.draw do
           end
         end
 
+        # Notification routing configuration
+        resources :notification_routes, only: %i[index create update destroy]
+
         # Organization audit logs
         resources :audit_logs, controller: "organization_audit_logs", only: [ :index ]
 
