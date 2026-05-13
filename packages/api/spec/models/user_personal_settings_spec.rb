@@ -8,6 +8,7 @@ RSpec.describe UserPersonalSettings, type: :model do
   describe 'validations' do
     subject { build(:user_personal_settings) }
 
+    it { is_expected.to validate_presence_of(:user_id) }
     it { is_expected.to validate_uniqueness_of(:user_id).ignoring_case_sensitivity }
   end
 

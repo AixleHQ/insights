@@ -1,6 +1,10 @@
 require 'rails_helper'
 
 RSpec.describe OrganizationRetentionPolicy, type: :model do
+  describe 'alert threshold columns' do
+    it { expect(described_class.column_names).to include('cost_threshold_cents', 'token_threshold', 'alert_enabled') }
+  end
+
   describe 'constants' do
     it 'defines valid raw event TTLs' do
       expect(OrganizationRetentionPolicy::RAW_EVENT_TTLS).to eq(%w[6_hours 12_hours 24_hours 48_hours 72_hours])

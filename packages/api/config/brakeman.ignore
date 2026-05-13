@@ -85,6 +85,36 @@
       "line": 52,
       "note": "False positive: Integer(Zlib.crc32(...)) always produces a numeric literal, SQL injection is impossible."
     },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "983d6e3991bdda256492add6ffd1b256ecb876a0b1742dab866c3001e8590430",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/jobs/ai_usage_sync_job.rb",
+      "line": 161,
+      "note": "False positive: quoted_table_name escapes the table name, quote_column_name escapes column names, and conn.quote escapes all values. No user input reaches this query."
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "ca0dd6ffeeff833ac0d5a8f23db7ffebf4e583fb6bdd899addbcc49143a01510",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/services/tool_events/connector_upsert.rb",
+      "line": 65,
+      "note": "False positive: quoted_table_name, quote_column_name, and conn.quote sanitise all interpolated values. No user input reaches this query."
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "e908ffe4a7cd00415ba5a3cf9477821845787a7b12ca741bbbfeed9387a3835b",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/services/tool_events/batch_connector_upsert.rb",
+      "line": 139,
+      "note": "False positive: quoted_table_name, quote_column_name, and conn.quote sanitise all interpolated values. No user input reaches this query."
+    }
   ],
   "updated": "2026-05-04 09:01:00 +0000",
   "brakeman_version": "7.1.2"
