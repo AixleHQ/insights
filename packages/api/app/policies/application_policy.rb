@@ -65,5 +65,17 @@ class ApplicationPolicy < ActionPolicy::Base
     user && target_user && user.id == target_user.id
   end
 
+  def org_alert_policy(org = organization)
+    org&.retention_policy
+  end
+
+  def project_alert_policy(project)
+    project&.retention_policy
+  end
+
+  def personal_alert_setting
+    user&.personal_setting
+  end
+
   alias_rule :edit?, :update?, :destroy?, to: :manage?
 end

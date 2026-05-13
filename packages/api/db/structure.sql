@@ -422,7 +422,7 @@ CREATE TABLE public.connector_health_snapshots (
     snapshotted_at timestamp(6) without time zone NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT connector_health_snapshots_status_check CHECK (((status)::text = ANY ((ARRAY['success'::character varying, 'failure'::character varying])::text[])))
+    CONSTRAINT connector_health_snapshots_status_check CHECK (((status)::text = ANY (ARRAY[('success'::character varying)::text, ('failure'::character varying)::text])))
 );
 
 --
@@ -567,7 +567,10 @@ CREATE TABLE public.organization_retention_policies (
     retention_reason character varying,
     updated_by_id uuid,
     created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    cost_threshold_cents integer,
+    token_threshold integer,
+    alert_enabled boolean DEFAULT true NOT NULL
 );
 
 --
@@ -667,7 +670,10 @@ CREATE TABLE public.project_retention_policies (
     daily_aggregate_retention public.daily_aggregate_retention DEFAULT 'forever'::public.daily_aggregate_retention NOT NULL,
     retention_reason character varying,
     created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    cost_threshold_cents integer,
+    token_threshold integer,
+    alert_enabled boolean DEFAULT true NOT NULL
 );
 
 --
@@ -750,6 +756,23 @@ CREATE TABLE public.sanitization_policies (
 
 CREATE TABLE public.schema_migrations (
     version character varying NOT NULL
+);
+
+--
+-- Name: user_personal_settings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.user_personal_settings (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid NOT NULL,
+    cost_threshold_cents integer,
+    token_threshold integer,
+    alert_email boolean DEFAULT true NOT NULL,
+    alert_slack boolean DEFAULT false NOT NULL,
+    theme character varying,
+    timezone character varying,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
 );
 
 --
@@ -1026,6 +1049,13 @@ ALTER TABLE ONLY public.sanitization_policies
 
 ALTER TABLE ONLY public.schema_migrations
     ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
+
+--
+-- Name: user_personal_settings user_personal_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_personal_settings
+    ADD CONSTRAINT user_personal_settings_pkey PRIMARY KEY (id);
 
 --
 -- Name: user_settings user_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1603,6 +1633,12 @@ CREATE INDEX index_sanitization_policies_on_is_active ON public.sanitization_pol
 CREATE UNIQUE INDEX index_sanitization_policies_on_version ON public.sanitization_policies USING btree (version);
 
 --
+-- Name: index_user_personal_settings_on_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_user_personal_settings_on_user_id ON public.user_personal_settings USING btree (user_id);
+
+--
 -- Name: index_user_settings_on_user_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1775,6 +1811,13 @@ ALTER TABLE ONLY public.organization_memberships
 
 ALTER TABLE ONLY public.connector_health_snapshots
     ADD CONSTRAINT fk_rails_5fe169f99b FOREIGN KEY (organization_connector_id) REFERENCES public.organization_connectors(id);
+
+--
+-- Name: user_personal_settings fk_rails_61a8fa50df; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_personal_settings
+    ADD CONSTRAINT fk_rails_61a8fa50df FOREIGN KEY (user_id) REFERENCES public.users(id);
 
 --
 -- Name: organization_audit_logs fk_rails_6b6833732b; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1972,6 +2015,9 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260513140003'),
+('20260513140002'),
+('20260513140001'),
 ('20260513120000'),
 ('20260512120000'),
 ('20260511120000'),
