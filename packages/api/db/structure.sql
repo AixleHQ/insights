@@ -255,7 +255,6 @@ CREATE VIEW _timescaledb_internal._direct_view_4 AS
     sum(cost_usd) AS total_cost
    FROM timeseries.tool_events
   GROUP BY (public.time_bucket('1 day'::interval, occurred_at)), organization_id, user_id, project_id, tool_name, event_type;
-
 --
 -- Name: _materialized_hypertable_3; Type: TABLE; Schema: _timescaledb_internal; Owner: -
 --
@@ -273,7 +272,6 @@ CREATE TABLE _timescaledb_internal._materialized_hypertable_3 (
     total_tokens bigint,
     total_cost numeric
 );
-
 --
 -- Name: _materialized_hypertable_4; Type: TABLE; Schema: _timescaledb_internal; Owner: -
 --
@@ -291,7 +289,6 @@ CREATE TABLE _timescaledb_internal._materialized_hypertable_4 (
     total_tokens bigint,
     total_cost numeric
 );
-
 --
 -- Name: _partial_view_3; Type: VIEW; Schema: _timescaledb_internal; Owner: -
 --
@@ -329,7 +326,6 @@ CREATE VIEW _timescaledb_internal._partial_view_4 AS
     sum(cost_usd) AS total_cost
    FROM timeseries.tool_events
   GROUP BY (public.time_bucket('1 day'::interval, occurred_at)), organization_id, user_id, project_id, tool_name, event_type;
-
 --
 -- Name: admin_audit_logs; Type: TABLE; Schema: public; Owner: -
 --
@@ -422,7 +418,7 @@ CREATE TABLE public.connector_health_snapshots (
     snapshotted_at timestamp(6) without time zone NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT connector_health_snapshots_status_check CHECK (((status)::text = ANY (ARRAY[('success'::character varying)::text, ('failure'::character varying)::text])))
+    CONSTRAINT connector_health_snapshots_status_check CHECK (((status)::text = ANY ((ARRAY['success'::character varying, 'failure'::character varying])::text[])))
 );
 
 --
@@ -487,6 +483,37 @@ CREATE TABLE public.model_pricing_overrides (
     model_pattern character varying NOT NULL,
     input_per_mtok numeric(10,6) NOT NULL,
     output_per_mtok numeric(10,6) NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+--
+-- Name: notification_routes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.notification_routes (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    notification_type character varying NOT NULL,
+    recipient_type character varying NOT NULL,
+    recipient_role character varying,
+    recipient_user_id uuid,
+    enabled boolean DEFAULT true NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+--
+-- Name: notifications; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.notifications (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    notification_type character varying NOT NULL,
+    payload jsonb DEFAULT '{}'::jsonb NOT NULL,
+    read_at timestamp(6) without time zone,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL
 );
@@ -882,13 +909,11 @@ CREATE VIEW timeseries.hourly_token_usage AS
     total_tokens,
     total_cost
    FROM _timescaledb_internal._materialized_hypertable_3;
-
 --
 -- Name: connector_event_dedup id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.connector_event_dedup ALTER COLUMN id SET DEFAULT nextval('public.connector_event_dedup_id_seq'::regclass);
-
 --
 -- Name: admin_audit_logs admin_audit_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
@@ -944,6 +969,20 @@ ALTER TABLE ONLY public.issues
 
 ALTER TABLE ONLY public.model_pricing_overrides
     ADD CONSTRAINT model_pricing_overrides_pkey PRIMARY KEY (id);
+
+--
+-- Name: notification_routes notification_routes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notification_routes
+    ADD CONSTRAINT notification_routes_pkey PRIMARY KEY (id);
+
+--
+-- Name: notifications notifications_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notifications
+    ADD CONSTRAINT notifications_pkey PRIMARY KEY (id);
 
 --
 -- Name: organization_audit_logs organization_audit_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1091,7 +1130,6 @@ ALTER TABLE ONLY public.webhook_deliveries
 
 ALTER TABLE ONLY timeseries.tool_events
     ADD CONSTRAINT tool_events_pkey PRIMARY KEY (id, occurred_at);
-
 --
 -- Name: _materialized_hypertable_3_bucket_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
 --
@@ -1163,7 +1201,6 @@ CREATE INDEX _materialized_hypertable_4_tool_name_bucket_idx ON _timescaledb_int
 --
 
 CREATE INDEX _materialized_hypertable_4_user_id_bucket_idx ON _timescaledb_internal._materialized_hypertable_4 USING btree (user_id, bucket DESC);
-
 --
 -- Name: idx_connector_event_dedup_event_id; Type: INDEX; Schema: public; Owner: -
 --
@@ -1175,6 +1212,18 @@ CREATE INDEX idx_connector_event_dedup_event_id ON public.connector_event_dedup 
 --
 
 CREATE UNIQUE INDEX idx_connector_event_dedup_lookup ON public.connector_event_dedup USING btree (organization_id, tool_name, event_type, unique_key, unique_value);
+
+--
+-- Name: idx_notification_routes_role_unique; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_notification_routes_role_unique ON public.notification_routes USING btree (organization_id, notification_type, recipient_role) WHERE ((recipient_type)::text = 'role'::text);
+
+--
+-- Name: idx_notification_routes_user_unique; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_notification_routes_user_unique ON public.notification_routes USING btree (organization_id, notification_type, recipient_user_id) WHERE ((recipient_type)::text = 'user'::text);
 
 --
 -- Name: idx_on_organization_connector_id_created_at_49b9e3dabf; Type: INDEX; Schema: public; Owner: -
@@ -1373,6 +1422,36 @@ CREATE UNIQUE INDEX index_model_pricing_overrides_on_org_and_pattern ON public.m
 --
 
 CREATE INDEX index_model_pricing_overrides_on_organization_id ON public.model_pricing_overrides USING btree (organization_id);
+
+--
+-- Name: index_notification_routes_on_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_notification_routes_on_organization_id ON public.notification_routes USING btree (organization_id);
+
+--
+-- Name: index_notification_routes_on_recipient_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_notification_routes_on_recipient_user_id ON public.notification_routes USING btree (recipient_user_id);
+
+--
+-- Name: index_notifications_on_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_notifications_on_organization_id ON public.notifications USING btree (organization_id);
+
+--
+-- Name: index_notifications_on_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_notifications_on_user_id ON public.notifications USING btree (user_id);
+
+--
+-- Name: index_notifications_on_user_id_and_read_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_notifications_on_user_id_and_read_at ON public.notifications USING btree (user_id, read_at);
 
 --
 -- Name: index_organization_audit_logs_on_action; Type: INDEX; Schema: public; Owner: -
@@ -1727,7 +1806,6 @@ CREATE INDEX idx_tool_events_user_occurred ON timeseries.tool_events USING btree
 --
 
 CREATE INDEX tool_events_occurred_at_idx ON timeseries.tool_events USING btree (occurred_at DESC);
-
 --
 -- Name: project_memberships fk_project_memberships_created_by_id; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
@@ -1783,6 +1861,13 @@ ALTER TABLE ONLY public.organization_retention_policies
 
 ALTER TABLE ONLY public.repositories
     ADD CONSTRAINT fk_rails_36d1823ddd FOREIGN KEY (project_id) REFERENCES public.projects(id);
+
+--
+-- Name: notifications fk_rails_394d9847aa; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notifications
+    ADD CONSTRAINT fk_rails_394d9847aa FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
 
 --
 -- Name: issues fk_rails_4b8ef071a8; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1876,6 +1961,13 @@ ALTER TABLE ONLY public.issues
     ADD CONSTRAINT fk_rails_899c8f3231 FOREIGN KEY (project_id) REFERENCES public.projects(id);
 
 --
+-- Name: notification_routes fk_rails_8c39011ce1; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notification_routes
+    ADD CONSTRAINT fk_rails_8c39011ce1 FOREIGN KEY (recipient_user_id) REFERENCES public.users(id);
+
+--
 -- Name: project_connectors fk_rails_8c7a35259d; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1916,6 +2008,13 @@ ALTER TABLE ONLY public.projects
 
 ALTER TABLE ONLY public.organization_retention_policies
     ADD CONSTRAINT fk_rails_aea4165a3f FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+
+--
+-- Name: notifications fk_rails_b080fb4855; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notifications
+    ADD CONSTRAINT fk_rails_b080fb4855 FOREIGN KEY (user_id) REFERENCES public.users(id);
 
 --
 -- Name: project_retention_policies fk_rails_b240657e32; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1967,6 +2066,13 @@ ALTER TABLE ONLY public.invitations
     ADD CONSTRAINT fk_rails_d799c974a1 FOREIGN KEY (invited_by_id) REFERENCES public.users(id);
 
 --
+-- Name: notification_routes fk_rails_f38ba37cba; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notification_routes
+    ADD CONSTRAINT fk_rails_f38ba37cba FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+
+--
 -- Name: admin_audit_logs fk_rails_f48ad7fa19; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2015,6 +2121,8 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260513150002'),
+('20260513150001'),
 ('20260513140003'),
 ('20260513140002'),
 ('20260513140001'),
