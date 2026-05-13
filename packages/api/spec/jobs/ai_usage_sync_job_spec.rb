@@ -177,36 +177,38 @@ RSpec.describe AiUsageSyncJob, type: :job do
         last_sync_at: last_sync_at)
     end
     let(:last_sync_at) { nil }
-    let(:activity_response) do
-      {
-        "data" => [
-          {
-            "date" => "2026-04-29",
-            "model" => "openai/gpt-4.1",
-            "model_permaslug" => "openai/gpt-4.1-2025-04-14",
-            "endpoint_id" => "endpoint-123",
-            "provider_name" => "OpenAI",
-            "usage" => 0.015,
-            "byok_usage_inference" => 0.012,
-            "requests" => 5,
-            "prompt_tokens" => 50,
-            "completion_tokens" => 125,
-            "reasoning_tokens" => 25
+    let(:sample_activity) do
+      [
+        {
+          external_id: "openrouter:2026-04-29:endpoint-123:openai/gpt-4.1",
+          model: "openai/gpt-4.1",
+          tokens_in: 50,
+          tokens_out: 125,
+          cost_usd: 0.015,
+          occurred_at: Time.zone.parse("2026-04-29 23:59:59 UTC"),
+          metadata: {
+            provider: "openai",
+            routed_model: "openai/gpt-4.1",
+            model_permaslug: "openai/gpt-4.1-2025-04-14",
+            provider_name: "OpenAI",
+            endpoint_id: "endpoint-123",
+            requests: 5,
+            reasoning_tokens: 25,
+            byok_usage_inference: 0.012,
+            aggregation_level: "daily_endpoint_model",
+            synced_from: "activity_api",
+            usage_date: "2026-04-29"
           }
-        ]
-      }
+        }
+      ]
     end
     let(:external_id) { "openrouter:2026-04-29:endpoint-123:openai/gpt-4.1" }
+    let(:provider_double) { instance_double(Oauth::OpenrouterProvider) }
 
     before do
       connector
-      allow(job).to receive(:perform_json_get) do |uri, _access_token|
-        if uri.query == "date=2026-04-29"
-          activity_response
-        else
-          { "data" => [] }
-        end
-      end
+      allow(Oauth::OpenrouterProvider).to receive(:new).and_return(provider_double)
+      allow(provider_double).to receive(:fetch_activity).and_return(sample_activity)
     end
 
     it "creates a ToolEvent for each OpenRouter activity row" do
@@ -238,15 +240,54 @@ RSpec.describe AiUsageSyncJob, type: :job do
       )
     end
 
-    it "uses last_sync_at with a 1-day overlap on recurring sync" do
-      connector.update!(last_sync_at: Time.zone.parse("2026-04-01 08:30:00 UTC"))
+    it "uses a 29-day window on initial sync (no last_sync_at)" do
+      connector.update!(last_sync_at: nil)
 
       travel_to Time.zone.parse("2026-04-30 12:00:00 UTC") do
         job.perform(organization.id, "openrouter")
-      end
 
-      # 2026-03-31 through 2026-04-29 inclusive
-      expect(job).to have_received(:perform_json_get).exactly(30).times
+        expect(provider_double).to have_received(:fetch_activity)
+          .with(start_date: 29.days.ago.to_date, end_date: Date.yesterday)
+      end
+    end
+
+    it "uses a 7-day window on recurring sync (has last_sync_at)" do
+      connector.update!(last_sync_at: 1.hour.ago)
+
+      travel_to Time.zone.parse("2026-04-30 12:00:00 UTC") do
+        job.perform(organization.id, "openrouter")
+
+        expect(provider_double).to have_received(:fetch_activity)
+          .with(start_date: 7.days.ago.to_date, end_date: Date.yesterday)
+      end
+    end
+
+    it "returns all results when provider spans multiple dates (multi-date)" do
+      multi_day_activity = [
+        sample_activity.first,
+        sample_activity.first.merge(
+          external_id: "openrouter:2026-04-28:endpoint-123:openai/gpt-4.1",
+          occurred_at: Time.zone.parse("2026-04-28 23:59:59 UTC"),
+          metadata: sample_activity.first[:metadata].merge(usage_date: "2026-04-28")
+        )
+      ]
+      allow(provider_double).to receive(:fetch_activity).and_return(multi_day_activity)
+
+      travel_to Time.zone.parse("2026-04-30 12:00:00 UTC") do
+        expect {
+          job.perform(organization.id, "openrouter")
+        }.to change(ToolEvent, :count).by(2)
+      end
+    end
+
+    it "does not create any ToolEvents when provider returns an empty array" do
+      allow(provider_double).to receive(:fetch_activity).and_return([])
+
+      travel_to Time.zone.parse("2026-04-30 12:00:00 UTC") do
+        expect {
+          job.perform(organization.id, "openrouter")
+        }.not_to change(ToolEvent, :count)
+      end
     end
 
     it "does not create a duplicate ToolEvent when the same job runs twice" do
@@ -266,21 +307,10 @@ RSpec.describe AiUsageSyncJob, type: :job do
         job.perform(organization.id, "openrouter")
       end
 
-      allow(job).to receive(:perform_json_get) do |uri, _access_token|
-        if uri.query == "date=2026-04-29"
-          {
-            "data" => [
-              activity_response["data"].first.merge(
-                "usage" => 0.025,
-                "prompt_tokens" => 75,
-                "completion_tokens" => 150
-              )
-            ]
-          }
-        else
-          { "data" => [] }
-        end
-      end
+      updated_activity = [
+        sample_activity.first.merge(tokens_in: 75, tokens_out: 150, cost_usd: 0.025)
+      ]
+      allow(provider_double).to receive(:fetch_activity).and_return(updated_activity)
 
       travel_to Time.zone.parse("2026-04-30 12:00:00 UTC") do
         job.perform(organization.id, "openrouter")
@@ -311,11 +341,10 @@ RSpec.describe AiUsageSyncJob, type: :job do
         }.not_to change(ToolEvent, :count)
       end
 
-      expect(job).not_to have_received(:perform_json_get)
+      expect(provider_double).not_to have_received(:fetch_activity)
     end
 
     it "does not duplicate events that were created before BatchConnectorUpsert (lazy backfill)" do
-      # Simulate a pre-existing event created by the old per-row path (no dedup row).
       pre_existing = ToolEvent.create!(
         organization_id: organization.id,
         tool_name:       "openrouter_api",
@@ -334,7 +363,6 @@ RSpec.describe AiUsageSyncJob, type: :job do
         end
       }.not_to change(ToolEvent, :count)
 
-      # The backfill must have seeded connector_event_dedup with the pre-existing event.
       dedup = ConnectorEventDedup.find_by(
         organization_id: organization.id,
         tool_name:       "openrouter_api",
@@ -346,7 +374,7 @@ RSpec.describe AiUsageSyncJob, type: :job do
     end
 
     it "stores a friendly management-key error when OpenRouter activity sync is forbidden" do
-      allow(job).to receive(:perform_json_get)
+      allow(provider_double).to receive(:fetch_activity)
         .and_raise(StandardError, 'HTTP 403: {"error":{"message":"Only management keys can fetch activity for an account","code":403}}')
 
       travel_to Time.zone.parse("2026-04-30 12:00:00 UTC") do
@@ -357,6 +385,66 @@ RSpec.describe AiUsageSyncJob, type: :job do
       expect(connector.last_error).to eq(
         "OpenRouter usage sync requires a management key. Reconnect this integration with a management key to fetch activity data."
       )
+    end
+  end
+
+  describe "Oauth::OpenrouterProvider#fetch_activity — rate limit retry" do
+    let(:connector) do
+      create(:organization_connector,
+        organization: organization,
+        connector_type: "openrouter",
+        access_token: "or-test",
+        is_active: true,
+        last_sync_at: nil)
+    end
+    let(:provider) { Oauth::OpenrouterProvider.new(connector) }
+    let(:faraday_conn) { instance_double(Faraday::Connection) }
+
+    before do
+      stub_const("Oauth::OpenrouterProvider::BASE_RETRY_DELAY", 0)
+      allow(provider).to receive(:http_client).and_return(faraday_conn)
+    end
+
+    it "retries on 429 and succeeds on the second attempt" do
+      success_body = JSON.generate(
+        "data" => [
+          {
+            "model" => "openai/gpt-4.1",
+            "model_permaslug" => "openai/gpt-4.1-2025-04-14",
+            "endpoint_id" => "ep-1",
+            "provider_name" => "OpenAI",
+            "usage" => 0.01,
+            "byok_usage_inference" => 0.0,
+            "requests" => 1,
+            "prompt_tokens" => 10,
+            "completion_tokens" => 20,
+            "reasoning_tokens" => 0
+          }
+        ]
+      )
+      fake_429 = instance_double(Faraday::Response, status: 429, success?: false, body: "rate limited")
+      fake_200 = instance_double(Faraday::Response, status: 200, success?: true, body: success_body)
+
+      call_count = 0
+      allow(faraday_conn).to receive(:get) do
+        call_count += 1
+        call_count == 1 ? fake_429 : fake_200
+      end
+
+      results = provider.fetch_activity(start_date: Date.parse("2026-04-29"), end_date: Date.parse("2026-04-29"))
+
+      expect(results.size).to eq(1)
+      expect(results.first[:model]).to eq("openai/gpt-4.1")
+      expect(call_count).to eq(2)
+    end
+
+    it "raises after exhausting MAX_RETRIES on persistent 429" do
+      fake_429 = instance_double(Faraday::Response, status: 429, success?: false, body: "rate limited")
+      allow(faraday_conn).to receive(:get).and_return(fake_429)
+
+      expect {
+        provider.fetch_activity(start_date: Date.parse("2026-04-29"), end_date: Date.parse("2026-04-29"))
+      }.to raise_error(RuntimeError, /HTTP 429/)
     end
   end
 end
