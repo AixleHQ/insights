@@ -118,7 +118,7 @@ module Api
         claims = request.env["jwt.claims"]
 
         unless claims["jti"].present?
-          return render json: { error: "Token missing jti claim" }, status: :unprocessable_entity
+          return render json: { error: "Token missing jti claim" }, status: :unprocessable_content
         end
 
         ImpersonationService.revoke_token(claims["jti"], claims["exp"])
