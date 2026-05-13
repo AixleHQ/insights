@@ -80,6 +80,14 @@ RSpec.describe 'Api::V1::NotificationRoutes', type: :request do
 
         expect_unprocessable
       end
+
+      it 'returns 422 when recipient_user_id is absent' do
+        authenticated_post "/api/v1/organizations/#{organization.id}/notification_routes",
+                           user: owner, organization: organization,
+                           params: { notification_type: 'cost_alert', recipient_type: 'user' }
+
+        expect_unprocessable
+      end
     end
 
     it 'returns 422 for duplicate route' do
@@ -136,6 +144,16 @@ RSpec.describe 'Api::V1::NotificationRoutes', type: :request do
                           params: { enabled: false }
 
       expect_not_found
+    end
+
+    it 'returns 422 with error shape for an invalid update' do
+      authenticated_patch "/api/v1/organizations/#{organization.id}/notification_routes/#{route.id}",
+                          user: owner, organization: organization,
+                          params: { notification_type: 'bad_type' }
+
+      expect_unprocessable
+      expect(json_response[:error]).to eq("Unprocessable Entity")
+      expect(json_response[:errors]).to be_present
     end
   end
 

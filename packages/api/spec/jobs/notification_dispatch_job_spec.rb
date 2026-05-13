@@ -83,6 +83,9 @@ RSpec.describe NotificationDispatchJob, type: :job do
         expect {
           described_class.new.perform(organization.id, "cost_alert", alert_data)
         }.not_to change(Notification, :count)
+
+        # Org-level Slack webhook fires regardless of per-user opt-outs
+        expect(Slack::NotificationService).to have_received(:deliver_alert).once
       end
 
       it 'does not skip users with at least one channel enabled' do
@@ -97,6 +100,23 @@ RSpec.describe NotificationDispatchJob, type: :job do
         expect {
           described_class.new.perform(organization.id, "cost_alert", alert_data)
         }.to change(Notification, :count).by(1)
+      end
+    end
+
+    context 'with a disabled route' do
+      it 'ignores disabled routes while still processing enabled ones' do
+        create(:notification_route, organization: organization,
+               notification_type: "cost_alert", recipient_type: "role", recipient_role: "owner",
+               enabled: true)
+        create(:notification_route, organization: organization,
+               notification_type: "cost_alert", recipient_type: "role", recipient_role: "member",
+               enabled: false)
+
+        expect {
+          described_class.new.perform(organization.id, "cost_alert", alert_data)
+        }.to change(Notification, :count).by(1)
+
+        expect(Notification.last.user).to eq(owner)
       end
     end
 
