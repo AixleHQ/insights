@@ -1,4 +1,6 @@
 class ProjectRetentionPolicy < ApplicationRecord
+  # Also holds alert threshold columns (cost_threshold_cents, token_threshold, alert_enabled)
+  # added by AIX-203. Full alert resolution semantics live in AIX-212.
   RAW_EVENT_TTLS = %w[6_hours 12_hours 24_hours 48_hours 72_hours].freeze
   TOOL_EVENTS_RETENTIONS = %w[30_days 60_days 90_days 180_days 365_days 730_days].freeze
   HOURLY_AGGREGATE_RETENTIONS = %w[90_days 180_days 365_days 730_days].freeze
