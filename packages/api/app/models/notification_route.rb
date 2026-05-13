@@ -1,7 +1,7 @@
 class NotificationRoute < ApplicationRecord
   NOTIFICATION_TYPES = %w[cost_alert token_alert retention_warning risk_alert].freeze
   RECIPIENT_TYPES    = %w[role user].freeze
-  RECIPIENT_ROLES    = %w[owner member viewer].freeze
+  RECIPIENT_ROLES    = OrganizationMembership::ROLES
 
   belongs_to :organization
   belongs_to :recipient_user, class_name: "User", optional: true
@@ -30,8 +30,6 @@ class NotificationRoute < ApplicationRecord
   end
 
   def recipient_user_belongs_to_org
-    return if organization.nil?
-
     unless organization.members.exists?(id: recipient_user_id)
       errors.add(:recipient_user_id, "must be a member of this organization")
     end
