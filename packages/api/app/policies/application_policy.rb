@@ -73,7 +73,7 @@ class ApplicationPolicy < ActionPolicy::Base
     project&.retention_policy
   end
 
-  def personal_alert_settings
+  def personal_alert_setting
     user&.personal_setting
   end
 

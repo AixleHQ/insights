@@ -34,16 +34,16 @@ RSpec.describe ApplicationPolicy, type: :policy do
     end
   end
 
-  describe '#personal_alert_settings' do
+  describe '#personal_alert_setting' do
     it 'returns the user personal_setting' do
       settings = create(:user_personal_settings, user: user)
       p = policy(current_user: user)
-      expect(p.personal_alert_settings).to eq(settings)
+      expect(p.personal_alert_setting).to eq(settings)
     end
 
     it 'returns nil when user is nil' do
       p = policy(current_user: nil)
-      expect(p.personal_alert_settings).to be_nil
+      expect(p.personal_alert_setting).to be_nil
     end
   end
 end
