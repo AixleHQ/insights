@@ -22,6 +22,21 @@ RSpec.describe ProjectRetentionPolicyPolicy, type: :policy do
     described_class.new(record, user: current_user, organization: organization)
   end
 
+  shared_examples 'allows only personal project owner' do |action|
+    let(:personal_owner)        { create(:user) }
+    let(:other_user)            { create(:user) }
+    let(:personal_project)      { create(:project, :personal, owner: personal_owner) }
+    let(:personal_policy_record) { build(:project_retention_policy, project: personal_project) }
+
+    it 'allows the personal project owner' do
+      expect(described_class.new(personal_policy_record, user: personal_owner, organization: nil).apply(action)).to be true
+    end
+
+    it 'denies another user on a personal project' do
+      expect(described_class.new(personal_policy_record, user: other_user, organization: nil).apply(action)).to be false
+    end
+  end
+
   describe '#show?' do
     it 'allows org owner (implicit project owner)' do
       expect(policy(project_policy_record, current_user: org_owner).apply(:show?)).to be true
@@ -46,18 +61,7 @@ RSpec.describe ProjectRetentionPolicyPolicy, type: :policy do
     end
 
     context 'with a personal project' do
-      let(:personal_owner) { create(:user) }
-      let(:other_user)     { create(:user) }
-      let(:personal_project) { create(:project, :personal, owner: personal_owner) }
-      let(:personal_policy_record) { build(:project_retention_policy, project: personal_project) }
-
-      it 'allows the personal project owner' do
-        expect(described_class.new(personal_policy_record, user: personal_owner, organization: nil).apply(:show?)).to be true
-      end
-
-      it 'denies another user on a personal project' do
-        expect(described_class.new(personal_policy_record, user: other_user, organization: nil).apply(:show?)).to be false
-      end
+      include_examples 'allows only personal project owner', :show?
     end
   end
 
@@ -85,18 +89,7 @@ RSpec.describe ProjectRetentionPolicyPolicy, type: :policy do
     end
 
     context 'with a personal project' do
-      let(:personal_owner) { create(:user) }
-      let(:other_user)     { create(:user) }
-      let(:personal_project) { create(:project, :personal, owner: personal_owner) }
-      let(:personal_policy_record) { build(:project_retention_policy, project: personal_project) }
-
-      it 'allows the personal project owner' do
-        expect(described_class.new(personal_policy_record, user: personal_owner, organization: nil).apply(:update?)).to be true
-      end
-
-      it 'denies another user on a personal project' do
-        expect(described_class.new(personal_policy_record, user: other_user, organization: nil).apply(:update?)).to be false
-      end
+      include_examples 'allows only personal project owner', :update?
     end
   end
 
