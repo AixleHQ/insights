@@ -2014,6 +2014,42 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /api/v1/organizations/{organization_id}/retention_logs:
+    get:
+      summary: List retention purge logs for an organization
+      description: >
+        Returns paginated records of data purge runs for the organization.
+        Each record contains the retention window applied, cutoff timestamp,
+        number of records deleted, and the run status.
+        Requires org owner or global admin role. Other roles receive 403.
+      tags:
+        - Retention
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+      responses:
+        '200':
+          description: Paginated retention purge log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RetentionPurgeLog'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   /api/v1/organizations/{organization_id}/webhook_deliveries:
     get:
       summary: List webhook deliveries
@@ -3726,6 +3762,89 @@ paths:
               schema:
                 $ref: '#/components/schemas/RateLimitError'
 
+  /admin/retention_logs:
+    get:
+      summary: List all retention purge logs (platform admin)
+      description: >
+        Returns paginated records of all data purge runs across all organizations.
+        Requires platform admin (global_admin) role.
+      tags:
+        - Admin
+        - Retention
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+      responses:
+        '200':
+          description: Paginated retention purge log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RetentionPurgeLog'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      summary: Create a notification route
+      description: Creates a routing rule for a notification type. Requires owner role.
+      tags:
+        - Notification Routes
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - notification_type
+                - recipient_type
+              properties:
+                notification_type:
+                  type: string
+                  enum: [cost_alert, token_alert, retention_warning, risk_alert]
+                recipient_type:
+                  type: string
+                  enum: [role, user]
+                recipient_role:
+                  type: string
+                  nullable: true
+                  description: Required when recipient_type is 'role'. Must be one of owner, member, viewer.
+                recipient_user_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: Required when recipient_type is 'user'. User must be an org member.
+                enabled:
+                  type: boolean
+                  default: true
+      responses:
+        '201':
+          description: Notification route created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/NotificationRoute'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
   /api/v1/organizations/{organization_id}/notification_routes:
     get:
       summary: List notification routes
@@ -4224,6 +4343,60 @@ components:
         - trackedChanges
         - metadata
         - ipAddress
+        - createdAt
+
+    RetentionPurgeLog:
+      type: object
+      description: >
+        Tamper-evident record of a data retention purge run.
+        Append-only — records are never updated or deleted.
+      properties:
+        id:
+          type: integer
+        organizationId:
+          type: integer
+          description: ID of the organization whose data was purged
+        projectId:
+          type: integer
+          nullable: true
+          description: ID of the project (null for org-level purge)
+        retentionPolicyType:
+          type: string
+          enum: [org, project]
+          description: Whether the purge was applied at org or project level
+        retentionDaysApplied:
+          type: integer
+          description: Number of retention days used as the window
+        cutoffTimestamp:
+          type: string
+          format: date-time
+          description: Datetime before which records were deleted
+        recordsDeleted:
+          type: integer
+          description: Number of records deleted in this run
+        jobRunAt:
+          type: string
+          format: date-time
+          description: Datetime when the job ran
+        status:
+          type: string
+          enum: [success, partial, failed]
+        errorMessage:
+          type: string
+          nullable: true
+          description: Error details if status is failed or partial
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - organizationId
+        - retentionPolicyType
+        - retentionDaysApplied
+        - cutoffTimestamp
+        - recordsDeleted
+        - jobRunAt
+        - status
         - createdAt
 
     ProjectAuditLog:

@@ -18,7 +18,6 @@ class UpdateTimescaleRetentionJob
   sidekiq_options queue: "maintenance", retry: 3
 
   HYPERTABLE = "timeseries.tool_events"
-  HYPERTABLE_UNQUALIFIED = "tool_events"
 
   def perform
     target_days = RetentionService.max_tool_events_retention_days
@@ -37,16 +36,14 @@ class UpdateTimescaleRetentionJob
       "#{current_days.inspect} days → #{target_days} days"
     )
 
-    # TimescaleDB policy functions resolve the table name via regclass using search_path.
-    # The hypertable lives in the `timeseries` schema which is not in the default
-    # search_path, so we set it explicitly for this session before calling the functions.
     ApplicationRecord.connection.transaction do
-      ApplicationRecord.connection.execute("SET LOCAL search_path TO timeseries, public;")
+      if current_days
+        ApplicationRecord.connection.execute(
+          "SELECT remove_retention_policy('#{HYPERTABLE}');"
+        )
+      end
       ApplicationRecord.connection.execute(
-        "SELECT remove_retention_policy('#{HYPERTABLE_UNQUALIFIED}');"
-      )
-      ApplicationRecord.connection.execute(
-        "SELECT add_retention_policy('#{HYPERTABLE_UNQUALIFIED}', INTERVAL '#{target_days} days');"
+        "SELECT add_retention_policy('#{HYPERTABLE}', INTERVAL '#{target_days} days');"
       )
     end
 

@@ -9,6 +9,7 @@ class Organization < ApplicationRecord
   has_many :tool_events, class_name: "ToolEvent", dependent: :restrict_with_error
   has_many :audit_logs, dependent: :restrict_with_error
   has_many :organization_audit_logs, dependent: :destroy
+  has_many :retention_purge_logs, dependent: :destroy
   has_many :model_pricing_overrides, dependent: :destroy
   has_many :notification_routes, dependent: :destroy
   has_many :notifications, dependent: :destroy

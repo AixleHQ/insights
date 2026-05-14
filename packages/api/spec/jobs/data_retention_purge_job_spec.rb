@@ -173,6 +173,50 @@ RSpec.describe DataRetentionPurgeJob, type: :job do
       end
     end
 
+    context "retention purge log creation" do
+      before { organization.retention_policy.update!(tool_events_retention: "30_days") }
+
+      it "creates an org-level purge log after a successful run" do
+        create_tool_event(organization, user, 60.days.ago)
+
+        expect { described_class.new.perform }.to change(RetentionPurgeLog, :count).by_at_least(1)
+
+        org_log = RetentionPurgeLog.where(organization: organization, project: nil).last
+        expect(org_log).to be_present
+        expect(org_log.status).to eq("success")
+        expect(org_log.retention_policy_type).to eq("org")
+        expect(org_log.records_deleted).to eq(1)
+        expect(org_log.retention_days_applied).to be_within(2).of(30)
+        expect(org_log.cutoff_timestamp).to be_within(5.minutes).of(30.days.ago)
+      end
+
+      it "creates a project-level purge log for each project" do
+        project = create(:project, organization: organization)
+        project.retention_policy.update!(tool_events_retention: "30_days")
+        create_tool_event(organization, user, 60.days.ago, project: project)
+
+        described_class.new.perform
+
+        project_log = RetentionPurgeLog.where(organization: organization, project: project).last
+        expect(project_log).to be_present
+        expect(project_log.retention_policy_type).to eq("project")
+        expect(project_log.status).to eq("success")
+      end
+
+      it "creates a failed log when an error occurs" do
+        allow(RetentionService).to receive(:retention_cutoff)
+          .with(organization, :tool_events_retention)
+          .and_raise(StandardError, "Simulated failure")
+
+        described_class.new.perform
+
+        failed_log = RetentionPurgeLog.where(organization: organization, status: :failed).last
+        expect(failed_log).to be_present
+        expect(failed_log.error_message).to eq("Simulated failure")
+        expect(failed_log.records_deleted).to eq(0)
+      end
+    end
+
     context "Sidekiq configuration" do
       it "uses the maintenance queue" do
         expect(described_class.sidekiq_options["queue"]).to eq("maintenance")

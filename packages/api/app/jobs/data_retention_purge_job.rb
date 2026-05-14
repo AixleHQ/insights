@@ -19,10 +19,10 @@ class DataRetentionPurgeJob
         deleted = purge_organization(org)
         stats[:organizations_processed] += 1
         stats[:total_deleted] += deleted
-        enqueue_audit_log(org, deleted)
       rescue => e
         stats[:errors] << { organization_id: org.id, error: e.message }
         Rails.logger.error("[DataRetentionPurgeJob] Error purging org #{org.id}: #{e.message}")
+        write_purge_log_on_error(org: org, error: e)
       end
     end
 
@@ -60,6 +60,8 @@ class DataRetentionPurgeJob
         )
       end
 
+      write_purge_log(org: org, project: project, records_deleted: deleted, cutoff: cutoff, status: :success)
+
       total_deleted += deleted
     end
 
@@ -73,6 +75,8 @@ class DataRetentionPurgeJob
         "deleted #{deleted} tool_events older than #{org_cutoff}"
       )
     end
+
+    write_purge_log(org: org, project: nil, records_deleted: deleted, cutoff: org_cutoff, status: :success)
 
     total_deleted += deleted
     total_deleted
@@ -128,14 +132,36 @@ class DataRetentionPurgeJob
     [ org_cutoff, project_cutoff ].max
   end
 
-  def enqueue_audit_log(org, records_deleted)
-    # PurgeAuditLogJob is implemented in AIX-210
-    return unless defined?(PurgeAuditLogJob)
-
-    PurgeAuditLogJob.perform_async(
-      org_id: org.id,
+  def write_purge_log(org:, project:, records_deleted:, cutoff:, status:, error_message: nil)
+    days_applied = ((Time.current - cutoff) / 1.day).round
+    RetentionPurgeLog.create!(
+      organization: org,
+      project: project,
+      retention_policy_type: project ? :project : :org,
+      retention_days_applied: days_applied,
+      cutoff_timestamp: cutoff,
       records_deleted: records_deleted,
-      cutoff_timestamp: RetentionService.retention_cutoff(org, :tool_events_retention)&.iso8601
+      job_run_at: Time.current,
+      status: status,
+      error_message: error_message
     )
+  rescue => e
+    Rails.logger.error("[DataRetentionPurgeJob] Failed to write purge log for org #{org.id}: #{e.message}")
+  end
+
+  def write_purge_log_on_error(org:, error:)
+    RetentionPurgeLog.create!(
+      organization: org,
+      project: nil,
+      retention_policy_type: :org,
+      retention_days_applied: 0,
+      cutoff_timestamp: Time.current,
+      records_deleted: 0,
+      job_run_at: Time.current,
+      status: :failed,
+      error_message: error.message
+    )
+  rescue => e
+    Rails.logger.error("[DataRetentionPurgeJob] Failed to write error purge log for org #{org.id}: #{e.message}")
   end
 end
