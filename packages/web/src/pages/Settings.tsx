@@ -713,9 +713,7 @@ function DataRetentionSettings() {
   }
 
   const toolEventsRetention = retentionPolicy?.toolEventsRetention ?? "90_days";
-  const retentionDays = toolEventsRetention === "forever"
-    ? null
-    : parseInt(toolEventsRetention.split("_")[0], 10);
+  const retentionDays = parseInt(toolEventsRetention.split("_")[0], 10);
 
   const logs = logsData?.data ?? [];
   const meta = logsData?.meta;
@@ -746,9 +744,7 @@ function DataRetentionSettings() {
             <Skeleton className="h-5 w-72" />
           ) : (
             <p className="text-sm">
-              {retentionDays === null
-                ? "Data is retained forever (no automatic deletion)."
-                : `Data older than ${retentionDays} days is automatically deleted.`}
+              {`Data older than ${retentionDays} days is automatically deleted.`}
             </p>
           )}
           <div>
