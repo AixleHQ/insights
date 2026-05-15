@@ -32,6 +32,7 @@ Rails.application.routes.draw do
         member do
           get :retention_policy
           patch :retention_policy, action: :update_retention_policy
+          get :retention_preview
           get :settings
           put "settings/:key", action: :update_setting
           delete "settings/:key", action: :destroy_setting

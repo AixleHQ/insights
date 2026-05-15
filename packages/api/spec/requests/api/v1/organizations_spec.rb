@@ -189,4 +189,64 @@ RSpec.describe 'Api::V1::Organizations', type: :request do
       expect_forbidden
     end
   end
+
+  describe 'GET /api/v1/organizations/:id/retention_preview' do
+    it 'returns cutoff_date and estimated_records for org owner' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/retention_preview", user: user
+
+      expect_success
+      expect(json_data).to have_key(:cutoffDate)
+      expect(json_data).to have_key(:estimatedRecords)
+    end
+
+    it 'returns cutoff_date as ISO 8601 date string when retention is not forever' do
+      organization.retention_policy.update!(tool_events_retention: '90_days')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/retention_preview", user: user
+
+      expect_success
+      expect(json_data[:cutoffDate]).to match(/\A\d{4}-\d{2}-\d{2}\z/)
+    end
+
+    it 'returns null cutoff_date when retention policy is forever' do
+      organization.retention_policy.update!(
+        tool_events_retention: '30_days',
+        daily_aggregate_retention: 'forever'
+      )
+      # Stub RetentionService to simulate "forever" for tool_events_retention
+      allow(RetentionService).to receive(:retention_cutoff).and_return(nil)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/retention_preview", user: user
+
+      expect_success
+      expect(json_data[:cutoffDate]).to be_nil
+      expect(json_data[:estimatedRecords]).to be_nil
+    end
+
+    it 'returns 403 for org member (non-owner)' do
+      member = create(:user)
+      create(:organization_membership, user: member, organization: organization, role: 'member')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/retention_preview", user: member
+
+      expect_forbidden
+    end
+
+    it 'returns 403 for users not in the organization' do
+      outsider = create(:user)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/retention_preview", user: outsider
+
+      expect_forbidden
+    end
+
+    it 'returns estimated_records as nil when COUNT query times out' do
+      allow(Timeout).to receive(:timeout).and_raise(Timeout::Error)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/retention_preview", user: user
+
+      expect_success
+      expect(json_data[:estimatedRecords]).to be_nil
+    end
+  end
 end

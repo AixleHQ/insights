@@ -338,6 +338,38 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationError'
 
+  /api/v1/organizations/{id}/retention_preview:
+    get:
+      summary: Get retention purge preview for an organization
+      description: >
+        Returns the upcoming purge cutoff date and an estimated count of tool_events
+        that will be deleted at the next scheduled purge run.
+        The count is computed via a COUNT(*) query gated by a 3-second timeout;
+        if the query exceeds the limit, estimatedRecords is null.
+        Requires org owner or global admin role.
+      tags:
+        - Organizations
+        - Retention
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      responses:
+        '200':
+          description: Retention preview
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/RetentionPreview'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   /api/v1/organizations/{id}/settings:
     get:
       summary: Get organization settings
@@ -4398,6 +4430,24 @@ components:
         - jobRunAt
         - status
         - createdAt
+
+    RetentionPreview:
+      type: object
+      description: >
+        Upcoming purge cutoff and estimated tool_events row count (Alba camelCase keys).
+      properties:
+        cutoffDate:
+          type: string
+          format: date
+          nullable: true
+          description: ISO 8601 date before which records will be deleted (null if retention is forever)
+        estimatedRecords:
+          type: integer
+          nullable: true
+          description: Estimated number of tool_events to be deleted (null if query timed out)
+      required:
+        - cutoffDate
+        - estimatedRecords
 
     ProjectAuditLog:
       type: object

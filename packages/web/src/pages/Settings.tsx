@@ -17,6 +17,8 @@ import {
   FileSearch,
   Users,
   DollarSign,
+  Database,
+  History,
 } from "lucide-react";
 import { retentionOrder, formatRetentionLabel } from "@/lib/retention-utils";
 import { useOrg } from "@/contexts/OrgContext";
@@ -25,6 +27,8 @@ import {
   useUpdateOrganization,
   useRetentionPolicy,
   useUpdateRetentionPolicy,
+  useRetentionPreview,
+  useRetentionLogs,
   useOrganizationSettings,
   useUpdateOrganizationSetting,
   useDeleteOrganizationSetting,
@@ -34,6 +38,7 @@ import {
   useConnectors,
   type AuditLogFilters,
 } from "@/hooks/useApi";
+import { formatTokens } from "@/lib/formatters";
 import { AUDIT_ACTION_LABELS, AUDIT_ACTION_OPTIONS } from "@/lib/audit-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -81,6 +86,7 @@ const navItems = [
   { title: "General", href: "/settings", icon: Building2 },
   { title: "Members", href: "/settings/members", icon: Users },
   { title: "Policies", href: "/settings/policies", icon: Shield },
+  { title: "Data & Retention", href: "/settings/retention", icon: Database },
   { title: "Alerts", href: "/settings/alerts", icon: Bell },
   { title: "Billing", href: "/settings/billing", icon: CreditCard },
   { title: "Model Pricing", href: "/settings/pricing", icon: DollarSign },
@@ -673,6 +679,228 @@ function PolicySettings() {
   );
 }
 
+function DataRetentionSettings() {
+  const { currentOrg, hasRole } = useOrg();
+  const isOwner = hasRole("owner");
+
+  const { data: retentionPolicy, isLoading: isLoadingPolicy } = useRetentionPolicy(currentOrg?.id || "");
+  const { data: preview, isLoading: isLoadingPreview } = useRetentionPreview(
+    isOwner ? (currentOrg?.id || "") : ""
+  );
+  const [page, setPage] = useState(1);
+  const { data: logsData, isLoading: isLoadingLogs } = useRetentionLogs(
+    isOwner ? (currentOrg?.id || "") : "",
+    page
+  );
+
+  if (!isOwner) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-lg font-medium">Data & Retention</h2>
+        </div>
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+            <Shield className="mb-3 size-10 text-muted-foreground/40" />
+            <p className="text-sm font-medium">Access restricted</p>
+            <p className="text-xs text-muted-foreground">
+              Only organization owners can view retention history and purge previews.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const toolEventsRetention = retentionPolicy?.toolEventsRetention ?? "90_days";
+  const retentionDays = toolEventsRetention === "forever"
+    ? null
+    : parseInt(toolEventsRetention.split("_")[0], 10);
+
+  const logs = logsData?.data ?? [];
+  const meta = logsData?.meta;
+
+  const statusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
+    if (status === "success") return "default";
+    if (status === "partial") return "secondary";
+    return "destructive";
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg font-medium">Data & Retention</h2>
+        <p className="text-sm text-muted-foreground">
+          Active retention policy, upcoming purge preview, and history of past purge runs
+        </p>
+      </div>
+
+      {/* Panel 1 — Active Policy Summary */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Active Policy</CardTitle>
+          <CardDescription>Current data retention configuration for your organization</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {isLoadingPolicy ? (
+            <Skeleton className="h-5 w-72" />
+          ) : (
+            <p className="text-sm">
+              {retentionDays === null
+                ? "Data is retained forever (no automatic deletion)."
+                : `Data older than ${retentionDays} days is automatically deleted.`}
+            </p>
+          )}
+          <div>
+            <Link
+              to="/settings/policies"
+              className="text-sm text-primary hover:underline"
+            >
+              Edit policy →
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Panel 2 — Next Purge Preview */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Next Purge Preview</CardTitle>
+          <CardDescription>
+            Estimated impact of the next scheduled purge run
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoadingPreview ? (
+            <div className="space-y-2">
+              <Skeleton className="h-5 w-48" />
+              <Skeleton className="h-5 w-36" />
+            </div>
+          ) : preview ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground">Cutoff date:</span>
+                <span className="font-medium">
+                  {preview.cutoffDate
+                    ? new Date(preview.cutoffDate).toLocaleDateString("en-US", {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      })
+                    : "N/A (retention is forever)"}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground">Estimated records to delete:</span>
+                <span className="font-mono font-medium">
+                  {preview.estimatedRecords === null
+                    ? "N/A"
+                    : formatTokens(preview.estimatedRecords)}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Unable to load preview.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Panel 3 — Purge History */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <History className="size-4 text-muted-foreground" />
+            <CardTitle className="text-base">Purge History</CardTitle>
+          </div>
+          <CardDescription>Log of all past data purge runs for your organization</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          {isLoadingLogs ? (
+            <div className="space-y-2 p-4">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          ) : logs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <History className="mb-3 size-10 text-muted-foreground/40" />
+              <p className="text-sm font-medium">No purge history yet</p>
+              <p className="text-xs text-muted-foreground">
+                Past purge runs will appear here once the retention job has executed.
+              </p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date run</TableHead>
+                  <TableHead>Policy</TableHead>
+                  <TableHead>Retention window</TableHead>
+                  <TableHead className="text-right">Records deleted</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {logs.map((log) => (
+                  <TableRow key={log.id}>
+                    <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                      {new Date(log.jobRunAt).toLocaleString()}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-xs capitalize">
+                        {log.retentionPolicyType}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {log.retentionDaysApplied} days
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm">
+                      {formatTokens(log.recordsDeleted)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={statusVariant(log.status)} className="text-xs capitalize">
+                        {log.status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {meta && meta.total_pages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Page {meta.current_page} of {meta.total_pages} ({meta.total_count} entries)
+          </p>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => p - 1)}
+            >
+              <ChevronLeft className="size-4" />
+              Previous
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={page >= meta.total_pages}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Next
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AlertSettings() {
   const { currentOrg } = useOrg();
   const { data: settings, isLoading } = useOrganizationSettings(currentOrg?.id || "");
@@ -1255,6 +1483,7 @@ export function Settings() {
             <Route index element={<GeneralSettings />} />
             <Route path="members" element={<Team />} />
             <Route path="policies" element={<PolicySettings />} />
+            <Route path="retention" element={<DataRetentionSettings />} />
             <Route path="alerts" element={<AlertSettings />} />
             <Route path="billing" element={<BillingSettings />} />
             <Route path="pricing" element={<ModelPricingSettings />} />

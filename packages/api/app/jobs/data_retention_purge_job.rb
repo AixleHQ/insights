@@ -89,7 +89,7 @@ class DataRetentionPurgeJob
     loop do
       # Fetch id+occurred_at together so TimescaleDB can use chunk exclusion on deletion
       batch = scope
-        .where("occurred_at < ?", cutoff)
+        .before_cutoff(cutoff)
         .limit(batch_size)
         .pluck(:id, :occurred_at)
       break if batch.empty?

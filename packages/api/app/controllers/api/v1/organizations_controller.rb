@@ -3,7 +3,7 @@
 module Api
   module V1
     class OrganizationsController < BaseController
-      before_action :set_organization, only: %i[show update destroy retention_policy update_retention_policy settings update_setting destroy_setting]
+      before_action :set_organization, only: %i[show update destroy retention_policy update_retention_policy retention_preview settings update_setting destroy_setting]
 
       # GET /api/v1/organizations
       def index
@@ -99,6 +99,37 @@ module Api
             errors: format_validation_errors(policy.errors)
           }, status: :unprocessable_content
         end
+      end
+
+      # GET /api/v1/organizations/:id/retention_preview
+      def retention_preview
+        authorize! @organization, to: :retention_preview?
+
+        cutoff = RetentionService.retention_cutoff(@organization, :tool_events_retention)
+
+        if cutoff.nil?
+          render_resource(
+            RetentionPreviewSerializer::Payload.new(cutoff_date: nil, estimated_records: nil),
+            RetentionPreviewSerializer
+          )
+          return
+        end
+
+        estimated = begin
+          Timeout.timeout(3) do
+            ToolEvent.for_organization(@organization).before_cutoff(cutoff).count
+          end
+        rescue Timeout::Error
+          nil
+        end
+
+        render_resource(
+          RetentionPreviewSerializer::Payload.new(
+            cutoff_date: cutoff.to_date.iso8601,
+            estimated_records: estimated
+          ),
+          RetentionPreviewSerializer
+        )
       end
 
       # GET /api/v1/organizations/:id/settings
