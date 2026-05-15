@@ -324,14 +324,14 @@ module Api
 
       # GET /api/v1/projects/:id/retention_policy
       def retention_policy
-        authorize! @project, to: :retention_policy?
+        authorize! (@project.retention_policy || ProjectRetentionPolicy.new(project: @project)), to: :show?
         policy = @project.retention_policy || @project.create_retention_policy!
         render_resource(policy, ProjectRetentionPolicySerializer)
       end
 
       # PATCH /api/v1/projects/:id/retention_policy
       def update_retention_policy
-        authorize! @project, to: :retention_policy?
+        authorize! (@project.retention_policy || ProjectRetentionPolicy.new(project: @project)), to: :update?
 
         return render_resource(@project.retention_policy || @project.create_retention_policy!, ProjectRetentionPolicySerializer) if retention_policy_params.empty?
 

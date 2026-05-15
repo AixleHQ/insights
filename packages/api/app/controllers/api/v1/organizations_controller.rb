@@ -72,13 +72,13 @@ module Api
 
       # GET /api/v1/organizations/:id/retention_policy
       def retention_policy
-        authorize! @organization, to: :retention_policy?
+        authorize! (@organization.retention_policy || OrganizationRetentionPolicy.new(organization: @organization)), to: :show?
         render_resource(@organization.retention_policy, OrganizationRetentionPolicySerializer)
       end
 
       # PATCH /api/v1/organizations/:id/retention_policy
       def update_retention_policy
-        authorize! @organization, to: :retention_policy?
+        authorize! (@organization.retention_policy || OrganizationRetentionPolicy.new(organization: @organization)), to: :update?
 
         policy = @organization.retention_policy || @organization.build_retention_policy
         changes_before = policy.attributes.slice(*retention_policy_params.keys)
@@ -160,7 +160,7 @@ module Api
       private
 
       def set_organization
-        @organization = Organization.find(params[:id])
+        @organization = Organization.includes(:retention_policy).find(params[:id])
       end
 
       def organization_params
