@@ -2,14 +2,18 @@ import { describe, it, expect } from "vitest";
 import { parseArgs } from "../cli.js";
 
 describe("parseArgs", () => {
-  it("defaults to serve when no command is given", () => {
-    expect(parseArgs(["node", "cli.js"]).command).toBe("serve");
+  it("defaults to run when no command is given", () => {
+    expect(parseArgs(["node", "cli.js"]).command).toBe("run");
   });
 
-  it("recognises serve / init / health subcommands", () => {
-    expect(parseArgs(["node", "cli.js", "serve"]).command).toBe("serve");
+  it("recognises run / init / health subcommands", () => {
+    expect(parseArgs(["node", "cli.js", "run"]).command).toBe("run");
     expect(parseArgs(["node", "cli.js", "init"]).command).toBe("init");
     expect(parseArgs(["node", "cli.js", "health"]).command).toBe("health");
+  });
+
+  it("maps serve to run for backward compatibility", () => {
+    expect(parseArgs(["node", "cli.js", "serve"]).command).toBe("run");
   });
 
   it("treats unknown commands as help", () => {

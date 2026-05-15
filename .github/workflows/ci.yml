@@ -194,6 +194,9 @@ jobs:
       - name: Install workspace
         run: npm ci
         working-directory: packages/tools
+      - name: Build SDK
+        run: npm run build --workspace=@db90/sdk
+        working-directory: packages/tools
       - name: Build
         run: npm run build --workspace=@db90/mcp
         working-directory: packages/tools

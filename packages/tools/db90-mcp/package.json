@@ -1,7 +1,7 @@
 {
   "name": "@db90/mcp",
   "version": "0.1.0",
-  "description": "MCP server that auto-forwards Claude Code and Cursor usage telemetry to db90",
+  "description": "Minimal stdio MCP server for DB90 (phase-0 placeholder tool only)",
   "type": "module",
   "bin": {
     "db90-mcp": "./dist/cli.js"
@@ -35,19 +35,17 @@
     "model-context-protocol",
     "claude-code",
     "cursor",
-    "ai-usage",
-    "analytics",
     "db90"
   ],
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
     "dev": "tsx src/cli.ts",
+    "prepare": "npm run build",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
-    "keytar": "^7.9.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "zod": "^3.23.0 || ^4.0.0"
   },
   "devDependencies": {

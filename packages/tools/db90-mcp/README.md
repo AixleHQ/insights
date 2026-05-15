@@ -1,26 +1,43 @@
 # @db90/mcp
 
-MCP server that auto-forwards Claude Code and Cursor usage telemetry to [db90](https://db90.io). One install, one login — every editor session syncs automatically.
+Phase-0 **stdio MCP server**: a single tool, `db90_status`, returns a static JSON placeholder (no network, no auth). Intended as the Claude Code round-trip baseline before sync and richer tooling.
 
-> **Status:** scaffold — not published to npm yet. Full functionality lands across plan tasks 07 (auth), 08 (sync watcher), 09 (tools/resources), and 10 (publish). The release workflow excludes `cli-mcp-v*` tags until Task 10 wires the real sync to `@db90/claude` and `@db90/cursor`; until then `runClaudeSync` and `runCursorSync` in [`src/sync.ts`](src/sync.ts) are stubs that return zero counts.
+## Build and test
 
-## Install
+From the shared tools workspace (recommended — one `package-lock.json`):
 
 ```bash
-npx @db90/mcp init      # registers the MCP entry in Claude Code / Cursor
-npx @db90/mcp           # serves stdio (auto-invoked by your editor)
-npx @db90/mcp health    # diagnostic snapshot from a regular terminal
+cd packages/tools
+npm ci
+npm run build --workspace=@db90/mcp
+npm test --workspace=@db90/mcp
 ```
 
-After install, the on-disk command is `db90-mcp`.
+There is no per-package lockfile under `db90-mcp/`; `cd packages/tools/db90-mcp && npm ci` alone is not supported—use `packages/tools` as above.
 
-## State files
+## CLI
 
-- `~/.db90-mcp/state.json` — MCP-specific state: auth refresh metadata, last-sync timestamp, error counter.
-- `~/.db90-mcp/mcp.log` — append-only log file, rotated at 5 MB.
-- `~/.db90-mcp/credentials.json` (fallback) — used when `keytar` is unavailable; chmod 0600.
+- `db90-mcp` or `db90-mcp run` — start the MCP server on stdio (what Claude Code spawns).
+- `db90-mcp health` — one-line diagnostic.
+- `db90-mcp init` — prints the `~/.claude.json` snippet below (does not modify files).
 
-Per-session checkpoints for Claude Code transcripts live at `~/.db90-claude/state-<host>-<hash>.json` and are managed by `@db90/claude/sync` (shared with the standalone CLI by design — natural migration).
+Legacy `serve` is accepted as an alias for `run`.
+
+## Claude Code
+
+1. `npm install -g` from this package (or use `npx -y @db90/mcp` once published).
+2. Merge the snippet from `db90-mcp init` into `~/.claude.json` under `mcpServers`.
+3. Restart Claude Code; `/mcp` should list **db90**; call **`db90_status`** — you should see:
+
+```json
+{
+  "authenticated": false,
+  "host": null,
+  "last_sync_at": null,
+  "sessions_synced": 0,
+  "errors": []
+}
+```
 
 ## License
 

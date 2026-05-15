@@ -4,6 +4,8 @@ All notable changes to `@db90/mcp` will be documented in this file.
 
 ## Unreleased
 
+- Phase-0 reset: stdio MCP exposes only `db90_status` with a static placeholder payload (no sync, auth, Keycloak, keytar, resources, or background timers). CLI defaults to `run`; `serve` remains an alias. `init` prints a `~/.claude.json` snippet without writing files.
+
 ## 0.1.0 — 2026-05-01
 
 - First public release on npm as `@db90/mcp`.
