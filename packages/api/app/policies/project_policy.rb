@@ -46,11 +46,6 @@ class ProjectPolicy < ApplicationPolicy
     update?
   end
 
-  # Retention policy access
-  def retention_policy?
-    update?
-  end
-
   # Linking a Jira project requires the same permission as updating the project
   def link_jira?
     update?

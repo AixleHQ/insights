@@ -26,11 +26,6 @@ class OrganizationPolicy < ApplicationPolicy
     user.present?
   end
 
-  # Only admins can view/update retention policy
-  def retention_policy?
-    org_admin?(record) || global_admin?
-  end
-
   # Only admins can manage settings
   def settings?
     org_admin?(record) || global_admin?
