@@ -28,8 +28,7 @@ class OrgRetentionCleanupJob
   def cleanup_organization(org)
     total_deleted = 0
 
-    # Clean up tool_events
-    total_deleted += cleanup_tool_events(org)
+    # tool_events retention is enforced by DataRetentionPurgeJob (org + project policies, batched).
 
     # Clean up webhook deliveries older than the retention window
     total_deleted += cleanup_webhook_deliveries(org)
@@ -41,22 +40,6 @@ class OrgRetentionCleanupJob
     # total_deleted += cleanup_hourly_aggregates(org)
 
     total_deleted
-  end
-
-  def cleanup_tool_events(org)
-    cutoff = RetentionService.retention_cutoff(org, :tool_events_retention)
-    return 0 unless cutoff
-
-    deleted = ToolEvent
-      .where(organization_id: org.id)
-      .where("occurred_at < ?", cutoff)
-      .delete_all
-
-    if deleted > 0
-      Rails.logger.info("[OrgRetentionCleanupJob] Org #{org.slug}: deleted #{deleted} tool_events older than #{cutoff}")
-    end
-
-    deleted
   end
 
   def cleanup_webhook_deliveries(org)
