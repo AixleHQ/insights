@@ -20,7 +20,11 @@ class UpdateTimescaleRetentionJob
   HYPERTABLE = "timeseries.tool_events"
 
   def perform
-    target_days = RetentionService.max_tool_events_retention_days
+    target_days = Integer(RetentionService.max_tool_events_retention_days)
+    unless target_days.positive? && target_days <= 10_000
+      raise ArgumentError, "MAX_RETENTION_DAYS must be a positive integer <= 10000, got #{target_days.inspect}"
+    end
+
     current_days = current_retention_days
 
     if current_days == target_days
@@ -36,14 +40,18 @@ class UpdateTimescaleRetentionJob
       "#{current_days.inspect} days → #{target_days} days"
     )
 
+    conn = ApplicationRecord.connection
     ApplicationRecord.connection.transaction do
       if current_days
-        ApplicationRecord.connection.execute(
-          "SELECT remove_retention_policy('#{HYPERTABLE}');"
+        conn.execute(
+          ActiveRecord::Base.sanitize_sql_array([ "SELECT remove_retention_policy(?::regclass)", HYPERTABLE ])
         )
       end
-      ApplicationRecord.connection.execute(
-        "SELECT add_retention_policy('#{HYPERTABLE}', INTERVAL '#{target_days} days');"
+      interval_literal = "#{target_days} days"
+      conn.execute(
+        ActiveRecord::Base.sanitize_sql_array(
+          [ "SELECT add_retention_policy(?::regclass, ?::interval)", HYPERTABLE, interval_literal ]
+        )
       )
     end
 
@@ -60,14 +68,16 @@ class UpdateTimescaleRetentionJob
   # config->'drop_after' is a PostgreSQL interval stored as JSON string, e.g. "730 days".
   # We cast it to an interval and extract epoch to get seconds, then convert to days.
   def current_retention_days
-    result = ApplicationRecord.connection.select_one(<<~SQL)
+    sql = ActiveRecord::Base.sanitize_sql_array([ <<~SQL.squish, HYPERTABLE ])
       SELECT
         EXTRACT(EPOCH FROM (config->>'drop_after')::interval)::bigint / 86400 AS days
       FROM timescaledb_information.jobs
       WHERE proc_name = 'policy_retention'
-        AND hypertable_schema || '.' || hypertable_name = '#{HYPERTABLE}'
+        AND (hypertable_schema || '.' || hypertable_name) = ?
       LIMIT 1
     SQL
+
+    result = ApplicationRecord.connection.select_one(sql)
 
     result&.fetch("days")&.to_i
   end

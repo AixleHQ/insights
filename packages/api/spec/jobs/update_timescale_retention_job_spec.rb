@@ -22,10 +22,10 @@ RSpec.describe UpdateTimescaleRetentionJob, type: :job do
         job.perform
 
         expect(connection).to have_received(:execute).with(
-          "SELECT remove_retention_policy('timeseries.tool_events');"
+          "SELECT remove_retention_policy('timeseries.tool_events'::regclass)"
         )
         expect(connection).to have_received(:execute).with(
-          "SELECT add_retention_policy('timeseries.tool_events', INTERVAL '180 days');"
+          "SELECT add_retention_policy('timeseries.tool_events'::regclass, '180 days'::interval)"
         )
       end
 
@@ -42,8 +42,8 @@ RSpec.describe UpdateTimescaleRetentionJob, type: :job do
 
     context "when MAX_RETENTION_DAYS matches the current policy (idempotency)" do
       before do
-        allow(connection).to receive(:select_one).and_return({ "days" => 365 })
-        stub_const("ENV", ENV.to_h.merge("MAX_RETENTION_DAYS" => "365"))
+        allow(connection).to receive(:select_one).and_return({ "days" => RetentionService::DEFAULT_RETENTION_DAYS })
+        stub_const("ENV", ENV.to_h.merge("MAX_RETENTION_DAYS" => RetentionService::DEFAULT_RETENTION_DAYS.to_s))
       end
 
       it "does not execute remove/add" do
@@ -75,7 +75,7 @@ RSpec.describe UpdateTimescaleRetentionJob, type: :job do
     context "when no retention policy exists on the hypertable" do
       before do
         allow(connection).to receive(:select_one).and_return(nil)
-        stub_const("ENV", ENV.to_h.merge("MAX_RETENTION_DAYS" => "365"))
+        stub_const("ENV", ENV.to_h.merge("MAX_RETENTION_DAYS" => RetentionService::DEFAULT_RETENTION_DAYS.to_s))
       end
 
       it "skips remove and adds the policy" do
@@ -85,22 +85,26 @@ RSpec.describe UpdateTimescaleRetentionJob, type: :job do
           match(/remove_retention_policy/)
         )
         expect(connection).to have_received(:execute).with(
-          "SELECT add_retention_policy('timeseries.tool_events', INTERVAL '365 days');"
+          "SELECT add_retention_policy('timeseries.tool_events'::regclass, '#{RetentionService::DEFAULT_RETENTION_DAYS} days'::interval)"
         )
       end
     end
 
     context "when MAX_RETENTION_DAYS is not set (default)" do
       before do
-        allow(connection).to receive(:select_one).and_return({ "days" => 730 })
+        # Current policy in DB must differ from default (730) or the job no-ops.
+        allow(connection).to receive(:select_one).and_return({ "days" => 365 })
         stub_const("ENV", ENV.to_h.reject { |k, _| k == "MAX_RETENTION_DAYS" })
       end
 
-      it "uses 365 days as the default" do
+      it "uses #{RetentionService::DEFAULT_RETENTION_DAYS} days as the default" do
         job.perform
 
         expect(connection).to have_received(:execute).with(
-          "SELECT add_retention_policy('timeseries.tool_events', INTERVAL '365 days');"
+          "SELECT remove_retention_policy('timeseries.tool_events'::regclass)"
+        )
+        expect(connection).to have_received(:execute).with(
+          "SELECT add_retention_policy('timeseries.tool_events'::regclass, '#{RetentionService::DEFAULT_RETENTION_DAYS} days'::interval)"
         )
       end
     end

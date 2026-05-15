@@ -663,7 +663,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
             <CardDescription>Latest events from this team member</CardDescription>
           </div>
           <Button asChild variant="outline" size="sm">
-            <Link to={`/events?user_id=${member.user_id}`}>View all</Link>
+            <Link to={`/events?user_id=${member.user.id}`}>View all</Link>
           </Button>
         </CardHeader>
         <CardContent className="px-0 pb-0">

@@ -1,4 +1,6 @@
 class RetentionService
+  DEFAULT_RETENTION_DAYS = 730
+
   DEFAULTS = {
     raw_event_ttl: "24_hours",
     tool_events_retention: "90_days",
@@ -79,7 +81,7 @@ class RetentionService
     # environment variable. This ceiling must be >= any per-org tool_events_retention
     # window; the DataRetentionPurgeJob enforces stricter per-org limits on top.
     def max_tool_events_retention_days
-      ENV.fetch("MAX_RETENTION_DAYS", "365").to_i
+      ENV.fetch("MAX_RETENTION_DAYS", DEFAULT_RETENTION_DAYS).to_i
     end
 
     private
