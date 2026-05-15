@@ -160,7 +160,7 @@ module Api
       private
 
       def set_organization
-        @organization = Organization.find(params[:id])
+        @organization = Organization.includes(:retention_policy).find(params[:id])
       end
 
       def organization_params
