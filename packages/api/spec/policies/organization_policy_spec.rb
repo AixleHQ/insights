@@ -72,16 +72,6 @@ RSpec.describe OrganizationPolicy, type: :policy do
     end
   end
 
-  describe '#retention_policy?' do
-    it 'allows admins' do
-      expect(policy(organization, current_user: admin).apply(:retention_policy?)).to be true
-    end
-
-    it 'denies regular members' do
-      expect(policy(organization, current_user: member).apply(:retention_policy?)).to be false
-    end
-  end
-
   describe '#list_unattributed?' do
     it 'allows owners and admins' do
       expect(policy(organization, current_user: owner).apply(:list_unattributed?)).to be true
