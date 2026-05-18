@@ -79,15 +79,16 @@ class CostAlertJob
     policy = org.retention_policy
 
     cost_usd = policy&.cost_threshold_cents&.fdiv(100) || DEFAULT_THRESHOLDS[:monthly]
+    per_user_raw = OrganizationSetting.get(org, "cost_threshold_per_user")
 
     {
-      daily: nil,
+      daily: DEFAULT_THRESHOLDS[:daily],
       weekly: nil,
       monthly: cost_usd,
       token: policy&.token_threshold,
-      per_user: nil,
+      per_user: per_user_raw&.to_f,
       alert_enabled: policy.nil? || policy.alert_enabled,
-      alert_slack: false
+      alert_slack: OrganizationSetting.get(org, "alert_slack") == "true"
     }
   end
 
