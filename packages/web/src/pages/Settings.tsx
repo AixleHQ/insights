@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { validateCostInput as validateCostInputLib } from "@/lib/validation";
 import { Routes, Route, Link, useLocation, Navigate } from "react-router-dom";
 import { ModelPricingSettings } from "./ModelPricingSettings";
 import {
@@ -33,7 +32,6 @@ import {
   useOverviewStats,
   useDailyStats,
   useOrganizationAuditLogs,
-  useConnectors,
   type AuditLogFilters,
 } from "@/hooks/useApi";
 import { formatTokens, formatCost } from "@/lib/formatters";
