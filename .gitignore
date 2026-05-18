@@ -5,6 +5,10 @@ vendor/bundle/
 .playwright-mcp/
 settings.local.json
 CLAUDE.local.md
+/_bmad/
+.cursor/skills/
+.agents/skills/
+.claude/skills/bmad-*
 
 # Build outputs
 dist/
