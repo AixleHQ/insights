@@ -47,6 +47,76 @@ const roleColors: Record<string, string> = {
 
 const ROLES = ["owner", "member", "viewer"] as const;
 
+function ProjectTeamManageList({
+  members,
+  projectId,
+  orgId,
+  existingUserIds,
+}: {
+  members: ProjectMember[];
+  projectId: string;
+  orgId: string;
+  existingUserIds: Set<string>;
+}) {
+  const updateMember = useUpdateMember(projectId);
+  const removeMember = useRemoveMember(projectId);
+
+  return (
+    <div className="space-y-2">
+      {members.map((member) => (
+        <div
+          key={member.id}
+          className="flex items-center gap-3 rounded-lg border px-3 py-2"
+        >
+          <Avatar className="size-8 shrink-0">
+            {member.avatarUrl && (
+              <AvatarImage src={member.avatarUrl} alt={member.name || member.email} />
+            )}
+            <AvatarFallback className="text-xs bg-muted">
+              {getInitials(member.name, member.email)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium">
+              {getMemberDisplayName(member)}
+            </p>
+            <p className="truncate text-xs text-muted-foreground">{member.email}</p>
+          </div>
+          <Select
+            value={member.role}
+            onValueChange={(role) => updateMember.mutate({ id: member.id, role })}
+          >
+            <SelectTrigger className="h-7 w-24 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {ROLES.map((r) => (
+                <SelectItem key={r} value={r} className="text-xs">
+                  {r}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-7 shrink-0 text-muted-foreground hover:text-destructive"
+            onClick={() => removeMember.mutate(member.id)}
+            disabled={removeMember.isPending}
+          >
+            <Trash2 className="size-3.5" />
+          </Button>
+        </div>
+      ))}
+      <AddProjectMemberForm
+        projectId={projectId}
+        orgId={orgId}
+        existingUserIds={existingUserIds}
+      />
+    </div>
+  );
+}
+
 function AddProjectMemberForm({
   projectId,
   orgId,
@@ -135,8 +205,6 @@ export function ProjectTeamSection({
   canManage,
 }: ProjectTeamSectionProps) {
   const commitsByUserId = new Map(commitStats?.map((s) => [s.userId, s]) ?? []);
-  const updateMember = useUpdateMember(projectId ?? "");
-  const removeMember = useRemoveMember(projectId ?? "");
 
   if (isLoading) {
     return (
@@ -175,63 +243,13 @@ export function ProjectTeamSection({
       </CardHeader>
       <CardContent>
         {memberCount > 0 ? (
-          canManage ? (
-            <div className="space-y-2">
-              {members?.map((member) => (
-                <div
-                  key={member.id}
-                  className="flex items-center gap-3 rounded-lg border px-3 py-2"
-                >
-                  <Avatar className="size-8 shrink-0">
-                    {member.avatarUrl && (
-                      <AvatarImage src={member.avatarUrl} alt={member.name || member.email} />
-                    )}
-                    <AvatarFallback className="text-xs bg-muted">
-                      {getInitials(member.name, member.email)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">
-                      {getMemberDisplayName(member)}
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">{member.email}</p>
-                  </div>
-                  <Select
-                    value={member.role}
-                    onValueChange={(role) =>
-                      updateMember.mutate({ id: member.id, role })
-                    }
-                  >
-                    <SelectTrigger className="h-7 w-24 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ROLES.map((r) => (
-                        <SelectItem key={r} value={r} className="text-xs">
-                          {r}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="size-7 shrink-0 text-muted-foreground hover:text-destructive"
-                    onClick={() => removeMember.mutate(member.id)}
-                    disabled={removeMember.isPending}
-                  >
-                    <Trash2 className="size-3.5" />
-                  </Button>
-                </div>
-              ))}
-              {projectId && orgId && (
-                <AddProjectMemberForm
-                  projectId={projectId}
-                  orgId={orgId}
-                  existingUserIds={existingUserIds}
-                />
-              )}
-            </div>
+          canManage && projectId && orgId ? (
+            <ProjectTeamManageList
+              members={members ?? []}
+              projectId={projectId}
+              orgId={orgId}
+              existingUserIds={existingUserIds}
+            />
           ) : (
             <div className="flex flex-wrap gap-3">
               {members?.map((member) => {
@@ -277,7 +295,8 @@ export function ProjectTeamSection({
         ) : canManage && projectId && orgId ? (
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">No team members assigned to this project</p>
-            <AddProjectMemberForm
+            <ProjectTeamManageList
+              members={[]}
               projectId={projectId}
               orgId={orgId}
               existingUserIds={existingUserIds}

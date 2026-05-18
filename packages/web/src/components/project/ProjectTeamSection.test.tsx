@@ -190,21 +190,21 @@ describe("ProjectTeamSection", () => {
   });
 
   describe("canManage mode", () => {
+    const manageProps = { canManage: true, projectId: "proj-1", orgId: "org-1" };
+
     it("does not show link cards when canManage is true", () => {
-      renderComponent({ canManage: true });
+      renderComponent(manageProps);
       expect(screen.queryAllByRole("link")).toHaveLength(0);
     });
 
     it("shows remove button for each member", () => {
-      renderComponent({ canManage: true });
+      renderComponent(manageProps);
       const buttons = screen.getAllByRole("button");
-      // One remove button per member
       expect(buttons.length).toBeGreaterThanOrEqual(mockMembers.length);
     });
 
     it("shows role selects for each member", () => {
-      renderComponent({ canManage: true });
-      // Each member row has a role combobox
+      renderComponent(manageProps);
       const combos = screen.getAllByRole("combobox");
       expect(combos.length).toBe(mockMembers.length);
     });
@@ -212,7 +212,7 @@ describe("ProjectTeamSection", () => {
     it("calls removeMember mutate when remove button is clicked", async () => {
       const { default: userEvent } = await import("@testing-library/user-event");
       const user = userEvent.setup();
-      renderComponent({ canManage: true });
+      renderComponent(manageProps);
 
       const removeButtons = screen.getAllByRole("button");
       await user.click(removeButtons[0]);
