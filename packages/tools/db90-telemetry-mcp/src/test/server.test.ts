@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 describe("MCP server (in-process)", () => {
   let home: string;
 
-  async function callTool(name: string): Promise<unknown> {
+  async function callTool(name: string, args: Record<string, unknown> = {}): Promise<unknown> {
     vi.resetModules();
     const { createDb90McpServer } = await import("../server.js");
     const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
@@ -19,7 +19,7 @@ describe("MCP server (in-process)", () => {
     await server.connect(serverTransport);
     await client.connect(clientTransport);
 
-    const result = await client.callTool({ name, arguments: {} });
+    const result = await client.callTool({ name, arguments: args });
     const first = result.content[0];
     if (first?.type !== "text") throw new Error("expected text content");
     const parsed = JSON.parse(first.text) as unknown;
@@ -33,14 +33,16 @@ describe("MCP server (in-process)", () => {
     home = mkdtempSync(join(tmpdir(), "db90-mcp-home-"));
     mkdirSync(home, { recursive: true });
     process.env.DB90_MCP_HOME = home;
+    process.env.DB90_MCP_DISABLE_KEYTAR = "true";
   });
 
   afterEach(() => {
     delete process.env.DB90_MCP_HOME;
+    delete process.env.DB90_MCP_DISABLE_KEYTAR;
     vi.restoreAllMocks();
   });
 
-  it("listTools includes exactly db90_status and db90_sync_now", async () => {
+  it("listTools includes db90_authenticate, db90_status, and db90_sync_now", async () => {
     vi.resetModules();
     const { createDb90McpServer } = await import("../server.js");
     const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
@@ -54,7 +56,7 @@ describe("MCP server (in-process)", () => {
     await client.connect(clientTransport);
 
     const tools = await client.listTools();
-    expect(tools.tools.map((t) => t.name).sort()).toEqual(["db90_status", "db90_sync_now"].sort());
+    expect(tools.tools.map((t) => t.name).sort()).toEqual(["db90_authenticate", "db90_status", "db90_sync_now"].sort());
 
     await client.close();
     await server.close();
@@ -127,6 +129,36 @@ describe("MCP server (in-process)", () => {
       host: creds.host,
       state_tracked_sessions: 0,
     });
+  });
+
+  it("db90_authenticate returns device instructions without polling", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          device_code: "device-secret",
+          user_code: "WXYZ-ABCD",
+          verification_uri: "http://localhost:8080/device",
+          verification_uri_complete: "http://localhost:8080/device?user_code=WXYZ-ABCD",
+          expires_in: 300,
+          interval: 5,
+        }),
+        { status: 200 }
+      )
+    );
+
+    const parsed = await callTool("db90_authenticate", {
+      keycloakUrl: "http://localhost:8080/realms/db90",
+    });
+
+    expect(parsed).toMatchObject({
+      ok: true,
+      verificationUri: "http://localhost:8080/device",
+      verificationUriComplete: "http://localhost:8080/device?user_code=WXYZ-ABCD",
+      userCode: "WXYZ-ABCD",
+      expiresIn: 300,
+      interval: 5,
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
   it("db90_sync_now reports ok false when another sync holds the lock", async () => {

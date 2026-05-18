@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseArgs, runOnce } from "../cli.js";
+import { parseArgs, runOnce, runInit } from "../cli.js";
 import { DEFAULT_PRICING } from "../pricing.js";
 
 describe("parseArgs", () => {
@@ -58,6 +58,24 @@ describe("parseArgs", () => {
     expect(parseArgs(["node", "cli.js", "-h"]).command).toBe("help");
     expect(parseArgs(["node", "cli.js", "health", "--help"]).help).toBe(true);
   });
+
+  it("parses init with --host and --keycloak-url", () => {
+    const a = parseArgs(["node", "cli.js", "init", "--host", "http://api", "--keycloak-url", "http://kc/realms/db90"]);
+    expect(a.command).toBe("init");
+    expect(a.host).toBe("http://api");
+    expect(a.keycloakUrl).toBe("http://kc/realms/db90");
+    expect(
+      parseArgs(["node", "cli.js", "init", "--host=http://api", "--keycloak-url=http://kc/r"]).host
+    ).toBe("http://api");
+  });
+
+  it("treats init with unknown flags as help", () => {
+    expect(parseArgs(["node", "cli.js", "init", "--bogus"]).command).toBe("help");
+  });
+
+  it("treats run --host as help (host is init-only)", () => {
+    expect(parseArgs(["node", "cli.js", "run", "--host", "http://x"]).command).toBe("help");
+  });
 });
 
 describe("runOnce", () => {
@@ -69,7 +87,7 @@ describe("runOnce", () => {
 
   it("returns non-zero when credentials are missing", async () => {
     const code = await runOnce({
-      loadCredentials: () => null,
+      loadCredentials: async () => null,
       ...silentOutput,
     });
 
@@ -78,7 +96,7 @@ describe("runOnce", () => {
 
   it("returns non-zero when the sync is locked", async () => {
     const code = await runOnce({
-      loadCredentials: () => creds,
+      loadCredentials: async () => creds,
       migrateLegacyState: () => undefined,
       getAppDir: () => "/tmp/db90-mcp-test",
       pricing: DEFAULT_PRICING,
@@ -91,7 +109,7 @@ describe("runOnce", () => {
 
   it("returns non-zero when any event fails to post", async () => {
     const code = await runOnce({
-      loadCredentials: () => creds,
+      loadCredentials: async () => creds,
       migrateLegacyState: () => undefined,
       getAppDir: () => "/tmp/db90-mcp-test",
       pricing: DEFAULT_PRICING,
@@ -104,7 +122,7 @@ describe("runOnce", () => {
 
   it("returns zero after a successful single sync", async () => {
     const code = await runOnce({
-      loadCredentials: () => creds,
+      loadCredentials: async () => creds,
       migrateLegacyState: () => undefined,
       getAppDir: () => "/tmp/db90-mcp-test",
       pricing: DEFAULT_PRICING,
@@ -119,7 +137,7 @@ describe("runOnce", () => {
     const messages: string[] = [];
 
     const code = await runOnce({
-      loadCredentials: () => creds,
+      loadCredentials: async () => creds,
       migrateLegacyState: () => undefined,
       getAppDir: () => "/tmp/db90-mcp-test",
       pricing: DEFAULT_PRICING,
@@ -130,5 +148,51 @@ describe("runOnce", () => {
 
     expect(code).toBe(0);
     expect(messages).toContain("Sync complete: sent=2 failed=0 skipped=3");
+  });
+});
+
+describe("runInit", () => {
+  it("returns 0 when login succeeds", async () => {
+    const code = await runInit(
+      {
+        command: "init",
+        help: false,
+        once: false,
+        host: "http://localhost:3000",
+        keycloakUrl: "http://localhost:8080/realms/db90",
+        toolName: "claude_code",
+      },
+      {
+        loginAndPersistCredentials: async () => ({ ok: true, organizationId: "org-1" }),
+        defaultKeycloakIssuer: () => "",
+        getAppDir: () => "/tmp/db90-mcp-init-test",
+        log: () => undefined,
+        error: () => undefined,
+      }
+    );
+    expect(code).toBe(0);
+  });
+
+  it("rejects invalid tool names instead of coercing to claude_code", async () => {
+    const code = await runInit(
+      {
+        command: "init",
+        help: false,
+        once: false,
+        host: "http://localhost:3000",
+        keycloakUrl: "http://localhost:8080/realms/db90",
+        toolName: "github_copilot",
+      },
+      {
+        loginAndPersistCredentials: async () => {
+          throw new Error("should not authenticate");
+        },
+        defaultKeycloakIssuer: () => "",
+        getAppDir: () => "/tmp/db90-mcp-init-test",
+        log: () => undefined,
+        error: () => undefined,
+      }
+    );
+    expect(code).toBe(1);
   });
 });

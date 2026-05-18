@@ -1,5 +1,5 @@
 /**
- * Model pricing table and cost calculation for @db90/mcp (duplicated from db90-claude).
+ * Model pricing table and cost calculation for @db90/telemetry-mcp (duplicated from db90-claude).
  *
  * Default rates source: https://platform.claude.com/docs/en/about-claude/pricing
  * Rates last verified: 2026-05-04

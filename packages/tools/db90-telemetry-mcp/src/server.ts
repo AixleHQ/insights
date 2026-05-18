@@ -1,6 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
 import { loadCredentials } from "./credentials.js";
+import { defaultKeycloakClientId, defaultKeycloakIssuer, startDeviceAuthorization } from "./auth/keycloak.js";
 import { readState, migrateLegacyState, getAppDir } from "./state.js";
 import { syncOnce, getSyncTelemetry } from "./sync.js";
 import { DEFAULT_PRICING, mergePricing } from "./pricing.js";
@@ -30,10 +32,10 @@ function syncResultOk(result: Awaited<ReturnType<typeof syncOnce>>): boolean {
 }
 
 /** Structured status for `db90_status` — tolerates missing/malformed credentials and state. */
-export function buildDb90StatusPayload(): Record<string, unknown> {
+export async function buildDb90StatusPayload(): Promise<Record<string, unknown>> {
   const telemetry = getSyncTelemetry();
   try {
-    const creds = loadCredentials();
+    const creds = await loadCredentials();
     if (!creds) {
       return {
         authenticated: false,
@@ -86,7 +88,7 @@ export function createDb90McpServer(): McpServer {
       description:
         "Returns DB90 MCP connectivity and last sync metadata from disk (credentials + state). No arguments.",
     },
-    async () => jsonContent(buildDb90StatusPayload())
+    async () => jsonContent(await buildDb90StatusPayload())
   );
 
   server.registerTool(
@@ -97,7 +99,7 @@ export function createDb90McpServer(): McpServer {
     },
     async () => {
       try {
-        const creds = loadCredentials();
+        const creds = await loadCredentials();
         if (!creds) {
           return jsonContent({ ok: false, error: "missing_credentials" });
         }
@@ -111,6 +113,51 @@ export function createDb90McpServer(): McpServer {
           pricing: defaultPricing(),
         });
         return jsonContent({ ok: syncResultOk(result), result });
+      } catch (err) {
+        return jsonContent({
+          ok: false,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+  );
+
+  server.registerTool(
+    "db90_authenticate",
+    {
+      description:
+        "Starts Keycloak device login and returns the visit URL/code for the user. Use db90-mcp init for the full terminal flow that saves credentials.",
+      inputSchema: z.object({
+        keycloakUrl: z.string().optional(),
+        clientId: z.string().optional(),
+      }),
+    },
+    async (input) => {
+      try {
+        const args = input;
+        const kc = (args.keycloakUrl?.trim() || defaultKeycloakIssuer()).trim();
+        if (!kc) {
+          return jsonContent({
+            ok: false,
+            error: "keycloakUrl or KEYCLOAK_ISSUER / DB90_KEYCLOAK_ISSUER is required",
+          });
+        }
+        const clientId = args.clientId?.trim() || defaultKeycloakClientId();
+        const device = await startDeviceAuthorization({
+          issuer: kc,
+          clientId,
+        });
+        return jsonContent({
+          ok: true,
+          verificationUri: device.verification_uri,
+          verificationUriComplete: device.verification_uri_complete ?? null,
+          userCode: device.user_code,
+          expiresIn: device.expires_in,
+          interval: device.interval ?? 5,
+          issuer: kc,
+          clientId,
+          message: `Visit ${device.verification_uri} and enter code ${device.user_code}`,
+        });
       } catch (err) {
         return jsonContent({
           ok: false,
@@ -144,7 +191,7 @@ export async function startServer(): Promise<void> {
 
   const runBackground = async (source: string) => {
     if (shuttingDown) return;
-    const creds = loadCredentials();
+    const creds = await loadCredentials();
     if (!creds) return;
     try {
       migrateLegacyState(getAppDir(), creds.host, creds.token);

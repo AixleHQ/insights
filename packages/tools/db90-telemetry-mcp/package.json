@@ -1,5 +1,5 @@
 {
-  "name": "@db90/mcp",
+  "name": "@db90/telemetry-mcp",
   "version": "0.1.0",
   "description": "stdio MCP server for DB90 — Claude transcript sync, db90_status, db90_sync_now",
   "type": "module",
@@ -24,9 +24,9 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/dualboot-partners/db90-rails.git",
-    "directory": "packages/tools/db90-mcp"
+    "directory": "packages/tools/db90-telemetry-mcp"
   },
-  "homepage": "https://github.com/dualboot-partners/db90-rails/tree/develop/packages/tools/db90-mcp#readme",
+  "homepage": "https://github.com/dualboot-partners/db90-rails/tree/develop/packages/tools/db90-telemetry-mcp#readme",
   "bugs": {
     "url": "https://github.com/dualboot-partners/db90-rails/issues"
   },
@@ -49,6 +49,9 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "glob": "^10.5.0",
     "zod": "^3.23.0 || ^4.0.0"
+  },
+  "optionalDependencies": {
+    "keytar": "^7.9.0"
   },
   "devDependencies": {
     "@types/node": "^24",

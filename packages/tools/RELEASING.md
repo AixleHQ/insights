@@ -2,7 +2,7 @@
 
 Runbook for cutting a new release of `@db90/claude` or `@db90/cursor` to public npm. Each package versions independently.
 
-> MCP (`@db90/mcp`) is currently excluded — see the note at the bottom.
+> MCP (`@db90/telemetry-mcp`) is currently excluded — see the note at the bottom.
 
 ## Prerequisites (once per maintainer)
 
@@ -92,4 +92,4 @@ If a tag push can't be used (e.g. hotfix from a non-default branch), use the `wo
 
 ## MCP exclusion
 
-`@db90/mcp` is intentionally not covered by this runbook. `src/sync.ts` currently ships scaffold stubs (`runClaudeSync` and `runCursorSync` return zero counts). The `cli-mcp-v*` tag prefix has been removed from [`release-cli.yml`](../../.github/workflows/release-cli.yml) until [Task 10](../../plans/npm-distribution-AIX-157/tasks/10-mcp-publish.md) lands the real sync wiring. Re-enable the tag prefix in the same PR that lands Task 10.
+`@db90/telemetry-mcp` is intentionally not covered by this runbook. `src/sync.ts` currently ships scaffold stubs (`runClaudeSync` and `runCursorSync` return zero counts). The `cli-mcp-v*` tag prefix has been removed from [`release-cli.yml`](../../.github/workflows/release-cli.yml) until [Task 10](../../plans/npm-distribution-AIX-157/tasks/10-mcp-publish.md) lands the real sync wiring. Re-enable the tag prefix in the same PR that lands Task 10.

@@ -1,7 +1,7 @@
 /**
  * Pragmatic copy of `packages/tools/db90-claude/src/claude-reader.ts` for MCP.
  * Conscious duplication for phase 1 — phase 8 may hoist into `packages/db90-shared/`
- * if reuse earns its keep (avoids publish-order dependency from `@db90/mcp` to `@db90/claude`).
+ * if reuse earns its keep (avoids publish-order dependency from `@db90/telemetry-mcp` to `@db90/claude`).
  */
 import { createReadStream, statSync } from "node:fs";
 import { finished } from "node:stream/promises";

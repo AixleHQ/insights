@@ -6,7 +6,7 @@ on:
       - 'cli-claude-v*'
       - 'cli-cursor-v*'
       # NOTE: cli-mcp-v* intentionally excluded.
-      # @db90/mcp ships a scaffold sync.ts (runClaudeSync/runCursorSync return
+      # @db90/telemetry-mcp ships a scaffold sync.ts (runClaudeSync/runCursorSync return
       # empty results) per plans/npm-distribution-AIX-157/tasks/10-mcp-publish.md.
       # Re-enable this tag prefix once Task 10 lands the real sync wiring.
   workflow_dispatch:
@@ -62,7 +62,11 @@ jobs:
               exit 1
             fi
             echo "package=$INPUT_PACKAGE" >> "$GITHUB_OUTPUT"
-            echo "working_directory=packages/tools/db90-$INPUT_PACKAGE" >> "$GITHUB_OUTPUT"
+            if [[ "$INPUT_PACKAGE" == "mcp" ]]; then
+              echo "working_directory=packages/tools/db90-telemetry-mcp" >> "$GITHUB_OUTPUT"
+            else
+              echo "working_directory=packages/tools/db90-$INPUT_PACKAGE" >> "$GITHUB_OUTPUT"
+            fi
             echo "tag_version=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
           else
             echo "Could not resolve target package from ref=$REF / input=$INPUT_PACKAGE" >&2

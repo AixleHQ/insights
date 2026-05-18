@@ -198,10 +198,10 @@ jobs:
         run: npm run build --workspace=@db90/sdk
         working-directory: packages/tools
       - name: Build
-        run: npm run build --workspace=@db90/mcp
+        run: npm run build --workspace=@db90/telemetry-mcp
         working-directory: packages/tools
       - name: Test
-        run: npm test --workspace=@db90/mcp
+        run: npm test --workspace=@db90/telemetry-mcp
         working-directory: packages/tools
 
   # --- Deploy pipeline (staging and main only) ---
