@@ -33,6 +33,14 @@ vi.mock("@/hooks/useApi", () => ({
   useUpdateProjectRetentionPolicy: () => mockUseUpdateProjectRetentionPolicy(),
 }));
 
+vi.mock("@/contexts/OrgContext", () => ({
+  useOrg: () => ({
+    currentOrg: { id: "test-org-id", name: "Test Org", slug: "test-org" },
+    currentMembership: { role: "member" },
+    isLoading: false,
+  }),
+}));
+
 vi.mock("@/components/project", () => ({
   ProjectTeamSection: () => <div>Team Section</div>,
   ProjectConnectorsTab: () => <div>Connectors Tab</div>,

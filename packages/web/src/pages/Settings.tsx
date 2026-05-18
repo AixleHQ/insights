@@ -904,10 +904,10 @@ export function AlertSettings() {
       (s) => s.key === key
     )?.value;
 
-  // Risk alert toggles still use org settings KV store
-  const riskCritical = getSetting("alert_risk_critical") !== "false" && getSetting("alert_risk_critical") !== undefined ? getSetting("alert_risk_critical") !== "false" : true;
-  const riskHigh = getSetting("alert_risk_high") !== "false" && getSetting("alert_risk_high") !== undefined ? getSetting("alert_risk_high") !== "false" : true;
-  const usageSpike = getSetting("alert_usage_spike") !== "false" && getSetting("alert_usage_spike") !== undefined ? getSetting("alert_usage_spike") !== "false" : true;
+  // Risk alert toggles still use org settings KV store; default to true when not set
+  const riskCritical = getSetting("alert_risk_critical") === undefined ? true : getSetting("alert_risk_critical") !== "false";
+  const riskHigh = getSetting("alert_risk_high") === undefined ? true : getSetting("alert_risk_high") !== "false";
+  const usageSpike = getSetting("alert_usage_spike") === undefined ? true : getSetting("alert_usage_spike") !== "false";
 
   // Cost/token thresholds are stored on the retention policy record
   const [costDollars, setCostDollars] = useState("");

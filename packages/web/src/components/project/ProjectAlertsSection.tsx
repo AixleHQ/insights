@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -25,6 +26,7 @@ export function ProjectAlertsSection({ projectId, orgId }: Props) {
 
   const [costDollars, setCostDollars] = useState("");
   const [tokenThreshold, setTokenThreshold] = useState("");
+  const [alertEnabled, setAlertEnabled] = useState(true);
   const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
@@ -39,6 +41,7 @@ export function ProjectAlertsSection({ projectId, orgId }: Props) {
           ? String(projectPolicy.tokenThreshold)
           : ""
       );
+      setAlertEnabled(projectPolicy.alertEnabled ?? true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectPolicy]);
@@ -60,6 +63,7 @@ export function ProjectAlertsSection({ projectId, orgId }: Props) {
       data: {
         cost_threshold_cents: costCentsInput,
         token_threshold: tokenInput,
+        alert_enabled: alertEnabled,
       },
     });
     setDirty(false);
@@ -146,6 +150,14 @@ export function ProjectAlertsSection({ projectId, orgId }: Props) {
                 </p>
               )}
             </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Switch
+              id="proj-alert-enabled"
+              checked={alertEnabled}
+              onCheckedChange={(checked) => { setAlertEnabled(checked); setDirty(true); }}
+            />
+            <Label htmlFor="proj-alert-enabled">Enable alerts</Label>
           </div>
           <Button
             onClick={handleSave}

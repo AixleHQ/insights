@@ -113,6 +113,8 @@ vi.mock("@/hooks/useApi", () => {
   useUpdateCurrentUser: () => ({ mutate: vi.fn(), isPending: false }),
   useUserOrganizations: () => ({ data: mockOrgs, isLoading: false }),
   useUpdateUserSetting: () => ({ mutate: vi.fn(), isPending: false }),
+  usePersonalSettings: () => ({ data: undefined, isLoading: false }),
+  useUpdatePersonalSettings: () => ({ mutate: vi.fn(), isPending: false }),
   };
 });
 
