@@ -11,6 +11,8 @@ class UpdateToolEventsRetentionPolicy < ActiveRecord::Migration[8.1]
   # Decision: Option A — TimescaleDB ceiling + application purge job for per-org enforcement.
 
   def up
+    return unless tool_events_hypertable?
+
     days = ENV.fetch("MAX_RETENTION_DAYS", RetentionService::DEFAULT_RETENTION_DAYS).to_i
 
     execute "SET search_path TO timeseries, public;"
@@ -21,10 +23,30 @@ class UpdateToolEventsRetentionPolicy < ActiveRecord::Migration[8.1]
   end
 
   def down
+    return unless tool_events_hypertable?
+
     execute "SET search_path TO timeseries, public;"
     execute "SELECT remove_retention_policy('tool_events', if_exists => true);"
     execute "SELECT add_retention_policy('tool_events', INTERVAL '#{RetentionService::DEFAULT_RETENTION_DAYS} days');"
   ensure
     execute "SET search_path TO public;" rescue nil
+  end
+
+  private
+
+  # Skip when TimescaleDB is absent, or tool_events exists but is not a hypertable
+  # (e.g. plain table / different schema in dev or forked DBs).
+  def tool_events_hypertable?
+    sql = <<~SQL.squish
+      SELECT EXISTS (
+        SELECT 1
+        FROM timescaledb_information.hypertables
+        WHERE hypertable_schema = 'timeseries'
+          AND hypertable_name = 'tool_events'
+      )
+    SQL
+    ActiveRecord::Type::Boolean.new.cast(connection.select_value(sql))
+  rescue ActiveRecord::StatementInvalid
+    false
   end
 end
