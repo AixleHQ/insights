@@ -86,5 +86,28 @@ RSpec.describe 'Api::V1::UserPersonalSettings', type: :request do
 
       expect(response).to have_http_status(:bad_request)
     end
+
+    it 'handles concurrent first-write without raising a unique constraint error' do
+      # Simulate the race: two threads both call find_or_create_by! before either commits.
+      # The second call will hit a RecordNotUnique; the rescue/retry in the controller
+      # recovers and the row ends up in the database exactly once.
+      call_count = 0
+      allow(UserPersonalSettings).to receive(:find_or_create_by!).and_wrap_original do |m, *args|
+        call_count += 1
+        if call_count == 1
+          # First caller: raise as if the DB constraint fired on a concurrent insert
+          raise ActiveRecord::RecordNotUnique, "duplicate key value"
+        else
+          m.call(*args)
+        end
+      end
+
+      authenticated_patch '/api/v1/users/me/personal_settings',
+                          user: user,
+                          params: { personal_settings: { cost_threshold_cents: 500 } }
+
+      expect_success
+      expect(json_data[:costThresholdCents]).to eq(500)
+    end
   end
 end
