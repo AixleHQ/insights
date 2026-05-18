@@ -499,6 +499,17 @@ RSpec.describe 'Api::V1::Projects', type: :request do
 
       expect_forbidden
     end
+
+    it 'persists cost_threshold_cents and token_threshold alert fields' do
+      authenticated_patch "/api/v1/projects/#{project.id}/retention_policy",
+                          user: user,
+                          params: { cost_threshold_cents: 200, token_threshold: 50_000, alert_enabled: true }
+
+      expect_success
+      expect(json_data[:costThresholdCents]).to eq(200)
+      expect(json_data[:tokenThreshold]).to eq(50_000)
+      expect(json_data[:alertEnabled]).to be true
+    end
   end
 
   describe 'POST /api/v1/projects/:id/link_jira' do

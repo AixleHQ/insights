@@ -373,7 +373,8 @@ module Api
 
       def retention_policy_params
         params.permit(:raw_event_ttl, :tool_events_retention, :hourly_aggregate_retention,
-                      :daily_aggregate_retention, :retention_reason)
+                      :daily_aggregate_retention, :retention_reason,
+                      :cost_threshold_cents, :token_threshold, :alert_enabled)
       end
     end
   end
