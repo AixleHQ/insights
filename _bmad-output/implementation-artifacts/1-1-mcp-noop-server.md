@@ -75,6 +75,13 @@ so that we have a verified end-to-end foundation before adding authentication, s
 - [x] [Review][Patch] Test does not prove the MCP server exposes exactly one tool [packages/tools/db90-mcp/src/test/server.test.ts:15] — fixed with `listTools()` assertion
 - [ ] [Review][Patch] Manual Claude Code `/mcp` and `db90_status` verification is not evidenced [_bmad-output/implementation-artifacts/1-1-mcp-noop-server.md:139] — pending real Claude Code restart/manual call
 - [x] [Review][Patch] `mcp_check` does not fully mirror the existing `claude_check` job shape [.github/workflows/ci.yml:184] — fixed with SDK build step
+- [x] [Review][Decision] Full diff no longer matches Story 1.1 no-op scope — Resolved: treat this branch as stacked Story 1.1 + Story 1.2, so the sync/timer expansion is intentional and reviewed under the full diff.
+- [x] [Review][Patch] Manual verification is checked off while still described as pending [_bmad-output/implementation-artifacts/1-1-mcp-noop-server.md:76] — fixed by reopening the manual verification item and returning the story to `in-progress`
+- [x] [Review][Patch] Story 1.2 manual dev DB verification is checked off while notes say it was not executed [_bmad-output/implementation-artifacts/1-2-mcp-claude-sync-timer.md:89] — fixed by reopening the manual verification task in Story 1.2
+- [x] [Review][Patch] Stale-lock recovery can remove another active process lock [packages/tools/db90-mcp/src/lock.ts:32] — fixed with lock owner tokens and release ownership checks
+- [x] [Review][Patch] Rate-limit backoff is not honored inside the current sync loop [packages/tools/db90-mcp/src/sync.ts:74] — fixed by stopping the current sync pass after 429 backoff is set
+- [x] [Review][Patch] `db90_sync_now` reports `ok: true` for locked or failed syncs [packages/tools/db90-mcp/src/server.ts:100] — fixed by deriving `ok` from sync result success
+- [x] [Review][Patch] Background sync captures credentials only once at startup [packages/tools/db90-mcp/src/server.ts:128] — fixed by reloading credentials on each background sync pass
 
 ## Dev Notes
 
