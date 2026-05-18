@@ -184,6 +184,18 @@ CREATE TYPE public.tool_name AS ENUM (
     'bitbucket'
 );
 
+--
+-- Name: prevent_retention_purge_log_mutation(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.prevent_retention_purge_log_mutation() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  RAISE EXCEPTION 'retention_purge_logs is append-only — updates and deletes are not permitted';
+END;
+$$;
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -757,6 +769,42 @@ CREATE TABLE public.repositories (
 );
 
 --
+-- Name: retention_purge_logs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.retention_purge_logs (
+    id bigint NOT NULL,
+    organization_id uuid NOT NULL,
+    project_id uuid,
+    retention_policy_type integer NOT NULL,
+    retention_days_applied integer NOT NULL,
+    cutoff_timestamp timestamp(6) without time zone NOT NULL,
+    records_deleted integer DEFAULT 0 NOT NULL,
+    job_run_at timestamp(6) without time zone NOT NULL,
+    status integer DEFAULT 0 NOT NULL,
+    error_message text,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+--
+-- Name: retention_purge_logs_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.retention_purge_logs_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+--
+-- Name: retention_purge_logs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.retention_purge_logs_id_seq OWNED BY public.retention_purge_logs.id;
+
+--
 -- Name: sanitization_policies; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -914,6 +962,12 @@ CREATE VIEW timeseries.hourly_token_usage AS
 --
 
 ALTER TABLE ONLY public.connector_event_dedup ALTER COLUMN id SET DEFAULT nextval('public.connector_event_dedup_id_seq'::regclass);
+--
+-- Name: retention_purge_logs id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retention_purge_logs ALTER COLUMN id SET DEFAULT nextval('public.retention_purge_logs_id_seq'::regclass);
+
 --
 -- Name: admin_audit_logs admin_audit_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
@@ -1074,6 +1128,13 @@ ALTER TABLE ONLY public.projects
 
 ALTER TABLE ONLY public.repositories
     ADD CONSTRAINT repositories_pkey PRIMARY KEY (id);
+
+--
+-- Name: retention_purge_logs retention_purge_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retention_purge_logs
+    ADD CONSTRAINT retention_purge_logs_pkey PRIMARY KEY (id);
 
 --
 -- Name: sanitization_policies sanitization_policies_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1700,6 +1761,24 @@ CREATE INDEX index_repositories_on_organization_connector_id ON public.repositor
 CREATE INDEX index_repositories_on_project_id ON public.repositories USING btree (project_id);
 
 --
+-- Name: index_retention_purge_logs_on_job_run_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_retention_purge_logs_on_job_run_at ON public.retention_purge_logs USING btree (job_run_at);
+
+--
+-- Name: index_retention_purge_logs_on_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_retention_purge_logs_on_organization_id ON public.retention_purge_logs USING btree (organization_id);
+
+--
+-- Name: index_retention_purge_logs_on_project_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_retention_purge_logs_on_project_id ON public.retention_purge_logs USING btree (project_id);
+
+--
 -- Name: index_sanitization_policies_on_is_active; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1807,6 +1886,12 @@ CREATE INDEX idx_tool_events_user_occurred ON timeseries.tool_events USING btree
 
 CREATE INDEX tool_events_occurred_at_idx ON timeseries.tool_events USING btree (occurred_at DESC);
 --
+-- Name: retention_purge_logs retention_purge_logs_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER retention_purge_logs_append_only BEFORE DELETE OR UPDATE ON public.retention_purge_logs FOR EACH ROW EXECUTE FUNCTION public.prevent_retention_purge_log_mutation();
+
+--
 -- Name: project_memberships fk_project_memberships_created_by_id; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1910,6 +1995,13 @@ ALTER TABLE ONLY public.user_personal_settings
 
 ALTER TABLE ONLY public.organization_audit_logs
     ADD CONSTRAINT fk_rails_6b6833732b FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+
+--
+-- Name: retention_purge_logs fk_rails_6cfbc838f7; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retention_purge_logs
+    ADD CONSTRAINT fk_rails_6cfbc838f7 FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
 
 --
 -- Name: project_audit_logs fk_rails_6fe27c573a; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2080,6 +2172,13 @@ ALTER TABLE ONLY public.admin_audit_logs
     ADD CONSTRAINT fk_rails_f48ad7fa19 FOREIGN KEY (admin_user_id) REFERENCES public.users(id);
 
 --
+-- Name: retention_purge_logs fk_rails_f79fa6fcf2; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retention_purge_logs
+    ADD CONSTRAINT fk_rails_f79fa6fcf2 FOREIGN KEY (project_id) REFERENCES public.projects(id);
+
+--
 -- Name: issues fk_rails_ff669b5916; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2121,6 +2220,8 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260514090000'),
+('20260513161604'),
 ('20260513150002'),
 ('20260513150001'),
 ('20260513140003'),

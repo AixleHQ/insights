@@ -14,6 +14,18 @@ Sidekiq.configure_server do |config|
         "cron" => "0 6 * * *",
         "queue" => "connectors",
         "description" => "Fan out daily GitHub Copilot usage sync for all active connectors"
+      },
+      "update_timescale_retention" => {
+        "class" => "UpdateTimescaleRetentionJob",
+        "cron" => "0 1 * * *",
+        "queue" => "maintenance",
+        "description" => "Daily sync of TimescaleDB retention policy ceiling from MAX_RETENTION_DAYS env var"
+      },
+      "data_retention_purge" => {
+        "class" => "DataRetentionPurgeJob",
+        "cron" => "0 2 * * *",
+        "queue" => "maintenance",
+        "description" => "Daily purge of expired tool_events per org/project retention policies"
       }
     })
   end

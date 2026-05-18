@@ -34,6 +34,7 @@ class ToolEvent < ApplicationRecord
   scope :for_user, ->(user) { where(user: user) }
   scope :for_organization, ->(org) { where(organization: org) }
   scope :for_project, ->(project) { where(project: project) }
+  scope :before_cutoff, ->(cutoff) { where("occurred_at < ?", cutoff) }
 
   def self.total_tokens_in_range(start_time, end_time)
     in_range(start_time, end_time).sum(:tokens_total)

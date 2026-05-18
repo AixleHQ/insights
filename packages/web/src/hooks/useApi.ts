@@ -46,6 +46,8 @@ import type {
   ModelPricingOverride,
   ModelPricingOverrideInput,
   ModelPricingOverridesResponse,
+  RetentionPreview,
+  RetentionPurgeLog,
 } from "@/lib/types";
 
 // Query keys factory
@@ -292,6 +294,30 @@ export function useUpdateProjectRetentionPolicy() {
     onSuccess: (_, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: ["projects", projectId, "retention_policy"] });
     },
+  });
+}
+
+export function useRetentionPreview(orgId: string) {
+  return useQuery({
+    queryKey: ["organizations", orgId, "retention_preview"],
+    queryFn: async () => {
+      const response = await api.get<{ data: RetentionPreview }>(`/organizations/${orgId}/retention_preview`);
+      return response.data;
+    },
+    enabled: !!orgId,
+  });
+}
+
+export function useRetentionLogs(orgId: string, page = 1) {
+  return useQuery({
+    queryKey: ["organizations", orgId, "retention_logs", page],
+    queryFn: async () => {
+      const params = new URLSearchParams({ page: String(page), per_page: "20" });
+      return api.get<PaginatedResponse<RetentionPurgeLog>>(
+        `/organizations/${orgId}/retention_logs?${params.toString()}`
+      );
+    },
+    enabled: !!orgId,
   });
 }
 

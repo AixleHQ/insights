@@ -56,6 +56,12 @@ namespace :admin do
   post "sanitization_policies/:id/activate", to: "sanitization_policies#activate", as: :activate_sanitization_policy
   post "sanitization_policies/:id/deactivate", to: "sanitization_policies#deactivate", as: :deactivate_sanitization_policy
 
+  # Manual retention purge trigger (platform admin only)
+  post "retention/purge", to: "retention#purge", as: :purge_retention
+
+  # Retention purge audit log (platform admin only)
+  get "retention_logs", to: "retention#index", as: :retention_logs
+
   root to: "home#index"
 end
 

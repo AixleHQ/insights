@@ -32,6 +32,7 @@ Rails.application.routes.draw do
         member do
           get :retention_policy
           patch :retention_policy, action: :update_retention_policy
+          get :retention_preview
           get :settings
           put "settings/:key", action: :update_setting
           delete "settings/:key", action: :destroy_setting
@@ -63,6 +64,9 @@ Rails.application.routes.draw do
 
         # Organization audit logs
         resources :audit_logs, controller: "organization_audit_logs", only: [ :index ]
+
+        # Retention purge logs (compliance evidence)
+        resources :retention_logs, controller: "retention_purge_logs", only: [ :index ]
 
         # Webhook delivery history and retry
         resources :webhook_deliveries, only: [ :index ] do

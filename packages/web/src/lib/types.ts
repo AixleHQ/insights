@@ -368,6 +368,28 @@ export interface ProjectRetentionPolicy {
   updatedAt: string;
 }
 
+export interface RetentionPreview {
+  cutoffDate: string | null;
+  estimatedRecords: number | null;
+}
+
+export type RetentionPurgeStatus = "success" | "partial" | "failed";
+export type RetentionPolicyType = "org" | "project";
+
+export interface RetentionPurgeLog {
+  id: number;
+  organizationId: string;
+  projectId: string | null;
+  retentionPolicyType: RetentionPolicyType;
+  retentionDaysApplied: number;
+  cutoffTimestamp: string;
+  recordsDeleted: number;
+  jobRunAt: string;
+  status: RetentionPurgeStatus;
+  errorMessage: string | null;
+  createdAt: string;
+}
+
 // Invitation types
 export type InvitationStatus = "pending" | "accepted" | "revoked" | "expired";
 export type MemberRole = "owner" | "member" | "viewer";
