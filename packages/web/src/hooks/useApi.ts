@@ -48,6 +48,8 @@ import type {
   ModelPricingOverridesResponse,
   RetentionPreview,
   RetentionPurgeLog,
+  UserPersonalSettings,
+  NotificationRoute,
 } from "@/lib/types";
 
 // Query keys factory
@@ -266,7 +268,7 @@ export function useUpdateRetentionPolicy() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ orgId, data }: { orgId: string; data: Record<string, string> }) =>
+    mutationFn: ({ orgId, data }: { orgId: string; data: Record<string, string | number | boolean | null> }) =>
       api.patch<{ data: RetentionPolicy }>(`/organizations/${orgId}/retention_policy`, data),
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: ["organizations", orgId, "retention_policy"] });
@@ -289,7 +291,7 @@ export function useUpdateProjectRetentionPolicy() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ projectId, data }: { projectId: string; data: Record<string, string> }) =>
+    mutationFn: ({ projectId, data }: { projectId: string; data: Record<string, string | number | boolean | null> }) =>
       api.patch<{ data: ProjectRetentionPolicy }>(`/projects/${projectId}/retention_policy`, data),
     onSuccess: (_, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: ["projects", projectId, "retention_policy"] });
@@ -679,6 +681,132 @@ export function useProjectMembers(projectId: string) {
       return response.data;
     },
     enabled: !!projectId,
+  });
+}
+
+export function useAddProjectMember(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { user_id: string; role: string }) =>
+      api.post<{ data: ProjectMember }>(`/projects/${projectId}/members`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "members"] });
+    },
+  });
+}
+
+export function useUpdateProjectMember(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, role }: { id: string; role: string }) =>
+      api.patch<{ data: ProjectMember }>(`/projects/${projectId}/members/${id}`, { role }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "members"] });
+    },
+  });
+}
+
+export function useRemoveProjectMember(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api.delete(`/projects/${projectId}/members/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "members"] });
+    },
+  });
+}
+
+// Personal settings
+export function usePersonalSettings() {
+  return useQuery({
+    queryKey: ["user", "personal-settings"],
+    queryFn: async () => {
+      const response = await api.get<{ data: UserPersonalSettings }>("/users/me/personal_settings");
+      return response.data;
+    },
+  });
+}
+
+export function useUpdatePersonalSettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      costThresholdCents?: number | null;
+      tokenThreshold?: number | null;
+      alertEmail?: boolean;
+      alertSlack?: boolean;
+    }) =>
+      api.patch<{ data: UserPersonalSettings }>("/users/me/personal_settings", {
+        personal_settings: {
+          cost_threshold_cents: data.costThresholdCents,
+          token_threshold: data.tokenThreshold,
+          alert_email: data.alertEmail,
+          alert_slack: data.alertSlack,
+        },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user", "personal-settings"] });
+    },
+  });
+}
+
+// Notification routes
+export function useNotificationRoutes(orgId: string) {
+  return useQuery({
+    queryKey: ["organizations", orgId, "notification_routes"],
+    queryFn: async () => {
+      const response = await api.get<{ data: NotificationRoute[] }>(
+        `/organizations/${orgId}/notification_routes`
+      );
+      return response.data;
+    },
+    enabled: !!orgId,
+  });
+}
+
+export function useCreateNotificationRoute(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      notification_type: NotificationRoute["notificationType"];
+      recipient_type: NotificationRoute["recipientType"];
+      recipient_role?: MemberRole | null;
+      recipient_user_id?: string | null;
+      enabled: boolean;
+    }) =>
+      api.post<{ data: NotificationRoute }>(
+        `/organizations/${orgId}/notification_routes`,
+        { notification_route: data }
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["organizations", orgId, "notification_routes"] });
+    },
+  });
+}
+
+export function useUpdateNotificationRoute(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: { id: string; enabled?: boolean }) =>
+      api.patch<{ data: NotificationRoute }>(
+        `/organizations/${orgId}/notification_routes/${id}`,
+        { notification_route: data }
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["organizations", orgId, "notification_routes"] });
+    },
+  });
+}
+
+export function useDeleteNotificationRoute(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api.delete(`/organizations/${orgId}/notification_routes/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["organizations", orgId, "notification_routes"] });
+    },
   });
 }
 
