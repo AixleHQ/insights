@@ -36,7 +36,7 @@ import {
   useConnectors,
   type AuditLogFilters,
 } from "@/hooks/useApi";
-import { formatTokens } from "@/lib/formatters";
+import { formatTokens, formatCost } from "@/lib/formatters";
 import { AUDIT_ACTION_LABELS, AUDIT_ACTION_OPTIONS } from "@/lib/audit-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -896,8 +896,9 @@ function DataRetentionSettings() {
 
 export function AlertSettings() {
   const { currentOrg } = useOrg();
-  const { data: settings, isLoading } = useOrganizationSettings(currentOrg?.id || "");
-  const { data: connectors } = useConnectors(currentOrg?.id || "");
+  const { data: settings, isLoading: isLoadingSettings } = useOrganizationSettings(currentOrg?.id || "");
+  const { data: retentionPolicy, isLoading: isLoadingRetention } = useRetentionPolicy(currentOrg?.id || "");
+  const updateRetentionPolicy = useUpdateRetentionPolicy();
   const updateSetting = useUpdateOrganizationSetting();
 
   const getSetting = (key: string) =>
@@ -905,64 +906,43 @@ export function AlertSettings() {
       (s) => s.key === key
     )?.value;
 
-  const hasSlackConnector = connectors?.some(
-    (c) => (c.connectorType === "slack" || c.connector_type === "slack") && (c.isActive || c.is_active)
-  ) ?? false;
-
-  // Parse boolean/numeric settings
+  // Risk alert toggles still use org settings KV store
   const riskCritical = getSetting("alert_risk_critical") !== "false" && getSetting("alert_risk_critical") !== undefined ? getSetting("alert_risk_critical") !== "false" : true;
   const riskHigh = getSetting("alert_risk_high") !== "false" && getSetting("alert_risk_high") !== undefined ? getSetting("alert_risk_high") !== "false" : true;
   const usageSpike = getSetting("alert_usage_spike") !== "false" && getSetting("alert_usage_spike") !== undefined ? getSetting("alert_usage_spike") !== "false" : true;
-  const emailNotifications = getSetting("alert_email") !== "false" && getSetting("alert_email") !== undefined ? getSetting("alert_email") !== "false" : true;
-  const slackNotifications = getSetting("alert_slack") === "true";
 
-  // Controlled state for cost threshold inputs
-  const [costDaily, setCostDaily] = useState("");
-  const [costMonthly, setCostMonthly] = useState("");
-  const [costDailyError, setCostDailyError] = useState("");
-  const [costMonthlyError, setCostMonthlyError] = useState("");
-
-  // Sync controlled inputs when settings load
-  useEffect(() => {
-    const daily = getSetting("alert_cost_daily");
-    if (daily !== undefined) setCostDaily(daily);
-    else setCostDaily("500");
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings]);
+  // Cost/token thresholds are stored on the retention policy record
+  const [costDollars, setCostDollars] = useState("");
+  const [tokenThreshold, setTokenThreshold] = useState("");
+  const [thresholdDirty, setThresholdDirty] = useState(false);
 
   useEffect(() => {
-    const monthly = getSetting("alert_cost_monthly");
-    if (monthly !== undefined) setCostMonthly(monthly);
-    else setCostMonthly("5000");
+    if (retentionPolicy && !thresholdDirty) {
+      setCostDollars(
+        retentionPolicy.costThresholdCents != null
+          ? String(retentionPolicy.costThresholdCents / 100)
+          : ""
+      );
+      setTokenThreshold(
+        retentionPolicy.tokenThreshold != null
+          ? String(retentionPolicy.tokenThreshold)
+          : ""
+      );
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings]);
+  }, [retentionPolicy]);
 
-  const validateCostInput = (value: string) => validateCostInputLib(value, { required: true });
-
-  const handleCostDailyChange = (value: string) => {
-    setCostDaily(value);
-    setCostDailyError(validateCostInput(value));
-  };
-
-  const handleCostMonthlyChange = (value: string) => {
-    setCostMonthly(value);
-    setCostMonthlyError(validateCostInput(value));
-  };
-
-  const handleCostDailyBlur = () => {
-    const error = validateCostInput(costDaily);
-    setCostDailyError(error);
-    if (!error && currentOrg) {
-      updateSetting.mutate({ orgId: currentOrg.id, key: "alert_cost_daily", value: costDaily });
-    }
-  };
-
-  const handleCostMonthlyBlur = () => {
-    const error = validateCostInput(costMonthly);
-    setCostMonthlyError(error);
-    if (!error && currentOrg) {
-      updateSetting.mutate({ orgId: currentOrg.id, key: "alert_cost_monthly", value: costMonthly });
-    }
+  const handleSaveThresholds = () => {
+    if (!currentOrg) return;
+    updateRetentionPolicy.mutate({
+      orgId: currentOrg.id,
+      data: {
+        cost_threshold_cents: costDollars !== "" ? Math.round(parseFloat(costDollars) * 100) : null,
+        token_threshold: tokenThreshold !== "" ? parseInt(tokenThreshold, 10) : null,
+        alert_enabled: true,
+      },
+    });
+    setThresholdDirty(false);
   };
 
   const updateAlertSetting = async (key: string, value: unknown) => {
@@ -974,7 +954,7 @@ export function AlertSettings() {
     }
   };
 
-  if (isLoading) {
+  if (isLoadingSettings || isLoadingRetention) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-8 w-48" />
@@ -994,40 +974,49 @@ export function AlertSettings() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Cost Thresholds</CardTitle>
-          <CardDescription>Get notified when costs exceed limits</CardDescription>
+          <CardTitle className="text-base">Cost &amp; Token Thresholds</CardTitle>
+          <CardDescription>
+            Get notified when usage exceeds these limits.
+            {retentionPolicy?.costThresholdCents != null && (
+              <> Current: <strong>{formatCost(retentionPolicy.costThresholdCents / 100)}</strong> / {retentionPolicy.tokenThreshold != null ? <strong>{formatTokens(retentionPolicy.tokenThreshold)} tokens</strong> : "no token limit"}.</>
+            )}
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="costDaily">Daily Cost Limit (USD)</Label>
-            <Input
-              id="costDaily"
-              type="number"
-              min={0}
-              value={costDaily}
-              onChange={(e) => handleCostDailyChange(e.target.value)}
-              onBlur={handleCostDailyBlur}
-              className={cn(costDailyError && "border-destructive focus-visible:ring-destructive")}
-            />
-            {costDailyError && (
-              <p className="text-xs text-destructive">{costDailyError}</p>
-            )}
+          <div className="flex gap-4 flex-wrap">
+            <div className="flex-1 space-y-2">
+              <Label htmlFor="costThreshold">Cost Threshold (USD)</Label>
+              <Input
+                id="costThreshold"
+                type="number"
+                min={0}
+                step={0.01}
+                placeholder="e.g. 500"
+                value={costDollars}
+                onChange={(e) => { setCostDollars(e.target.value); setThresholdDirty(true); }}
+              />
+            </div>
+            <div className="flex-1 space-y-2">
+              <Label htmlFor="tokenThreshold">Token Threshold</Label>
+              <Input
+                id="tokenThreshold"
+                type="number"
+                min={0}
+                placeholder="e.g. 1000000"
+                value={tokenThreshold}
+                onChange={(e) => { setTokenThreshold(e.target.value); setThresholdDirty(true); }}
+              />
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="costMonthly">Monthly Cost Limit (USD)</Label>
-            <Input
-              id="costMonthly"
-              type="number"
-              min={0}
-              value={costMonthly}
-              onChange={(e) => handleCostMonthlyChange(e.target.value)}
-              onBlur={handleCostMonthlyBlur}
-              className={cn(costMonthlyError && "border-destructive focus-visible:ring-destructive")}
-            />
-            {costMonthlyError && (
-              <p className="text-xs text-destructive">{costMonthlyError}</p>
-            )}
-          </div>
+          <Button
+            onClick={handleSaveThresholds}
+            disabled={!thresholdDirty || updateRetentionPolicy.isPending}
+          >
+            {updateRetentionPolicy.isPending ? "Saving…" : "Save thresholds"}
+          </Button>
+          {updateRetentionPolicy.isError && (
+            <p className="text-sm text-destructive">Failed to save. Please try again.</p>
+          )}
         </CardContent>
       </Card>
 
@@ -1081,48 +1070,6 @@ export function AlertSettings() {
               checked={usageSpike}
               onCheckedChange={(checked) =>
                 updateAlertSetting("alert_usage_spike", checked)
-              }
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Notification Channels</CardTitle>
-          <CardDescription>Where to send alert notifications</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between rounded-lg border p-3">
-            <div>
-              <Label>Email Notifications</Label>
-              <p className="text-xs text-muted-foreground">
-                Send alerts to organization admins
-              </p>
-            </div>
-            <Switch
-              aria-label="Email Notifications"
-              checked={emailNotifications}
-              onCheckedChange={(checked) =>
-                updateAlertSetting("alert_email", checked)
-              }
-            />
-          </div>
-          <div className={cn("flex items-center justify-between rounded-lg border p-3", !hasSlackConnector && "opacity-60")}>
-            <div>
-              <Label>Slack Notifications</Label>
-              <p className="text-xs text-muted-foreground">
-                {hasSlackConnector
-                  ? "Post alerts to a Slack channel"
-                  : "Connect a Slack integration to enable this"}
-              </p>
-            </div>
-            <Switch
-              aria-label="Slack Notifications"
-              checked={slackNotifications}
-              disabled={!hasSlackConnector}
-              onCheckedChange={(checked) =>
-                updateAlertSetting("alert_slack", checked)
               }
             />
           </div>
