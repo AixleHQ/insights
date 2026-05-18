@@ -4,7 +4,8 @@ import { User, Settings2, Bell, Shield, Wrench, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrg } from "@/contexts/OrgContext";
 import { useTheme, type Theme } from "@/contexts/ThemeContext";
-import { useOrganizationMembers, useCurrentUser, useUpdateCurrentUser, useUserOrganizations, useUpdateUserSetting } from "@/hooks/useApi";
+import { useOrganizationMembers, useCurrentUser, useUpdateCurrentUser, useUserOrganizations, useUpdateUserSetting, usePersonalSettings, useUpdatePersonalSettings } from "@/hooks/useApi";
+import type { UserPersonalSettings } from "@/lib/types";
 import { MemberProfileView } from "./MemberProfile";
 import { cn } from "@/lib/utils";
 import {
@@ -277,6 +278,121 @@ function PreferencesSection() {
   );
 }
 
+function PersonalAlertThresholdsForm({ settings }: { settings: UserPersonalSettings }) {
+  const updateSettings = useUpdatePersonalSettings();
+  const [costInput, setCostInput] = useState(
+    settings.costThresholdCents != null ? String(settings.costThresholdCents / 100) : ""
+  );
+  const [tokenInput, setTokenInput] = useState(
+    settings.tokenThreshold != null ? String(settings.tokenThreshold) : ""
+  );
+
+  function handleSaveThresholds() {
+    const costCents = costInput !== "" ? Math.round(parseFloat(costInput) * 100) : null;
+    const tokens = tokenInput !== "" ? parseInt(tokenInput, 10) : null;
+    updateSettings.mutate({
+      costThresholdCents: isNaN(costCents as number) ? null : costCents,
+      tokenThreshold: isNaN(tokens as number) ? null : tokens,
+    });
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Personal Alert Thresholds</CardTitle>
+        <CardDescription>
+          Override org-level thresholds with your own limits. Leave blank to use org defaults.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="personal-cost-threshold">Cost threshold (USD)</Label>
+            <Input
+              id="personal-cost-threshold"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="e.g. 5.00"
+              value={costInput}
+              onChange={(e) => setCostInput(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">Alert when your personal cost exceeds this amount.</p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="personal-token-threshold">Token threshold</Label>
+            <Input
+              id="personal-token-threshold"
+              type="number"
+              min="0"
+              step="1000"
+              placeholder="e.g. 100000"
+              value={tokenInput}
+              onChange={(e) => setTokenInput(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">Alert when your personal token usage exceeds this count.</p>
+          </div>
+        </div>
+        <Button
+          size="sm"
+          onClick={handleSaveThresholds}
+          disabled={updateSettings.isPending}
+        >
+          {updateSettings.isPending && <Loader2 className="mr-2 size-3.5 animate-spin" />}
+          Save thresholds
+        </Button>
+        <div className="space-y-4 border-t pt-4">
+          <p className="text-sm font-medium">Alert delivery</p>
+          <div className="flex items-center justify-between gap-4">
+            <div className="space-y-0.5">
+              <Label htmlFor="alert-email">Email alerts</Label>
+              <p className="text-xs text-muted-foreground">Receive alert notifications by email.</p>
+            </div>
+            <Switch
+              id="alert-email"
+              checked={settings.alertEmail}
+              onCheckedChange={(checked) => updateSettings.mutate({ alertEmail: checked })}
+              disabled={updateSettings.isPending}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <div className="space-y-0.5">
+              <Label htmlFor="alert-slack">Slack alerts</Label>
+              <p className="text-xs text-muted-foreground">Receive alert notifications via Slack.</p>
+            </div>
+            <Switch
+              id="alert-slack"
+              checked={settings.alertSlack}
+              onCheckedChange={(checked) => updateSettings.mutate({ alertSlack: checked })}
+              disabled={updateSettings.isPending}
+            />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PersonalAlertThresholdsCard() {
+  const { data: settings, isLoading } = usePersonalSettings();
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Personal Alert Thresholds</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Skeleton className="h-10" />
+          <Skeleton className="h-10" />
+        </CardContent>
+      </Card>
+    );
+  }
+  if (!settings) return null;
+  return <PersonalAlertThresholdsForm settings={settings} />;
+}
+
 const NOTIFICATION_TOGGLES = [
   { key: "notify_in_app_risk",  label: "In-app risk alerts",  description: "Show alerts in-app when a risk is detected." },
   { key: "notify_in_app_cost",  label: "In-app cost alerts",  description: "Show alerts in-app when cost thresholds are exceeded." },
@@ -327,6 +443,7 @@ function NotificationsSection() {
           )}
         </CardContent>
       </Card>
+      <PersonalAlertThresholdsCard />
     </div>
   );
 }
