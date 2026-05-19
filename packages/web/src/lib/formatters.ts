@@ -26,6 +26,12 @@ export function formatPercentage(n: number | null | undefined): string {
   return `${(n * 100).toFixed(1)}%`;
 }
 
+// For already-computed percentage values (e.g. 12.3 → "12.3%").
+// Distinct from formatPercentage which expects a fraction (0.123 → "12.3%").
+export function formatPercent(n: number, decimals = 1): string {
+  return `${n.toFixed(decimals)}%`;
+}
+
 export function truncateModelName(name: string): string {
   return name.length > 30 ? `${name.slice(0, 30)}…` : name;
 }

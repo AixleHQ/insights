@@ -4,5 +4,5 @@ class OrganizationRetentionPolicyPolicy < ApplicationPolicy
   # ApplicationPolicy aliases edit?, update?, destroy? → manage?; add show? and create? here.
   alias_rule :show?, :create?, to: :manage?
 
-  def manage? = org_admin?(record.organization) || global_admin?
+  def manage? = org_owner?(record.organization) || global_admin?
 end

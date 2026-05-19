@@ -774,6 +774,112 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /api/v1/organizations/{organization_id}/members/{id}/dashboard_stats:
+    get:
+      summary: Personal dashboard stats for a member
+      tags:
+        - Organization Members
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: id
+          in: path
+          required: true
+          description: Membership ID or user UUID
+          schema:
+            type: string
+        - name: period
+          in: query
+          required: false
+          description: Time window (7d, 30d, 90d). Default 30d.
+          schema:
+            type: string
+            enum: [7d, 30d, 90d]
+      responses:
+        '200':
+          description: Dashboard stats for the period
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_events:
+                    type: integer
+                  total_cost_usd:
+                    type: number
+                    format: float
+                  total_tokens_in:
+                    type: integer
+                  total_tokens_out:
+                    type: integer
+                  events_change_percent:
+                    type: number
+                    format: float
+                  cost_change_percent:
+                    type: number
+                    format: float
+                  tokens_change_percent:
+                    type: number
+                    format: float
+                  tool_breakdown:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        tool_name:
+                          type: string
+                        event_count:
+                          type: integer
+                        cost_usd:
+                          type: number
+                          format: float
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/organizations/{organization_id}/members/{id}/stats/heatmap:
+    get:
+      summary: Activity heatmap for a member (last 365 days)
+      tags:
+        - Organization Members
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: id
+          in: path
+          required: true
+          description: Membership ID or user UUID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Daily event counts for heatmap
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    date:
+                      type: string
+                      format: date
+                    count:
+                      type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   # ============================================
   # ORGANIZATION CONNECTORS ENDPOINTS
   # ============================================

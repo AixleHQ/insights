@@ -51,6 +51,8 @@ Rails.application.routes.draw do
           member do
             get :stats
             get :events
+            get :dashboard_stats
+            get "stats/heatmap", action: :member_heatmap
           end
         end
 

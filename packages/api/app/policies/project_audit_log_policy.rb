@@ -6,7 +6,7 @@ class ProjectAuditLogPolicy < ApplicationPolicy
   def index?
     return true if global_admin?
     return own_personal_project? if record.personal?
-    return project_admin?(record) || org_admin?(record.organization) if record.organization_project?
+    return project_admin?(record) || org_owner?(record.organization) if record.organization_project?
 
     false
   end
@@ -21,7 +21,7 @@ class ProjectAuditLogPolicy < ApplicationPolicy
     @full_access ||= begin
       return true if global_admin?
       return own_personal_project? if record.personal?
-      return org_admin?(record.organization) if record.organization_project?
+      return org_owner?(record.organization) if record.organization_project?
 
       false
     end

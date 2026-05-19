@@ -354,4 +354,161 @@ RSpec.describe 'Api::V1::OrganizationMembers', type: :request do
       expect_success
     end
   end
+
+  describe 'GET /api/v1/organizations/:organization_id/members/:id/dashboard_stats' do
+    before do
+      create(:tool_event,
+             organization: organization,
+             user: member,
+             tool_name: 'claude_code',
+             tokens_in: 100,
+             tokens_out: 500,
+             cost_usd: 0.05,
+             occurred_at: 10.days.ago)
+      create(:tool_event,
+             organization: organization,
+             user: member,
+             tool_name: 'cursor',
+             tokens_in: 50,
+             tokens_out: 200,
+             cost_usd: 0.02,
+             occurred_at: 20.days.ago)
+    end
+
+    it 'returns dashboard stats with default period' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/dashboard_stats",
+                        user: owner,
+                        organization: organization
+
+      expect_success
+      expect(json_response[:total_events]).to be_a(Integer)
+      expect(json_response[:total_cost_usd]).to be_a(Numeric)
+      expect(json_response[:total_tokens_in]).to be_a(Integer)
+      expect(json_response[:total_tokens_out]).to be_a(Integer)
+      expect(json_response[:events_change_percent]).to be_a(Numeric)
+      expect(json_response[:cost_change_percent]).to be_a(Numeric)
+      expect(json_response[:tokens_change_percent]).to be_a(Numeric)
+      expect(json_response[:tool_breakdown]).to be_an(Array)
+    end
+
+    it 'returns tool_breakdown with correct field names' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/dashboard_stats",
+                        user: owner,
+                        organization: organization
+
+      expect_success
+      tool = json_response[:tool_breakdown].first
+      expect(tool).to have_key(:tool_name)
+      expect(tool).to have_key(:event_count)
+      expect(tool).to have_key(:cost_usd)
+    end
+
+    it 'filters by explicit period param' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/dashboard_stats",
+                        user: owner,
+                        organization: organization,
+                        params: { period: '7d' }
+
+      expect_success
+      # Both events are older than 7 days, so current window should be 0
+      expect(json_response[:total_events]).to eq(0)
+    end
+
+    it 'resolves membership by user.id in path' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member.id}/dashboard_stats",
+                        user: owner,
+                        organization: organization
+
+      expect_success
+    end
+
+    it 'allows member to view their own dashboard stats' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/dashboard_stats",
+                        user: member,
+                        organization: organization
+
+      expect_success
+    end
+
+    it 'denies a member from viewing another member dashboard stats' do
+      other_member = create(:user)
+      create(:organization_membership, user: other_member, organization: organization, role: 'member')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/dashboard_stats",
+                        user: other_member,
+                        organization: organization
+
+      expect(response).to have_http_status(:forbidden)
+    end
+  end
+
+  describe 'GET /api/v1/organizations/:organization_id/members/:id/stats/heatmap' do
+    before do
+      create(:tool_event,
+             organization: organization,
+             user: member,
+             tool_name: 'claude_code',
+             occurred_at: 10.days.ago)
+      create(:tool_event,
+             organization: organization,
+             user: member,
+             tool_name: 'cursor',
+             occurred_at: 10.days.ago)
+      create(:tool_event,
+             organization: organization,
+             user: member,
+             tool_name: 'claude_code',
+             occurred_at: 20.days.ago)
+    end
+
+    it 'returns heatmap data as array of date/count pairs' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/stats/heatmap",
+                        user: owner,
+                        organization: organization
+
+      expect_success
+      expect(json_response).to be_an(Array)
+      entry = json_response.first
+      expect(entry).to have_key(:date)
+      expect(entry).to have_key(:count)
+    end
+
+    it 'groups events by date' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/stats/heatmap",
+                        user: owner,
+                        organization: organization
+
+      expect_success
+      # Two events on same day should sum to count 2
+      ten_days_ago = json_response.find { |r| r[:count] == 2 }
+      expect(ten_days_ago).not_to be_nil
+    end
+
+    it 'resolves membership by user.id in path' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member.id}/stats/heatmap",
+                        user: owner,
+                        organization: organization
+
+      expect_success
+    end
+
+    it 'allows member to view their own heatmap' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/stats/heatmap",
+                        user: member,
+                        organization: organization
+
+      expect_success
+    end
+
+    it 'denies a member from viewing another member heatmap' do
+      other_member = create(:user)
+      create(:organization_membership, user: other_member, organization: organization, role: 'member')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/stats/heatmap",
+                        user: other_member,
+                        organization: organization
+
+      expect(response).to have_http_status(:forbidden)
+    end
+  end
 end
