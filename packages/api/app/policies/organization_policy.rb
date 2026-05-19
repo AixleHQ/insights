@@ -8,7 +8,7 @@ class OrganizationPolicy < ApplicationPolicy
 
   # Only admins can update the organization
   def update?
-    org_admin?(record) || global_admin?
+    org_owner?(record) || global_admin?
   end
 
   # Only owners can destroy the organization
@@ -28,7 +28,7 @@ class OrganizationPolicy < ApplicationPolicy
 
   # Only admins can view/update retention policy
   def retention_policy?
-    org_admin?(record) || global_admin?
+    org_owner?(record) || global_admin?
   end
 
   # Only owners can view retention preview (estimated purge count)
@@ -38,17 +38,17 @@ class OrganizationPolicy < ApplicationPolicy
 
   # Only admins can manage settings
   def settings?
-    org_admin?(record) || global_admin?
+    org_owner?(record) || global_admin?
   end
 
   # Admins can view the model pricing table
   def model_pricing?
-    org_admin?(record) || global_admin?
+    org_owner?(record) || global_admin?
   end
 
   # Admins can manage per-org pricing overrides (index, create, update, destroy)
   def manage_pricing_override?
-    org_admin?(record) || global_admin?
+    org_owner?(record) || global_admin?
   end
 
   # Members can create events (telemetry ingestion)
@@ -57,11 +57,11 @@ class OrganizationPolicy < ApplicationPolicy
   end
 
   def list_unattributed?
-    org_admin?(record) || global_admin?
+    org_owner?(record) || global_admin?
   end
 
   def attribute_bulk?
-    org_admin?(record) || global_admin?
+    org_owner?(record) || global_admin?
   end
 
   relation_scope do |scope|

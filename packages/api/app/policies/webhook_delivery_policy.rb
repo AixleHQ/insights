@@ -3,12 +3,12 @@
 class WebhookDeliveryPolicy < ApplicationPolicy
   # index?: record = Organization instance (authorized via current_organization)
   def index?
-    org_admin?(record) || global_admin?
+    org_owner?(record) || global_admin?
   end
 
   # retry?: record = WebhookDelivery instance
   def retry?
-    org_admin?(record.organization_connector.organization) || global_admin?
+    org_owner?(record.organization_connector.organization) || global_admin?
   end
 
   relation_scope do |scope|

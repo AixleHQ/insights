@@ -13,13 +13,6 @@ class ApplicationPolicy < ActionPolicy::Base
     user.member_of?(org)
   end
 
-  def org_admin?(org = organization)
-    # post-AIX-201: delegates to admin_of? which now means owner-only
-    # TODO AIX-XXX: deprecate in favour of org_owner? and sweep callers
-    return false unless user && org
-    user.admin_of?(org)
-  end
-
   def org_owner?(org = organization)
     return false unless user && org
     user.role_in(org) == "owner"

@@ -4,7 +4,7 @@ class OrganizationAuditLogPolicy < ApplicationPolicy
   # record = current_organization (Organization instance)
 
   def index?
-    org_admin?(record) || global_admin?
+    org_owner?(record) || global_admin?
   end
 
   # Reserved for a future single-record endpoint; mirrors index? for now
