@@ -198,11 +198,11 @@ Output is a markdown table classifying each task as ✅ green (≤ 80K), ⚠️ 
 
 **If a task comes back red — split it.** Two options, in order of preference:
 
-1. **Split by subsystem into sibling tasks** — if the task touches `api` + `web`, separate them into `0X-api-...md` and `0Y-web-...md`. Each is its own branch and its own PR. Standard "1 task = 1 branch = 1 PR" applies.
+1. **Split into sub-tasks on the same branch** — use suffix-letter naming (`01a-...md`, `01b-...md`, `02a-...md`, `02b-...md`, etc.) and ship all sub-tasks on the **same branch** as **one PR with N commits, one per sub-task**. Run `/clear` between sub-task implementation sessions to keep each session fresh on Sonnet. The PR description references all sub-task files for review context. This is the default split strategy — **keep all work for a ticket in a single PR**, even when it spans `api` + `web` subsystems.
 
-2. **Split into sub-tasks on the same branch** — when the task is one logical unit but too large for a single session (e.g. extracting a 1500-LOC service into a new module). Use suffix-letter naming (`02a-...md`, `02b-...md`, `02c-...md`) and ship them on the **same branch** as **one PR with N commits, one per sub-task**. Run `/clear` between sub-task implementation sessions to keep each session fresh on Sonnet. The PR description references all sub-task files for review context.
+2. **Split by subsystem into sibling tasks (separate PRs)** — only when the subsystem pieces are genuinely independent and could ship to production on different timelines (e.g., a standalone API change that unblocks another team). If the feature only makes sense when both sides ship together, stay on one branch.
 
-**Choose option 2 when** the work is one indivisible commit-history story (one feature, one rationale, one rollback unit), but happens to be too big for one Sonnet session. Choose option 1 when the work could ship in independent PRs without coordination overhead.
+**Default: one ticket = one PR.** Use option 2 only when there is a concrete reason to ship subsystems separately.
 
 The plan-task-budget script doesn't distinguish between sub-tasks and standalone tasks — both must fit individually. Sub-tasks share a branch but each must still pass the 130K budget check on its own.
 
