@@ -1,8 +1,26 @@
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
-import { BrowserRouter } from "react-router-dom";
+import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
+import { render, screen } from "@/test/utils";
 import { ProjectTeamSection } from "./ProjectTeamSection";
 import type { ProjectMember } from "@/hooks/useApi";
+
+// Radix UI Select requires these in jsdom
+beforeAll(() => {
+  window.Element.prototype.hasPointerCapture = vi.fn(() => false);
+  window.Element.prototype.setPointerCapture = vi.fn();
+  window.Element.prototype.releasePointerCapture = vi.fn();
+  window.Element.prototype.scrollIntoView = vi.fn();
+});
+
+const mockUpdateMutate = vi.fn();
+const mockRemoveMutate = vi.fn();
+const mockAddMutate = vi.fn();
+
+vi.mock("@/hooks/useApi", () => ({
+  useUpdateProjectMember: () => ({ mutate: mockUpdateMutate, isPending: false }),
+  useRemoveProjectMember: () => ({ mutate: mockRemoveMutate, isPending: false }),
+  useAddProjectMember: () => ({ mutate: mockAddMutate, isPending: false }),
+  useOrganizationMembers: () => ({ data: [] }),
+}));
 
 const mockMembers: ProjectMember[] = [
   {
@@ -26,14 +44,14 @@ const mockMembers: ProjectMember[] = [
 ];
 
 const renderComponent = (props: Partial<Parameters<typeof ProjectTeamSection>[0]> = {}) => {
-  return render(
-    <BrowserRouter>
-      <ProjectTeamSection members={mockMembers} {...props} />
-    </BrowserRouter>
-  );
+  return render(<ProjectTeamSection members={mockMembers} {...props} />);
 };
 
 describe("ProjectTeamSection", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   describe("Initial Render", () => {
     it("renders the component with title", () => {
       renderComponent();
@@ -51,7 +69,7 @@ describe("ProjectTeamSection", () => {
     });
   });
 
-  describe("Member Display", () => {
+  describe("Member Display (read-only)", () => {
     it("renders member names", () => {
       renderComponent();
       expect(screen.getByText("Alice Johnson")).toBeInTheDocument();
@@ -112,7 +130,7 @@ describe("ProjectTeamSection", () => {
   describe("Loading State", () => {
     it("shows loading text when isLoading is true", () => {
       renderComponent({ isLoading: true });
-      expect(screen.getByText("Loading team members...")).toBeInTheDocument();
+      expect(screen.getByText("Loading team members…")).toBeInTheDocument();
     });
 
     it("shows skeleton loaders when loading", () => {
@@ -125,12 +143,15 @@ describe("ProjectTeamSection", () => {
   describe("Empty State", () => {
     it("shows empty message when no members", () => {
       renderComponent({ members: [] });
-      expect(screen.getByText("No team members assigned to this project")).toBeInTheDocument();
+      expect(screen.getByText("No explicit project members.")).toBeInTheDocument();
+      expect(
+        screen.getByText(/Organization owners always have implicit access/)
+      ).toBeInTheDocument();
     });
 
     it("shows empty message when members is undefined", () => {
       renderComponent({ members: undefined });
-      expect(screen.getByText("No team members assigned to this project")).toBeInTheDocument();
+      expect(screen.getByText("No explicit project members.")).toBeInTheDocument();
     });
 
     it("displays 0 members count", () => {
@@ -140,16 +161,16 @@ describe("ProjectTeamSection", () => {
   });
 
   describe("Role Badge Colors", () => {
-    it("applies correct color class for owner role", () => {
-      renderComponent({ members: [mockMembers[0]] });
-      const ownerBadge = screen.getByText("owner");
-      expect(ownerBadge).toHaveClass("text-violet-400");
+    it("applies shared role badge for owner role", () => {
+      const { container } = renderComponent({ members: [mockMembers[0]] });
+      expect(screen.getByText("owner")).toBeInTheDocument();
+      expect(container.querySelector(".lucide-crown")).toBeInTheDocument();
     });
 
-    it("applies correct color class for member role", () => {
-      renderComponent({ members: [mockMembers[1]] });
-      const memberBadge = screen.getByText("member");
-      expect(memberBadge).toHaveClass("text-blue-400");
+    it("applies shared role badge for member role", () => {
+      const { container } = renderComponent({ members: [mockMembers[1]] });
+      expect(screen.getByText("member")).toBeInTheDocument();
+      expect(container.querySelector(".lucide-user")).toBeInTheDocument();
     });
 
     it("handles viewer role", () => {
@@ -159,8 +180,7 @@ describe("ProjectTeamSection", () => {
         role: "viewer",
       };
       renderComponent({ members: [viewerMember] });
-      const viewerBadge = screen.getByText("viewer");
-      expect(viewerBadge).toHaveClass("text-slate-400");
+      expect(screen.getByText("viewer")).toBeInTheDocument();
     });
   });
 
@@ -168,6 +188,38 @@ describe("ProjectTeamSection", () => {
     it("applies custom className to container", () => {
       const { container } = renderComponent({ className: "custom-class" });
       expect(container.firstChild).toHaveClass("custom-class");
+    });
+  });
+
+  describe("canManage mode", () => {
+    const manageProps = { canManage: true, projectId: "proj-1", orgId: "org-1" };
+
+    it("does not show link cards when canManage is true", () => {
+      renderComponent(manageProps);
+      expect(screen.queryAllByRole("link")).toHaveLength(0);
+    });
+
+    it("shows remove button for each member", () => {
+      renderComponent(manageProps);
+      const buttons = screen.getAllByRole("button");
+      expect(buttons.length).toBeGreaterThanOrEqual(mockMembers.length);
+    });
+
+    it("shows role selects for each member", () => {
+      renderComponent(manageProps);
+      const combos = screen.getAllByRole("combobox");
+      expect(combos.length).toBe(mockMembers.length);
+    });
+
+    it("calls removeMember mutate when remove button is clicked", async () => {
+      const { default: userEvent } = await import("@testing-library/user-event");
+      const user = userEvent.setup();
+      renderComponent(manageProps);
+
+      const removeButtons = screen.getAllByRole("button");
+      await user.click(removeButtons[0]);
+
+      expect(mockRemoveMutate).toHaveBeenCalledWith(mockMembers[0].id);
     });
   });
 });

@@ -19,7 +19,9 @@ import {
   useDeleteProject,
   useProjectMembers,
   useProjectCommitStats,
+  useCurrentUser,
 } from "@/hooks/useApi";
+import { useOrg } from "@/contexts/OrgContext";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -276,11 +278,27 @@ function ProjectGeneralSettings({
   return <ProjectGeneralSettingsForm key={project.id} projectId={projectId} defaultValues={defaultValues} />;
 }
 
-function ProjectMembersSettings({ projectId }: { projectId: string }) {
+function ProjectMembersSettings({ projectId, orgId }: { projectId: string; orgId: string }) {
   const { data: members, isLoading } = useProjectMembers(projectId);
   const { data: commitStats } = useProjectCommitStats(projectId);
+  const { data: currentUser } = useCurrentUser();
+  const { currentMembership } = useOrg();
+  const isOrgOwner = currentMembership?.role === "owner";
+  const isProjectOwner = members?.some(
+    (m) => m.userId === currentUser?.id && m.role === "owner"
+  );
+  const canManage = isOrgOwner || !!isProjectOwner;
 
-  return <ProjectTeamSection members={members} isLoading={isLoading} commitStats={commitStats} projectId={projectId} />;
+  return (
+    <ProjectTeamSection
+      members={members}
+      isLoading={isLoading}
+      commitStats={commitStats}
+      projectId={projectId}
+      orgId={orgId}
+      canManage={canManage}
+    />
+  );
 }
 
 function ProjectIntegrationsSettings({ projectId }: { projectId: string }) {
@@ -333,7 +351,7 @@ export function ProjectSettings() {
         <div className="flex-1 min-w-0">
           <Routes>
             <Route index element={<ProjectGeneralSettings projectId={id} project={project} isLoading={isLoadingProject} />} />
-            <Route path="members" element={<ProjectMembersSettings projectId={id} />} />
+            <Route path="members" element={<ProjectMembersSettings projectId={id} orgId={project?.organization_id ?? ""} />} />
             <Route path="integrations" element={<ProjectIntegrationsSettings projectId={id} />} />
             <Route path="security" element={<ProjectSecurityTab projectId={id} />} />
             <Route path="policies" element={<ProjectRetentionPolicySection projectId={id} />} />

@@ -20,11 +20,18 @@ import {
   useLeaveOrganization,
   useInvitations,
   useRevokeInvitation,
+  useNotificationRoutes,
+  useCreateNotificationRoute,
+  useUpdateNotificationRoute,
+  useDeleteNotificationRoute,
 } from "@/hooks/useApi";
-import type { Invitation } from "@/lib/types";
+import type { Invitation, NotificationRoute, OrganizationMember } from "@/lib/types";
 import { formatCost, formatCount } from "@/lib/formatters";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { SortButton, type SortDirection } from "@/components/ui/sort-button";
 import {
   Select,
@@ -61,8 +68,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RoleBadge } from "@/components/ui/role-badge";
+import { OrgPolicyPanel } from "@/components/org/OrgPolicyPanel";
 
 type MemberSortField = "name" | "role" | "last_active_at" | "total_events" | "total_cost";
 
@@ -371,6 +379,10 @@ export function Members() {
         </Table>
       </div>
 
+      {currentOrg && <OrgPolicyPanel orgId={currentOrg.id} />}
+
+      {currentOrg && <NotificationRoutesPanel orgId={currentOrg.id} members={membersData ?? []} />}
+
       <LeaveOrganizationSection
         currentOrg={currentOrg}
         currentMembership={currentMembership}
@@ -443,9 +455,7 @@ function MemberTableRow({
           </div>
         </TableCell>
         <TableCell className="p-4">
-          <Badge variant="outline" className="capitalize text-xs">
-            {member.role}
-          </Badge>
+          <RoleBadge role={member.role} />
         </TableCell>
         <TableCell className="hidden md:table-cell p-4 text-sm text-muted-foreground">
           {formatLastActive(member.last_active_at)}
@@ -467,14 +477,24 @@ function MemberTableRow({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 {member.role === "member" && (
-                  <DropdownMenuItem onClick={() => onRoleChange(member.id, "viewer")}>
-                    Change to Viewer
-                  </DropdownMenuItem>
+                  <>
+                    <DropdownMenuItem onClick={() => onRoleChange(member.id, "owner")}>
+                      Promote to Owner
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onRoleChange(member.id, "viewer")}>
+                      Change to Viewer
+                    </DropdownMenuItem>
+                  </>
                 )}
                 {member.role === "viewer" && (
-                  <DropdownMenuItem onClick={() => onRoleChange(member.id, "member")}>
-                    Change to Member
-                  </DropdownMenuItem>
+                  <>
+                    <DropdownMenuItem onClick={() => onRoleChange(member.id, "member")}>
+                      Change to Member
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onRoleChange(member.id, "owner")}>
+                      Promote to Owner
+                    </DropdownMenuItem>
+                  </>
                 )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -648,5 +668,165 @@ function LeaveOrganizationSection({
         </AlertDialog>
       </div>
     </div>
+  );
+}
+
+const NOTIFICATION_TYPE_LABELS: Record<NotificationRoute["notificationType"], string> = {
+  cost_alert: "Cost Alert",
+  token_alert: "Token Alert",
+  retention_warning: "Retention Warning",
+  risk_alert: "Risk Alert",
+};
+
+function NotificationRoutesPanel({
+  orgId,
+  members,
+}: {
+  orgId: string;
+  members: OrganizationMember[];
+}) {
+  const { data: routes = [] } = useNotificationRoutes(orgId);
+  const createRoute = useCreateNotificationRoute(orgId);
+  const updateRoute = useUpdateNotificationRoute(orgId);
+  const deleteRoute = useDeleteNotificationRoute(orgId);
+
+  const [newType, setNewType] = useState<NotificationRoute["notificationType"]>("cost_alert");
+  const [newRecipientType, setNewRecipientType] = useState<"role" | "user">("role");
+  const [newRole, setNewRole] = useState<MemberRole>("owner");
+  const [newUserId, setNewUserId] = useState<string>("");
+
+  function handleAdd() {
+    createRoute.mutate({
+      notification_type: newType,
+      recipient_type: newRecipientType,
+      recipient_role: newRecipientType === "role" ? newRole : null,
+      recipient_user_id: newRecipientType === "user" ? newUserId || null : null,
+      enabled: true,
+    });
+    setNewUserId("");
+  }
+
+  const recipientLabel = (route: NotificationRoute) => {
+    if (route.recipientType === "role") return `All ${route.recipientRole}s`;
+    const member = members.find((m) => (m.userId ?? m.user_id) === route.recipientUserId);
+    return member?.user.email ?? route.recipientUserId ?? "Unknown user";
+  };
+
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle>Notification Routes</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {routes.length === 0 && (
+          <p className="text-sm text-muted-foreground">No routes configured. Add one below.</p>
+        )}
+        {routes.map((route) => (
+          <div
+            key={route.id}
+            className="flex items-center justify-between gap-2 py-2 border-b last:border-0"
+          >
+            <div className="text-sm">
+              <span className="font-medium">{NOTIFICATION_TYPE_LABELS[route.notificationType]}</span>
+              <span className="text-muted-foreground"> → {recipientLabel(route)}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={route.enabled}
+                onCheckedChange={(enabled) => updateRoute.mutate({ id: route.id, enabled })}
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => deleteRoute.mutate(route.id)}
+                disabled={deleteRoute.isPending}
+              >
+                Remove
+              </Button>
+            </div>
+          </div>
+        ))}
+
+        <div className="border-t pt-4 space-y-3">
+          <p className="text-sm font-medium">Add route</p>
+          <div className="flex gap-2 flex-wrap items-end">
+            <div>
+              <Label className="text-xs">Alert type</Label>
+              <Select
+                value={newType}
+                onValueChange={(v) => setNewType(v as NotificationRoute["notificationType"])}
+              >
+                <SelectTrigger className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(NOTIFICATION_TYPE_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Recipient</Label>
+              <Select
+                value={newRecipientType}
+                onValueChange={(v) => setNewRecipientType(v as "role" | "user")}
+              >
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="role">By role</SelectItem>
+                  <SelectItem value="user">Specific user</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {newRecipientType === "role" ? (
+              <div>
+                <Label className="text-xs">Role</Label>
+                <Select value={newRole} onValueChange={(v) => setNewRole(v as MemberRole)}>
+                  <SelectTrigger className="w-28">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="owner">Owner</SelectItem>
+                    <SelectItem value="member">Member</SelectItem>
+                    <SelectItem value="viewer">Viewer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div>
+                <Label className="text-xs">Member</Label>
+                <Select value={newUserId} onValueChange={setNewUserId}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Select member…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {members.map((m) => (
+                      <SelectItem key={m.userId ?? m.user_id} value={(m.userId ?? m.user_id)!}>
+                        {m.user.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <Button
+              size="sm"
+              onClick={handleAdd}
+              disabled={createRoute.isPending || (newRecipientType === "user" && !newUserId)}
+            >
+              Add
+            </Button>
+          </div>
+          {createRoute.isError && (
+            <p className="text-sm text-destructive">Failed to add route. Try again.</p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

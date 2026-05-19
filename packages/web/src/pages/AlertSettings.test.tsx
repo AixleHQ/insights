@@ -10,12 +10,15 @@ vi.mock("@/contexts/OrgContext", () => ({
   }),
 }));
 
-const mockMutate = vi.fn();
 const mockMutateAsync = vi.fn();
+const mockRetentionMutate = vi.fn();
 
-// Minimal default: no connectors, no saved settings
 let mockSettingsData: { data: Array<{ key: string; value: string }> } | undefined = undefined;
-let mockConnectorsData: Array<{ connectorType: string; isActive: boolean }> = [];
+let mockRetentionData: {
+  costThresholdCents: number | null;
+  tokenThreshold: number | null;
+  alertEnabled: boolean;
+} | undefined = undefined;
 
 vi.mock("@/hooks/useApi", () => ({
   useOrganizationSettings: () => ({
@@ -23,11 +26,17 @@ vi.mock("@/hooks/useApi", () => ({
     isLoading: false,
   }),
   useUpdateOrganizationSetting: () => ({
-    mutate: mockMutate,
+    mutate: vi.fn(),
     mutateAsync: mockMutateAsync,
   }),
-  useConnectors: () => ({
-    data: mockConnectorsData,
+  useRetentionPolicy: () => ({
+    data: mockRetentionData,
+    isLoading: false,
+  }),
+  useUpdateRetentionPolicy: () => ({
+    mutate: mockRetentionMutate,
+    isPending: false,
+    isError: false,
   }),
 }));
 
@@ -40,202 +49,71 @@ describe("AlertSettings", () => {
     vi.clearAllMocks();
     mockMutateAsync.mockResolvedValue({});
     mockSettingsData = undefined;
-    mockConnectorsData = [];
+    mockRetentionData = undefined;
   });
 
-  describe("Cost Thresholds", () => {
-    it("renders daily and monthly cost inputs", () => {
+  // ── Cost & Token Thresholds ────────────────────────────────────────────────
+
+  describe("Cost & Token Thresholds", () => {
+    it("renders cost and token threshold inputs", () => {
       renderAlertSettings();
-      expect(screen.getByLabelText("Daily Cost Limit (USD)")).toBeInTheDocument();
-      expect(screen.getByLabelText("Monthly Cost Limit (USD)")).toBeInTheDocument();
+      expect(screen.getByLabelText("Cost Threshold (USD)")).toBeInTheDocument();
+      expect(screen.getByLabelText("Token Threshold")).toBeInTheDocument();
     });
 
-    it("uses default value of 500 for daily when no setting exists", () => {
+    it("shows empty cost input when no retention policy set", () => {
       renderAlertSettings();
-      expect(screen.getByLabelText("Daily Cost Limit (USD)")).toHaveValue(500);
+      expect(screen.getByLabelText("Cost Threshold (USD)")).toHaveValue(null);
     });
 
-    it("uses default value of 5000 for monthly when no setting exists", () => {
+    it("populates cost input from retention policy (cents to dollars)", () => {
+      mockRetentionData = { costThresholdCents: 50000, tokenThreshold: null, alertEnabled: true };
       renderAlertSettings();
-      expect(screen.getByLabelText("Monthly Cost Limit (USD)")).toHaveValue(5000);
+      expect(screen.getByLabelText("Cost Threshold (USD)")).toHaveValue(500);
     });
 
-    it("displays saved daily cost from settings", () => {
-      mockSettingsData = { data: [{ key: "alert_cost_daily", value: "250" }] };
+    it("populates token input from retention policy", () => {
+      mockRetentionData = { costThresholdCents: null, tokenThreshold: 1000000, alertEnabled: true };
       renderAlertSettings();
-      expect(screen.getByLabelText("Daily Cost Limit (USD)")).toHaveValue(250);
+      expect(screen.getByLabelText("Token Threshold")).toHaveValue(1000000);
     });
 
-    it("displays saved monthly cost from settings", () => {
-      mockSettingsData = { data: [{ key: "alert_cost_monthly", value: "3000" }] };
+    it("renders save thresholds button", () => {
       renderAlertSettings();
-      expect(screen.getByLabelText("Monthly Cost Limit (USD)")).toHaveValue(3000);
+      expect(screen.getByRole("button", { name: /save thresholds/i })).toBeInTheDocument();
     });
 
-    it("saves daily cost on blur when valid", async () => {
+    it("save button is disabled when form is not dirty", () => {
+      renderAlertSettings();
+      expect(screen.getByRole("button", { name: /save thresholds/i })).toBeDisabled();
+    });
+
+    it("save button is enabled after changing cost input", async () => {
       const user = userEvent.setup();
       renderAlertSettings();
 
-      const input = screen.getByLabelText("Daily Cost Limit (USD)");
-      await user.clear(input);
-      await user.type(input, "300");
-      await user.tab();
+      await user.type(screen.getByLabelText("Cost Threshold (USD)"), "10");
 
-      await waitFor(() => {
-        expect(mockMutate).toHaveBeenCalledWith(
-          expect.objectContaining({ key: "alert_cost_daily", value: "300" })
-        );
-      });
+      expect(screen.getByRole("button", { name: /save thresholds/i })).not.toBeDisabled();
     });
 
-    it("saves monthly cost on blur when valid", async () => {
+    it("calls retention policy mutation with correct payload on save", async () => {
       const user = userEvent.setup();
       renderAlertSettings();
 
-      const input = screen.getByLabelText("Monthly Cost Limit (USD)");
-      await user.clear(input);
-      await user.type(input, "8000");
-      await user.tab();
+      await user.type(screen.getByLabelText("Cost Threshold (USD)"), "20");
+      await user.click(screen.getByRole("button", { name: /save thresholds/i }));
 
-      await waitFor(() => {
-        expect(mockMutate).toHaveBeenCalledWith(
-          expect.objectContaining({ key: "alert_cost_monthly", value: "8000" })
-        );
-      });
-    });
-  });
-
-  describe("Cost threshold validation", () => {
-    it("shows error message for negative daily input", async () => {
-      const user = userEvent.setup();
-      renderAlertSettings();
-
-      const input = screen.getByLabelText("Daily Cost Limit (USD)");
-      await user.clear(input);
-      await user.type(input, "-5");
-
-      expect(screen.getByText("Must be a non-negative number")).toBeInTheDocument();
-    });
-
-    it("shows error message for negative monthly input", async () => {
-      const user = userEvent.setup();
-      renderAlertSettings();
-
-      const input = screen.getByLabelText("Monthly Cost Limit (USD)");
-      await user.clear(input);
-      await user.type(input, "-5");
-
-      expect(screen.getByText("Must be a non-negative number")).toBeInTheDocument();
-    });
-
-    it("does not save daily cost on blur when input is invalid", async () => {
-      const user = userEvent.setup();
-      renderAlertSettings();
-
-      const input = screen.getByLabelText("Daily Cost Limit (USD)");
-      await user.clear(input);
-      await user.type(input, "abc");
-      await user.tab();
-
-      expect(mockMutate).not.toHaveBeenCalledWith(
-        expect.objectContaining({ key: "alert_cost_daily" })
-      );
-    });
-
-    it("does not save monthly cost on blur when input is invalid", async () => {
-      const user = userEvent.setup();
-      renderAlertSettings();
-
-      const input = screen.getByLabelText("Monthly Cost Limit (USD)");
-      await user.clear(input);
-      await user.type(input, "-50");
-      await user.tab();
-
-      expect(mockMutate).not.toHaveBeenCalledWith(
-        expect.objectContaining({ key: "alert_cost_monthly" })
-      );
-    });
-
-    it("clears the error when a valid value is entered after an invalid one", async () => {
-      const user = userEvent.setup();
-      renderAlertSettings();
-
-      const input = screen.getByLabelText("Daily Cost Limit (USD)");
-      await user.clear(input);
-      await user.type(input, "-5");
-      expect(screen.getByText("Must be a non-negative number")).toBeInTheDocument();
-
-      await user.clear(input);
-      await user.type(input, "100");
-      expect(screen.queryByText("Must be a non-negative number")).not.toBeInTheDocument();
-    });
-
-    it("applies destructive border style to daily input when invalid", async () => {
-      const user = userEvent.setup();
-      renderAlertSettings();
-
-      const input = screen.getByLabelText("Daily Cost Limit (USD)");
-      await user.clear(input);
-      await user.type(input, "bad");
-
-      expect(input).toHaveClass("border-destructive");
-    });
-  });
-
-  describe("Slack Notifications toggle", () => {
-    it("disables Slack toggle when no Slack connector exists", () => {
-      mockConnectorsData = [];
-      renderAlertSettings();
-
-      const slackSwitch = screen.getByRole("switch", { name: /slack notifications/i });
-      expect(slackSwitch).toBeDisabled();
-    });
-
-    it("shows hint to connect Slack when no connector exists", () => {
-      mockConnectorsData = [];
-      renderAlertSettings();
-
-      expect(
-        screen.getByText("Connect a Slack integration to enable this")
-      ).toBeInTheDocument();
-    });
-
-    it("enables Slack toggle when an active Slack connector exists", () => {
-      mockConnectorsData = [{ connectorType: "slack", isActive: true }];
-      renderAlertSettings();
-
-      const slackSwitch = screen.getByRole("switch", { name: /slack notifications/i });
-      expect(slackSwitch).toBeEnabled();
-    });
-
-    it("shows normal hint text when Slack connector is connected", () => {
-      mockConnectorsData = [{ connectorType: "slack", isActive: true }];
-      renderAlertSettings();
-
-      expect(screen.getByText("Post alerts to a Slack channel")).toBeInTheDocument();
-    });
-
-    it("disables Slack toggle when connector exists but is inactive", () => {
-      mockConnectorsData = [{ connectorType: "slack", isActive: false }];
-      renderAlertSettings();
-
-      const slackSwitch = screen.getByRole("switch", { name: /slack notifications/i });
-      expect(slackSwitch).toBeDisabled();
-    });
-
-    it("does not fire update when disabled Slack toggle is clicked", async () => {
-      mockConnectorsData = [];
-      const user = userEvent.setup();
-      renderAlertSettings();
-
-      const slackSwitch = screen.getByRole("switch", { name: /slack notifications/i });
-      await user.click(slackSwitch);
-
-      expect(mockMutate).not.toHaveBeenCalledWith(
-        expect.objectContaining({ key: "alert_slack" })
+      expect(mockRetentionMutate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orgId: "test-org-id",
+          data: expect.objectContaining({ cost_threshold_cents: 2000 }),
+        })
       );
     });
   });
+
+  // ── Risk Alerts ────────────────────────────────────────────────────────────
 
   describe("Risk Alerts toggles", () => {
     it("renders all three risk alert toggles", () => {
@@ -244,6 +122,18 @@ describe("AlertSettings", () => {
       expect(screen.getByRole("switch", { name: /critical risk events/i })).toBeInTheDocument();
       expect(screen.getByRole("switch", { name: /high risk events/i })).toBeInTheDocument();
       expect(screen.getByRole("switch", { name: /usage spikes/i })).toBeInTheDocument();
+    });
+
+    it("critical risk toggle is checked by default (no setting)", () => {
+      renderAlertSettings();
+      // Default is true when no setting exists
+      expect(screen.getByRole("switch", { name: /critical risk events/i })).toBeChecked();
+    });
+
+    it("critical risk toggle is unchecked when setting is false", () => {
+      mockSettingsData = { data: [{ key: "alert_risk_critical", value: "false" }] };
+      renderAlertSettings();
+      expect(screen.getByRole("switch", { name: /critical risk events/i })).not.toBeChecked();
     });
 
     it("saves critical risk setting when toggled", async () => {
@@ -256,27 +146,6 @@ describe("AlertSettings", () => {
       await waitFor(() => {
         expect(mockMutateAsync).toHaveBeenCalledWith(
           expect.objectContaining({ key: "alert_risk_critical" })
-        );
-      });
-    });
-  });
-
-  describe("Notification Channels", () => {
-    it("renders email notifications toggle", () => {
-      renderAlertSettings();
-      expect(screen.getByRole("switch", { name: /email notifications/i })).toBeInTheDocument();
-    });
-
-    it("saves email setting when toggled", async () => {
-      mockSettingsData = { data: [{ key: "alert_email", value: "true" }] };
-      const user = userEvent.setup();
-      renderAlertSettings();
-
-      await user.click(screen.getByRole("switch", { name: /email notifications/i }));
-
-      await waitFor(() => {
-        expect(mockMutateAsync).toHaveBeenCalledWith(
-          expect.objectContaining({ key: "alert_email" })
         );
       });
     });

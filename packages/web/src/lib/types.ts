@@ -355,6 +355,9 @@ export interface RetentionPolicy {
   toolEventsRetention: ToolEventsRetention;
   hourlyAggregateRetention: HourlyAggregateRetention;
   dailyAggregateRetention: DailyAggregateRetention;
+  costThresholdCents: number | null;
+  tokenThreshold: number | null;
+  alertEnabled: boolean;
 }
 
 export interface ProjectRetentionPolicy {
@@ -366,6 +369,29 @@ export interface ProjectRetentionPolicy {
   dailyAggregateRetention: DailyAggregateRetention;
   retentionReason?: string;
   updatedById?: string;
+  costThresholdCents: number | null;
+  tokenThreshold: number | null;
+  alertEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UserPersonalSettings {
+  id: string | null;
+  costThresholdCents: number | null;
+  tokenThreshold: number | null;
+  alertEmail: boolean;
+  alertSlack: boolean;
+}
+
+export interface NotificationRoute {
+  id: string;
+  organizationId: string;
+  notificationType: "cost_alert" | "token_alert" | "retention_warning" | "risk_alert";
+  recipientType: "role" | "user";
+  recipientRole: MemberRole | null;
+  recipientUserId: string | null;
+  enabled: boolean;
   createdAt: string;
   updatedAt: string;
 }

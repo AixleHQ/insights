@@ -154,6 +154,68 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /api/v1/users/me/personal_settings:
+    get:
+      summary: Get current user personal alert settings
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Personal settings (defaults returned if no row saved yet)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserPersonalSettings'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      summary: Update current user personal alert settings
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - personal_settings
+              properties:
+                personal_settings:
+                  type: object
+                  properties:
+                    cost_threshold_cents:
+                      type: integer
+                      nullable: true
+                    token_threshold:
+                      type: integer
+                      nullable: true
+                    alert_email:
+                      type: boolean
+                    alert_slack:
+                      type: boolean
+      responses:
+        '200':
+          description: Updated personal settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserPersonalSettings'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
   # ============================================
   # ORGANIZATION ENDPOINTS
   # ============================================
@@ -4722,26 +4784,94 @@ components:
         organizationId:
           type: string
           format: uuid
-        retentionDays:
+        rawEventTtl:
+          type: string
+        toolEventsRetention:
+          type: string
+        hourlyAggregateRetention:
+          type: string
+        dailyAggregateRetention:
+          type: string
+        retentionReason:
+          type: string
+          nullable: true
+        updatedById:
+          type: string
+          format: uuid
+          nullable: true
+        costThresholdCents:
           type: integer
-        autoDeleteEvents:
+          nullable: true
+        tokenThreshold:
+          type: integer
+          nullable: true
+        alertEnabled:
           type: boolean
-        anonymizeAfterRetention:
-          type: boolean
+          nullable: true
         createdAt:
           type: string
           format: date-time
         updatedAt:
           type: string
           format: date-time
-      required:
-        - id
-        - organizationId
-        - retentionDays
-        - autoDeleteEvents
-        - anonymizeAfterRetention
-        - createdAt
-        - updatedAt
+
+    ProjectRetentionPolicy:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        rawEventTtl:
+          type: string
+        toolEventsRetention:
+          type: string
+        hourlyAggregateRetention:
+          type: string
+        dailyAggregateRetention:
+          type: string
+        retentionReason:
+          type: string
+          nullable: true
+        updatedById:
+          type: string
+          format: uuid
+          nullable: true
+        costThresholdCents:
+          type: integer
+          nullable: true
+        tokenThreshold:
+          type: integer
+          nullable: true
+        alertEnabled:
+          type: boolean
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    UserPersonalSettings:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          nullable: true
+        costThresholdCents:
+          type: integer
+          nullable: true
+        tokenThreshold:
+          type: integer
+          nullable: true
+        alertEmail:
+          type: boolean
+        alertSlack:
+          type: boolean
 
     UserToolAccount:
       type: object

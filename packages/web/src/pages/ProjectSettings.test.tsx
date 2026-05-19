@@ -31,6 +31,15 @@ vi.mock("@/hooks/useApi", () => ({
   useProjectCommitStats: () => ({ data: undefined, isLoading: false }),
   useProjectRetentionPolicy: (...args: unknown[]) => mockUseProjectRetentionPolicy(...args),
   useUpdateProjectRetentionPolicy: () => mockUseUpdateProjectRetentionPolicy(),
+  useCurrentUser: () => ({ data: { id: "user-1", email: "test@example.com" }, isLoading: false }),
+}));
+
+vi.mock("@/contexts/OrgContext", () => ({
+  useOrg: () => ({
+    currentOrg: { id: "test-org-id", name: "Test Org", slug: "test-org" },
+    currentMembership: { role: "member" },
+    isLoading: false,
+  }),
 }));
 
 vi.mock("@/components/project", () => ({

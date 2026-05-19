@@ -188,6 +188,29 @@ RSpec.describe 'Api::V1::Organizations', type: :request do
 
       expect_forbidden
     end
+
+    it 'persists cost_threshold_cents and token_threshold alert fields' do
+      authenticated_patch "/api/v1/organizations/#{organization.id}/retention_policy",
+                          user: user,
+                          params: { cost_threshold_cents: 500, token_threshold: 100_000, alert_enabled: true }
+
+      expect_success
+      expect(json_data[:costThresholdCents]).to eq(500)
+      expect(json_data[:tokenThreshold]).to eq(100_000)
+      expect(json_data[:alertEnabled]).to be true
+      expect(organization.retention_policy.reload.cost_threshold_cents).to eq(500)
+    end
+
+    it 'allows clearing alert thresholds to nil' do
+      organization.retention_policy.update!(cost_threshold_cents: 500)
+
+      authenticated_patch "/api/v1/organizations/#{organization.id}/retention_policy",
+                          user: user,
+                          params: { cost_threshold_cents: nil }
+
+      expect_success
+      expect(json_data[:costThresholdCents]).to be_nil
+    end
   end
 
   describe 'GET /api/v1/organizations/:id/retention_preview' do
