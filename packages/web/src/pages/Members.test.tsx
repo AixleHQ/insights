@@ -43,6 +43,10 @@ vi.mock("@/hooks/useApi", () => ({
   useRemoveMember: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useLeaveOrganization: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useRevokeInvitation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useNotificationRoutes: () => ({ data: [] }),
+  useCreateNotificationRoute: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
+  useUpdateNotificationRoute: () => ({ mutate: vi.fn(), isPending: false }),
+  useDeleteNotificationRoute: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 const mockMembers: OrganizationMember[] = [
@@ -154,7 +158,7 @@ describe("Members", () => {
       const user = userEvent.setup();
       renderMembers();
 
-      await user.click(screen.getByRole("combobox"));
+      await user.click(screen.getByText("All Seat Types").closest("button")!);
       await user.click(screen.getByRole("option", { name: "Viewer" }));
 
       expect(screen.getByText("Viewer User")).toBeInTheDocument();
