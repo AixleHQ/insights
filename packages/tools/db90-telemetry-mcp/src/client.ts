@@ -1,9 +1,13 @@
-import { postEvent as sdkPostEvent, type PostEventOptions } from "@db90/sdk";
-import type { Db90Payload } from "./readers/claude.js";
+import { postEvent as sdkPostEvent, type IngestPayload, type PostEventOptions } from "@db90/sdk";
 
 export interface PostResult {
   sent: number;
   failed: number;
+}
+
+export interface PostEventsResult extends PostResult {
+  /** ISO timestamp of the latest successfully-sent event's occurred_at, or null if none sent. */
+  lastSentAt: string | null;
 }
 
 /**
@@ -11,36 +15,48 @@ export interface PostResult {
  * imports from `./client.js` keep working.
  */
 export async function postEvent(
-  event: Db90Payload,
+  payload: IngestPayload,
   host: string,
   token: string,
   options: PostEventOptions = {}
 ): Promise<boolean> {
-  return sdkPostEvent(event, host, token, options);
+  return sdkPostEvent(payload, host, token, options);
 }
 
 /**
- * Batch POST with sent/failed aggregation. Cursor uses a different result
- * shape (with `lastSentAt` watermarking), so the batching wrapper stays
- * per-connector even though the per-event POST is shared.
+ * Batch POST with sent/failed aggregation plus max `occurred_at` watermarking
+ * (used by Cursor multi-event sync loops).
  */
 export async function postEvents(
-  events: Db90Payload[],
+  events: IngestPayload[],
   host: string,
   token: string,
   options: PostEventOptions = {}
-): Promise<PostResult> {
-  if (events.length === 0) return { sent: 0, failed: 0 };
+): Promise<PostEventsResult> {
+  if (events.length === 0) return { sent: 0, failed: 0, lastSentAt: null };
 
   const outcomes = await Promise.allSettled(
-    events.map((event) => postEvent(event, host, token, options))
+    events.map((event) => postEvent(event, host, token, options).then((ok) => ({ event, ok })))
   );
 
   let sent = 0;
   let failed = 0;
+  let lastSentAt: string | null = null;
+
   for (const outcome of outcomes) {
-    if (outcome.status === "fulfilled" && outcome.value) sent++;
-    else failed++;
+    if (outcome.status === "rejected") {
+      failed++;
+      continue;
+    }
+    if (outcome.value.ok) {
+      sent++;
+      const t = outcome.value.event.occurred_at;
+      if (typeof t === "string" && (lastSentAt === null || t > lastSentAt)) {
+        lastSentAt = t;
+      }
+    } else {
+      failed++;
+    }
   }
-  return { sent, failed };
+  return { sent, failed, lastSentAt };
 }

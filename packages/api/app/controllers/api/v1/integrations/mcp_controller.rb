@@ -3,9 +3,8 @@
 module Api
   module V1
     module Integrations
-      # Exchanges an authenticated user's Keycloak access token (Bearer) for a
-      # fresh `UserToolAccount` ingest token. The MCP client calls this after
-      # RFC 8628 device authorization completes.
+      # Exchanges Keycloak Bearer tokens for ingest tokens on one or more
+      # `UserToolAccount` rows (scoped to the user's oldest org membership).
       class McpController < BaseController
         # POST /api/v1/integrations/mcp/exchange
         def exchange
@@ -19,53 +18,22 @@ module Api
 
           authorize! membership, to: :create?, with: ::UserToolAccountPolicy
 
-          permitted = params.permit(:tool_name, :device_label)
-          tool_name, _device_label = permitted.values_at(:tool_name, :device_label)
-          tool_name = tool_name.to_s
-          unless UserToolAccount::INGEST_TOOLS.include?(tool_name)
-            return render json: {
-              error: "Unprocessable Entity",
-              errors: {
-                tool_name: [ "must be one of: #{UserToolAccount::INGEST_TOOLS.join(', ')}" ]
-              }
-            }, status: :unprocessable_content
-          end
+          result = ::Mcp::IngestTokenExchangeService.call(
+            membership: membership,
+            tool_name: exchange_params[:tool_name],
+            tools: exchange_params[:tools],
+            ingest_host: request.base_url
+          )
 
-          tool_account = nil
-          validation_errors = nil
-
-          membership.with_lock do
-            tool_account = membership.user_tool_accounts.find_or_initialize_by(tool_name: tool_name)
-            tool_account.is_active = true
-
-            if tool_account.new_record? && !tool_account.save
-              validation_errors = tool_account.errors
-              next
-            end
-
-            tool_account.rotate_ingest_token!
-          end
-
-          if validation_errors
-            return render json: {
-              error: "Unprocessable Entity",
-              errors: format_validation_errors(validation_errors)
-            }, status: :unprocessable_content
-          end
-
-          render json: {
-            data: {
-              ingestToken: tool_account.plaintext_token,
-              ingestHost: request.base_url,
-              organizationId: membership.organization_id.to_s
-            }
-          }, status: :created
+          render json: result.body, status: result.http_status
         end
 
         private
 
-        # Picks the oldest membership for stable resolution. Client-org header
-        # selection is deferred.
+        def exchange_params
+          params.permit(:tool_name, :device_label, tools: [])
+        end
+
         def primary_membership
           current_user.organization_memberships.order(:created_at).first
         end

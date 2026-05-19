@@ -45,4 +45,29 @@ describe("exchangeIngestToken", () => {
     const body = JSON.parse((fetchImpl.mock.calls[0][1] as { body: string }).body);
     expect(body).toEqual({ tool_name: "claude_code", device_label: "unit test" });
   });
+
+  it("maps a legacy flat token response to the requested cursor tool", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: {
+            ingestToken: `db90_${"cd".repeat(32)}`,
+            ingestHost: "http://localhost:3000",
+            organizationId: "org-uuid-1",
+          },
+        }),
+        { status: 201 }
+      )
+    );
+
+    const out = await exchangeIngestToken({
+      db90Host: "http://localhost:3000",
+      keycloakAccessToken: "kc-secret",
+      toolName: "cursor",
+      fetchImpl,
+    });
+
+    expect(out.accounts.cursor?.ingestToken.startsWith("db90_")).toBe(true);
+    expect(out.accounts.claude_code).toBeUndefined();
+  });
 });

@@ -27,7 +27,7 @@ describe("auth/credentials", () => {
       expect((st.mode & 0o777) === 0o600).toBe(true);
     }
     const creds = await loadCredentials(home);
-    expect(creds?.token).toBe("db90_testtoken");
+    expect(creds?.accounts.claude_code).toBe("db90_testtoken");
     expect(creds?.host).toBe("http://localhost:3000");
   });
 
@@ -45,11 +45,11 @@ describe("auth/credentials", () => {
     await saveCredentials("db90_fallback", "http://localhost:3000", home);
 
     expect(loadCredentialsFromFileOnly(home)).toEqual({
-      token: "db90_fallback",
+      accounts: { claude_code: "db90_fallback" },
       host: "http://localhost:3000",
     });
     await expect(loadCredentials(home)).resolves.toEqual({
-      token: "db90_fallback",
+      accounts: { claude_code: "db90_fallback" },
       host: "http://localhost:3000",
     });
   });

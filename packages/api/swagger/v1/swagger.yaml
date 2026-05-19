@@ -3946,13 +3946,20 @@ paths:
 
   /api/v1/integrations/mcp/exchange:
     post:
-      summary: Exchange Keycloak access token for an MCP ingest token
+      summary: Exchange Keycloak access token for MCP ingest token(s)
       description: |
-        Mints a fresh `UserToolAccount` ingest token for the JWT-authenticated user
-        and the requested ingest tool, scoped to the user's oldest organization
-        membership (primary). Call with `Authorization: Bearer` set to the
-        Keycloak access token obtained after RFC 8628 device authorization.
-        The plaintext ingest token is returned exactly once in the response body.
+        Mints fresh `UserToolAccount` ingest token(s) for the JWT-authenticated user
+        and the requested ingest tool(s). Accounts are scoped to the user's oldest
+        organization membership. Call with `Authorization: Bearer` carrying the Keycloak
+        access token from RFC 8628 device authorization.
+
+        Pass **`tool_name`** for a legacy single-account exchange, **or**
+        **`tools`** to rotate/create multiple connectors in one request (atomic under
+        a membership advisory lock).
+
+        Responses always include **`accounts`** with per-tool `ingestToken` entries.
+        When exactly one tool is provisioned the payload also echoes flat
+        **`ingestToken`** + **`toolName`** for MCP clients expecting the original shape.
       tags:
         - Integrations
       security:
@@ -3962,19 +3969,45 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                tool_name:
-                  type: string
-                  enum: [claude_code, cursor]
-                device_label:
-                  type: string
-                  description: Optional client context (not persisted in this version)
-              required:
-                - tool_name
+              oneOf:
+                - type: object
+                  properties:
+                    tool_name:
+                      type: string
+                      enum: [claude_code, cursor]
+                    device_label:
+                      type: string
+                      description: Optional client context (not persisted in this version)
+                  required:
+                    - tool_name
+                - type: object
+                  properties:
+                    tools:
+                      type: array
+                      description: Duplicate tools are stripped server-side via `uniq`
+                      minItems: 1
+                      items:
+                        type: string
+                        enum: [claude_code, cursor]
+                    device_label:
+                      type: string
+                      description: Optional client context (not persisted in this version)
+                  required:
+                    - tools
+            examples:
+              single_legacy:
+                summary: Legacy single-token exchange
+                value:
+                  tool_name: claude_code
+                  device_label: db90-dev
+              multi:
+                summary: Dual-token MCP install
+                value:
+                  tools: [claude_code, cursor]
+                  device_label: db90-mcp
       responses:
         '201':
-          description: Ingest token minted
+          description: Ingest token(s) minted
           content:
             application/json:
               schema:
@@ -3985,18 +4018,29 @@ paths:
                     properties:
                       ingestToken:
                         type: string
-                        description: Plaintext ingest token, returned exactly once
+                        description: Duplicate of the lone tool token — present only when provisioning a single ingest account
+                      toolName:
+                        type: string
+                        enum: [claude_code, cursor]
+                        description: Echoed ingest tool identifier when only one token is rotated
+                      accounts:
+                        type: object
+                        additionalProperties:
+                          type: object
+                          properties:
+                            ingestToken:
+                              type: string
+                          required:
+                            - ingestToken
                       ingestHost:
                         type: string
                         format: uri
-                        description: DB90 API base URL for ingest calls
                       organizationId:
                         type: string
-                        description: Organization UUID for the resolved membership
                     required:
-                      - ingestToken
                       - ingestHost
                       - organizationId
+                      - accounts
                 required:
                   - data
         '401':

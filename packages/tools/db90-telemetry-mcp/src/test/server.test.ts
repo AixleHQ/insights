@@ -195,4 +195,22 @@ describe("MCP server (in-process)", () => {
     await client.close();
     await server.close();
   });
+
+  it("db90_sync_now rejects a requested tool that has no configured credential", async () => {
+    writeFileSync(
+      join(home, "credentials.json"),
+      JSON.stringify({ token: "db90_test", host: "http://localhost:3000" }),
+      "utf-8"
+    );
+
+    const parsed = await callTool("db90_sync_now", { tools: ["cursor"] });
+    expect(parsed).toMatchObject({
+      ok: false,
+      result: {
+        sent: 0,
+        skipped: 0,
+      },
+    });
+    expect(parsed).toHaveProperty("result.errors");
+  });
 });

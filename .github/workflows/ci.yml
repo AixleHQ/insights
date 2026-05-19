@@ -204,13 +204,33 @@ jobs:
         run: npm test --workspace=@db90/telemetry-mcp
         working-directory: packages/tools
 
+  telemetry_mcp_windows_install:
+    name: db90-telemetry-mcp (Windows install smoke — better-sqlite3)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: packages/tools/package-lock.json
+      - name: Install workspace
+        run: npm ci
+        working-directory: packages/tools
+      - name: Build SDK
+        run: npm run build --workspace=@db90/sdk
+        working-directory: packages/tools
+      - name: Build telemetry-mcp native dependency
+        run: npm run build --workspace=@db90/telemetry-mcp
+        working-directory: packages/tools
+
   # --- Deploy pipeline (staging and main only) ---
 
   migrate:
     name: Run DB Migrations
     runs-on: ubuntu-latest
     container: ghcr.io/artempartos/ecs_toolbox:latest
-    needs: [build, api_test, api_lint, api_security, web_test, web_lint, web_typecheck, cursor_check, claude_check, mcp_check]
+    needs: [build, api_test, api_lint, api_security, web_test, web_lint, web_typecheck, cursor_check, claude_check, mcp_check, telemetry_mcp_windows_install]
     if: github.ref_name == 'staging' || github.ref_name == 'main'
     env:
       ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'staging' }}

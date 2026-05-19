@@ -1,16 +1,31 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { loadCredentials } from "./credentials.js";
+import { loadCredentials, type TelemetryToolId, type StoredCredentials, credentialsHaveAnyToken } from "./credentials.js";
 import { defaultKeycloakClientId, defaultKeycloakIssuer, startDeviceAuthorization } from "./auth/keycloak.js";
 import { readState, migrateLegacyState, getAppDir } from "./state.js";
-import { syncOnce, getSyncTelemetry } from "./sync.js";
+import { syncTelemetryTools, getSyncTelemetry } from "./sync.js";
 import { DEFAULT_PRICING, mergePricing } from "./pricing.js";
 
 const SERVER_NAME = "db90-mcp";
 const SERVER_VERSION = "0.1.0";
 
 const SYNC_INTERVAL_MS = 5 * 60 * 1000;
+
+export const SYNC_NOW_INPUT_SCHEMA = z
+  .object({
+    tools: z.array(z.enum(["claude_code", "cursor"])).min(1).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.tools && new Set(value.tools).size !== value.tools.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "tools must not contain duplicates",
+        path: ["tools"],
+      });
+    }
+  })
+  .strict();
 
 function jsonContent(value: unknown) {
   return {
@@ -27,8 +42,31 @@ function defaultPricing(): ReturnType<typeof mergePricing> {
   return mergePricing(DEFAULT_PRICING, {});
 }
 
-function syncResultOk(result: Awaited<ReturnType<typeof syncOnce>>): boolean {
+function migrateAllLegacyState(creds: StoredCredentials): void {
+  const appDir = getAppDir();
+  const seenTokens = new Set<string>();
+  for (const [_tool, tok] of Object.entries(creds.accounts)) {
+    if (typeof tok === "string" && tok.length > 0 && !seenTokens.has(tok)) {
+      migrateLegacyState(appDir, creds.host, tok);
+      seenTokens.add(tok);
+    }
+  }
+}
+
+function syncResultOk(result: Awaited<ReturnType<typeof syncTelemetryTools>>): boolean {
   return !result.locked && result.failed === 0;
+}
+
+/** Session keys tracked across credential-scoped state files. */
+async function mergedSessionTrackedCount(appDir: string, creds: StoredCredentials): Promise<number> {
+  let n = 0;
+  for (const [_t, tok] of Object.entries(creds.accounts)) {
+    if (typeof tok === "string" && tok.length > 0) {
+      const st = readState(appDir, creds.host, tok);
+      n += Object.keys(st.sessions).length;
+    }
+  }
+  return n;
 }
 
 /** Structured status for `db90_status` — tolerates missing/malformed credentials and state. */
@@ -36,7 +74,7 @@ export async function buildDb90StatusPayload(): Promise<Record<string, unknown>>
   const telemetry = getSyncTelemetry();
   try {
     const creds = await loadCredentials();
-    if (!creds) {
+    if (!creds || !credentialsHaveAnyToken(creds)) {
       return {
         authenticated: false,
         configured: false,
@@ -49,16 +87,22 @@ export async function buildDb90StatusPayload(): Promise<Record<string, unknown>>
       };
     }
     const appDir = getAppDir();
-    const state = readState(appDir, creds.host, creds.token);
+    const tracked = await mergedSessionTrackedCount(appDir, creds);
     return {
       authenticated: true,
       configured: true,
       host: creds.host,
+      ingest_tools: (
+        Object.entries(creds.accounts) as [TelemetryToolId, string | undefined][]
+      )
+        .filter(([, tok]) => typeof tok === "string" && tok.length > 0)
+        .map(([k]) => k)
+        .sort(),
       last_sync_at: telemetry.lastSyncAt,
       last_result: telemetry.lastResult,
       sessions_synced: telemetry.lastResult?.sent ?? 0,
       skipped: telemetry.lastResult?.skipped ?? 0,
-      state_tracked_sessions: Object.keys(state.sessions).length,
+      state_tracked_sessions: tracked,
       errors: telemetry.recentErrors,
     };
   } catch (err) {
@@ -73,6 +117,23 @@ export async function buildDb90StatusPayload(): Promise<Record<string, unknown>>
       errors: [...telemetry.recentErrors, err instanceof Error ? err.message : String(err)],
     };
   }
+}
+
+async function executeSync(parsed: { tools?: TelemetryToolId[] }): Promise<unknown> {
+  const creds = await loadCredentials();
+  if (!creds || !credentialsHaveAnyToken(creds)) {
+    return { ok: false, error: "missing_credentials" };
+  }
+  migrateAllLegacyState(creds);
+  const result = await syncTelemetryTools({
+    credentials: creds,
+    dryRun: false,
+    verbose: false,
+    projectId: null,
+    pricing: defaultPricing(),
+    tools: parsed.tools,
+  });
+  return { ok: syncResultOk(result), result };
 }
 
 /** In-process MCP server instance (stdio not attached). */
@@ -95,25 +156,22 @@ export function createDb90McpServer(): McpServer {
     "db90_sync_now",
     {
       description:
-        "Runs one Claude transcript → DB90 ingest sync cycle immediately (same path as the background timer). No arguments.",
+        "Runs one DB90 ingest sync cycle for enabled tools immediately (matches background cadence). " +
+          "Optional `tools` subset filter: omit to sync every tool credential you have authenticated (Claude transcripts + Cursor telemetry).",
+      inputSchema: SYNC_NOW_INPUT_SCHEMA,
     },
-    async () => {
+    async (input: unknown) => {
       try {
-        const creds = await loadCredentials();
-        if (!creds) {
-          return jsonContent({ ok: false, error: "missing_credentials" });
-        }
-        migrateLegacyState(getAppDir(), creds.host, creds.token);
-        const result = await syncOnce({
-          token: creds.token,
-          host: creds.host,
-          dryRun: false,
-          verbose: false,
-          projectId: null,
-          pricing: defaultPricing(),
-        });
-        return jsonContent({ ok: syncResultOk(result), result });
+        const parsed = SYNC_NOW_INPUT_SCHEMA.parse(input ?? {});
+        return jsonContent(await executeSync(parsed));
       } catch (err) {
+        if (err instanceof z.ZodError) {
+          return jsonContent({
+            ok: false,
+            error: "validation_error",
+            details: err.flatten(),
+          });
+        }
         return jsonContent({
           ok: false,
           error: err instanceof Error ? err.message : String(err),
@@ -192,12 +250,11 @@ export async function startServer(): Promise<void> {
   const runBackground = async (source: string) => {
     if (shuttingDown) return;
     const creds = await loadCredentials();
-    if (!creds) return;
+    if (!creds || !credentialsHaveAnyToken(creds)) return;
     try {
-      migrateLegacyState(getAppDir(), creds.host, creds.token);
-      await syncOnce({
-        token: creds.token,
-        host: creds.host,
+      migrateAllLegacyState(creds);
+      await syncTelemetryTools({
+        credentials: creds,
         dryRun: false,
         verbose: false,
         projectId: null,

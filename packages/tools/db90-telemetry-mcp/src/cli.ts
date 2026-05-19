@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 import { fileURLToPath } from "node:url";
 import { realpathSync } from "node:fs";
-import { loadCredentials } from "./credentials.js";
+import { loadCredentials, credentialsHaveAnyToken } from "./credentials.js";
+import type { TelemetryToolId } from "./credentials.js";
 import { loginAndPersistCredentials } from "./auth/flow.js";
 import { defaultKeycloakIssuer } from "./auth/keycloak.js";
 import { migrateLegacyState, getAppDir } from "./state.js";
-import { syncOnce } from "./sync.js";
+import { syncTelemetryTools } from "./sync.js";
 import { DEFAULT_PRICING, mergePricing } from "./pricing.js";
 import { installClaudeUserMcp, type InstallClaudeUserMcpOptions, type InstallResult } from "./install/claude.js";
 
@@ -23,7 +24,7 @@ interface RunOnceDeps {
   loadCredentials: typeof loadCredentials;
   migrateLegacyState: typeof migrateLegacyState;
   getAppDir: typeof getAppDir;
-  syncOnce: typeof syncOnce;
+  syncTelemetryTools: typeof syncTelemetryTools;
   pricing: ReturnType<typeof mergePricing>;
   log: (message: string) => void;
   error: (message: string) => void;
@@ -175,29 +176,31 @@ export function parseArgs(argv: string[]): Args {
 
 function printHelp(): void {
   console.log(`
-db90-mcp — DB90 MCP server (Claude transcript sync)
+db90-mcp — DB90 MCP telemetry (Claude transcripts + Cursor SQLite ingest)
 
 Usage:
   db90-mcp [command] [options]
 
 Commands:
   run         Start the MCP stdio server (default — used by Claude Code).
-  init        Keycloak device login, then save DB90 ingest credentials (keychain or file).
+  init        Keycloak device login once, then persist DB90 ingest credentials (keychain or file).
   health      Minimal process diagnostic.
 
 Options:
-  --once      With 'run': perform a single sync and exit (no MCP server).
+  --once      With 'run': perform a multi-tool sync then exit (no MCP server).
   --help, -h  Show this help message.
 
 init options:
   --host <url>            DB90 API base URL (default: env DB90_API_URL or http://localhost:3000)
   --keycloak-url <issuer> Keycloak realm issuer (default: env KEYCLOAK_ISSUER / DB90_KEYCLOAK_ISSUER; local default only with DB90_MCP_USE_LOCAL_KEYCLOAK_DEFAULT=true)
-  --tool-name <name>      claude_code or cursor (default: claude_code; only claude_code auto-installs MCP)
+  --tool-name <name>      Optional: mint only \`claude_code\`, only \`cursor\`, or omit to mint BOTH in one OAuth session.
   --force                 Replace an existing user "db90" MCP entry in ~/.claude.json if it differs
 
 Credentials:
   Stored in the OS keychain via keytar when available; otherwise
   ~/.db90-mcp/credentials.json (mode 0600 on POSIX).
+
+Note: Omitting --tool-name provisions separate ingest tokens for Claude Code + Cursor behind a single Keycloak login.
 `);
 }
 
@@ -208,7 +211,9 @@ function defaultDb90Host(): string {
 }
 
 function runHealth(): void {
-  console.log("db90-mcp: ok (stdio MCP + Claude transcript sync when configured)");
+  console.log(
+    "db90-mcp: ok (stdio MCP + multi-tool ingest sync when Claude + Cursor credentials are configured)"
+  );
 }
 
 async function runMcpServer(): Promise<void> {
@@ -235,16 +240,27 @@ export async function runInit(cliArgs: Args, deps?: Partial<InitDeps>): Promise<
     );
     return 1;
   }
-  const tool = cliArgs.toolName ?? "claude_code";
-  if (!["claude_code", "cursor"].includes(tool)) {
+  if (cliArgs.toolName !== undefined && !["claude_code", "cursor"].includes(cliArgs.toolName)) {
     runtime.error("Error: --tool-name must be one of: claude_code, cursor.");
     return 1;
   }
+  const provisionTools: TelemetryToolId[] =
+    cliArgs.toolName === "cursor"
+      ? ["cursor"]
+      : cliArgs.toolName === "claude_code"
+        ? ["claude_code"]
+        : ["claude_code", "cursor"];
 
   const result = await runtime.loginAndPersistCredentials({
     db90Host,
     keycloakIssuer: kcIssuer,
-    toolName: tool,
+    tools: provisionTools.length > 1 ? provisionTools : undefined,
+    toolName:
+      provisionTools.length === 1
+        ? provisionTools[0] === "cursor"
+          ? "cursor"
+          : "claude_code"
+        : undefined,
     deviceLabel: "db90-mcp CLI init",
     appDir: runtime.getAppDir(),
     onVisitInstructions: (uri, code) => {
@@ -258,7 +274,9 @@ export async function runInit(cliArgs: Args, deps?: Partial<InitDeps>): Promise<
   }
   runtime.log(`Credentials saved (organization ${result.organizationId}).`);
 
-  if (tool === "claude_code") {
+  const shouldInstall = provisionTools.includes("claude_code");
+
+  if (shouldInstall) {
     const installResult = runtime.installClaudeUserMcp({ force: cliArgs.force === true });
     switch (installResult.kind) {
       case "already-configured":
@@ -277,7 +295,7 @@ export async function runInit(cliArgs: Args, deps?: Partial<InitDeps>): Promise<
 
     runtime.log("Restart Claude Code to activate.");
   } else {
-    runtime.log(`No Claude Code config was changed for tool "${tool}".`);
+    runtime.log("Skipped Claude Code MCP auto-install (--tool-name cursor only).");
   }
   return 0;
 }
@@ -287,7 +305,7 @@ export async function runOnce(deps?: Partial<RunOnceDeps>): Promise<number> {
     loadCredentials,
     migrateLegacyState,
     getAppDir,
-    syncOnce,
+    syncTelemetryTools,
     pricing: mergePricing(DEFAULT_PRICING, {}),
     log: console.log,
     error: console.error,
@@ -295,20 +313,25 @@ export async function runOnce(deps?: Partial<RunOnceDeps>): Promise<number> {
   };
 
   const creds = await runtime.loadCredentials();
-  if (!creds) {
+  if (!creds || !credentialsHaveAnyToken(creds)) {
     runtime.error(
-      'Error: no DB90 credentials. Run `db90-mcp init` or create ~/.db90-mcp/credentials.json with "token" and "host".'
+      "Error: no DB90 credentials. Run `db90-mcp init` first (dual-tool auth is the default)."
     );
     return 1;
   }
-  runtime.migrateLegacyState(runtime.getAppDir(), creds.host, creds.token);
-  const result = await runtime.syncOnce({
-    token: creds.token,
-    host: creds.host,
+  const appDirRuntime = runtime.getAppDir();
+  for (const tok of Object.values(creds.accounts)) {
+    if (typeof tok === "string" && tok.length > 0) {
+      runtime.migrateLegacyState(appDirRuntime, creds.host, tok);
+    }
+  }
+  const result = await runtime.syncTelemetryTools({
+    credentials: creds,
     dryRun: false,
     verbose: false,
     projectId: null,
     pricing: runtime.pricing,
+    appDir: appDirRuntime,
   });
   if (result.locked || result.failed > 0) {
     runtime.error(`Sync finished with failures: sent=${result.sent} failed=${result.failed} skipped=${result.skipped}`);

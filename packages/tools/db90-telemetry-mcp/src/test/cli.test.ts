@@ -95,7 +95,7 @@ describe("parseArgs", () => {
 });
 
 describe("runOnce", () => {
-  const creds = { token: "db90_test", host: "http://localhost:3000" };
+  const creds = { host: "http://localhost:3000", accounts: { claude_code: "db90_test" } };
   const silentOutput = {
     log: () => undefined,
     error: () => undefined,
@@ -116,7 +116,7 @@ describe("runOnce", () => {
       migrateLegacyState: () => undefined,
       getAppDir: () => "/tmp/db90-mcp-test",
       pricing: DEFAULT_PRICING,
-      syncOnce: async () => ({ sent: 0, failed: 0, skipped: 0, locked: true }),
+      syncTelemetryTools: async () => ({ sent: 0, failed: 0, skipped: 0, locked: true }),
       ...silentOutput,
     });
 
@@ -129,7 +129,7 @@ describe("runOnce", () => {
       migrateLegacyState: () => undefined,
       getAppDir: () => "/tmp/db90-mcp-test",
       pricing: DEFAULT_PRICING,
-      syncOnce: async () => ({ sent: 1, failed: 1, skipped: 0 }),
+      syncTelemetryTools: async () => ({ sent: 1, failed: 1, skipped: 0 }),
       ...silentOutput,
     });
 
@@ -142,7 +142,7 @@ describe("runOnce", () => {
       migrateLegacyState: () => undefined,
       getAppDir: () => "/tmp/db90-mcp-test",
       pricing: DEFAULT_PRICING,
-      syncOnce: async () => ({ sent: 1, failed: 0, skipped: 0 }),
+      syncTelemetryTools: async () => ({ sent: 1, failed: 0, skipped: 0 }),
       ...silentOutput,
     });
 
@@ -157,7 +157,7 @@ describe("runOnce", () => {
       migrateLegacyState: () => undefined,
       getAppDir: () => "/tmp/db90-mcp-test",
       pricing: DEFAULT_PRICING,
-      syncOnce: async () => ({ sent: 2, failed: 0, skipped: 3 }),
+      syncTelemetryTools: async () => ({ sent: 2, failed: 0, skipped: 3 }),
       log: (message) => messages.push(message),
       error: () => undefined,
     });
@@ -358,7 +358,7 @@ describe("runInit", () => {
     );
     expect(code).toBe(0);
     expect(installCalled).toBe(false);
-    expect(lines.some((l) => l.includes("No Claude Code config was changed"))).toBe(true);
+    expect(lines.some((l) => l.includes("Skipped Claude Code MCP auto-install"))).toBe(true);
     expect(lines.some((l) => l.includes("Restart Claude Code to activate"))).toBe(false);
   });
 

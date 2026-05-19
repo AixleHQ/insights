@@ -9,9 +9,16 @@ RSpec.describe "Api::V1::Integrations::Mcp", type: :request do
     create(:organization_membership, user: internal_user, organization: organization)
   end
 
-  def expect_data_shape(body)
+  TOKEN_RE = /\Adb90_[a-f0-9]{64}\z/
+
+  def expect_single_tool_shape(body)
     expect(body["data"]).to be_a(Hash)
-    expect(body["data"]["ingestToken"]).to match(/\Adb90_[a-f0-9]{64}\z/)
+    expect(body["data"]["ingestToken"]).to match(TOKEN_RE)
+    expect(body["data"]["accounts"]).to be_a(Hash)
+    expect(body["data"]["accounts"]).not_to be_empty
+    body["data"]["accounts"].each_value do |entry|
+      expect(entry["ingestToken"]).to match(TOKEN_RE)
+    end
     expect(body["data"]["ingestHost"]).to eq(request.base_url)
     expect(body["data"]["organizationId"]).to eq(organization.id.to_s)
   end
@@ -30,7 +37,9 @@ RSpec.describe "Api::V1::Integrations::Mcp", type: :request do
 
         expect(response).to have_http_status(:created)
         body = JSON.parse(response.body)
-        expect_data_shape(body)
+        expect_single_tool_shape(body)
+        expect(body["data"]["toolName"]).to eq("claude_code")
+        expect(body["data"]["accounts"].keys.sort).to eq([ "claude_code" ])
       end
 
       it "mints an ingest token for cursor" do
@@ -40,9 +49,8 @@ RSpec.describe "Api::V1::Integrations::Mcp", type: :request do
 
         expect(response).to have_http_status(:created)
         body = JSON.parse(response.body)
-        expect(body["data"]["ingestToken"]).to match(/\Adb90_[a-f0-9]{64}\z/)
-        expect(body["data"]["ingestHost"]).to eq(request.base_url)
-        expect(body["data"]["organizationId"]).to eq(organization.id.to_s)
+        expect_single_tool_shape(body)
+        expect(body["data"]["accounts"]["cursor"]["ingestToken"]).to match(TOKEN_RE)
       end
 
       it "rotates the token on each call (one account, fresh credential)" do
@@ -58,6 +66,46 @@ RSpec.describe "Api::V1::Integrations::Mcp", type: :request do
       end
     end
 
+    context "with a valid OIDC session and supported tools payload" do
+      it "mints ingest tokens for claude_code and cursor in one call" do
+        expect {
+          authenticated_post "/api/v1/integrations/mcp/exchange",
+                             user: internal_user,
+                             params: {
+                               tools: [ "cursor", "claude_code", "cursor" ],
+                               device_label: "multi MCP"
+                             }
+        }.to change { internal_membership.user_tool_accounts.count }.by(2)
+
+        expect(response).to have_http_status(:created)
+        data = JSON.parse(response.body)["data"]
+        expect(data["ingestToken"]).to be_nil
+        accounts = data["accounts"]
+        expect(accounts.keys.sort).to eq([ "claude_code", "cursor" ])
+        expect(accounts["claude_code"]["ingestToken"]).to match(TOKEN_RE)
+        expect(accounts["cursor"]["ingestToken"]).to match(TOKEN_RE)
+      end
+
+      it "rotates tokens for requested accounts independently" do
+        authenticated_post "/api/v1/integrations/mcp/exchange",
+                           user: internal_user,
+                           params: { tools: [ "claude_code", "cursor" ] }
+        cc1 = JSON.parse(response.body)["data"]["accounts"]["claude_code"]["ingestToken"]
+        cr1 = JSON.parse(response.body)["data"]["accounts"]["cursor"]["ingestToken"]
+
+        authenticated_post "/api/v1/integrations/mcp/exchange",
+                           user: internal_user,
+                           params: { tools: [ "claude_code", "cursor" ] }
+        cc2 = JSON.parse(response.body)["data"]["accounts"]["claude_code"]["ingestToken"]
+        cr2 = JSON.parse(response.body)["data"]["accounts"]["cursor"]["ingestToken"]
+
+        expect(internal_membership.reload.user_tool_accounts.count).to eq(2)
+        expect([ cc1, cr1 ].uniq.size).to eq(2)
+        expect(cc1).not_to eq(cc2)
+        expect(cr1).not_to eq(cr2)
+      end
+    end
+
     context "with an unsupported tool_name" do
       it "returns 422" do
         authenticated_post "/api/v1/integrations/mcp/exchange",
@@ -70,13 +118,27 @@ RSpec.describe "Api::V1::Integrations::Mcp", type: :request do
       end
     end
 
-    context "with no tool_name" do
+    context "with an unsupported tools array entry" do
+      it "returns 422" do
+        authenticated_post "/api/v1/integrations/mcp/exchange",
+                           user: internal_user,
+                           params: { tools: [ "claude_code", "github_copilot" ] }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        parsed = JSON.parse(response.body)
+        expect(parsed["errors"]).to have_key("tools")
+      end
+    end
+
+    context "without tool_name nor tools" do
       it "returns 422" do
         authenticated_post "/api/v1/integrations/mcp/exchange",
                            user: internal_user,
                            params: {}
 
         expect(response).to have_http_status(:unprocessable_content)
+        parsed = JSON.parse(response.body)
+        expect(parsed["errors"]).to have_key("base")
       end
     end
 
@@ -102,7 +164,7 @@ RSpec.describe "Api::V1::Integrations::Mcp", type: :request do
                            params: { tool_name: "claude_code" }
 
         expect(response).to have_http_status(:created)
-        expect_data_shape(JSON.parse(response.body))
+        expect_single_tool_shape(JSON.parse(response.body))
       end
     end
 
