@@ -436,7 +436,23 @@ export function useUpdateMemberRole() {
   return useMutation({
     mutationFn: ({ orgId, memberId, role }: { orgId: string; memberId: string; role: string }) =>
       api.patch<OrganizationMember>(`/organizations/${orgId}/members/${memberId}`, { role }),
-    onSuccess: (_, { orgId }) => {
+    onMutate: async ({ orgId, memberId, role }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.members.all(orgId) });
+      const previous = queryClient.getQueryData<OrganizationMember[]>(queryKeys.members.all(orgId));
+      if (previous) {
+        queryClient.setQueryData<OrganizationMember[]>(
+          queryKeys.members.all(orgId),
+          previous.map((m) => (m.id === memberId ? { ...m, role: role as OrganizationMember["role"] } : m))
+        );
+      }
+      return { previous, orgId };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKeys.members.all(context.orgId), context.previous);
+      }
+    },
+    onSettled: (_, __, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.members.all(orgId) });
     },
   });
@@ -1845,6 +1861,10 @@ export function useUpdateModelPricingOverride(orgId: string) {
     },
   });
 }
+
+// AIX-206 ticket naming aliases
+export { useRetentionPolicy as useOrgPolicy, useUpdateRetentionPolicy as useUpdateOrgPolicy };
+export { useProjectMembers as useProjectMemberships };
 
 export function useDeleteModelPricingOverride(orgId: string) {
   const queryClient = useQueryClient();

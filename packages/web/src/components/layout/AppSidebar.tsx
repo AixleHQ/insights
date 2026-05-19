@@ -11,8 +11,6 @@ import {
   ChevronsUpDown,
   Plus,
   Check,
-  Crown,
-  Eye,
   User,
   Users,
   BookOpen,
@@ -59,6 +57,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { roleIcons, roleColors } from "@/lib/role-display";
 
 type NavItem = {
   title: string;
@@ -77,18 +76,6 @@ const navItems: NavItem[] = [
   { title: "Library",      icon: BookOpen,        href: "/library",          roles: ["owner", "member", "viewer"] },
   { title: "Feedback",     icon: MessageSquare,   href: "/feedback",         roles: ["owner", "member", "viewer"] },
 ];
-
-const roleIcons: Record<MemberRole, LucideIcon> = {
-  owner: Crown,
-  member: User,
-  viewer: Eye,
-};
-
-const roleColors: Record<MemberRole, string> = {
-  owner: "text-amber-500",
-  member: "text-emerald-500",
-  viewer: "text-muted-foreground",
-};
 
 function getOrgInitials(name: string | undefined | null) {
   if (!name) return "??";

@@ -7,6 +7,7 @@ module Api
       NOTIFICATION_KEYS = %w[
         notify_in_app_risk notify_in_app_cost
         notify_email_digest notify_email_alerts
+        notify_cost_alert notify_token_alert notify_retention_warning notify_risk_alert
       ].freeze
 
       # GET /api/v1/users/me

@@ -143,12 +143,15 @@ describe("ProjectTeamSection", () => {
   describe("Empty State", () => {
     it("shows empty message when no members", () => {
       renderComponent({ members: [] });
-      expect(screen.getByText("No team members assigned to this project")).toBeInTheDocument();
+      expect(screen.getByText("No explicit project members.")).toBeInTheDocument();
+      expect(
+        screen.getByText(/Organization owners always have implicit access/)
+      ).toBeInTheDocument();
     });
 
     it("shows empty message when members is undefined", () => {
       renderComponent({ members: undefined });
-      expect(screen.getByText("No team members assigned to this project")).toBeInTheDocument();
+      expect(screen.getByText("No explicit project members.")).toBeInTheDocument();
     });
 
     it("displays 0 members count", () => {
@@ -158,16 +161,16 @@ describe("ProjectTeamSection", () => {
   });
 
   describe("Role Badge Colors", () => {
-    it("applies correct color class for owner role", () => {
-      renderComponent({ members: [mockMembers[0]] });
-      const ownerBadge = screen.getByText("owner");
-      expect(ownerBadge).toHaveClass("text-violet-400");
+    it("applies shared role badge for owner role", () => {
+      const { container } = renderComponent({ members: [mockMembers[0]] });
+      expect(screen.getByText("owner")).toBeInTheDocument();
+      expect(container.querySelector(".lucide-crown")).toBeInTheDocument();
     });
 
-    it("applies correct color class for member role", () => {
-      renderComponent({ members: [mockMembers[1]] });
-      const memberBadge = screen.getByText("member");
-      expect(memberBadge).toHaveClass("text-blue-400");
+    it("applies shared role badge for member role", () => {
+      const { container } = renderComponent({ members: [mockMembers[1]] });
+      expect(screen.getByText("member")).toBeInTheDocument();
+      expect(container.querySelector(".lucide-user")).toBeInTheDocument();
     });
 
     it("handles viewer role", () => {
@@ -177,8 +180,7 @@ describe("ProjectTeamSection", () => {
         role: "viewer",
       };
       renderComponent({ members: [viewerMember] });
-      const viewerBadge = screen.getByText("viewer");
-      expect(viewerBadge).toHaveClass("text-slate-400");
+      expect(screen.getByText("viewer")).toBeInTheDocument();
     });
   });
 

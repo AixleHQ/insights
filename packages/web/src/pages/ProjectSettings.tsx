@@ -19,6 +19,7 @@ import {
   useDeleteProject,
   useProjectMembers,
   useProjectCommitStats,
+  useCurrentUser,
 } from "@/hooks/useApi";
 import { useOrg } from "@/contexts/OrgContext";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -280,8 +281,13 @@ function ProjectGeneralSettings({
 function ProjectMembersSettings({ projectId, orgId }: { projectId: string; orgId: string }) {
   const { data: members, isLoading } = useProjectMembers(projectId);
   const { data: commitStats } = useProjectCommitStats(projectId);
+  const { data: currentUser } = useCurrentUser();
   const { currentMembership } = useOrg();
-  const canManage = currentMembership?.role === "owner";
+  const isOrgOwner = currentMembership?.role === "owner";
+  const isProjectOwner = members?.some(
+    (m) => m.userId === currentUser?.id && m.role === "owner"
+  );
+  const canManage = isOrgOwner || !!isProjectOwner;
 
   return (
     <ProjectTeamSection

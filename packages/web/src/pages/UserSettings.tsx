@@ -4,7 +4,18 @@ import { User, Settings2, Bell, Shield, Wrench, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrg } from "@/contexts/OrgContext";
 import { useTheme, type Theme } from "@/contexts/ThemeContext";
-import { useOrganizationMembers, useCurrentUser, useUpdateCurrentUser, useUserOrganizations, useUpdateUserSetting, usePersonalSettings, useUpdatePersonalSettings } from "@/hooks/useApi";
+import {
+  useOrganizationMembers,
+  useCurrentUser,
+  useUpdateCurrentUser,
+  useUserOrganizations,
+  useUpdateUserSetting,
+  usePersonalSettings,
+  useUpdatePersonalSettings,
+  useRetentionPolicy,
+} from "@/hooks/useApi";
+import { formatCost, formatTokens } from "@/lib/formatters";
+import { formatRetentionLabel, retentionOrder } from "@/lib/retention-utils";
 import type { UserPersonalSettings } from "@/lib/types";
 import { MemberProfileView } from "./MemberProfile";
 import { cn } from "@/lib/utils";
@@ -274,11 +285,82 @@ function PreferencesSection() {
           </div>
         </CardContent>
       </Card>
+      <PersonalRetentionPreferenceCard />
     </div>
   );
 }
 
+const PERSONAL_RETENTION_OPTIONS = [
+  "30_days",
+  "60_days",
+  "90_days",
+  "180_days",
+  "365_days",
+  "730_days",
+] as const;
+
+function PersonalRetentionPreferenceCard() {
+  const { currentOrg } = useOrg();
+  const { data: orgPolicy, isLoading: orgLoading } = useRetentionPolicy(currentOrg?.id || "");
+  const { data: currentUser, isLoading: userLoading } = useCurrentUser();
+  const updateSetting = useUpdateUserSetting();
+
+  const orgMax = orgPolicy?.toolEventsRetention ?? "90_days";
+  const allowedOptions = PERSONAL_RETENTION_OPTIONS.filter(
+    (value) => retentionOrder(value) <= retentionOrder(orgMax)
+  );
+  const saved = currentUser?.settings?.personal_tool_events_retention ?? "";
+  const exceedsCeiling = !!saved && retentionOrder(saved) > retentionOrder(orgMax);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Data Retention Preference</CardTitle>
+        <CardDescription>
+          Personal retention cannot exceed the org maximum ({formatRetentionLabel(orgMax)}).
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {orgLoading || userLoading ? (
+          <Skeleton className="h-9 w-48" />
+        ) : (
+          <>
+            <Select
+              value={saved || "__inherit__"}
+              onValueChange={(v) =>
+                updateSetting.mutate({
+                  key: "personal_tool_events_retention",
+                  value: v === "__inherit__" ? "" : v,
+                })
+              }
+            >
+              <SelectTrigger className="w-full sm:max-w-xs">
+                <SelectValue placeholder="Use org default" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__inherit__">Use org default</SelectItem>
+                {allowedOptions.map((value) => (
+                  <SelectItem key={value} value={value}>
+                    {formatRetentionLabel(value)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {exceedsCeiling && (
+              <p className="text-xs text-destructive">
+                Current value exceeds org max. Choose a shorter period.
+              </p>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function PersonalAlertThresholdsForm({ settings }: { settings: UserPersonalSettings }) {
+  const { currentOrg } = useOrg();
+  const { data: orgPolicy } = useRetentionPolicy(currentOrg?.id || "");
   const updateSettings = useUpdatePersonalSettings();
   const [costInput, setCostInput] = useState(
     settings.costThresholdCents != null ? String(settings.costThresholdCents / 100) : ""
@@ -287,12 +369,21 @@ function PersonalAlertThresholdsForm({ settings }: { settings: UserPersonalSetti
     settings.tokenThreshold != null ? String(settings.tokenThreshold) : ""
   );
 
+  const orgCostCeiling = orgPolicy?.costThresholdCents ?? null;
+  const orgTokenCeiling = orgPolicy?.tokenThreshold ?? null;
+  const costCents = costInput !== "" ? Math.round(parseFloat(costInput) * 100) : null;
+  const tokens = tokenInput !== "" ? parseInt(tokenInput, 10) : null;
+  const exceedsCostCeiling =
+    orgCostCeiling != null && costCents != null && !isNaN(costCents) && costCents > orgCostCeiling;
+  const exceedsTokenCeiling =
+    orgTokenCeiling != null && tokens != null && !isNaN(tokens) && tokens > orgTokenCeiling;
+  const hasValidationError = exceedsCostCeiling || exceedsTokenCeiling;
+
   function handleSaveThresholds() {
-    const costCents = costInput !== "" ? Math.round(parseFloat(costInput) * 100) : null;
-    const tokens = tokenInput !== "" ? parseInt(tokenInput, 10) : null;
+    if (hasValidationError) return;
     updateSettings.mutate({
-      costThresholdCents: isNaN(costCents as number) ? null : costCents,
-      tokenThreshold: isNaN(tokens as number) ? null : tokens,
+      costThresholdCents: costCents != null && !isNaN(costCents) ? costCents : null,
+      tokenThreshold: tokens != null && !isNaN(tokens) ? tokens : null,
     });
   }
 
@@ -308,35 +399,65 @@ function PersonalAlertThresholdsForm({ settings }: { settings: UserPersonalSetti
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="personal-cost-threshold">Cost threshold (USD)</Label>
+            {orgCostCeiling != null && (
+              <p className="text-xs text-muted-foreground">
+                Org max: {formatCost(orgCostCeiling / 100)}
+              </p>
+            )}
             <Input
               id="personal-cost-threshold"
               type="number"
               min="0"
               step="0.01"
-              placeholder="e.g. 5.00"
+              placeholder={
+                orgCostCeiling != null
+                  ? `Max ${formatCost(orgCostCeiling / 100)}`
+                  : "e.g. 5.00"
+              }
               value={costInput}
               onChange={(e) => setCostInput(e.target.value)}
+              className={exceedsCostCeiling ? "border-destructive" : ""}
             />
+            {exceedsCostCeiling && (
+              <p className="text-xs text-destructive">
+                Cannot exceed org ceiling of {formatCost(orgCostCeiling! / 100)}.
+              </p>
+            )}
             <p className="text-xs text-muted-foreground">Alert when your personal cost exceeds this amount.</p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="personal-token-threshold">Token threshold</Label>
+            {orgTokenCeiling != null && (
+              <p className="text-xs text-muted-foreground">
+                Org max: {formatTokens(orgTokenCeiling)}
+              </p>
+            )}
             <Input
               id="personal-token-threshold"
               type="number"
               min="0"
               step="1000"
-              placeholder="e.g. 100000"
+              placeholder={
+                orgTokenCeiling != null
+                  ? `Max ${formatTokens(orgTokenCeiling)}`
+                  : "e.g. 100000"
+              }
               value={tokenInput}
               onChange={(e) => setTokenInput(e.target.value)}
+              className={exceedsTokenCeiling ? "border-destructive" : ""}
             />
+            {exceedsTokenCeiling && (
+              <p className="text-xs text-destructive">
+                Cannot exceed org ceiling of {formatTokens(orgTokenCeiling!)}.
+              </p>
+            )}
             <p className="text-xs text-muted-foreground">Alert when your personal token usage exceeds this count.</p>
           </div>
         </div>
         <Button
           size="sm"
           onClick={handleSaveThresholds}
-          disabled={updateSettings.isPending}
+          disabled={updateSettings.isPending || hasValidationError}
         >
           {updateSettings.isPending && <Loader2 className="mr-2 size-3.5 animate-spin" />}
           Save thresholds
@@ -393,11 +514,19 @@ function PersonalAlertThresholdsCard() {
   return <PersonalAlertThresholdsForm settings={settings} />;
 }
 
-const NOTIFICATION_TOGGLES = [
-  { key: "notify_in_app_risk",  label: "In-app risk alerts",  description: "Show alerts in-app when a risk is detected." },
-  { key: "notify_in_app_cost",  label: "In-app cost alerts",  description: "Show alerts in-app when cost thresholds are exceeded." },
+/** Per notification-route-type opt-outs (true = receive, false = opted out). */
+const NOTIFICATION_TYPE_TOGGLES = [
+  { key: "notify_cost_alert", label: "Cost alerts", description: "Notifications when cost thresholds are exceeded." },
+  { key: "notify_token_alert", label: "Token alerts", description: "Notifications when token thresholds are exceeded." },
+  { key: "notify_retention_warning", label: "Retention warnings", description: "Warnings before data is purged per retention policy." },
+  { key: "notify_risk_alert", label: "Risk alerts", description: "Security and risk scan notifications." },
+] as const;
+
+const LEGACY_NOTIFICATION_TOGGLES = [
+  { key: "notify_in_app_risk", label: "In-app risk alerts", description: "Show alerts in-app when a risk is detected." },
+  { key: "notify_in_app_cost", label: "In-app cost alerts", description: "Show alerts in-app when cost thresholds are exceeded." },
   { key: "notify_email_digest", label: "Weekly email digest", description: "Receive a weekly summary of usage and costs by email." },
-  { key: "notify_email_alerts", label: "Alert emails",        description: "Receive email notifications for risk and cost alerts." },
+  { key: "notify_email_alerts", label: "Alert emails", description: "Receive email notifications for risk and cost alerts." },
 ] as const;
 
 function NotificationsSection() {
@@ -413,18 +542,20 @@ function NotificationsSection() {
       <Card>
         <CardHeader>
           <CardTitle>Notifications</CardTitle>
-          <CardDescription>Control how and when you receive notifications.</CardDescription>
+          <CardDescription>
+            Per-type opt-outs and delivery preferences. Disabled types will not be sent to you.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {isLoading ? (
             <div className="space-y-4">
-              {NOTIFICATION_TOGGLES.map(({ key }) => (
+              {[...NOTIFICATION_TYPE_TOGGLES, ...LEGACY_NOTIFICATION_TOGGLES].map(({ key }) => (
                 <Skeleton key={key} className="h-10" />
               ))}
             </div>
           ) : (
-            NOTIFICATION_TOGGLES.map(({ key, label, description }) => {
-              const enabled = currentUser?.settings?.[key] === "true";
+            [...NOTIFICATION_TYPE_TOGGLES, ...LEGACY_NOTIFICATION_TOGGLES].map(({ key, label, description }) => {
+              const enabled = currentUser?.settings?.[key] !== "false";
               return (
                 <div key={key} className="flex items-center justify-between gap-4">
                   <div className="space-y-0.5">

@@ -115,6 +115,14 @@ vi.mock("@/hooks/useApi", () => {
   useUpdateUserSetting: () => ({ mutate: vi.fn(), isPending: false }),
   usePersonalSettings: () => ({ data: undefined, isLoading: false }),
   useUpdatePersonalSettings: () => ({ mutate: vi.fn(), isPending: false }),
+  useRetentionPolicy: () => ({
+    data: {
+      toolEventsRetention: "90_days",
+      costThresholdCents: 10000,
+      tokenThreshold: 500000,
+    },
+    isLoading: false,
+  }),
   };
 });
 
@@ -213,30 +221,28 @@ describe("UserSettings", () => {
     it("renders Notifications section at /profile/settings/notifications", () => {
       renderAtPath("/profile/settings/notifications");
 
-      expect(screen.getByText("Control how and when you receive notifications.")).toBeInTheDocument();
+      expect(screen.getByText(/Per-type opt-outs/)).toBeInTheDocument();
+      expect(screen.getByLabelText("Cost alerts")).toBeInTheDocument();
+      expect(screen.getByLabelText("Token alerts")).toBeInTheDocument();
       expect(screen.getByLabelText("In-app risk alerts")).toBeInTheDocument();
-      expect(screen.getByLabelText("In-app cost alerts")).toBeInTheDocument();
-      expect(screen.getByLabelText("Weekly email digest")).toBeInTheDocument();
       expect(screen.getByLabelText("Alert emails")).toBeInTheDocument();
     });
 
-    it("renders notification toggles as unchecked by default", () => {
+    it("renders notification toggles as enabled by default", () => {
       renderAtPath("/profile/settings/notifications");
 
       const switches = screen.getAllByRole("switch");
-      expect(switches).toHaveLength(4);
-      switches.forEach((sw) => expect(sw).not.toBeChecked());
+      expect(switches.length).toBeGreaterThanOrEqual(8);
+      switches.forEach((sw) => expect(sw).toBeChecked());
     });
 
-    it('checks toggles whose setting value is "true"', () => {
-      notificationSettings.value = { notify_in_app_risk: "true" };
+    it('opts out toggles whose setting value is "false"', () => {
+      notificationSettings.value = { notify_risk_alert: "false" };
 
       renderAtPath("/profile/settings/notifications");
 
-      expect(screen.getByLabelText("In-app risk alerts")).toBeChecked();
-      expect(screen.getByLabelText("In-app cost alerts")).not.toBeChecked();
-      expect(screen.getByLabelText("Weekly email digest")).not.toBeChecked();
-      expect(screen.getByLabelText("Alert emails")).not.toBeChecked();
+      expect(screen.getByLabelText("Risk alerts")).not.toBeChecked();
+      expect(screen.getByLabelText("Cost alerts")).toBeChecked();
     });
 
     describe("SecuritySection", () => {

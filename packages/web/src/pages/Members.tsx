@@ -68,8 +68,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RoleBadge } from "@/lib/role-display";
+import { OrgPolicyPanel } from "@/components/org/OrgPolicyPanel";
 
 type MemberSortField = "name" | "role" | "last_active_at" | "total_events" | "total_cost";
 
@@ -378,6 +379,8 @@ export function Members() {
         </Table>
       </div>
 
+      {currentOrg && <OrgPolicyPanel orgId={currentOrg.id} />}
+
       {currentOrg && <NotificationRoutesPanel orgId={currentOrg.id} members={membersData ?? []} />}
 
       <LeaveOrganizationSection
@@ -452,9 +455,7 @@ function MemberTableRow({
           </div>
         </TableCell>
         <TableCell className="p-4">
-          <Badge variant="outline" className="capitalize text-xs">
-            {member.role}
-          </Badge>
+          <RoleBadge role={member.role} />
         </TableCell>
         <TableCell className="hidden md:table-cell p-4 text-sm text-muted-foreground">
           {formatLastActive(member.last_active_at)}
@@ -476,14 +477,24 @@ function MemberTableRow({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 {member.role === "member" && (
-                  <DropdownMenuItem onClick={() => onRoleChange(member.id, "viewer")}>
-                    Change to Viewer
-                  </DropdownMenuItem>
+                  <>
+                    <DropdownMenuItem onClick={() => onRoleChange(member.id, "owner")}>
+                      Promote to Owner
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onRoleChange(member.id, "viewer")}>
+                      Change to Viewer
+                    </DropdownMenuItem>
+                  </>
                 )}
                 {member.role === "viewer" && (
-                  <DropdownMenuItem onClick={() => onRoleChange(member.id, "member")}>
-                    Change to Member
-                  </DropdownMenuItem>
+                  <>
+                    <DropdownMenuItem onClick={() => onRoleChange(member.id, "member")}>
+                      Change to Member
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onRoleChange(member.id, "owner")}>
+                      Promote to Owner
+                    </DropdownMenuItem>
+                  </>
                 )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem

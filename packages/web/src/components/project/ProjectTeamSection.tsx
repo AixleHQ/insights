@@ -2,12 +2,12 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Users, GitCommitHorizontal, Trash2, UserPlus } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn, formatDistanceToNow, getMemberDisplayName } from "@/lib/utils";
+import { formatDistanceToNow, getMemberDisplayName } from "@/lib/utils";
+import { RoleBadge } from "@/lib/role-display";
 import type { ProjectMember, MemberCommitStat } from "@/hooks/useApi";
 import {
   useAddProjectMember as useAddMember,
@@ -38,12 +38,6 @@ function getInitials(name?: string | null, email?: string): string {
   }
   return email?.slice(0, 2).toUpperCase() || "U";
 }
-
-const roleColors: Record<string, string> = {
-  owner: "bg-violet-500/10 text-violet-400",
-  member: "bg-blue-500/10 text-blue-400",
-  viewer: "bg-slate-500/10 text-slate-400",
-};
 
 const ROLES = ["owner", "member", "viewer"] as const;
 
@@ -272,9 +266,7 @@ export function ProjectTeamSection({
                       <p className="truncate text-sm font-medium group-hover:underline">
                         {getMemberDisplayName(member)}
                       </p>
-                      <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0", roleColors[member.role])}>
-                        {member.role}
-                      </Badge>
+                      <RoleBadge role={member.role as "owner" | "member" | "viewer"} className="text-[10px] px-1.5 py-0" />
                     </div>
                     {stats && (
                       <div className="flex flex-col items-end shrink-0 text-muted-foreground">
@@ -294,7 +286,10 @@ export function ProjectTeamSection({
           )
         ) : canManage && projectId && orgId ? (
           <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">No team members assigned to this project</p>
+            <p className="text-sm text-muted-foreground">No explicit project members yet.</p>
+            <p className="text-xs text-muted-foreground">
+              Organization owners always have implicit access to every project in the org.
+            </p>
             <ProjectTeamManageList
               members={[]}
               projectId={projectId}
@@ -303,7 +298,12 @@ export function ProjectTeamSection({
             />
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">No team members assigned to this project</p>
+          <div className="space-y-1">
+            <p className="text-sm text-muted-foreground">No explicit project members.</p>
+            <p className="text-xs text-muted-foreground">
+              Organization owners always have implicit access to every project in the org.
+            </p>
+          </div>
         )}
       </CardContent>
     </Card>
