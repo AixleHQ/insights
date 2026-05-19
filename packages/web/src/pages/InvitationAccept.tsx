@@ -107,7 +107,7 @@ export function InvitationAccept() {
             is_active: true,
           });
         }
-        navigate("/profile");
+        navigate("/");
       }, 1500);
     } catch (err) {
       const message =

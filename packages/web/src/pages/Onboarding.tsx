@@ -178,7 +178,7 @@ export function Onboarding() {
 
       // Navigate to dashboard
       if (result.data?.organization) {
-        navigate("/profile");
+        navigate("/");
       }
     } catch (err) {
       console.error("Failed to accept invitation:", err);

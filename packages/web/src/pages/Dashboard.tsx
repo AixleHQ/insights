@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
 import { Activity, DollarSign, AlertTriangle, Users, Coins } from "lucide-react";
 import { useOrg } from "@/contexts/OrgContext";
 import { useOverviewStats, useDailyStats, useEvents, useDailyByTool } from "@/hooks/useApi";
@@ -20,15 +19,7 @@ import {
 import { EventDrawer } from "@/components/events";
 
 export function Dashboard() {
-  const navigate = useNavigate();
-  const { currentOrg, currentRole } = useOrg();
-
-  // Role-based redirect: members and viewers go to profile
-  useEffect(() => {
-    if (currentRole && (currentRole === "member" || currentRole === "viewer")) {
-      navigate("/profile", { replace: true });
-    }
-  }, [currentRole, navigate]);
+  const { currentOrg } = useOrg();
 
   // Fetch data using TanStack Query
   const {
