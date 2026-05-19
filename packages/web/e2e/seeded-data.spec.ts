@@ -93,6 +93,18 @@ test.describe("Seeded Data Verification", () => {
     await expect(page.getByText(/billy\.boozer@dualbootpartners\.com/i)).toBeVisible({ timeout: 10000 });
   });
 
+  test("/team redirects to /members", async ({ page }) => {
+    await page.goto("/team");
+    await expect(page).toHaveURL(/\/members$/, { timeout: 15000 });
+    await expect(page.getByRole("heading", { name: /members/i })).toBeVisible({ timeout: 15000 });
+  });
+
+  test("/settings/members redirects to /members", async ({ page }) => {
+    await page.goto("/settings/members");
+    await expect(page).toHaveURL(/\/members$/, { timeout: 15000 });
+    await expect(page.getByRole("heading", { name: /members/i })).toBeVisible({ timeout: 15000 });
+  });
+
   test("user profile shows user settings page", async ({ page }) => {
     await page.goto("/profile");
 
