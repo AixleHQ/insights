@@ -4,7 +4,7 @@
 
 ## Credentials
 
-Preferred: run **`db90-mcp init`** (Keycloak device flow) or call MCP tool **`db90_authenticate`**. Tokens are stored in the OS keychain when `keytar` is available, otherwise in `~/.db90-telemetry-mcp/credentials.json` (mode `0600` on POSIX).
+Preferred: run **`db90-mcp init`** (Keycloak device flow, then **user-scoped Claude Code MCP install**) or call MCP tool **`db90_authenticate`**. Tokens are stored in the OS keychain when `keytar` is available, otherwise in `~/.db90-mcp/credentials.json` (mode `0600` on POSIX).
 
 Manual file (fallback / CI):
 
@@ -39,7 +39,7 @@ Tests may set `DB90_MCP_HOME` to a temp directory so `~/.db90-mcp` is not touche
 - `db90-mcp` or `db90-mcp run` — start the MCP server on stdio (what Claude Code spawns). After the stdio session connects, a **5-minute** background timer runs the same sync as `db90_sync_now`; an **immediate** sync runs once on startup when credentials exist.
 - `db90-mcp run --once` — run a single sync and exit; **exit code 1** if any event failed to post.
 - `db90-mcp health` — one-line diagnostic.
-- `db90-mcp init [--host URL] --keycloak-url ISSUER [--tool-name claude_code|cursor]` — Keycloak device login, exchange for a DB90 ingest token, save credentials, then exit. `--keycloak-url` may be omitted when `KEYCLOAK_ISSUER` / `DB90_KEYCLOAK_ISSUER` is set or local defaults are explicitly enabled with `DB90_MCP_USE_LOCAL_KEYCLOAK_DEFAULT=true`.
+- `db90-mcp init [--host URL] --keycloak-url ISSUER [--tool-name claude_code|cursor] [--force]` — Keycloak device login, exchange for a DB90 ingest token, save credentials, merge **`db90`** into the **user** Claude Code MCP config file (`~/.claude.json`, top-level `mcpServers`), then exit with **`Restart Claude Code to activate`**. Use **`--force`** only if you need to replace an existing `db90` entry that differs from the `npx -y @db90/telemetry-mcp run` shape. On Windows the stored command uses `cmd /c` per Claude Code expectations for `npx`-backed stdio servers. `--keycloak-url` may be omitted when `KEYCLOAK_ISSUER` / `DB90_KEYCLOAK_ISSUER` is set or local defaults are explicitly enabled with `DB90_MCP_USE_LOCAL_KEYCLOAK_DEFAULT=true`.
 
 Legacy `serve` is accepted as an alias for `run`.
 
@@ -53,10 +53,13 @@ Session checkpoints in state files use keys `claude_code:<sessionId>` so future 
 
 ## Claude Code
 
-1. Install the package (or use `npx -y @db90/telemetry-mcp` once published).
-2. Run `db90-mcp init` (or create `credentials.json` manually under `~/.db90-mcp` or `DB90_MCP_HOME`).
-3. Add the MCP server entry under `mcpServers` in `~/.claude.json` (see package docs / examples using `db90-mcp run` or `npx`).
-4. Restart Claude Code; `/mcp` should list **db90**; call **`db90_status`** after a sync to see populated fields.
+Per [Claude Code MCP docs](https://docs.anthropic.com/en/docs/claude-code/mcp), **user-scoped** servers are stored in **`~/.claude.json`** (team-shared **project** scope uses a repo-root `.mcp.json` — not written by `init`).
+
+1. Install the package (or use `npx -y @db90/telemetry-mcp`).
+2. Run `db90-mcp init ...` — this stores credentials and adds **`mcpServers.db90`** to `~/.claude.json` without removing other MCP servers or unrelated JSON keys. If a conflicting `db90` entry already exists, re-run with **`--force`**.
+3. Restart Claude Code when prompted; `/mcp` should list **db90**. Call **`db90_status`** after a sync to see populated fields.
+
+Manual `credentials.json` (under `~/.db90-mcp` or `DB90_MCP_HOME`) remains supported for CI or advanced setups; use **`claude mcp add`** if you prefer the native CLI over `init` for MCP wiring.
 
 ## License
 

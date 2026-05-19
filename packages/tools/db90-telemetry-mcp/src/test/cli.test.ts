@@ -73,6 +73,22 @@ describe("parseArgs", () => {
     expect(parseArgs(["node", "cli.js", "init", "--bogus"]).command).toBe("help");
   });
 
+  it("parses init --force", () => {
+    expect(parseArgs(["node", "cli.js", "init", "--force"]).force).toBe(true);
+  });
+
+  it("treats init --force=false as help (force is boolean-only)", () => {
+    expect(parseArgs(["node", "cli.js", "init", "--force=false"]).command).toBe("help");
+  });
+
+  it("treats init --force junk as help (no extra positional args)", () => {
+    expect(parseArgs(["node", "cli.js", "init", "--force", "junk"]).command).toBe("help");
+  });
+
+  it("treats run --force as help (force is init-only)", () => {
+    expect(parseArgs(["node", "cli.js", "run", "--force"]).command).toBe("help");
+  });
+
   it("treats run --host as help (host is init-only)", () => {
     expect(parseArgs(["node", "cli.js", "run", "--host", "http://x"]).command).toBe("help");
   });
@@ -152,6 +168,200 @@ describe("runOnce", () => {
 });
 
 describe("runInit", () => {
+  it("calls install only after successful login", async () => {
+    const events: string[] = [];
+    const code = await runInit(
+      {
+        command: "init",
+        help: false,
+        once: false,
+        host: "http://localhost:3000",
+        keycloakUrl: "http://localhost:8080/realms/db90",
+        toolName: "claude_code",
+      },
+      {
+        loginAndPersistCredentials: async () => {
+          events.push("login");
+          return { ok: true, organizationId: "org-1" };
+        },
+        defaultKeycloakIssuer: () => "",
+        getAppDir: () => "/tmp/db90-mcp-init-test",
+        installClaudeUserMcp: () => {
+          events.push("install");
+          return { kind: "installed" };
+        },
+        log: () => undefined,
+        error: () => undefined,
+      }
+    );
+    expect(code).toBe(0);
+    expect(events).toEqual(["login", "install"]);
+  });
+
+  it("does not call install when login fails", async () => {
+    let installCalled = false;
+    const code = await runInit(
+      {
+        command: "init",
+        help: false,
+        once: false,
+        host: "http://localhost:3000",
+        keycloakUrl: "http://localhost:8080/realms/db90",
+        toolName: "claude_code",
+      },
+      {
+        loginAndPersistCredentials: async () => ({ ok: false, error: "bad auth" }),
+        defaultKeycloakIssuer: () => "",
+        getAppDir: () => "/tmp/db90-mcp-init-test",
+        installClaudeUserMcp: () => {
+          installCalled = true;
+          return { kind: "installed" };
+        },
+        log: () => undefined,
+        error: () => undefined,
+      }
+    );
+    expect(code).toBe(1);
+    expect(installCalled).toBe(false);
+  });
+
+  it("returns 0 when login and Claude MCP install succeed", async () => {
+    const installCalls: { force: boolean }[] = [];
+    const code = await runInit(
+      {
+        command: "init",
+        help: false,
+        once: false,
+        host: "http://localhost:3000",
+        keycloakUrl: "http://localhost:8080/realms/db90",
+        toolName: "claude_code",
+        force: false,
+      },
+      {
+        loginAndPersistCredentials: async () => ({ ok: true, organizationId: "org-1" }),
+        defaultKeycloakIssuer: () => "",
+        getAppDir: () => "/tmp/db90-mcp-init-test",
+        installClaudeUserMcp: (opts) => {
+          installCalls.push({ force: opts.force === true });
+          return { kind: "installed" };
+        },
+        log: () => undefined,
+        error: () => undefined,
+      }
+    );
+    expect(code).toBe(0);
+    expect(installCalls).toEqual([{ force: false }]);
+  });
+
+  it("returns non-zero when install fails after successful login (credentials must remain saved)", async () => {
+    let loginCalled = false;
+    const code = await runInit(
+      {
+        command: "init",
+        help: false,
+        once: false,
+        host: "http://localhost:3000",
+        keycloakUrl: "http://localhost:8080/realms/db90",
+        toolName: "claude_code",
+      },
+      {
+        loginAndPersistCredentials: async () => {
+          loginCalled = true;
+          return { ok: true, organizationId: "org-1" };
+        },
+        defaultKeycloakIssuer: () => "",
+        getAppDir: () => "/tmp/db90-mcp-init-test",
+        installClaudeUserMcp: () => ({ kind: "error", message: "disk full" }),
+        log: () => undefined,
+        error: () => undefined,
+      }
+    );
+    expect(loginCalled).toBe(true);
+    expect(code).toBe(1);
+  });
+
+  it("passes --force through to install", async () => {
+    const forces: boolean[] = [];
+    const code = await runInit(
+      {
+        command: "init",
+        help: false,
+        once: false,
+        host: "http://localhost:3000",
+        keycloakUrl: "http://localhost:8080/realms/db90",
+        toolName: "claude_code",
+        force: true,
+      },
+      {
+        loginAndPersistCredentials: async () => ({ ok: true, organizationId: "org-1" }),
+        defaultKeycloakIssuer: () => "",
+        getAppDir: () => "/tmp/db90-mcp-init-test",
+        installClaudeUserMcp: (opts) => {
+          forces.push(opts.force === true);
+          return { kind: "installed" };
+        },
+        log: () => undefined,
+        error: () => undefined,
+      }
+    );
+    expect(code).toBe(0);
+    expect(forces).toEqual([true]);
+  });
+
+  it("prints Restart Claude Code to activate after successful init", async () => {
+    const lines: string[] = [];
+    const code = await runInit(
+      {
+        command: "init",
+        help: false,
+        once: false,
+        host: "http://localhost:3000",
+        keycloakUrl: "http://localhost:8080/realms/db90",
+        toolName: "claude_code",
+      },
+      {
+        loginAndPersistCredentials: async () => ({ ok: true, organizationId: "org-1" }),
+        defaultKeycloakIssuer: () => "",
+        getAppDir: () => "/tmp/db90-mcp-init-test",
+        installClaudeUserMcp: () => ({ kind: "installed" }),
+        log: (m) => lines.push(m),
+        error: () => undefined,
+      }
+    );
+    expect(code).toBe(0);
+    expect(lines.some((l) => l.includes("Restart Claude Code to activate"))).toBe(true);
+  });
+
+  it("skips Claude install for cursor toolName", async () => {
+    let installCalled = false;
+    const lines: string[] = [];
+    const code = await runInit(
+      {
+        command: "init",
+        help: false,
+        once: false,
+        host: "http://localhost:3000",
+        keycloakUrl: "http://localhost:8080/realms/db90",
+        toolName: "cursor",
+      },
+      {
+        loginAndPersistCredentials: async () => ({ ok: true, organizationId: "org-1" }),
+        defaultKeycloakIssuer: () => "",
+        getAppDir: () => "/tmp/db90-mcp-init-test",
+        installClaudeUserMcp: () => {
+          installCalled = true;
+          return { kind: "installed" };
+        },
+        log: (m) => lines.push(m),
+        error: () => undefined,
+      }
+    );
+    expect(code).toBe(0);
+    expect(installCalled).toBe(false);
+    expect(lines.some((l) => l.includes("No Claude Code config was changed"))).toBe(true);
+    expect(lines.some((l) => l.includes("Restart Claude Code to activate"))).toBe(false);
+  });
+
   it("returns 0 when login succeeds", async () => {
     const code = await runInit(
       {
@@ -166,6 +376,7 @@ describe("runInit", () => {
         loginAndPersistCredentials: async () => ({ ok: true, organizationId: "org-1" }),
         defaultKeycloakIssuer: () => "",
         getAppDir: () => "/tmp/db90-mcp-init-test",
+        installClaudeUserMcp: () => ({ kind: "already-configured" }),
         log: () => undefined,
         error: () => undefined,
       }
@@ -189,6 +400,7 @@ describe("runInit", () => {
         },
         defaultKeycloakIssuer: () => "",
         getAppDir: () => "/tmp/db90-mcp-init-test",
+        installClaudeUserMcp: () => ({ kind: "installed" }),
         log: () => undefined,
         error: () => undefined,
       }

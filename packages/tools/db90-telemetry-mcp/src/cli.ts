@@ -7,6 +7,7 @@ import { defaultKeycloakIssuer } from "./auth/keycloak.js";
 import { migrateLegacyState, getAppDir } from "./state.js";
 import { syncOnce } from "./sync.js";
 import { DEFAULT_PRICING, mergePricing } from "./pricing.js";
+import { installClaudeUserMcp, type InstallClaudeUserMcpOptions, type InstallResult } from "./install/claude.js";
 
 export interface Args {
   command: "init" | "health" | "run" | "help";
@@ -15,6 +16,7 @@ export interface Args {
   host?: string;
   keycloakUrl?: string;
   toolName?: string;
+  force?: boolean;
 }
 
 interface RunOnceDeps {
@@ -31,11 +33,14 @@ interface InitDeps {
   loginAndPersistCredentials: typeof loginAndPersistCredentials;
   defaultKeycloakIssuer: typeof defaultKeycloakIssuer;
   getAppDir: typeof getAppDir;
+  installClaudeUserMcp: (options: InstallClaudeUserMcpOptions) => InstallResult;
   log: (message: string) => void;
   error: (message: string) => void;
 }
 
 const GLOBAL_FLAGS = new Set(["--help", "-h", "--once"]);
+const INIT_VALUE_FLAGS = new Set(["--host", "--keycloak-url", "--tool-name"]);
+const INIT_BOOLEAN_FLAGS = new Set(["--force"]);
 
 function takeFlagValue(argv: string[], name: string): string | undefined {
   const eqForm = argv.find((a) => a.startsWith(`${name}=`));
@@ -49,13 +54,18 @@ function takeFlagValue(argv: string[], name: string): string | undefined {
   return next;
 }
 
-function unknownFlags(argv: string[], allowed: Set<string>): string[] {
+function unknownFlags(argv: string[], valueFlags: Set<string>, booleanFlags: Set<string>): string[] {
   const out: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (!a.startsWith("--") && a !== "-h") continue;
     if (GLOBAL_FLAGS.has(a)) continue;
-    if (allowed.has(a)) {
+
+    if (booleanFlags.has(a)) {
+      continue;
+    }
+
+    if (valueFlags.has(a)) {
       const next = argv[i + 1];
       if (!a.includes("=") && next && !next.startsWith("-")) {
         i += 1;
@@ -64,9 +74,37 @@ function unknownFlags(argv: string[], allowed: Set<string>): string[] {
     }
     if (a.startsWith("--") && a.includes("=")) {
       const key = a.slice(0, a.indexOf("="));
-      if (allowed.has(key)) continue;
+      if (booleanFlags.has(key)) {
+        out.push(a);
+        continue;
+      }
+      if (valueFlags.has(key)) continue;
     }
     if (a === "-h") continue;
+    out.push(a);
+  }
+  return out;
+}
+
+function initExtraPositionals(argv: string[]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === "init") continue;
+    if (a === "-h" || GLOBAL_FLAGS.has(a) || INIT_BOOLEAN_FLAGS.has(a)) continue;
+
+    if (INIT_VALUE_FLAGS.has(a)) {
+      const next = argv[i + 1];
+      if (next && !next.startsWith("-")) {
+        i += 1;
+      }
+      continue;
+    }
+
+    if (a.startsWith("--")) {
+      continue;
+    }
+
     out.push(a);
   }
   return out;
@@ -80,20 +118,23 @@ export function parseArgs(argv: string[]): Args {
   const positional = args.filter((a) => !a.startsWith("-") && a !== "-h");
   const raw = positional[0];
 
-  const initAllowed = new Set(["--host", "--keycloak-url", "--tool-name"]);
-
   if (raw === "init") {
     const bad = unknownFlags(
       args.filter((a) => a !== "init"),
-      initAllowed
+      INIT_VALUE_FLAGS,
+      INIT_BOOLEAN_FLAGS
     );
     if (bad.length > 0) {
+      return { command: "help", help: true, once: false };
+    }
+    if (initExtraPositionals(args).length > 0) {
       return { command: "help", help: true, once: false };
     }
     const host = takeFlagValue(args, "--host");
     const keycloakUrl = takeFlagValue(args, "--keycloak-url");
     const toolName = takeFlagValue(args, "--tool-name");
-    return { command: "init", help, once: false, host, keycloakUrl, toolName };
+    const force = args.includes("--force");
+    return { command: "init", help, once: false, host, keycloakUrl, toolName, force };
   }
 
   const nonInitBad = args.filter((a) => {
@@ -151,7 +192,8 @@ Options:
 init options:
   --host <url>            DB90 API base URL (default: env DB90_API_URL or http://localhost:3000)
   --keycloak-url <issuer> Keycloak realm issuer (default: env KEYCLOAK_ISSUER / DB90_KEYCLOAK_ISSUER; local default only with DB90_MCP_USE_LOCAL_KEYCLOAK_DEFAULT=true)
-  --tool-name <name>      claude_code or cursor (default: claude_code)
+  --tool-name <name>      claude_code or cursor (default: claude_code; only claude_code auto-installs MCP)
+  --force                 Replace an existing user "db90" MCP entry in ~/.claude.json if it differs
 
 Credentials:
   Stored in the OS keychain via keytar when available; otherwise
@@ -179,6 +221,7 @@ export async function runInit(cliArgs: Args, deps?: Partial<InitDeps>): Promise<
     loginAndPersistCredentials,
     defaultKeycloakIssuer,
     getAppDir,
+    installClaudeUserMcp,
     log: console.log,
     error: console.error,
     ...deps,
@@ -213,9 +256,29 @@ export async function runInit(cliArgs: Args, deps?: Partial<InitDeps>): Promise<
     runtime.error(`Auth failed: ${result.error}`);
     return 1;
   }
-  runtime.log(
-    `Credentials saved (organization ${result.organizationId}). You can run \`db90-mcp run\` or \`db90-mcp run --once\`.`
-  );
+  runtime.log(`Credentials saved (organization ${result.organizationId}).`);
+
+  if (tool === "claude_code") {
+    const installResult = runtime.installClaudeUserMcp({ force: cliArgs.force === true });
+    switch (installResult.kind) {
+      case "already-configured":
+        runtime.log("Claude Code MCP: db90 server is already configured for your user.");
+        break;
+      case "installed":
+        runtime.log("Claude Code MCP: added db90 server to your user config (~/.claude.json).");
+        break;
+      case "requires-force":
+        runtime.error(installResult.detail);
+        return 1;
+      case "error":
+        runtime.error(`Claude Code MCP install failed: ${installResult.message}`);
+        return 1;
+    }
+
+    runtime.log("Restart Claude Code to activate.");
+  } else {
+    runtime.log(`No Claude Code config was changed for tool "${tool}".`);
+  }
   return 0;
 }
 
