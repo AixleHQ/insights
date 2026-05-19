@@ -118,8 +118,8 @@ export const queryKeys = {
       ["organizations", orgId, "stats", "daily", days] as const,
     hourly: (orgId: string, hours?: number) =>
       ["organizations", orgId, "stats", "hourly", hours] as const,
-    riskAlerts: (orgId: string, projectId?: string) =>
-      ["organizations", orgId, "stats", "risk_alerts", { projectId }] as const,
+    riskAlerts: (orgId: string, projectId?: string, month?: string) =>
+      ["organizations", orgId, "stats", "risk_alerts", { projectId, month }] as const,
     dailyByModel: (orgId: string, days: number, projectId?: string) =>
       ["organizations", orgId, "stats", "daily_by_model", { days, projectId }] as const,
     toolOverview: (orgId: string, tool: string) =>
@@ -1568,12 +1568,15 @@ export interface RiskAlertRow {
   costUsd: number;
 }
 
-export function useOrgRiskAlerts(orgId: string, projectId?: string) {
+export function useOrgRiskAlerts(orgId: string, projectId?: string, month?: string) {
   return useQuery({
-    queryKey: queryKeys.stats.riskAlerts(orgId, projectId),
+    queryKey: queryKeys.stats.riskAlerts(orgId, projectId, month),
     queryFn: () => {
-      const params = projectId ? `?project_id=${projectId}` : "";
-      return api.get<RiskAlertRow[]>(`/organizations/${orgId}/stats/risk_alerts${params}`);
+      const p = new URLSearchParams();
+      if (projectId) p.set("project_id", projectId);
+      if (month) p.set("month", month);
+      const qs = p.toString();
+      return api.get<RiskAlertRow[]>(`/organizations/${orgId}/stats/risk_alerts${qs ? `?${qs}` : ""}`);
     },
     enabled: !!orgId,
     staleTime: 60_000,

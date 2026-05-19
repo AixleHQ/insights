@@ -15,6 +15,11 @@ import { humanizeToolName } from "@/lib/utils";
 import { formatCost, formatTokens, formatCount } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 
+function currentMonth(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
 interface RiskAlertsTableProps {
   orgId: string;
   projectId?: string;
@@ -35,7 +40,7 @@ function SkeletonRow() {
 
 export function RiskAlertsTable({ orgId, projectId, className }: RiskAlertsTableProps) {
   const navigate = useNavigate();
-  const { data: rows, isLoading } = useOrgRiskAlerts(orgId, projectId);
+  const { data: rows, isLoading } = useOrgRiskAlerts(orgId, projectId, currentMonth());
 
   const handleRowClick = (toolName: string) => {
     navigate(`/events?tool_name=${encodeURIComponent(toolName)}&risk_level=not_none`);
