@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import type { MemberRole } from "@/contexts/OrgContext";
+import type { MemberRole, OrganizationMembership } from "@/contexts/OrgContext";
 import type { FavoriteProject } from "@/hooks/useFavorites";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
@@ -10,7 +10,7 @@ import { AppSidebar } from "./AppSidebar";
 const orgMock = vi.hoisted(() => ({
   currentRole: "owner" as MemberRole,
   currentOrg: { id: "org-1", name: "Test Org", slug: "test" },
-  memberships: [] as [],
+  memberships: [] as OrganizationMembership[],
   setCurrentOrg: vi.fn(),
   refreshOrganizations: vi.fn(),
 }));

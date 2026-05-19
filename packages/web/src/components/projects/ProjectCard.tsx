@@ -3,6 +3,7 @@ import { MoreHorizontal, GitBranch, Activity, DollarSign, Calendar, Star } from 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { formatCost } from "@/lib/formatters";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,15 +43,6 @@ function formatDate(dateStr: string | undefined | null): string {
   const date = new Date(dateStr);
   if (isNaN(date.getTime())) return "-";
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(value);
 }
 
 export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFavorite, className }: ProjectCardProps) {
@@ -137,7 +129,7 @@ export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFa
               Cost
             </div>
             <p className="font-mono-display text-sm font-medium">
-              {formatCurrency(project.total_cost_usd || 0)}
+              {formatCost(project.total_cost_usd || 0)}
             </p>
           </div>
           <div className="space-y-1">

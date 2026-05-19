@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
 
+// NOTE: name is snapshotted at pin-time from the project card. If a project is
+// renamed server-side, the sidebar will show the old name until the user re-pins.
+// When backend persistence lands, reconcile against useProjects cache instead.
 export interface FavoriteProject {
   id: string;
   name: string;

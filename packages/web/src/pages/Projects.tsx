@@ -36,7 +36,9 @@ export function Projects() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
-  const { toggleFavorite, isFavorite } = useFavorites();
+  const { toggleFavorite, favorites } = useFavorites();
+  const favoritedIds = useMemo(() => new Set(favorites.map((f) => f.id)), [favorites]);
+  const isFavorite = (id: string) => favoritedIds.has(id);
 
   const { data: projectsData, isLoading } = useProjects(currentOrg?.id || "");
   const deleteProject = useDeleteProject();
