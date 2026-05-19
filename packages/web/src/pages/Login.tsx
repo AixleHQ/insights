@@ -192,7 +192,7 @@ export function Login() {
             variant="outline"
             size="lg"
             disabled
-            aria-disabled="true"
+            aria-disabled={true}
             className="w-full cursor-not-allowed border-zinc-800 bg-transparent text-zinc-500"
           >
             <Fingerprint className="mr-2 size-4" />

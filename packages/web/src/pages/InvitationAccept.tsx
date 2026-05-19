@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   Building2,
@@ -73,6 +73,9 @@ export function InvitationAccept() {
   const [isAccepting, setIsAccepting] = useState(false);
   const [acceptError, setAcceptError] = useState<string | null>(null);
   const [acceptSuccess, setAcceptSuccess] = useState(false);
+  const redirectTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => () => clearTimeout(redirectTimer.current), []);
 
   // Fetch invitation details
   const {
@@ -98,7 +101,7 @@ export function InvitationAccept() {
       setAcceptSuccess(true);
 
       // Brief pause to show success state, then redirect
-      setTimeout(() => {
+      redirectTimer.current = setTimeout(() => {
         if (result.data?.organization) {
           setCurrentOrg({
             id: result.data.organization.id,
