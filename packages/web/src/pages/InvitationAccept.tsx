@@ -73,7 +73,7 @@ export function InvitationAccept() {
   const [isAccepting, setIsAccepting] = useState(false);
   const [acceptError, setAcceptError] = useState<string | null>(null);
   const [acceptSuccess, setAcceptSuccess] = useState(false);
-  const redirectTimer = useRef<ReturnType<typeof setTimeout>>();
+  const redirectTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => () => clearTimeout(redirectTimer.current), []);
 
