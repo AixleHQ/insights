@@ -65,6 +65,42 @@ RSpec.describe 'Api::V1::OrganizationMembers', type: :request do
       expect(member_data[:total_tokens]).to eq(0)
     end
 
+    it 'includes total_events for each member' do
+      create_list(:tool_event, 3, organization: organization, user: member)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/members",
+                        user: member,
+                        organization: organization
+
+      expect_success
+      member_data = json_data.find { |m| m[:user][:email] == member.email }
+      expect(member_data[:total_events]).to eq(3)
+    end
+
+    it 'includes total_cost for each member' do
+      create(:tool_event, organization: organization, user: member, cost_usd: 0.5)
+      create(:tool_event, organization: organization, user: member, cost_usd: 1.25)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/members",
+                        user: member,
+                        organization: organization
+
+      expect_success
+      member_data = json_data.find { |m| m[:user][:email] == member.email }
+      expect(member_data[:total_cost]).to be_within(0.001).of(1.75)
+    end
+
+    it 'returns 0 events and 0 cost for members with no events' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/members",
+                        user: member,
+                        organization: organization
+
+      expect_success
+      member_data = json_data.find { |m| m[:user][:email] == member.email }
+      expect(member_data[:total_events]).to eq(0)
+      expect(member_data[:total_cost]).to eq(0.0)
+    end
+
     it 'filters by role' do
       authenticated_get "/api/v1/organizations/#{organization.id}/members",
                         user: member,

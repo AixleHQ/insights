@@ -82,15 +82,27 @@ test.describe("Seeded Data Verification", () => {
     expect(rowCount).toBeGreaterThan(0);
   });
 
-  test("user can access team page", async ({ page }) => {
-    await page.goto("/team");
+  test("user can access members page", async ({ page }) => {
+    await page.goto("/members");
 
-    // Should see team members list
-    await expect(page.getByRole("heading", { name: /team/i })).toBeVisible({ timeout: 15000 });
+    // Should see members list
+    await expect(page.getByRole("heading", { name: /members/i })).toBeVisible({ timeout: 15000 });
 
     // The seed creates 101 users (1 owner + 100 engineers)
     // At minimum, we should see the logged-in user
     await expect(page.getByText(/billy\.boozer@dualbootpartners\.com/i)).toBeVisible({ timeout: 10000 });
+  });
+
+  test("/team redirects to /members", async ({ page }) => {
+    await page.goto("/team");
+    await expect(page).toHaveURL(/\/members$/, { timeout: 15000 });
+    await expect(page.getByRole("heading", { name: /members/i })).toBeVisible({ timeout: 15000 });
+  });
+
+  test("/settings/members redirects to /members", async ({ page }) => {
+    await page.goto("/settings/members");
+    await expect(page).toHaveURL(/\/members$/, { timeout: 15000 });
+    await expect(page.getByRole("heading", { name: /members/i })).toBeVisible({ timeout: 15000 });
   });
 
   test("user profile shows user settings page", async ({ page }) => {

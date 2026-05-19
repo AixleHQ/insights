@@ -88,6 +88,13 @@ describe("MemberProfileView", () => {
       render(<MemberProfileView memberId="mem-1" />);
       expect(screen.queryByText(/Commits in/)).not.toBeInTheDocument();
     });
+
+    it("links back to /members", () => {
+      render(<MemberProfileView memberId="mem-1" />);
+
+      const backLinks = screen.getAllByRole("link").filter((link) => link.getAttribute("href") === "/members");
+      expect(backLinks.length).toBeGreaterThan(0);
+    });
   });
 
   describe("with projectId", () => {

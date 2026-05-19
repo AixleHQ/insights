@@ -82,6 +82,11 @@ describe("AppSidebar", () => {
       // Profile must not appear as a direct nav link — only inside the avatar dropdown
       expect(screen.queryByRole("link", { name: /^Profile$/i })).not.toBeInTheDocument();
     });
+
+    it("links Members to /members", () => {
+      renderSidebar();
+      expect(screen.getByRole("link", { name: /^Members$/i })).toHaveAttribute("href", "/members");
+    });
   });
 
   describe("member role", () => {

@@ -261,7 +261,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
       <div className="flex flex-col items-center justify-center py-12">
         <p className="text-muted-foreground">Member not found</p>
         <Button asChild variant="link" className="mt-2">
-          <Link to="/settings/members">
+          <Link to="/members">
             <ArrowLeft className="mr-2 size-4" />
             Back to team
           </Link>
@@ -288,7 +288,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-3 sm:gap-4">
             <Button asChild variant="ghost" size="icon" className="shrink-0">
-              <Link to="/settings/members">
+              <Link to="/members">
                 <ArrowLeft className="size-4" />
               </Link>
             </Button>
