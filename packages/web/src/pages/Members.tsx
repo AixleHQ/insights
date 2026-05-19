@@ -69,7 +69,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RoleBadge } from "@/lib/role-display";
+import { RoleBadge } from "@/components/ui/role-badge";
 import { OrgPolicyPanel } from "@/components/org/OrgPolicyPanel";
 
 type MemberSortField = "name" | "role" | "last_active_at" | "total_events" | "total_cost";

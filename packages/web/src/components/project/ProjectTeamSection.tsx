@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow, getMemberDisplayName } from "@/lib/utils";
-import { RoleBadge } from "@/lib/role-display";
+import { RoleBadge } from "@/components/ui/role-badge";
 import type { ProjectMember, MemberCommitStat } from "@/hooks/useApi";
 import {
   useAddProjectMember as useAddMember,
