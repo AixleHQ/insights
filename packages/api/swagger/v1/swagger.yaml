@@ -6,20 +6,784 @@ info:
   description: API for DB90 - Developer Tooling Platform
   contact:
     name: DB90 Team
+servers:
+  - url: http://localhost:3001
+    description: Development server
+  - url: https://api.db90.io
+    description: Production server
+security:
+  - bearer_auth: []
+
 paths:
-  /api/v1/organizations/{organization_id}/members/{id}/dashboard_stats:
+  # ============================================
+  # USER ENDPOINTS
+  # ============================================
+  /api/v1/users/me:
     get:
-      summary: Personal dashboard stats for a member
+      summary: Get current user profile
       tags:
-        - Members
-      security:
-        - bearer_auth: []
+        - Users
+      responses:
+        '200':
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      summary: Update current user profile
+      tags:
+        - Users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                avatar_url:
+                  type: string
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/users/me/organizations:
+    get:
+      summary: Get current user's organizations
+      tags:
+        - Users
       parameters:
-        - name: organization_id
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+      responses:
+        '200':
+          description: User's organizations with membership info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OrganizationWithMembership'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+  /api/v1/users/me/settings:
+    get:
+      summary: Get current user's settings
+      tags:
+        - Users
+      responses:
+        '200':
+          description: User settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Setting'
+
+  /api/v1/users/me/settings/{key}:
+    put:
+      summary: Create or update a user setting
+      tags:
+        - Users
+      parameters:
+        - name: key
           in: path
           required: true
           schema:
             type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                value:
+                  type: object
+              required:
+                - value
+      responses:
+        '200':
+          description: Setting updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Setting'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      summary: Delete a user setting
+      tags:
+        - Users
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Setting deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/users/me/personal_settings:
+    get:
+      summary: Get current user personal alert settings
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Personal settings (defaults returned if no row saved yet)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserPersonalSettings'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      summary: Update current user personal alert settings
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - personal_settings
+              properties:
+                personal_settings:
+                  type: object
+                  properties:
+                    cost_threshold_cents:
+                      type: integer
+                      nullable: true
+                    token_threshold:
+                      type: integer
+                      nullable: true
+                    alert_email:
+                      type: boolean
+                    alert_slack:
+                      type: boolean
+      responses:
+        '200':
+          description: Updated personal settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserPersonalSettings'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  # ============================================
+  # ORGANIZATION ENDPOINTS
+  # ============================================
+  /api/v1/organizations:
+    get:
+      summary: List organizations
+      description: Returns organizations the current user is a member of (or all for global admins)
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+      responses:
+        '200':
+          description: Organizations list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Organization'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+    post:
+      summary: Create organization
+      description: Creates a new organization and makes the current user an owner
+      tags:
+        - Organizations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                slug:
+                  type: string
+                  description: URL-friendly identifier (auto-generated if not provided)
+                description:
+                  type: string
+              required:
+                - name
+      responses:
+        '201':
+          description: Organization created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Organization'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{id}:
+    get:
+      summary: Get organization details
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Organization details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OrganizationFull'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      summary: Update organization
+      description: Requires owner role in the organization
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                slug:
+                  type: string
+                description:
+                  type: string
+                is_active:
+                  type: boolean
+      responses:
+        '200':
+          description: Organization updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Organization'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      summary: Delete organization
+      description: Requires owner role in the organization
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204':
+          description: Organization deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{id}/retention_policy:
+    get:
+      summary: Get organization retention policy
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Retention policy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OrganizationRetentionPolicy'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    patch:
+      summary: Update organization retention policy
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                retention_days:
+                  type: integer
+                  minimum: 1
+                auto_delete_events:
+                  type: boolean
+                anonymize_after_retention:
+                  type: boolean
+      responses:
+        '200':
+          description: Retention policy updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OrganizationRetentionPolicy'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{id}/retention_preview:
+    get:
+      summary: Get retention purge preview for an organization
+      description: >
+        Returns the upcoming purge cutoff date and an estimated count of tool_events
+        that will be deleted at the next scheduled purge run.
+        The count is computed via a COUNT(*) query gated by a 3-second timeout;
+        if the query exceeds the limit, estimatedRecords is null.
+        Requires org owner or global admin role.
+      tags:
+        - Organizations
+        - Retention
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      responses:
+        '200':
+          description: Retention preview
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/RetentionPreview'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{id}/settings:
+    get:
+      summary: Get organization settings
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Organization settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Setting'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{id}/settings/{key}:
+    put:
+      summary: Create or update organization setting
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                value:
+                  type: object
+              required:
+                - value
+      responses:
+        '200':
+          description: Setting updated
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    delete:
+      summary: Delete organization setting
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Setting deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/organizations/{id}/model_pricing:
+    get:
+      summary: Get model and tool pricing table
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Pricing table (static list prices per million tokens)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  models:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PricingEntry'
+                  tools:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PricingEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ============================================
+  # MODEL PRICING OVERRIDES ENDPOINTS
+  # ============================================
+  /api/v1/organizations/{organization_id}/model_pricing/overrides:
+    get:
+      summary: List per-org model pricing overrides
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      responses:
+        '200':
+          description: List of pricing overrides for the organization
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ModelPricingOverride'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      summary: Create a per-org model pricing override
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelPricingOverrideInput'
+      responses:
+        '201':
+          description: Override created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ModelPricingOverride'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /api/v1/organizations/{organization_id}/model_pricing/overrides/{id}:
+    put:
+      summary: Update a per-org model pricing override
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelPricingOverrideInput'
+      responses:
+        '200':
+          description: Override updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ModelPricingOverride'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    delete:
+      summary: Delete a per-org model pricing override
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      responses:
+        '204':
+          description: Override deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================
+  # ORGANIZATION MEMBERS ENDPOINTS
+  # ============================================
+  /api/v1/organizations/{organization_id}/members:
+    get:
+      summary: List organization members
+      tags:
+        - Organization Members
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [owner, member, viewer]
+      responses:
+        '200':
+          description: Members list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OrganizationMemberListItem'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+    post:
+      summary: Add organization member
+      description: Requires owner role. Adds a user as a member of the organization.
+      tags:
+        - Organization Members
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: string
+                  format: uuid
+                role:
+                  type: string
+                  enum: [owner, member, viewer]
+              required:
+                - user_id
+                - role
+      responses:
+        '201':
+          description: Member added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OrganizationMembership'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/members/{id}:
+    get:
+      summary: Get organization member
+      tags:
+        - Organization Members
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Member details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OrganizationMembership'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      summary: Update organization member role
+      description: Requires owner role. Cannot demote owners unless you are also an owner.
+      tags:
+        - Organization Members
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role:
+                  type: string
+                  enum: [owner, member, viewer]
+              required:
+                - role
+      responses:
+        '200':
+          description: Member updated
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      summary: Remove organization member
+      description: Requires owner role. Cannot remove owners unless you are also an owner.
+      tags:
+        - Organization Members
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204':
+          description: Member removed
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/members/{id}/dashboard_stats:
+    get:
+      summary: Personal dashboard stats for a member
+      tags:
+        - Organization Members
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
         - name: id
           in: path
           required: true
@@ -72,24 +836,22 @@ paths:
                           type: number
                           format: float
         '401':
-          description: Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Forbidden
+          $ref: '#/components/responses/Forbidden'
         '404':
-          description: Member not found
+          $ref: '#/components/responses/NotFound'
+
   /api/v1/organizations/{organization_id}/members/{id}/stats/heatmap:
     get:
       summary: Activity heatmap for a member (last 365 days)
       tags:
-        - Members
+        - Organization Members
       security:
         - bearer_auth: []
       parameters:
-        - name: organization_id
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
         - name: id
           in: path
           required: true
@@ -112,16 +874,3323 @@ paths:
                     count:
                       type: integer
         '401':
-          description: Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Forbidden
+          $ref: '#/components/responses/Forbidden'
         '404':
-          description: Member not found
-servers:
-- url: http://localhost:3001
-  description: Development server
-- url: https://api.db90.io
-  description: Production server
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================
+  # ORGANIZATION CONNECTORS ENDPOINTS
+  # ============================================
+  /api/v1/organizations/{organization_id}/connectors:
+    get:
+      summary: List organization connectors
+      tags:
+        - Organization Connectors
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - name: type
+          in: query
+          description: Filter by connector type
+          schema:
+            type: string
+            enum: [github, gitlab, bitbucket, jira, linear, openrouter, anthropic, openai, gemini]
+        - name: active
+          in: query
+          schema:
+            type: string
+            enum: ['true', 'false']
+      responses:
+        '200':
+          description: Connectors list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OrganizationConnector'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+    post:
+      summary: Create organization connector
+      description: Requires owner role. Creates a new connector for the organization.
+      tags:
+        - Organization Connectors
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                connector_type:
+                  type: string
+                  enum: [github, gitlab, bitbucket, jira, linear, openrouter, anthropic, openai, gemini, slack, github_copilot]
+                access_token:
+                  type: string
+                  description: OAuth access token (sensitive)
+                refresh_token:
+                  type: string
+                  description: OAuth refresh token (sensitive)
+                token_expires_at:
+                  type: string
+                  format: date-time
+                external_account_id:
+                  type: string
+                external_account_name:
+                  type: string
+                webhook_secret:
+                  type: string
+                is_active:
+                  type: boolean
+                  default: true
+              required:
+                - connector_type
+      responses:
+        '201':
+          description: Connector created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OrganizationConnector'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/connectors/{id}:
+    get:
+      summary: Get organization connector
+      tags:
+        - Organization Connectors
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Connector details (tokens never exposed)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OrganizationConnector'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      summary: Update organization connector
+      tags:
+        - Organization Connectors
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                access_token:
+                  type: string
+                refresh_token:
+                  type: string
+                token_expires_at:
+                  type: string
+                  format: date-time
+                external_account_id:
+                  type: string
+                external_account_name:
+                  type: string
+                webhook_secret:
+                  type: string
+                is_active:
+                  type: boolean
+      responses:
+        '200':
+          description: Connector updated
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      summary: Delete organization connector
+      tags:
+        - Organization Connectors
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204':
+          description: Connector deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/connectors/{id}/test:
+    post:
+      summary: Test connector connection
+      description: Tests if the connector can successfully connect to the external service
+      tags:
+        - Organization Connectors
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Test result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      success:
+                        type: boolean
+                      message:
+                        type: string
+                      error:
+                        type: string
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/connectors/{id}/sync:
+    post:
+      summary: Trigger connector sync
+      description: Triggers a sync operation for the connector (e.g., fetch repositories)
+      tags:
+        - Organization Connectors
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Sync triggered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OrganizationConnector'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/connectors/{id}/sync_status:
+    get:
+      summary: Get connector sync status
+      description: Returns the connector's current status, last sync time, last error, and total synced event count
+      tags:
+        - Organization Connectors
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Sync status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  connector_type:
+                    type: string
+                  status:
+                    type: string
+                    enum: [connected, testing, error, disconnected]
+                  last_sync_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  last_error:
+                    type: string
+                    nullable: true
+                  total_events:
+                    type: integer
+                  repository_count:
+                    type: integer
+                  last_event_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/organizations/{organization_id}/connectors/health:
+    get:
+      summary: Get connector health rollup
+      description: Returns aggregated 7-day health metrics for all connectors in the organization. Summary counts use all connectors; per-connector list excludes disconnected.
+      tags:
+        - Organization Connectors
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      responses:
+        '200':
+          description: Connector health rollup
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      summary:
+                        type: object
+                        properties:
+                          total:
+                            type: integer
+                          connected:
+                            type: integer
+                          testing:
+                            type: integer
+                          error:
+                            type: integer
+                          disconnected:
+                            type: integer
+                      connectors:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            connector_type:
+                              type: string
+                            status:
+                              type: string
+                              enum: [connected, testing, error]
+                            last_sync_at:
+                              type: string
+                              format: date-time
+                              nullable: true
+                            last_error:
+                              type: string
+                              nullable: true
+                            success_rate_7d:
+                              type: number
+                              format: float
+                              nullable: true
+                              description: Fraction of successful syncs in the last 7 days (0.0–1.0). Null if no snapshots exist.
+                            avg_sync_duration_ms_7d:
+                              type: number
+                              format: float
+                              nullable: true
+                              description: Average sync duration in milliseconds over the last 7 days. Null if no snapshots exist.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/connectors/authorize/{type}:
+    get:
+      summary: Get OAuth authorization URL
+      description: Returns the OAuth authorization URL to start the OAuth flow
+      tags:
+        - Organization Connectors
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [github, gitlab, bitbucket, jira, linear, github_copilot]
+      responses:
+        '200':
+          description: Authorization URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      authorize_url:
+                        type: string
+                        format: uri
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/connectors/callback:
+    post:
+      summary: OAuth callback
+      description: Handles the OAuth callback and exchanges the code for tokens
+      tags:
+        - Organization Connectors
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                connector_type:
+                  type: string
+                  enum: [github, gitlab, bitbucket, jira, linear, github_copilot]
+                code:
+                  type: string
+                  description: OAuth authorization code
+              required:
+                - connector_type
+                - code
+      responses:
+        '200':
+          description: Connector created/updated with tokens
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OrganizationConnector'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  # ============================================
+  # USER TOOL ACCOUNTS ENDPOINTS
+  # ============================================
+  /api/v1/organizations/{organization_id}/tool_accounts:
+    get:
+      summary: List user's tool accounts
+      description: Returns the current user's tool accounts for this organization
+      tags:
+        - User Tool Accounts
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: tool
+          in: query
+          description: Filter by tool name
+          schema:
+            type: string
+            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom]
+        - name: active
+          in: query
+          schema:
+            type: string
+            enum: ['true', 'false']
+      responses:
+        '200':
+          description: Tool accounts list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserToolAccount'
+    post:
+      summary: Link tool account
+      description: Links a new tool account to the user's membership in this organization
+      tags:
+        - User Tool Accounts
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tool_name:
+                  type: string
+                  enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom]
+                access_token:
+                  type: string
+                refresh_token:
+                  type: string
+                token_expires_at:
+                  type: string
+                  format: date-time
+                external_account_id:
+                  type: string
+                external_account_name:
+                  type: string
+                is_active:
+                  type: boolean
+                  default: true
+              required:
+                - tool_name
+      responses:
+        '201':
+          description: Tool account created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserToolAccount'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/tool_accounts/{id}:
+    get:
+      summary: Get tool account
+      tags:
+        - User Tool Accounts
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Tool account details (tokens never exposed)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserToolAccount'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      summary: Update tool account
+      tags:
+        - User Tool Accounts
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                access_token:
+                  type: string
+                refresh_token:
+                  type: string
+                token_expires_at:
+                  type: string
+                  format: date-time
+                external_account_id:
+                  type: string
+                external_account_name:
+                  type: string
+                is_active:
+                  type: boolean
+      responses:
+        '200':
+          description: Tool account updated
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      summary: Unlink tool account
+      tags:
+        - User Tool Accounts
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204':
+          description: Tool account deleted
+
+  # ============================================
+  # STATS ENDPOINTS
+  # ============================================
+  /api/v1/organizations/{organization_id}/stats/overview:
+    get:
+      summary: Organization stats overview
+      description: Returns aggregate event count, cost, active users, and high-risk event count for the current month, with percentage change vs the previous month.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      responses:
+        '200':
+          description: Overview stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_events:
+                    type: integer
+                  total_cost_usd:
+                    type: number
+                    format: float
+                  high_risk_events:
+                    type: integer
+                  active_users:
+                    type: integer
+                  events_change_percent:
+                    type: number
+                    format: float
+                  cost_change_percent:
+                    type: number
+                    format: float
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/stats/hourly:
+    get:
+      summary: Hourly stats
+      description: Returns per-hour event counts, token totals, cost, and unique users. Defaults to the last 24 hours; override with start_date/end_date.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+      responses:
+        '200':
+          description: Hourly stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      timeRange:
+                        type: object
+                        properties:
+                          start:
+                            type: string
+                            format: date-time
+                          end:
+                            type: string
+                            format: date-time
+                      hourly:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            hour:
+                              type: string
+                              format: date-time
+                            eventCount:
+                              type: integer
+                            tokensIn:
+                              type: integer
+                            tokensOut:
+                              type: integer
+                            costUsd:
+                              type: number
+                              format: float
+                            uniqueUsers:
+                              type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/stats/daily:
+    get:
+      summary: Daily stats
+      description: Returns daily event counts and cost, plus a per-tool breakdown. Defaults to the last 30 days; pass `days` to override.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: days
+          in: query
+          description: Number of days to look back (default 30)
+          schema:
+            type: integer
+            default: 30
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+      responses:
+        '200':
+          description: Daily stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                        event_count:
+                          type: integer
+                        cost_usd:
+                          type: number
+                          format: float
+                  tool_breakdown:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        tool_name:
+                          type: string
+                        event_count:
+                          type: integer
+                        cost_usd:
+                          type: number
+                          format: float
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/stats/daily_by_tool:
+    get:
+      summary: Daily stats by tool
+      description: Returns daily event counts grouped by the top 3 tools plus an "Other" bucket — shaped for stacked bar charts. Defaults to the last 30 days.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: days
+          in: query
+          description: Number of days to look back (default 30)
+          schema:
+            type: integer
+            default: 30
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+      responses:
+        '200':
+          description: Daily stats by tool
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    description: One entry per day; keys are tool names + "Other"
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                      additionalProperties:
+                        type: integer
+                  tools:
+                    type: array
+                    description: Ordered list of tool names present in data (top 3 + "Other")
+                    items:
+                      type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/stats/heatmap:
+    get:
+      summary: Activity heatmap
+      description: Returns daily event counts for the past year, shaped for a calendar heatmap.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      responses:
+        '200':
+          description: Heatmap data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    date:
+                      type: string
+                      format: date
+                    count:
+                      type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/overview:
+    get:
+      summary: Tool overview stats
+      description: Returns aggregate usage stats (events, cost, tokens, active users) for a specific tool. Returns 422 if tool_name is not a recognised value.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: tool_name
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github, gitlab]
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+      responses:
+        '200':
+          description: Tool overview stats for the current month vs previous month
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tool:
+                    type: string
+                    example: cursor
+                  total_events:
+                    type: integer
+                    description: Event count for the current month
+                  total_cost_usd:
+                    type: number
+                    format: float
+                    description: Total cost in USD for the current month
+                  total_tokens_in:
+                    type: integer
+                    description: Total input tokens for the current month
+                  total_tokens_out:
+                    type: integer
+                    description: Total output tokens for the current month
+                  active_users:
+                    type: integer
+                    description: Distinct non-null user IDs with events this month
+                  events_change_pct:
+                    type: number
+                    format: float
+                    description: Percentage change in events vs previous month (0 if no prior data)
+                  cost_change_pct:
+                    type: number
+                    format: float
+                    description: Percentage change in cost vs previous month (0 if no prior data)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/models:
+    get:
+      summary: Tool model breakdown
+      description: Returns per-model usage aggregates (event count, tokens, cost) enriched with pricing data. Sorted by eventCount descending. Null-model events are excluded. Defaults to the last 30 days; pass days or start_date/end_date to override.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: tool_name
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github, gitlab]
+        - name: days
+          in: query
+          description: Number of days to look back (default 30)
+          schema:
+            type: integer
+            default: 30
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+      responses:
+        '200':
+          description: Model breakdown for the tool
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tool:
+                    type: string
+                    example: openrouter_api
+                  timeRange:
+                    type: object
+                    properties:
+                      start:
+                        type: string
+                        format: date-time
+                      end:
+                        type: string
+                        format: date-time
+                  models:
+                    type: array
+                    description: Per-model aggregates sorted by eventCount descending
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                          example: claude-3-5-sonnet-20241022
+                        eventCount:
+                          type: integer
+                        tokensIn:
+                          type: integer
+                        tokensOut:
+                          type: integer
+                        costUsd:
+                          type: number
+                          format: float
+                        price_per_million_input:
+                          type: number
+                          format: float
+                          nullable: true
+                          description: Input price per million tokens; null if model not in pricing table
+                        price_per_million_output:
+                          type: number
+                          format: float
+                          nullable: true
+                          description: Output price per million tokens; null if model not in pricing table
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/users:
+    get:
+      summary: Tool user breakdown
+      description: Returns top users by token consumption for a specific tool, sorted by totalTokens descending. Events without a user_id are excluded.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: tool_name
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github, gitlab]
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+        - name: days
+          in: query
+          required: false
+          description: Number of past days to include (ignored when start_date/end_date are provided). Defaults to 30.
+          schema:
+            type: integer
+            default: 30
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of users to return. Clamped between 1 and 100. Defaults to 20.
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: User breakdown sorted by totalTokens descending
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tool:
+                    type: string
+                    example: cursor
+                  timeRange:
+                    type: object
+                    properties:
+                      start:
+                        type: string
+                        format: date-time
+                      end:
+                        type: string
+                        format: date-time
+                  users:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        userId:
+                          type: string
+                          format: uuid
+                        name:
+                          type: string
+                          example: Alice Chen
+                        email:
+                          type: string
+                          format: email
+                          example: alice@company.com
+                        eventCount:
+                          type: integer
+                          example: 214
+                        totalTokens:
+                          type: integer
+                          example: 380000
+                        costUsd:
+                          type: number
+                          format: float
+                          example: 6.12
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/daily:
+    get:
+      summary: Tool daily stats
+      description: Returns day-by-day event counts, tokens, and cost for a specific tool. Every day in the range has an entry — days with no events are zero-filled.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: tool_name
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github, gitlab]
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+        - name: days
+          in: query
+          required: false
+          description: Number of past days to include (ignored when start_date/end_date are provided). Defaults to 30.
+          schema:
+            type: integer
+            default: 30
+      responses:
+        '200':
+          description: Daily trend data with zero-filled gaps
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tool:
+                    type: string
+                    example: claude_code
+                  timeRange:
+                    type: object
+                    properties:
+                      start:
+                        type: string
+                        format: date-time
+                      end:
+                        type: string
+                        format: date-time
+                  daily:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                          example: '2026-04-10'
+                        eventCount:
+                          type: integer
+                          example: 42
+                        tokensIn:
+                          type: integer
+                          example: 15000
+                        tokensOut:
+                          type: integer
+                          example: 32000
+                        costUsd:
+                          type: number
+                          format: float
+                          example: 0.87
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/event_types:
+    get:
+      summary: Tool event type breakdown
+      description: Returns per-event-type usage aggregates (event count, tokens, cost) for a specific tool. Sorted by eventCount descending. Defaults to the last 30 days; pass days or start_date/end_date to override.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: tool_name
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github, gitlab]
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+        - name: days
+          in: query
+          required: false
+          description: Number of past days to include (ignored when start_date/end_date are provided). Defaults to 30.
+          schema:
+            type: integer
+            default: 30
+      responses:
+        '200':
+          description: Event type breakdown sorted by eventCount descending
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tool:
+                    type: string
+                    example: cursor
+                  timeRange:
+                    type: object
+                    properties:
+                      start:
+                        type: string
+                        format: date-time
+                      end:
+                        type: string
+                        format: date-time
+                  eventTypes:
+                    type: array
+                    description: Per-event-type aggregates sorted by eventCount descending
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                          enum: [chat, completion, edit, commit, review, test, debug, refactor, documentation, other, issue, comment, sprint]
+                          example: chat
+                        eventCount:
+                          type: integer
+                          example: 580
+                        tokensIn:
+                          type: integer
+                          example: 72000
+                        tokensOut:
+                          type: integer
+                          example: 31000
+                        costUsd:
+                          type: number
+                          format: float
+                          example: 14.85
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  # ============================================
+  # PROJECT LOOKUP (ingest token auth)
+  # ============================================
+  /api/v1/projects/lookup:
+    get:
+      summary: Look up project by git remote URL
+      description: >
+        Returns a project matching the given git remote URL, scoped to projects
+        accessible by the ingest token's user (org projects + personal projects).
+        URL is normalized (lowercased, `.git` suffix stripped, whitespace trimmed)
+        before lookup. SSH and HTTPS variants are not interchangeable — the stored
+        value must match the exact protocol form of `git remote get-url origin`.
+        Used by CLI connectors for automatic project attribution.
+      tags:
+        - Projects
+      security:
+        - ingest_token_auth: []
+      parameters:
+        - name: git_remote
+          in: query
+          required: true
+          description: Git remote URL (e.g. git@github.com:org/repo.git)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Project found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      project_id:
+                        type: string
+                        format: uuid
+                      name:
+                        type: string
+                    required:
+                      - project_id
+                      - name
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================
+  # PROJECT ENDPOINTS
+  # ============================================
+  /api/v1/projects:
+    get:
+      summary: List projects
+      description: Returns all projects the user can access (personal + organization projects)
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - name: personal
+          in: query
+          description: Filter to personal projects only
+          schema:
+            type: string
+            enum: ['true', 'false']
+        - name: active
+          in: query
+          schema:
+            type: string
+            enum: ['true', 'false']
+      responses:
+        '200':
+          description: Projects list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Project'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+    post:
+      summary: Create personal project
+      description: Creates a new personal project owned by the current user
+      tags:
+        - Projects
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                slug:
+                  type: string
+                description:
+                  type: string
+                git_remote_url:
+                  type: string
+                  nullable: true
+                  description: Git remote URL used by CLI connectors for auto-detection (e.g. git@github.com:org/repo.git)
+              required:
+                - name
+      responses:
+        '201':
+          description: Project created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Project'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  # ============================================
+  # ORGANIZATION AUDIT LOG ENDPOINTS
+  # ============================================
+  /api/v1/organizations/{organization_id}/audit_logs:
+    get:
+      summary: List organization audit logs
+      description: >
+        Returns paginated audit log entries for the organization.
+        Requires org admin or global admin role. Members receive 403.
+        All fields including `ipAddress` and `trackedChanges` are included.
+      tags:
+        - Organization Audit Logs
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - name: actor_id
+          in: query
+          description: Filter by actor user ID
+          schema:
+            type: string
+            format: uuid
+        - name: log_action
+          in: query
+          description: Filter by action (e.g. settings.update, member.removed)
+          schema:
+            type: string
+        - name: resource_type
+          in: query
+          description: Filter by resource type (e.g. OrganizationConnector)
+          schema:
+            type: string
+        - name: from_date
+          in: query
+          description: Filter entries on or after this ISO 8601 datetime
+          schema:
+            type: string
+            format: date-time
+        - name: to_date
+          in: query
+          description: Filter entries on or before this ISO 8601 datetime
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Paginated audit log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OrganizationAuditLog'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/retention_logs:
+    get:
+      summary: List retention purge logs for an organization
+      description: >
+        Returns paginated records of data purge runs for the organization.
+        Each record contains the retention window applied, cutoff timestamp,
+        number of records deleted, and the run status.
+        Requires org owner or global admin role. Other roles receive 403.
+      tags:
+        - Retention
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+      responses:
+        '200':
+          description: Paginated retention purge log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RetentionPurgeLog'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/webhook_deliveries:
+    get:
+      summary: List webhook deliveries
+      description: >
+        Returns paginated webhook delivery history for the organization.
+        Requires org admin or global admin role. Filterable by status, provider, and date range.
+      tags:
+        - Webhook Deliveries
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - name: status
+          in: query
+          description: Filter by delivery status
+          schema:
+            type: string
+            enum: [pending, processing, delivered, failed]
+        - name: provider
+          in: query
+          description: Filter by provider
+          schema:
+            type: string
+            enum: [github, gitlab, bitbucket, jira, linear, slack]
+        - name: date_from
+          in: query
+          description: Filter deliveries created on or after this ISO 8601 datetime
+          schema:
+            type: string
+            format: date-time
+        - name: date_to
+          in: query
+          description: Filter deliveries created on or before this ISO 8601 datetime
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Paginated webhook delivery list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WebhookDelivery'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/webhook_deliveries/{id}/retry:
+    post:
+      summary: Retry a failed webhook delivery
+      description: >
+        Re-enqueues a failed webhook delivery using the stored raw payload from MinIO.
+        Only allowed for deliveries with status "failed". Returns 422 if the delivery
+        is not in a failed state or if the raw payload has expired (MinIO TTL).
+      tags:
+        - Webhook Deliveries
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: id
+          in: path
+          required: true
+          description: Webhook delivery UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '202':
+          description: Delivery re-enqueued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/WebhookDelivery'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Delivery is not retryable (not failed, or payload expired)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
+  /api/v1/organizations/{organization_id}/projects:
+    get:
+      summary: List organization projects
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - name: active
+          in: query
+          schema:
+            type: string
+            enum: ['true', 'false']
+      responses:
+        '200':
+          description: Organization projects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Project'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+    post:
+      summary: Create organization project
+      description: Creates a new project in the organization
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                slug:
+                  type: string
+                description:
+                  type: string
+                git_remote_url:
+                  type: string
+                  nullable: true
+                  description: Git remote URL used by CLI connectors for auto-detection (e.g. git@github.com:org/repo.git)
+              required:
+                - name
+      responses:
+        '201':
+          description: Project created
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/projects/{id}:
+    get:
+      summary: Get project details
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Project details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ProjectFull'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      summary: Update project
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                slug:
+                  type: string
+                description:
+                  type: string
+                is_active:
+                  type: boolean
+                git_remote_url:
+                  type: string
+                  nullable: true
+                  description: Git remote URL used by CLI connectors for auto-detection (e.g. git@github.com:org/repo.git)
+      responses:
+        '200':
+          description: Project updated
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      summary: Delete project
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204':
+          description: Project deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/projects/{id}/link_jira:
+    post:
+      summary: Link a Jira project to this DB90 project
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                connector_id:
+                  type: integer
+                  description: ID of the Jira OrganizationConnector
+                jira_project_key:
+                  type: string
+                  description: Jira project key (e.g. SCRUM)
+              required:
+                - connector_id
+                - jira_project_key
+      responses:
+        '200':
+          description: Jira project linked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      linked:
+                        type: boolean
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/projects/{id}/link_linear:
+    post:
+      summary: Link a Linear project to this DB90 project
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                connector_id:
+                  type: integer
+                  description: ID of the Linear OrganizationConnector
+                linear_project_id:
+                  type: string
+                  description: External Linear project ID (UUID)
+                linear_project_name:
+                  type: string
+                  description: Display name of the Linear project
+              required:
+                - connector_id
+                - linear_project_id
+                - linear_project_name
+      responses:
+        '200':
+          description: Linear project linked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      linked:
+                        type: boolean
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/projects/{id}/sync_issues:
+    post:
+      summary: Trigger synchronous issue sync for Jira or Linear connector
+      description: >
+        Runs the connector sync job inline (perform_now) and returns only after issues
+        are written to the database. Supports both Jira and Linear connectors — whichever
+        is currently linked to the project.
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Sync completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      synced_at:
+                        type: string
+                        format: date-time
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/projects/{id}/settings:
+    get:
+      summary: Get project settings
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Project settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Setting'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/projects/{id}/settings/{key}:
+    put:
+      summary: Create or update project setting
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                value:
+                  type: object
+              required:
+                - value
+      responses:
+        '200':
+          description: Setting updated
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    delete:
+      summary: Delete project setting
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Setting deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================
+  # PROJECT AUDIT LOG ENDPOINTS
+  # ============================================
+  /api/v1/projects/{project_id}/audit_logs:
+    get:
+      summary: List project audit logs
+      description: >
+        Returns paginated audit log entries for the project.
+        Accessible by project admins (owner/admin role on the project), org admins, and global admins.
+        Project members and viewers receive 403.
+
+        **Role-based field visibility:**
+        - Org admins and global admins: all fields including `ipAddress` and `trackedChanges`
+        - Project admins (non-org-admin): `ipAddress` and `trackedChanges` are omitted from the response
+        - Personal project owners: all fields included
+      tags:
+        - Project Audit Logs
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - name: actor_id
+          in: query
+          description: Filter by actor user ID
+          schema:
+            type: string
+            format: uuid
+        - name: log_action
+          in: query
+          description: Filter by action (e.g. settings.update, member.removed)
+          schema:
+            type: string
+        - name: resource_type
+          in: query
+          description: Filter by resource type (e.g. ProjectConnector)
+          schema:
+            type: string
+        - name: from_date
+          in: query
+          description: Filter entries on or after this ISO 8601 datetime
+          schema:
+            type: string
+            format: date-time
+        - name: to_date
+          in: query
+          description: Filter entries on or before this ISO 8601 datetime
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Paginated audit log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProjectAuditLog'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================
+  # PROJECT MEMBERS ENDPOINTS
+  # ============================================
+  /api/v1/projects/{project_id}/members:
+    get:
+      summary: List project members
+      tags:
+        - Project Members
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [owner, member, viewer]
+      responses:
+        '200':
+          description: Project members
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProjectMembership'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+    post:
+      summary: Add project member
+      description: Requires organization owner (or personal project owner) for org projects
+      tags:
+        - Project Members
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: string
+                  format: uuid
+                role:
+                  type: string
+                  enum: [owner, member, viewer]
+              required:
+                - user_id
+                - role
+      responses:
+        '201':
+          description: Member added
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/projects/{project_id}/members/{id}:
+    get:
+      summary: Get project member
+      tags:
+        - Project Members
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Member details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ProjectMembership'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      summary: Update project member role
+      tags:
+        - Project Members
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role:
+                  type: string
+                  enum: [owner, member, viewer]
+              required:
+                - role
+      responses:
+        '200':
+          description: Member updated
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      summary: Remove project member
+      tags:
+        - Project Members
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204':
+          description: Member removed
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ============================================
+  # REPOSITORY ENDPOINTS
+  # ============================================
+  /api/v1/projects/{project_id}/repositories:
+    get:
+      summary: List project repositories
+      tags:
+        - Repositories
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - name: private
+          in: query
+          schema:
+            type: string
+            enum: ['true', 'false']
+      responses:
+        '200':
+          description: Repositories list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Repository'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+    post:
+      summary: Add repository to project
+      description: Requires admin role in the project
+      tags:
+        - Repositories
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                organization_connector_id:
+                  type: string
+                  format: uuid
+                external_id:
+                  type: string
+                name:
+                  type: string
+                full_name:
+                  type: string
+                description:
+                  type: string
+                default_branch:
+                  type: string
+                clone_url:
+                  type: string
+                html_url:
+                  type: string
+                is_private:
+                  type: boolean
+              required:
+                - organization_connector_id
+                - external_id
+                - name
+                - full_name
+      responses:
+        '201':
+          description: Repository added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Repository'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/projects/{project_id}/repositories/{id}:
+    get:
+      summary: Get repository details
+      tags:
+        - Repositories
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Repository details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Repository'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      summary: Update repository
+      tags:
+        - Repositories
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                description:
+                  type: string
+                default_branch:
+                  type: string
+      responses:
+        '200':
+          description: Repository updated
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      summary: Remove repository from project
+      tags:
+        - Repositories
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204':
+          description: Repository removed
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/projects/{project_id}/repositories/{id}/sync:
+    post:
+      summary: Trigger repository sync
+      description: >
+        Queues a sync for the repository's organization connector (metadata refresh and,
+        for GitHub/GitLab/Bitbucket, recent activity backfill). Matches POST …/connectors/:id/sync.
+      tags:
+        - Repositories
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Sync triggered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Repository'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ============================================
+  # EVENTS
+  # ============================================
+  /api/v1/organizations/{organization_id}/events:
+    get:
+      summary: List events
+      description: Returns a paginated list of tool events for the organization. Supports filtering by tool, event type, risk level, user, project, model, and date range.
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+        - name: tool_name
+          in: query
+          schema:
+            type: string
+        - name: event_type
+          in: query
+          schema:
+            type: string
+        - name: risk_level
+          in: query
+          schema:
+            type: string
+            enum: [critical, high, medium, low, none]
+        - name: user_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: project_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: model
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated list of events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ToolEvent'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/events/{id}:
+    get:
+      summary: Get event details
+      description: Returns full details for a single tool event, including metadata, audit log, and associations.
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Event details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ToolEventDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/organizations/{organization_id}/events/summary:
+    get:
+      summary: Event summary statistics
+      description: Returns aggregate counts (events, tokens, cost) grouped by tool, event type, and user.
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+      responses:
+        '200':
+          description: Summary statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      totalEvents:
+                        type: integer
+                      totalTokensIn:
+                        type: integer
+                      totalTokensOut:
+                        type: integer
+                      totalCostUsd:
+                        type: number
+                        format: float
+                      byTool:
+                        type: object
+                        additionalProperties:
+                          type: integer
+                      byEventType:
+                        type: object
+                        additionalProperties:
+                          type: integer
+                      byUser:
+                        type: object
+                        additionalProperties:
+                          type: integer
+                      timeRange:
+                        type: object
+                        properties:
+                          start:
+                            type: string
+                            format: date-time
+                            nullable: true
+                          end:
+                            type: string
+                            format: date-time
+                            nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/events/unattributed:
+    get:
+      summary: List unattributed events
+      description: >
+        Returns events with no assigned user (user_id is null). Restricted to org admins and above.
+        Each event includes correlation_method and correlation_confidence from metadata (populated by
+        AttributionJob when a candidate was found but below the confidence threshold).
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+        - name: tool_name
+          in: query
+          schema:
+            type: string
+        - name: event_type
+          in: query
+          schema:
+            type: string
+        - name: min_confidence
+          in: query
+          description: Filter to events where the best-attempt correlation_confidence is at least this value (0.0–1.0). Events never processed by AttributionJob are excluded when this filter is active.
+          schema:
+            type: number
+            format: float
+            minimum: 0
+            maximum: 1
+      responses:
+        '200':
+          description: Paginated list of unattributed events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ToolEvent'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/events/{id}/attribute:
+    post:
+      summary: Manually attribute an event to a user
+      description: >
+        Assigns a user to an unattributed event. Sets correlation_method to "manual" and
+        correlation_confidence to 1.0 in metadata. Restricted to org admins and above.
+        The action is audit-logged.
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - user_id
+              properties:
+                user_id:
+                  type: string
+                  format: uuid
+                  description: ID of the organization member to assign the event to
+      responses:
+        '200':
+          description: Event successfully attributed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ToolEvent'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /api/v1/organizations/{organization_id}/events/attribute_bulk:
+    post:
+      summary: Bulk attribute events to a user
+      description: >
+        Assigns up to 500 events to a single user in one request. All event IDs must belong to
+        the organization. Sets correlation_method to "manual" and correlation_confidence to 1.0
+        for each event. Restricted to org admins and above. The action is audit-logged.
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - event_ids
+                - user_id
+              properties:
+                event_ids:
+                  type: array
+                  maxItems: 500
+                  items:
+                    type: string
+                    format: uuid
+                  description: List of event IDs to attribute (max 500)
+                user_id:
+                  type: string
+                  format: uuid
+                  description: ID of the organization member to assign the events to
+      responses:
+        '200':
+          description: Bulk attribution result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      updated:
+                        type: integer
+                        description: Number of events successfully attributed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /api/v1/organizations/{organization_id}/events/{id}/audit_trail:
+    get:
+      summary: Get event audit trail
+      description: Returns the audit log entry for a specific event, if one exists.
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Audit log for the event (or null if none exists)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AuditLog'
+                  - type: object
+                    properties:
+                      data:
+                        type: 'null'
+                      message:
+                        type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/organizations/{organization_id}/events/export:
+    get:
+      summary: Export events as CSV
+      description: >
+        Exports filtered events as a CSV file. When any export query parameters
+        are present, the file begins with an "Applied filters" title row, then one
+        row per active filter, then a blank row, before the column headers. Columns vary by role:
+        members receive base columns only; org admins add user_email;
+        global admins also add model and session_id.
+        If the result set exceeds 100,000 rows the export is queued as a
+        background job and a 202 response is returned with a Link header
+        pointing to the job status endpoint.
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+        - name: tool_name
+          in: query
+          schema:
+            type: string
+        - name: event_type
+          in: query
+          schema:
+            type: string
+        - name: risk_level
+          in: query
+          schema:
+            type: string
+            enum: [high, medium, low, none]
+        - name: project_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: user_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: model
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: CSV file download
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        '202':
+          description: Export queued — result set exceeds 100,000 rows
+          headers:
+            Link:
+              description: URL of the background job status endpoint
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_id:
+                    type: string
+                  message:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/event_export_jobs/{id}:
+    get:
+      summary: Get export job status
+      description: Returns the status of a background CSV export job.
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Job status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_id:
+                    type: string
+                  status:
+                    type: string
+                    enum: [pending, complete, failed, not_found]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/event_export_jobs/{id}/download:
+    get:
+      summary: Download completed export CSV
+      description: Streams the CSV for a completed export job. Returns 404 if not ready or expired.
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: CSV file download
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ============================================
+  # AI GATEWAY
+  # ============================================
+  /api/v1/organizations/{organization_id}/ai/{provider}/completions:
+    post:
+      summary: AI completion
+      description: |
+        Proxies a completion request to the specified AI provider.
+        Polling-only providers (e.g. `anthropic`) return 403 — they are connected for usage data only, not chat/completion.
+      tags:
+        - AI Gateway
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                prompt:
+                  type: string
+                model:
+                  type: string
+                temperature:
+                  type: number
+                max_tokens:
+                  type: integer
+                top_p:
+                  type: number
+              required:
+                - prompt
+      responses:
+        '200':
+          description: Completion result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiCompletionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Forbidden — provider is polling-only or access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          description: Rate limited
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          description: Upstream AI provider error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/organizations/{organization_id}/ai/{provider}/chat:
+    post:
+      summary: AI chat
+      description: |
+        Proxies a chat request to the specified AI provider.
+        Polling-only providers (e.g. `anthropic`) return 403 — they are connected for usage data only, not chat/completion.
+      tags:
+        - AI Gateway
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                messages:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      role:
+                        type: string
+                        enum: [system, user, assistant]
+                      content:
+                        type: string
+                    required:
+                      - role
+                      - content
+                model:
+                  type: string
+                temperature:
+                  type: number
+                max_tokens:
+                  type: integer
+                top_p:
+                  type: number
+                stream:
+                  type: boolean
+              required:
+                - messages
+      responses:
+        '200':
+          description: Chat result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiChatResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Forbidden — provider is polling-only or access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          description: Rate limited
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          description: Upstream AI provider error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/organizations/{organization_id}/ai/{provider}/models:
+    get:
+      summary: List AI models
+      description: |
+        Returns available models for the specified AI provider.
+        Polling-only providers (e.g. `anthropic`) return 403.
+      tags:
+        - AI Gateway
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of available models
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Forbidden — provider is polling-only or access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          description: Upstream AI provider error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ============================================
+  # OPENROUTER WEBHOOK
+  # ============================================
+  /api/v1/webhooks/openrouter_traces:
+    post:
+      summary: Receive OpenRouter Broadcast Webhook OTLP traces
+      description: |
+        Public endpoint that receives per-request telemetry from OpenRouter's
+        Broadcast Webhook feature (Settings > Observability > Webhook).
+
+        OpenRouter sends an OTLP JSON payload after each API call made through a
+        connected account. The connector is resolved via the SHA-256 hash of the
+        API key embedded as a span attribute (`openrouter.api_key_hash`).
+
+        Optional HMAC verification: if `connector.webhook_secret` is set, the
+        request must include a matching `X-Openrouter-Signature` header
+        (HMAC-SHA256 of the raw body).
+
+        Returns 200 for test-connection requests (`X-Test-Connection: true`),
+        202 for accepted payloads, and 200 when the connector is not found
+        (to prevent OpenRouter from retrying unknown-account payloads).
+      tags:
+        - Webhooks
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: OTLP resourceSpans envelope
+              properties:
+                resourceSpans:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      resource:
+                        type: object
+                      scopeSpans:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            spans:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  traceId:
+                                    type: string
+                                  spanId:
+                                    type: string
+                                  name:
+                                    type: string
+                                  startTimeUnixNano:
+                                    type: string
+                                  endTimeUnixNano:
+                                    type: string
+                                  attributes:
+                                    type: array
+                                    items:
+                                      type: object
+                                      properties:
+                                        key:
+                                          type: string
+                                        value:
+                                          type: object
+      responses:
+        '200':
+          description: Test connection acknowledged or connector not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received:
+                    type: boolean
+        '202':
+          description: Trace accepted and queued for processing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received:
+                    type: boolean
+        '400':
+          description: Invalid JSON payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid HMAC signature
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unexpected server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/integrations/mcp/exchange:
+    post:
+      summary: Exchange OIDC session for an MCP ingest token
+      description: |
+        Mints a fresh `UserToolAccount` ingest token for the authenticated user
+        and the requested tool, scoped to the user's primary organization
+        membership. Internal-only — restricted to `@example.com`
+        accounts. Called by `@db90/mcp` once after a successful Keycloak
+        device-flow login. The plaintext token is returned exactly once.
+      tags:
+        - Integrations
+      security:
+        - bearer_auth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tool_name:
+                  type: string
+                  enum: [claude_code, cursor]
+              required:
+                - tool_name
+      responses:
+        '201':
+          description: Ingest token minted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ingest_token:
+                    type: string
+                    description: Plaintext ingest token, returned exactly once
+                  host:
+                    type: string
+                    format: uri
+                  tool_name:
+                    type: string
+                    enum: [claude_code, cursor]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Forbidden — non-internal email or no DBP membership
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  # ============================================
+  # INGEST ENDPOINT (ingest token auth)
+  # ============================================
+  /api/v1/ingest/events:
+    post:
+      summary: Ingest a tool event
+      description: |
+        Accepts a single tool-usage event from a CLI connector (`db90-claude`, `db90-cursor`).
+        Authenticated with a per-`UserToolAccount` Bearer ingest token (not a Keycloak JWT).
+
+        The endpoint also accepts raw Claude Code hook payloads (`PostToolUse` and `Stop`),
+        which are mapped to structured events server-side.
+
+        On success the event is stored in MinIO and queued for sanitization via a Temporal
+        workflow. A `202 Accepted` is returned immediately — the event may not be persisted
+        to `tool_events` yet.
+
+        **Rate limiting:** Each organization is limited to 1,000 events/minute by default
+        (configurable per org via `OrganizationSetting`). Excess requests receive `429` with
+        a `Retry-After: 60` header.
+
+        **Monthly quota:** Organizations may have a monthly event quota set. Once the quota
+        is reached, all further requests return `429` with `code: "quota_exceeded"` until the
+        next calendar month.
+      tags:
+        - Ingest
+      security:
+        - ingest_token_auth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: |
+                Standard event payload. Also accepts raw Claude Code hook payloads
+                (`session_id` + `tool_input`/`tool_response` for PostToolUse, or
+                `session_id` + `stop_hook_active` for Stop hooks).
+              properties:
+                event_type:
+                  type: string
+                  example: completion
+                model:
+                  type: string
+                  example: claude-3-5-sonnet
+                tokens_in:
+                  type: integer
+                  example: 1024
+                tokens_out:
+                  type: integer
+                  example: 512
+                tokens_total:
+                  type: integer
+                  example: 1536
+                cost_usd:
+                  type: number
+                  format: float
+                  example: 0.0042
+                duration_ms:
+                  type: integer
+                  example: 1200
+                occurred_at:
+                  type: string
+                  format: date-time
+                  example: "2026-05-11T14:00:00Z"
+                project_id:
+                  type: string
+                  format: uuid
+                  description: Optional. Stripped silently if not accessible to the token's org/user.
+                metadata:
+                  type: object
+                  additionalProperties: true
+      responses:
+        '202':
+          description: Event accepted for processing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      accepted:
+                        type: boolean
+                        example: true
+                      rawEventKey:
+                        type: string
+                        description: MinIO object key for the raw event payload
+                        example: events/2026/05/11/abc123.json
+                      workflowId:
+                        type: string
+                        description: Temporal workflow ID (absent if Temporal unavailable)
+                      fallback:
+                        type: boolean
+                        description: Present and true when Temporal unavailable and event was inserted directly
+                    required:
+                      - accepted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          description: |
+            Rate limit exceeded or monthly quota reached.
+            Check the `code` field to distinguish the two cases.
+            Respect the `Retry-After` header before retrying.
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait before retrying. Capped at 3600 for quota exceeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+
+  /admin/retention_logs:
+    get:
+      summary: List all retention purge logs (platform admin)
+      description: >
+        Returns paginated records of all data purge runs across all organizations.
+        Requires platform admin (global_admin) role.
+      tags:
+        - Admin
+        - Retention
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+      responses:
+        '200':
+          description: Paginated retention purge log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RetentionPurgeLog'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      summary: Create a notification route
+      description: Creates a routing rule for a notification type. Requires owner role.
+      tags:
+        - Notification Routes
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - notification_type
+                - recipient_type
+              properties:
+                notification_type:
+                  type: string
+                  enum: [cost_alert, token_alert, retention_warning, risk_alert]
+                recipient_type:
+                  type: string
+                  enum: [role, user]
+                recipient_role:
+                  type: string
+                  nullable: true
+                  description: Required when recipient_type is 'role'. Must be one of owner, member, viewer.
+                recipient_user_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: Required when recipient_type is 'user'. User must be an org member.
+                enabled:
+                  type: boolean
+                  default: true
+      responses:
+        '201':
+          description: Notification route created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/NotificationRoute'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/notification_routes:
+    get:
+      summary: List notification routes
+      description: Returns all notification routes for the organization. Requires owner role.
+      tags:
+        - Notification Routes
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+      responses:
+        '200':
+          description: Notification routes list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NotificationRoute'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      summary: Create a notification route
+      description: Creates a routing rule for a notification type. Requires owner role.
+      tags:
+        - Notification Routes
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - notification_type
+                - recipient_type
+              properties:
+                notification_type:
+                  type: string
+                  enum: [cost_alert, token_alert, retention_warning, risk_alert]
+                recipient_type:
+                  type: string
+                  enum: [role, user]
+                recipient_role:
+                  type: string
+                  nullable: true
+                  description: Required when recipient_type is 'role'. Must be one of owner, member, viewer.
+                recipient_user_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: Required when recipient_type is 'user'. User must be an org member.
+                enabled:
+                  type: boolean
+                  default: true
+      responses:
+        '201':
+          description: Notification route created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/NotificationRoute'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/notification_routes/{id}:
+    patch:
+      summary: Update a notification route
+      description: Update fields (e.g. enable/disable) on a route. Requires owner role.
+      tags:
+        - Notification Routes
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                notification_type:
+                  type: string
+                  enum: [cost_alert, token_alert, retention_warning, risk_alert]
+                recipient_type:
+                  type: string
+                  enum: [role, user]
+                recipient_role:
+                  type: string
+                  nullable: true
+                recipient_user_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+      responses:
+        '200':
+          description: Notification route updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/NotificationRoute'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      summary: Delete a notification route
+      description: Removes a routing rule. Requires owner role.
+      tags:
+        - Notification Routes
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204':
+          description: No Content
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+# ============================================
+# COMPONENTS
+# ============================================
 components:
   securitySchemes:
     bearer_auth:
@@ -129,7 +4198,181 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: JWT token from Keycloak authentication
+    ingest_token_auth:
+      type: http
+      scheme: bearer
+      description: Opaque ingest token issued per UserToolAccount (CLI connectors only)
+
+  parameters:
+    id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    organization_id:
+      name: organization_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    project_id:
+      name: project_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    X-Organization-ID:
+      name: X-Organization-ID
+      in: header
+      required: true
+      description: Organization context for the request
+      schema:
+        type: string
+        format: uuid
+    page:
+      name: page
+      in: query
+      description: Page number for pagination
+      schema:
+        type: integer
+        default: 1
+        minimum: 1
+    per_page:
+      name: per_page
+      in: query
+      description: Number of items per page (max 100)
+      schema:
+        type: integer
+        default: 25
+        minimum: 1
+        maximum: 100
+    start_date:
+      name: start_date
+      in: query
+      description: Start of the time range (ISO 8601 date, e.g. 2026-01-01)
+      schema:
+        type: string
+        format: date
+    end_date:
+      name: end_date
+      in: query
+      description: End of the time range (ISO 8601 date, e.g. 2026-01-31)
+      schema:
+        type: string
+        format: date
+
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Access denied
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+
   schemas:
+    PricingEntry:
+      type: object
+      properties:
+        name:
+          type: string
+          example: gpt-4o
+        input_per_mtok:
+          type: number
+          format: float
+          description: Input price in USD per million tokens
+          example: 2.5
+        output_per_mtok:
+          type: number
+          format: float
+          description: Output price in USD per million tokens
+          example: 10.0
+      required:
+        - name
+        - input_per_mtok
+        - output_per_mtok
+
+    ModelPricingOverride:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        model_pattern:
+          type: string
+          description: Substring pattern matched against the model name (e.g. "gpt-4o-ft-acme")
+          example: gpt-4o-ft-acme
+        input_per_mtok:
+          type: number
+          format: float
+          description: Override input price in USD per million tokens
+          example: 1.5
+        output_per_mtok:
+          type: number
+          format: float
+          description: Override output price in USD per million tokens
+          example: 6.0
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - model_pattern
+        - input_per_mtok
+        - output_per_mtok
+
+    ModelPricingOverrideInput:
+      type: object
+      properties:
+        model_pattern:
+          type: string
+          description: Substring pattern matched against the model name
+          example: gpt-4o-ft-acme
+        input_per_mtok:
+          type: number
+          format: float
+          description: Override input price in USD per million tokens
+          example: 1.5
+        output_per_mtok:
+          type: number
+          format: float
+          description: Override output price in USD per million tokens
+          example: 6.0
+      required:
+        - model_pattern
+        - input_per_mtok
+        - output_per_mtok
+
     Error:
       type: object
       properties:
@@ -138,7 +4381,36 @@ components:
         message:
           type: string
       required:
-      - error
+        - error
+
+    RateLimitError:
+      type: object
+      description: |
+        Returned with HTTP 429. The `code` field distinguishes rate-limit from quota errors.
+        `rate_limit_exceeded` — per-minute request rate exceeded; retry after 60 seconds.
+        `quota_exceeded` — monthly event quota reached; retry after `retry_after` seconds (capped at 3600).
+      properties:
+        error:
+          type: string
+          example: Rate Limited
+        code:
+          type: string
+          enum: [rate_limit_exceeded, quota_exceeded]
+          example: rate_limit_exceeded
+        retry_after:
+          type: integer
+          description: Seconds to wait before retrying. Matches the Retry-After response header.
+          example: 60
+        quota_resets_at:
+          type: string
+          format: date-time
+          description: ISO8601 timestamp of when the monthly quota resets. Present only when code is quota_exceeded.
+          example: "2026-06-01T00:00:00Z"
+      required:
+        - error
+        - code
+        - retry_after
+
     ValidationError:
       type: object
       properties:
@@ -151,8 +4423,9 @@ components:
             items:
               type: string
       required:
-      - error
-      - errors
+        - error
+        - errors
+
     PaginationMeta:
       type: object
       properties:
@@ -165,10 +4438,227 @@ components:
         perPage:
           type: integer
       required:
-      - currentPage
-      - totalPages
-      - totalCount
-      - perPage
+        - currentPage
+        - totalPages
+        - totalCount
+        - perPage
+
+    AuditLogActor:
+      type: object
+      nullable: true
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          nullable: true
+      required:
+        - id
+        - email
+
+    WebhookDelivery:
+      type: object
+      description: A single webhook delivery tracking record. Captures lifecycle from receipt through sync job completion.
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationConnectorId:
+          type: string
+          format: uuid
+        provider:
+          type: string
+          enum: [github, gitlab, bitbucket, jira, linear, slack]
+        eventType:
+          type: string
+          description: Webhook event type (e.g. push, pull_request, jira:issue_created)
+        rawEventKey:
+          type: string
+          description: MinIO key for the stored raw payload
+        status:
+          type: string
+          enum: [pending, processing, delivered, failed]
+        attempts:
+          type: integer
+          minimum: 0
+        lastAttemptedAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastError:
+          type: string
+          nullable: true
+          description: Error message from the most recent failed attempt
+        deliveredAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    OrganizationAuditLog:
+      type: object
+      description: Organization-level audit log entry. All fields visible to org admins and global admins.
+      properties:
+        id:
+          type: string
+          format: uuid
+        action:
+          type: string
+          example: settings.update
+        resourceType:
+          type: string
+          nullable: true
+        resourceId:
+          type: string
+          format: uuid
+          nullable: true
+        trackedChanges:
+          type: object
+          description: JSON diff of before/after values for the audited resource
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+        ipAddress:
+          type: string
+          nullable: true
+          description: IP address of the actor at the time of the action
+        createdAt:
+          type: string
+          format: date-time
+        actor:
+          $ref: '#/components/schemas/AuditLogActor'
+      required:
+        - id
+        - action
+        - trackedChanges
+        - metadata
+        - ipAddress
+        - createdAt
+
+    RetentionPurgeLog:
+      type: object
+      description: >
+        Tamper-evident record of a data retention purge run.
+        Append-only — records are never updated or deleted.
+      properties:
+        id:
+          type: integer
+        organizationId:
+          type: integer
+          description: ID of the organization whose data was purged
+        projectId:
+          type: integer
+          nullable: true
+          description: ID of the project (null for org-level purge)
+        retentionPolicyType:
+          type: string
+          enum: [org, project]
+          description: Whether the purge was applied at org or project level
+        retentionDaysApplied:
+          type: integer
+          description: Number of retention days used as the window
+        cutoffTimestamp:
+          type: string
+          format: date-time
+          description: Datetime before which records were deleted
+        recordsDeleted:
+          type: integer
+          description: Number of records deleted in this run
+        jobRunAt:
+          type: string
+          format: date-time
+          description: Datetime when the job ran
+        status:
+          type: string
+          enum: [success, partial, failed]
+        errorMessage:
+          type: string
+          nullable: true
+          description: Error details if status is failed or partial
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - organizationId
+        - retentionPolicyType
+        - retentionDaysApplied
+        - cutoffTimestamp
+        - recordsDeleted
+        - jobRunAt
+        - status
+        - createdAt
+
+    RetentionPreview:
+      type: object
+      description: >
+        Upcoming purge cutoff and estimated tool_events row count (Alba camelCase keys).
+      properties:
+        cutoffDate:
+          type: string
+          format: date
+          nullable: true
+          description: ISO 8601 date before which records will be deleted (null if retention is forever)
+        estimatedRecords:
+          type: integer
+          nullable: true
+          description: Estimated number of tool_events to be deleted (null if query timed out)
+      required:
+        - cutoffDate
+        - estimatedRecords
+
+    ProjectAuditLog:
+      type: object
+      description: >
+        Project-level audit log entry.
+        `ipAddress` and `trackedChanges` are omitted (key absent, not null) for project-admin callers
+        who are not org admins. Org admins and global admins receive all fields.
+      properties:
+        id:
+          type: string
+          format: uuid
+        action:
+          type: string
+          example: settings.update
+        resourceType:
+          type: string
+          nullable: true
+        resourceId:
+          type: string
+          format: uuid
+          nullable: true
+        trackedChanges:
+          type: object
+          description: JSON diff of before/after values. Omitted for project-admin callers (non-org-admin).
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+        ipAddress:
+          type: string
+          nullable: true
+          description: IP of the actor at action time. Omitted for project-admin callers (non-org-admin).
+        createdAt:
+          type: string
+          format: date-time
+        actor:
+          $ref: '#/components/schemas/AuditLogActor'
+      required:
+        - id
+        - action
+        - metadata
+        - createdAt
+
     User:
       type: object
       properties:
@@ -193,11 +4683,31 @@ components:
           type: string
           format: date-time
       required:
-      - id
-      - email
-      - globalAdmin
-      - createdAt
-      - updatedAt
+        - id
+        - email
+        - globalAdmin
+        - createdAt
+        - updatedAt
+
+    UserMinimal:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+      required:
+        - id
+        - email
+
     Organization:
       type: object
       properties:
@@ -220,12 +4730,34 @@ components:
           type: string
           format: date-time
       required:
-      - id
-      - name
-      - slug
-      - isActive
-      - createdAt
-      - updatedAt
+        - id
+        - name
+        - slug
+        - isActive
+        - createdAt
+        - updatedAt
+
+    OrganizationFull:
+      allOf:
+        - $ref: '#/components/schemas/Organization'
+        - type: object
+          properties:
+            retentionPolicy:
+              $ref: '#/components/schemas/OrganizationRetentionPolicy'
+            memberCount:
+              type: integer
+            projectCount:
+              type: integer
+
+    OrganizationWithMembership:
+      allOf:
+        - $ref: '#/components/schemas/Organization'
+        - type: object
+          properties:
+            userRole:
+              type: string
+              enum: [owner, member, viewer]
+
     OrganizationMembership:
       type: object
       properties:
@@ -237,12 +4769,9 @@ components:
           format: uuid
         role:
           type: string
-          enum:
-          - owner
-          - member
-          - viewer
+          enum: [owner, member, viewer]
         user:
-          "$ref": "#/components/schemas/UserMinimal"
+          $ref: '#/components/schemas/UserMinimal'
         createdAt:
           type: string
           format: date-time
@@ -250,14 +4779,37 @@ components:
           type: string
           format: date-time
       required:
-      - id
-      - organizationId
-      - role
-      - user
-      - createdAt
-      - updatedAt
+        - id
+        - organizationId
+        - role
+        - user
+        - createdAt
+        - updatedAt
+
+    OrganizationMemberListItem:
+      allOf:
+        - $ref: '#/components/schemas/OrganizationMembership'
+        - type: object
+          properties:
+            total_tokens:
+              type: integer
+              description: Total tokens consumed by this member in the organization
+            total_events:
+              type: integer
+              description: Total tool events generated by this member in the organization
+            total_cost:
+              type: number
+              format: float
+              description: Total cost (USD) attributed to this member in the organization
+            last_active_at:
+              type: string
+              format: date-time
+              nullable: true
+              description: Timestamp of the member's last login
+
     OrganizationConnector:
       type: object
+      description: Connector credentials (tokens are never exposed in responses)
       properties:
         id:
           type: string
@@ -267,16 +4819,7 @@ components:
           format: uuid
         connectorType:
           type: string
-          enum:
-          - github
-          - gitlab
-          - bitbucket
-          - jira
-          - linear
-          - openrouter
-          - anthropic
-          - openai
-          - gemini
+          enum: [github, gitlab, bitbucket, jira, linear, openrouter, anthropic, openai, gemini, slack, github_copilot]
         isActive:
           type: boolean
         externalAccountId:
@@ -292,6 +4835,10 @@ components:
         lastError:
           type: string
           nullable: true
+        tokenExpiresAt:
+          type: string
+          format: date-time
+          nullable: true
         tokenExpired:
           type: boolean
         sourceControl:
@@ -300,6 +4847,25 @@ components:
           type: boolean
         aiProvider:
           type: boolean
+        copilotConnector:
+          type: boolean
+        seatCount:
+          type: integer
+          nullable: true
+        activeUsersCount:
+          type: integer
+        repositoryCount:
+          type: integer
+        syncedEventCount:
+          type: integer
+        lastEventAt:
+          type: string
+          format: date-time
+          nullable: true
+        scope:
+          type: string
+          enum: [org, project, persona]
+          example: org
         createdAt:
           type: string
           format: date-time
@@ -307,12 +4873,158 @@ components:
           type: string
           format: date-time
       required:
-      - id
-      - organizationId
-      - connectorType
-      - isActive
-      - createdAt
-      - updatedAt
+        - id
+        - organizationId
+        - connectorType
+        - isActive
+        - scope
+        - createdAt
+        - updatedAt
+
+    OrganizationRetentionPolicy:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        rawEventTtl:
+          type: string
+        toolEventsRetention:
+          type: string
+        hourlyAggregateRetention:
+          type: string
+        dailyAggregateRetention:
+          type: string
+        retentionReason:
+          type: string
+          nullable: true
+        updatedById:
+          type: string
+          format: uuid
+          nullable: true
+        costThresholdCents:
+          type: integer
+          nullable: true
+        tokenThreshold:
+          type: integer
+          nullable: true
+        alertEnabled:
+          type: boolean
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ProjectRetentionPolicy:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        rawEventTtl:
+          type: string
+        toolEventsRetention:
+          type: string
+        hourlyAggregateRetention:
+          type: string
+        dailyAggregateRetention:
+          type: string
+        retentionReason:
+          type: string
+          nullable: true
+        updatedById:
+          type: string
+          format: uuid
+          nullable: true
+        costThresholdCents:
+          type: integer
+          nullable: true
+        tokenThreshold:
+          type: integer
+          nullable: true
+        alertEnabled:
+          type: boolean
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    UserPersonalSettings:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          nullable: true
+        costThresholdCents:
+          type: integer
+          nullable: true
+        tokenThreshold:
+          type: integer
+          nullable: true
+        alertEmail:
+          type: boolean
+        alertSlack:
+          type: boolean
+
+    UserToolAccount:
+      type: object
+      description: User's tool account (tokens are never exposed in responses)
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationMembershipId:
+          type: string
+          format: uuid
+        toolName:
+          type: string
+          enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom]
+        isActive:
+          type: boolean
+        externalAccountId:
+          type: string
+          nullable: true
+        externalAccountName:
+          type: string
+          nullable: true
+        tokenExpiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        tokenExpired:
+          type: boolean
+        scope:
+          type: string
+          enum: [org, project, persona]
+          example: persona
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - organizationMembershipId
+        - toolName
+        - isActive
+        - scope
+        - createdAt
+        - updatedAt
+
     Project:
       type: object
       properties:
@@ -328,6 +5040,15 @@ components:
           nullable: true
         isActive:
           type: boolean
+        repositoryUrl:
+          type: string
+          nullable: true
+        gitRemoteUrl:
+          type: string
+          nullable: true
+          description: >
+            Git remote URL used for automatic project attribution by CLI connectors.
+            Stored in normalized form (lowercased, .git suffix stripped).
         organizationId:
           type: string
           format: uuid
@@ -345,13 +5066,115 @@ components:
           type: string
           format: date-time
       required:
-      - id
-      - name
-      - slug
-      - isActive
-      - isPersonal
-      - createdAt
-      - updatedAt
+        - id
+        - name
+        - slug
+        - isActive
+        - isPersonal
+        - createdAt
+        - updatedAt
+
+    ProjectFull:
+      allOf:
+        - $ref: '#/components/schemas/Project'
+        - type: object
+          properties:
+            organization:
+              $ref: '#/components/schemas/OrganizationMinimal'
+            owner:
+              $ref: '#/components/schemas/UserMinimal'
+            memberCount:
+              type: integer
+            repositoryCount:
+              type: integer
+            sourceControlSummary:
+              type: array
+              items:
+                $ref: '#/components/schemas/SourceControlSummary'
+
+    SourceControlSummary:
+      type: object
+      properties:
+        provider:
+          type: string
+        repositoryCount:
+          type: integer
+        commitCount:
+          type: integer
+        reviewCount:
+          type: integer
+        pipelineCount:
+          type: integer
+        lastActivityAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastSyncAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    OrganizationMinimal:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+      required:
+        - id
+        - name
+        - slug
+
+    ProjectMembership:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [owner, member, viewer]
+        userId:
+          type: string
+          format: uuid
+        email:
+          type: string
+          nullable: true
+        name:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+        joinedAt:
+          type: string
+          format: date-time
+        createdById:
+          type: string
+          format: uuid
+          nullable: true
+          description: UUID of the user who granted this membership (typically an org owner)
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - projectId
+        - userId
+        - role
+        - createdAt
+        - updatedAt
+
     Repository:
       type: object
       properties:
@@ -399,63 +5222,17 @@ components:
           type: string
           format: date-time
       required:
-      - id
-      - projectId
-      - organizationConnectorId
-      - externalId
-      - name
-      - fullName
-      - isPrivate
-      - provider
-      - createdAt
-      - updatedAt
-    UserMinimal:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        email:
-          type: string
-          format: email
-        name:
-          type: string
-          nullable: true
-        avatarUrl:
-          type: string
-          nullable: true
-      required:
-      - id
-      - email
-    OrganizationRetentionPolicy:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        organizationId:
-          type: string
-          format: uuid
-        retentionDays:
-          type: integer
-        autoDeleteEvents:
-          type: boolean
-        anonymizeAfterRetention:
-          type: boolean
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-      required:
-      - id
-      - organizationId
-      - retentionDays
-      - autoDeleteEvents
-      - anonymizeAfterRetention
-      - createdAt
-      - updatedAt
+        - id
+        - projectId
+        - organizationConnectorId
+        - externalId
+        - name
+        - fullName
+        - isPrivate
+        - provider
+        - createdAt
+        - updatedAt
+
     Setting:
       type: object
       properties:
@@ -473,10 +5250,280 @@ components:
           type: string
           format: date-time
       required:
-      - id
-      - key
-      - value
-      - createdAt
-      - updatedAt
-security:
-- bearer_auth: []
+        - id
+        - key
+        - value
+        - createdAt
+        - updatedAt
+
+    ToolEvent:
+      type: object
+      description: Tool event as returned by the list endpoint
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+          nullable: true
+        projectId:
+          type: string
+          format: uuid
+          nullable: true
+        toolName:
+          type: string
+        eventType:
+          type: string
+        model:
+          type: string
+          nullable: true
+        costUsd:
+          type: number
+          format: float
+          nullable: true
+        durationMs:
+          type: integer
+          nullable: true
+        inputTokens:
+          type: integer
+          nullable: true
+        outputTokens:
+          type: integer
+          nullable: true
+        costCents:
+          type: integer
+          nullable: true
+        riskLevel:
+          type: string
+          enum: [critical, high, medium, low, none]
+        attribution:
+          type: string
+          enum: [user, organization, unknown]
+        correlationMethod:
+          type: string
+          nullable: true
+          description: Method used (or attempted) to correlate the event to a user (e.g. "email", "machine_id", "manual")
+        correlationConfidence:
+          type: number
+          format: float
+          nullable: true
+          description: Confidence score (0.0–1.0) for the best correlation attempt
+        securityFindings:
+          type: array
+          items:
+            type: object
+        occurredAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        user:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            email:
+              type: string
+              format: email
+            name:
+              type: string
+              nullable: true
+        project:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+      required:
+        - id
+        - organizationId
+        - toolName
+        - eventType
+        - riskLevel
+        - attribution
+        - occurredAt
+        - createdAt
+
+    ToolEventDetail:
+      description: Tool event as returned by the detail endpoint (includes metadata and audit log)
+      allOf:
+        - $ref: '#/components/schemas/ToolEvent'
+        - type: object
+          properties:
+            metadata:
+              type: object
+              nullable: true
+              additionalProperties: true
+            project:
+              type: object
+              nullable: true
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                name:
+                  type: string
+                slug:
+                  type: string
+            auditLog:
+              nullable: true
+              $ref: '#/components/schemas/AuditLog'
+
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        toolEventId:
+          type: string
+          format: uuid
+        riskLevel:
+          type: string
+          nullable: true
+        temporalWorkflowId:
+          type: string
+          nullable: true
+        rawEventKey:
+          type: string
+          nullable: true
+        confidenceScore:
+          type: number
+          format: float
+          nullable: true
+        classificationLabels:
+          type: array
+          nullable: true
+          items:
+            type: string
+        sanitizationActions:
+          type: array
+          nullable: true
+          items:
+            type: string
+        highRisk:
+          type: boolean
+        detectionSummary:
+          type: object
+          nullable: true
+        sanitizationChanges:
+          type: object
+          nullable: true
+        riskScore:
+          type: number
+          format: float
+          nullable: true
+        policyVersion:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            version:
+              type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - organizationId
+        - toolEventId
+        - highRisk
+        - createdAt
+
+    AiCompletionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        model:
+          type: string
+        content:
+          type: string
+        finishReason:
+          type: string
+        usage:
+          type: object
+          properties:
+            promptTokens:
+              type: integer
+            completionTokens:
+              type: integer
+            totalTokens:
+              type: integer
+
+    AiChatResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        model:
+          type: string
+        message:
+          type: object
+          properties:
+            role:
+              type: string
+              enum: [assistant]
+            content:
+              type: string
+        finishReason:
+          type: string
+        usage:
+          type: object
+          properties:
+            promptTokens:
+              type: integer
+            completionTokens:
+              type: integer
+            totalTokens:
+              type: integer
+
+    NotificationRoute:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        notificationType:
+          type: string
+          enum: [cost_alert, token_alert, retention_warning, risk_alert]
+        recipientType:
+          type: string
+          enum: [role, user]
+        recipientRole:
+          type: string
+          nullable: true
+          description: Present when recipientType is 'role'. One of owner, member, viewer.
+        recipientUserId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Present when recipientType is 'user'.
+        enabled:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time

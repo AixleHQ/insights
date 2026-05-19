@@ -11,7 +11,7 @@ import {
 } from "@/components/dashboard";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatTokens, formatPercent } from "@/lib/formatters";
+import { formatTokens, formatPercent, formatCount } from "@/lib/formatters";
 
 const PERIODS = ["7d", "30d", "90d"] as const;
 type Period = (typeof PERIODS)[number];
@@ -139,7 +139,7 @@ export function MemberDashboard() {
 
       <div>
         <p className="text-sm text-muted-foreground mb-2">
-          {formatTokens(totalHeatmapEvents)} events in the last year
+          {formatCount(totalHeatmapEvents)} events in the last year
         </p>
         {heatmapData ? (
           <ActivityHeatmap data={heatmapData} className="col-span-full" />
