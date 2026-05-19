@@ -82,11 +82,11 @@ test.describe("Seeded Data Verification", () => {
     expect(rowCount).toBeGreaterThan(0);
   });
 
-  test("user can access team page", async ({ page }) => {
-    await page.goto("/team");
+  test("user can access members page", async ({ page }) => {
+    await page.goto("/members");
 
-    // Should see team members list
-    await expect(page.getByRole("heading", { name: /team/i })).toBeVisible({ timeout: 15000 });
+    // Should see members list
+    await expect(page.getByRole("heading", { name: /members/i })).toBeVisible({ timeout: 15000 });
 
     // The seed creates 101 users (1 owner + 100 engineers)
     // At minimum, we should see the logged-in user

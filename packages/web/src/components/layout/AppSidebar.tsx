@@ -71,7 +71,7 @@ const navItems: NavItem[] = [
   { title: "Dashboard",    icon: LayoutDashboard, href: "/",                 roles: ["owner", "member", "viewer"] },
   { title: "Events",       icon: Activity,        href: "/events",           roles: ["owner", "member", "viewer"] },
   { title: "Projects",     icon: FolderKanban,    href: "/projects",         roles: ["owner", "member", "viewer"] },
-  { title: "Members",      icon: Users,           href: "/settings/members", roles: ["owner"] },
+  { title: "Members",      icon: Users,           href: "/members",          roles: ["owner"] },
   { title: "Integrations", icon: Plug,            href: "/integrations",     roles: ["owner"] },
   { title: "Settings",     icon: Settings,        href: "/settings",         roles: ["owner"] },
   { title: "Library",      icon: BookOpen,        href: "/library",          roles: ["owner", "member", "viewer"] },

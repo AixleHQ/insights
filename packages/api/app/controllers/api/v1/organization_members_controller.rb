@@ -17,23 +17,27 @@ module Api
         # Allow filtering by role
         memberships = memberships.where(role: params[:role]) if params[:role].present?
 
-        # Get token usage stats for all users in this org
+        # Get usage stats for all users in this org in a single query
         user_ids = memberships.map { |m| m.user_id }
 
-        token_stats = current_organization.tool_events
+        user_stats = current_organization.tool_events
           .where(user_id: user_ids)
           .group(:user_id)
           .select(
             "user_id",
-            "COALESCE(SUM(tokens_in), 0) + COALESCE(SUM(tokens_out), 0) as total_tokens"
+            "COALESCE(SUM(tokens_in), 0) + COALESCE(SUM(tokens_out), 0) as total_tokens",
+            "COUNT(*) as total_events",
+            "COALESCE(SUM(cost_usd), 0) as total_cost"
           )
           .index_by(&:user_id)
 
         # Build response with stats
         data = memberships.map do |membership|
-          stats = token_stats[membership.user_id]
+          stats = user_stats[membership.user_id]
           OrganizationMembershipSerializer.new(membership).serializable_hash.merge(
             total_tokens: stats&.total_tokens&.to_i || 0,
+            total_events: stats&.total_events&.to_i || 0,
+            total_cost:   stats&.total_cost&.to_f  || 0.0,
             last_active_at: membership.user.last_login_at&.iso8601
           )
         end

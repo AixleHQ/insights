@@ -19,6 +19,7 @@ const routeLabels: Record<string, string> = {
   events: "Events",
   projects: "Projects",
   integrations: "Integrations",
+  members: "Members",
   team: "Team",
   settings: "Settings",
   new: "New",

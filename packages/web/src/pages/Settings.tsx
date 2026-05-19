@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { validateCostInput as validateCostInputLib } from "@/lib/validation";
 import { Routes, Route, Link, useLocation, Navigate } from "react-router-dom";
 import { ModelPricingSettings } from "./ModelPricingSettings";
-import { Team } from "./Team";
 import {
   Building2,
   Shield,
@@ -15,7 +14,6 @@ import {
   Search,
   X,
   FileSearch,
-  Users,
   DollarSign,
   Database,
   History,
@@ -84,7 +82,6 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { title: "General", href: "/settings", icon: Building2 },
-  { title: "Members", href: "/settings/members", icon: Users },
   { title: "Policies", href: "/settings/policies", icon: Shield },
   { title: "Data & Retention", href: "/settings/retention", icon: Database },
   { title: "Alerts", href: "/settings/alerts", icon: Bell },
@@ -1477,7 +1474,6 @@ export function Settings() {
         <div className="flex-1">
           <Routes>
             <Route index element={<GeneralSettings />} />
-            <Route path="members" element={<Team />} />
             <Route path="policies" element={<PolicySettings />} />
             <Route path="retention" element={<DataRetentionSettings />} />
             <Route path="alerts" element={<AlertSettings />} />

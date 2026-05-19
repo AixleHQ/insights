@@ -56,6 +56,8 @@ export interface OrganizationMember {
   created_at: string;
   updated_at: string;
   total_tokens?: number;
+  total_events?: number;
+  total_cost?: number;
   last_active_at?: string | null;
 }
 

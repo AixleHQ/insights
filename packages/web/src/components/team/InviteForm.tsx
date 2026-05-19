@@ -14,7 +14,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import type { MemberRole } from "./MemberRow";
+import type { MemberRole } from "@/contexts/OrgContext";
 
 interface InviteFormProps {
   onSubmit: (invites: Array<{ email: string; role: MemberRole }>) => Promise<void>;
@@ -74,7 +74,7 @@ export function InviteForm({ onSubmit, className }: InviteFormProps) {
     setIsSubmitting(true);
     try {
       await onSubmit(invites);
-      navigate("/team");
+      navigate("/members");
     } catch (error) {
       console.error("Failed to send invites:", error);
       // Extract specific validation error message if available
@@ -106,7 +106,7 @@ export function InviteForm({ onSubmit, className }: InviteFormProps) {
   return (
     <div className={cn("space-y-6", className)}>
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/team")}>
+        <Button variant="ghost" size="icon" onClick={() => navigate("/members")}>
           <ArrowLeft className="size-4" />
         </Button>
         <div>
@@ -213,7 +213,7 @@ export function InviteForm({ onSubmit, className }: InviteFormProps) {
           <Button
             type="button"
             variant="outline"
-            onClick={() => navigate("/team")}
+            onClick={() => navigate("/members")}
             disabled={isSubmitting}
           >
             Cancel

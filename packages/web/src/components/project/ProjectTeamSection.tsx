@@ -77,7 +77,7 @@ export function ProjectTeamSection({ members, isLoading, className, commitStats,
               return (
                 <Link
                   key={member.id}
-                  to={projectId ? `/team/${member.userId}?projectId=${projectId}` : `/team/${member.userId}`}
+                  to={projectId ? `/members/${member.userId}?projectId=${projectId}` : `/members/${member.userId}`}
                   className="group flex items-center gap-2 rounded-lg border p-2 transition-colors hover:bg-muted/50"
                 >
                   <Avatar className="size-8">

@@ -85,8 +85,8 @@ function CommandPalette({
               <CommandItem onSelect={() => runCommand(() => onNavigate("/integrations"))}>
                 Integrations
               </CommandItem>
-              <CommandItem onSelect={() => runCommand(() => onNavigate("/team"))}>
-                Team
+              <CommandItem onSelect={() => runCommand(() => onNavigate("/members"))}>
+                Members
               </CommandItem>
               <CommandItem onSelect={() => runCommand(() => onNavigate("/settings"))}>
                 Settings
