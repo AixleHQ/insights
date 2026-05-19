@@ -1590,11 +1590,17 @@ export interface DailyByModelResponse {
   models: string[];
 }
 
-export function useDailyByModel(orgId: string, days = 30, projectId?: string) {
+export function useDailyByModel(orgId: string, opts: DailyByToolOpts | number = {}) {
+  const normalized: DailyByToolOpts = typeof opts === "number" ? { days: opts } : opts;
+  const { days = 30, period, month, projectId } = normalized;
+
   return useQuery({
     queryKey: queryKeys.stats.dailyByModel(orgId, days, projectId),
     queryFn: () => {
-      const p = new URLSearchParams({ days: String(days) });
+      const p = new URLSearchParams();
+      if (!month) p.set("days", String(days));
+      if (period) p.set("period", period);
+      if (month) p.set("month", month);
       if (projectId) p.set("project_id", projectId);
       return api.get<DailyByModelResponse>(`/organizations/${orgId}/stats/daily_by_model?${p}`);
     },

@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Download, Loader2, RefreshCw, UserX } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useOrg } from "@/contexts/OrgContext";
@@ -34,7 +34,11 @@ export function Events() {
     (hasRole(["owner"]) ||
       (!isLoadingMe && Boolean(me?.globalAdmin ?? me?.super_admin)));
   const queryClient = useQueryClient();
-  const [filters, setFilters] = useState<EventFiltersState>({});
+  const [urlParams] = useSearchParams();
+  const [filters, setFilters] = useState<EventFiltersState>(() => ({
+    tool: urlParams.get("tool_name") ?? undefined,
+    riskLevel: urlParams.get("risk_level") ?? undefined,
+  }));
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [page, setPage] = useState(1);

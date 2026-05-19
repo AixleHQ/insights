@@ -1,21 +1,20 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Activity, DollarSign, AlertTriangle, Users } from "lucide-react";
 import { useOrg } from "@/contexts/OrgContext";
-import { useOverviewStats, useDailyStats, useEvents, useDailyByTool, useProjects } from "@/hooks/useApi";
+import { useOverviewStats, useDailyStats, useEvents, useProjects } from "@/hooks/useApi";
 import {
   MetricCard,
   MetricGrid,
   CostTrendChart,
   ActivityFeed,
   TopToolsChart,
-  AlertsPanel,
-  ToolUsageByDayChart,
   ToolInsightsSection,
+  WeeklyToolUsageChart,
+  RiskAlertsTable,
   type DailyCostData,
   type ActivityEvent,
   type ToolUsageData,
-  type Alert,
 } from "@/components/dashboard";
 import { EventDrawer } from "@/components/events";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -73,10 +72,9 @@ export function OrgDashboard() {
 
   const orgId = currentOrg?.id || "";
 
-  const { data: stats, isLoading: isLoadingStats } = useOverviewStats(orgId, selectedProjectId);
+  const { data: stats } = useOverviewStats(orgId, selectedProjectId);
   const { data: dailyData, isLoading: isLoadingDaily } = useDailyStats(orgId, 30);
   const { data: eventsResponse, isLoading: isLoadingEvents } = useEvents(orgId, { per_page: 10 });
-  const { data: toolByDayData, isLoading: isLoadingToolByDay } = useDailyByTool(orgId, { days: 365 });
 
   const chartData: DailyCostData[] = dailyData?.data?.map((d) => ({
     date: d.date,
@@ -105,40 +103,6 @@ export function OrgDashboard() {
       })) || [],
     [eventsResponse?.data]
   );
-
-  const dismissedAlertsKey = `db90_dismissed_alerts_${currentOrg?.id}`;
-  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(() => {
-    try {
-      const stored = localStorage.getItem(dismissedAlertsKey);
-      return stored ? new Set(JSON.parse(stored)) : new Set();
-    } catch {
-      return new Set();
-    }
-  });
-
-  useEffect(() => {
-    if (currentOrg?.id) {
-      localStorage.setItem(dismissedAlertsKey, JSON.stringify([...dismissedAlerts]));
-    }
-  }, [dismissedAlerts, dismissedAlertsKey, currentOrg?.id]);
-
-  const alerts: Alert[] = stats?.risk_alerts && stats.risk_alerts > 0
-    ? [
-        {
-          id: "high-risk-events",
-          type: "risk_detected",
-          severity: "warning",
-          title: "High-risk events detected",
-          description: `${stats.risk_alerts} high-risk event(s) require attention`,
-          created_at: new Date().toISOString(),
-          acknowledged: dismissedAlerts.has("high-risk-events"),
-        },
-      ]
-    : [];
-
-  const handleDismissAlert = (id: string) => {
-    setDismissedAlerts((prev) => new Set([...prev, id]));
-  };
 
   const [toolInsightsDays, setToolInsightsDays] = useState(30);
 
@@ -202,11 +166,7 @@ export function OrgDashboard() {
         <MemberDashboard hideHeader />
       ) : (
         <>
-          <ToolUsageByDayChart
-            data={toolByDayData?.data || []}
-            tools={toolByDayData?.tools || []}
-            isLoading={isLoadingToolByDay}
-          />
+          <WeeklyToolUsageChart orgId={orgId} projectId={selectedProjectId} />
 
           <MetricGrid>
             <MetricCard
@@ -275,11 +235,7 @@ export function OrgDashboard() {
 
           <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
             <TopToolsChart data={toolUsage} isLoading={isLoadingDaily} />
-            <AlertsPanel
-              alerts={alerts}
-              isLoading={isLoadingStats}
-              onDismiss={handleDismissAlert}
-            />
+            <RiskAlertsTable orgId={orgId} projectId={selectedProjectId} />
           </div>
 
           <ToolInsightsSection
