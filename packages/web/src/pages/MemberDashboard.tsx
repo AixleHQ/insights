@@ -11,7 +11,7 @@ import {
 } from "@/components/dashboard";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatTokens } from "@/lib/formatters";
+import { formatTokens, formatPercent } from "@/lib/formatters";
 
 const PERIODS = ["7d", "30d", "90d"] as const;
 type Period = (typeof PERIODS)[number];
@@ -85,7 +85,7 @@ export function MemberDashboard() {
           }
           trendValue={
             stats?.events_change_percent
-              ? `${Math.abs(stats.events_change_percent).toFixed(1)}%`
+              ? formatPercent(Math.abs(stats.events_change_percent))
               : undefined
           }
           description={`Last ${PERIOD_LABELS[period]}`}
@@ -104,7 +104,7 @@ export function MemberDashboard() {
           }
           trendValue={
             stats?.cost_change_percent
-              ? `${Math.abs(stats.cost_change_percent).toFixed(1)}%`
+              ? formatPercent(Math.abs(stats.cost_change_percent))
               : undefined
           }
           description={`Last ${PERIOD_LABELS[period]}`}
@@ -123,7 +123,7 @@ export function MemberDashboard() {
           }
           trendValue={
             stats?.tokens_change_percent
-              ? `${Math.abs(stats.tokens_change_percent).toFixed(1)}%`
+              ? formatPercent(Math.abs(stats.tokens_change_percent))
               : undefined
           }
           description={`${formatTokens(stats?.total_tokens_in ?? 0)} in / ${formatTokens(stats?.total_tokens_out ?? 0)} out`}
@@ -139,7 +139,7 @@ export function MemberDashboard() {
 
       <div>
         <p className="text-sm text-muted-foreground mb-2">
-          {totalHeatmapEvents.toLocaleString()} events in the last year
+          {formatTokens(totalHeatmapEvents)} events in the last year
         </p>
         {heatmapData ? (
           <ActivityHeatmap data={heatmapData} className="col-span-full" />

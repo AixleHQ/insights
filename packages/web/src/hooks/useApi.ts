@@ -614,6 +614,7 @@ export function useMemberDashboardStats(orgId: string, userId: string, period = 
       return response;
     },
     enabled: !!orgId && !!userId,
+    staleTime: 60_000,
   });
 }
 
@@ -627,6 +628,7 @@ export function useMemberHeatmap(orgId: string, userId: string) {
       return response;
     },
     enabled: !!orgId && !!userId,
+    staleTime: 5 * 60_000,
   });
 }
 

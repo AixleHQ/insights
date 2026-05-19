@@ -16,8 +16,15 @@ class OrganizationMembershipPolicy < ApplicationPolicy
     org_member?(record.organization) || global_admin?
   end
 
-  alias_method :dashboard_stats?, :stats?
-  alias_method :member_heatmap?, :stats?
+  # Personal dashboard endpoints are self-or-admin only — stricter than stats?
+  # which allows any org member to view any other member's aggregate stats.
+  def dashboard_stats?
+    global_admin? ||
+      org_admin?(record.organization) ||
+      (org_member?(record.organization) && record.user_id == user.id)
+  end
+
+  alias_method :member_heatmap?, :dashboard_stats?
 
   # Members can view events of other members
   def events?

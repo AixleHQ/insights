@@ -17,6 +17,7 @@ import {
   type Alert,
 } from "@/components/dashboard";
 import { EventDrawer } from "@/components/events";
+import { formatTokens, formatPercent } from "@/lib/formatters";
 
 export function OrgDashboard() {
   const { currentOrg } = useOrg();
@@ -161,7 +162,7 @@ export function OrgDashboard() {
           }
           trendValue={
             stats?.events_change_percent
-              ? `${Math.abs(stats.events_change_percent).toFixed(1)}%`
+              ? formatPercent(Math.abs(stats.events_change_percent))
               : undefined
           }
           description="This month"
@@ -180,7 +181,7 @@ export function OrgDashboard() {
           }
           trendValue={
             stats?.cost_change_percent
-              ? `${Math.abs(stats.cost_change_percent).toFixed(1)}%`
+              ? formatPercent(Math.abs(stats.cost_change_percent))
               : undefined
           }
           description="This month"
@@ -204,7 +205,7 @@ export function OrgDashboard() {
           value={stats?.total_tokens ?? 0}
           format="compact"
           icon={<Coins className="size-5" />}
-          description={`${((stats?.total_tokens_in ?? 0) / 1000).toFixed(0)}K in / ${((stats?.total_tokens_out ?? 0) / 1000).toFixed(0)}K out`}
+          description={`${formatTokens(stats?.total_tokens_in ?? 0)} in / ${formatTokens(stats?.total_tokens_out ?? 0)} out`}
         />
       </MetricGrid>
 

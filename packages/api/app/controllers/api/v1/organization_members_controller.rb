@@ -321,38 +321,45 @@ module Api
         end
 
         current_start = days.days.ago.beginning_of_day
-        prev_start = (days * 2).days.ago.beginning_of_day
-        prev_end = days.days.ago.end_of_day
+        prev_start    = (days * 2).days.ago.beginning_of_day
+        quoted        = ActiveRecord::Base.connection.quote(current_start)
 
-        base = current_organization.tool_events.where(user_id: @membership.user_id)
+        # Single aggregate query covering both windows using PostgreSQL FILTER.
+        # Uses >= / < boundary so the windows are non-overlapping (fixes the
+        # original double-counting bug on the boundary day).
+        base = current_organization.tool_events
+          .where(user_id: @membership.user_id, occurred_at: prev_start..Time.current)
 
-        current = base.where(occurred_at: current_start..Time.current)
-        prior   = base.where(occurred_at: prev_start..prev_end)
+        agg = base.select(Arel.sql(<<~SQL.squish)).take
+          COUNT(*) FILTER (WHERE occurred_at >= #{quoted}) AS curr_events,
+          COUNT(*) FILTER (WHERE occurred_at <  #{quoted}) AS prev_events,
+          COALESCE(SUM(cost_usd)   FILTER (WHERE occurred_at >= #{quoted}), 0) AS curr_cost,
+          COALESCE(SUM(cost_usd)   FILTER (WHERE occurred_at <  #{quoted}), 0) AS prev_cost,
+          COALESCE(SUM(tokens_in)  FILTER (WHERE occurred_at >= #{quoted}), 0) AS curr_in,
+          COALESCE(SUM(tokens_in)  FILTER (WHERE occurred_at <  #{quoted}), 0) AS prev_in,
+          COALESCE(SUM(tokens_out) FILTER (WHERE occurred_at >= #{quoted}), 0) AS curr_out,
+          COALESCE(SUM(tokens_out) FILTER (WHERE occurred_at <  #{quoted}), 0) AS prev_out
+        SQL
 
-        curr_events = current.count
-        curr_cost   = current.sum(:cost_usd).to_f
-        curr_in     = current.sum(:tokens_in).to_i
-        curr_out    = current.sum(:tokens_out).to_i
-
-        prev_events = prior.count
-        prev_cost   = prior.sum(:cost_usd).to_f
-        prev_in     = prior.sum(:tokens_in).to_i
-        prev_out    = prior.sum(:tokens_out).to_i
-
-        prev_tokens = prev_in + prev_out
+        curr_events = agg.curr_events.to_i
+        prev_events = agg.prev_events.to_i
+        curr_cost   = agg.curr_cost.to_f
+        prev_cost   = agg.prev_cost.to_f
+        curr_in     = agg.curr_in.to_i
+        prev_in     = agg.prev_in.to_i
+        curr_out    = agg.curr_out.to_i
+        prev_out    = agg.prev_out.to_i
         curr_tokens = curr_in + curr_out
+        prev_tokens = prev_in + prev_out
 
-        events_change  = prev_events > 0 ? ((curr_events - prev_events).to_f / prev_events * 100).round(1) : 0
-        cost_change    = prev_cost   > 0 ? ((curr_cost   - prev_cost).to_f   / prev_cost   * 100).round(1) : 0
-        tokens_change  = prev_tokens > 0 ? ((curr_tokens - prev_tokens).to_f / prev_tokens * 100).round(1) : 0
+        events_change = prev_events > 0 ? ((curr_events - prev_events).to_f / prev_events * 100).round(1) : 0
+        cost_change   = prev_cost   > 0 ? ((curr_cost   - prev_cost).to_f   / prev_cost   * 100).round(1) : 0
+        tokens_change = prev_tokens > 0 ? ((curr_tokens - prev_tokens).to_f / prev_tokens * 100).round(1) : 0
 
-        tool_breakdown = current
+        tool_breakdown = base
+          .where(occurred_at: current_start..Time.current)
           .group(:tool_name)
-          .select(
-            "tool_name",
-            "COUNT(*) as event_count",
-            "COALESCE(SUM(cost_usd), 0) as cost_usd"
-          )
+          .select("tool_name, COUNT(*) as event_count, COALESCE(SUM(cost_usd), 0) as cost_usd")
           .order("event_count DESC")
           .map { |t| { tool_name: t.tool_name, event_count: t.event_count.to_i, cost_usd: t.cost_usd.to_f } }
 
@@ -372,12 +379,14 @@ module Api
       def member_heatmap
         authorize! @membership
 
+        # Dates are bucketed in DB server timezone (UTC). Events near midnight
+        # for users in non-UTC zones may bucket into adjacent calendar days.
         data = current_organization.tool_events
           .where(user_id: @membership.user_id, occurred_at: 1.year.ago..Time.current)
           .group("DATE(occurred_at)")
           .select("DATE(occurred_at) as date, COUNT(*) as count")
+          .order("date ASC")
           .map { |r| { date: r.date.to_s, count: r.count.to_i } }
-          .sort_by { |r| r[:date] }
 
         render json: data
       end

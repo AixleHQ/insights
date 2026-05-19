@@ -429,6 +429,17 @@ RSpec.describe 'Api::V1::OrganizationMembers', type: :request do
 
       expect_success
     end
+
+    it 'denies a member from viewing another member dashboard stats' do
+      other_member = create(:user)
+      create(:organization_membership, user: other_member, organization: organization, role: 'member')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/dashboard_stats",
+                        user: other_member,
+                        organization: organization
+
+      expect(response).to have_http_status(:forbidden)
+    end
   end
 
   describe 'GET /api/v1/organizations/:organization_id/members/:id/stats/heatmap' do
@@ -487,6 +498,17 @@ RSpec.describe 'Api::V1::OrganizationMembers', type: :request do
                         organization: organization
 
       expect_success
+    end
+
+    it 'denies a member from viewing another member heatmap' do
+      other_member = create(:user)
+      create(:organization_membership, user: other_member, organization: organization, role: 'member')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/stats/heatmap",
+                        user: other_member,
+                        organization: organization
+
+      expect(response).to have_http_status(:forbidden)
     end
   end
 end
