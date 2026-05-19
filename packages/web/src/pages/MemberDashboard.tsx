@@ -22,7 +22,7 @@ const PERIOD_LABELS: Record<Period, string> = {
   "90d": "90 days",
 };
 
-export function MemberDashboard() {
+export function MemberDashboard({ hideHeader = false }: { hideHeader?: boolean }) {
   const { currentOrg } = useOrg();
   const { data: currentUser, isLoading: isLoadingUser } = useCurrentUser();
 
@@ -47,28 +47,36 @@ export function MemberDashboard() {
   const totalTokens = (stats?.total_tokens_in ?? 0) + (stats?.total_tokens_out ?? 0);
   const totalHeatmapEvents = heatmapData?.reduce((sum, d) => sum + d.count, 0) ?? 0;
 
+  const periodButtons = (
+    <div className="flex gap-2">
+      {PERIODS.map((p) => (
+        <Button
+          key={p}
+          size="sm"
+          variant={period === p ? "default" : "outline"}
+          onClick={() => setPeriod(p)}
+        >
+          {PERIOD_LABELS[p]}
+        </Button>
+      ))}
+    </div>
+  );
+
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">My Dashboard</h1>
-          <p className="text-sm text-muted-foreground">
-            Your personal AI tool usage for {currentOrg?.name || "your organization"}
-          </p>
+      {!hideHeader ? (
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">My Dashboard</h1>
+            <p className="text-sm text-muted-foreground">
+              Your personal AI tool usage for {currentOrg?.name || "your organization"}
+            </p>
+          </div>
+          {periodButtons}
         </div>
-        <div className="flex gap-2">
-          {PERIODS.map((p) => (
-            <Button
-              key={p}
-              size="sm"
-              variant={period === p ? "default" : "outline"}
-              onClick={() => setPeriod(p)}
-            >
-              {PERIOD_LABELS[p]}
-            </Button>
-          ))}
-        </div>
-      </div>
+      ) : (
+        <div className="flex justify-end">{periodButtons}</div>
+      )}
 
       <MetricGrid>
         <MetricCard

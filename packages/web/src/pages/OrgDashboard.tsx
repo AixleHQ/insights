@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Activity, DollarSign, AlertTriangle, Users, Coins } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { Activity, DollarSign, AlertTriangle, Users } from "lucide-react";
 import { useOrg } from "@/contexts/OrgContext";
-import { useOverviewStats, useDailyStats, useEvents, useDailyByTool } from "@/hooks/useApi";
+import { useOverviewStats, useDailyStats, useEvents, useDailyByTool, useProjects } from "@/hooks/useApi";
 import {
   MetricCard,
   MetricGrid,
@@ -17,33 +18,66 @@ import {
   type Alert,
 } from "@/components/dashboard";
 import { EventDrawer } from "@/components/events";
-import { formatTokens, formatPercent } from "@/lib/formatters";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { MemberDashboard } from "@/pages/MemberDashboard";
+import { formatPercent } from "@/lib/formatters";
+
+function ProjectFilterDropdown({
+  orgId,
+  value,
+  onChange,
+}: {
+  orgId: string;
+  value: string | undefined;
+  onChange: (v: string | undefined) => void;
+}) {
+  const { data: projects } = useProjects(orgId);
+
+  return (
+    <Select
+      value={value ?? "all"}
+      onValueChange={(v) => onChange(v === "all" ? undefined : v)}
+    >
+      <SelectTrigger className="w-48">
+        <SelectValue placeholder="All Projects" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">All Projects</SelectItem>
+        {projects?.map((p) => (
+          <SelectItem key={p.id} value={p.id}>
+            {p.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
 
 export function OrgDashboard() {
-  const { currentOrg } = useOrg();
+  const { currentOrg, hasRole } = useOrg();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const isOwnerOrViewer = hasRole(["owner", "viewer"]);
 
-  // Fetch data using TanStack Query
-  const {
-    data: stats,
-    isLoading: isLoadingStats,
-  } = useOverviewStats(currentOrg?.id || "");
+  const activeTab = isOwnerOrViewer
+    ? ((searchParams.get("tab") as "team" | "personal") ?? "team")
+    : "team";
 
-  const {
-    data: dailyData,
-    isLoading: isLoadingDaily,
-  } = useDailyStats(currentOrg?.id || "", 30);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | undefined>();
 
-  const {
-    data: eventsResponse,
-    isLoading: isLoadingEvents,
-  } = useEvents(currentOrg?.id || "", { per_page: 10 });
+  const orgId = currentOrg?.id || "";
 
-  const {
-    data: toolByDayData,
-    isLoading: isLoadingToolByDay,
-  } = useDailyByTool(currentOrg?.id || "", 365);
+  const { data: stats, isLoading: isLoadingStats } = useOverviewStats(orgId, selectedProjectId);
+  const { data: dailyData, isLoading: isLoadingDaily } = useDailyStats(orgId, 30);
+  const { data: eventsResponse, isLoading: isLoadingEvents } = useEvents(orgId, { per_page: 10 });
+  const { data: toolByDayData, isLoading: isLoadingToolByDay } = useDailyByTool(orgId, { days: 365 });
 
-  // Transform API responses to component formats
   const chartData: DailyCostData[] = dailyData?.data?.map((d) => ({
     date: d.date,
     cost: d.cost_usd,
@@ -56,19 +90,22 @@ export function OrgDashboard() {
     total_cost: t.cost_usd,
   })) || [];
 
-  const events: ActivityEvent[] = useMemo(() => eventsResponse?.data?.map((e) => ({
-    id: e.id,
-    tool_name: e.toolName,
-    event_type: e.eventType,
-    attribution: e.attribution,
-    risk_level: e.riskLevel,
-    cost_usd: e.costUsd,
-    created_at: e.occurredAt || e.createdAt,
-    user: e.user ? { email: e.user.email } : undefined,
-    project: e.project ? { name: e.project.name } : undefined,
-  })) || [], [eventsResponse?.data]);
+  const events: ActivityEvent[] = useMemo(
+    () =>
+      eventsResponse?.data?.map((e) => ({
+        id: e.id,
+        tool_name: e.toolName,
+        event_type: e.eventType,
+        attribution: e.attribution,
+        risk_level: e.riskLevel,
+        cost_usd: e.costUsd,
+        created_at: e.occurredAt || e.createdAt,
+        user: e.user ? { email: e.user.email } : undefined,
+        project: e.project ? { name: e.project.name } : undefined,
+      })) || [],
+    [eventsResponse?.data]
+  );
 
-  // Track dismissed alerts in local storage (per organization)
   const dismissedAlertsKey = `db90_dismissed_alerts_${currentOrg?.id}`;
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(() => {
     try {
@@ -79,22 +116,20 @@ export function OrgDashboard() {
     }
   });
 
-  // Sync dismissed alerts to localStorage
   useEffect(() => {
     if (currentOrg?.id) {
       localStorage.setItem(dismissedAlertsKey, JSON.stringify([...dismissedAlerts]));
     }
   }, [dismissedAlerts, dismissedAlertsKey, currentOrg?.id]);
 
-  // Derive alerts from stats
-  const alerts: Alert[] = stats?.high_risk_events && stats.high_risk_events > 0
+  const alerts: Alert[] = stats?.risk_alerts && stats.risk_alerts > 0
     ? [
         {
           id: "high-risk-events",
           type: "risk_detected",
           severity: "warning",
           title: "High-risk events detected",
-          description: `${stats.high_risk_events} high-risk event(s) require attention`,
+          description: `${stats.risk_alerts} high-risk event(s) require attention`,
           created_at: new Date().toISOString(),
           acknowledged: dismissedAlerts.has("high-risk-events"),
         },
@@ -105,10 +140,8 @@ export function OrgDashboard() {
     setDismissedAlerts((prev) => new Set([...prev, id]));
   };
 
-  // Tool insights day range state
   const [toolInsightsDays, setToolInsightsDays] = useState(30);
 
-  // Event drawer state
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -117,16 +150,18 @@ export function OrgDashboard() {
     setDrawerOpen(true);
   }, []);
 
-  const handleNavigate = useCallback((direction: "prev" | "next") => {
-    if (!selectedEventId) return;
-    const currentIndex = events.findIndex((e) => e.id === selectedEventId);
-    if (currentIndex === -1) return;
-
-    const newIndex = direction === "prev" ? currentIndex - 1 : currentIndex + 1;
-    if (newIndex >= 0 && newIndex < events.length) {
-      setSelectedEventId(events[newIndex].id);
-    }
-  }, [selectedEventId, events]);
+  const handleNavigate = useCallback(
+    (direction: "prev" | "next") => {
+      if (!selectedEventId) return;
+      const currentIndex = events.findIndex((e) => e.id === selectedEventId);
+      if (currentIndex === -1) return;
+      const newIndex = direction === "prev" ? currentIndex - 1 : currentIndex + 1;
+      if (newIndex >= 0 && newIndex < events.length) {
+        setSelectedEventId(events[newIndex].id);
+      }
+    },
+    [selectedEventId, events]
+  );
 
   const selectedEventIndex = selectedEventId
     ? events.findIndex((e) => e.id === selectedEventId)
@@ -134,114 +169,135 @@ export function OrgDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">
-          AI tool usage and cost overview for {currentOrg?.name || "your organization"}
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">
+            AI tool usage and cost overview for {currentOrg?.name || "your organization"}
+          </p>
+        </div>
+        {isOwnerOrViewer && (
+          <div className="flex items-center gap-3">
+            {activeTab === "team" && (
+              <ProjectFilterDropdown
+                orgId={orgId}
+                value={selectedProjectId}
+                onChange={setSelectedProjectId}
+              />
+            )}
+            <Tabs
+              value={activeTab}
+              onValueChange={(v) => setSearchParams({ tab: v })}
+            >
+              <TabsList>
+                <TabsTrigger value="team">Team</TabsTrigger>
+                <TabsTrigger value="personal">Personal</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+        )}
       </div>
 
-      <ToolUsageByDayChart
-        data={toolByDayData?.data || []}
-        tools={toolByDayData?.tools || []}
-        isLoading={isLoadingToolByDay}
-      />
+      {activeTab === "personal" ? (
+        <MemberDashboard hideHeader />
+      ) : (
+        <>
+          <ToolUsageByDayChart
+            data={toolByDayData?.data || []}
+            tools={toolByDayData?.tools || []}
+            isLoading={isLoadingToolByDay}
+          />
 
-      <MetricGrid>
-        <MetricCard
-          title="Total Events"
-          value={stats?.total_events ?? 0}
-          format="number"
-          icon={<Activity className="size-5" />}
-          trend={
-            stats?.events_change_percent
-              ? stats.events_change_percent > 0
-                ? "up"
-                : "down"
-              : "neutral"
-          }
-          trendValue={
-            stats?.events_change_percent
-              ? formatPercent(Math.abs(stats.events_change_percent))
-              : undefined
-          }
-          description="This month"
-        />
-        <MetricCard
-          title="Total Cost"
-          value={stats?.total_cost_usd ?? 0}
-          format="currency"
-          icon={<DollarSign className="size-5" />}
-          trend={
-            stats?.cost_change_percent
-              ? stats.cost_change_percent > 0
-                ? "up"
-                : "down"
-              : "neutral"
-          }
-          trendValue={
-            stats?.cost_change_percent
-              ? formatPercent(Math.abs(stats.cost_change_percent))
-              : undefined
-          }
-          description="This month"
-        />
-        <MetricCard
-          title="High-Risk Events"
-          value={stats?.high_risk_events ?? 0}
-          format="number"
-          icon={<AlertTriangle className="size-5" />}
-          description="Requiring attention"
-        />
-        <MetricCard
-          title="Active Users"
-          value={stats?.active_users ?? 0}
-          format="number"
-          icon={<Users className="size-5" />}
-          description="Last 7 days"
-        />
-        <MetricCard
-          title="Total Tokens"
-          value={stats?.total_tokens ?? 0}
-          format="compact"
-          icon={<Coins className="size-5" />}
-          description={`${formatTokens(stats?.total_tokens_in ?? 0)} in / ${formatTokens(stats?.total_tokens_out ?? 0)} out`}
-        />
-      </MetricGrid>
+          <MetricGrid>
+            <MetricCard
+              title="Total Events"
+              value={stats?.total_events ?? 0}
+              format="number"
+              icon={<Activity className="size-5" />}
+              trend={
+                stats?.events_change_percent
+                  ? stats.events_change_percent > 0
+                    ? "up"
+                    : "down"
+                  : "neutral"
+              }
+              trendValue={
+                stats?.events_change_percent
+                  ? formatPercent(Math.abs(stats.events_change_percent))
+                  : undefined
+              }
+              description="This month"
+            />
+            <MetricCard
+              title="Total Cost"
+              value={stats?.total_cost_usd ?? 0}
+              format="currency"
+              icon={<DollarSign className="size-5" />}
+              trend={
+                stats?.cost_change_percent
+                  ? stats.cost_change_percent > 0
+                    ? "up"
+                    : "down"
+                  : "neutral"
+              }
+              trendValue={
+                stats?.cost_change_percent
+                  ? formatPercent(Math.abs(stats.cost_change_percent))
+                  : undefined
+              }
+              description="This month"
+            />
+            <MetricCard
+              title="Risk Alerts"
+              value={stats?.risk_alerts ?? 0}
+              format="number"
+              icon={<AlertTriangle className="size-5" />}
+              description="This month"
+            />
+            <MetricCard
+              title="Active Members"
+              value={stats?.active_users ?? 0}
+              format="number"
+              icon={<Users className="size-5" />}
+              description="Last 7 days"
+            />
+          </MetricGrid>
 
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
-        <CostTrendChart data={chartData} isLoading={isLoadingDaily} />
-        <ActivityFeed
-          events={events}
-          isLoading={isLoadingEvents}
-          onEventClick={handleEventClick}
-          selectedEventId={selectedEventId}
-        />
-      </div>
+          <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+            <CostTrendChart data={chartData} isLoading={isLoadingDaily} />
+            <ActivityFeed
+              events={events}
+              isLoading={isLoadingEvents}
+              onEventClick={handleEventClick}
+              selectedEventId={selectedEventId}
+            />
+          </div>
 
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-        <TopToolsChart data={toolUsage} isLoading={isLoadingDaily} />
-        <AlertsPanel
-          alerts={alerts}
-          isLoading={isLoadingStats}
-          onDismiss={handleDismissAlert}
-        />
-      </div>
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+            <TopToolsChart data={toolUsage} isLoading={isLoadingDaily} />
+            <AlertsPanel
+              alerts={alerts}
+              isLoading={isLoadingStats}
+              onDismiss={handleDismissAlert}
+            />
+          </div>
 
-      <ToolInsightsSection
-        orgId={currentOrg?.id || ""}
-        days={toolInsightsDays}
-        onDaysChange={setToolInsightsDays}
-      />
+          <ToolInsightsSection
+            orgId={orgId}
+            days={toolInsightsDays}
+            onDaysChange={setToolInsightsDays}
+          />
 
-      <EventDrawer
-        eventId={selectedEventId}
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-        onNavigate={handleNavigate}
-        hasPrev={selectedEventIndex > 0}
-        hasNext={selectedEventIndex < events.length - 1}
-      />
+          <EventDrawer
+            eventId={selectedEventId}
+            open={drawerOpen}
+            onOpenChange={setDrawerOpen}
+            onNavigate={handleNavigate}
+            hasPrev={selectedEventIndex > 0}
+            hasNext={selectedEventIndex < events.length - 1}
+          />
+        </>
+      )}
     </div>
   );
 }

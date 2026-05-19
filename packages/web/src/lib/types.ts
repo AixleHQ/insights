@@ -271,7 +271,7 @@ export interface OverviewStats {
   events_today: number;
   cost_today_usd: number;
   active_users: number;
-  high_risk_events: number;
+  risk_alerts: number;
   events_change_percent: number;
   cost_change_percent: number;
   // Token metrics
