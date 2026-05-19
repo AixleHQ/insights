@@ -177,6 +177,12 @@
 .risk-low { color: var(--risk-low); }
 .risk-none { color: var(--risk-none); }
 
+/* Login page particle animation */
+@keyframes float-dot {
+  0%, 100% { opacity: 0; transform: translateY(0); }
+  50%       { opacity: 0.5; transform: translateY(-14px); }
+}
+
 .bg-risk-critical { background-color: oklch(from var(--risk-critical) l c h / 0.15); }
 .bg-risk-high { background-color: oklch(from var(--risk-high) l c h / 0.15); }
 .bg-risk-medium { background-color: oklch(from var(--risk-medium) l c h / 0.15); }
