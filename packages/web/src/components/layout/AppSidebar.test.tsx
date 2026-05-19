@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import type { MemberRole, OrganizationMembership } from "@/contexts/OrgContext";
 import type { FavoriteProject } from "@/hooks/useFavorites";
@@ -154,6 +155,34 @@ describe("AppSidebar", () => {
       renderSidebar("/events");
       const dashboardLink = screen.getByRole("link", { name: /Dashboard/i });
       expect(dashboardLink).not.toHaveAttribute("data-active", "true");
+    });
+  });
+
+  describe("UserMenu Settings", () => {
+    async function openUserMenu() {
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: /Test User/i }));
+    }
+
+    it("shows Settings in the avatar menu for owner", async () => {
+      orgMock.currentRole = "owner";
+      renderSidebar();
+      await openUserMenu();
+      expect(screen.getByRole("menuitem", { name: /Settings/i })).toBeInTheDocument();
+    });
+
+    it("hides Settings in the avatar menu for member", async () => {
+      orgMock.currentRole = "member";
+      renderSidebar();
+      await openUserMenu();
+      expect(screen.queryByRole("menuitem", { name: /Settings/i })).not.toBeInTheDocument();
+    });
+
+    it("hides Settings in the avatar menu for viewer", async () => {
+      orgMock.currentRole = "viewer";
+      renderSidebar();
+      await openUserMenu();
+      expect(screen.queryByRole("menuitem", { name: /Settings/i })).not.toBeInTheDocument();
     });
   });
 });
