@@ -136,6 +136,8 @@ Rails.application.routes.draw do
         get "stats/daily", to: "stats#daily"
         get "stats/daily_by_tool", to: "stats#daily_by_tool"
         get "stats/heatmap", to: "stats#heatmap"
+        get "stats/risk_alerts",    to: "stats#risk_alerts"
+        get "stats/daily_by_model", to: "stats#daily_by_model"
 
         # Tool-scoped stats
         get "stats/tools/:tool_name/overview",    to: "stats#tool_overview"
