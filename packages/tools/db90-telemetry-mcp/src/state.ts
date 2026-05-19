@@ -10,10 +10,29 @@ export interface SessionRecord {
   sentAt: string;
 }
 
+/** Persisted summary of the last sync run (for CLI/MCP health across processes). */
+export interface SyncResultSnapshot {
+  sent: number;
+  failed: number;
+  skipped: number;
+  locked?: boolean;
+  rate_limited_until?: string | null;
+  errors?: string[];
+}
+
+/** Operator-facing metadata stored beside checkpoint `sessions` (same credential-scoped file). */
+export interface McpOperatorState {
+  last_sync_at: string | null;
+  last_result: SyncResultSnapshot | null;
+  recent_errors: string[];
+}
+
 export interface State {
   version: number;
   /** Map of session ID → last known state. */
   sessions: Record<string, SessionRecord>;
+  /** Optional MCP diagnostics for health / debugging (does not replace session checkpoints). */
+  mcp_operator?: McpOperatorState;
 }
 
 export function getAppDir(): string {
@@ -44,6 +63,56 @@ function stateFilePath(dir: string, host?: string, token?: string): string {
   return join(dir, filename);
 }
 
+/** Absolute path to the credential-scoped state JSON on disk. */
+export function credentialStateFilePath(dir: string, host: string, token: string): string {
+  return stateFilePath(dir, host, token);
+}
+
+function parseMcpOperator(raw: unknown): McpOperatorState | undefined {
+  if (typeof raw !== "object" || raw === null) return undefined;
+  const o = raw as Record<string, unknown>;
+
+  let lastSyncAt: string | null = null;
+  if (o.last_sync_at === null) lastSyncAt = null;
+  else if (typeof o.last_sync_at === "string") lastSyncAt = o.last_sync_at;
+
+  let lastResult: SyncResultSnapshot | null = null;
+  if (o.last_result === null) {
+    lastResult = null;
+  } else if (typeof o.last_result === "object" && o.last_result !== null) {
+    const r = o.last_result as Record<string, unknown>;
+    if (
+      typeof r.sent === "number" &&
+      typeof r.failed === "number" &&
+      typeof r.skipped === "number"
+    ) {
+      lastResult = {
+        sent: r.sent,
+        failed: r.failed,
+        skipped: r.skipped,
+        locked: typeof r.locked === "boolean" ? r.locked : undefined,
+        rate_limited_until:
+          r.rate_limited_until === null || typeof r.rate_limited_until === "string"
+            ? (r.rate_limited_until as string | null)
+            : undefined,
+        errors: Array.isArray(r.errors)
+          ? r.errors.filter((e): e is string => typeof e === "string")
+          : undefined,
+      };
+    }
+  }
+
+  const recentErrors: string[] = Array.isArray(o.recent_errors)
+    ? o.recent_errors.filter((e): e is string => typeof e === "string")
+    : [];
+
+  return {
+    last_sync_at: lastSyncAt,
+    last_result: lastResult,
+    recent_errors: recentErrors,
+  };
+}
+
 /**
  * One-time migration: if a legacy `state.json` exists but no credential-scoped
  * file does, rename it to the new name so existing sessions are not re-sent on
@@ -69,10 +138,15 @@ export function readState(dir?: string, host?: string, token?: string): State {
         typeof p.sessions === "object" &&
         p.sessions !== null
       ) {
-        return {
+        const out: State = {
           version: p.version,
           sessions: p.sessions as Record<string, SessionRecord>,
         };
+        if ("mcp_operator" in p) {
+          const mcp = parseMcpOperator(p.mcp_operator);
+          if (mcp) out.mcp_operator = mcp;
+        }
+        return out;
       }
     }
   } catch {
@@ -105,4 +179,9 @@ export function markSessionSent(
       [sessionId]: { fileSize, sentAt: new Date().toISOString() },
     },
   };
+}
+
+/** Merge operator snapshot into an existing state object before `writeState`. */
+export function withMcpOperator(state: State, operator: McpOperatorState): State {
+  return { ...state, mcp_operator: operator };
 }

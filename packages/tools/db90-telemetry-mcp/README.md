@@ -38,15 +38,15 @@ Tests may set `DB90_MCP_HOME` to a temp directory so `~/.db90-mcp` is not touche
 
 - `db90-mcp` or `db90-mcp run` — start the MCP server on stdio (what Claude Code spawns). After the stdio session connects, a **5-minute** background timer runs the same sync as `db90_sync_now`; an **immediate** sync runs once on startup when credentials exist.
 - `db90-mcp run --once` — run a single sync and exit; **exit code 1** if any event failed to post.
-- `db90-mcp health` — one-line diagnostic.
+- `db90-mcp health` — multi-line diagnostic: auth status, API host, provisioned ingest tools, last sync summary, state file paths, log path (`~/.db90-mcp/mcp.log`), and merged recent errors (in-memory + on-disk `mcp_operator`).
 - `db90-mcp init [--host URL] --keycloak-url ISSUER [--tool-name claude_code|cursor] [--force]` — Keycloak device login, exchange for a DB90 ingest token, save credentials, merge **`db90`** into the **user** Claude Code MCP config file (`~/.claude.json`, top-level `mcpServers`), then exit with **`Restart Claude Code to activate`**. Use **`--force`** only if you need to replace an existing `db90` entry that differs from the `npx -y @db90/telemetry-mcp run` shape. On Windows the stored command uses `cmd /c` per Claude Code expectations for `npx`-backed stdio servers. `--keycloak-url` may be omitted when `KEYCLOAK_ISSUER` / `DB90_KEYCLOAK_ISSUER` is set or local defaults are explicitly enabled with `DB90_MCP_USE_LOCAL_KEYCLOAK_DEFAULT=true`.
 
 Legacy `serve` is accepted as an alias for `run`.
 
 ## MCP tools
 
-- **`db90_status`** — JSON: configured/authenticated flag, host, last sync time, last run counts (`sent` / `failed` / `skipped`), optional lock/rate-limit hints, recent errors. Tolerates missing or malformed credentials/state.
-- **`db90_sync_now`** — runs one Claude transcript sync (advisory lock under `~/.db90-telemetry-mcp/state.lock`).
+- **`db90_status`** — JSON from the shared health builder: configured/authenticated flags, host, ingest tools, last sync time, last run counts, rate-limit hints, per-credential state paths, `log_path`, persisted operator metadata, and merged recent errors. Tolerates missing or malformed credentials/state.
+- **`db90_sync_now`** — runs one ingest sync (advisory lock under `~/.db90-mcp/state.lock` or `${DB90_MCP_HOME}/state.lock`).
 - **`db90_authenticate`** — starts Keycloak device login and returns JSON containing `verificationUri`, `verificationUriComplete`, `userCode`, `expiresIn`, and `interval`. Use `db90-mcp init` for the complete terminal flow that exchanges and saves credentials.
 
 Session checkpoints in state files use keys `claude_code:<sessionId>` so future tools can share the same store without collisions.
@@ -60,6 +60,11 @@ Per [Claude Code MCP docs](https://docs.anthropic.com/en/docs/claude-code/mcp), 
 3. Restart Claude Code when prompted; `/mcp` should list **db90**. Call **`db90_status`** after a sync to see populated fields.
 
 Manual `credentials.json` (under `~/.db90-mcp` or `DB90_MCP_HOME`) remains supported for CI or advanced setups; use **`claude mcp add`** if you prefer the native CLI over `init` for MCP wiring.
+
+## Operational logging and state
+
+- JSONL-style records are appended to **`mcp.log`** under **`~/.db90-mcp`** (or **`${DB90_MCP_HOME}/mcp.log`**). The active file is capped at **5 MiB**; older content rotates to **`mcp.log.1`**.
+- Sync telemetry and recent errors are also written into each credential-scoped state JSON as **`mcp_operator`**, so **`db90-mcp health`** and **`db90_status`** can report the last run after a fresh process start.
 
 ## License
 

@@ -6,6 +6,9 @@ import {
   getAppDir,
   stateKey as credentialStateKey,
   migrateLegacyState,
+  withMcpOperator,
+  type McpOperatorState,
+  type SyncResultSnapshot,
 } from "./state.js";
 import {
   findTranscriptFiles,
@@ -26,6 +29,7 @@ import {
 import { postEvent } from "./client.js";
 import { type PricingTable, getCostWarning } from "./pricing.js";
 import { acquireSyncLock } from "./lock.js";
+import { mcpLog } from "./log.js";
 
 /** Prefix for Claude Code session keys in shared MCP state. */
 export const CLAUDE_STATE_PREFIX = "claude_code:" as const;
@@ -76,9 +80,59 @@ export interface MultiSyncOptions {
 
 const backoffUntilByCredential = new Map<string, Date>();
 
+/** Clears in-memory rate-limit backoff (test hook). */
+export function resetBackoffStateForTests(): void {
+  backoffUntilByCredential.clear();
+}
+
 let lastSyncAt: string | null = null;
 let lastSyncResult: SyncResult | null = null;
 let recentErrors: string[] = [];
+
+function syncResultToSnapshot(r: SyncResult): SyncResultSnapshot {
+  return {
+    sent: r.sent,
+    failed: r.failed,
+    skipped: r.skipped,
+    locked: r.locked,
+    rate_limited_until: r.rateLimitedUntil ?? null,
+    errors: r.errors,
+  };
+}
+
+function persistOperatorState(
+  appDir: string,
+  host: string,
+  credentials: StoredCredentials,
+  result: SyncResult,
+  errors: string[],
+  syncTimestamp: string
+): void {
+  const seen = new Set<string>();
+  for (const tok of Object.values(credentials.accounts)) {
+    if (typeof tok !== "string" || !tok.length || seen.has(tok)) continue;
+    seen.add(tok);
+    const st = readState(appDir, host, tok);
+    let nextOp: McpOperatorState;
+    if (result.locked) {
+      const prev = st.mcp_operator;
+      const lockMsg = "Sync skipped — another process holds the lock";
+      nextOp = {
+        last_sync_at: prev?.last_sync_at ?? null,
+        last_result: prev?.last_result ?? null,
+        recent_errors: [...(prev?.recent_errors ?? []), lockMsg].slice(-20),
+      };
+    } else {
+      nextOp = {
+        last_sync_at: syncTimestamp,
+        last_result: syncResultToSnapshot(result),
+        recent_errors:
+          errors.length > 0 || result.failed > 0 ? errors.slice(-20) : [],
+      };
+    }
+    writeState(withMcpOperator(st, nextOp), appDir, host, tok);
+  }
+}
 
 export function getSyncTelemetry(): {
   lastSyncAt: string | null;
@@ -88,9 +142,14 @@ export function getSyncTelemetry(): {
   return { lastSyncAt, lastResult: lastSyncResult, recentErrors };
 }
 
-function recordTelemetry(result: SyncResult, errors: string[]): void {
+function recordTelemetry(
+  result: SyncResult,
+  errors: string[],
+  persistCtx?: { appDir: string; host: string; credentials: StoredCredentials }
+): void {
+  const syncTimestamp = new Date().toISOString();
   if (!result.locked) {
-    lastSyncAt = new Date().toISOString();
+    lastSyncAt = syncTimestamp;
     lastSyncResult = result;
   }
   if (result.locked) {
@@ -99,6 +158,17 @@ function recordTelemetry(result: SyncResult, errors: string[]): void {
     recentErrors = errors.slice(-20);
   } else {
     recentErrors = [];
+  }
+
+  if (persistCtx) {
+    persistOperatorState(
+      persistCtx.appDir,
+      persistCtx.host,
+      persistCtx.credentials,
+      result,
+      errors,
+      syncTimestamp
+    );
   }
 }
 
@@ -124,6 +194,7 @@ async function runClaudeSlice(options: SyncOptions): Promise<SyncResult> {
 
   if (backoffUntil && new Date() < backoffUntil) {
     const until = backoffUntil.toISOString();
+    mcpLog.info("sync_rate_limit_skip", { tool: "claude_code", until }, verbose);
     if (verbose) {
       console.log(`[verbose] Rate limited — skipping until ${until}`);
     } else {
@@ -141,6 +212,7 @@ async function runClaudeSlice(options: SyncOptions): Promise<SyncResult> {
 
   if (verbose) {
     console.log(`[verbose] Found ${files.length} transcript file(s)`);
+    mcpLog.info("sync_claude_transcripts", { files_found: files.length }, false);
   }
 
   const allFileSessions = await Promise.all(files.map((f) => parseTranscriptFile(f, verbose)));
@@ -169,6 +241,11 @@ async function runClaudeSlice(options: SyncOptions): Promise<SyncResult> {
       if (verbose) {
         console.log(`[verbose] Skipping unchanged session ${sessionId}`);
       }
+      mcpLog.info(
+        "sync_checkpoint_skip",
+        { tool: "claude_code", reason: "unchanged_transcript", session_id: sessionId },
+        false
+      );
       continue;
     }
 
@@ -203,6 +280,15 @@ async function runClaudeSlice(options: SyncOptions): Promise<SyncResult> {
         backoffUntilByCredential.set(backoffKey, nextBackoff);
         shouldStopForBackoff = true;
         const reason = quotaExceeded ? "Monthly quota exceeded" : "Rate limited";
+        mcpLog.warn(
+          "sync_rate_limit_pause",
+          {
+            tool: "claude_code",
+            retry_until: nextBackoff.toISOString(),
+            quota_exceeded: quotaExceeded,
+          },
+          true
+        );
         console.warn(`[db90-mcp] ${reason}. Pausing until ${nextBackoff.toISOString()}.`);
       },
     });
@@ -213,6 +299,7 @@ async function runClaudeSlice(options: SyncOptions): Promise<SyncResult> {
     } else {
       totalFailed++;
       errors.push(`Failed to post session ${sessionId}`);
+      mcpLog.error("sync_ingest_final_failure", { tool: "claude_code", session_id: sessionId }, true);
       if (shouldStopForBackoff) {
         break;
       }
@@ -253,6 +340,7 @@ async function runCursorSlice(params: {
 
   if (backoffUntil && new Date() < backoffUntil) {
     const until = backoffUntil.toISOString();
+    mcpLog.info("sync_rate_limit_skip", { tool: "cursor", until }, verbose);
     if (verbose) {
       console.log(`[verbose][cursor] Rate limited — skipping until ${until}`);
     } else {
@@ -351,6 +439,15 @@ async function runCursorSlice(params: {
           backoffUntilByCredential.set(backoffKey, nextBackoff);
           shouldStopForBackoff = true;
           const reason = quotaExceeded ? "Monthly quota exceeded" : "Rate limited";
+          mcpLog.warn(
+            "sync_rate_limit_pause",
+            {
+              tool: "cursor",
+              retry_until: nextBackoff.toISOString(),
+              quota_exceeded: quotaExceeded,
+            },
+            true
+          );
           console.warn(`[db90-mcp][cursor] ${reason}. Pausing until ${nextBackoff.toISOString()}.`);
         },
       });
@@ -365,6 +462,11 @@ async function runCursorSlice(params: {
       groupFailed = true;
       abortRemaining = true;
       errors.push(`Cursor sync (${group.label}): failed to post ${payload.occurred_at}`);
+      mcpLog.error(
+        "sync_ingest_final_failure",
+        { tool: "cursor", group: group.label, occurred_at: payload.occurred_at },
+        true
+      );
       totalSkipped += group.payloads.length - payloadIndex - 1;
       break;
     }
@@ -410,6 +512,7 @@ export async function syncTelemetryTools(options: MultiSyncOptions): Promise<Syn
   if (!lock.acquired) {
     const lockedResult: SyncResult = { sent: 0, failed: 0, skipped: 0, locked: true };
     recordTelemetry(lockedResult, []);
+    mcpLog.warn("sync_lock_skip", { reason: "advisory_lock_held", app_dir: appDir }, true);
     return lockedResult;
   }
 
@@ -422,16 +525,27 @@ export async function syncTelemetryTools(options: MultiSyncOptions): Promise<Syn
     if (missingRequested.length > 0) {
       const errors = [`Missing credentials for requested tool(s): ${missingRequested.join(", ")}`];
       const failedResult: SyncResult = { sent: 0, failed: missingRequested.length, skipped: 0, errors };
-      recordTelemetry(failedResult, errors);
+      mcpLog.warn(
+        "sync_tool_validation_failed",
+        { missing_tools: missingRequested, requested_tools: requested },
+        true
+      );
+      recordTelemetry(failedResult, errors, dryRun ? undefined : { appDir, host, credentials });
       return failedResult;
     }
     const withToken = requested.filter((t) => !!credentials.accounts[t]);
 
     if (withToken.length === 0) {
       const zero: SyncResult = { sent: 0, failed: 0, skipped: 0 };
-      recordTelemetry(zero, []);
+      recordTelemetry(zero, [], dryRun ? undefined : { appDir, host, credentials });
       return zero;
     }
+
+    mcpLog.info(
+      "sync_cycle_start",
+      { ingest_tools: withToken, requested_tools: requested, dry_run: dryRun },
+      false
+    );
 
     const uniqueTokens = new Set<string>();
     for (const t of withToken) {
@@ -515,7 +629,12 @@ export async function syncTelemetryTools(options: MultiSyncOptions): Promise<Syn
     if (rl) merged.rateLimitedUntil = rl;
     if (errorsAcc.length > 0) merged.errors = errorsAcc;
 
-    recordTelemetry(merged, errorsAcc);
+    recordTelemetry(merged, errorsAcc, dryRun ? undefined : { appDir, host, credentials });
+    mcpLog.info(
+      "sync_cycle_end",
+      { sent: merged.sent, failed: merged.failed, skipped: merged.skipped },
+      false
+    );
     return merged;
   } finally {
     lock.release();

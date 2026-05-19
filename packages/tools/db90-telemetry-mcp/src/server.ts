@@ -3,9 +3,11 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { loadCredentials, type TelemetryToolId, type StoredCredentials, credentialsHaveAnyToken } from "./credentials.js";
 import { defaultKeycloakClientId, defaultKeycloakIssuer, startDeviceAuthorization } from "./auth/keycloak.js";
-import { readState, migrateLegacyState, getAppDir } from "./state.js";
-import { syncTelemetryTools, getSyncTelemetry } from "./sync.js";
+import { migrateLegacyState, getAppDir } from "./state.js";
+import { syncTelemetryTools } from "./sync.js";
 import { DEFAULT_PRICING, mergePricing } from "./pricing.js";
+import { buildHealthSnapshot, healthSnapshotToStatusPayload } from "./health.js";
+import { mcpLog } from "./log.js";
 
 const SERVER_NAME = "db90-mcp";
 const SERVER_VERSION = "0.1.0";
@@ -57,71 +59,16 @@ function syncResultOk(result: Awaited<ReturnType<typeof syncTelemetryTools>>): b
   return !result.locked && result.failed === 0;
 }
 
-/** Session keys tracked across credential-scoped state files. */
-async function mergedSessionTrackedCount(appDir: string, creds: StoredCredentials): Promise<number> {
-  let n = 0;
-  for (const [_t, tok] of Object.entries(creds.accounts)) {
-    if (typeof tok === "string" && tok.length > 0) {
-      const st = readState(appDir, creds.host, tok);
-      n += Object.keys(st.sessions).length;
-    }
-  }
-  return n;
-}
-
 /** Structured status for `db90_status` — tolerates missing/malformed credentials and state. */
 export async function buildDb90StatusPayload(): Promise<Record<string, unknown>> {
-  const telemetry = getSyncTelemetry();
-  try {
-    const creds = await loadCredentials();
-    if (!creds || !credentialsHaveAnyToken(creds)) {
-      return {
-        authenticated: false,
-        configured: false,
-        host: null,
-        last_sync_at: telemetry.lastSyncAt,
-        last_result: telemetry.lastResult,
-        sessions_synced: telemetry.lastResult?.sent ?? 0,
-        skipped: telemetry.lastResult?.skipped ?? 0,
-        errors: telemetry.recentErrors,
-      };
-    }
-    const appDir = getAppDir();
-    const tracked = await mergedSessionTrackedCount(appDir, creds);
-    return {
-      authenticated: true,
-      configured: true,
-      host: creds.host,
-      ingest_tools: (
-        Object.entries(creds.accounts) as [TelemetryToolId, string | undefined][]
-      )
-        .filter(([, tok]) => typeof tok === "string" && tok.length > 0)
-        .map(([k]) => k)
-        .sort(),
-      last_sync_at: telemetry.lastSyncAt,
-      last_result: telemetry.lastResult,
-      sessions_synced: telemetry.lastResult?.sent ?? 0,
-      skipped: telemetry.lastResult?.skipped ?? 0,
-      state_tracked_sessions: tracked,
-      errors: telemetry.recentErrors,
-    };
-  } catch (err) {
-    return {
-      authenticated: false,
-      configured: false,
-      host: null,
-      last_sync_at: telemetry.lastSyncAt,
-      last_result: telemetry.lastResult,
-      sessions_synced: 0,
-      skipped: 0,
-      errors: [...telemetry.recentErrors, err instanceof Error ? err.message : String(err)],
-    };
-  }
+  const snapshot = await buildHealthSnapshot();
+  return healthSnapshotToStatusPayload(snapshot);
 }
 
 async function executeSync(parsed: { tools?: TelemetryToolId[] }): Promise<unknown> {
   const creds = await loadCredentials();
   if (!creds || !credentialsHaveAnyToken(creds)) {
+    mcpLog.warn("credential_validation_failed", { source: "db90_sync_now", reason: "missing_credentials" }, false);
     return { ok: false, error: "missing_credentials" };
   }
   migrateAllLegacyState(creds);
@@ -250,7 +197,10 @@ export async function startServer(): Promise<void> {
   const runBackground = async (source: string) => {
     if (shuttingDown) return;
     const creds = await loadCredentials();
-    if (!creds || !credentialsHaveAnyToken(creds)) return;
+    if (!creds || !credentialsHaveAnyToken(creds)) {
+      mcpLog.warn("credential_validation_failed", { source, reason: "missing_credentials" }, false);
+      return;
+    }
     try {
       migrateAllLegacyState(creds);
       await syncTelemetryTools({
@@ -261,7 +211,11 @@ export async function startServer(): Promise<void> {
         pricing: defaultPricing(),
       });
     } catch (err) {
-      console.error(`[db90-mcp] sync (${source}) failed:`, err instanceof Error ? err.message : err);
+      mcpLog.error(
+        "background_sync_failed",
+        { source, error: err instanceof Error ? err.message : String(err) },
+        true
+      );
     }
   };
 

@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -73,6 +73,7 @@ describe("MCP server (in-process)", () => {
       sessions_synced: 0,
       skipped: 0,
     });
+    expect(parsed && typeof parsed === "object" && parsed !== null && "log_path" in parsed).toBe(true);
     expect(
       parsed && typeof parsed === "object" && "errors" in parsed && Array.isArray((parsed as { errors: unknown }).errors)
     ).toBe(true);
@@ -190,6 +191,8 @@ describe("MCP server (in-process)", () => {
     const parsed = JSON.parse(first.text) as { ok: boolean; result?: { locked?: boolean } };
     expect(parsed.ok).toBe(false);
     expect(parsed.result?.locked).toBe(true);
+    const { stateKey } = await import("../state.js");
+    expect(existsSync(join(home, `${stateKey("http://localhost:3000", "db90_test")}.json`))).toBe(false);
 
     heldLock.release();
     await client.close();
@@ -212,5 +215,11 @@ describe("MCP server (in-process)", () => {
       },
     });
     expect(parsed).toHaveProperty("result.errors");
+  });
+
+  it("db90_sync_now logs missing credentials to mcp.log", async () => {
+    const parsed = await callTool("db90_sync_now");
+    expect(parsed).toMatchObject({ ok: false, error: "missing_credentials" });
+    expect(readFileSync(join(home, "mcp.log"), "utf-8")).toContain("credential_validation_failed");
   });
 });

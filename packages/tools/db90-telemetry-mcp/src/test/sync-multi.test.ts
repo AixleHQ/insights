@@ -49,6 +49,7 @@ import {
   CURSOR_RECENT_COMMIT_WATERMARK_KEY,
   sessionStateKey,
   syncTelemetryTools,
+  resetBackoffStateForTests,
 } from "../sync.js";
 
 describe("syncTelemetryTools", () => {
@@ -57,6 +58,7 @@ describe("syncTelemetryTools", () => {
 
   beforeEach(() => {
     appDir = mkdtempSync(join(tmpdir(), "db90-mcp-sync-multi-"));
+    process.env.DB90_MCP_HOME = appDir;
     mkdirSync(appDir, { recursive: true });
     vi.clearAllMocks();
     mocks.findTranscriptFiles.mockReturnValue([]);
@@ -73,6 +75,8 @@ describe("syncTelemetryTools", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    delete process.env.DB90_MCP_HOME;
+    resetBackoffStateForTests();
   });
 
   it("does not advance the cursor events watermark when a cursor event fails", async () => {

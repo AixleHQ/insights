@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { describe, it, expect } from "vitest";
 import { parseArgs, runOnce, runInit } from "../cli.js";
 import { DEFAULT_PRICING } from "../pricing.js";
@@ -102,12 +105,19 @@ describe("runOnce", () => {
   };
 
   it("returns non-zero when credentials are missing", async () => {
-    const code = await runOnce({
-      loadCredentials: async () => null,
-      ...silentOutput,
-    });
+    const home = mkdtempSync(join(tmpdir(), "db90-cli-missing-creds-"));
+    process.env.DB90_MCP_HOME = home;
+    try {
+      const code = await runOnce({
+        loadCredentials: async () => null,
+        ...silentOutput,
+      });
 
-    expect(code).toBe(1);
+      expect(code).toBe(1);
+      expect(readFileSync(join(home, "mcp.log"), "utf-8")).toContain("credential_validation_failed");
+    } finally {
+      delete process.env.DB90_MCP_HOME;
+    }
   });
 
   it("returns non-zero when the sync is locked", async () => {
@@ -406,5 +416,24 @@ describe("runInit", () => {
       }
     );
     expect(code).toBe(1);
+  });
+});
+
+describe("health CLI formatting", () => {
+  it("includes log_path and app_dir from buildHealthSnapshot", async () => {
+    const home = mkdtempSync(join(tmpdir(), "db90-health-cli-"));
+    mkdirSync(home, { recursive: true });
+    process.env.DB90_MCP_HOME = home;
+    process.env.DB90_MCP_DISABLE_KEYTAR = "true";
+    try {
+      const { formatHealthForCli, buildHealthSnapshot } = await import("../health.js");
+      const text = formatHealthForCli(await buildHealthSnapshot());
+      expect(text).toContain("log_path:");
+      expect(text).toContain(join(home, "mcp.log"));
+      expect(text).toContain(`app_dir: ${home}`);
+    } finally {
+      delete process.env.DB90_MCP_HOME;
+      delete process.env.DB90_MCP_DISABLE_KEYTAR;
+    }
   });
 });

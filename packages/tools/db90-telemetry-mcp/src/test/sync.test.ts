@@ -1,10 +1,11 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_PRICING } from "../pricing.js";
 import { stateKey } from "../state.js";
-import { sessionStateKey, syncOnce } from "../sync.js";
+import { sessionStateKey, syncOnce, resetBackoffStateForTests } from "../sync.js";
+import { setIngestRetryWaitOverrideForTests } from "../client.js";
 
 describe("syncOnce", () => {
   let appDir: string;
@@ -13,8 +14,10 @@ describe("syncOnce", () => {
 
   beforeEach(() => {
     appDir = mkdtempSync(join(tmpdir(), "db90-mcp-sync-"));
+    process.env.DB90_MCP_HOME = appDir;
     transcriptsRoot = join(appDir, "claude-projects");
     mkdirSync(join(transcriptsRoot, "proj"), { recursive: true });
+    setIngestRetryWaitOverrideForTests(async () => {});
     const line = JSON.stringify({
       type: "assistant",
       sessionId: "sess-test-1",
@@ -37,6 +40,9 @@ describe("syncOnce", () => {
 
   afterEach(() => {
     fetchSpy.mockRestore();
+    delete process.env.DB90_MCP_HOME;
+    resetBackoffStateForTests();
+    setIngestRetryWaitOverrideForTests(undefined);
   });
 
   it("posts one ingest event then skips on second pass when transcript size unchanged", async () => {
@@ -136,5 +142,86 @@ describe("syncOnce", () => {
     expect(result.failed).toBe(1);
     expect(result.rateLimitedUntil).toEqual(expect.any(String));
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not persist operator state during dry-run sync", async () => {
+    const host = "http://localhost:3000";
+    const token = "db90_test_token";
+
+    const r = await syncOnce({
+      token,
+      host,
+      dryRun: true,
+      verbose: false,
+      projectId: null,
+      pricing: DEFAULT_PRICING,
+      appDir,
+      transcriptBaseDirs: [transcriptsRoot],
+    });
+
+    expect(r.sent).toBe(1);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(existsSync(join(appDir, `${stateKey(host, token)}.json`))).toBe(false);
+  });
+
+  it("persists mcp_operator recent_errors to disk when ingest exhausts transient retries", async () => {
+    fetchSpy.mockResolvedValue(
+      new Response("no", { status: 503, statusText: "Service Unavailable" })
+    );
+
+    const host = "http://localhost:3000";
+    const token = "db90_test_token";
+
+    const r = await syncOnce({
+      token,
+      host,
+      dryRun: false,
+      verbose: false,
+      projectId: null,
+      pricing: DEFAULT_PRICING,
+      appDir,
+      transcriptBaseDirs: [transcriptsRoot],
+    });
+
+    expect(r.failed).toBeGreaterThanOrEqual(1);
+    expect(fetchSpy.mock.calls.length).toBeGreaterThanOrEqual(4);
+
+    const fname = `${stateKey(host, token)}.json`;
+    const raw = JSON.parse(readFileSync(join(appDir, fname), "utf-8")) as {
+      mcp_operator?: { recent_errors?: string[]; last_result?: { failed: number } };
+    };
+    expect(raw.mcp_operator?.recent_errors?.length).toBeGreaterThan(0);
+    expect(raw.mcp_operator?.last_result?.failed).toBeGreaterThanOrEqual(1);
+  });
+
+  it("counts retry-then-success as sent with no failed increment", async () => {
+    let n = 0;
+    fetchSpy.mockImplementation(() => {
+      n++;
+      if (n === 1) {
+        return Promise.resolve(new Response("x", { status: 503, statusText: "Service Unavailable" }));
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+    });
+
+    const r = await syncOnce({
+      token: "db90_test_token",
+      host: "http://localhost:3000",
+      dryRun: false,
+      verbose: false,
+      projectId: null,
+      pricing: DEFAULT_PRICING,
+      appDir,
+      transcriptBaseDirs: [transcriptsRoot],
+    });
+
+    expect(r.failed).toBe(0);
+    expect(r.sent).toBe(1);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 });

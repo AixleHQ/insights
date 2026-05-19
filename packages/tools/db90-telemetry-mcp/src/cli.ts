@@ -8,7 +8,9 @@ import { defaultKeycloakIssuer } from "./auth/keycloak.js";
 import { migrateLegacyState, getAppDir } from "./state.js";
 import { syncTelemetryTools } from "./sync.js";
 import { DEFAULT_PRICING, mergePricing } from "./pricing.js";
+import { buildHealthSnapshot, formatHealthForCli } from "./health.js";
 import { installClaudeUserMcp, type InstallClaudeUserMcpOptions, type InstallResult } from "./install/claude.js";
+import { mcpLog } from "./log.js";
 
 export interface Args {
   command: "init" | "health" | "run" | "help";
@@ -184,7 +186,7 @@ Usage:
 Commands:
   run         Start the MCP stdio server (default — used by Claude Code).
   init        Keycloak device login once, then persist DB90 ingest credentials (keychain or file).
-  health      Minimal process diagnostic.
+  health      Multi-line diagnostic (credentials, sync, log path, state files).
 
 Options:
   --once      With 'run': perform a multi-tool sync then exit (no MCP server).
@@ -210,10 +212,9 @@ function defaultDb90Host(): string {
   return "http://localhost:3000";
 }
 
-function runHealth(): void {
-  console.log(
-    "db90-mcp: ok (stdio MCP + multi-tool ingest sync when Claude + Cursor credentials are configured)"
-  );
+async function runHealth(): Promise<void> {
+  const snap = await buildHealthSnapshot();
+  console.log(formatHealthForCli(snap));
 }
 
 async function runMcpServer(): Promise<void> {
@@ -314,6 +315,7 @@ export async function runOnce(deps?: Partial<RunOnceDeps>): Promise<number> {
 
   const creds = await runtime.loadCredentials();
   if (!creds || !credentialsHaveAnyToken(creds)) {
+    mcpLog.warn("credential_validation_failed", { source: "cli_once", reason: "missing_credentials" }, false);
     runtime.error(
       "Error: no DB90 credentials. Run `db90-mcp init` first (dual-tool auth is the default)."
     );
@@ -355,9 +357,10 @@ async function main(): Promise<void> {
   }
 
   switch (args.command) {
-    case "health":
-      runHealth();
+    case "health": {
+      await runHealth();
       return;
+    }
     case "init": {
       const code = await runInit(args);
       if (code !== 0) process.exit(code);
