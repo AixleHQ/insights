@@ -358,7 +358,7 @@ export function Members() {
                 <MemberTableRow
                   key={member.id}
                   member={member}
-                  currentUserId={profile?.id}
+                  currentUserEmail={profile?.email}
                   currentUserRole={currentMembership?.role}
                   onRoleChange={handleRoleChange}
                   onRemove={handleRemove}
@@ -400,7 +400,7 @@ export function Members() {
 
 interface MemberTableRowProps {
   member: MemberData;
-  currentUserId?: string;
+  currentUserEmail?: string;
   currentUserRole?: MemberRole;
   onRoleChange: (id: string, role: MemberRole) => void;
   onRemove: (id: string) => void;
@@ -410,7 +410,7 @@ interface MemberTableRowProps {
 
 function MemberTableRow({
   member,
-  currentUserId,
+  currentUserEmail,
   currentUserRole,
   onRoleChange,
   onRemove,
@@ -419,7 +419,8 @@ function MemberTableRow({
 }: MemberTableRowProps) {
   const [removeOpen, setRemoveOpen] = useState(false);
   const isOwner = currentUserRole === "owner";
-  const canManage = isOwner && member.role !== "owner" && member.id !== currentUserId;
+  const isSelf = !!currentUserEmail && member.email === currentUserEmail;
+  const canManage = isOwner && member.role !== "owner" && !isSelf;
 
   return (
     <>

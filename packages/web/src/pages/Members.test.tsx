@@ -32,7 +32,7 @@ vi.mock("@/contexts/OrgContext", () => ({
 
 vi.mock("@/contexts/AuthContext", () => ({
   useAuth: () => ({
-    profile: { id: "user-owner", email: "owner@example.com", name: "Owner User" },
+    profile: { sub: "user-owner", email: "owner@example.com", name: "Owner User" },
   }),
 }));
 
