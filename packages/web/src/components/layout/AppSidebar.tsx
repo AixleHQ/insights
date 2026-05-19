@@ -14,17 +14,24 @@ import {
   Crown,
   Eye,
   User,
+  Users,
+  BookOpen,
+  MessageSquare,
+  Star,
+  type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrg, type MemberRole } from "@/contexts/OrgContext";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useCreateOrganization, useCurrentUser } from "@/hooks/useApi";
+import { useFavorites } from "@/hooks/useFavorites";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -53,16 +60,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-const navItems = [
-  { title: "Profile", icon: User, href: "/profile" },
-  { title: "Dashboard", icon: LayoutDashboard, href: "/" },
-  { title: "Events", icon: Activity, href: "/events" },
-  { title: "Projects", icon: FolderKanban, href: "/projects" },
-  { title: "Integrations", icon: Plug, href: "/integrations" },
-  { title: "Settings", icon: Settings, href: "/settings" },
+type NavItem = {
+  title: string;
+  icon: LucideIcon;
+  href: string;
+  roles: MemberRole[];
+};
+
+const navItems: NavItem[] = [
+  { title: "Dashboard",    icon: LayoutDashboard, href: "/",                 roles: ["owner", "member", "viewer"] },
+  { title: "Events",       icon: Activity,        href: "/events",           roles: ["owner", "member", "viewer"] },
+  { title: "Projects",     icon: FolderKanban,    href: "/projects",         roles: ["owner", "member", "viewer"] },
+  { title: "Members",      icon: Users,           href: "/settings/members", roles: ["owner"] },
+  { title: "Integrations", icon: Plug,            href: "/integrations",     roles: ["owner"] },
+  { title: "Settings",     icon: Settings,        href: "/settings",         roles: ["owner"] },
+  { title: "Library",      icon: BookOpen,        href: "/library",          roles: ["owner", "member", "viewer"] },
+  { title: "Feedback",     icon: MessageSquare,   href: "/feedback",         roles: ["owner", "member", "viewer"] },
 ];
 
-const roleIcons: Record<MemberRole, typeof Crown> = {
+const roleIcons: Record<MemberRole, LucideIcon> = {
   owner: Crown,
   member: User,
   viewer: Eye,
@@ -319,6 +335,7 @@ function OrgSwitcher() {
 function UserMenu() {
   const { profile, logout } = useAuth();
   const { data: currentUser } = useCurrentUser();
+  const { currentRole } = useOrg();
   const { state } = useSidebar();
   const { isImpersonating } = useImpersonation();
 
@@ -380,12 +397,14 @@ function UserMenu() {
             My Profile
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link to="/settings">
-            <Settings className="mr-2 size-4" />
-            Settings
-          </Link>
-        </DropdownMenuItem>
+        {currentRole === "owner" && (
+          <DropdownMenuItem asChild>
+            <Link to="/settings">
+              <Settings className="mr-2 size-4" />
+              Settings
+            </Link>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={logout} className="text-destructive">
           <LogOut className="mr-2 size-4" />
@@ -399,25 +418,16 @@ function UserMenu() {
 export function AppSidebar() {
   const location = useLocation();
   const { currentRole } = useOrg();
+  const { favorites } = useFavorites();
 
-  // Filter nav items based on role - hide Dashboard for members/viewers
-  const visibleNavItems = navItems.filter((item) => {
-    // Dashboard (href: '/') is only visible to owners
-    if (item.href === "/") {
-      return currentRole === "owner";
-    }
-    return true;
-  });
+  const visibleNavItems = navItems.filter(
+    (item) => currentRole && item.roles.includes(currentRole),
+  );
 
   const isActive = (href: string) => {
-    if (href === "/") {
-      return location.pathname === "/";
-    }
-    return location.pathname.startsWith(href);
+    if (href === "/") return location.pathname === "/";
+    return location.pathname === href || location.pathname.startsWith(href + "/");
   };
-
-  // Determine home link based on role
-  const homeLink = currentRole === "owner" ? "/" : "/profile";
 
   return (
     <Sidebar collapsible="icon" variant="sidebar">
@@ -425,7 +435,7 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link to={homeLink} className="flex items-center gap-2">
+              <Link to="/" className="flex items-center gap-2">
                 <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70">
                   <span className="font-mono-display text-sm font-bold text-primary-foreground">
                     90
@@ -479,6 +489,32 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
+        {favorites.length > 0 && (
+          <>
+            <SidebarGroup>
+              <SidebarGroupLabel>Favorites</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {favorites.map((p) => (
+                    <SidebarMenuItem key={p.id}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive(`/projects/${p.id}`)}
+                        tooltip={p.name}
+                      >
+                        <Link to={`/projects/${p.id}`}>
+                          <Star className="size-4" />
+                          <span>{p.name}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+            <SidebarSeparator />
+          </>
+        )}
         <SidebarMenu>
           <SidebarMenuItem>
             <UserMenu />

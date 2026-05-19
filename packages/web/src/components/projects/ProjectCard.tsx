@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { MoreHorizontal, GitBranch, Activity, DollarSign, Calendar } from "lucide-react";
+import { MoreHorizontal, GitBranch, Activity, DollarSign, Calendar, Star } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +32,8 @@ interface ProjectCardProps {
   project: ProjectData;
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
+  isFavorited?: boolean;
+  onToggleFavorite?: (project: { id: string; name: string }) => void;
   className?: string;
 }
 
@@ -51,7 +53,7 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
-export function ProjectCard({ project, onEdit, onDelete, className }: ProjectCardProps) {
+export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFavorite, className }: ProjectCardProps) {
   return (
     <Card className={cn("group relative transition-shadow hover:shadow-md", className)}>
       <CardHeader className="pb-3">
@@ -72,6 +74,19 @@ export function ProjectCard({ project, onEdit, onDelete, className }: ProjectCar
             )}
           </div>
           <div className="flex items-center gap-2">
+            {onToggleFavorite && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8 opacity-0 transition-opacity group-hover:opacity-100"
+                aria-label="Toggle favorite"
+                onClick={() => onToggleFavorite({ id: project.id, name: project.name })}
+              >
+                <Star
+                  className={cn("size-4", isFavorited && "fill-current text-amber-500")}
+                />
+              </Button>
+            )}
             <Badge variant={project.is_active ? "default" : "secondary"} className="text-xs">
               {project.is_active ? "Active" : "Inactive"}
             </Badge>

@@ -37,6 +37,7 @@ import {
   AdminOrganizations,
   WebhookDeliveriesPage,
 } from "./pages/admin";
+import { ComingSoon } from "./components/ui/ComingSoon";
 
 function TeamIdRedirect() {
   const { id } = useParams<{ id: string }>();
@@ -124,6 +125,8 @@ function App() {
                   <Route path="/settings/members/:id" element={<MemberProfile />} />
                   <Route path="/events/unattributed" element={<UnattributedEvents />} />
                   <Route path="/notifications" element={<Notifications />} />
+                  <Route path="/library" element={<ComingSoon title="Library" />} />
+                  <Route path="/feedback" element={<ComingSoon title="Feedback" />} />
 
                   {/* Admin routes */}
                   <Route path="/admin" element={<AdminLayout />}>
