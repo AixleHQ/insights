@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Plus, Grid, List, Search } from "lucide-react";
 import { useOrg } from "@/contexts/OrgContext";
 import { useProjects, useDeleteProject } from "@/hooks/useApi";
+import { useFavorites } from "@/hooks/useFavorites";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -35,6 +36,9 @@ export function Projects() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const { toggleFavorite, favorites } = useFavorites();
+  const favoritedIds = useMemo(() => new Set(favorites.map((f) => f.id)), [favorites]);
+  const isFavorite = (id: string) => favoritedIds.has(id);
 
   const { data: projectsData, isLoading } = useProjects(currentOrg?.id || "");
   const deleteProject = useDeleteProject();
@@ -172,6 +176,8 @@ export function Projects() {
               project={project}
               onEdit={handleEdit}
               onDelete={handleDelete}
+              isFavorited={isFavorite(project.id)}
+              onToggleFavorite={toggleFavorite}
             />
           ))}
         </div>
