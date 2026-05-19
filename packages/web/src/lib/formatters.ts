@@ -11,6 +11,10 @@ export function formatCost(n: number | string | null | undefined): string {
   }).format(num);
 }
 
+export function formatCount(n: number): string {
+  return new Intl.NumberFormat("en-US").format(n);
+}
+
 export function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;

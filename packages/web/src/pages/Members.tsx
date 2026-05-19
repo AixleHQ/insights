@@ -22,7 +22,7 @@ import {
   useRevokeInvitation,
 } from "@/hooks/useApi";
 import type { Invitation } from "@/lib/types";
-import { formatCost } from "@/lib/formatters";
+import { formatCost, formatCount } from "@/lib/formatters";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SortButton, type SortDirection } from "@/components/ui/sort-button";
@@ -216,12 +216,10 @@ export function Members() {
 
   const handleRemove = async (id: string) => {
     if (!currentOrg) return;
-    if (window.confirm("Are you sure you want to remove this member?")) {
-      try {
-        await removeMember.mutateAsync({ orgId: currentOrg.id, memberId: id });
-      } catch (error) {
-        console.error("Failed to remove member:", error);
-      }
+    try {
+      await removeMember.mutateAsync({ orgId: currentOrg.id, memberId: id });
+    } catch (error) {
+      console.error("Failed to remove member:", error);
     }
   };
 
@@ -364,6 +362,7 @@ export function Members() {
                   currentUserRole={currentMembership?.role}
                   onRoleChange={handleRoleChange}
                   onRemove={handleRemove}
+                  isRemoving={removeMember.isPending}
                   onRowClick={() => navigate(`/members/${member.id}`)}
                 />
               ))
@@ -405,84 +404,112 @@ interface MemberTableRowProps {
   currentUserRole?: MemberRole;
   onRoleChange: (id: string, role: MemberRole) => void;
   onRemove: (id: string) => void;
+  isRemoving: boolean;
   onRowClick: () => void;
 }
 
 function MemberTableRow({
   member,
+  currentUserId,
   currentUserRole,
   onRoleChange,
   onRemove,
+  isRemoving,
   onRowClick,
 }: MemberTableRowProps) {
+  const [removeOpen, setRemoveOpen] = useState(false);
   const isOwner = currentUserRole === "owner";
-  const canManage = isOwner && member.role !== "owner";
+  const canManage = isOwner && member.role !== "owner" && member.id !== currentUserId;
 
   return (
-    <TableRow
-      className="cursor-pointer hover:bg-muted/50"
-      onClick={onRowClick}
-    >
-      <TableCell className="p-4">
-        <div className="flex items-center gap-3">
-          <Avatar className="size-8 shrink-0">
-            {member.avatar_url && <AvatarImage src={member.avatar_url} alt={member.name || member.email} />}
-            <AvatarFallback className="text-xs bg-muted">
-              {getInitials(member.name, member.email)}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium">{member.name || member.email.split("@")[0]}</p>
-            <p className="truncate text-xs text-muted-foreground">{member.email}</p>
+    <>
+      <TableRow
+        className="cursor-pointer hover:bg-muted/50"
+        onClick={onRowClick}
+      >
+        <TableCell className="p-4">
+          <div className="flex items-center gap-3">
+            <Avatar className="size-8 shrink-0">
+              {member.avatar_url && <AvatarImage src={member.avatar_url} alt={member.name || member.email} />}
+              <AvatarFallback className="text-xs bg-muted">
+                {getInitials(member.name, member.email)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">{member.name || member.email.split("@")[0]}</p>
+              <p className="truncate text-xs text-muted-foreground">{member.email}</p>
+            </div>
           </div>
-        </div>
-      </TableCell>
-      <TableCell className="p-4">
-        <Badge variant="outline" className="capitalize text-xs">
-          {member.role}
-        </Badge>
-      </TableCell>
-      <TableCell className="hidden md:table-cell p-4 text-sm text-muted-foreground">
-        {formatLastActive(member.last_active_at)}
-      </TableCell>
-      <TableCell className="hidden sm:table-cell p-4 text-sm">
-        {(member.total_events ?? 0).toLocaleString()}
-      </TableCell>
-      <TableCell className="hidden sm:table-cell p-4 text-sm">
-        {formatCost(member.total_cost ?? 0)}
-      </TableCell>
-      <TableCell className="p-4" onClick={(e) => e.stopPropagation()}>
-        {canManage && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="size-8">
-                <ChevronDown className="size-4" />
-                <span className="sr-only">Actions</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {member.role === "member" && (
-                <DropdownMenuItem onClick={() => onRoleChange(member.id, "viewer")}>
-                  Change to Viewer
+        </TableCell>
+        <TableCell className="p-4">
+          <Badge variant="outline" className="capitalize text-xs">
+            {member.role}
+          </Badge>
+        </TableCell>
+        <TableCell className="hidden md:table-cell p-4 text-sm text-muted-foreground">
+          {formatLastActive(member.last_active_at)}
+        </TableCell>
+        <TableCell className="hidden sm:table-cell p-4 text-sm">
+          {formatCount(member.total_events ?? 0)}
+        </TableCell>
+        <TableCell className="hidden sm:table-cell p-4 text-sm">
+          {formatCost(member.total_cost ?? 0)}
+        </TableCell>
+        <TableCell className="p-4" onClick={(e) => e.stopPropagation()}>
+          {canManage && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="size-8">
+                  <ChevronDown className="size-4" />
+                  <span className="sr-only">Actions</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {member.role === "member" && (
+                  <DropdownMenuItem onClick={() => onRoleChange(member.id, "viewer")}>
+                    Change to Viewer
+                  </DropdownMenuItem>
+                )}
+                {member.role === "viewer" && (
+                  <DropdownMenuItem onClick={() => onRoleChange(member.id, "member")}>
+                    Change to Member
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive"
+                  onClick={() => setRemoveOpen(true)}
+                >
+                  Remove
                 </DropdownMenuItem>
-              )}
-              {member.role === "viewer" && (
-                <DropdownMenuItem onClick={() => onRoleChange(member.id, "member")}>
-                  Change to Member
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive"
-                onClick={() => onRemove(member.id)}
-              >
-                Remove
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-      </TableCell>
-    </TableRow>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </TableCell>
+      </TableRow>
+
+      <AlertDialog open={removeOpen} onOpenChange={setRemoveOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove {member.name || member.email}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove them from the organization. They will lose access to all
+              projects, events, and data. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => onRemove(member.id)}
+              disabled={isRemoving}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
