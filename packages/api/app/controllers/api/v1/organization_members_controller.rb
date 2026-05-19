@@ -4,7 +4,7 @@ module Api
   module V1
     class OrganizationMembersController < BaseController
       before_action :require_organization!
-      before_action :set_membership, only: %i[show update destroy stats events]
+      before_action :set_membership, only: %i[show update destroy stats events dashboard_stats member_heatmap]
 
       # GET /api/v1/organizations/:organization_id/members
       def index
@@ -308,6 +308,78 @@ module Api
             total_pages: (total.to_f / per_page).ceil
           }
         )
+      end
+
+      # GET /api/v1/organizations/:organization_id/members/:id/dashboard_stats
+      def dashboard_stats
+        authorize! @membership
+
+        days = case params[:period]
+        when "7d"  then 7
+        when "90d" then 90
+        else 30
+        end
+
+        current_start = days.days.ago.beginning_of_day
+        prev_start = (days * 2).days.ago.beginning_of_day
+        prev_end = days.days.ago.end_of_day
+
+        base = current_organization.tool_events.where(user_id: @membership.user_id)
+
+        current = base.where(occurred_at: current_start..Time.current)
+        prior   = base.where(occurred_at: prev_start..prev_end)
+
+        curr_events = current.count
+        curr_cost   = current.sum(:cost_usd).to_f
+        curr_in     = current.sum(:tokens_in).to_i
+        curr_out    = current.sum(:tokens_out).to_i
+
+        prev_events = prior.count
+        prev_cost   = prior.sum(:cost_usd).to_f
+        prev_in     = prior.sum(:tokens_in).to_i
+        prev_out    = prior.sum(:tokens_out).to_i
+
+        prev_tokens = prev_in + prev_out
+        curr_tokens = curr_in + curr_out
+
+        events_change  = prev_events > 0 ? ((curr_events - prev_events).to_f / prev_events * 100).round(1) : 0
+        cost_change    = prev_cost   > 0 ? ((curr_cost   - prev_cost).to_f   / prev_cost   * 100).round(1) : 0
+        tokens_change  = prev_tokens > 0 ? ((curr_tokens - prev_tokens).to_f / prev_tokens * 100).round(1) : 0
+
+        tool_breakdown = current
+          .group(:tool_name)
+          .select(
+            "tool_name",
+            "COUNT(*) as event_count",
+            "COALESCE(SUM(cost_usd), 0) as cost_usd"
+          )
+          .order("event_count DESC")
+          .map { |t| { tool_name: t.tool_name, event_count: t.event_count.to_i, cost_usd: t.cost_usd.to_f } }
+
+        render json: {
+          total_events:          curr_events,
+          total_cost_usd:        curr_cost,
+          total_tokens_in:       curr_in,
+          total_tokens_out:      curr_out,
+          events_change_percent: events_change,
+          cost_change_percent:   cost_change,
+          tokens_change_percent: tokens_change,
+          tool_breakdown:        tool_breakdown
+        }
+      end
+
+      # GET /api/v1/organizations/:organization_id/members/:id/stats/heatmap
+      def member_heatmap
+        authorize! @membership
+
+        data = current_organization.tool_events
+          .where(user_id: @membership.user_id, occurred_at: 1.year.ago..Time.current)
+          .group("DATE(occurred_at)")
+          .select("DATE(occurred_at) as date, COUNT(*) as count")
+          .map { |r| { date: r.date.to_s, count: r.count.to_i } }
+          .sort_by { |r| r[:date] }
+
+        render json: data
       end
 
       private

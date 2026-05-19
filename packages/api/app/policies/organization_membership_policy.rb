@@ -16,6 +16,9 @@ class OrganizationMembershipPolicy < ApplicationPolicy
     org_member?(record.organization) || global_admin?
   end
 
+  alias_method :dashboard_stats?, :stats?
+  alias_method :member_heatmap?, :stats?
+
   # Members can view events of other members
   def events?
     org_member?(record.organization) || global_admin?

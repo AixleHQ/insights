@@ -69,6 +69,10 @@ export const queryKeys = {
     detail: (orgId: string, id: string) => ["organizations", orgId, "members", id] as const,
     events: (orgId: string, id: string) => ["organizations", orgId, "members", id, "events"] as const,
     stats: (orgId: string, id: string) => ["organizations", orgId, "members", id, "stats"] as const,
+    dashboardStats: (orgId: string, userId: string, period: string) =>
+      ["organizations", orgId, "members", userId, "dashboard_stats", period] as const,
+    heatmap: (orgId: string, userId: string) =>
+      ["organizations", orgId, "members", userId, "heatmap"] as const,
   },
   projects: {
     all: (orgId: string) => ["organizations", orgId, "projects"] as const,
@@ -581,6 +585,48 @@ export function useMemberStats(orgId: string, memberId: string) {
       return response;
     },
     enabled: !!orgId && !!memberId,
+  });
+}
+
+export interface MemberDashboardStats {
+  total_events: number;
+  total_cost_usd: number;
+  total_tokens_in: number;
+  total_tokens_out: number;
+  events_change_percent: number;
+  cost_change_percent: number;
+  tokens_change_percent: number;
+  tool_breakdown: { tool_name: string; event_count: number; cost_usd: number }[];
+}
+
+export interface MemberHeatmapEntry {
+  date: string;
+  count: number;
+}
+
+export function useMemberDashboardStats(orgId: string, userId: string, period = "30d") {
+  return useQuery({
+    queryKey: queryKeys.members.dashboardStats(orgId, userId, period),
+    queryFn: async () => {
+      const response = await api.get<MemberDashboardStats>(
+        `/organizations/${orgId}/members/${userId}/dashboard_stats?period=${period}`
+      );
+      return response;
+    },
+    enabled: !!orgId && !!userId,
+  });
+}
+
+export function useMemberHeatmap(orgId: string, userId: string) {
+  return useQuery({
+    queryKey: queryKeys.members.heatmap(orgId, userId),
+    queryFn: async () => {
+      const response = await api.get<MemberHeatmapEntry[]>(
+        `/organizations/${orgId}/members/${userId}/stats/heatmap`
+      );
+      return response;
+    },
+    enabled: !!orgId && !!userId,
   });
 }
 
