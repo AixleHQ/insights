@@ -38,7 +38,9 @@ export function Events() {
   const [urlParams] = useSearchParams();
   const [filters, setFilters] = useState<EventFiltersState>(() => ({
     tool: urlParams.get("tool_name") ?? undefined,
-    riskLevel: urlParams.get("risk_level") ?? undefined,
+    riskLevels: urlParams.get("risk_level")
+      ? [urlParams.get("risk_level")!]
+      : undefined,
   }));
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -55,7 +57,7 @@ export function Events() {
     page,
     per_page: 25,
     tool_name: filters.tool,
-    risk_level: filters.riskLevel,
+    risk_level: filters.riskLevels?.length === 1 ? filters.riskLevels[0] : undefined,
     event_type: filters.eventType,
     start_date: filters.dateFrom,
     end_date: filters.dateTo,
@@ -120,6 +122,13 @@ export function Events() {
       );
     }
 
+    // Client-side risk filter (API handles single value; client handles multi-select)
+    if (filters.riskLevels && filters.riskLevels.length > 0) {
+      result = result.filter((e) =>
+        filters.riskLevels!.includes(e.risk_level || "none")
+      );
+    }
+
     // Apply sorting
     result.sort((a, b) => {
       let comparison = 0;
@@ -141,7 +150,7 @@ export function Events() {
     });
 
     return result;
-  }, [events, filters.search, sortField, sortDirection]);
+  }, [events, filters.search, filters.riskLevels, sortField, sortDirection]);
 
   const handleExport = async () => {
     setExportQueued(false);
@@ -153,7 +162,7 @@ export function Events() {
     try {
       const result = await exportEvents({
         tool_name: filters.tool,
-        risk_level: filters.riskLevel,
+        risk_level: filters.riskLevels?.[0],
         event_type: filters.eventType,
         start_date: filters.dateFrom,
         end_date: filters.dateTo,
