@@ -14,6 +14,7 @@ import {
   type EventRow,
 } from "@/components/events";
 import { EVENTS_TOOL_FILTER_OPTIONS } from "@/lib/eventsToolFilters";
+import { showEventsUserColumn } from "@/lib/eventAccess";
 
 type SortField = "created_at" | "tool_name" | "risk_level" | "cost_usd";
 type SortDirection = "asc" | "desc";
@@ -27,7 +28,7 @@ const riskLevelOrder = {
 };
 
 export function Events() {
-  const { currentOrg, hasRole } = useOrg();
+  const { currentOrg, hasRole, currentRole } = useOrg();
   const { data: me, isLoading: isLoadingMe } = useCurrentUser();
   const showUnattributedNav =
     Boolean(currentOrg) &&
@@ -248,6 +249,7 @@ export function Events() {
         onSort={handleSort}
         onEventClick={handleEventClick}
         selectedEventId={selectedEventId}
+        showUserColumn={showEventsUserColumn(currentRole)}
       />
 
       <EventDrawer

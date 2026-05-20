@@ -35,36 +35,21 @@ interface EventsTableProps {
   onSort?: (field: SortField) => void;
   onEventClick?: (eventId: string) => void;
   selectedEventId?: string | null;
+  showUserColumn?: boolean;
   className?: string;
 }
 
-function EventRowSkeleton() {
+function EventRowSkeleton({ showUserColumn }: { showUserColumn: boolean }) {
   return (
     <TableRow>
-      <TableCell>
-        <Skeleton className="h-4 w-24" />
-      </TableCell>
-      <TableCell>
-        <Skeleton className="h-4 w-20" />
-      </TableCell>
-      <TableCell>
-        <Skeleton className="h-4 w-16" />
-      </TableCell>
-      <TableCell>
-        <Skeleton className="h-4 w-32" />
-      </TableCell>
-      <TableCell>
-        <Skeleton className="h-4 w-24" />
-      </TableCell>
-      <TableCell>
-        <Skeleton className="h-4 w-16" />
-      </TableCell>
-      <TableCell>
-        <Skeleton className="h-4 w-14" />
-      </TableCell>
-      <TableCell>
-        <Skeleton className="h-4 w-20" />
-      </TableCell>
+      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+      {showUserColumn && <TableCell><Skeleton className="h-4 w-32" /></TableCell>}
+      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+      <TableCell><Skeleton className="h-4 w-14" /></TableCell>
+      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
     </TableRow>
   );
 }
@@ -95,6 +80,7 @@ export function EventsTable({
   onSort,
   onEventClick,
   selectedEventId,
+  showUserColumn = false,
   className,
 }: EventsTableProps) {
   return (
@@ -123,7 +109,7 @@ export function EventsTable({
                 Risk
               </SortButton>
             </TableHead>
-            <TableHead className="hidden md:table-cell">User</TableHead>
+            {showUserColumn && <TableHead className="w-[150px]">User</TableHead>}
             <TableHead className="hidden lg:table-cell">Project</TableHead>
             <TableHead className="w-[80px] sm:w-[100px] text-right">
               <SortButton
@@ -150,10 +136,10 @@ export function EventsTable({
         </TableHeader>
         <TableBody>
           {isLoading ? (
-            Array.from({ length: 10 }).map((_, i) => <EventRowSkeleton key={i} />)
+            Array.from({ length: 10 }).map((_, i) => <EventRowSkeleton key={i} showUserColumn={showUserColumn} />)
           ) : events.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={8} className="h-24 text-center">
+              <TableCell colSpan={showUserColumn ? 8 : 7} className="h-24 text-center">
                 <p className="text-muted-foreground">No events found</p>
               </TableCell>
             </TableRow>
@@ -180,11 +166,13 @@ export function EventsTable({
                 <TableCell>
                   <RiskBadge level={event.risk_level || "none"} />
                 </TableCell>
-                <TableCell className="hidden md:table-cell">
-                  <span className="text-sm text-muted-foreground truncate max-w-[150px] block">
-                    {getEventActorLabel(event)}
-                  </span>
-                </TableCell>
+                {showUserColumn && (
+                  <TableCell>
+                    <span className="text-sm text-muted-foreground truncate max-w-[150px] block">
+                      {getEventActorLabel(event)}
+                    </span>
+                  </TableCell>
+                )}
                 <TableCell className="hidden lg:table-cell">
                   <span className="text-sm text-muted-foreground truncate max-w-[120px] block">
                     {event.project?.name || "-"}
