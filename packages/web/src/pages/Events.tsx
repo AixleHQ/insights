@@ -110,13 +110,12 @@ export function Events() {
   const filteredAndSortedEvents = useMemo(() => {
     let result = [...events];
 
-    // Apply client-side search filter
+    // Apply client-side search filter (tool name and project only)
     if (filters.search) {
       const search = filters.search.toLowerCase();
       result = result.filter(
         (e) =>
           (e.tool_name || "").toLowerCase().includes(search) ||
-          (e.user?.email || "").toLowerCase().includes(search) ||
           (e.project?.name || "").toLowerCase().includes(search)
       );
     }

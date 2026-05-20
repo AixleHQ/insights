@@ -189,7 +189,10 @@ export function EventsTable({
                   </span>
                 </TableCell>
                 <TableCell>
-                  <span className="text-xs sm:text-sm text-muted-foreground">
+                  <span
+                    className="text-xs sm:text-sm text-muted-foreground"
+                    title={event.created_at ? new Date(event.created_at).toLocaleString() : undefined}
+                  >
                     {formatDistanceToNow(event.created_at)}
                   </span>
                 </TableCell>
