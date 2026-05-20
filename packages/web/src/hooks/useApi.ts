@@ -1423,6 +1423,28 @@ export function useEventAuditTrail(orgId: string, id: string) {
   });
 }
 
+export interface EventsSummary {
+  totalEvents: number;
+  totalTokensIn: number;
+  totalTokensOut: number;
+  totalCostUsd: number;
+  byTool: Record<string, number>;
+  byEventType: Record<string, number>;
+  byUser: Record<string, number>;
+  timeRange: { start: string | null; end: string | null };
+}
+
+export function useEventsSummary(orgId: string) {
+  return useQuery({
+    queryKey: queryKeys.events.summary(orgId),
+    queryFn: async () => {
+      const response = await api.get<{ data: EventsSummary }>(`/organizations/${orgId}/events/summary`);
+      return response.data;
+    },
+    enabled: !!orgId,
+  });
+}
+
 export interface UnattributedEventsParams {
   toolName?: string;
   startDate?: string;

@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Download, Loader2, RefreshCw, UserX } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useOrg } from "@/contexts/OrgContext";
-import { useEvents, useExportEvents, useProjects, useCurrentUser, queryKeys } from "@/hooks/useApi";
+import { useEvents, useExportEvents, useProjects, useCurrentUser, useEventsSummary, queryKeys } from "@/hooks/useApi";
 import { useEventsPageUpdates } from "@/hooks/useWebSocket";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,7 +13,8 @@ import {
   type EventFiltersState,
   type EventRow,
 } from "@/components/events";
-import { EVENTS_TOOL_FILTER_OPTIONS } from "@/lib/eventsToolFilters";
+import type { EventsToolFilterOption } from "@/lib/eventsToolFilters";
+import { humanizeToolName } from "@/lib/utils";
 import { showEventsUserColumn } from "@/lib/eventAccess";
 
 type SortField = "created_at" | "tool_name" | "risk_level" | "cost_usd";
@@ -51,6 +52,15 @@ export function Events() {
   const [exportError, setExportError] = useState(false);
 
   const { data: orgProjects } = useProjects(currentOrg?.id || "");
+  const { data: eventsSummary } = useEventsSummary(currentOrg?.id || "");
+
+  const toolFilterOptions = useMemo<EventsToolFilterOption[]>(() => {
+    const byTool = eventsSummary?.byTool;
+    if (!byTool || Object.keys(byTool).length === 0) return [];
+    return Object.keys(byTool)
+      .sort()
+      .map((slug) => ({ value: slug, label: humanizeToolName(slug) }));
+  }, [eventsSummary]);
 
   // Build API params from filters (keep in sync with handleExport)
   const apiParams = useMemo(() => ({
@@ -245,7 +255,7 @@ export function Events() {
           setFilters(newFilters);
           setPage(1); // Reset to first page on filter change
         }}
-        tools={EVENTS_TOOL_FILTER_OPTIONS}
+        tools={toolFilterOptions}
         projects={orgProjects}
       />
 
