@@ -63,6 +63,39 @@ RSpec.describe 'Api::V1::Events', type: :request do
 
       expect_forbidden
     end
+
+    it 'returns only the requesting member\'s events' do
+      other_user = create(:user)
+      create(:organization_membership, user: other_user, organization: organization, role: 'member')
+      other_event = create(:tool_event, organization: organization, user: other_user, tool_name: 'cursor')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                        user: user,
+                        organization: organization
+
+      expect_success
+      ids = json_data.map { |e| e[:id] }
+      expect(ids).to include(tool_event.id)
+      expect(ids).not_to include(other_event.id)
+    end
+
+    context 'as an owner' do
+      before { membership.update!(role: 'owner') }
+
+      it 'returns all organization events' do
+        other_user = create(:user)
+        create(:organization_membership, user: other_user, organization: organization, role: 'member')
+        other_event = create(:tool_event, organization: organization, user: other_user, tool_name: 'cursor')
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                          user: user,
+                          organization: organization
+
+        expect_success
+        ids = json_data.map { |e| e[:id] }
+        expect(ids).to include(tool_event.id, other_event.id)
+      end
+    end
   end
 
   describe 'GET /api/v1/organizations/:organization_id/events/:id' do
@@ -86,7 +119,21 @@ RSpec.describe 'Api::V1::Events', type: :request do
       expect(json_data[:attribution]).to eq("user")
     end
 
-    it "returns attribution 'organization' for reconciled events" do
+    it "returns 404 when a member requests a reconciled org event they do not own" do
+      org_event = create(:tool_event,
+                         organization: organization,
+                         user: nil,
+                         metadata: { "reconciled" => true })
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/events/#{org_event.id}",
+                        user: user,
+                        organization: organization
+
+      expect_not_found
+    end
+
+    it "returns attribution 'organization' for reconciled events when requested by an owner" do
+      membership.update!(role: "owner")
       org_event = create(:tool_event,
                          organization: organization,
                          user: nil,
@@ -131,6 +178,18 @@ RSpec.describe 'Api::V1::Events', type: :request do
       expect(json_data[:project][:id]).to eq(project.id)
       expect(json_data[:project][:name]).to eq(project.name)
       expect(json_data[:project][:slug]).to eq(project.slug)
+    end
+
+    it 'returns 404 when a member requests another member\'s event' do
+      other_user = create(:user)
+      create(:organization_membership, user: other_user, organization: organization, role: 'member')
+      other_event = create(:tool_event, organization: organization, user: other_user, tool_name: 'cursor')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/events/#{other_event.id}",
+                        user: user,
+                        organization: organization
+
+      expect_not_found
     end
 
     it 'returns 404 for non-existent event' do

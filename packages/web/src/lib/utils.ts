@@ -59,7 +59,9 @@ const TOOL_NAME_MAP: Record<string, string> = {
   "claude-code": "Claude Code",
   "github_copilot": "GitHub Copilot",
   "github-copilot": "GitHub Copilot",
+  "github": "GitHub",
   "gitlab": "GitLab",
+  "bitbucket": "Bitbucket",
   "cursor": "Cursor",
   "aider": "Aider",
   "codeium": "Codeium",
@@ -77,8 +79,12 @@ const TOOL_NAME_MAP: Record<string, string> = {
   "chatgpt": "ChatGPT",
   "openai": "OpenAI",
   "openai_api": "OpenAI API",
+  "openrouter_api": "OpenRouter API",
+  "gemini_api": "Gemini API",
   "anthropic": "Anthropic",
   "anthropic_api": "Anthropic API",
+  "jira": "Jira",
+  "linear": "Linear",
 };
 
 /**

@@ -1,6 +1,7 @@
 import { Search, X, Calendar, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -21,7 +22,7 @@ export interface EventFiltersState {
   search?: string;
   /** Canonical API `tool_name` (e.g. `cursor`, `claude_code`). */
   tool?: string;
-  riskLevel?: string;
+  riskLevels?: string[];
   eventType?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -181,6 +182,10 @@ export function EventFilters({
     });
   };
 
+  const updateRiskLevels = (values: string[] | undefined) => {
+    onFiltersChange({ ...filters, riskLevels: values });
+  };
+
   const clearFilters = () => {
     onFiltersChange({});
   };
@@ -193,15 +198,7 @@ export function EventFilters({
       tools.find((t) => t.value === filters.tool)?.label ?? humanizeToolName(filters.tool);
     activeFilters.push({ key: "tool", label: "Tool", value: toolLabel });
   }
-  if (filters.riskLevel) {
-    const risk = riskLevels.find(r => r.value === filters.riskLevel);
-    activeFilters.push({
-      key: "riskLevel",
-      label: "Risk",
-      value: risk?.label || filters.riskLevel,
-      colorDot: risk?.color
-    });
-  }
+  // riskLevels chips are rendered separately below (per-level chips)
   if (filters.eventType) {
     const type = eventTypes.find(t => t.value === filters.eventType);
     activeFilters.push({ key: "eventType", label: "Type", value: type?.label || filters.eventType });
@@ -229,7 +226,7 @@ export function EventFilters({
     });
   }
 
-  const hasActiveFilters = activeFilters.length > 0 || filters.search;
+  const hasActiveFilters = activeFilters.length > 0 || !!filters.search || (filters.riskLevels?.length ?? 0) > 0;
 
   return (
     <div className={cn("space-y-3", className)}>
@@ -279,29 +276,58 @@ export function EventFilters({
             </SelectContent>
           </Select>
 
-          {/* Risk level filter */}
-          <Select
-            value={filters.riskLevel || "all"}
-            onValueChange={(value) => updateFilter("riskLevel", value)}
-          >
-            <SelectTrigger className={cn(
-              "h-9 sm:h-8 w-full sm:w-[130px] gap-1 border-dashed text-sm font-normal",
-              filters.riskLevel && "border-solid border-primary/50 bg-primary/5"
-            )}>
-              <SelectValue placeholder="Risk level" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All risks</SelectItem>
-              {riskLevels.map((level) => (
-                <SelectItem key={level.value} value={level.value}>
-                  <span className="flex items-center gap-2">
-                    <span className={cn("size-2 rounded-full", level.color)} />
+          {/* Risk level multi-select */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className={cn(
+                  "h-9 sm:h-8 w-full sm:w-[140px] justify-between gap-1 border-dashed text-sm font-normal",
+                  (filters.riskLevels?.length ?? 0) > 0 &&
+                    "border-solid border-primary/50 bg-primary/5"
+                )}
+              >
+                <span
+                  className={
+                    (filters.riskLevels?.length ?? 0) > 0
+                      ? "text-foreground"
+                      : "text-muted-foreground"
+                  }
+                >
+                  {(filters.riskLevels?.length ?? 0) > 0
+                    ? `Risk (${filters.riskLevels!.length})`
+                    : "Risk level"}
+                </span>
+                <ChevronDown className="size-3 text-muted-foreground" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-44 p-2" align="start">
+              <div className="space-y-0.5">
+                {riskLevels.map((level) => (
+                  <label
+                    key={level.value}
+                    htmlFor={`risk-${level.value}`}
+                    className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted"
+                  >
+                    <Checkbox
+                      id={`risk-${level.value}`}
+                      checked={(filters.riskLevels || []).includes(level.value)}
+                      onCheckedChange={(checked) => {
+                        const current = filters.riskLevels || [];
+                        const next = checked === true
+                          ? [...current, level.value]
+                          : current.filter((v) => v !== level.value);
+                        updateRiskLevels(next.length > 0 ? next : undefined);
+                      }}
+                    />
+                    <span className={cn("size-2 flex-shrink-0 rounded-full", level.color)} />
                     {level.label}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+                  </label>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
 
           {/* Event type filter */}
           <Select
@@ -376,7 +402,7 @@ export function EventFilters({
       </div>
 
       {/* Active filter chips */}
-      {activeFilters.length > 0 && (
+      {(activeFilters.length > 0 || (filters.riskLevels?.length ?? 0) > 0) && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted-foreground">Active filters:</span>
           {activeFilters.map((filter) => (
@@ -388,6 +414,21 @@ export function EventFilters({
               onRemove={() => updateFilter(filter.key, undefined)}
             />
           ))}
+          {filters.riskLevels?.map((level) => {
+            const risk = riskLevels.find((r) => r.value === level);
+            return (
+              <FilterChip
+                key={`risk-${level}`}
+                label="Risk"
+                value={risk?.label ?? level}
+                colorDot={risk?.color}
+                onRemove={() => {
+                  const next = (filters.riskLevels || []).filter((v) => v !== level);
+                  updateRiskLevels(next.length > 0 ? next : undefined);
+                }}
+              />
+            );
+          })}
         </div>
       )}
     </div>

@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Download, Loader2, RefreshCw, UserX } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useOrg } from "@/contexts/OrgContext";
-import { useEvents, useExportEvents, useProjects, useCurrentUser, queryKeys } from "@/hooks/useApi";
+import { useEvents, useExportEvents, useProjects, useCurrentUser, useEventsSummary, queryKeys } from "@/hooks/useApi";
 import { useEventsPageUpdates } from "@/hooks/useWebSocket";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,7 +13,9 @@ import {
   type EventFiltersState,
   type EventRow,
 } from "@/components/events";
-import { EVENTS_TOOL_FILTER_OPTIONS } from "@/lib/eventsToolFilters";
+import type { EventsToolFilterOption } from "@/lib/eventsToolFilters";
+import { humanizeToolName } from "@/lib/utils";
+import { showEventsUserColumn } from "@/lib/eventAccess";
 
 type SortField = "created_at" | "tool_name" | "risk_level" | "cost_usd";
 type SortDirection = "asc" | "desc";
@@ -27,7 +29,7 @@ const riskLevelOrder = {
 };
 
 export function Events() {
-  const { currentOrg, hasRole } = useOrg();
+  const { currentOrg, hasRole, currentRole } = useOrg();
   const { data: me, isLoading: isLoadingMe } = useCurrentUser();
   const showUnattributedNav =
     Boolean(currentOrg) &&
@@ -37,7 +39,9 @@ export function Events() {
   const [urlParams] = useSearchParams();
   const [filters, setFilters] = useState<EventFiltersState>(() => ({
     tool: urlParams.get("tool_name") ?? undefined,
-    riskLevel: urlParams.get("risk_level") ?? undefined,
+    riskLevels: urlParams.get("risk_level")
+      ? [urlParams.get("risk_level")!]
+      : undefined,
   }));
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -48,13 +52,22 @@ export function Events() {
   const [exportError, setExportError] = useState(false);
 
   const { data: orgProjects } = useProjects(currentOrg?.id || "");
+  const { data: eventsSummary } = useEventsSummary(currentOrg?.id || "");
+
+  const toolFilterOptions = useMemo<EventsToolFilterOption[]>(() => {
+    const byTool = eventsSummary?.byTool;
+    if (!byTool || Object.keys(byTool).length === 0) return [];
+    return Object.keys(byTool)
+      .sort()
+      .map((slug) => ({ value: slug, label: humanizeToolName(slug) }));
+  }, [eventsSummary]);
 
   // Build API params from filters (keep in sync with handleExport)
   const apiParams = useMemo(() => ({
     page,
     per_page: 25,
     tool_name: filters.tool,
-    risk_level: filters.riskLevel,
+    risk_level: filters.riskLevels?.length === 1 ? filters.riskLevels[0] : undefined,
     event_type: filters.eventType,
     start_date: filters.dateFrom,
     end_date: filters.dateTo,
@@ -109,14 +122,20 @@ export function Events() {
   const filteredAndSortedEvents = useMemo(() => {
     let result = [...events];
 
-    // Apply client-side search filter
+    // Apply client-side search filter (tool name and project only)
     if (filters.search) {
       const search = filters.search.toLowerCase();
       result = result.filter(
         (e) =>
           (e.tool_name || "").toLowerCase().includes(search) ||
-          (e.user?.email || "").toLowerCase().includes(search) ||
           (e.project?.name || "").toLowerCase().includes(search)
+      );
+    }
+
+    // Client-side risk filter (API handles single value; client handles multi-select)
+    if (filters.riskLevels && filters.riskLevels.length > 0) {
+      result = result.filter((e) =>
+        filters.riskLevels!.includes(e.risk_level || "none")
       );
     }
 
@@ -141,7 +160,7 @@ export function Events() {
     });
 
     return result;
-  }, [events, filters.search, sortField, sortDirection]);
+  }, [events, filters.search, filters.riskLevels, sortField, sortDirection]);
 
   const handleExport = async () => {
     setExportQueued(false);
@@ -153,7 +172,7 @@ export function Events() {
     try {
       const result = await exportEvents({
         tool_name: filters.tool,
-        risk_level: filters.riskLevel,
+        risk_level: filters.riskLevels?.[0],
         event_type: filters.eventType,
         start_date: filters.dateFrom,
         end_date: filters.dateTo,
@@ -236,7 +255,7 @@ export function Events() {
           setFilters(newFilters);
           setPage(1); // Reset to first page on filter change
         }}
-        tools={EVENTS_TOOL_FILTER_OPTIONS}
+        tools={toolFilterOptions}
         projects={orgProjects}
       />
 
@@ -248,6 +267,7 @@ export function Events() {
         onSort={handleSort}
         onEventClick={handleEventClick}
         selectedEventId={selectedEventId}
+        showUserColumn={showEventsUserColumn(currentRole) || (!isLoadingMe && Boolean(me?.globalAdmin ?? me?.super_admin))}
       />
 
       <EventDrawer

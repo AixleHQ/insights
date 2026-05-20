@@ -8,8 +8,10 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RiskBadge } from "@/components/dashboard/ActivityFeed";
+import { useOrg } from "@/contexts/OrgContext";
 import { cn, humanizeToolName } from "@/lib/utils";
 import { formatTokens } from "@/lib/formatters";
+import { canViewEventPrompt } from "@/lib/eventAccess";
 
 export interface EventDetailData {
   id: string;
@@ -83,6 +85,9 @@ function ContentPanel({ title, content }: { title: string; content?: string }) {
 }
 
 export function EventDetail({ event, isLoading, className }: EventDetailProps) {
+  const { currentRole } = useOrg();
+  const isOwner = canViewEventPrompt(currentRole);
+
   if (isLoading) {
     return (
       <div className={cn("space-y-6", className)}>
@@ -220,37 +225,43 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="sanitized">
-              <TabsList>
-                <TabsTrigger value="sanitized">Sanitized</TabsTrigger>
-                <TabsTrigger value="raw">Raw</TabsTrigger>
-                <TabsTrigger value="metadata">Metadata</TabsTrigger>
-              </TabsList>
-              <TabsContent value="sanitized" className="mt-4">
-                <ContentPanel
-                  title="Sanitized Content"
-                  content={event.sanitized_content}
-                />
-              </TabsContent>
-              <TabsContent value="raw" className="mt-4">
-                <ContentPanel title="Raw Content" content={event.raw_content} />
-              </TabsContent>
-              <TabsContent value="metadata" className="mt-4">
-                <ContentPanel
-                  title="Event Metadata"
-                  content={
-                    event.metadata
-                      ? JSON.stringify(event.metadata, null, 2)
-                      : undefined
-                  }
-                />
-              </TabsContent>
-            </Tabs>
+            {isOwner ? (
+              <Tabs defaultValue="sanitized">
+                <TabsList>
+                  <TabsTrigger value="sanitized">Sanitized</TabsTrigger>
+                  <TabsTrigger value="raw">Raw</TabsTrigger>
+                  <TabsTrigger value="metadata">Metadata</TabsTrigger>
+                </TabsList>
+                <TabsContent value="sanitized" className="mt-4">
+                  <ContentPanel
+                    title="Sanitized Content"
+                    content={event.sanitized_content}
+                  />
+                </TabsContent>
+                <TabsContent value="raw" className="mt-4">
+                  <ContentPanel title="Raw Content" content={event.raw_content} />
+                </TabsContent>
+                <TabsContent value="metadata" className="mt-4">
+                  <ContentPanel
+                    title="Event Metadata"
+                    content={
+                      event.metadata
+                        ? JSON.stringify(event.metadata, null, 2)
+                        : undefined
+                    }
+                  />
+                </TabsContent>
+              </Tabs>
+            ) : (
+              <p className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
+                Prompt content is visible to organization owners only.
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {event.findings && event.findings.length > 0 && (
+      {isOwner && event.findings && event.findings.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Security Findings</CardTitle>

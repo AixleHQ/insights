@@ -29,6 +29,7 @@ import { useOrg } from "@/contexts/OrgContext";
 import { useEvent } from "@/hooks/useApi";
 import { cn, humanizeToolName } from "@/lib/utils";
 import { formatTokens } from "@/lib/formatters";
+import { canViewEventPrompt } from "@/lib/eventAccess";
 
 interface EventDrawerProps {
   eventId: string | null;
@@ -105,7 +106,8 @@ export function EventDrawer({
   hasPrev = false,
   hasNext = false,
 }: EventDrawerProps) {
-  const { currentOrg } = useOrg();
+  const { currentOrg, currentRole } = useOrg();
+  const isOwner = canViewEventPrompt(currentRole);
   const { data: event, isLoading } = useEvent(currentOrg?.id || "", eventId || "");
 
   const formattedDate = event?.createdAt
@@ -265,44 +267,43 @@ export function EventDrawer({
 
                 <Separator />
 
-                {/* Content tabs */}
+                {/* Content tabs — owner only */}
                 <div className="space-y-4">
                   <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
                     Content
                   </h3>
-                  <Tabs defaultValue="sanitized">
-                    <TabsList className="w-full justify-start">
-                      <TabsTrigger value="sanitized">Sanitized</TabsTrigger>
-                      <TabsTrigger value="raw">Raw</TabsTrigger>
-                      <TabsTrigger value="metadata">Metadata</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="sanitized" className="mt-4">
-                      <ContentPanel
-                        title="Sanitized Content"
-                        content={event.sanitizedContent || undefined}
-                      />
-                    </TabsContent>
-                    <TabsContent value="raw" className="mt-4">
-                      <ContentPanel
-                        title="Raw Content"
-                        content={event.sanitizedContent || undefined}
-                      />
-                    </TabsContent>
-                    <TabsContent value="metadata" className="mt-4">
-                      <ContentPanel
-                        title="Event Metadata"
-                        content={
-                          event.metadata
-                            ? JSON.stringify(event.metadata, null, 2)
-                            : undefined
-                        }
-                      />
-                    </TabsContent>
-                  </Tabs>
+                  {isOwner ? (
+                    <Tabs defaultValue="sanitized">
+                      <TabsList className="w-full justify-start">
+                        <TabsTrigger value="sanitized">Sanitized</TabsTrigger>
+                        <TabsTrigger value="metadata">Metadata</TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="sanitized" className="mt-4">
+                        <ContentPanel
+                          title="Sanitized Content"
+                          content={event.sanitizedContent || undefined}
+                        />
+                      </TabsContent>
+                      <TabsContent value="metadata" className="mt-4">
+                        <ContentPanel
+                          title="Event Metadata"
+                          content={
+                            event.metadata
+                              ? JSON.stringify(event.metadata, null, 2)
+                              : undefined
+                          }
+                        />
+                      </TabsContent>
+                    </Tabs>
+                  ) : (
+                    <p className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
+                      Prompt content is visible to organization owners only.
+                    </p>
+                  )}
                 </div>
 
-                {/* Security findings */}
-                {event.securityFindings && event.securityFindings.length > 0 && (
+                {/* Security findings — owner only */}
+                {isOwner && event.securityFindings && event.securityFindings.length > 0 && (
                   <>
                     <Separator />
                     <div className="space-y-4">
