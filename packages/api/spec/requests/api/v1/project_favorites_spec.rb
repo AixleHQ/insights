@@ -104,5 +104,24 @@ RSpec.describe "Api::V1::ProjectFavorites", type: :request do
       expect(json_data.first[:id]).to eq(project.id)
       expect(json_data.first[:name]).to eq(project.name)
     end
+
+    it "excludes favorites for projects the user no longer has access to" do
+      # Use a member-role user: only sees projects they have an explicit membership for
+      member = create(:user)
+      create(:organization_membership, user: member, organization: organization, role: "member")
+      create(:project_membership, user: member, project: project, role: "member")
+
+      revoked_project = create(:project, organization: organization, owner: nil)
+      # member favorited revoked_project while they still had access, then was removed
+      create(:user_project_favorite, user: member, project: revoked_project)
+      create(:user_project_favorite, user: member, project: project)
+
+      authenticated_get "/api/v1/users/me/favorites", user: member
+
+      expect_success
+      ids = json_data.map { |p| p[:id] }
+      expect(ids).to include(project.id)
+      expect(ids).not_to include(revoked_project.id)
+    end
   end
 end

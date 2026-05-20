@@ -56,9 +56,9 @@ module Api
 
       # GET /api/v1/users/me/favorites
       def favorites
-        projects = current_user.user_project_favorites
-                               .includes(:project)
-                               .map { |f| { id: f.project.id, name: f.project.name } }
+        projects = authorized_scope(current_user.favorited_projects)
+                                   .pluck(:id, :name)
+                                   .map { |id, name| { id:, name: } }
         render json: { data: projects }
       end
 

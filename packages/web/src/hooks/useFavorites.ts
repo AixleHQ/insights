@@ -8,7 +8,7 @@ export function useFavorites() {
 
   const toggleFavorite = (project: FavoriteProject) => {
     const favorited = favorites.some((f) => f.id === project.id);
-    toggleMutation.mutate({ id: project.id, favorited });
+    toggleMutation.mutate({ id: project.id, name: project.name, favorited });
   };
 
   const isFavorite = (id: string) => favorites.some((f) => f.id === id);

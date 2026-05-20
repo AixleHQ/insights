@@ -50,7 +50,7 @@ describe("useFavorites", () => {
       result.current.toggleFavorite({ id: "p3", name: "Project Three" });
     });
 
-    expect(mockMutate).toHaveBeenCalledWith({ id: "p3", favorited: false });
+    expect(mockMutate).toHaveBeenCalledWith({ id: "p3", name: "Project Three", favorited: false });
   });
 
   it("toggleFavorite calls mutate with favorited=true when project is already favorited", () => {
@@ -61,7 +61,7 @@ describe("useFavorites", () => {
       result.current.toggleFavorite({ id: "p4", name: "Project Four" });
     });
 
-    expect(mockMutate).toHaveBeenCalledWith({ id: "p4", favorited: true });
+    expect(mockMutate).toHaveBeenCalledWith({ id: "p4", name: "Project Four", favorited: true });
   });
 
   it("returns empty list when query data is undefined", () => {

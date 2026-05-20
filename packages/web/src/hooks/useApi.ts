@@ -719,6 +719,7 @@ export function useFavoriteProjects() {
       const response = await api.get<{ data: FavoriteProject[] }>("/users/me/favorites");
       return response.data;
     },
+    staleTime: 5 * 60_000,
   });
 }
 
@@ -726,15 +727,15 @@ export function useToggleFavorite() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, favorited }: { id: string; favorited: boolean }) =>
+    mutationFn: ({ id, favorited }: { id: string; name: string; favorited: boolean }) =>
       favorited
         ? api.delete(`/projects/${id}/favorite`)
         : api.post(`/projects/${id}/favorite`),
-    onMutate: async ({ id, favorited }) => {
+    onMutate: async ({ id, name, favorited }) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.favorites.all() });
       const previous = queryClient.getQueryData<FavoriteProject[]>(queryKeys.favorites.all());
       queryClient.setQueryData<FavoriteProject[]>(queryKeys.favorites.all(), (old = []) =>
-        favorited ? old.filter((f) => f.id !== id) : [...old, { id, name: "" }],
+        favorited ? old.filter((f) => f.id !== id) : [...old, { id, name }],
       );
       return { previous };
     },
