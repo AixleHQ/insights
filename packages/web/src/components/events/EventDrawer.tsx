@@ -276,18 +276,11 @@ export function EventDrawer({
                     <Tabs defaultValue="sanitized">
                       <TabsList className="w-full justify-start">
                         <TabsTrigger value="sanitized">Sanitized</TabsTrigger>
-                        <TabsTrigger value="raw">Raw</TabsTrigger>
                         <TabsTrigger value="metadata">Metadata</TabsTrigger>
                       </TabsList>
                       <TabsContent value="sanitized" className="mt-4">
                         <ContentPanel
                           title="Sanitized Content"
-                          content={event.sanitizedContent || undefined}
-                        />
-                      </TabsContent>
-                      <TabsContent value="raw" className="mt-4">
-                        <ContentPanel
-                          title="Raw Content"
                           content={event.sanitizedContent || undefined}
                         />
                       </TabsContent>

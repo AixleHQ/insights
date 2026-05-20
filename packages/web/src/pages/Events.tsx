@@ -257,7 +257,7 @@ export function Events() {
         onSort={handleSort}
         onEventClick={handleEventClick}
         selectedEventId={selectedEventId}
-        showUserColumn={showEventsUserColumn(currentRole)}
+        showUserColumn={showEventsUserColumn(currentRole) || (!isLoadingMe && Boolean(me?.globalAdmin ?? me?.super_admin))}
       />
 
       <EventDrawer
