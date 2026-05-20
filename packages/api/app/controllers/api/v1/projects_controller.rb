@@ -3,7 +3,7 @@
 module Api
   module V1
     class ProjectsController < BaseController
-      before_action :set_project, only: %i[show update destroy settings update_setting destroy_setting stats daily_by_tool commits_by_user retention_policy update_retention_policy link_jira link_linear sync_issues]
+      before_action :set_project, only: %i[show update destroy settings update_setting destroy_setting stats daily_by_tool commits_by_user retention_policy update_retention_policy link_jira link_linear sync_issues favorite unfavorite]
 
       # GET /api/v1/projects
       # GET /api/v1/organizations/:organization_id/projects
@@ -320,6 +320,20 @@ module Api
         render json: { error: "Connector not found" }, status: :not_found
       rescue StandardError => e
         render json: { error: e.message }, status: :unprocessable_content
+      end
+
+      # POST /api/v1/projects/:id/favorite
+      def favorite
+        authorize! @project, to: :show?
+        current_user.user_project_favorites.find_or_create_by!(project: @project)
+        render json: { data: { favorited: true } }
+      end
+
+      # DELETE /api/v1/projects/:id/favorite
+      def unfavorite
+        authorize! @project, to: :show?
+        current_user.user_project_favorites.where(project: @project).destroy_all
+        render json: { data: { favorited: false } }
       end
 
       # GET /api/v1/projects/:id/retention_policy

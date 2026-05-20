@@ -22,6 +22,7 @@ Rails.application.routes.draw do
       get "users/me", to: "users#me"
       patch "users/me", to: "users#update"
       get "users/me/organizations", to: "users#organizations"
+      get "users/me/favorites", to: "users#favorites"
       get "users/me/settings", to: "users#settings"
       put "users/me/settings/:key", to: "users#update_setting"
       delete "users/me/settings/:key", to: "users#destroy_setting"
@@ -191,6 +192,8 @@ Rails.application.routes.draw do
           post :link_jira
           post :link_linear
           post :sync_issues
+          post :favorite
+          delete :favorite, action: :unfavorite
         end
 
         resources :issues, only: [ :index, :show ]

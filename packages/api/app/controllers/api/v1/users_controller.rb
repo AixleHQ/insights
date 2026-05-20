@@ -54,6 +54,14 @@ module Api
         end
       end
 
+      # GET /api/v1/users/me/favorites
+      def favorites
+        projects = current_user.user_project_favorites
+                               .includes(:project)
+                               .map { |f| { id: f.project.id, name: f.project.name } }
+        render json: { data: projects }
+      end
+
       # GET /api/v1/users/me/organizations
       def organizations
         authorize! current_user, to: :organizations?
