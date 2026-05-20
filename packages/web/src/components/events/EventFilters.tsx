@@ -314,9 +314,8 @@ export function EventFilters({
                       id={`risk-${level.value}`}
                       checked={(filters.riskLevels || []).includes(level.value)}
                       onCheckedChange={(checked) => {
-                        if (checked === "indeterminate") return;
                         const current = filters.riskLevels || [];
-                        const next = checked
+                        const next = checked === true
                           ? [...current, level.value]
                           : current.filter((v) => v !== level.value);
                         updateRiskLevels(next.length > 0 ? next : undefined);
