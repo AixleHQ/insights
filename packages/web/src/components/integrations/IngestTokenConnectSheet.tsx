@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProviderLogo } from "@/components/icons";
 import type { ProviderInfo } from "./IntegrationCard";
 
@@ -87,20 +88,32 @@ function buildClaudeCodeSettingsSnippet(token: string): string {
 }`;
 }
 
+const MCP_TELEMETRY_INIT = "npx -y @db90/telemetry-mcp init";
+
 function ClaudeCodeSetupInstructions({ token }: { token: string }) {
+  const [copiedInit, setCopiedInit] = useState(false);
   const [copiedNpx, setCopiedNpx] = useState(false);
   const [copiedSettings, setCopiedSettings] = useState(false);
+  const initTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const npxTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const settingsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => {
+    if (initTimerRef.current) clearTimeout(initTimerRef.current);
     if (npxTimerRef.current) clearTimeout(npxTimerRef.current);
     if (settingsTimerRef.current) clearTimeout(settingsTimerRef.current);
   }, []);
 
   const host = ingestHostUrl();
+  const initCommand = `${MCP_TELEMETRY_INIT} --host ${host}`;
   const npxCommand = `npx @db90/claude --token ${token} --host ${host}`;
   const settingsSnippet = buildClaudeCodeSettingsSnippet(token);
+
+  const handleCopyInit = async () => {
+    await navigator.clipboard.writeText(initCommand);
+    setCopiedInit(true);
+    initTimerRef.current = setTimeout(() => setCopiedInit(false), 2000);
+  };
 
   const handleCopyNpx = async () => {
     await navigator.clipboard.writeText(npxCommand);
@@ -115,31 +128,71 @@ function ClaudeCodeSetupInstructions({ token }: { token: string }) {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <p className="text-sm font-medium">Run the db90 Claude reporter</p>
-        <div className="flex items-start gap-2">
-          <pre className="text-xs bg-muted rounded p-3 overflow-x-auto flex-1 whitespace-pre-wrap break-all">
-            {npxCommand}
-          </pre>
-          <Button variant="outline" size="sm" onClick={handleCopyNpx} aria-label={copiedNpx ? "Copied" : "Copy command"} className="shrink-0 mt-0.5">
-            {copiedNpx ? <Check className="size-3.5 mr-1" /> : <Copy className="size-3.5 mr-1" />}
-            {copiedNpx ? "Copied" : "Copy"}
-          </Button>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Reads Claude Code transcripts from <code className="bg-muted px-1 rounded">~/.config/claude/projects/</code> and <code className="bg-muted px-1 rounded">~/.claude/projects/</code>, then posts aggregated token usage. Add <code className="bg-muted px-1 rounded">--watch</code> to poll continuously.
-        </p>
-      </div>
+    <div className="space-y-3">
+      <Tabs defaultValue="mcp-recommended">
+        <TabsList className="w-full justify-start gap-2 flex-wrap h-auto rounded-md">
+          <TabsTrigger value="mcp-recommended" className="text-xs shrink-0">
+            MCP (recommended)
+          </TabsTrigger>
+          <TabsTrigger value="standalone-cli" className="text-xs shrink-0">
+            Standalone CLI
+          </TabsTrigger>
+          <TabsTrigger value="advanced-hooks" className="text-xs shrink-0">
+            Advanced hooks
+          </TabsTrigger>
+        </TabsList>
 
-      <details className="text-sm">
-        <summary className="cursor-pointer text-muted-foreground hover:text-foreground select-none">
-          Advanced: PostToolUse hook (optional, requires jq)
-        </summary>
-        <div className="mt-2 space-y-2">
+        <TabsContent value="mcp-recommended" className="space-y-2 pt-2">
+          <p className="text-xs text-muted-foreground">
+            One-time Keycloak device login installs the MCP entry in <code className="bg-muted px-1 rounded whitespace-pre-wrap break-all">~/.claude.json</code>.
+            Omit <code className="bg-muted px-1 rounded">--tool-name</code> during <code className="bg-muted px-1 rounded">init</code> so both Claude Code and Cursor accounts can auto-forward telemetry when Integration Connect has provisioned them — no pasted ingest token needed for this path.
+          </p>
+          <div className="flex items-start gap-2">
+            <pre
+              className="text-xs bg-muted rounded p-3 overflow-x-auto flex-1 whitespace-pre-wrap break-all"
+              aria-label="Recommended MCP install command"
+            >
+              {initCommand}
+            </pre>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopyInit}
+              aria-label={copiedInit ? "Copied MCP init command" : "Copy MCP init command"}
+              className="shrink-0 mt-0.5"
+            >
+              {copiedInit ? <Check className="size-3.5 mr-1" /> : <Copy className="size-3.5 mr-1" />}
+              {copiedInit ? "Copied" : "Copy"}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            After provisioning through this sheet, rerun <code className="bg-muted px-1 rounded whitespace-pre-wrap break-all">{initCommand}</code> whenever you rotate hosts or reinstall.
+            Troubleshooting: issuer configuration, duplicate <code className="bg-muted px-1 rounded">db90</code> MCP entries (<code className="bg-muted px-1 rounded">init --force</code>), logs under <code className="bg-muted px-1 rounded">~/.db90-mcp</code> — see <code className="bg-muted px-1 rounded">@db90/telemetry-mcp</code> README.
+          </p>
+        </TabsContent>
+
+        <TabsContent value="standalone-cli" className="space-y-2 pt-2">
+          <p className="text-sm font-medium">Run the db90 Claude reporter</p>
+          <div className="flex items-start gap-2">
+            <pre className="text-xs bg-muted rounded p-3 overflow-x-auto flex-1 whitespace-pre-wrap break-all">
+              {npxCommand}
+            </pre>
+            <Button variant="outline" size="sm" onClick={handleCopyNpx} aria-label={copiedNpx ? "Copied Claude CLI command" : "Copy Claude CLI command"} className="shrink-0 mt-0.5">
+              {copiedNpx ? <Check className="size-3.5 mr-1" /> : <Copy className="size-3.5 mr-1" />}
+              {copiedNpx ? "Copied" : "Copy"}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Reads Claude Code transcripts from <code className="bg-muted px-1 rounded">~/.config/claude/projects/</code> and <code className="bg-muted px-1 rounded">~/.claude/projects/</code>, then posts aggregated token usage.
+            Add <code className="bg-muted px-1 rounded">--watch</code> to poll continuously.
+          </p>
+        </TabsContent>
+
+        <TabsContent value="advanced-hooks" className="space-y-2 pt-2">
+          <p className="text-sm font-medium">PostToolUse / Stop hooks (optional, brittle)</p>
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium">Add to <code className="text-xs bg-muted px-1 py-0.5 rounded">~/.claude/settings.json</code></p>
-            <Button variant="outline" size="sm" onClick={handleCopySettings} aria-label={copiedSettings ? "Copied" : "Copy settings"}>
+            <p className="text-xs text-muted-foreground">Snippet for <code className="bg-muted px-1 py-0.5 rounded">~/.claude/settings.json</code></p>
+            <Button variant="outline" size="sm" onClick={handleCopySettings} aria-label={copiedSettings ? "Copied Claude hook settings snippet" : "Copy Claude hook settings snippet"}>
               {copiedSettings ? <Check className="size-3.5 mr-1" /> : <Copy className="size-3.5 mr-1" />}
               {copiedSettings ? "Copied" : "Copy"}
             </Button>
@@ -147,9 +200,15 @@ function ClaudeCodeSetupInstructions({ token }: { token: string }) {
           <pre className="text-xs bg-muted rounded p-3 overflow-x-auto whitespace-pre-wrap break-all">
             {settingsSnippet}
           </pre>
-          <p className="text-xs text-muted-foreground">The PostToolUse hook requires <code className="bg-muted px-1 rounded">jq</code> — install with <code className="bg-muted px-1 rounded">brew install jq</code>. The Stop hook uses <code className="bg-muted px-1 rounded">python3</code>, which ships with macOS.</p>
-        </div>
-      </details>
+          <p className="text-xs text-muted-foreground">
+            The PostToolUse hook requires <code className="bg-muted px-1 rounded">jq</code>. The Stop hook uses <code className="bg-muted px-1 rounded">python3</code> — still needs the pasted ingest token in each curl invocation.
+          </p>
+        </TabsContent>
+      </Tabs>
+
+      <div className="rounded-md bg-muted/50 p-2 text-[11px] text-muted-foreground">
+        Prefer the MCP tab whenever possible — standalone CLI commands above still require copying the ingest token shown above.
+      </div>
     </div>
   );
 }

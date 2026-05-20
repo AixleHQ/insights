@@ -11,10 +11,8 @@ const mocks = vi.hoisted(() => ({
   toDb90Payload: vi.fn(),
   readCursorEvents: vi.fn(),
   readDailyStats: vi.fn(),
-  readRecentCommitSnapshots: vi.fn(),
   mapCursorEvent: vi.fn(),
   mapDailyStats: vi.fn(),
-  mapRecentCommit: vi.fn(),
   postEvent: vi.fn(),
 }));
 
@@ -27,10 +25,8 @@ vi.mock("../readers/claude.js", () => ({
 vi.mock("../readers/cursor.js", () => ({
   readEvents: mocks.readCursorEvents,
   readDailyStats: mocks.readDailyStats,
-  readRecentCommitSnapshots: mocks.readRecentCommitSnapshots,
   mapEvent: mocks.mapCursorEvent,
   mapDailyStats: mocks.mapDailyStats,
-  mapRecentCommit: mocks.mapRecentCommit,
   DEFAULT_CURSOR_PRICING: {
     tokens_per_line: 15,
     completion_output_per_mtok: 0.6,
@@ -46,7 +42,6 @@ vi.mock("../client.js", () => ({
 import {
   CURSOR_DAILY_STATS_WATERMARK_KEY,
   CURSOR_EVENTS_WATERMARK_KEY,
-  CURSOR_RECENT_COMMIT_WATERMARK_KEY,
   sessionStateKey,
   syncTelemetryTools,
   resetBackoffStateForTests,
@@ -66,10 +61,8 @@ describe("syncTelemetryTools", () => {
     mocks.toDb90Payload.mockReturnValue(null);
     mocks.readCursorEvents.mockReturnValue([]);
     mocks.readDailyStats.mockReturnValue([]);
-    mocks.readRecentCommitSnapshots.mockReturnValue([]);
     mocks.mapCursorEvent.mockReturnValue(null);
     mocks.mapDailyStats.mockReturnValue([]);
-    mocks.mapRecentCommit.mockReturnValue(null);
     mocks.postEvent.mockResolvedValue(true);
   });
 
@@ -125,26 +118,25 @@ describe("syncTelemetryTools", () => {
     expect(state.sessions[CURSOR_EVENTS_WATERMARK_KEY]).toBeUndefined();
   });
 
-  it("tracks cursor daily stats independently from recent commit watermarks", async () => {
+  it("tracks cursor daily stats independently from cursor event watermarks", async () => {
     const cursorToken = "db90_cursor_token";
-    mocks.readRecentCommitSnapshots.mockImplementation((since: Date | null) =>
-      since === null ? [{ value: { timestamp: 1747645200000 }, dbPath: "/tmp/state.vscdb" }] : []
-    );
-    mocks.mapRecentCommit.mockReturnValue({
+    mocks.readCursorEvents.mockReturnValue([
+      { row: { requestId: "r1" }, workspacePath: "/tmp/state.vscdb" },
+    ]);
+    mocks.mapCursorEvent.mockReturnValue({
       tool_name: "cursor",
       event_type: "chat",
-      model: "unknown",
+      model: "gpt-4.1",
       tokens_in: 3,
       tokens_out: 1,
       cost_usd: 0.1,
       occurred_at: "2026-05-19T09:00:00.000Z",
       metadata: {
-        cursor_session_id: null,
+        cursor_session_id: "r1",
         workspace: "/tmp/state.vscdb",
         cost_model: "estimated_line_count",
         scannable: false,
         risk_level: "none",
-        source: "recent_commit",
       },
     });
 
@@ -159,7 +151,7 @@ describe("syncTelemetryTools", () => {
     });
 
     mocks.postEvent.mockClear();
-    mocks.readRecentCommitSnapshots.mockReturnValue([]);
+    mocks.readCursorEvents.mockReturnValue([]);
     mocks.readDailyStats.mockImplementation((since: Date | null) => {
       expect(since).toBeNull();
       return [{ date: "2026-05-19", value: { tabSuggestedLines: 5, tabAcceptedLines: 2 }, dbPath: "/tmp/state.vscdb" }];
@@ -189,7 +181,7 @@ describe("syncTelemetryTools", () => {
 
     expect(result.sent).toBe(1);
     const state = readState(appDir, host, cursorToken);
-    expect(state.sessions[CURSOR_RECENT_COMMIT_WATERMARK_KEY]?.sentAt).toBe("2026-05-19T09:00:00.000Z");
+    expect(state.sessions[CURSOR_EVENTS_WATERMARK_KEY]?.sentAt).toBe("2026-05-19T09:00:00.000Z");
     expect(state.sessions[CURSOR_DAILY_STATS_WATERMARK_KEY]?.sentAt).toBe("2026-05-19T00:00:00.000Z");
   });
 

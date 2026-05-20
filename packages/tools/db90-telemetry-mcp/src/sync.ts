@@ -19,10 +19,8 @@ import {
 import {
   readEvents as readCursorEvents,
   readDailyStats,
-  readRecentCommitSnapshots,
   mapEvent as mapCursorEvent,
   mapDailyStats,
-  mapRecentCommit,
   DEFAULT_CURSOR_PRICING,
   type CursorDb90Payload,
 } from "./readers/cursor.js";
@@ -38,7 +36,6 @@ export const CLAUDE_STATE_PREFIX = "claude_code:" as const;
 export const CURSOR_WATERMARK_KEY = "cursor:watermark" as const;
 export const CURSOR_EVENTS_WATERMARK_KEY = "cursor:events_watermark" as const;
 export const CURSOR_DAILY_STATS_WATERMARK_KEY = "cursor:daily_stats_watermark" as const;
-export const CURSOR_RECENT_COMMIT_WATERMARK_KEY = "cursor:recent_commit_watermark" as const;
 
 export function sessionStateKey(sessionId: string): string {
   return `${CLAUDE_STATE_PREFIX}${sessionId}`;
@@ -357,12 +354,10 @@ async function runCursorSlice(params: {
   const stateBefore = readState(appDir, host, token);
   const eventsSince = cursorWatermarkDate(stateBefore, CURSOR_EVENTS_WATERMARK_KEY, CURSOR_WATERMARK_KEY);
   const dailyStatsSince = cursorWatermarkDate(stateBefore, CURSOR_DAILY_STATS_WATERMARK_KEY, CURSOR_WATERMARK_KEY);
-  const recentCommitSince = cursorWatermarkDate(stateBefore, CURSOR_RECENT_COMMIT_WATERMARK_KEY, CURSOR_WATERMARK_KEY);
 
   const baseDir = cursorBaseDir;
   const rawEvents = readCursorEvents(eventsSince, baseDir, verbose);
   const dailyStats = readDailyStats(dailyStatsSince, baseDir, verbose);
-  const recentCommits = readRecentCommitSnapshots(recentCommitSince, baseDir, verbose);
 
   const projectIdOpt = projectId ?? undefined;
 
@@ -374,10 +369,6 @@ async function runCursorSlice(params: {
     mapDailyStats(entry, projectIdOpt, DEFAULT_CURSOR_PRICING)
   );
 
-  const mappedFromRecent = recentCommits
-    .map((snap) => mapRecentCommit(snap, projectIdOpt, DEFAULT_CURSOR_PRICING))
-    .filter((e): e is CursorDb90Payload => e !== null);
-
   const groups: Array<{ key: string; label: string; payloads: CursorDb90Payload[] }> = [
     {
       key: CURSOR_EVENTS_WATERMARK_KEY,
@@ -388,11 +379,6 @@ async function runCursorSlice(params: {
       key: CURSOR_DAILY_STATS_WATERMARK_KEY,
       label: "daily_stats",
       payloads: mappedFromStats.sort((a, b) => a.occurred_at.localeCompare(b.occurred_at)),
-    },
-    {
-      key: CURSOR_RECENT_COMMIT_WATERMARK_KEY,
-      label: "recent_commit",
-      payloads: mappedFromRecent.sort((a, b) => a.occurred_at.localeCompare(b.occurred_at)),
     },
   ];
 

@@ -100,7 +100,7 @@ Decision hierarchy: standard Rails patterns first → existing codebase patterns
 
 - `NPM_TOKEN` — GitHub Actions repository secret (Settings → Secrets → Actions). Automation token scoped to `@db90/*`, read + write. Rotate every 11 months. Owners: Ada Lovelace + Grace Hopper. Set a calendar reminder on creation.
 - npm org `@db90` — both owners must have hardware 2FA enforced at org level.
-- To publish: push a tag matching `cli-claude-v*` or `cli-cursor-v*`. See `packages/tools/RELEASING.md` for the full runbook.
+- To publish: push a tag matching `cli-claude-v*`, `cli-cursor-v*`, or **`cli-mcp-v*`** (@db90/telemetry-mcp). See `packages/tools/RELEASING.md` for the full runbook.
 
 ## Codebase Exploration
 

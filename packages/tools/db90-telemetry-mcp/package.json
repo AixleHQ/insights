@@ -42,8 +42,12 @@
     "test": "vitest run",
     "dev": "tsx src/cli.ts",
     "prepare": "npm run build",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "prepack": "node ../scripts/stage-sdk-bundle.mjs"
   },
+  "bundledDependencies": [
+    "@db90/sdk"
+  ],
   "dependencies": {
     "@db90/sdk": "*",
     "@modelcontextprotocol/sdk": "^1.29.0",

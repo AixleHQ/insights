@@ -163,8 +163,26 @@ describe("IngestTokenConnectSheet", () => {
       expect(screen.getByText(/npx @db90\/cursor --token/i)).toBeInTheDocument();
     });
 
-    it("shows settings.json instructions for claude-code", async () => {
+    it("defaults MCP (recommended) tab with npx telemetry-mcp init for claude-code", async () => {
       await goToSetupStep(claudeCodeProvider);
+      const mcpTab = screen.getByRole("tab", { name: /MCP \(recommended\)/i });
+      expect(mcpTab).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByLabelText(/Recommended MCP install command/i)).toHaveTextContent(
+        /npx -y @db90\/telemetry-mcp init --host http:\/\/localhost:3000/,
+      );
+    });
+
+    it("shows standalone Claude CLI after selecting Standalone CLI tab", async () => {
+      const user = userEvent.setup();
+      await goToSetupStep(claudeCodeProvider);
+      await user.click(screen.getByRole("tab", { name: /Standalone CLI/i }));
+      expect(screen.getByText(/npx @db90\/claude --token/i)).toBeInTheDocument();
+    });
+
+    it("shows ~/.claude/settings.json hook snippet on Advanced hooks tab", async () => {
+      const user = userEvent.setup();
+      await goToSetupStep(claudeCodeProvider);
+      await user.click(screen.getByRole("tab", { name: /Advanced hooks/i }));
       expect(screen.getByText(/~\/.claude\/settings\.json/i)).toBeInTheDocument();
     });
   });

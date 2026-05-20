@@ -1,6 +1,6 @@
 import { readState, writeState } from "./state.js";
-import { readEvents, readDailyStats, readRecentCommitSnapshots } from "./cursor-reader.js";
-import { mapEvent, mapDailyStats, mapRecentCommit, type Db90Payload, type PricingConfig } from "./mapper.js";
+import { readEvents, readDailyStats } from "./cursor-reader.js";
+import { mapEvent, mapDailyStats, type Db90Payload, type PricingConfig } from "./mapper.js";
 import { postEvents } from "./client.js";
 
 // Public surface re-exported so MCP consumers only need to import from "@db90/cursor/sync"
@@ -60,10 +60,6 @@ export async function syncOnce(options: SyncOptions): Promise<SyncResult> {
 
   const rawEvents = readEvents(since, undefined, verbose);
   const dailyStats = readDailyStats(since, undefined, verbose);
-  // AIX-170: Cursor's aiCodeTracking.recentCommit row is a separate ingest source
-  // — one row per repo, overwritten on each commit — carrying line-add/delete counts
-  // we turn into chat-style events with a commit-scoped metadata payload.
-  const recentCommits = readRecentCommitSnapshots(since, undefined, verbose);
 
   const projectIdOpt = projectId ?? undefined;
 
@@ -72,12 +68,7 @@ export async function syncOnce(options: SyncOptions): Promise<SyncResult> {
     .filter((e): e is Db90Payload => e !== null);
 
   const mappedFromStats = dailyStats.flatMap((entry) => mapDailyStats(entry, projectIdOpt, pricing));
-
-  const mappedFromRecent = recentCommits
-    .map((snap) => mapRecentCommit(snap, projectIdOpt, pricing))
-    .filter((e): e is Db90Payload => e !== null);
-
-  const mappedEvents = [...mappedFromEvents, ...mappedFromStats, ...mappedFromRecent];
+  const mappedEvents = [...mappedFromEvents, ...mappedFromStats];
 
   if (mappedEvents.length === 0) {
     // Do NOT advance state when there are no events — clock-skew or backfilled rows

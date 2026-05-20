@@ -2,24 +2,20 @@
 
 All notable changes to `@db90/telemetry-mcp` will be documented in this file.
 
-## Unreleased
+## [0.1.0] - 2026-05-19
 
-- Operational **`mcp.log`** under `~/.db90-mcp` (or `DB90_MCP_HOME`) with **5 MiB** rotation to `mcp.log.1`, dependency-free (`src/log.ts`). Sync/server diagnostics use structured `mcpLog` events (retries, rate-limit pauses, lock skips, validation failures).
-- Shared **`src/health.ts`** powers **`db90-mcp health`** (multi-line) and MCP **`db90_status`** via `buildHealthSnapshot()` / `healthSnapshotToStatusPayload()` — adds `log_path`, `state_file_paths`, `persisted_operator`, merges disk `mcp_operator` with in-process telemetry.
-- Credential-scoped state files gain optional **`mcp_operator`** (last sync summary + `recent_errors`) persisted from `syncTelemetryTools` so failures survive process restarts.
-- **`postEvent`** wraps `@db90/sdk` with **three transient retries** (1s / 4s / 16s) after failures; **429** still uses `on429` only (no retry loop). Vitest hook `setIngestRetryWaitOverrideForTests` for fast tests.
-- **`resetBackoffStateForTests`** clears rate-limit backoff map between tests.
+First public npm release (`@db90/telemetry-mcp@0.1.0`): stdio MCP server for DB90 with Claude Code + Cursor ingestion, Keycloak/OIDC device login, bundled private `@db90/sdk`.
 
-- `init` installs the **db90** MCP server into **user** Claude Code config (`~/.claude.json` → `mcpServers`): merge-only writes, idempotent when already correct, `init --force` to replace a mismatched `db90` entry; Windows uses `cmd /c npx …`. New modules under `src/install/`. Tests: `src/test/install.test.ts`.
-- Keycloak RFC 8628 device login: `src/auth/keycloak.ts`, exchange to `POST /api/v1/integrations/mcp/exchange`, `src/auth/credentials.ts` (keytar optional + `credentials.json` fallback, `0600` on POSIX), CLI `init --host/--keycloak-url/--tool-name`, MCP tool `db90_authenticate` for device-code instructions.
-- Claude transcript sync in-process (duplicated reader/pricing/risk from `@db90/claude` for publish isolation): `syncOnce` + `~/.db90-mcp` state with `claude_code:<sessionId>` keys, advisory lock file `state.lock`, `POST` via `@db90/sdk` to `/api/v1/ingest/events`.
-- MCP tools: `db90_status` (live JSON from disk/telemetry), `db90_sync_now` (single sync). Stdio server runs a 5-minute timer after connect plus one startup sync when credentials exist. CLI: `db90-mcp run --once` for a single sync and non-zero exit on post failures.
+### Highlights
 
-## 0.1.0 — initial scaffold
+- **Init & auth**: Keycloak RFC 8628 device login (`src/auth/keycloak.ts`), exchange to `POST /api/v1/integrations/mcp/exchange`, `src/auth/credentials.ts` with optional OS keychain (`keytar`) and `credentials.json` fallback (`0600` on POSIX). CLI `init --host/--keycloak-url/--tool-name/--force`; MCP tool **`db90_authenticate`** for device-code JSON.
+- **Claude Code wiring**: `init` merges the **`db90`** MCP server into **user** config **`~/.claude.json`** → `mcpServers` (`src/install/`). Omit **`--tool-name`** so provisioning can attach both **`claude_code`** and **`cursor`** when eligible. **`--tool-name cursor`** skips Claude MCP install. **`--force`** replaces a conflicting existing `db90` entry. Windows uses `cmd /c npx …` per Claude expectations.
+- **Sync & ingest**: Claude JSONL transcript sync in-process (`syncOnce`, state keys `claude_code:<sessionId>`), Cursor SQLite readers, advisory lock **`state.lock`**, posts via **`@db90/sdk`** to **`POST /api/v1/ingest/events`**. MCP tools **`db90_status`**, **`db90_sync_now`**, **5‑minute** background timer plus startup sync when credentials exist. CLI **`db90-mcp run --once`** for single sync / non-zero exit on failures.
+- **Resilience & observability**: Shared **`src/health.ts`** for **`db90-mcp health`** and MCP **`db90_status`**. Operational **`mcp.log`** (~/.db90-mcp, `DB90_MCP_HOME` override), **5 MiB** rotate to **`mcp.log.1`**. Credential-scoped state **`mcp_operator`** diagnostics. **`postEvent`** retries (1s / 4s / 16s) on transient failures; **429** uses backoff helper only.
 
-- First public package scaffold for `@db90/telemetry-mcp`.
-- CLI commands: `run` starts the stdio MCP server, `serve` is a legacy alias, `init` performs auth and (in current versions) merges MCP config into `~/.claude.json`, and `health` prints a process diagnostic.
-- MCP tool surface starts with `db90_status`; the sync/auth/dashboard/resource surface is tracked in Unreleased until those features ship from this branch.
+### Packaging
+
+- **Bundled `@db90/sdk`** via **`prepack` → `packages/tools/scripts/stage-sdk-bundle.mjs`** and **`bundledDependencies`**, so published tarballs remain installable while the SDK stays private on npm.
 
 ## API stability policy (applies from 0.1.0 forward)
 
@@ -29,5 +25,5 @@ All notable changes to `@db90/telemetry-mcp` will be documented in this file.
 
 ## Dependencies
 
-- `@db90/sdk` provides the shared ingest HTTP primitive.
-- Claude reader/sync code is intentionally duplicated inside `@db90/telemetry-mcp` for this phase to avoid a runtime publish-order dependency on `@db90/claude`.
+- `@db90/sdk` provides the shared ingest HTTP primitive (bundled in the published tarball).
+- Claude reader/sync code is intentionally duplicated inside `@db90/telemetry-mcp` for publish isolation.
