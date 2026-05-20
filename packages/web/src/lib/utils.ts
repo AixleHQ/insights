@@ -85,7 +85,6 @@ const TOOL_NAME_MAP: Record<string, string> = {
   "anthropic_api": "Anthropic API",
   "jira": "Jira",
   "linear": "Linear",
-  "continue": "Continue",
 };
 
 /**
