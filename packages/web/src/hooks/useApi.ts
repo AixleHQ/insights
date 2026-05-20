@@ -112,11 +112,16 @@ export const queryKeys = {
     summary: (orgId: string) => ["organizations", orgId, "events", "summary"] as const,
   },
   stats: {
-    overview: (orgId: string) => ["organizations", orgId, "stats", "overview"] as const,
+    overview: (orgId: string, projectId?: string) =>
+      ["organizations", orgId, "stats", "overview", { projectId }] as const,
     daily: (orgId: string, days?: number) =>
       ["organizations", orgId, "stats", "daily", days] as const,
     hourly: (orgId: string, hours?: number) =>
       ["organizations", orgId, "stats", "hourly", hours] as const,
+    riskAlerts: (orgId: string, projectId?: string, month?: string) =>
+      ["organizations", orgId, "stats", "risk_alerts", { projectId, month }] as const,
+    dailyByModel: (orgId: string, days: number, projectId?: string) =>
+      ["organizations", orgId, "stats", "daily_by_model", { days, projectId }] as const,
     toolOverview: (orgId: string, tool: string) =>
       ["organizations", orgId, "stats", "tools", tool, "overview"] as const,
     toolModels: (orgId: string, tool: string, days?: number) =>
@@ -1476,12 +1481,15 @@ export function useBulkAttributeEvents(orgId: string) {
 // Stats Hooks
 // ============================================================================
 
-export function useOverviewStats(orgId: string) {
+export function useOverviewStats(orgId: string, projectId?: string) {
   return useQuery({
-    queryKey: queryKeys.stats.overview(orgId),
-    queryFn: () => api.get<OverviewStats>(`/organizations/${orgId}/stats/overview`),
+    queryKey: queryKeys.stats.overview(orgId, projectId),
+    queryFn: () => {
+      const params = projectId ? `?project_id=${projectId}` : "";
+      return api.get<OverviewStats>(`/organizations/${orgId}/stats/overview${params}`);
+    },
     enabled: !!orgId,
-    refetchInterval: 30000, // Refetch every 30 seconds for live dashboard
+    refetchInterval: 30000,
   });
 }
 
@@ -1519,7 +1527,7 @@ export function useActivityHeatmap(orgId: string) {
 
 export interface DailyToolData {
   date: string;
-  [toolName: string]: string | number; // date is string, tool counts are numbers
+  [toolName: string]: string | number;
 }
 
 export interface DailyByToolResponse {
@@ -1527,10 +1535,78 @@ export interface DailyByToolResponse {
   tools: string[];
 }
 
-export function useDailyByTool(orgId: string, days = 30) {
+export interface DailyByToolOpts {
+  days?: number;
+  period?: "day" | "week";
+  month?: string;
+  projectId?: string;
+}
+
+export function useDailyByTool(orgId: string, opts: DailyByToolOpts | number = {}) {
+  const normalized: DailyByToolOpts = typeof opts === "number" ? { days: opts } : opts;
+  const { days = 30, period, month, projectId } = normalized;
+
   return useQuery({
-    queryKey: ["organizations", orgId, "stats", "daily_by_tool", days],
-    queryFn: () => api.get<DailyByToolResponse>(`/organizations/${orgId}/stats/daily_by_tool?days=${days}`),
+    queryKey: ["organizations", orgId, "stats", "daily_by_tool", normalized],
+    queryFn: () => {
+      const p = new URLSearchParams();
+      if (!month) p.set("days", String(days));
+      if (period) p.set("period", period);
+      if (month) p.set("month", month);
+      if (projectId) p.set("project_id", projectId);
+      return api.get<DailyByToolResponse>(`/organizations/${orgId}/stats/daily_by_tool?${p}`);
+    },
+    enabled: !!orgId,
+  });
+}
+
+export interface RiskAlertRow {
+  toolName: string;
+  eventCount: number;
+  tokensIn: number;
+  tokensOut: number;
+  costUsd: number;
+}
+
+export function useOrgRiskAlerts(orgId: string, projectId?: string, month?: string) {
+  return useQuery({
+    queryKey: queryKeys.stats.riskAlerts(orgId, projectId, month),
+    queryFn: () => {
+      const p = new URLSearchParams();
+      if (projectId) p.set("project_id", projectId);
+      if (month) p.set("month", month);
+      const qs = p.toString();
+      return api.get<RiskAlertRow[]>(`/organizations/${orgId}/stats/risk_alerts${qs ? `?${qs}` : ""}`);
+    },
+    enabled: !!orgId,
+    staleTime: 60_000,
+  });
+}
+
+export interface DailyModelData {
+  date: string;
+  [modelName: string]: string | number;
+}
+
+export interface DailyByModelResponse {
+  data: DailyModelData[];
+  models: string[];
+}
+
+export function useDailyByModel(orgId: string, opts: DailyByToolOpts | number = {}) {
+  const normalized: DailyByToolOpts = typeof opts === "number" ? { days: opts } : opts;
+  const { days = 30, period, month, projectId } = normalized;
+
+  return useQuery({
+    queryKey: queryKeys.stats.dailyByModel(orgId, days, projectId),
+    queryFn: () => {
+      const p = new URLSearchParams();
+      if (!month) p.set("days", String(days));
+      if (period) p.set("period", period);
+      if (month) p.set("month", month);
+      if (projectId) p.set("project_id", projectId);
+      return api.get<DailyByModelResponse>(`/organizations/${orgId}/stats/daily_by_model?${p}`);
+    },
     enabled: !!orgId,
   });
 }

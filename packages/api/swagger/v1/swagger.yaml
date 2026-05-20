@@ -1434,12 +1434,17 @@ paths:
   /api/v1/organizations/{organization_id}/stats/overview:
     get:
       summary: Organization stats overview
-      description: Returns aggregate event count, cost, active users, and high-risk event count for the current month, with percentage change vs the previous month.
+      description: Returns aggregate event count, cost, active users, and risk alert count for the current month, with percentage change vs the previous month. Pass project_id to scope all counts to a single project.
       tags:
         - Stats
       parameters:
         - $ref: '#/components/parameters/organization_id'
         - $ref: '#/components/parameters/X-Organization-ID'
+        - name: project_id
+          in: query
+          description: Scope stats to a specific project (must belong to this organization)
+          schema:
+            type: string
       responses:
         '200':
           description: Overview stats
@@ -1453,8 +1458,9 @@ paths:
                   total_cost_usd:
                     type: number
                     format: float
-                  high_risk_events:
+                  risk_alerts:
                     type: integer
+                    description: Count of distinct tool_events with at least one non-none audit log in the current month
                   active_users:
                     type: integer
                   events_change_percent:
@@ -1467,6 +1473,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /api/v1/organizations/{organization_id}/stats/hourly:
     get:
@@ -1581,7 +1589,7 @@ paths:
   /api/v1/organizations/{organization_id}/stats/daily_by_tool:
     get:
       summary: Daily stats by tool
-      description: Returns daily event counts grouped by the top 3 tools plus an "Other" bucket — shaped for stacked bar charts. Defaults to the last 30 days.
+      description: Returns event counts grouped by the top 3 tools plus an "Other" bucket — shaped for stacked bar charts. Granularity is day (default) or week. Use month (YYYY-MM) or days to set the window.
       tags:
         - Stats
       parameters:
@@ -1589,15 +1597,33 @@ paths:
         - $ref: '#/components/parameters/X-Organization-ID'
         - name: days
           in: query
-          description: Number of days to look back (default 30)
+          description: Rolling window in days (default 30). Ignored when month is present.
           schema:
             type: integer
             default: 30
+        - name: period
+          in: query
+          description: Bucket granularity
+          schema:
+            type: string
+            enum: [day, week]
+            default: day
+        - name: month
+          in: query
+          description: Exact calendar month to query (YYYY-MM). Takes precedence over days.
+          schema:
+            type: string
+            example: '2026-05'
+        - name: project_id
+          in: query
+          description: Scope to a specific project (must belong to this organization)
+          schema:
+            type: string
         - $ref: '#/components/parameters/start_date'
         - $ref: '#/components/parameters/end_date'
       responses:
         '200':
-          description: Daily stats by tool
+          description: Stats by tool
           content:
             application/json:
               schema:
@@ -1605,7 +1631,7 @@ paths:
                 properties:
                   data:
                     type: array
-                    description: One entry per day; keys are tool names + "Other"
+                    description: One entry per bucket (day or week start); keys are tool names + "Other"
                     items:
                       type: object
                       properties:
@@ -1648,6 +1674,125 @@ paths:
                       format: date
                     count:
                       type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/stats/risk_alerts:
+    get:
+      summary: Risk alerts by tool
+      description: |
+        Returns tool-grouped events that have at least one audit log with risk_level != 'none' in the given window.
+        Uses a subquery to prevent SUM inflation from the ToolEvent has_many :audit_logs relation.
+        The SUM(eventCount) across rows approximates the risk_alerts value in /stats/overview when both use the same window.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: days
+          in: query
+          description: Rolling window in days (default 30). Ignored when month is present.
+          schema:
+            type: integer
+            default: 30
+        - name: month
+          in: query
+          description: Exact calendar month (YYYY-MM). Takes precedence over days.
+          schema:
+            type: string
+            example: '2026-05'
+        - name: project_id
+          in: query
+          description: Scope to a specific project (must belong to this organization)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Risk alert rows sorted by event count descending
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    toolName:
+                      type: string
+                    eventCount:
+                      type: integer
+                    tokensIn:
+                      type: integer
+                    tokensOut:
+                      type: integer
+                    costUsd:
+                      type: number
+                      format: float
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/organizations/{organization_id}/stats/daily_by_model:
+    get:
+      summary: Daily stats by model
+      description: Returns event counts grouped by the top 3 AI models plus an "Other" bucket. Granularity is day (default) or week. Use month (YYYY-MM) or days to set the window.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: days
+          in: query
+          description: Rolling window in days (default 30). Ignored when month is present.
+          schema:
+            type: integer
+            default: 30
+        - name: period
+          in: query
+          description: Bucket granularity
+          schema:
+            type: string
+            enum: [day, week]
+            default: day
+        - name: month
+          in: query
+          description: Exact calendar month (YYYY-MM). Takes precedence over days.
+          schema:
+            type: string
+            example: '2026-05'
+        - name: project_id
+          in: query
+          description: Scope to a specific project (must belong to this organization)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Stats by model
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    description: One entry per bucket (day or week start); keys are model names + "Other"
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                      additionalProperties:
+                        type: integer
+                  models:
+                    type: array
+                    description: Ordered list of model names present in data (top 3 + "Other")
+                    items:
+                      type: string
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -3063,9 +3208,13 @@ paths:
             type: string
         - name: risk_level
           in: query
+          description: |
+            Filter by cost-based risk tier. `not_none` is a convenience alias for `cost_usd > 0.01`
+            (any non-zero risk). Note: this is cost-based risk; AuditLog risk (content scanning) is a
+            separate signal available via /stats/risk_alerts.
           schema:
             type: string
-            enum: [critical, high, medium, low, none]
+            enum: [critical, high, medium, low, none, not_none]
         - name: user_id
           in: query
           schema:
@@ -3393,9 +3542,12 @@ paths:
             type: string
         - name: risk_level
           in: query
+          description: |
+            Filter by cost-based risk tier. `not_none` is a convenience alias for `cost_usd > 0.01`.
+            Note: this is cost-based risk; AuditLog risk (content scanning) is a separate signal.
           schema:
             type: string
-            enum: [high, medium, low, none]
+            enum: [high, medium, low, none, not_none]
         - name: project_id
           in: query
           schema:

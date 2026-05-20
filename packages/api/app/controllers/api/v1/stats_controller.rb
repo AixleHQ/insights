@@ -9,47 +9,51 @@ module Api
       before_action :set_tool_scope, only: TOOL_SCOPED_ACTIONS
 
       # GET /api/v1/organizations/:organization_id/stats/overview
-      # Frontend expects: { total_events, total_cost_usd, high_risk_events, active_users, events_change_percent, cost_change_percent }
+      # Optional param: project_id — scopes all counts to that project
       def overview
         authorize! current_organization, to: :show?
 
-        # Current period (this month)
-        current_start = Time.current.beginning_of_month
-        current_end = Time.current
-        current_events = current_organization.tool_events.where(occurred_at: current_start..current_end)
+        base_scope = if params[:project_id].present?
+          current_organization.projects.find(params[:project_id]).tool_events
+        else
+          current_organization.tool_events
+        end
 
-        # Previous period (last month) for comparison
-        prev_start = 1.month.ago.beginning_of_month
-        prev_end = 1.month.ago.end_of_month
-        prev_events = current_organization.tool_events.where(occurred_at: prev_start..prev_end)
+        current_start  = Time.current.beginning_of_month
+        current_end    = Time.current
+        current_events = base_scope.where(occurred_at: current_start..current_end)
 
-        # Last 7 days for active users
-        week_ago = 7.days.ago
-        active_users = current_organization.tool_events.where("occurred_at > ?", week_ago).distinct.count(:user_id)
+        prev_start  = 1.month.ago.beginning_of_month
+        prev_end    = 1.month.ago.end_of_month
+        prev_events = base_scope.where(occurred_at: prev_start..prev_end)
 
-        # High risk events (from audit logs)
+        active_users = base_scope.where("occurred_at > ?", 7.days.ago).distinct.count(:user_id)
+
+        # Count distinct tool_events that have at least one non-none audit log in the current month.
+        # Distinct avoids inflation when one event has multiple audit_log rows.
         high_risk_count = AuditLog
           .joins(:tool_event)
-          .where(tool_events: { organization_id: current_organization.id })
-          .where(risk_level: %w[high critical])
+          .where(tool_events: { id: current_events.select(:id) })
+          .where.not(risk_level: "none")
+          .select(:tool_event_id)
+          .distinct
           .count
 
-        # Calculate change percentages
         current_count = current_events.count
-        prev_count = prev_events.count
+        prev_count    = prev_events.count
         events_change = prev_count > 0 ? ((current_count - prev_count).to_f / prev_count * 100) : 0
 
         current_cost = current_events.sum(:cost_usd).to_f
-        prev_cost = prev_events.sum(:cost_usd).to_f
-        cost_change = prev_cost > 0 ? ((current_cost - prev_cost) / prev_cost * 100) : 0
+        prev_cost    = prev_events.sum(:cost_usd).to_f
+        cost_change  = prev_cost > 0 ? ((current_cost - prev_cost) / prev_cost * 100) : 0
 
         render json: {
-          total_events: current_count,
-          total_cost_usd: current_cost,
-          high_risk_events: high_risk_count,
-          active_users: active_users,
+          total_events:          current_count,
+          total_cost_usd:        current_cost,
+          risk_alerts:           high_risk_count,
+          active_users:          active_users,
           events_change_percent: events_change.round(1),
-          cost_change_percent: cost_change.round(1)
+          cost_change_percent:   cost_change.round(1)
         }
       end
 
@@ -149,47 +153,41 @@ module Api
       end
 
       # GET /api/v1/organizations/:organization_id/stats/daily_by_tool
-      # Returns daily event counts grouped by tool for stacked bar chart
+      # Optional params: period (day|week), month (YYYY-MM), project_id
       def daily_by_tool
         authorize! current_organization, to: :show?
 
-        days = (params[:days] || 30).to_i
-        time_range = parse_time_range(default_days: days)
-        events = current_organization.tool_events
-                                     .where(occurred_at: time_range[:start]..time_range[:end])
+        time_range = month_or_days_time_range
+        trunc      = params[:period] == "week" ? "week" : "day"
+        events     = scoped_events(time_range)
 
-        # Get top tools by total event count
         top_tools = events
           .group(:tool_name)
           .order(Arel.sql("COUNT(*) DESC"))
           .limit(3)
           .pluck(:tool_name)
 
-        # Get daily data grouped by date and tool
         daily_tool_data = events
-          .group("DATE_TRUNC('day', occurred_at)", :tool_name)
+          .group("DATE_TRUNC('#{trunc}', occurred_at)", :tool_name)
           .select(
-            "DATE_TRUNC('day', occurred_at) as day",
+            "DATE_TRUNC('#{trunc}', occurred_at) as bucket",
             "tool_name",
             "COUNT(*) as event_count"
           )
-          .order("day")
+          .order("bucket")
 
-        # Transform into chart-friendly format
-        # Group by date, with each date having counts for top tools + "Other"
         date_map = {}
         daily_tool_data.each do |row|
-          date = row.day&.to_date&.iso8601
+          date = row.bucket&.to_date&.iso8601
           next unless date
 
           date_map[date] ||= { date: date }
           tool_key = top_tools.include?(row.tool_name) ? row.tool_name : "Other"
-          date_map[date][tool_key] ||= 0
-          date_map[date][tool_key] += row.event_count
+          date_map[date][tool_key] = (date_map[date][tool_key] || 0) + row.event_count
         end
 
         render json: {
-          data: date_map.values.sort_by { |d| d[:date] },
+          data:  date_map.values.sort_by { |d| d[:date] },
           tools: top_tools + [ "Other" ]
         }
       end
@@ -217,6 +215,84 @@ module Api
         end
 
         render json: heatmap_data
+      end
+
+      # GET /api/v1/organizations/:organization_id/stats/risk_alerts
+      # Returns tool-grouped events that have >=1 non-none audit log.
+      # Subquery form prevents SUM inflation from the ToolEvent has_many :audit_logs relation.
+      def risk_alerts
+        authorize! current_organization, to: :show?
+
+        time_range = month_or_days_time_range
+
+        risky_ids = scoped_events(time_range)
+          .joins("INNER JOIN audit_logs ON audit_logs.tool_event_id = tool_events.id")
+          .where.not("audit_logs.risk_level": "none")
+          .select("tool_events.id")
+          .distinct
+
+        rows = ToolEvent.where(id: risky_ids)
+          .group(:tool_name)
+          .select(
+            "tool_name",
+            "COUNT(*) AS event_count",
+            "SUM(tokens_in)  AS tokens_in",
+            "SUM(tokens_out) AS tokens_out",
+            "SUM(cost_usd)   AS cost_usd"
+          )
+          .order(Arel.sql("COUNT(*) DESC"))
+
+        render json: rows.map { |r|
+          {
+            toolName:   r.tool_name,
+            eventCount: r.event_count,
+            tokensIn:   r.tokens_in.to_i,
+            tokensOut:  r.tokens_out.to_i,
+            costUsd:    r.cost_usd.to_f
+          }
+        }
+      end
+
+      # GET /api/v1/organizations/:organization_id/stats/daily_by_model
+      # Optional params: period (day|week), month (YYYY-MM), project_id
+      def daily_by_model
+        authorize! current_organization, to: :show?
+
+        time_range = month_or_days_time_range
+        trunc      = params[:period] == "week" ? "week" : "day"
+        events     = scoped_events(time_range)
+
+        top_models = events
+          .where.not(model: [ nil, "" ])
+          .group(:model)
+          .order(Arel.sql("COUNT(*) DESC"))
+          .limit(3)
+          .pluck(:model)
+
+        data = events
+          .where.not(model: [ nil, "" ])
+          .group("DATE_TRUNC('#{trunc}', occurred_at)", :model)
+          .select(
+            "DATE_TRUNC('#{trunc}', occurred_at) as bucket",
+            "model",
+            "COUNT(*) as event_count"
+          )
+          .order("bucket")
+
+        date_map = {}
+        data.each do |row|
+          date = row.bucket&.to_date&.iso8601
+          next unless date
+
+          date_map[date] ||= { date: date }
+          key = top_models.include?(row.model) ? row.model : "Other"
+          date_map[date][key] = (date_map[date][key] || 0) + row.event_count
+        end
+
+        render json: {
+          data:   date_map.values.sort_by { |d| d[:date] },
+          models: top_models + [ "Other" ]
+        }
       end
 
       # GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/overview
@@ -450,6 +526,28 @@ module Api
           byRiskLevel: audit_logs.group(:risk_level).count,
           highRiskCount: audit_logs.where(risk_level: %w[high critical]).count
         }
+      end
+
+      # Resolves time range from ?month=YYYY-MM (exact calendar month) or ?days=N (rolling window).
+      def month_or_days_time_range
+        if params[:month].present?
+          month = Date.parse("#{params[:month]}-01")
+          { start: month.beginning_of_month.beginning_of_day,
+            end:   month.end_of_month.end_of_day }
+        else
+          parse_time_range(default_days: (params[:days] || 30).to_i)
+        end
+      end
+
+      # Returns a time-scoped ToolEvent relation, optionally filtered to a project.
+      # project_id is validated through the org to prevent cross-org data access.
+      def scoped_events(time_range)
+        base = if params[:project_id].present?
+          current_organization.projects.find(params[:project_id]).tool_events
+        else
+          current_organization.tool_events
+        end
+        base.where(occurred_at: time_range[:start]..time_range[:end])
       end
     end
   end

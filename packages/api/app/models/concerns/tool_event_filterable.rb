@@ -36,6 +36,7 @@ module ToolEventFilterable
     when "medium" then scope.where("cost_usd > 0.1 AND cost_usd <= 1.0")
     when "low"    then scope.where("cost_usd > 0.01 AND cost_usd <= 0.1")
     when "none"   then scope.where("cost_usd IS NULL OR cost_usd <= 0.01")
+    when "not_none" then scope.where("cost_usd > 0.01")
     else scope
     end
   end
