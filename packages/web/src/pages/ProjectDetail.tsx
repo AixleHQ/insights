@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from "react";
+import React, { useMemo, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   AlertCircle,
@@ -14,11 +14,10 @@ import {
   Download,
   Loader2,
 } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
 import { useOrg } from "@/contexts/OrgContext";
+
 import {
   useProject,
-  useEvents,
   useDeleteProject,
   useProjectDailyByTool,
   useProjectRepositories,
@@ -26,12 +25,11 @@ import {
   useProjectMembers,
   useProjectStats,
   useCurrentUser,
-  useEventsSummary,
-  useExportEvents,
   type ProjectMember,
 } from "@/hooks/useApi";
+
+import { useProjectEventsTab } from "@/hooks/useProjectEventsTab";
 import { formatCost, formatCount } from "@/lib/formatters";
-import { useEventsPageUpdates } from "@/hooks/useWebSocket";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -51,7 +49,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { EventsTable, EventDrawer, EventFilters, type EventRow, type EventFiltersState } from "@/components/events";
+import { EventsTable, EventDrawer, EventFilters } from "@/components/events";
 import { ToolUsageByDayChart } from "@/components/dashboard";
 import {
   ProjectReposSection,
@@ -62,20 +60,7 @@ import {
   ProjectMembersTab,
 } from "@/components/project";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatDistanceToNow, toEventRow, humanizeToolName } from "@/lib/utils";
-import { showEventsUserColumn } from "@/lib/eventAccess";
-import type { EventsToolFilterOption } from "@/lib/eventsToolFilters";
-
-type SortField = "created_at" | "tool_name" | "risk_level" | "cost_usd";
-type SortDirection = "asc" | "desc";
-
-const riskLevelOrder = {
-  critical: 4,
-  high: 3,
-  medium: 2,
-  low: 1,
-  none: 0,
-};
+import { formatDistanceToNow } from "@/lib/utils";
 
 function StatCard({
   icon: Icon,
@@ -119,19 +104,7 @@ export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const { currentOrg, currentRole, hasRole } = useOrg();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const [connectRepoOpen, setConnectRepoOpen] = useState(false);
-
-  // Events tab state
-  const [eventsFilters, setEventsFilters] = useState<EventFiltersState>({});
-  const [eventsPage, setEventsPage] = useState(1);
-  const [eventsSort, setEventsSort] = useState<SortField>("created_at");
-  const [eventsSortDir, setEventsSortDir] = useState<SortDirection>("desc");
-  const [eventsSelectedId, setEventsSelectedId] = useState<string | null>(null);
-  const [eventsDrawerOpen, setEventsDrawerOpen] = useState(false);
-  const [exportQueued, setExportQueued] = useState(false);
-  const [exportError, setExportError] = useState(false);
-
 
   const { data: project, isLoading: isLoadingProject } = useProject(id || "");
   const { data: projectMembers } = useProjectMembers(id || "");
@@ -142,130 +115,11 @@ export function ProjectDetail() {
   const disconnectRepo = useDisconnectRepo(id || "");
   const deleteProject = useDeleteProject();
 
-  // Events tab hooks
-  const eventsApiParams = useMemo(() => ({
-    page: eventsPage,
-    per_page: 25,
-    project_id: id,
-    tool_name: eventsFilters.tool,
-    risk_level: eventsFilters.riskLevels?.length === 1 ? eventsFilters.riskLevels[0] : undefined,
-    event_type: eventsFilters.eventType,
-    start_date: eventsFilters.dateFrom,
-    end_date: eventsFilters.dateTo,
-  }), [id, eventsPage, eventsFilters]);
-
-  const { data: eventsResponse, isLoading: isLoadingTabEvents } = useEvents(currentOrg?.id || "", eventsApiParams);
-  const { data: eventsSummary } = useEventsSummary(currentOrg?.id || "");
-  const { exportEvents, isExporting } = useExportEvents(currentOrg?.id || "");
-
-  const toolFilterOptions = useMemo<EventsToolFilterOption[]>(() => {
-    const byTool = eventsSummary?.byTool;
-    if (!byTool || Object.keys(byTool).length === 0) return [];
-    return Object.keys(byTool).sort().map((slug) => ({ value: slug, label: humanizeToolName(slug) }));
-  }, [eventsSummary]);
-
-  const showUserCol = showEventsUserColumn(currentRole) || !!(me?.globalAdmin ?? me?.super_admin);
-
-  useEventsPageUpdates({
-    onNewEvent: () => queryClient.invalidateQueries({ queryKey: ["organizations", currentOrg?.id, "events"] }),
-    onEventUpdated: () => queryClient.invalidateQueries({ queryKey: ["organizations", currentOrg?.id, "events"] }),
+  const eventsTab = useProjectEventsTab({
+    projectId: id || "",
+    orgId: currentOrg?.id || "",
+    currentRole,
   });
-
-  const tabEvents: EventRow[] = useMemo(
-    () => eventsResponse?.data?.map(toEventRow) ?? [],
-    [eventsResponse]
-  );
-
-  const filteredAndSortedEvents = useMemo(() => {
-    let result = [...tabEvents];
-
-    if (eventsFilters.search) {
-      const s = eventsFilters.search.toLowerCase();
-      result = result.filter(
-        (e) =>
-          (e.tool_name || "").toLowerCase().includes(s) ||
-          (e.project?.name || "").toLowerCase().includes(s)
-      );
-    }
-
-    if (eventsFilters.riskLevels && eventsFilters.riskLevels.length > 0) {
-      result = result.filter((e) => eventsFilters.riskLevels!.includes(e.risk_level || "none"));
-    }
-
-    result.sort((a, b) => {
-      let comparison = 0;
-      switch (eventsSort) {
-        case "created_at":
-          comparison = new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
-          break;
-        case "tool_name":
-          comparison = (a.tool_name || "").localeCompare(b.tool_name || "");
-          break;
-        case "risk_level":
-          comparison =
-            (riskLevelOrder[a.risk_level as keyof typeof riskLevelOrder] || 0) -
-            (riskLevelOrder[b.risk_level as keyof typeof riskLevelOrder] || 0);
-          break;
-        case "cost_usd":
-          comparison = (a.cost_usd || 0) - (b.cost_usd || 0);
-          break;
-      }
-      return eventsSortDir === "asc" ? comparison : -comparison;
-    });
-
-    return result;
-  }, [tabEvents, eventsFilters.search, eventsFilters.riskLevels, eventsSort, eventsSortDir]);
-
-  const totalPages = eventsResponse?.meta?.total_pages || 1;
-  const totalCount = eventsResponse?.meta?.total_count || 0;
-
-  const eventsSelectedIndex = eventsSelectedId
-    ? filteredAndSortedEvents.findIndex((e) => e.id === eventsSelectedId)
-    : -1;
-
-  const handleEventsSort = useCallback((field: SortField) => {
-    if (eventsSort === field) {
-      setEventsSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setEventsSort(field);
-      setEventsSortDir("desc");
-    }
-  }, [eventsSort]);
-
-  const handleEventsNavigate = useCallback((direction: "prev" | "next") => {
-    if (!eventsSelectedId) return;
-    const currentIndex = filteredAndSortedEvents.findIndex((e) => e.id === eventsSelectedId);
-    if (currentIndex === -1) return;
-    const newIndex = direction === "prev" ? currentIndex - 1 : currentIndex + 1;
-    if (newIndex >= 0 && newIndex < filteredAndSortedEvents.length) {
-      setEventsSelectedId(filteredAndSortedEvents[newIndex].id);
-    }
-  }, [eventsSelectedId, filteredAndSortedEvents]);
-
-  const handleExport = async () => {
-    setExportQueued(false);
-    setExportError(false);
-    const startStr = eventsFilters.dateFrom ?? "all";
-    const endStr = eventsFilters.dateTo ?? new Date().toISOString().split("T")[0];
-    const filename = `db90-events-${startStr}-${endStr}.csv`;
-    try {
-      const result = await exportEvents({
-        tool_name: eventsFilters.tool,
-        risk_level: eventsFilters.riskLevels?.[0],
-        event_type: eventsFilters.eventType,
-        start_date: eventsFilters.dateFrom,
-        end_date: eventsFilters.dateTo,
-        project_id: id,
-        filename,
-      });
-      if (result?.queued) {
-        setExportQueued(true);
-      }
-    } catch (err) {
-      console.error("Export failed:", err);
-      setExportError(true);
-    }
-  };
 
   // Permission flags (reused by tab gates)
   const myProjectMembership = projectMembers?.find((m: ProjectMember) => m.userId === me?.id);
@@ -550,32 +404,32 @@ export function ProjectDetail() {
         <TabsContent value="events" className="space-y-4 mt-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <EventFilters
-              filters={eventsFilters}
-              onFiltersChange={(f) => { setEventsFilters(f); setEventsPage(1); }}
-              tools={toolFilterOptions}
+              filters={eventsTab.filters}
+              onFiltersChange={eventsTab.handleFiltersChange}
+              tools={eventsTab.toolFilterOptions}
             />
             <Button
               variant="outline"
               size="sm"
-              onClick={handleExport}
-              disabled={isExporting}
+              onClick={eventsTab.handleExport}
+              disabled={eventsTab.isExporting}
               className="shrink-0"
             >
-              {isExporting ? (
+              {eventsTab.isExporting ? (
                 <Loader2 className="mr-2 size-4 animate-spin" />
               ) : (
                 <Download className="mr-2 size-4" />
               )}
-              <span className="hidden sm:inline">{isExporting ? "Exporting…" : "Export"}</span>
+              <span className="hidden sm:inline">{eventsTab.isExporting ? "Exporting…" : "Export"}</span>
             </Button>
           </div>
 
-          {exportQueued && (
+          {eventsTab.exportQueued && (
             <p className="text-sm text-muted-foreground">
               Your export is too large to download immediately. It has been queued — check back shortly.
             </p>
           )}
-          {exportError && (
+          {eventsTab.exportError && (
             <Alert variant="destructive">
               <AlertCircle className="size-4" />
               <AlertDescription>Export failed. Please try again.</AlertDescription>
@@ -583,37 +437,37 @@ export function ProjectDetail() {
           )}
 
           <EventsTable
-            events={filteredAndSortedEvents}
-            isLoading={isLoadingTabEvents}
-            sortField={eventsSort}
-            sortDirection={eventsSortDir}
-            onSort={handleEventsSort}
+            events={eventsTab.filteredAndSortedEvents}
+            isLoading={eventsTab.isLoading}
+            sortField={eventsTab.sort}
+            sortDirection={eventsTab.sortDir}
+            onSort={eventsTab.handleSort}
             onEventClick={(eid) => {
-              setEventsSelectedId(eid);
-              setEventsDrawerOpen(true);
+              eventsTab.setSelectedId(eid);
+              eventsTab.setDrawerOpen(true);
             }}
-            selectedEventId={eventsSelectedId}
-            showUserColumn={showUserCol}
+            selectedEventId={eventsTab.selectedId}
+            showUserColumn={eventsTab.showUserCol}
           />
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm text-muted-foreground">
-            <p>Showing {filteredAndSortedEvents.length} of {totalCount} events</p>
-            {totalPages > 1 && (
+            <p>Showing {eventsTab.filteredAndSortedEvents.length} of {eventsTab.totalCount} events</p>
+            {eventsTab.totalPages > 1 && (
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setEventsPage((p) => Math.max(1, p - 1))}
-                  disabled={eventsPage === 1}
+                  onClick={() => eventsTab.setPage((p) => Math.max(1, p - 1))}
+                  disabled={eventsTab.page === 1}
                 >
                   Previous
                 </Button>
-                <span className="text-xs sm:text-sm">Page {eventsPage} of {totalPages}</span>
+                <span className="text-xs sm:text-sm">Page {eventsTab.page} of {eventsTab.totalPages}</span>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setEventsPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={eventsPage >= totalPages}
+                  onClick={() => eventsTab.setPage((p) => Math.min(eventsTab.totalPages, p + 1))}
+                  disabled={eventsTab.page >= eventsTab.totalPages}
                 >
                   Next
                 </Button>
@@ -622,12 +476,12 @@ export function ProjectDetail() {
           </div>
 
           <EventDrawer
-            eventId={eventsSelectedId}
-            open={eventsDrawerOpen}
-            onOpenChange={setEventsDrawerOpen}
-            onNavigate={handleEventsNavigate}
-            hasPrev={eventsSelectedIndex > 0}
-            hasNext={eventsSelectedIndex < filteredAndSortedEvents.length - 1}
+            eventId={eventsTab.selectedId}
+            open={eventsTab.drawerOpen}
+            onOpenChange={eventsTab.setDrawerOpen}
+            onNavigate={eventsTab.handleNavigate}
+            hasPrev={eventsTab.selectedIndex > 0}
+            hasNext={eventsTab.selectedIndex < eventsTab.filteredAndSortedEvents.length - 1}
           />
         </TabsContent>
 

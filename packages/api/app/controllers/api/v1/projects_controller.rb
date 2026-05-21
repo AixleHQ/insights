@@ -165,15 +165,21 @@ module Api
 
         prev_start = (2 * days).days.ago.beginning_of_day
         prev_end   = time_range_start
-        prev_events = @project.tool_events.where(occurred_at: prev_start...prev_end)
+
+        curr_count, curr_cost = events.pick(
+          Arel.sql("COUNT(*)"), Arel.sql("COALESCE(SUM(cost_usd), 0)")
+        )
+        prev_count, prev_cost = @project.tool_events
+          .where(occurred_at: prev_start...prev_end)
+          .pick(Arel.sql("COUNT(*)"), Arel.sql("COALESCE(SUM(cost_usd), 0)"))
 
         render json: {
           daily: daily_data,
-          totalEvents: events.count,
-          totalCost: events.sum(:cost_usd).to_f,
+          totalEvents: curr_count,
+          totalCost: curr_cost.to_f,
           previousPeriod: {
-            totalEvents: prev_events.count,
-            totalCost: prev_events.sum(:cost_usd).to_f
+            totalEvents: prev_count,
+            totalCost: prev_cost.to_f
           }
         }
       end

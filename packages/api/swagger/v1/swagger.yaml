@@ -3209,11 +3209,11 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  /api/v1/projects/{project_id}/members/{id}/stats:
+  /api/v1/projects/{project_id}/members/{id}/breakdown:
     get:
-      summary: Project-scoped member activity stats
+      summary: Project-scoped member activity breakdown
       description: |
-        Aggregate tool usage for a project member. All metrics are scoped to `tool_events` for this project only
+        Detailed tool and model breakdown for a single project member. All metrics are scoped to `tool_events` for this project only
         (events from other projects are excluded). Path `id` may be project membership id or member user UUID.
       tags:
         - Project Members

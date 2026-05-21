@@ -132,7 +132,7 @@ RSpec.describe "Api::V1::ProjectMembers", type: :request do
     end
   end
 
-  describe "GET /api/v1/projects/:project_id/members/:id/stats" do
+  describe "GET /api/v1/projects/:project_id/members/:id/breakdown" do
     let(:other_project) { create(:project, organization: organization) }
 
     before do
@@ -159,7 +159,7 @@ RSpec.describe "Api::V1::ProjectMembers", type: :request do
     end
 
     it "returns project-scoped stats and breakdowns" do
-      authenticated_get "/api/v1/projects/#{project.id}/members/#{project_member_membership.id}/stats",
+      authenticated_get "/api/v1/projects/#{project.id}/members/#{project_member_membership.id}/breakdown",
                           user: org_owner
 
       expect_success
@@ -174,7 +174,7 @@ RSpec.describe "Api::V1::ProjectMembers", type: :request do
     end
 
     it "resolves stats when path id is the member user uuid" do
-      authenticated_get "/api/v1/projects/#{project.id}/members/#{member.id}/stats",
+      authenticated_get "/api/v1/projects/#{project.id}/members/#{member.id}/breakdown",
                           user: org_owner
 
       expect_success
@@ -182,7 +182,7 @@ RSpec.describe "Api::V1::ProjectMembers", type: :request do
     end
 
     it "returns 403 for a regular project member" do
-      authenticated_get "/api/v1/projects/#{project.id}/members/#{project_member_membership.id}/stats",
+      authenticated_get "/api/v1/projects/#{project.id}/members/#{project_member_membership.id}/breakdown",
                           user: member
 
       expect_forbidden
