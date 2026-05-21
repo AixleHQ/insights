@@ -57,7 +57,8 @@ vi.mock("@/hooks/useApi", () => ({
   useConnectRepo: () => ({ mutateAsync: vi.fn() }),
   useDisconnectRepo: () => ({ mutateAsync: vi.fn() }),
   useAddProjectMember: () => ({ mutate: vi.fn(), isPending: false }),
-  useRemoveProjectMember: () => ({ mutate: vi.fn() }),
+  useUpdateProjectMember: () => ({ mutate: vi.fn(), isPending: false }),
+  useRemoveProjectMember: () => ({ mutate: vi.fn(), isPending: false }),
   useOrganizationMembers: () => ({ data: [] }),
 }));
 
@@ -95,8 +96,8 @@ const mockProject = {
 };
 
 const mockMembers = [
-  { id: "1", userId: "user-1", email: "alice@example.com", name: "Alice Johnson", avatarUrl: null, role: "owner", joinedAt: "2024-01-01T00:00:00Z" },
-  { id: "2", userId: "user-2", email: "bob@example.com", name: null, avatarUrl: null, role: "member", joinedAt: "2024-01-01T00:00:00Z" },
+  { id: "1", userId: "user-1", email: "alice@example.com", name: "Alice Johnson", avatarUrl: null, role: "owner", joinedAt: "2024-01-01T00:00:00Z", totalEvents: 0, totalCost: 0, lastActiveAt: null },
+  { id: "2", userId: "user-2", email: "bob@example.com", name: null, avatarUrl: null, role: "member", joinedAt: "2024-01-01T00:00:00Z", totalEvents: 0, totalCost: 0, lastActiveAt: null },
 ];
 
 function setupDefaultMocks() {
@@ -166,10 +167,10 @@ describe("ProjectDetail", () => {
     expect(screen.getByText("8")).toBeInTheDocument();
   });
 
-  it("does not render Team section on the overview", () => {
+  it("renders Team section on the overview", () => {
     render(<ProjectDetail />);
 
-    expect(screen.queryByText("Team")).not.toBeInTheDocument();
+    expect(screen.getByText("Team")).toBeInTheDocument();
   });
 
   it("navigates to settings when Settings menu item is clicked", async () => {

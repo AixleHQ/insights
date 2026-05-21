@@ -785,6 +785,21 @@ export function useProjectDailyByTool(projectId: string, days = 30) {
 }
 
 // Project members
+interface RawProjectMember {
+  id: string;
+  userId: string;
+  email: string;
+  name: string | null;
+  avatarUrl: string | null;
+  role: string;
+  joinedAt: string;
+  createdById?: string | null;
+  // Stats merged after Alba serialisation — snake_case because they bypass transform_keys :lower_camel
+  total_events?: number;
+  total_cost?: number;
+  last_active_at?: string | null;
+}
+
 export interface ProjectMember {
   id: string;
   userId: string;
@@ -794,14 +809,22 @@ export interface ProjectMember {
   role: string;
   joinedAt: string;
   createdById?: string | null;
+  totalEvents: number;
+  totalCost: number;
+  lastActiveAt: string | null;
 }
 
 export function useProjectMembers(projectId: string) {
   return useQuery({
     queryKey: ["projects", projectId, "members"],
     queryFn: async () => {
-      const response = await api.get<{ data: ProjectMember[] }>(`/projects/${projectId}/members`);
-      return response.data;
+      const response = await api.get<{ data: RawProjectMember[] }>(`/projects/${projectId}/members`);
+      return response.data.map((m): ProjectMember => ({
+        ...m,
+        totalEvents: m.total_events ?? 0,
+        totalCost: m.total_cost ?? 0,
+        lastActiveAt: m.last_active_at ?? null,
+      }));
     },
     enabled: !!projectId,
   });
@@ -1033,28 +1056,6 @@ export function useDisconnectRepo(projectId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects", projectId] });
     },
-  });
-}
-
-export interface MemberCommitStat {
-  userId: string;
-  name: string | null;
-  email: string;
-  avatarUrl: string | null;
-  commitCount: number;
-  lastCommitAt: string | null;
-}
-
-export function useProjectCommitStats(projectId: string, days = 30) {
-  return useQuery({
-    queryKey: ["projects", projectId, "stats", "commits_by_user", days],
-    queryFn: async () => {
-      const response = await api.get<{ data: MemberCommitStat[] }>(
-        `/projects/${projectId}/stats/commits_by_user?days=${days}`
-      );
-      return response.data;
-    },
-    enabled: !!projectId,
   });
 }
 

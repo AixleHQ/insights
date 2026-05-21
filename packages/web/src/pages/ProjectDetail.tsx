@@ -58,6 +58,7 @@ import {
   ProjectIssuesTab,
   ProjectConnectorsTab,
   ProjectMembersTab,
+  ProjectTeamSection,
 } from "@/components/project";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDistanceToNow } from "@/lib/utils";
@@ -107,7 +108,7 @@ export function ProjectDetail() {
   const [connectRepoOpen, setConnectRepoOpen] = useState(false);
 
   const { data: project, isLoading: isLoadingProject } = useProject(id || "");
-  const { data: projectMembers } = useProjectMembers(id || "");
+  const { data: projectMembers, isLoading: isLoadingMembers } = useProjectMembers(id || "");
   const { data: me } = useCurrentUser();
   const { data: projectStats } = useProjectStats(id || "");
   const { data: dailyByToolData, isLoading: isLoadingDailyByTool } = useProjectDailyByTool(id || "");
@@ -289,6 +290,14 @@ export function ProjectDetail() {
             isLoading={isLoadingRepositories}
             onConnectRepo={() => setConnectRepoOpen(true)}
             onDisconnect={(repoId) => disconnectRepo.mutateAsync(repoId)}
+          />
+
+          <ProjectTeamSection
+            members={projectMembers}
+            isLoading={isLoadingMembers}
+            projectId={id}
+            orgId={currentOrg?.id}
+            canManage={canManageMembers}
           />
 
           {(project.sourceControlSummary?.length ?? 0) > 0 && (

@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Users, GitCommitHorizontal, Trash2, UserPlus } from "lucide-react";
+import { Users, Trash2, UserPlus } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow, getMemberDisplayName, organizationMemberUserId } from "@/lib/utils";
+import { formatCost, formatCount } from "@/lib/formatters";
 import { RoleBadge } from "@/components/ui/role-badge";
-import type { ProjectMember, MemberCommitStat } from "@/hooks/useApi";
+import type { ProjectMember } from "@/hooks/useApi";
 import {
   useAddProjectMember as useAddMember,
   useUpdateProjectMember as useUpdateMember,
@@ -21,7 +22,6 @@ interface ProjectTeamSectionProps {
   members: ProjectMember[] | undefined;
   isLoading?: boolean;
   className?: string;
-  commitStats?: MemberCommitStat[];
   projectId?: string;
   orgId?: string;
   canManage?: boolean;
@@ -40,6 +40,24 @@ function getInitials(name?: string | null, email?: string): string {
 }
 
 const ROLES = ["owner", "member", "viewer"] as const;
+
+function MemberStatBlock({ member }: { member: ProjectMember }) {
+  return (
+    <div className="flex flex-col items-end shrink-0 text-right">
+      <span className="text-xs font-medium tabular-nums">
+        {formatCount(member.totalEvents)} events
+      </span>
+      <span className="text-xs text-muted-foreground tabular-nums">
+        {formatCost(member.totalCost)}
+      </span>
+      {member.lastActiveAt && (
+        <span className="text-[10px] text-muted-foreground">
+          {formatDistanceToNow(member.lastActiveAt)}
+        </span>
+      )}
+    </div>
+  );
+}
 
 function ProjectTeamManageList({
   members,
@@ -76,6 +94,7 @@ function ProjectTeamManageList({
             </p>
             <p className="truncate text-xs text-muted-foreground">{member.email}</p>
           </div>
+          <MemberStatBlock member={member} />
           <Select
             value={member.role}
             onValueChange={(role) => updateMember.mutate({ id: member.id, role })}
@@ -193,12 +212,10 @@ export function ProjectTeamSection({
   members,
   isLoading,
   className,
-  commitStats,
   projectId,
   orgId,
   canManage,
 }: ProjectTeamSectionProps) {
-  const commitsByUserId = new Map(commitStats?.map((s) => [s.userId, s]) ?? []);
 
   if (isLoading) {
     return (
@@ -246,42 +263,29 @@ export function ProjectTeamSection({
             />
           ) : (
             <div className="flex flex-wrap gap-3">
-              {members?.map((member) => {
-                const stats = commitsByUserId.get(member.userId);
-                return (
-                  <Link
-                    key={member.id}
-                    to={projectId ? `/members/${member.userId}?projectId=${projectId}` : `/members/${member.userId}`}
-                    className="group flex items-center gap-2 rounded-lg border p-2 transition-colors hover:bg-muted/50"
-                  >
-                    <Avatar className="size-8">
-                      {member.avatarUrl && (
-                        <AvatarImage src={member.avatarUrl} alt={member.name || member.email} />
-                      )}
-                      <AvatarFallback className="text-xs bg-muted">
-                        {getInitials(member.name, member.email)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium group-hover:underline">
-                        {getMemberDisplayName(member)}
-                      </p>
-                      <RoleBadge role={member.role as "owner" | "member" | "viewer"} className="text-[10px] px-1.5 py-0" />
-                    </div>
-                    {stats && (
-                      <div className="flex flex-col items-end shrink-0 text-muted-foreground">
-                        <span className="flex items-center gap-1 text-xs font-medium">
-                          <GitCommitHorizontal className="size-3" />
-                          {stats.commitCount}
-                        </span>
-                        {stats.lastCommitAt && (
-                          <span className="text-[10px]">{formatDistanceToNow(stats.lastCommitAt)}</span>
-                        )}
-                      </div>
+              {members?.map((member) => (
+                <Link
+                  key={member.id}
+                  to={projectId ? `/members/${member.userId}?projectId=${projectId}` : `/members/${member.userId}`}
+                  className="group flex items-center gap-2 rounded-lg border p-2 transition-colors hover:bg-muted/50"
+                >
+                  <Avatar className="size-8">
+                    {member.avatarUrl && (
+                      <AvatarImage src={member.avatarUrl} alt={member.name || member.email} />
                     )}
-                  </Link>
-                );
-              })}
+                    <AvatarFallback className="text-xs bg-muted">
+                      {getInitials(member.name, member.email)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium group-hover:underline">
+                      {getMemberDisplayName(member)}
+                    </p>
+                    <RoleBadge role={member.role as "owner" | "member" | "viewer"} className="text-[10px] px-1.5 py-0" />
+                  </div>
+                  <MemberStatBlock member={member} />
+                </Link>
+              ))}
             </div>
           )
         ) : canManage && projectId && orgId ? (

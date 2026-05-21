@@ -31,6 +31,9 @@ const mockMembers: ProjectMember[] = [
     avatarUrl: "https://example.com/avatar1.jpg",
     role: "owner",
     joinedAt: "2024-01-15T10:00:00Z",
+    totalEvents: 0,
+    totalCost: 0,
+    lastActiveAt: null,
   },
   {
     id: "2",
@@ -40,6 +43,9 @@ const mockMembers: ProjectMember[] = [
     avatarUrl: null,
     role: "member",
     joinedAt: "2024-01-20T10:00:00Z",
+    totalEvents: 0,
+    totalCost: 0,
+    lastActiveAt: null,
   },
 ];
 
@@ -184,6 +190,51 @@ describe("ProjectTeamSection", () => {
     });
   });
 
+  describe("Stats display", () => {
+    const membersWithStats: ProjectMember[] = [
+      {
+        ...mockMembers[0],
+        totalEvents: 42,
+        totalCost: 1.234,
+        lastActiveAt: new Date(Date.now() - 3_600_000).toISOString(),
+      },
+      {
+        ...mockMembers[1],
+        totalEvents: 0,
+        totalCost: 0,
+        lastActiveAt: null,
+      },
+    ];
+
+    it("shows event count per member", () => {
+      renderComponent({ members: membersWithStats });
+      expect(screen.getByText("42 events")).toBeInTheDocument();
+      expect(screen.getByText("0 events")).toBeInTheDocument();
+    });
+
+    it("shows formatted cost per member", () => {
+      renderComponent({ members: membersWithStats });
+      // formatCost(1.234): ≥ $0.01 → 2 dp → "$1.23"
+      expect(screen.getByText("$1.23")).toBeInTheDocument();
+      expect(screen.getByText("$0.00")).toBeInTheDocument();
+    });
+
+    it("shows last active when present, omits when null", () => {
+      const { container } = renderComponent({ members: membersWithStats });
+      const memberLinks = container.querySelectorAll('a[href^="/members/"]');
+      expect(memberLinks[0]?.textContent).toMatch(/ago/);
+      expect(memberLinks[1]?.textContent).not.toMatch(/ago/);
+    });
+
+    it("shows zero-state for members without stats fields", () => {
+      renderComponent(); // mockMembers have no stats fields — ?? 0 applies
+      const zeros = screen.getAllByText("0 events");
+      expect(zeros).toHaveLength(mockMembers.length);
+      const zeroCosts = screen.getAllByText("$0.00");
+      expect(zeroCosts).toHaveLength(mockMembers.length);
+    });
+  });
+
   describe("Custom className", () => {
     it("applies custom className to container", () => {
       const { container } = renderComponent({ className: "custom-class" });
@@ -220,6 +271,18 @@ describe("ProjectTeamSection", () => {
       await user.click(removeButtons[0]);
 
       expect(mockRemoveMutate).toHaveBeenCalledWith(mockMembers[0].id);
+    });
+
+    it("shows events and cost in manage rows", () => {
+      const membersWithStats: ProjectMember[] = [
+        { ...mockMembers[0], totalEvents: 42, totalCost: 1.234, lastActiveAt: null },
+        { ...mockMembers[1], totalEvents: 0,  totalCost: 0,     lastActiveAt: null },
+      ];
+      renderComponent({ ...manageProps, members: membersWithStats });
+      expect(screen.getByText("42 events")).toBeInTheDocument();
+      expect(screen.getByText("$1.23")).toBeInTheDocument();
+      expect(screen.getByText("0 events")).toBeInTheDocument();
+      expect(screen.getAllByText("$0.00")).toHaveLength(1);
     });
   });
 });
