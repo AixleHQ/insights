@@ -16,7 +16,6 @@ import {
   useUpdateProject,
   useDeleteProject,
 } from "@/hooks/useApi";
-import { useOrg } from "@/contexts/OrgContext";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
