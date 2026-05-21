@@ -11,7 +11,10 @@ import {
   MoreHorizontal,
   RefreshCw,
   Trash2,
+  Download,
+  Loader2,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useOrg } from "@/contexts/OrgContext";
 import {
   useProject,
@@ -21,8 +24,12 @@ import {
   useProjectRepositories,
   useDisconnectRepo,
   useProjectMembers,
+  useCurrentUser,
+  useEventsSummary,
+  useExportEvents,
   type ProjectMember,
 } from "@/hooks/useApi";
+import { useEventsPageUpdates } from "@/hooks/useWebSocket";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -42,26 +49,30 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { EventsTable, EventDrawer, FilterChip, type EventRow } from "@/components/events";
+import { EventsTable, EventDrawer, EventFilters, type EventRow, type EventFiltersState } from "@/components/events";
 import { ToolUsageByDayChart } from "@/components/dashboard";
-import { ProjectReposSection, ProjectNotFound, ConnectRepoSheet, ProjectIssuesTab } from "@/components/project";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { formatDistanceToNow, toEventRow, getMemberDisplayName } from "@/lib/utils";
+  ProjectReposSection,
+  ProjectNotFound,
+  ConnectRepoSheet,
+  ProjectIssuesTab,
+  ProjectConnectorsTab,
+} from "@/components/project";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatDistanceToNow, toEventRow, humanizeToolName } from "@/lib/utils";
+import { showEventsUserColumn } from "@/lib/eventAccess";
+import type { EventsToolFilterOption } from "@/lib/eventsToolFilters";
 
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-  }).format(value);
-}
+type SortField = "created_at" | "tool_name" | "risk_level" | "cost_usd";
+type SortDirection = "asc" | "desc";
+
+const riskLevelOrder = {
+  critical: 4,
+  high: 3,
+  medium: 2,
+  low: 1,
+  none: 0,
+};
 
 function StatCard({
   icon: Icon,
@@ -93,55 +104,169 @@ function StatCard({
   );
 }
 
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+  }).format(value);
+}
+
 export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
-  const { currentOrg } = useOrg();
+  const { currentOrg, currentRole, hasRole } = useOrg();
   const navigate = useNavigate();
-  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const queryClient = useQueryClient();
   const [connectRepoOpen, setConnectRepoOpen] = useState(false);
 
-  const [selectedUserId, setSelectedUserId] = useState<string | undefined>(undefined);
+  // Events tab state
+  const [eventsFilters, setEventsFilters] = useState<EventFiltersState>({});
+  const [eventsPage, setEventsPage] = useState(1);
+  const [eventsSort, setEventsSort] = useState<SortField>("created_at");
+  const [eventsSortDir, setEventsSortDir] = useState<SortDirection>("desc");
+  const [eventsSelectedId, setEventsSelectedId] = useState<string | null>(null);
+  const [eventsDrawerOpen, setEventsDrawerOpen] = useState(false);
+  const [exportQueued, setExportQueued] = useState(false);
+  const [exportError, setExportError] = useState(false);
+
 
   const { data: project, isLoading: isLoadingProject } = useProject(id || "");
   const { data: projectMembers } = useProjectMembers(id || "");
-  const { data: eventsResponse, isLoading: isLoadingEvents, isError: isEventsError } = useEvents(
-    currentOrg?.id || "",
-    { project_id: id, per_page: 10, user_id: selectedUserId }
-  );
+  const { data: me } = useCurrentUser();
   const { data: dailyByToolData, isLoading: isLoadingDailyByTool } = useProjectDailyByTool(id || "");
   const { data: projectRepositories, isLoading: isLoadingRepositories } = useProjectRepositories(id || "");
   const disconnectRepo = useDisconnectRepo(id || "");
   const deleteProject = useDeleteProject();
 
-  const events: EventRow[] = useMemo(
+  // Events tab hooks
+  const eventsApiParams = useMemo(() => ({
+    page: eventsPage,
+    per_page: 25,
+    project_id: id,
+    tool_name: eventsFilters.tool,
+    risk_level: eventsFilters.riskLevels?.length === 1 ? eventsFilters.riskLevels[0] : undefined,
+    event_type: eventsFilters.eventType,
+    start_date: eventsFilters.dateFrom,
+    end_date: eventsFilters.dateTo,
+  }), [id, eventsPage, eventsFilters]);
+
+  const { data: eventsResponse, isLoading: isLoadingTabEvents } = useEvents(currentOrg?.id || "", eventsApiParams);
+  const { data: eventsSummary } = useEventsSummary(currentOrg?.id || "");
+  const { exportEvents, isExporting } = useExportEvents(currentOrg?.id || "");
+
+  const toolFilterOptions = useMemo<EventsToolFilterOption[]>(() => {
+    const byTool = eventsSummary?.byTool;
+    if (!byTool || Object.keys(byTool).length === 0) return [];
+    return Object.keys(byTool).sort().map((slug) => ({ value: slug, label: humanizeToolName(slug) }));
+  }, [eventsSummary]);
+
+  const showUserCol = showEventsUserColumn(currentRole) || !!(me?.globalAdmin ?? me?.super_admin);
+
+  useEventsPageUpdates({
+    onNewEvent: () => queryClient.invalidateQueries({ queryKey: ["organizations", currentOrg?.id, "events"] }),
+    onEventUpdated: () => queryClient.invalidateQueries({ queryKey: ["organizations", currentOrg?.id, "events"] }),
+  });
+
+  const tabEvents: EventRow[] = useMemo(
     () => eventsResponse?.data?.map(toEventRow) ?? [],
     [eventsResponse]
   );
 
-  const selectedMember = selectedUserId
-    ? projectMembers?.find((m) => m.userId === selectedUserId)
-    : undefined;
+  const filteredAndSortedEvents = useMemo(() => {
+    let result = [...tabEvents];
 
-  const handleEventClick = useCallback((eventId: string) => {
-    setSelectedEventId(eventId);
-    setDrawerOpen(true);
-  }, []);
-
-  const handleNavigate = useCallback((direction: "prev" | "next") => {
-    if (!selectedEventId) return;
-    const currentIndex = events.findIndex((e) => e.id === selectedEventId);
-    if (currentIndex === -1) return;
-
-    const newIndex = direction === "prev" ? currentIndex - 1 : currentIndex + 1;
-    if (newIndex >= 0 && newIndex < events.length) {
-      setSelectedEventId(events[newIndex].id);
+    if (eventsFilters.search) {
+      const s = eventsFilters.search.toLowerCase();
+      result = result.filter(
+        (e) =>
+          (e.tool_name || "").toLowerCase().includes(s) ||
+          (e.project?.name || "").toLowerCase().includes(s)
+      );
     }
-  }, [selectedEventId, events]);
 
-  const selectedEventIndex = selectedEventId
-    ? events.findIndex((e) => e.id === selectedEventId)
+    if (eventsFilters.riskLevels && eventsFilters.riskLevels.length > 0) {
+      result = result.filter((e) => eventsFilters.riskLevels!.includes(e.risk_level || "none"));
+    }
+
+    result.sort((a, b) => {
+      let comparison = 0;
+      switch (eventsSort) {
+        case "created_at":
+          comparison = new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+          break;
+        case "tool_name":
+          comparison = (a.tool_name || "").localeCompare(b.tool_name || "");
+          break;
+        case "risk_level":
+          comparison =
+            (riskLevelOrder[a.risk_level as keyof typeof riskLevelOrder] || 0) -
+            (riskLevelOrder[b.risk_level as keyof typeof riskLevelOrder] || 0);
+          break;
+        case "cost_usd":
+          comparison = (a.cost_usd || 0) - (b.cost_usd || 0);
+          break;
+      }
+      return eventsSortDir === "asc" ? comparison : -comparison;
+    });
+
+    return result;
+  }, [tabEvents, eventsFilters.search, eventsFilters.riskLevels, eventsSort, eventsSortDir]);
+
+  const totalPages = eventsResponse?.meta?.total_pages || 1;
+  const totalCount = eventsResponse?.meta?.total_count || 0;
+
+  const eventsSelectedIndex = eventsSelectedId
+    ? filteredAndSortedEvents.findIndex((e) => e.id === eventsSelectedId)
     : -1;
+
+  const handleEventsSort = useCallback((field: SortField) => {
+    if (eventsSort === field) {
+      setEventsSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setEventsSort(field);
+      setEventsSortDir("desc");
+    }
+  }, [eventsSort]);
+
+  const handleEventsNavigate = useCallback((direction: "prev" | "next") => {
+    if (!eventsSelectedId) return;
+    const currentIndex = filteredAndSortedEvents.findIndex((e) => e.id === eventsSelectedId);
+    if (currentIndex === -1) return;
+    const newIndex = direction === "prev" ? currentIndex - 1 : currentIndex + 1;
+    if (newIndex >= 0 && newIndex < filteredAndSortedEvents.length) {
+      setEventsSelectedId(filteredAndSortedEvents[newIndex].id);
+    }
+  }, [eventsSelectedId, filteredAndSortedEvents]);
+
+  const handleExport = async () => {
+    setExportQueued(false);
+    setExportError(false);
+    const startStr = eventsFilters.dateFrom ?? "all";
+    const endStr = eventsFilters.dateTo ?? new Date().toISOString().split("T")[0];
+    const filename = `db90-events-${startStr}-${endStr}.csv`;
+    try {
+      const result = await exportEvents({
+        tool_name: eventsFilters.tool,
+        risk_level: eventsFilters.riskLevels?.[0],
+        event_type: eventsFilters.eventType,
+        start_date: eventsFilters.dateFrom,
+        end_date: eventsFilters.dateTo,
+        project_id: id,
+        filename,
+      });
+      if (result?.queued) {
+        setExportQueued(true);
+      }
+    } catch (err) {
+      console.error("Export failed:", err);
+      setExportError(true);
+    }
+  };
+
+  // Permission flags (reused by tab gates)
+  const myProjectMembership = projectMembers?.find((m: ProjectMember) => m.userId === me?.id);
+  const isProjectOwner = hasRole(["owner"]) || myProjectMembership?.role === "owner";
+  const isMemberOfProject = isProjectOwner || !!myProjectMembership;
 
   const handleDelete = async () => {
     if (!id) return;
@@ -225,11 +350,14 @@ export function ProjectDetail() {
       <Tabs defaultValue="overview">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="events">Events</TabsTrigger>
+          {isMemberOfProject && <TabsTrigger value="members">Members</TabsTrigger>}
+          {isProjectOwner && <TabsTrigger value="integrations">Integrations</TabsTrigger>}
           <TabsTrigger value="issues">Issues</TabsTrigger>
         </TabsList>
 
+        {/* ── Overview ── */}
         <TabsContent value="overview" className="space-y-6 mt-4">
-          {/* Tool Usage Chart */}
           {dailyByToolData && dailyByToolData.data && dailyByToolData.data.length > 0 && (
             <ToolUsageByDayChart
               data={dailyByToolData.data}
@@ -382,66 +510,6 @@ export function ProjectDetail() {
             </Card>
           )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Recent Events</CardTitle>
-              <CardDescription>
-                Latest AI tool activity for this project
-              </CardDescription>
-            </CardHeader>
-            {projectMembers && projectMembers.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2 px-6 pb-3">
-                <Select
-                  value={selectedUserId ?? "__all__"}
-                  onValueChange={(val) => setSelectedUserId(val === "__all__" ? undefined : val)}
-                >
-                  <SelectTrigger className="h-8 w-[180px] text-sm">
-                    <SelectValue placeholder="All members" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">All members</SelectItem>
-                    {projectMembers.map((member: ProjectMember) => (
-                      <SelectItem key={member.userId} value={member.userId}>
-                        {getMemberDisplayName(member)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {selectedUserId && selectedMember && (
-                  <FilterChip
-                    label="Member"
-                    value={getMemberDisplayName(selectedMember)}
-                    onRemove={() => setSelectedUserId(undefined)}
-                  />
-                )}
-              </div>
-            )}
-            <CardContent className="p-0">
-              {isEventsError ? (
-                <Alert variant="destructive" className="m-4">
-                  <AlertCircle className="size-4" />
-                  <AlertDescription>Failed to load events. Please try again.</AlertDescription>
-                </Alert>
-              ) : (
-                <EventsTable
-                  events={events}
-                  isLoading={isLoadingEvents}
-                  onEventClick={handleEventClick}
-                  selectedEventId={selectedEventId}
-                />
-              )}
-            </CardContent>
-          </Card>
-
-          <EventDrawer
-            eventId={selectedEventId}
-            open={drawerOpen}
-            onOpenChange={setDrawerOpen}
-            onNavigate={handleNavigate}
-            hasPrev={selectedEventIndex > 0}
-            hasNext={selectedEventIndex < events.length - 1}
-          />
-
           <ConnectRepoSheet
             projectId={id || ""}
             open={connectRepoOpen}
@@ -450,6 +518,108 @@ export function ProjectDetail() {
           />
         </TabsContent>
 
+        {/* ── Events ── */}
+        <TabsContent value="events" className="space-y-4 mt-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <EventFilters
+              filters={eventsFilters}
+              onFiltersChange={(f) => { setEventsFilters(f); setEventsPage(1); }}
+              tools={toolFilterOptions}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExport}
+              disabled={isExporting}
+              className="shrink-0"
+            >
+              {isExporting ? (
+                <Loader2 className="mr-2 size-4 animate-spin" />
+              ) : (
+                <Download className="mr-2 size-4" />
+              )}
+              <span className="hidden sm:inline">{isExporting ? "Exporting…" : "Export"}</span>
+            </Button>
+          </div>
+
+          {exportQueued && (
+            <p className="text-sm text-muted-foreground">
+              Your export is too large to download immediately. It has been queued — check back shortly.
+            </p>
+          )}
+          {exportError && (
+            <Alert variant="destructive">
+              <AlertCircle className="size-4" />
+              <AlertDescription>Export failed. Please try again.</AlertDescription>
+            </Alert>
+          )}
+
+          <EventsTable
+            events={filteredAndSortedEvents}
+            isLoading={isLoadingTabEvents}
+            sortField={eventsSort}
+            sortDirection={eventsSortDir}
+            onSort={handleEventsSort}
+            onEventClick={(eid) => {
+              setEventsSelectedId(eid);
+              setEventsDrawerOpen(true);
+            }}
+            selectedEventId={eventsSelectedId}
+            showUserColumn={showUserCol}
+          />
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm text-muted-foreground">
+            <p>Showing {filteredAndSortedEvents.length} of {totalCount} events</p>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEventsPage((p) => Math.max(1, p - 1))}
+                  disabled={eventsPage === 1}
+                >
+                  Previous
+                </Button>
+                <span className="text-xs sm:text-sm">Page {eventsPage} of {totalPages}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEventsPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={eventsPage >= totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <EventDrawer
+            eventId={eventsSelectedId}
+            open={eventsDrawerOpen}
+            onOpenChange={setEventsDrawerOpen}
+            onNavigate={handleEventsNavigate}
+            hasPrev={eventsSelectedIndex > 0}
+            hasNext={eventsSelectedIndex < filteredAndSortedEvents.length - 1}
+          />
+        </TabsContent>
+
+        {/* ── Members (stub — implemented in 01b) ── */}
+        {isMemberOfProject && (
+          <TabsContent value="members" className="mt-4">
+            <div className="flex items-center justify-center rounded-lg border border-dashed py-12">
+              <p className="text-sm text-muted-foreground">Members tab coming soon</p>
+            </div>
+          </TabsContent>
+        )}
+
+        {/* ── Integrations (lead-only) ── */}
+        {isProjectOwner && (
+          <TabsContent value="integrations" className="mt-4">
+            <ProjectConnectorsTab projectId={id || ""} />
+          </TabsContent>
+        )}
+
+        {/* ── Issues ── */}
         <TabsContent value="issues" className="mt-4">
           <ProjectIssuesTab projectId={id || ""} project={project} />
         </TabsContent>
