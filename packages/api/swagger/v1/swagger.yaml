@@ -2924,7 +2924,7 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: '#/components/schemas/ProjectMembership'
+                      $ref: '#/components/schemas/ProjectMemberListItem'
                   meta:
                     $ref: '#/components/schemas/PaginationMeta'
     post:
@@ -3016,6 +3016,34 @@ paths:
           description: Member removed
         '403':
           $ref: '#/components/responses/Forbidden'
+
+  /api/v1/projects/{project_id}/members/{id}/stats:
+    get:
+      summary: Project-scoped member activity stats
+      description: |
+        Aggregate tool usage for a project member. All metrics are scoped to `tool_events` for this project only
+        (events from other projects are excluded). Path `id` may be project membership id or member user UUID.
+      tags:
+        - Project Members
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - name: id
+          in: path
+          required: true
+          description: Project membership ID or member user UUID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Member stats for the project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectMemberStats'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   # ============================================
   # REPOSITORY ENDPOINTS
@@ -4957,7 +4985,7 @@ components:
               type: string
               format: date-time
               nullable: true
-              description: Timestamp of the member's last login
+              description: Most recent tool event time for this member within the organization (MAX(occurred_at)); null if no events
 
     OrganizationConnector:
       type: object
@@ -5326,6 +5354,64 @@ components:
         - role
         - createdAt
         - updatedAt
+
+    ProjectMemberListItem:
+      allOf:
+        - $ref: '#/components/schemas/ProjectMembership'
+        - type: object
+          properties:
+            total_tokens:
+              type: integer
+              description: Total tokens (tokens_in + tokens_out) for this member in this project
+            total_events:
+              type: integer
+            total_cost:
+              type: number
+              format: float
+            last_active_at:
+              type: string
+              format: date-time
+              nullable: true
+              description: Most recent tool event for this member in this project; null if none
+
+    ProjectMemberStats:
+      type: object
+      properties:
+        total_events:
+          type: integer
+        total_cost:
+          type: number
+          format: float
+        events_today:
+          type: integer
+        events_this_week:
+          type: integer
+        events_this_month:
+          type: integer
+        most_used_tool:
+          type: string
+          nullable: true
+        tokens:
+          type: object
+          properties:
+            total_in:
+              type: integer
+            total_out:
+              type: integer
+            total:
+              type: integer
+        tool_breakdown:
+          type: array
+          items:
+            type: object
+        model_breakdown:
+          type: array
+          items:
+            type: object
+        daily_activity:
+          type: array
+          items:
+            type: object
 
     Repository:
       type: object

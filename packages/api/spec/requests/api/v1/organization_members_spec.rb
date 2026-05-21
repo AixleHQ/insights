@@ -43,8 +43,10 @@ RSpec.describe 'Api::V1::OrganizationMembers', type: :request do
       expect(member_data[:total_tokens]).to eq(500) # 100+200+50+150
     end
 
-    it 'includes last_active_at from user login' do
-      member.update!(last_login_at: 1.hour.ago)
+    it 'includes last_active_at from latest organization tool event' do
+      member.update!(last_login_at: 1.week.ago)
+      event_time = Time.zone.parse("2024-06-01 12:00:00")
+      create(:tool_event, organization: organization, user: member, occurred_at: event_time)
 
       authenticated_get "/api/v1/organizations/#{organization.id}/members",
                         user: member,
@@ -53,6 +55,7 @@ RSpec.describe 'Api::V1::OrganizationMembers', type: :request do
       expect_success
       member_data = json_data.find { |m| m[:user][:email] == member.email }
       expect(member_data[:last_active_at]).to be_present
+      expect(Time.zone.parse(member_data[:last_active_at])).to be_within(1.second).of(event_time)
     end
 
     it 'returns 0 tokens for members with no events' do

@@ -48,6 +48,20 @@ RSpec.describe ProjectMembershipPolicy, type: :policy do
       end
     end
 
+    describe "#stats?" do
+      it "allows org owner" do
+        expect(policy(member_membership, current_user: org_owner_user).apply(:stats?)).to be true
+      end
+
+      it "allows project row-owner" do
+        expect(policy(member_membership, current_user: project_owner_user).apply(:stats?)).to be true
+      end
+
+      it "denies project member" do
+        expect(policy(member_membership, current_user: member_user).apply(:stats?)).to be false
+      end
+    end
+
     describe "#create?" do
       let(:new_member) { create(:user) }
 
