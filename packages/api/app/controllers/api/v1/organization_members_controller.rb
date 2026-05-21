@@ -27,7 +27,8 @@ module Api
             "user_id",
             "COALESCE(SUM(tokens_in), 0) + COALESCE(SUM(tokens_out), 0) as total_tokens",
             "COUNT(*) as total_events",
-            "COALESCE(SUM(cost_usd), 0) as total_cost"
+            "COALESCE(SUM(cost_usd), 0) as total_cost",
+            "MAX(occurred_at) as last_active_at"
           )
           .index_by(&:user_id)
 
@@ -38,7 +39,7 @@ module Api
             total_tokens: stats&.total_tokens&.to_i || 0,
             total_events: stats&.total_events&.to_i || 0,
             total_cost:   stats&.total_cost&.to_f  || 0.0,
-            last_active_at: membership.user.last_login_at&.iso8601
+            last_active_at: stats&.last_active_at&.in_time_zone&.iso8601
           )
         end
 

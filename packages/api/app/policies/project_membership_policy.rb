@@ -10,6 +10,10 @@ class ProjectMembershipPolicy < ApplicationPolicy
     can_view_membership_list?
   end
 
+  def stats?
+    can_view_membership_list?
+  end
+
   # Only org owners can add/change/remove members (or personal project owners / global admin)
   def create?
     can_mutate_membership?

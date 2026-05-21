@@ -199,7 +199,11 @@ Rails.application.routes.draw do
         resources :issues, only: [ :index, :show ]
 
         # Project members
-        resources :members, controller: "project_members"
+        resources :members, controller: "project_members" do
+          member do
+            get :stats
+          end
+        end
 
         # Project repositories
         resources :repositories do
