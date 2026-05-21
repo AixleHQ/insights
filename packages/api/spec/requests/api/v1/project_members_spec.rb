@@ -92,14 +92,11 @@ RSpec.describe "Api::V1::ProjectMembers", type: :request do
       expect(json_data.first[:role]).to eq("owner")
     end
 
-    it "returns 403 for regular project members" do
-      member_only = create(:user)
-      create(:organization_membership, user: member_only, organization: organization, role: "member")
-      create(:project_membership, user: member_only, project: project, role: "member")
+    it "returns 200 for regular project members (policy fix regression)" do
+      authenticated_get "/api/v1/projects/#{project.id}/members", user: member
 
-      authenticated_get "/api/v1/projects/#{project.id}/members", user: member_only
-
-      expect_forbidden
+      expect_success
+      expect(json_data.length).to eq(2)
     end
 
     it "returns 403 for outsiders" do
@@ -127,15 +124,15 @@ RSpec.describe "Api::V1::ProjectMembers", type: :request do
       expect(json_data[:id]).to eq(project_member_membership.id)
     end
 
-    it "returns 403 for regular members" do
+    it "returns 200 for regular project members (policy fix regression)" do
       authenticated_get "/api/v1/projects/#{project.id}/members/#{project_member_membership.id}",
                           user: member
 
-      expect_forbidden
+      expect_success
     end
   end
 
-  describe "GET /api/v1/projects/:project_id/members/:id/stats" do
+  describe "GET /api/v1/projects/:project_id/members/:id/breakdown" do
     let(:other_project) { create(:project, organization: organization) }
 
     before do
@@ -162,7 +159,7 @@ RSpec.describe "Api::V1::ProjectMembers", type: :request do
     end
 
     it "returns project-scoped stats and breakdowns" do
-      authenticated_get "/api/v1/projects/#{project.id}/members/#{project_member_membership.id}/stats",
+      authenticated_get "/api/v1/projects/#{project.id}/members/#{project_member_membership.id}/breakdown",
                           user: org_owner
 
       expect_success
@@ -177,7 +174,7 @@ RSpec.describe "Api::V1::ProjectMembers", type: :request do
     end
 
     it "resolves stats when path id is the member user uuid" do
-      authenticated_get "/api/v1/projects/#{project.id}/members/#{member.id}/stats",
+      authenticated_get "/api/v1/projects/#{project.id}/members/#{member.id}/breakdown",
                           user: org_owner
 
       expect_success
@@ -185,7 +182,7 @@ RSpec.describe "Api::V1::ProjectMembers", type: :request do
     end
 
     it "returns 403 for a regular project member" do
-      authenticated_get "/api/v1/projects/#{project.id}/members/#{project_member_membership.id}/stats",
+      authenticated_get "/api/v1/projects/#{project.id}/members/#{project_member_membership.id}/breakdown",
                           user: member
 
       expect_forbidden
@@ -322,6 +319,54 @@ RSpec.describe "Api::V1::ProjectMembers", type: :request do
                           params: { role: "viewer" }
 
       expect_forbidden
+    end
+  end
+
+  describe "GET /api/v1/projects/:project_id/members/stats" do
+    it "returns 200 for org owner" do
+      authenticated_get "/api/v1/projects/#{project.id}/members/stats", user: org_owner
+
+      expect_success
+      expect(json_data).to be_an(Array)
+    end
+
+    it "returns 200 for project row-owner" do
+      authenticated_get "/api/v1/projects/#{project.id}/members/stats", user: project_owner_user
+
+      expect_success
+      expect(json_data).to be_an(Array)
+    end
+
+    it "returns 403 for project member role" do
+      authenticated_get "/api/v1/projects/#{project.id}/members/stats", user: member
+
+      expect_forbidden
+    end
+
+    it "includes all members even those with zero events in the period" do
+      authenticated_get "/api/v1/projects/#{project.id}/members/stats", user: org_owner
+
+      expect_success
+      user_ids = json_data.map { |r| r[:userId] }
+      expect(user_ids).to include(member.id)
+      zero_row = json_data.find { |r| r[:userId] == member.id }
+      expect(zero_row[:eventCount]).to eq(0)
+    end
+
+    it "returns the most-used tool as primaryTool" do
+      create(:tool_event, user: project_owner_user, project: project,
+             organization: organization, tool_name: "claude_code", occurred_at: 1.day.ago)
+      create(:tool_event, user: project_owner_user, project: project,
+             organization: organization, tool_name: "claude_code", occurred_at: 2.days.ago)
+      create(:tool_event, user: project_owner_user, project: project,
+             organization: organization, tool_name: "cursor", occurred_at: 3.days.ago)
+
+      authenticated_get "/api/v1/projects/#{project.id}/members/stats", user: org_owner
+
+      expect_success
+      row = json_data.find { |r| r[:userId] == project_owner_user.id }
+      expect(row[:primaryTool]).to eq("claude_code")
+      expect(row[:eventCount]).to eq(3)
     end
   end
 

@@ -200,9 +200,8 @@ Rails.application.routes.draw do
 
         # Project members
         resources :members, controller: "project_members" do
-          member do
-            get :stats
-          end
+          collection { get :stats }
+          member { get :breakdown }
         end
 
         # Project repositories

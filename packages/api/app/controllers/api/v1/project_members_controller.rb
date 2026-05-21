@@ -4,7 +4,73 @@ module Api
   module V1
     class ProjectMembersController < BaseController
       before_action :set_project
-      before_action :set_membership, only: %i[show update destroy stats]
+      before_action :set_membership, only: %i[show update destroy breakdown]
+
+      # GET /api/v1/projects/:project_id/members/stats (collection — AIX-117 Members tab)
+      def stats
+        authorize! @project.project_memberships.new, to: :stats?
+
+        days = (params[:days] || 30).to_i
+        since = days.days.ago.beginning_of_day
+
+        # Single scan: group by user+tool, aggregate in Ruby
+        per_tool_rows = @project.tool_events
+          .where(occurred_at: since..)
+          .where.not(user_id: nil)
+          .group(:user_id, :tool_name)
+          .select(
+            "user_id",
+            "tool_name",
+            "COUNT(*) AS tool_count",
+            "COALESCE(SUM(tokens_in), 0) AS input_tokens",
+            "COALESCE(SUM(tokens_out), 0) AS output_tokens",
+            "COALESCE(SUM(cost_usd), 0) AS cost_usd",
+            "MAX(occurred_at) AS last_event_at"
+          )
+
+        stats_by_user = {}
+        primary_tools = {}
+
+        per_tool_rows.each do |row|
+          uid = row.user_id
+          s = stats_by_user[uid] ||= {
+            event_count: 0, input_tokens: 0, output_tokens: 0,
+            cost_usd: 0.0, last_event_at: nil, max_tool_count: 0
+          }
+          count = row.tool_count.to_i
+          s[:event_count]   += count
+          s[:input_tokens]  += row.input_tokens.to_i
+          s[:output_tokens] += row.output_tokens.to_i
+          s[:cost_usd]      += row.cost_usd.to_f
+          s[:last_event_at]  = [ s[:last_event_at], row.last_event_at ].compact.max
+          if count > s[:max_tool_count]
+            s[:max_tool_count] = count
+            primary_tools[uid] = row.tool_name
+          end
+        end
+
+        memberships = @project.project_memberships.includes(:user).order("users.name")
+
+        data = memberships.filter_map do |m|
+          next unless m.user
+
+          s = stats_by_user[m.user_id]
+          {
+            userId:      m.user_id,
+            email:       m.user.email,
+            name:        m.user.name,
+            role:        m.role,
+            eventCount:  s&.dig(:event_count)  || 0,
+            inputTokens: s&.dig(:input_tokens) || 0,
+            outputTokens: s&.dig(:output_tokens) || 0,
+            costUsd:     s&.dig(:cost_usd)     || 0.0,
+            lastEventAt: s&.dig(:last_event_at)&.iso8601,
+            primaryTool: primary_tools[m.user_id]
+          }
+        end
+
+        render json: { data: data }
+      end
 
       # GET /api/v1/projects/:project_id/members
       def index
@@ -127,9 +193,9 @@ module Api
         end
       end
 
-      # GET /api/v1/projects/:project_id/members/:id/stats
-      def stats
-        authorize! @membership
+      # GET /api/v1/projects/:project_id/members/:id/breakdown
+      def breakdown
+        authorize! @membership, to: :stats?
         user = @membership.user
 
         events = @project.tool_events.where(user_id: user.id)

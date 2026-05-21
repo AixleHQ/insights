@@ -2896,6 +2896,59 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /api/v1/projects/{id}/stats:
+    get:
+      summary: Project usage stats
+      description: Returns daily event/cost data plus period totals and a comparison window for delta display.
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 30
+          description: Number of days to look back (default 30)
+      responses:
+        '200':
+          description: Project stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  daily:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                        eventCount:
+                          type: integer
+                        costUsd:
+                          type: number
+                          format: float
+                  totalEvents:
+                    type: integer
+                  totalCost:
+                    type: number
+                    format: float
+                  previousPeriod:
+                    type: object
+                    properties:
+                      totalEvents:
+                        type: integer
+                      totalCost:
+                        type: number
+                        format: float
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   # ============================================
   # PROJECT AUDIT LOG ENDPOINTS
   # ============================================
@@ -3032,6 +3085,71 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationError'
 
+  /api/v1/projects/{project_id}/members/stats:
+    get:
+      summary: Get per-member usage stats for a project
+      description: Returns usage statistics for all project members in the given time window. Restricted to project owners and org owners.
+      tags:
+        - Project Members
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 30
+          description: Number of days to look back (default 30)
+      responses:
+        '200':
+          description: Per-member stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        userId:
+                          type: string
+                          format: uuid
+                        email:
+                          type: string
+                        name:
+                          type: string
+                          nullable: true
+                        role:
+                          type: string
+                          enum: [owner, member, viewer]
+                        eventCount:
+                          type: integer
+                        inputTokens:
+                          type: integer
+                        outputTokens:
+                          type: integer
+                        costUsd:
+                          type: number
+                          format: float
+                        lastEventAt:
+                          type: string
+                          format: date-time
+                          nullable: true
+                        primaryTool:
+                          type: string
+                          nullable: true
+                      required:
+                        - userId
+                        - email
+                        - role
+                        - eventCount
+                        - inputTokens
+                        - outputTokens
+                        - costUsd
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   /api/v1/projects/{project_id}/members/{id}:
     get:
       summary: Get project member
@@ -3091,11 +3209,11 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  /api/v1/projects/{project_id}/members/{id}/stats:
+  /api/v1/projects/{project_id}/members/{id}/breakdown:
     get:
-      summary: Project-scoped member activity stats
+      summary: Project-scoped member activity breakdown
       description: |
-        Aggregate tool usage for a project member. All metrics are scoped to `tool_events` for this project only
+        Detailed tool and model breakdown for a single project member. All metrics are scoped to `tool_events` for this project only
         (events from other projects are excluded). Path `id` may be project membership id or member user UUID.
       tags:
         - Project Members

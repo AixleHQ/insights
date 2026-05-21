@@ -761,6 +761,10 @@ export interface ProjectStatsResponse {
   daily: ProjectStatsData[];
   totalEvents: number;
   totalCost: number;
+  previousPeriod?: {
+    totalEvents: number;
+    totalCost: number;
+  };
 }
 
 export function useProjectStats(projectId: string, days = 30) {
@@ -810,6 +814,7 @@ export function useAddProjectMember(projectId: string) {
       api.post<{ data: ProjectMember }>(`/projects/${projectId}/members`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects", projectId, "members"] });
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "members", "stats"] });
     },
   });
 }
@@ -833,6 +838,33 @@ export function useRemoveProjectMember(projectId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects", projectId, "members"] });
     },
+  });
+}
+
+export interface ProjectMemberStat {
+  userId: string;
+  email: string;
+  name: string | null;
+  role: string;
+  eventCount: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  lastEventAt: string | null;
+  primaryTool: string | null;
+}
+
+// Pass enabled=false for non-project-owners — the API returns 403 for plain members.
+export function useProjectMemberStats(projectId: string, days = 30, enabled = true) {
+  return useQuery({
+    queryKey: ["projects", projectId, "members", "stats", days],
+    queryFn: async () => {
+      const res = await api.get<{ data: ProjectMemberStat[] }>(
+        `/projects/${projectId}/members/stats?days=${days}`
+      );
+      return res.data;
+    },
+    enabled: !!projectId && enabled,
   });
 }
 

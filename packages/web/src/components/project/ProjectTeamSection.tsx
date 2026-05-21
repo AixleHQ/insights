@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatDistanceToNow, getMemberDisplayName } from "@/lib/utils";
+import { formatDistanceToNow, getMemberDisplayName, organizationMemberUserId } from "@/lib/utils";
 import { RoleBadge } from "@/components/ui/role-badge";
 import type { ProjectMember, MemberCommitStat } from "@/hooks/useApi";
 import {
@@ -126,7 +126,7 @@ function AddProjectMemberForm({
   const [selectedRole, setSelectedRole] = useState("member");
 
   const available = orgMembers.filter((m: OrganizationMember) => {
-    const uid = m.userId ?? m.user_id;
+    const uid = organizationMemberUserId(m);
     return uid && !existingUserIds.has(uid);
   });
 
@@ -153,7 +153,7 @@ function AddProjectMemberForm({
         </SelectTrigger>
         <SelectContent>
           {available.map((m: OrganizationMember) => {
-            const uid = (m.userId ?? m.user_id)!;
+            const uid = organizationMemberUserId(m)!;
             const label = m.user?.name || m.user?.email || uid;
             return (
               <SelectItem key={uid} value={uid}>

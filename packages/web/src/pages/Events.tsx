@@ -15,18 +15,7 @@ import {
 } from "@/components/events";
 import type { EventsToolFilterOption } from "@/lib/eventsToolFilters";
 import { humanizeToolName } from "@/lib/utils";
-import { showEventsUserColumn } from "@/lib/eventAccess";
-
-type SortField = "created_at" | "tool_name" | "risk_level" | "cost_usd";
-type SortDirection = "asc" | "desc";
-
-const riskLevelOrder = {
-  critical: 4,
-  high: 3,
-  medium: 2,
-  low: 1,
-  none: 0,
-};
+import { showEventsUserColumn, type SortField, type SortDirection, riskLevelOrder } from "@/lib/eventAccess";
 
 export function Events() {
   const { currentOrg, hasRole, currentRole } = useOrg();

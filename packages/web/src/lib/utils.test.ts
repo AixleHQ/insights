@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { cn, formatDistanceToNow, formatCurrency, formatNumber } from "./utils";
+import { cn, formatDistanceToNow, formatCurrency, formatNumber, organizationMemberUserId } from "./utils";
 
 describe("cn", () => {
   it("should merge class names", () => {
@@ -89,5 +89,23 @@ describe("formatNumber", () => {
   it("should handle small numbers", () => {
     expect(formatNumber(0)).toBe("0");
     expect(formatNumber(42)).toBe("42");
+  });
+});
+
+describe("organizationMemberUserId", () => {
+  it("falls back to nested user.id when top-level ids are absent", () => {
+    expect(
+      organizationMemberUserId({
+        id: "om-1",
+        role: "member",
+        user: { id: "user-ana", email: "ana@example.com" },
+      })
+    ).toBe("user-ana");
+  });
+
+  it("prefers userId when present", () => {
+    expect(organizationMemberUserId({ userId: "explicit-id", user: { id: "nested" } })).toBe(
+      "explicit-id"
+    );
   });
 });

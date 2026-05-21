@@ -35,8 +35,8 @@ RSpec.describe ProjectMembershipPolicy, type: :policy do
         expect(policy(member_membership, current_user: project_owner_user).apply(:index?)).to be true
       end
 
-      it "denies project member (no ownership)" do
-        expect(policy(member_membership, current_user: member_user).apply(:index?)).to be false
+      it "allows project member (AIX-117: members see read-only list)" do
+        expect(policy(member_membership, current_user: member_user).apply(:index?)).to be true
       end
 
       it "denies outsiders" do
