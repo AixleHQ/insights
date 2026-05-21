@@ -44,6 +44,36 @@ describe("exchangeIngestToken", () => {
     );
     const body = JSON.parse((fetchImpl.mock.calls[0][1] as { body: string }).body);
     expect(body).toEqual({ tool_name: "claude_code", device_label: "unit test" });
+    const headers = (fetchImpl.mock.calls[0][1] as { headers: Record<string, string> }).headers;
+    expect(headers["X-Organization-ID"]).toBeUndefined();
+  });
+
+  it("sends X-Organization-ID when exchangeOrganizationId is set", async () => {
+    const orgUuid = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+    const fetchImpl = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: {
+            ingestToken: `db90_${"ab".repeat(32)}`,
+            ingestHost: "http://localhost:3000",
+            organizationId: orgUuid,
+          },
+        }),
+        { status: 201 }
+      )
+    );
+
+    await exchangeIngestToken({
+      db90Host: "http://localhost:3000",
+      keycloakAccessToken: "kc-secret",
+      toolName: "claude_code",
+      exchangeOrganizationId: orgUuid,
+      fetchImpl,
+    });
+
+    const headers = (fetchImpl.mock.calls[0][1] as { headers: Record<string, string> }).headers;
+    expect(headers["X-Organization-ID"]).toBe(orgUuid);
+    expect(headers.Authorization).toBe("Bearer kc-secret");
   });
 
   it("maps a legacy flat token response to the requested cursor tool", async () => {

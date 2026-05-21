@@ -62,7 +62,7 @@ db90-mcp health
 ## First-Run Setup (detailed)
 
 1. **Device login**: `init` prints a verification URI + short user code. Approve login in browser; issuer must expose **RFC 8628 Device Authorization**.
-2. **Exchange**: MCP CLI calls **`POST /api/v1/integrations/mcp/exchange`** to mint / bind ingest-ready credentials keyed to your memberships.
+2. **Exchange**: MCP CLI calls **`POST /api/v1/integrations/mcp/exchange`** to mint / bind ingest-ready credentials keyed to your memberships. By default the API uses your **oldest** organization membership; use **`--organization-id <uuid>`** or **`DB90_ORGANIZATION_ID`** to target another org you belong to (HTTP **`X-Organization-ID`**).
 3. **Claude install**: merges `db90` server entry into **`~/.claude.json`** with `cmd /c npx …` adaptations on Windows. Use **`--force`** only when replacing a stale/conflicting MCP stanza name collision.
 4. **Multi-tool provisioning**: Omit **`--tool-name`** unless you purposely want only one side. Passing **`cursor`** skips Claude MCP auto-install (`--tool-name cursor`).
 5. **Advanced override**: **`DB90_MCP_HOME`** repoints **`~/.db90-mcp`** for tests—isolate state/log/credentials directories when automating QA.
@@ -90,9 +90,23 @@ Environment variables commonly used:
 | **`KEYCLOAK_ISSUER`**, **`DB90_KEYCLOAK_ISSUER`** | Realm issuer URLs (preferred on servers & CI publishing guides).
 | **`DB90_KEYCLOAK_CLIENT_ID`** | Defaults **`db90-web`**; must allow device authorization in Keycloak.
 | **`DB90_MCP_HOME`** | Override state/log base (default **`~/.db90-mcp`**).
+| **`DB90_ORGANIZATION_ID`** | Optional UUID for **`init`**: scopes MCP token exchange to that organization (header **`X-Organization-ID`**). The CLI flag **`--organization-id`** overrides this variable when both are set. |
 | **`DB90_MCP_USE_LOCAL_KEYCLOAK_DEFAULT=true`** | *Local docker-compose hack only* → auto-default issuer `http://localhost:8080/realms/db90` when unset.
 
 Production / multi-tenant **must set issuer explicitly**. The published npm package refuses unsafe implicit issuers unless the local-default escape hatch flag is deliberately enabled.
+
+### Multi-organization users
+
+If your DB90 user has several organization memberships, **`init`** mints ingest tokens for the **oldest** membership unless you select an org:
+
+```bash
+npx -y @db90/telemetry-mcp init \
+  --host https://YOUR-API-HOST \
+  --keycloak-url https://YOUR-KEYCLOAK/realms/db90 \
+  --organization-id 550e8400-e29b-41d4-a716-446655440000
+```
+
+You can set **`DB90_ORGANIZATION_ID`** instead (for example under **`mcpServers.db90.env`** in **`~/.claude.json`**). The value must be a valid UUID (RFC 4122 versions 1–5 with the variant nibble enforced by the DB90 API).
 
 ## CLI commands (`db90-mcp`)
 
@@ -100,7 +114,7 @@ Production / multi-tenant **must set issuer explicitly**. The published npm pack
 |---|---|
 | **`run`** (default) | stdio MCP bridge + background sync timer (5 min cadence after connect + one startup flush when authenticated). Alias: legacy **`serve`**. |
 | **`run --once`** | Performs a single sync pass, exits **`1`** if ingestion posts fail — ideal for systemd/cron substitutes. |
-| **`init`** | Keycloak/OIDC onboarding, MCP merge, emits restart guidance. Supports **`--tool-name claude_code|cursor`**. |
+| **`init`** | Keycloak/OIDC onboarding, MCP merge, emits restart guidance. Supports **`--tool-name claude_code|cursor`**, **`--organization-id <uuid>`** (optional org for exchange). |
 | **`health`** | Human-readable rollup: issuer, ingest tools provisioned, last sync aggregates, **`mcp_operator`**, log path, persisted errors. |
 
 ## MCP tools (Claude exposes these)

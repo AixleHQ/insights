@@ -179,5 +179,109 @@ RSpec.describe "Api::V1::Integrations::Mcp", type: :request do
         expect(response).to have_http_status(:forbidden)
       end
     end
+
+    context "when the user has two organization memberships" do
+      let(:multi_user) { create(:user, email: "two-orgs@example.com") }
+      let(:primary_org) { create(:organization) }
+      let(:secondary_org) { create(:organization) }
+      let!(:primary_membership) do
+        travel_to(3.days.ago) do
+          create(:organization_membership, user: multi_user, organization: primary_org)
+        end
+      end
+      let!(:secondary_membership) do
+        travel_to(1.day.ago) do
+          create(:organization_membership, user: multi_user, organization: secondary_org)
+        end
+      end
+
+      it "returns 201 for the secondary org when X-Organization-ID selects it" do
+        expect {
+          authenticated_post "/api/v1/integrations/mcp/exchange",
+                             user: multi_user,
+                             organization: secondary_org,
+                             params: { tool_name: "claude_code" }
+        }.to change { secondary_membership.reload.user_tool_accounts.count }.by(1)
+          .and change { primary_membership.reload.user_tool_accounts.count }.by(0)
+
+        expect(response).to have_http_status(:created)
+        body = JSON.parse(response.body)
+        expect(body["data"]["organizationId"]).to eq(secondary_org.id.to_s)
+        expect(body["data"]["ingestToken"]).to match(TOKEN_RE)
+        account = secondary_membership.user_tool_accounts.find_by!(tool_name: "claude_code")
+        expect(account.organization_membership_id).to eq(secondary_membership.id)
+      end
+
+      it "falls back to the oldest membership when X-Organization-ID is absent" do
+        expect {
+          authenticated_post "/api/v1/integrations/mcp/exchange",
+                             user: multi_user,
+                             params: { tool_name: "claude_code" }
+        }.to change { primary_membership.reload.user_tool_accounts.count }.by(1)
+          .and change { secondary_membership.reload.user_tool_accounts.count }.by(0)
+
+        expect(response).to have_http_status(:created)
+        expect(JSON.parse(response.body)["data"]["organizationId"]).to eq(primary_org.id.to_s)
+      end
+
+      it "returns 403 and does not touch tool accounts when X-Organization-ID is not a membership org" do
+        other_org = create(:organization)
+
+        expect {
+          authenticated_post "/api/v1/integrations/mcp/exchange",
+                             user: multi_user,
+                             organization: other_org,
+                             params: { tool_name: "claude_code" }
+        }.to change { primary_membership.reload.user_tool_accounts.count }.by(0)
+          .and change { secondary_membership.reload.user_tool_accounts.count }.by(0)
+
+        expect(response).to have_http_status(:forbidden)
+        parsed = JSON.parse(response.body)
+        expect(parsed["error"]).to eq("Forbidden")
+        expect(parsed["message"]).to include("specified organization")
+      end
+
+      it "returns 403 and does not touch tool accounts when X-Organization-ID is malformed" do
+        expect {
+          post "/api/v1/integrations/mcp/exchange",
+               params: { tool_name: "claude_code" }.to_json,
+               headers: auth_headers_for(multi_user).merge("X-Organization-ID" => "not-a-uuid")
+        }.to change { primary_membership.reload.user_tool_accounts.count }.by(0)
+          .and change { secondary_membership.reload.user_tool_accounts.count }.by(0)
+
+        expect(response).to have_http_status(:forbidden)
+        parsed = JSON.parse(response.body)
+        expect(parsed["error"]).to eq("Forbidden")
+        expect(parsed["message"]).to include("specified organization")
+      end
+
+      it "returns 403 and does not touch tool accounts when X-Organization-ID is blank" do
+        expect {
+          post "/api/v1/integrations/mcp/exchange",
+               params: { tool_name: "claude_code" }.to_json,
+               headers: auth_headers_for(multi_user).merge("X-Organization-ID" => "   ")
+        }.to change { primary_membership.reload.user_tool_accounts.count }.by(0)
+          .and change { secondary_membership.reload.user_tool_accounts.count }.by(0)
+
+        expect(response).to have_http_status(:forbidden)
+        parsed = JSON.parse(response.body)
+        expect(parsed["error"]).to eq("Forbidden")
+        expect(parsed["message"]).to include("specified organization")
+      end
+
+      it "scopes multi-tool exchange to the header-selected membership" do
+        expect {
+          authenticated_post "/api/v1/integrations/mcp/exchange",
+                             user: multi_user,
+                             organization: secondary_org,
+                             params: { tools: %w[cursor claude_code] }
+        }.to change { secondary_membership.reload.user_tool_accounts.count }.by(2)
+          .and change { primary_membership.reload.user_tool_accounts.count }.by(0)
+
+        expect(response).to have_http_status(:created)
+        data = JSON.parse(response.body)["data"]
+        expect(data["organizationId"]).to eq(secondary_org.id.to_s)
+      end
+    end
   end
 end

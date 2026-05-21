@@ -3949,9 +3949,12 @@ paths:
       summary: Exchange Keycloak access token for MCP ingest token(s)
       description: |
         Mints fresh `UserToolAccount` ingest token(s) for the JWT-authenticated user
-        and the requested ingest tool(s). Accounts are scoped to the user's oldest
-        organization membership. Call with `Authorization: Bearer` carrying the Keycloak
-        access token from RFC 8628 device authorization.
+        and the requested ingest tool(s). Accounts are scoped to one of the caller's
+        organization memberships: use optional header **`X-Organization-ID`** to pick a
+        specific org the user belongs to; when that header is omitted, the exchange uses
+        the user's oldest membership (by `organization_memberships.created_at`). Call with
+        `Authorization: Bearer` carrying the Keycloak access token from RFC 8628 device
+        authorization.
 
         Pass **`tool_name`** for a legacy single-account exchange, **or**
         **`tools`** to rotate/create multiple connectors in one request (atomic under
@@ -3964,6 +3967,8 @@ paths:
         - Integrations
       security:
         - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/X-Organization-ID-Optional'
       requestBody:
         required: true
         content:
@@ -4046,7 +4051,10 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Forbidden — no organization membership or policy denied
+          description: |
+            Forbidden — no usable organization membership, user is not a member of the
+            organization given in `X-Organization-ID`, or `UserToolAccountPolicy` denied
+            create for the resolved membership.
           content:
             application/json:
               schema:
@@ -4439,6 +4447,17 @@ components:
       in: header
       required: true
       description: Organization context for the request
+      schema:
+        type: string
+        format: uuid
+    X-Organization-ID-Optional:
+      name: X-Organization-ID
+      in: header
+      required: false
+      description: |
+        Optional organization selector. On MCP token exchange, when present and the
+        authenticated user belongs to that organization, ingest accounts are scoped to
+        that membership; when omitted, the exchange uses the user's oldest membership.
       schema:
         type: string
         format: uuid

@@ -19,6 +19,8 @@ export interface Args {
   host?: string;
   keycloakUrl?: string;
   toolName?: string;
+  /** When set on init, sent as `X-Organization-ID` on MCP exchange (overrides DB90_ORGANIZATION_ID). */
+  organizationId?: string;
   force?: boolean;
 }
 
@@ -42,8 +44,16 @@ interface InitDeps {
 }
 
 const GLOBAL_FLAGS = new Set(["--help", "-h", "--once"]);
-const INIT_VALUE_FLAGS = new Set(["--host", "--keycloak-url", "--tool-name"]);
+const INIT_VALUE_FLAGS = new Set(["--host", "--keycloak-url", "--tool-name", "--organization-id"]);
 const INIT_BOOLEAN_FLAGS = new Set(["--force"]);
+
+/** Matches DB90 Rails `McpController` UUID check for `X-Organization-ID` (RFC 4122 variant). */
+export const DB90_ORGANIZATION_UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function isValidDb90OrganizationUuid(value: string): boolean {
+  return DB90_ORGANIZATION_UUID_PATTERN.test(value.trim());
+}
 
 function takeFlagValue(argv: string[], name: string): string | undefined {
   const eqForm = argv.find((a) => a.startsWith(`${name}=`));
@@ -136,8 +146,9 @@ export function parseArgs(argv: string[]): Args {
     const host = takeFlagValue(args, "--host");
     const keycloakUrl = takeFlagValue(args, "--keycloak-url");
     const toolName = takeFlagValue(args, "--tool-name");
+    const organizationId = takeFlagValue(args, "--organization-id");
     const force = args.includes("--force");
-    return { command: "init", help, once: false, host, keycloakUrl, toolName, force };
+    return { command: "init", help, once: false, host, keycloakUrl, toolName, organizationId, force };
   }
 
   const nonInitBad = args.filter((a) => {
@@ -196,7 +207,11 @@ init options:
   --host <url>            DB90 API base URL (default: env DB90_API_URL or http://localhost:3000)
   --keycloak-url <issuer> Keycloak realm issuer (default: env KEYCLOAK_ISSUER / DB90_KEYCLOAK_ISSUER; local default only with DB90_MCP_USE_LOCAL_KEYCLOAK_DEFAULT=true)
   --tool-name <name>      Optional: mint only \`claude_code\`, only \`cursor\`, or omit to mint BOTH in one OAuth session.
+  --organization-id <uuid> Optional: scope MCP token exchange to this org (sent as \`X-Organization-ID\`; overrides env DB90_ORGANIZATION_ID).
   --force                 Replace an existing user "db90" MCP entry in ~/.claude.json if it differs
+
+Multi-org:
+  Set \`DB90_ORGANIZATION_ID\` to a UUID, or pass \`--organization-id\` on \`init\`, so ingest tokens are minted for that membership instead of the default (oldest) org.
 
 Credentials:
   Stored in the OS keychain via keytar when available; otherwise
@@ -252,6 +267,16 @@ export async function runInit(cliArgs: Args, deps?: Partial<InitDeps>): Promise<
         ? ["claude_code"]
         : ["claude_code", "cursor"];
 
+  const fromFlag = cliArgs.organizationId?.trim();
+  const fromEnv = process.env["DB90_ORGANIZATION_ID"]?.trim();
+  const exchangeOrganizationId = fromFlag || fromEnv;
+  if (exchangeOrganizationId && !isValidDb90OrganizationUuid(exchangeOrganizationId)) {
+    runtime.error(
+      "Error: --organization-id / DB90_ORGANIZATION_ID must be a valid UUID (RFC 4122, version 1–5, variant per DB90 API)."
+    );
+    return 1;
+  }
+
   const result = await runtime.loginAndPersistCredentials({
     db90Host,
     keycloakIssuer: kcIssuer,
@@ -264,6 +289,7 @@ export async function runInit(cliArgs: Args, deps?: Partial<InitDeps>): Promise<
         : undefined,
     deviceLabel: "db90-mcp CLI init",
     appDir: runtime.getAppDir(),
+    exchangeOrganizationId: exchangeOrganizationId || undefined,
     onVisitInstructions: (uri, code) => {
       runtime.log(`Visit ${uri} and enter code ${code}`);
     },
