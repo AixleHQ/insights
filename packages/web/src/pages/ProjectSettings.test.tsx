@@ -19,7 +19,6 @@ vi.mock("react-router-dom", async () => {
 const mockUseProject = vi.fn();
 const mockUseUpdateProject = vi.fn();
 const mockUseDeleteProject = vi.fn();
-const mockUseProjectMembers = vi.fn();
 const mockUseProjectRetentionPolicy = vi.fn();
 const mockUseUpdateProjectRetentionPolicy = vi.fn();
 
@@ -27,8 +26,6 @@ vi.mock("@/hooks/useApi", () => ({
   useProject: (...args: unknown[]) => mockUseProject(...args),
   useUpdateProject: () => mockUseUpdateProject(),
   useDeleteProject: () => mockUseDeleteProject(),
-  useProjectMembers: (...args: unknown[]) => mockUseProjectMembers(...args),
-  useProjectCommitStats: () => ({ data: undefined, isLoading: false }),
   useProjectRetentionPolicy: (...args: unknown[]) => mockUseProjectRetentionPolicy(...args),
   useUpdateProjectRetentionPolicy: () => mockUseUpdateProjectRetentionPolicy(),
   useCurrentUser: () => ({ data: { id: "user-1", email: "test@example.com" }, isLoading: false }),
@@ -43,8 +40,6 @@ vi.mock("@/contexts/OrgContext", () => ({
 }));
 
 vi.mock("@/components/project", () => ({
-  ProjectTeamSection: () => <div>Team Section</div>,
-  ProjectConnectorsTab: () => <div>Connectors Tab</div>,
   ProjectSecurityTab: () => <div>Security Tab</div>,
   ProjectSettingsSection: () => <div>Email Domain Section</div>,
   ProjectRetentionPolicySection: () => <div>Retention Policy Section</div>,
@@ -86,7 +81,6 @@ function setupDefaultMocks() {
   mockUseProject.mockReturnValue({ data: mockProject, isLoading: false });
   mockUseUpdateProject.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
   mockUseDeleteProject.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
-  mockUseProjectMembers.mockReturnValue({ data: [], isLoading: false });
   mockUseProjectRetentionPolicy.mockReturnValue({ data: undefined, isLoading: false });
   mockUseUpdateProjectRetentionPolicy.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
 }
@@ -120,26 +114,21 @@ describe("ProjectSettings", () => {
   });
 
   describe("Sidebar navigation", () => {
-    it("renders all 5 nav links", () => {
+    it("renders settings nav links without Members or Integrations", () => {
       renderAtPath("/projects/proj-1/settings");
 
       expect(screen.getByRole("link", { name: /general/i })).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: /members/i })).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: /integrations/i })).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /^members$/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /^integrations$/i })).not.toBeInTheDocument();
       expect(screen.getByRole("link", { name: /security & audit/i })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: /policies/i })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /alerts/i })).toBeInTheDocument();
     });
 
     it("marks General as active on the index route", () => {
       renderAtPath("/projects/proj-1/settings");
 
       expect(screen.getByRole("link", { name: /general/i }).className).toMatch(/text-primary/);
-    });
-
-    it("marks Members as active on the members route", () => {
-      renderAtPath("/projects/proj-1/settings/members");
-
-      expect(screen.getByRole("link", { name: /members/i }).className).toMatch(/text-primary/);
     });
   });
 
@@ -269,16 +258,16 @@ describe("ProjectSettings", () => {
   });
 
   describe("Sub-routes", () => {
-    it("renders Members section at /settings/members", () => {
+    it("redirects /settings/members to project detail Members tab", () => {
       renderAtPath("/projects/proj-1/settings/members");
 
-      expect(screen.getByText("Team Section")).toBeInTheDocument();
+      expect(screen.queryByText("Team Section")).not.toBeInTheDocument();
     });
 
-    it("renders Integrations section at /settings/integrations", () => {
+    it("redirects /settings/integrations to project detail Integrations tab", () => {
       renderAtPath("/projects/proj-1/settings/integrations");
 
-      expect(screen.getByText("Connectors Tab")).toBeInTheDocument();
+      expect(screen.queryByText("Connectors Tab")).not.toBeInTheDocument();
     });
 
     it("renders Security & Audit section at /settings/security", () => {

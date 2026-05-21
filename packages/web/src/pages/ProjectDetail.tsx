@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   AlertCircle,
   ArrowLeft,
@@ -127,6 +127,16 @@ export function ProjectDetail() {
   const canManageMembers = hasRole(["owner"]);
   const isMemberOfProject = isProjectOwner || !!myProjectMembership;
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const activeTab = useMemo(() => {
+    const allowed = new Set(["overview", "events", "issues"]);
+    if (isMemberOfProject) allowed.add("members");
+    if (isProjectOwner) allowed.add("integrations");
+    if (tabParam && allowed.has(tabParam)) return tabParam;
+    return "overview";
+  }, [tabParam, isMemberOfProject, isProjectOwner]);
+
   const eventsDelta = useMemo(() => {
     const prev = projectStats?.previousPeriod?.totalEvents;
     const curr = projectStats?.totalEvents;
@@ -223,7 +233,10 @@ export function ProjectDetail() {
         </DropdownMenu>
       </div>
 
-      <Tabs defaultValue="overview">
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => setSearchParams({ tab: value }, { replace: true })}
+      >
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="events">Events</TabsTrigger>

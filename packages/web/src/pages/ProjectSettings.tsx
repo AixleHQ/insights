@@ -4,8 +4,6 @@ import {
   ArrowLeft,
   AlertCircle,
   Building2,
-  Users,
-  Plug,
   FileSearch,
   Shield,
   Bell,
@@ -17,9 +15,6 @@ import {
   useProject,
   useUpdateProject,
   useDeleteProject,
-  useProjectMembers,
-  useProjectCommitStats,
-  useCurrentUser,
 } from "@/hooks/useApi";
 import { useOrg } from "@/contexts/OrgContext";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -36,13 +31,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ProjectTeamSection, ProjectConnectorsTab, ProjectSecurityTab, ProjectSettingsSection, ProjectNotFound, ProjectRetentionPolicySection, ProjectAlertsSection } from "@/components/project";
+import { ProjectSecurityTab, ProjectSettingsSection, ProjectNotFound, ProjectRetentionPolicySection, ProjectAlertsSection } from "@/components/project";
 import { cn } from "@/lib/utils";
 
 const getNavItems = (id: string) => [
   { title: "General", href: `/projects/${id}/settings`, icon: Building2 },
-  { title: "Members", href: `/projects/${id}/settings/members`, icon: Users },
-  { title: "Integrations", href: `/projects/${id}/settings/integrations`, icon: Plug },
   { title: "Security & Audit", href: `/projects/${id}/settings/security`, icon: FileSearch },
   { title: "Policies", href: `/projects/${id}/settings/policies`, icon: Shield },
   { title: "Alerts", href: `/projects/${id}/settings/alerts`, icon: Bell },
@@ -278,44 +271,6 @@ function ProjectGeneralSettings({
   return <ProjectGeneralSettingsForm key={project.id} projectId={projectId} defaultValues={defaultValues} />;
 }
 
-function ProjectMembersSettings({ projectId, orgId }: { projectId: string; orgId: string }) {
-  const { data: members, isLoading } = useProjectMembers(projectId);
-  const { data: commitStats } = useProjectCommitStats(projectId);
-  const { data: currentUser } = useCurrentUser();
-  const { currentMembership } = useOrg();
-  const isOrgOwner = currentMembership?.role === "owner";
-  const isProjectOwner = members?.some(
-    (m) => m.userId === currentUser?.id && m.role === "owner"
-  );
-  const canManage = isOrgOwner || !!isProjectOwner;
-
-  return (
-    <ProjectTeamSection
-      members={members}
-      isLoading={isLoading}
-      commitStats={commitStats}
-      projectId={projectId}
-      orgId={orgId}
-      canManage={canManage}
-    />
-  );
-}
-
-function ProjectIntegrationsSettings({ projectId }: { projectId: string }) {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-medium">Integrations</h2>
-        <p className="text-sm text-muted-foreground">
-          Connect AI providers to track usage and costs for this project
-        </p>
-      </div>
-      <ProjectConnectorsTab projectId={projectId} />
-    </div>
-  );
-}
-
-
 export function ProjectSettings() {
   const { id } = useParams<{ id: string }>();
   const { data: project, isLoading: isLoadingProject } = useProject(id || "");
@@ -351,8 +306,8 @@ export function ProjectSettings() {
         <div className="flex-1 min-w-0">
           <Routes>
             <Route index element={<ProjectGeneralSettings projectId={id} project={project} isLoading={isLoadingProject} />} />
-            <Route path="members" element={<ProjectMembersSettings projectId={id} orgId={project?.organization_id ?? ""} />} />
-            <Route path="integrations" element={<ProjectIntegrationsSettings projectId={id} />} />
+            <Route path="members" element={<Navigate to={`/projects/${id}?tab=members`} replace />} />
+            <Route path="integrations" element={<Navigate to={`/projects/${id}?tab=integrations`} replace />} />
             <Route path="security" element={<ProjectSecurityTab projectId={id} />} />
             <Route path="policies" element={<ProjectRetentionPolicySection projectId={id} />} />
             <Route
