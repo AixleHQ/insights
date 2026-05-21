@@ -2896,6 +2896,59 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /api/v1/projects/{id}/stats:
+    get:
+      summary: Project usage stats
+      description: Returns daily event/cost data plus period totals and a comparison window for delta display.
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 30
+          description: Number of days to look back (default 30)
+      responses:
+        '200':
+          description: Project stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  daily:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                        eventCount:
+                          type: integer
+                        costUsd:
+                          type: number
+                          format: float
+                  totalEvents:
+                    type: integer
+                  totalCost:
+                    type: number
+                    format: float
+                  previousPeriod:
+                    type: object
+                    properties:
+                      totalEvents:
+                        type: integer
+                      totalCost:
+                        type: number
+                        format: float
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   # ============================================
   # PROJECT AUDIT LOG ENDPOINTS
   # ============================================

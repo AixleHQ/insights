@@ -761,6 +761,10 @@ export interface ProjectStatsResponse {
   daily: ProjectStatsData[];
   totalEvents: number;
   totalCost: number;
+  previousPeriod?: {
+    totalEvents: number;
+    totalCost: number;
+  };
 }
 
 export function useProjectStats(projectId: string, days = 30) {

@@ -163,10 +163,18 @@ module Api
             }
           end
 
+        prev_start = (2 * days).days.ago.beginning_of_day
+        prev_end   = time_range_start
+        prev_events = @project.tool_events.where(occurred_at: prev_start...prev_end)
+
         render json: {
           daily: daily_data,
           totalEvents: events.count,
-          totalCost: events.sum(:cost_usd).to_f
+          totalCost: events.sum(:cost_usd).to_f,
+          previousPeriod: {
+            totalEvents: prev_events.count,
+            totalCost: prev_events.sum(:cost_usd).to_f
+          }
         }
       end
 

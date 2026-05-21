@@ -35,6 +35,7 @@ const mockUseDeleteProject = vi.fn();
 const mockUseProjectDailyByTool = vi.fn();
 const mockUseProjectRepositories = vi.fn();
 const mockUseProjectMembers = vi.fn();
+const mockUseProjectStats = vi.fn();
 const mockUseCurrentUser = vi.fn();
 const mockUseEventsSummary = vi.fn();
 const mockUseExportEvents = vi.fn();
@@ -47,6 +48,7 @@ vi.mock("@/hooks/useApi", () => ({
   useProjectDailyByTool: (...args: unknown[]) => mockUseProjectDailyByTool(...args),
   useProjectRepositories: (...args: unknown[]) => mockUseProjectRepositories(...args),
   useProjectMembers: (...args: unknown[]) => mockUseProjectMembers(...args),
+  useProjectStats: (...args: unknown[]) => mockUseProjectStats(...args),
   useCurrentUser: (...args: unknown[]) => mockUseCurrentUser(...args),
   useEventsSummary: (...args: unknown[]) => mockUseEventsSummary(...args),
   useExportEvents: (...args: unknown[]) => mockUseExportEvents(...args),
@@ -54,6 +56,9 @@ vi.mock("@/hooks/useApi", () => ({
   useAvailableRepos: () => ({ data: [], isLoading: false }),
   useConnectRepo: () => ({ mutateAsync: vi.fn() }),
   useDisconnectRepo: () => ({ mutateAsync: vi.fn() }),
+  useAddProjectMember: () => ({ mutate: vi.fn(), isPending: false }),
+  useRemoveProjectMember: () => ({ mutate: vi.fn() }),
+  useOrganizationMembers: () => ({ data: [] }),
 }));
 
 const mockProject = {
@@ -103,6 +108,7 @@ function setupDefaultMocks() {
   mockUseProjectDailyByTool.mockReturnValue({ data: undefined, isLoading: false });
   mockUseProjectRepositories.mockReturnValue({ data: undefined, isLoading: false });
   mockUseProjectMembers.mockReturnValue({ data: mockMembers, isLoading: false });
+  mockUseProjectStats.mockReturnValue({ data: { daily: [], totalEvents: 0, totalCost: 0 } });
   mockUseCurrentUser.mockReturnValue({ data: { id: "user-99", globalAdmin: false }, isLoading: false });
   mockUseEventsSummary.mockReturnValue({ data: undefined });
   mockUseExportEvents.mockReturnValue({ exportEvents: vi.fn().mockResolvedValue({}), isExporting: false });
