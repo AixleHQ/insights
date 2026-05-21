@@ -8,10 +8,12 @@ import { readState } from "../state.js";
 const mocks = vi.hoisted(() => ({
   findTranscriptFiles: vi.fn(),
   parseTranscriptFile: vi.fn(),
-  toDb90Payload: vi.fn(),
+  mapClaudeTranscriptTurn: vi.fn(),
   readCursorEvents: vi.fn(),
   readDailyStats: vi.fn(),
+  readCursorTranscriptSessions: vi.fn(),
   mapCursorEvent: vi.fn(),
+  mapCursorTranscriptTurn: vi.fn(),
   mapDailyStats: vi.fn(),
   postEvent: vi.fn(),
 }));
@@ -19,13 +21,15 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../readers/claude.js", () => ({
   findTranscriptFiles: mocks.findTranscriptFiles,
   parseTranscriptFile: mocks.parseTranscriptFile,
-  toDb90Payload: mocks.toDb90Payload,
+  mapTranscriptTurn: mocks.mapClaudeTranscriptTurn,
 }));
 
 vi.mock("../readers/cursor.js", () => ({
   readEvents: mocks.readCursorEvents,
   readDailyStats: mocks.readDailyStats,
+  readCursorTranscriptSessions: mocks.readCursorTranscriptSessions,
   mapEvent: mocks.mapCursorEvent,
+  mapTranscriptTurn: mocks.mapCursorTranscriptTurn,
   mapDailyStats: mocks.mapDailyStats,
   DEFAULT_CURSOR_PRICING: {
     tokens_per_line: 15,
@@ -42,6 +46,7 @@ vi.mock("../client.js", () => ({
 import {
   CURSOR_DAILY_STATS_WATERMARK_KEY,
   CURSOR_EVENTS_WATERMARK_KEY,
+  cursorTranscriptTurnStateKey,
   sessionStateKey,
   syncTelemetryTools,
   resetBackoffStateForTests,
@@ -57,11 +62,13 @@ describe("syncTelemetryTools", () => {
     mkdirSync(appDir, { recursive: true });
     vi.clearAllMocks();
     mocks.findTranscriptFiles.mockReturnValue([]);
-    mocks.parseTranscriptFile.mockResolvedValue(new Map());
-    mocks.toDb90Payload.mockReturnValue(null);
+    mocks.parseTranscriptFile.mockResolvedValue([]);
+    mocks.mapClaudeTranscriptTurn.mockReturnValue(null);
     mocks.readCursorEvents.mockReturnValue([]);
     mocks.readDailyStats.mockReturnValue([]);
+    mocks.readCursorTranscriptSessions.mockResolvedValue([]);
     mocks.mapCursorEvent.mockReturnValue(null);
+    mocks.mapCursorTranscriptTurn.mockReturnValue(null);
     mocks.mapDailyStats.mockReturnValue([]);
     mocks.postEvent.mockResolvedValue(true);
   });
@@ -185,31 +192,115 @@ describe("syncTelemetryTools", () => {
     expect(state.sessions[CURSOR_DAILY_STATS_WATERMARK_KEY]?.sentAt).toBe("2026-05-19T00:00:00.000Z");
   });
 
+  it("checkpoints cursor transcript sessions by file size and suppresses aggregate chat duplicates", async () => {
+    const cursorToken = "db90_cursor_token";
+    mocks.readCursorTranscriptSessions.mockResolvedValue([
+      {
+        sessionId: "cursor-session-1",
+        turnId: "cursor-session-1:1",
+        filePath: "/tmp/cursor-session-1.jsonl",
+        fileSize: 321,
+        workspacePath: "/tmp/ws",
+        composerName: "Telemetry-mcp testing",
+        occurredAt: "2026-05-20T09:10:00.000Z",
+        promptText: "Inspect db90_status output",
+        assistantText: "The tool is not connected in this session.",
+        tokensIn: 7,
+        tokensOut: 11,
+        riskLevel: "low",
+        riskScore: 0,
+        riskCategories: [],
+      },
+    ]);
+    mocks.readCursorEvents.mockReturnValue([]);
+    mocks.readDailyStats.mockReturnValue([
+      { date: "2026-05-20", value: { composerSuggestedLines: 12, composerAcceptedLines: 3 }, dbPath: "/tmp/state.vscdb" },
+    ]);
+    mocks.mapCursorTranscriptTurn.mockReturnValue({
+      tool_name: "cursor",
+      event_type: "chat",
+      model: "unknown",
+      tokens_in: 7,
+      tokens_out: 11,
+      cost_usd: 0.1,
+      occurred_at: "2026-05-20T09:10:00.000Z",
+      metadata: {
+        session_id: "cursor-session-1:1",
+        cursor_session_id: "cursor-session-1",
+        workspace: "/tmp/ws",
+        cost_model: "estimated_transcript_text",
+        scannable: true,
+        risk_level: "low",
+        transcript_source: "agent_transcript",
+      },
+    });
+    mocks.mapDailyStats.mockReturnValue([
+      {
+        tool_name: "cursor",
+        event_type: "chat",
+        model: "unknown",
+        tokens_in: 12,
+        tokens_out: 3,
+        cost_usd: 0.1,
+        occurred_at: "2026-05-20T00:00:00.000Z",
+        metadata: { cursor_session_id: null, workspace: "/tmp/state.vscdb", cost_model: "estimated_line_count", scannable: false, risk_level: "none" },
+      },
+    ]);
+
+    const result = await syncTelemetryTools({
+      credentials: { host, accounts: { cursor: cursorToken } },
+      dryRun: false,
+      verbose: false,
+      projectId: null,
+      pricing: DEFAULT_PRICING,
+      appDir,
+      tools: ["cursor"],
+    });
+
+    expect(result.sent).toBe(1);
+    expect(mocks.postEvent).toHaveBeenCalledTimes(1);
+    expect(mocks.postEvent.mock.calls[0]?.[0]).toMatchObject({
+      tool_name: "cursor",
+      event_type: "chat",
+      metadata: {
+        cursor_session_id: "cursor-session-1",
+        transcript_source: "agent_transcript",
+        scannable: true,
+      },
+    });
+
+    const state = readState(appDir, host, cursorToken);
+    expect(state.sessions[cursorTranscriptTurnStateKey("cursor-session-1:1")]).toMatchObject({
+      fileSize: 321,
+    });
+    expect(state.sessions[CURSOR_DAILY_STATS_WATERMARK_KEY]).toBeUndefined();
+  });
+
   it("preserves both Claude and Cursor checkpoints when both tools share one token", async () => {
     const sharedToken = "db90_shared_token";
     mocks.findTranscriptFiles.mockReturnValue(["/tmp/session.jsonl"]);
     mocks.parseTranscriptFile.mockResolvedValue(
-      new Map([
-        [
-          "sess-1",
-          {
-            sessionId: "sess-1",
-            filePath: "/tmp/session.jsonl",
-            fileSize: 123,
-            model: "claude-sonnet-4",
-            tokensIn: 10,
-            tokensOut: 5,
-            cacheWriteTokens: 0,
-            cacheReadTokens: 0,
-            occurredAt: "2026-05-19T11:00:00.000Z",
-            riskLevel: "low",
-            riskScore: 0,
-            riskCategories: [],
-          },
-        ],
-      ])
+      [
+        {
+          sessionId: "sess-1",
+          turnId: "sess-1:1",
+          filePath: "/tmp/session.jsonl",
+          fileSize: 123,
+          model: "claude-sonnet-4",
+          tokensIn: 10,
+          tokensOut: 5,
+          cacheWriteTokens: 0,
+          cacheReadTokens: 0,
+          occurredAt: "2026-05-19T11:00:00.000Z",
+          promptText: "What changed in the release gate?",
+          assistantText: "The release gate now checks package contents.",
+          riskLevel: "low",
+          riskScore: 0,
+          riskCategories: [],
+        },
+      ]
     );
-    mocks.toDb90Payload.mockReturnValue({
+    mocks.mapClaudeTranscriptTurn.mockReturnValue({
       tool_name: "claude_code",
       event_type: "chat",
       model: "claude-sonnet-4",
@@ -219,7 +310,9 @@ describe("syncTelemetryTools", () => {
       cost_usd: 0.1,
       occurred_at: "2026-05-19T11:00:00.000Z",
       metadata: {
-        session_id: "sess-1",
+        session_id: "sess-1:1",
+        claude_session_id: "sess-1",
+        transcript_source: "claude_jsonl",
         model: "claude-sonnet-4",
         base_input_tokens: 10,
         output_tokens: 5,
@@ -228,10 +321,13 @@ describe("syncTelemetryTools", () => {
         risk_level: "low",
         risk_categories: [],
         risk_score: 0,
+        prompt_text: "What changed in the release gate?",
+        assistant_text: "The release gate now checks package contents.",
         scannable: true,
       },
     });
     mocks.readCursorEvents.mockReturnValue([{ row: { requestId: "r1" }, workspacePath: "/tmp/ws" }]);
+    mocks.readCursorTranscriptSessions.mockResolvedValue([]);
     mocks.mapCursorEvent.mockReturnValue({
       tool_name: "cursor",
       event_type: "chat",
@@ -265,7 +361,7 @@ describe("syncTelemetryTools", () => {
     expect(result.failed).toBe(0);
     expect(result.sent).toBe(2);
     const state = readState(appDir, host, sharedToken);
-    expect(state.sessions[sessionStateKey("sess-1")]).toBeDefined();
+    expect(state.sessions[sessionStateKey("sess-1:1")]).toBeDefined();
     expect(state.sessions[CURSOR_EVENTS_WATERMARK_KEY]?.sentAt).toBe("2026-05-19T12:00:00.000Z");
   });
 });

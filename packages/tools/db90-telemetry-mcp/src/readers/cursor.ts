@@ -2,11 +2,15 @@
  * Consolidated SQLite reader + ingest mapper copied from `@db90/cursor`'s internal
  * `cursor-reader.ts` and `mapper.ts`. Not imported from the package — public export is `./sync`.
  */
-import { join } from "node:path";
+import { createReadStream, statSync } from "node:fs";
+import { finished } from "node:stream/promises";
+import { createInterface } from "node:readline";
+import { basename, join } from "node:path";
 import { homedir } from "node:os";
 import { glob } from "glob";
 import Database from "better-sqlite3";
 import type { IngestPayload } from "@db90/sdk";
+import { type RiskLevel, scanText } from "../risk-scanner.js";
 
 // ─── Reader: paths & SQLite ──────────────────────────────────────────────────
 
@@ -19,6 +23,10 @@ export function cursorUserDir(): string {
     default:
       return join(process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config"), "Cursor", "User");
   }
+}
+
+function cursorProjectsDir(): string {
+  return join(homedir(), ".cursor", "projects");
 }
 
 interface TableInfo {
@@ -328,9 +336,259 @@ export function readEvents(
   return readLegacyEvents(since, baseDir, verbose);
 }
 
+// ─── Cursor composer transcripts (~/.cursor/projects/**/agent-transcripts/*.jsonl) ─────
+
+interface CursorComposerHeader {
+  composerId: string;
+  name: string | null;
+  workspacePath: string | null;
+  lastUpdatedAt: string | null;
+}
+
+interface CursorTranscriptLine {
+  role?: string;
+  message?: {
+    content?: unknown;
+  };
+}
+
+export interface CursorTranscriptTurn {
+  turnId: string;
+  sessionId: string;
+  filePath: string;
+  fileSize: number;
+  workspacePath: string | null;
+  composerName: string | null;
+  occurredAt: string;
+  promptText: string;
+  assistantText: string;
+  tokensIn: number;
+  tokensOut: number;
+  riskLevel: RiskLevel;
+  riskScore: number;
+  riskCategories: string[];
+}
+
+function extractContentText(content: unknown): string[] {
+  if (typeof content === "string") return [content];
+  if (!Array.isArray(content)) return [];
+  return content.flatMap((block) => {
+    if (typeof block !== "object" || block === null) return [];
+    const { type, text } = block as Record<string, unknown>;
+    return type === "text" && typeof text === "string" ? [text] : [];
+  });
+}
+
+function stripUserQueryWrapper(text: string): string {
+  return text
+    .replace(/<user_query>\s*/g, "")
+    .replace(/\s*<\/user_query>/g, "")
+    .trim();
+}
+
+function estimateTokens(text: string): number {
+  const trimmed = text.trim();
+  if (!trimmed) return 0;
+  return Math.max(1, Math.ceil(trimmed.length / 4));
+}
+
+function toIsoFromMs(value: unknown): string | null {
+  if (typeof value !== "number" || Number.isNaN(value) || value <= 0) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function readComposerHeaders(baseDir?: string): Map<string, CursorComposerHeader> {
+  const userDir = baseDir ?? cursorUserDir();
+  const dbPath = join(userDir, "globalStorage", "state.vscdb");
+  let db: Database.Database | null = null;
+
+  try {
+    db = new Database(dbPath, { readonly: true });
+    if (!tableExists(db, STATE_TABLE)) return new Map();
+
+    const row = db
+      .prepare(`SELECT value FROM ${STATE_TABLE} WHERE key = ?`)
+      .get("composer.composerHeaders") as { value: string } | undefined;
+    if (!row) return new Map();
+
+    const parsed = JSON.parse(row.value) as unknown;
+    if (typeof parsed !== "object" || parsed === null) return new Map();
+    const allComposers = (parsed as Record<string, unknown>).allComposers;
+    if (!Array.isArray(allComposers)) return new Map();
+
+    const headers = new Map<string, CursorComposerHeader>();
+    for (const entry of allComposers) {
+      if (typeof entry !== "object" || entry === null) continue;
+      const composer = entry as Record<string, unknown>;
+      const composerId =
+        typeof composer.composerId === "string" && composer.composerId.length > 0
+          ? composer.composerId
+          : null;
+      if (!composerId) continue;
+
+      const workspaceIdentifier =
+        typeof composer.workspaceIdentifier === "object" && composer.workspaceIdentifier !== null
+          ? (composer.workspaceIdentifier as Record<string, unknown>)
+          : null;
+      const uri =
+        workspaceIdentifier &&
+        typeof workspaceIdentifier.uri === "object" &&
+        workspaceIdentifier.uri !== null
+          ? (workspaceIdentifier.uri as Record<string, unknown>)
+          : null;
+
+      headers.set(composerId, {
+        composerId,
+        name: typeof composer.name === "string" ? composer.name : null,
+        workspacePath: typeof uri?.fsPath === "string" ? uri.fsPath : null,
+        lastUpdatedAt: toIsoFromMs(composer.lastUpdatedAt),
+      });
+    }
+
+    return headers;
+  } catch {
+    return new Map();
+  } finally {
+    db?.close();
+  }
+}
+
+export function findCursorTranscriptFiles(projectDirs?: string[]): string[] {
+  const dirs = projectDirs ?? [cursorProjectsDir()];
+  const files: string[] = [];
+
+  for (const dir of dirs) {
+    try {
+      files.push(
+        ...glob.sync("**/agent-transcripts/*/*.jsonl", {
+          cwd: dir,
+          absolute: true,
+        })
+      );
+    } catch {
+      // directory missing — skip
+    }
+  }
+
+  return [...new Set(files)];
+}
+
+export async function parseCursorTranscriptFile(
+  filePath: string,
+  composerHeaders: Map<string, CursorComposerHeader>,
+  verbose = false
+): Promise<CursorTranscriptTurn[]> {
+  let fileSize = 0;
+  let occurredAt = new Date().toISOString();
+
+  try {
+    const stat = statSync(filePath);
+    fileSize = stat.size;
+    occurredAt = stat.mtime.toISOString();
+  } catch {
+    return [];
+  }
+
+  const sessionId = basename(filePath, ".jsonl");
+  const header = composerHeaders.get(sessionId);
+  if (header?.lastUpdatedAt) occurredAt = header.lastUpdatedAt;
+
+  const turns: CursorTranscriptTurn[] = [];
+  let currentPromptParts: string[] = [];
+  let currentAssistantParts: string[] = [];
+  let turnIndex = 0;
+  const stream = createReadStream(filePath, { encoding: "utf-8" });
+  const rl = createInterface({ input: stream, crlfDelay: Infinity });
+
+  const finalizeTurn = (): void => {
+    const promptText = currentPromptParts.join("\n\n").trim();
+    const assistantText = currentAssistantParts.join("\n\n").trim();
+    if (!promptText && !assistantText) return;
+
+    const risk = scanText(promptText);
+    turnIndex += 1;
+    turns.push({
+      turnId: `${sessionId}:${turnIndex}`,
+      sessionId,
+      filePath,
+      fileSize,
+      workspacePath: header?.workspacePath ?? null,
+      composerName: header?.name ?? null,
+      occurredAt,
+      promptText,
+      assistantText,
+      tokensIn: estimateTokens(promptText),
+      tokensOut: estimateTokens(assistantText),
+      riskLevel: risk.risk_level,
+      riskScore: risk.risk_score,
+      riskCategories: risk.risk_categories,
+    });
+  };
+
+  let lineNumber = 0;
+  try {
+    for await (const line of rl) {
+      lineNumber++;
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      let entry: CursorTranscriptLine;
+      try {
+        entry = JSON.parse(trimmed) as CursorTranscriptLine;
+      } catch {
+        if (verbose) {
+          console.warn(`[warn] ${filePath}:${lineNumber} — invalid JSON, skipping`);
+        }
+        continue;
+      }
+
+      const texts = extractContentText(entry.message?.content);
+      if (texts.length === 0) continue;
+
+      if (entry.role === "user") {
+        if (currentPromptParts.length > 0 || currentAssistantParts.length > 0) {
+          finalizeTurn();
+          currentPromptParts = [];
+          currentAssistantParts = [];
+        }
+        currentPromptParts.push(...texts.map(stripUserQueryWrapper).filter((text) => text.length > 0));
+      } else if (entry.role === "assistant") {
+        currentAssistantParts.push(...texts.map((text) => text.trim()).filter((text) => text.length > 0));
+      }
+    }
+  } catch (err) {
+    if (verbose) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`[warn] ${filePath} — stream error, skipping file: ${message}`);
+    }
+    rl.close();
+    stream.destroy();
+    await finished(stream).catch(() => undefined);
+    return [];
+  }
+
+  finalizeTurn();
+  return turns;
+}
+
+export async function readCursorTranscriptSessions(
+  cursorUserBaseDir?: string,
+  transcriptProjectDirs?: string[],
+  verbose = false
+): Promise<CursorTranscriptTurn[]> {
+  const composerHeaders = readComposerHeaders(cursorUserBaseDir);
+  const files = findCursorTranscriptFiles(transcriptProjectDirs);
+  const sessions = await Promise.all(
+    files.map((filePath) => parseCursorTranscriptFile(filePath, composerHeaders, verbose))
+  );
+  return sessions.flat();
+}
+
 // ─── Mapper ──────────────────────────────────────────────────────────────────
 
 const COST_MODEL = "estimated_line_count" as const;
+const TRANSCRIPT_COST_MODEL = "estimated_transcript_text" as const;
 
 export interface PricingConfig {
   tokens_per_line: number;
@@ -347,12 +605,19 @@ export const DEFAULT_CURSOR_PRICING: PricingConfig = {
 };
 
 export type Db90CursorPayloadMetadata = {
+  session_id?: string;
   cursor_session_id: string | null;
   workspace: string;
-  cost_model: typeof COST_MODEL;
-  scannable: false;
-  risk_level: "none";
+  cost_model: typeof COST_MODEL | typeof TRANSCRIPT_COST_MODEL;
+  scannable: boolean;
+  risk_level: RiskLevel | "none";
   source?: "recent_commit";
+  transcript_source?: "agent_transcript";
+  composer_name?: string;
+  prompt_text?: string;
+  assistant_text?: string;
+  risk_categories?: string[];
+  risk_score?: number;
   commit_hash?: string;
   commit_message?: string;
   repo_name?: string;
@@ -610,6 +875,38 @@ export function mapEvent(
       cost_model: COST_MODEL,
       scannable: false,
       risk_level: "none",
+    },
+  };
+  if (projectId) payload.project_id = projectId;
+  return payload;
+}
+
+export function mapTranscriptTurn(
+  turn: CursorTranscriptTurn,
+  projectId?: string,
+  pricing: PricingConfig = DEFAULT_CURSOR_PRICING
+): CursorDb90Payload {
+  const payload: CursorDb90Payload = {
+    tool_name: "cursor",
+    event_type: "chat",
+    model: "unknown",
+    tokens_in: turn.tokensIn,
+    tokens_out: turn.tokensOut,
+    cost_usd: computeTokenCost("chat", turn.tokensIn, turn.tokensOut, pricing),
+    occurred_at: turn.occurredAt,
+    metadata: {
+      session_id: turn.turnId,
+      cursor_session_id: turn.sessionId,
+      workspace: turn.workspacePath ?? turn.filePath,
+      cost_model: TRANSCRIPT_COST_MODEL,
+      scannable: true,
+      risk_level: turn.riskLevel,
+      risk_categories: turn.riskCategories,
+      risk_score: turn.riskScore,
+      transcript_source: "agent_transcript",
+      composer_name: turn.composerName ?? undefined,
+      prompt_text: turn.promptText || undefined,
+      assistant_text: turn.assistantText || undefined,
     },
   };
   if (projectId) payload.project_id = projectId;

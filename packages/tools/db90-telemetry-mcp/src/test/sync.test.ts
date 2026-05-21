@@ -18,16 +18,25 @@ describe("syncOnce", () => {
     transcriptsRoot = join(appDir, "claude-projects");
     mkdirSync(join(transcriptsRoot, "proj"), { recursive: true });
     setIngestRetryWaitOverrideForTests(async () => {});
-    const line = JSON.stringify({
+    const userLine = JSON.stringify({
+      type: "user",
+      sessionId: "sess-test-1",
+      timestamp: "2026-05-15T11:59:00.000Z",
+      message: {
+        content: [{ type: "text", text: "Check the latest release gate status" }],
+      },
+    });
+    const assistantLine = JSON.stringify({
       type: "assistant",
       sessionId: "sess-test-1",
       timestamp: "2026-05-15T12:00:00.000Z",
       message: {
         model: "claude-sonnet-4",
         usage: { input_tokens: 100, output_tokens: 50 },
+        content: [{ type: "text", text: "Release gate is green." }],
       },
     });
-    writeFileSync(join(transcriptsRoot, "proj", "session.jsonl"), `${line}\n`, "utf-8");
+    writeFileSync(join(transcriptsRoot, "proj", "session.jsonl"), `${userLine}\n${assistantLine}\n`, "utf-8");
 
     fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ ok: true }), {
@@ -70,7 +79,12 @@ describe("syncOnce", () => {
     expect(body).toMatchObject({
       tool_name: "claude_code",
       event_type: "chat",
-      metadata: { session_id: "sess-test-1" },
+      metadata: {
+        session_id: "sess-test-1:1",
+        claude_session_id: "sess-test-1",
+        prompt_text: "Check the latest release gate status",
+        assistant_text: "Release gate is green.",
+      },
     });
 
     const r2 = await syncOnce({
@@ -87,7 +101,7 @@ describe("syncOnce", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
-  it("persists checkpoint under claude_code:<sessionId>", async () => {
+  it("persists checkpoint under claude_code:<turnId>", async () => {
     const host = "http://127.0.0.1:9";
     const token = "db90_test_token";
 
@@ -106,20 +120,29 @@ describe("syncOnce", () => {
     const raw = JSON.parse(readFileSync(join(appDir, fname), "utf-8")) as {
       sessions: Record<string, unknown>;
     };
-    expect(Object.keys(raw.sessions)).toContain(sessionStateKey("sess-test-1"));
+    expect(Object.keys(raw.sessions)).toContain(sessionStateKey("sess-test-1:1"));
   });
 
   it("stops posting remaining sessions after a 429 backoff response", async () => {
-    const secondLine = JSON.stringify({
+    const secondUserLine = JSON.stringify({
+      type: "user",
+      sessionId: "sess-test-2",
+      timestamp: "2026-05-15T12:00:30.000Z",
+      message: {
+        content: [{ type: "text", text: "And what about the retry budget?" }],
+      },
+    });
+    const secondAssistantLine = JSON.stringify({
       type: "assistant",
       sessionId: "sess-test-2",
       timestamp: "2026-05-15T12:01:00.000Z",
       message: {
         model: "claude-sonnet-4",
         usage: { input_tokens: 10, output_tokens: 5 },
+        content: [{ type: "text", text: "Retry budget remains healthy." }],
       },
     });
-    writeFileSync(join(transcriptsRoot, "proj", "session-2.jsonl"), `${secondLine}\n`, "utf-8");
+    writeFileSync(join(transcriptsRoot, "proj", "session-2.jsonl"), `${secondUserLine}\n${secondAssistantLine}\n`, "utf-8");
     fetchSpy.mockResolvedValueOnce(
       new Response(JSON.stringify({ code: "quota_exceeded" }), {
         status: 429,

@@ -2,11 +2,15 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { writeFileSync } from "node:fs";
 import Database from "better-sqlite3";
 import {
   findCursorDbs,
+  findCursorTranscriptFiles,
   findStateVscDbs,
+  parseCursorTranscriptFile,
   readLegacyEvents,
+  readCursorTranscriptSessions,
   readDailyStats,
   readEvents,
   readRecentCommitSnapshots,
@@ -128,6 +132,23 @@ describe("findStateVscDbs", () => {
     }
     // +1 for the always-included globalStorage path
     expect(findStateVscDbs(tempDir).length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("findCursorTranscriptFiles", () => {
+  let tempDir: string;
+
+  beforeEach(() => { tempDir = makeTempDir(); });
+  afterEach(() => { rmSync(tempDir, { recursive: true, force: true }); });
+
+  it("finds agent transcript jsonl files under project directories", () => {
+    const transcriptDir = join(tempDir, "repo", "agent-transcripts", "composer-1");
+    mkdirSync(transcriptDir, { recursive: true });
+    writeFileSync(join(transcriptDir, "composer-1.jsonl"), "", "utf-8");
+
+    const results = findCursorTranscriptFiles([tempDir]);
+    expect(results).toHaveLength(1);
+    expect(results[0]).toContain("composer-1.jsonl");
   });
 });
 
@@ -350,6 +371,112 @@ describe("readRecentCommitSnapshots", () => {
   it("returns empty when key is absent", () => {
     makeGlobalDb([{ key: "other.key", value: "{}" }]);
     expect(readRecentCommitSnapshots(null, tempDir)).toHaveLength(0);
+  });
+});
+
+describe("cursor transcript sessions", () => {
+  let tempDir: string;
+
+  beforeEach(() => { tempDir = makeTempDir(); });
+  afterEach(() => { rmSync(tempDir, { recursive: true, force: true }); });
+
+  it("parses prompt/assistant text from a transcript file", async () => {
+    const filePath = join(tempDir, "composer-1.jsonl");
+    writeFileSync(
+      filePath,
+      [
+        JSON.stringify({ role: "user", message: { content: [{ type: "text", text: "<user_query>\nInspect the health output\n</user_query>" }] } }),
+        JSON.stringify({ role: "assistant", message: { content: [{ type: "text", text: "Health is green." }, { type: "tool_use", name: "Read" }] } }),
+      ].join("\n"),
+      "utf-8"
+    );
+
+    const result = await parseCursorTranscriptFile(
+      filePath,
+      new Map([
+        [
+          "composer-1",
+          {
+            composerId: "composer-1",
+            name: "Health check",
+            workspacePath: "/tmp/workspace",
+            lastUpdatedAt: "2026-05-20T09:00:00.000Z",
+          },
+        ],
+      ])
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.sessionId).toBe("composer-1");
+    expect(result[0]?.turnId).toBe("composer-1:1");
+    expect(result[0]?.promptText).toBe("Inspect the health output");
+    expect(result[0]?.assistantText).toContain("Health is green.");
+    expect(result[0]?.workspacePath).toBe("/tmp/workspace");
+    expect(result[0]?.composerName).toBe("Health check");
+    expect(result[0]?.occurredAt).toBe("2026-05-20T09:00:00.000Z");
+    expect(result[0]?.tokensIn).toBeGreaterThan(0);
+    expect(result[0]?.tokensOut).toBeGreaterThan(0);
+  });
+
+  it("splits multiple user prompts into separate turns", async () => {
+    const filePath = join(tempDir, "composer-multi.jsonl");
+    writeFileSync(
+      filePath,
+      [
+        JSON.stringify({ role: "user", message: { content: [{ type: "text", text: "<user_query>\nFirst question\n</user_query>" }] } }),
+        JSON.stringify({ role: "assistant", message: { content: [{ type: "text", text: "First answer." }] } }),
+        JSON.stringify({ role: "user", message: { content: [{ type: "text", text: "<user_query>\nSecond question\n</user_query>" }] } }),
+        JSON.stringify({ role: "assistant", message: { content: [{ type: "text", text: "Second answer." }] } }),
+      ].join("\n"),
+      "utf-8"
+    );
+
+    const turns = await parseCursorTranscriptFile(filePath, new Map());
+    expect(turns).toHaveLength(2);
+    expect(turns[0]?.turnId).toBe("composer-multi:1");
+    expect(turns[0]?.promptText).toBe("First question");
+    expect(turns[1]?.turnId).toBe("composer-multi:2");
+    expect(turns[1]?.promptText).toBe("Second question");
+  });
+
+  it("reads transcript sessions using global composer headers metadata", async () => {
+    const userDir = join(tempDir, "CursorUser");
+    const globalDir = join(userDir, "globalStorage");
+    const projectsDir = join(tempDir, "cursor-projects", "repo", "agent-transcripts", "composer-2");
+    mkdirSync(globalDir, { recursive: true });
+    mkdirSync(projectsDir, { recursive: true });
+
+    createItemTableDb(join(globalDir, "state.vscdb"), [
+      {
+        key: "composer.composerHeaders",
+        value: JSON.stringify({
+          allComposers: [
+            {
+              composerId: "composer-2",
+              name: "Telemetry session",
+              lastUpdatedAt: 1779269828871,
+              workspaceIdentifier: {
+                uri: { fsPath: "/Users/test/repo" },
+              },
+            },
+          ],
+        }),
+      },
+    ]);
+
+    writeFileSync(
+      join(projectsDir, "composer-2.jsonl"),
+      [
+        JSON.stringify({ role: "user", message: { content: [{ type: "text", text: "<user_query>\nWhat does npm pack do?\n</user_query>" }] } }),
+        JSON.stringify({ role: "assistant", message: { content: [{ type: "text", text: "It creates a tarball." }] } }),
+      ].join("\n"),
+      "utf-8"
+    );
+
+    const sessions = await readCursorTranscriptSessions(userDir, [join(tempDir, "cursor-projects")]);
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]?.composerName).toBe("Telemetry session");
+    expect(sessions[0]?.workspacePath).toBe("/Users/test/repo");
   });
 });
 

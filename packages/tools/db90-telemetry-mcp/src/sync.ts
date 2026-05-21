@@ -13,15 +13,18 @@ import {
 import {
   findTranscriptFiles,
   parseTranscriptFile,
-  toDb90Payload,
-  type SessionAggregate,
+  mapTranscriptTurn as mapClaudeTranscriptTurn,
+  type ClaudeTranscriptTurn,
 } from "./readers/claude.js";
 import {
   readEvents as readCursorEvents,
   readDailyStats,
+  readCursorTranscriptSessions,
   mapEvent as mapCursorEvent,
+  mapTranscriptTurn as mapCursorTranscriptTurn,
   mapDailyStats,
   DEFAULT_CURSOR_PRICING,
+  type CursorTranscriptTurn,
   type CursorDb90Payload,
 } from "./readers/cursor.js";
 import { postEvent } from "./client.js";
@@ -36,9 +39,14 @@ export const CLAUDE_STATE_PREFIX = "claude_code:" as const;
 export const CURSOR_WATERMARK_KEY = "cursor:watermark" as const;
 export const CURSOR_EVENTS_WATERMARK_KEY = "cursor:events_watermark" as const;
 export const CURSOR_DAILY_STATS_WATERMARK_KEY = "cursor:daily_stats_watermark" as const;
+export const CURSOR_TRANSCRIPT_TURN_PREFIX = "cursor:transcript_turn:" as const;
 
 export function sessionStateKey(sessionId: string): string {
   return `${CLAUDE_STATE_PREFIX}${sessionId}`;
+}
+
+export function cursorTranscriptTurnStateKey(turnId: string): string {
+  return `${CURSOR_TRANSCRIPT_TURN_PREFIX}${turnId}`;
 }
 
 export interface SyncResult {
@@ -72,6 +80,7 @@ export interface MultiSyncOptions {
   transcriptBaseDirs?: string[];
   /** Synthetic Cursor paths for Vitest isolation. Omit for real installs. */
   cursorBaseDir?: string;
+  cursorTranscriptProjectDirs?: string[];
   tools?: TelemetryToolId[];
 }
 
@@ -212,13 +221,13 @@ async function runClaudeSlice(options: SyncOptions): Promise<SyncResult> {
     mcpLog.info("sync_claude_transcripts", { files_found: files.length }, false);
   }
 
-  const allFileSessions = await Promise.all(files.map((f) => parseTranscriptFile(f, verbose)));
-  const bestAggs = new Map<string, SessionAggregate>();
-  for (const fileSessions of allFileSessions) {
-    for (const [sessionId, agg] of fileSessions) {
-      const existing = bestAggs.get(sessionId);
-      if (!existing || agg.tokensIn + agg.tokensOut > existing.tokensIn + existing.tokensOut) {
-        bestAggs.set(sessionId, agg);
+  const allFileTurns = await Promise.all(files.map((f) => parseTranscriptFile(f, verbose)));
+  const bestTurns = new Map<string, ClaudeTranscriptTurn>();
+  for (const fileTurns of allFileTurns) {
+    for (const turn of fileTurns) {
+      const existing = bestTurns.get(turn.turnId);
+      if (!existing || turn.fileSize > existing.fileSize) {
+        bestTurns.set(turn.turnId, turn);
       }
     }
   }
@@ -229,45 +238,45 @@ async function runClaudeSlice(options: SyncOptions): Promise<SyncResult> {
   let totalSkipped = 0;
   let shouldStopForBackoff = false;
 
-  for (const [sessionId, agg] of bestAggs) {
-    const sKey = sessionStateKey(sessionId);
+  for (const turn of bestTurns.values()) {
+    const sKey = sessionStateKey(turn.turnId);
     const known = state.sessions[sKey];
 
-    if (known && known.fileSize === agg.fileSize) {
+    if (known) {
       totalSkipped++;
       if (verbose) {
-        console.log(`[verbose] Skipping unchanged session ${sessionId}`);
+        console.log(`[verbose] Skipping already-synced Claude turn ${turn.turnId}`);
       }
       mcpLog.info(
         "sync_checkpoint_skip",
-        { tool: "claude_code", reason: "unchanged_transcript", session_id: sessionId },
+        { tool: "claude_code", reason: "existing_turn_checkpoint", session_id: turn.turnId },
         false
       );
       continue;
     }
 
-    const payload = toDb90Payload(agg, { projectId, pricing });
+    const payload = mapClaudeTranscriptTurn(turn, { projectId, pricing });
 
     if (verbose && payload.cost_usd === null) {
-      if (!agg.model) {
-        if (agg.tokensIn > 0 || agg.tokensOut > 0) {
-          console.warn(`[warn] Session ${sessionId} has usage but no model — cost_usd will be null`);
+      if (!turn.model) {
+        if (turn.tokensIn > 0 || turn.tokensOut > 0) {
+          console.warn(`[warn] Claude turn ${turn.turnId} has usage but no model — cost_usd will be null`);
         }
       } else {
-        const warning = getCostWarning(agg.model, pricing);
+        const warning = getCostWarning(turn.model, pricing);
         if (warning) console.warn(`[warn] ${warning}`);
       }
     }
 
     if (dryRun) {
-      console.log(`[dry-run] Would send session ${sessionId}:`);
+      console.log(`[dry-run] Would send Claude turn ${turn.turnId}:`);
       console.log(JSON.stringify(payload, null, 2));
       totalSent++;
       continue;
     }
 
     if (verbose) {
-      console.log(`[verbose] Sending session ${sessionId} (${agg.tokensIn + agg.tokensOut} tokens)`);
+      console.log(`[verbose] Sending Claude turn ${turn.turnId} (${turn.tokensIn + turn.tokensOut} tokens)`);
     }
 
     const ok = await postEvent(payload, host, token, {
@@ -290,13 +299,13 @@ async function runClaudeSlice(options: SyncOptions): Promise<SyncResult> {
       },
     });
     if (ok) {
-      state = markSessionSent(state, sKey, agg.fileSize);
+      state = markSessionSent(state, sKey, turn.fileSize);
       writeState(state, appDir, host, token);
       totalSent++;
     } else {
       totalFailed++;
-      errors.push(`Failed to post session ${sessionId}`);
-      mcpLog.error("sync_ingest_final_failure", { tool: "claude_code", session_id: sessionId }, true);
+      errors.push(`Failed to post Claude turn ${turn.turnId}`);
+      mcpLog.error("sync_ingest_final_failure", { tool: "claude_code", session_id: turn.turnId }, true);
       if (shouldStopForBackoff) {
         break;
       }
@@ -330,8 +339,9 @@ async function runCursorSlice(params: {
   projectId: string | null;
   appDir: string;
   cursorBaseDir?: string;
+  cursorTranscriptProjectDirs?: string[];
 }): Promise<SyncResult> {
-  const { token, host, dryRun, verbose, projectId, appDir, cursorBaseDir } = params;
+  const { token, host, dryRun, verbose, projectId, appDir, cursorBaseDir, cursorTranscriptProjectDirs } = params;
   const backoffKey = credentialStateKey(host, token);
   const backoffUntil = backoffUntilByCredential.get(backoffKey) ?? null;
 
@@ -356,20 +366,40 @@ async function runCursorSlice(params: {
   const dailyStatsSince = cursorWatermarkDate(stateBefore, CURSOR_DAILY_STATS_WATERMARK_KEY, CURSOR_WATERMARK_KEY);
 
   const baseDir = cursorBaseDir;
+  const transcriptTurns = await readCursorTranscriptSessions(baseDir, cursorTranscriptProjectDirs, verbose);
   const rawEvents = readCursorEvents(eventsSince, baseDir, verbose);
   const dailyStats = readDailyStats(dailyStatsSince, baseDir, verbose);
 
   const projectIdOpt = projectId ?? undefined;
+  const transcriptTurnsById = new Map<string, CursorTranscriptTurn>();
+  for (const turn of transcriptTurns) {
+    transcriptTurnsById.set(turn.turnId, turn);
+  }
+  const transcriptPayloads = [...transcriptTurnsById.values()]
+    .filter((turn) => {
+      const known = stateBefore.sessions[cursorTranscriptTurnStateKey(turn.turnId)];
+      return !known || known.fileSize !== turn.fileSize;
+    })
+    .map((turn) => mapCursorTranscriptTurn(turn, projectIdOpt, DEFAULT_CURSOR_PRICING))
+    .sort((a, b) => a.occurred_at.localeCompare(b.occurred_at));
+  const skippedTranscriptCount = transcriptTurns.length - transcriptPayloads.length;
+  const transcriptModeEnabled = transcriptTurnsById.size > 0;
 
   const mappedFromEvents = rawEvents
     .map(({ row, workspacePath }) => mapCursorEvent(row, workspacePath, projectIdOpt, DEFAULT_CURSOR_PRICING))
-    .filter((e): e is CursorDb90Payload => e !== null);
+    .filter((e): e is CursorDb90Payload => e !== null)
+    .filter((payload) => !transcriptModeEnabled || payload.event_type !== "chat");
 
   const mappedFromStats = dailyStats.flatMap((entry) =>
     mapDailyStats(entry, projectIdOpt, DEFAULT_CURSOR_PRICING)
-  );
+  ).filter((payload) => !transcriptModeEnabled || payload.event_type !== "chat");
 
   const groups: Array<{ key: string; label: string; payloads: CursorDb90Payload[] }> = [
+    {
+      key: CURSOR_TRANSCRIPT_TURN_PREFIX,
+      label: "transcripts",
+      payloads: transcriptPayloads,
+    },
     {
       key: CURSOR_EVENTS_WATERMARK_KEY,
       label: "events",
@@ -401,7 +431,7 @@ async function runCursorSlice(params: {
   let stateMut = stateBefore;
   let totalSent = 0;
   let totalFailed = 0;
-  let totalSkipped = 0;
+  let totalSkipped = skippedTranscriptCount;
   const errors: string[] = [];
   let abortRemaining = false;
 
@@ -441,6 +471,19 @@ async function runCursorSlice(params: {
       if (ok) {
         totalSent++;
         groupLastSentAt = payload.occurred_at;
+        if (group.label === "transcripts") {
+          const turnId = payload.metadata.session_id;
+          const sourceTurn =
+            typeof turnId === "string" ? transcriptTurnsById.get(turnId) : undefined;
+          if (sourceTurn) {
+            stateMut = markSessionSent(
+              stateMut,
+              cursorTranscriptTurnStateKey(sourceTurn.turnId),
+              sourceTurn.fileSize
+            );
+            writeState(stateMut, appDir, host, token);
+          }
+        }
         continue;
       }
 
@@ -457,7 +500,7 @@ async function runCursorSlice(params: {
       break;
     }
 
-    if (!groupFailed && groupLastSentAt !== null) {
+    if (!groupFailed && groupLastSentAt !== null && group.label !== "transcripts") {
       stateMut = {
         ...stateMut,
         sessions: {
@@ -569,6 +612,7 @@ export async function syncTelemetryTools(options: MultiSyncOptions): Promise<Syn
           projectId,
           appDir,
           cursorBaseDir: options.cursorBaseDir,
+          cursorTranscriptProjectDirs: options.cursorTranscriptProjectDirs,
         }).then((r) => ({ ...r, tag: "cursor" as const }));
       tasks.push(task);
     }

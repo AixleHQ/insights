@@ -32,13 +32,15 @@ interface ClaudeMessage {
 interface ClaudeTranscriptLine {
   type?: string;
   sessionId?: string;
+  promptId?: string;
   timestamp?: string;
   message?: ClaudeMessage;
 }
 
-/** Aggregated token usage for one session. */
-export interface SessionAggregate {
+export interface ClaudeTranscriptTurn {
   sessionId: string;
+  turnId: string;
+  promptId?: string;
   filePath: string;
   fileSize: number;
   model: string | null;
@@ -46,8 +48,9 @@ export interface SessionAggregate {
   tokensOut: number;
   cacheWriteTokens: number;
   cacheReadTokens: number;
-  /** Latest assistant message timestamp in the session (ISO string). */
   occurredAt: string;
+  promptText: string;
+  assistantText: string;
   riskLevel: RiskLevel;
   riskScore: number;
   riskCategories: string[];
@@ -66,6 +69,8 @@ export interface Db90Payload extends IngestPayload {
   project_id?: string;
   metadata: {
     session_id: string;
+    claude_session_id: string;
+    transcript_source: "claude_jsonl";
     model: string | null;
     base_input_tokens: number;
     output_tokens: number;
@@ -74,11 +79,13 @@ export interface Db90Payload extends IngestPayload {
     risk_level: RiskLevel;
     risk_categories: string[];
     risk_score: number;
+    prompt_text?: string;
+    assistant_text?: string;
     scannable: true;
   };
 }
 
-/** Options for toDb90Payload. */
+/** Options for mapTranscriptTurn. */
 export interface ToDb90PayloadOptions {
   projectId?: string | null;
   pricing?: PricingTable;
@@ -122,19 +129,73 @@ function extractContentText(content: unknown): string[] {
   });
 }
 
-/** Streams a JSONL file and aggregates token usage per session. */
+function hasTextContent(content: unknown): boolean {
+  if (!Array.isArray(content)) return false;
+  return content.some((block) => {
+    if (typeof block !== "object" || block === null) return false;
+    const { type, text } = block as Record<string, unknown>;
+    return type === "text" && typeof text === "string" && text.trim().length > 0;
+  });
+}
+
+interface MutableTranscriptTurn extends ClaudeTranscriptTurn {
+  persisted?: boolean;
+}
+
+function newTurn(
+  sessionId: string,
+  turnIndex: number,
+  filePath: string,
+  fileSize: number,
+  occurredAt: string,
+  promptId?: string
+): MutableTranscriptTurn {
+  return {
+    sessionId,
+    turnId: `${sessionId}:${turnIndex}`,
+    promptId,
+    filePath,
+    fileSize,
+    model: null,
+    tokensIn: 0,
+    tokensOut: 0,
+    cacheWriteTokens: 0,
+    cacheReadTokens: 0,
+    occurredAt,
+    promptText: "",
+    assistantText: "",
+    riskLevel: "low",
+    riskScore: 0,
+    riskCategories: [],
+    persisted: false,
+  };
+}
+
+function appendText(existing: string, addition: string): string {
+  if (!addition.trim()) return existing;
+  return existing ? `${existing}\n\n${addition}` : addition;
+}
+
+function enrichTurnRisk(turn: MutableTranscriptTurn): void {
+  if (!turn.promptText.trim()) return;
+  const result = scanText(turn.promptText);
+  turn.riskLevel = result.risk_level;
+  turn.riskScore = result.risk_score;
+  turn.riskCategories = result.risk_categories;
+}
+
+/** Streams a JSONL file and splits Claude transcripts into individual turns. */
 export async function parseTranscriptFile(
   filePath: string,
   verbose: boolean = false
-): Promise<Map<string, SessionAggregate>> {
-  const sessions = new Map<string, SessionAggregate>();
-  const userTexts = new Map<string, string>();
+): Promise<ClaudeTranscriptTurn[]> {
+  const turns: ClaudeTranscriptTurn[] = [];
 
   let fileSize = 0;
   try {
     fileSize = statSync(filePath).size;
   } catch {
-    return sessions;
+    return turns;
   }
 
   const stream = createReadStream(filePath, { encoding: "utf-8" });
@@ -144,6 +205,23 @@ export async function parseTranscriptFile(
   });
 
   let lineNumber = 0;
+  let currentTurn: MutableTranscriptTurn | null = null;
+  let currentTurnIndex = 0;
+  const turnsByPromptId = new Map<string, MutableTranscriptTurn>();
+  const finalizedTurns: MutableTranscriptTurn[] = [];
+
+  const flushCurrentTurn = (): void => {
+    if (!currentTurn) return;
+    if (!currentTurn.persisted) {
+      enrichTurnRisk(currentTurn);
+      if (currentTurn.promptText.trim() || currentTurn.assistantText.trim()) {
+        currentTurn.persisted = true;
+        finalizedTurns.push(currentTurn);
+      }
+    }
+    currentTurn = null;
+  };
+
   try {
     for await (const line of rl) {
       lineNumber++;
@@ -160,60 +238,60 @@ export async function parseTranscriptFile(
         continue;
       }
 
+      const sessionId = entry.sessionId;
+      const promptId = entry.promptId;
+      const timestamp = entry.timestamp ?? new Date().toISOString();
+
+      if (entry.type === "user") {
+        if (!sessionId || !entry.message?.content) continue;
+        const text = extractContentText(entry.message.content).join("\n\n").trim();
+
+        // Claude emits tool_result-only user entries after assistant tool_use.
+        // Those are part of the active turn, not a new user prompt.
+        if (hasTextContent(entry.message.content)) {
+          flushCurrentTurn();
+          currentTurnIndex += 1;
+          currentTurn = newTurn(sessionId, currentTurnIndex, filePath, fileSize, timestamp, promptId);
+          currentTurn.promptText = appendText(currentTurn.promptText, text);
+          currentTurn.occurredAt = timestamp;
+          if (promptId) turnsByPromptId.set(promptId, currentTurn);
+        } else if (promptId && turnsByPromptId.has(promptId)) {
+          currentTurn = turnsByPromptId.get(promptId) ?? null;
+          if (currentTurn) {
+            currentTurn.occurredAt = timestamp > currentTurn.occurredAt ? timestamp : currentTurn.occurredAt;
+          }
+        } else if (currentTurn && currentTurn.sessionId === sessionId) {
+          currentTurn.occurredAt = timestamp > currentTurn.occurredAt ? timestamp : currentTurn.occurredAt;
+        }
+        continue;
+      }
+
       if (entry.type === "assistant") {
-        if (!entry.sessionId || !entry.message) continue;
+        if (!sessionId || !entry.message) continue;
+
+        if (!currentTurn || currentTurn.sessionId !== sessionId) {
+          currentTurnIndex += 1;
+          currentTurn = newTurn(sessionId, currentTurnIndex, filePath, fileSize, timestamp);
+        }
 
         const usage = entry.message.usage;
-        if (!usage) {
-          if (verbose) {
-            console.warn(`[warn] ${filePath}:${lineNumber} — assistant message has no usage, skipping`);
-          }
-          continue;
+        if (usage) {
+          currentTurn.tokensIn +=
+            (usage.input_tokens ?? 0) +
+            (usage.cache_creation_input_tokens ?? 0) +
+            (usage.cache_read_input_tokens ?? 0);
+          currentTurn.tokensOut += usage.output_tokens ?? 0;
+          currentTurn.cacheWriteTokens += usage.cache_creation_input_tokens ?? 0;
+          currentTurn.cacheReadTokens += usage.cache_read_input_tokens ?? 0;
+        } else if (verbose) {
+          console.warn(`[warn] ${filePath}:${lineNumber} — assistant message has no usage`);
         }
 
-        const sessionId = entry.sessionId;
-        const existing = sessions.get(sessionId);
+        if (entry.message.model) currentTurn.model = entry.message.model;
+        currentTurn.occurredAt = timestamp > currentTurn.occurredAt ? timestamp : currentTurn.occurredAt;
 
-        const tokensIn =
-          (usage.input_tokens ?? 0) +
-          (usage.cache_creation_input_tokens ?? 0) +
-          (usage.cache_read_input_tokens ?? 0);
-        const tokensOut = usage.output_tokens ?? 0;
-        const cacheWrite = usage.cache_creation_input_tokens ?? 0;
-        const cacheRead = usage.cache_read_input_tokens ?? 0;
-        const model = entry.message.model ?? null;
-        const timestamp = entry.timestamp ?? new Date().toISOString();
-
-        if (!existing) {
-          sessions.set(sessionId, {
-            sessionId,
-            filePath,
-            fileSize,
-            model,
-            tokensIn,
-            tokensOut,
-            cacheWriteTokens: cacheWrite,
-            cacheReadTokens: cacheRead,
-            occurredAt: timestamp,
-            riskLevel: "low",
-            riskScore: 0,
-            riskCategories: [],
-          });
-        } else {
-          existing.tokensIn += tokensIn;
-          existing.tokensOut += tokensOut;
-          existing.cacheWriteTokens += cacheWrite;
-          existing.cacheReadTokens += cacheRead;
-          if (model) existing.model = model;
-          if (timestamp > existing.occurredAt) existing.occurredAt = timestamp;
-        }
-      } else if (entry.type === "user") {
-        if (!entry.sessionId || !entry.message?.content) continue;
-        const texts = extractContentText(entry.message.content);
-        const existing = userTexts.get(entry.sessionId);
-        userTexts.set(entry.sessionId, existing ? `${existing} ${texts.join(" ")}` : texts.join(" "));
-      } else {
-        continue;
+        const text = extractContentText(entry.message.content).join("\n\n").trim();
+        currentTurn.assistantText = appendText(currentTurn.assistantText, text);
       }
     }
   } catch (err) {
@@ -224,55 +302,50 @@ export async function parseTranscriptFile(
     rl.close();
     stream.destroy();
     await finished(stream).catch(() => undefined);
-    return sessions;
+    return turns;
   }
 
-  for (const [sessionId, agg] of sessions) {
-    const combined = userTexts.get(sessionId);
-    if (combined) {
-      const result = scanText(combined);
-      agg.riskLevel = result.risk_level;
-      agg.riskScore = result.risk_score;
-      agg.riskCategories = result.risk_categories;
-    }
-  }
-
-  return sessions;
+  flushCurrentTurn();
+  return finalizedTurns.map(({ persisted: _persisted, ...turn }) => turn);
 }
 
-/** Converts a SessionAggregate to a db90 ingest payload. */
-export function toDb90Payload(agg: SessionAggregate, options?: ToDb90PayloadOptions): Db90Payload {
+/** Converts a Claude transcript turn to a db90 ingest payload. */
+export function mapTranscriptTurn(turn: ClaudeTranscriptTurn, options?: ToDb90PayloadOptions): Db90Payload {
   const { projectId, pricing } = options ?? {};
 
-  const baseInputTokens = Math.max(0, agg.tokensIn - agg.cacheWriteTokens - agg.cacheReadTokens);
+  const baseInputTokens = Math.max(0, turn.tokensIn - turn.cacheWriteTokens - turn.cacheReadTokens);
   const cost = pricing
-    ? calculateCost(agg.model, baseInputTokens, agg.tokensOut, agg.cacheWriteTokens, agg.cacheReadTokens, pricing)
+    ? calculateCost(turn.model, baseInputTokens, turn.tokensOut, turn.cacheWriteTokens, turn.cacheReadTokens, pricing)
     : null;
 
   const payload: Db90Payload = {
     tool_name: "claude_code",
     event_type: "chat",
     cost_usd: cost,
-    occurred_at: agg.occurredAt,
+    occurred_at: turn.occurredAt,
     metadata: {
-      session_id: agg.sessionId,
-      model: agg.model,
+      session_id: turn.turnId,
+      claude_session_id: turn.sessionId,
+      transcript_source: "claude_jsonl",
+      model: turn.model,
       base_input_tokens: baseInputTokens,
-      output_tokens: agg.tokensOut,
-      cache_write_tokens: agg.cacheWriteTokens,
-      cache_read_tokens: agg.cacheReadTokens,
-      risk_level: agg.riskLevel,
-      risk_categories: agg.riskCategories,
-      risk_score: agg.riskScore,
+      output_tokens: turn.tokensOut,
+      cache_write_tokens: turn.cacheWriteTokens,
+      cache_read_tokens: turn.cacheReadTokens,
+      risk_level: turn.riskLevel,
+      risk_categories: turn.riskCategories,
+      risk_score: turn.riskScore,
+      prompt_text: turn.promptText || undefined,
+      assistant_text: turn.assistantText || undefined,
       scannable: true,
     },
   };
 
-  if (agg.model) payload.model = agg.model;
-  if (agg.tokensIn > 0) payload.tokens_in = agg.tokensIn;
-  if (agg.tokensOut > 0) payload.tokens_out = agg.tokensOut;
-  if (agg.tokensIn > 0 || agg.tokensOut > 0) {
-    payload.tokens_total = agg.tokensIn + agg.tokensOut;
+  if (turn.model) payload.model = turn.model;
+  if (turn.tokensIn > 0) payload.tokens_in = turn.tokensIn;
+  if (turn.tokensOut > 0) payload.tokens_out = turn.tokensOut;
+  if (turn.tokensIn > 0 || turn.tokensOut > 0) {
+    payload.tokens_total = turn.tokensIn + turn.tokensOut;
   }
   if (projectId) payload.project_id = projectId;
 

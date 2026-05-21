@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { mapEvent, mapDailyStats, mapRecentCommit, DEFAULT_CURSOR_PRICING } from "../readers/cursor.js";
-import type { CursorRow, PricingConfig, DailyStatsEntry, RecentCommitSnapshot } from "../readers/cursor.js";
+import { mapEvent, mapDailyStats, mapRecentCommit, mapTranscriptTurn, DEFAULT_CURSOR_PRICING } from "../readers/cursor.js";
+import type { CursorRow, PricingConfig, DailyStatsEntry, RecentCommitSnapshot, CursorTranscriptTurn } from "../readers/cursor.js";
 
 describe("mapEvent", () => {
   const workspace = "/home/user/projects/myapp";
@@ -364,6 +364,42 @@ describe("mapDailyStats", () => {
     const results = mapDailyStats(entry, undefined, malformed);
     expect(results).toHaveLength(2);
     for (const r of results) expect(r.cost_usd).toBe(0);
+  });
+});
+
+describe("mapTranscriptTurn", () => {
+  it("maps a Cursor agent transcript turn into a scannable chat payload", () => {
+    const turn: CursorTranscriptTurn = {
+      turnId: "composer-123:1",
+      sessionId: "composer-123",
+      filePath: "/tmp/composer-123.jsonl",
+      fileSize: 456,
+      workspacePath: "/Users/test/repo",
+      composerName: "Telemetry-mcp testing",
+      occurredAt: "2026-05-20T09:10:00.000Z",
+      promptText: "Inspect db90_status output",
+      assistantText: "The db90 MCP server is not connected.",
+      tokensIn: 6,
+      tokensOut: 9,
+      riskLevel: "low",
+      riskScore: 0,
+      riskCategories: [],
+    };
+
+    const payload = mapTranscriptTurn(turn);
+    expect(payload.tool_name).toBe("cursor");
+    expect(payload.event_type).toBe("chat");
+    expect(payload.tokens_in).toBe(6);
+    expect(payload.tokens_out).toBe(9);
+    expect(payload.metadata.session_id).toBe("composer-123:1");
+    expect(payload.metadata.cursor_session_id).toBe("composer-123");
+    expect(payload.metadata.workspace).toBe("/Users/test/repo");
+    expect(payload.metadata.cost_model).toBe("estimated_transcript_text");
+    expect(payload.metadata.scannable).toBe(true);
+    expect(payload.metadata.risk_level).toBe("low");
+    expect(payload.metadata.transcript_source).toBe("agent_transcript");
+    expect(payload.metadata.prompt_text).toContain("db90_status");
+    expect(payload.metadata.assistant_text).toContain("not connected");
   });
 });
 
