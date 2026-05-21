@@ -11,6 +11,8 @@ class User < ApplicationRecord
   has_many :tool_events, class_name: "ToolEvent", dependent: :restrict_with_error
   has_many :admin_audit_logs, foreign_key: :admin_user_id, dependent: :restrict_with_error
   has_many :notifications, dependent: :destroy
+  has_many :user_project_favorites, dependent: :destroy
+  has_many :favorited_projects, through: :user_project_favorites, source: :project
 
   validates :keycloak_sub, presence: true, uniqueness: true
   validates :email, presence: true, uniqueness: true, format: { with: URI::MailTo::EMAIL_REGEXP }

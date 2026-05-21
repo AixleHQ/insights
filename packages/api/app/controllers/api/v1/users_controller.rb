@@ -54,6 +54,14 @@ module Api
         end
       end
 
+      # GET /api/v1/users/me/favorites
+      def favorites
+        projects = authorized_scope(current_user.favorited_projects)
+                                   .pluck(:id, :name)
+                                   .map { |id, name| { id:, name: } }
+        render json: { data: projects }
+      end
+
       # GET /api/v1/users/me/organizations
       def organizations
         authorize! current_user, to: :organizations?

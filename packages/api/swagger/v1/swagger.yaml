@@ -216,6 +216,32 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationError'
 
+  /api/v1/users/me/favorites:
+    get:
+      summary: Get current user's favorited projects
+      tags:
+        - Users
+      responses:
+        '200':
+          description: List of favorited projects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        name:
+                          type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   # ============================================
   # ORGANIZATION ENDPOINTS
   # ============================================
@@ -2752,6 +2778,54 @@ paths:
           $ref: '#/components/responses/NotFound'
         '422':
           $ref: '#/components/responses/ValidationError'
+
+  /api/v1/projects/{id}/favorite:
+    post:
+      summary: Favorite a project
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Project favorited
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      favorited:
+                        type: boolean
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      summary: Unfavorite a project
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Project unfavorited
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      favorited:
+                        type: boolean
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /api/v1/projects/{id}/settings:
     get:

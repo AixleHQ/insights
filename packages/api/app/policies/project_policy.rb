@@ -15,12 +15,11 @@ class ProjectPolicy < ApplicationPolicy
     user.present?
   end
 
-  # Members can create projects in their org
-  # Users can create personal projects
+  # Org owners can create org projects; users can create personal projects
   def create?
     return true if global_admin?
     return true if record.personal? && record.owner_id == user&.id
-    return org_member?(record.organization) if record.organization_project?
+    return org_owner?(record.organization) if record.organization_project?
     false
   end
 
@@ -77,10 +76,14 @@ class ProjectPolicy < ApplicationPolicy
     if global_admin?
       scope.all
     elsif user
-      # User's personal projects OR projects from their organizations
-      org_ids = user.organization_ids
-      scope.where(owner_id: user.id)
-           .or(scope.where(organization_id: org_ids))
+      personal = scope.where(owner_id: user.id)
+      # Projects the user has an explicit membership for
+      member_project_ids = user.project_memberships.select(:project_id)
+      member_org_projects = scope.where(id: member_project_ids)
+      # Org owners see all projects in their owned orgs
+      owned_org_ids = user.organization_memberships.owners.select(:organization_id)
+      owned_org_projects = scope.where(organization_id: owned_org_ids)
+      personal.or(member_org_projects).or(owned_org_projects)
     else
       scope.none
     end

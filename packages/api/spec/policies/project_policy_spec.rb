@@ -115,14 +115,68 @@ RSpec.describe ProjectPolicy, type: :policy do
   end
 
   describe '#create?' do
+    let(:org_owner) { create(:user) }
+
+    before do
+      create(:organization_membership, user: org_owner, organization: organization, role: 'owner')
+    end
+
     it 'allows creating personal projects' do
       project = Project.new(owner: user)
       expect(policy(project, current_user: user).apply(:create?)).to be true
     end
 
-    it 'allows org members to create org projects' do
+    it 'allows org owners to create org projects' do
       project = Project.new(organization: organization)
-      expect(policy(project, current_user: user).apply(:create?)).to be true
+      expect(policy(project, current_user: org_owner).apply(:create?)).to be true
+    end
+
+    it 'denies org members (non-owners) from creating org projects' do
+      # user has a member-role membership (created in outer before block)
+      project = Project.new(organization: organization)
+      expect(policy(project, current_user: user).apply(:create?)).to be false
+    end
+  end
+
+  describe 'relation_scope' do
+    let(:org_owner_user) { create(:user) }
+    let(:member_user) { create(:user) }
+    let(:assigned_project) { create(:project, organization: organization, owner: nil) }
+    let(:unassigned_project) { create(:project, organization: organization, owner: nil) }
+
+    before do
+      create(:organization_membership, user: org_owner_user, organization: organization, role: 'owner')
+      create(:organization_membership, user: member_user, organization: organization, role: 'member')
+      create(:project_membership, user: member_user, project: assigned_project, role: 'member')
+      # unassigned_project intentionally has no project_membership for member_user
+    end
+
+    def scope_for(actor)
+      p = policy(assigned_project, current_user: actor)
+      p.apply_scope(Project.all, type: :active_record_relation)
+    end
+
+    it 'org owners see all org projects' do
+      result = scope_for(org_owner_user)
+      expect(result).to include(assigned_project, unassigned_project)
+    end
+
+    it 'members see only projects they have an explicit membership for' do
+      result = scope_for(member_user)
+      expect(result).to include(assigned_project)
+      expect(result).not_to include(unassigned_project)
+    end
+
+    it 'users see their personal projects' do
+      personal = create(:project, owner: user, organization: nil)
+      p = policy(personal, current_user: user)
+      result = p.apply_scope(Project.all, type: :active_record_relation)
+      expect(result).to include(personal)
+    end
+
+    it 'global admins see all projects' do
+      result = scope_for(global_admin)
+      expect(result).to include(assigned_project, unassigned_project)
     end
   end
 end

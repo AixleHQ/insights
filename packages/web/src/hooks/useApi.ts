@@ -78,6 +78,9 @@ export const queryKeys = {
     all: (orgId: string) => ["organizations", orgId, "projects"] as const,
     detail: (id: string) => ["projects", id] as const,
   },
+  favorites: {
+    all: () => ["favorites"] as const,
+  },
   connectors: {
     all: (orgId: string) => ["organizations", orgId, "connectors"] as const,
     detail: (orgId: string, id: string) => ["organizations", orgId, "connectors", id] as const,
@@ -696,6 +699,53 @@ export function useDeleteProject() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       queryClient.invalidateQueries({ queryKey: ["organizations"] });
+    },
+  });
+}
+
+// ============================================================================
+// Favorites Hooks
+// ============================================================================
+
+export interface FavoriteProject {
+  id: string;
+  name: string;
+}
+
+export function useFavoriteProjects() {
+  return useQuery({
+    queryKey: queryKeys.favorites.all(),
+    queryFn: async () => {
+      const response = await api.get<{ data: FavoriteProject[] }>("/users/me/favorites");
+      return response.data;
+    },
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useToggleFavorite() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, favorited }: { id: string; name: string; favorited: boolean }) =>
+      favorited
+        ? api.delete(`/projects/${id}/favorite`)
+        : api.post(`/projects/${id}/favorite`),
+    onMutate: async ({ id, name, favorited }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.favorites.all() });
+      const previous = queryClient.getQueryData<FavoriteProject[]>(queryKeys.favorites.all());
+      queryClient.setQueryData<FavoriteProject[]>(queryKeys.favorites.all(), (old = []) =>
+        favorited ? old.filter((f) => f.id !== id) : [...old, { id, name }],
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(queryKeys.favorites.all(), context.previous);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.favorites.all() });
     },
   });
 }

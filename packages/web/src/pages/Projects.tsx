@@ -32,7 +32,7 @@ function ProjectSkeleton() {
 }
 
 export function Projects() {
-  const { currentOrg } = useOrg();
+  const { currentOrg, currentRole } = useOrg();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
@@ -89,12 +89,14 @@ export function Projects() {
             Manage your projects and track AI tool usage
           </p>
         </div>
-        <Button asChild className="w-full sm:w-auto">
-          <Link to="/projects/new">
-            <Plus className="mr-2 size-4" />
-            New Project
-          </Link>
-        </Button>
+        {currentRole === "owner" && (
+          <Button asChild className="w-full sm:w-auto">
+            <Link to="/projects/new">
+              <Plus className="mr-2 size-4" />
+              New Project
+            </Link>
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -155,11 +157,11 @@ export function Projects() {
             >
               Clear search
             </Button>
-          ) : (
+          ) : currentRole === "owner" ? (
             <Button asChild variant="link" className="mt-2">
               <Link to="/projects/new">Create your first project</Link>
             </Button>
-          )}
+          ) : null}
         </div>
       ) : (
         <div

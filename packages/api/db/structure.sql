@@ -267,6 +267,7 @@ CREATE VIEW _timescaledb_internal._direct_view_4 AS
     sum(cost_usd) AS total_cost
    FROM timeseries.tool_events
   GROUP BY (public.time_bucket('1 day'::interval, occurred_at)), organization_id, user_id, project_id, tool_name, event_type;
+
 --
 -- Name: _materialized_hypertable_3; Type: TABLE; Schema: _timescaledb_internal; Owner: -
 --
@@ -284,6 +285,7 @@ CREATE TABLE _timescaledb_internal._materialized_hypertable_3 (
     total_tokens bigint,
     total_cost numeric
 );
+
 --
 -- Name: _materialized_hypertable_4; Type: TABLE; Schema: _timescaledb_internal; Owner: -
 --
@@ -301,6 +303,7 @@ CREATE TABLE _timescaledb_internal._materialized_hypertable_4 (
     total_tokens bigint,
     total_cost numeric
 );
+
 --
 -- Name: _partial_view_3; Type: VIEW; Schema: _timescaledb_internal; Owner: -
 --
@@ -338,6 +341,7 @@ CREATE VIEW _timescaledb_internal._partial_view_4 AS
     sum(cost_usd) AS total_cost
    FROM timeseries.tool_events
   GROUP BY (public.time_bucket('1 day'::interval, occurred_at)), organization_id, user_id, project_id, tool_name, event_type;
+
 --
 -- Name: admin_audit_logs; Type: TABLE; Schema: public; Owner: -
 --
@@ -430,7 +434,7 @@ CREATE TABLE public.connector_health_snapshots (
     snapshotted_at timestamp(6) without time zone NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT connector_health_snapshots_status_check CHECK (((status)::text = ANY ((ARRAY['success'::character varying, 'failure'::character varying])::text[])))
+    CONSTRAINT connector_health_snapshots_status_check CHECK (((status)::text = ANY (ARRAY[('success'::character varying)::text, ('failure'::character varying)::text])))
 );
 
 --
@@ -851,6 +855,18 @@ CREATE TABLE public.user_personal_settings (
 );
 
 --
+-- Name: user_project_favorites; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.user_project_favorites (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid NOT NULL,
+    project_id uuid NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+--
 -- Name: user_settings; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -957,11 +973,13 @@ CREATE VIEW timeseries.hourly_token_usage AS
     total_tokens,
     total_cost
    FROM _timescaledb_internal._materialized_hypertable_3;
+
 --
 -- Name: connector_event_dedup id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.connector_event_dedup ALTER COLUMN id SET DEFAULT nextval('public.connector_event_dedup_id_seq'::regclass);
+
 --
 -- Name: retention_purge_logs id; Type: DEFAULT; Schema: public; Owner: -
 --
@@ -1158,6 +1176,13 @@ ALTER TABLE ONLY public.user_personal_settings
     ADD CONSTRAINT user_personal_settings_pkey PRIMARY KEY (id);
 
 --
+-- Name: user_project_favorites user_project_favorites_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_project_favorites
+    ADD CONSTRAINT user_project_favorites_pkey PRIMARY KEY (id);
+
+--
 -- Name: user_settings user_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1191,6 +1216,7 @@ ALTER TABLE ONLY public.webhook_deliveries
 
 ALTER TABLE ONLY timeseries.tool_events
     ADD CONSTRAINT tool_events_pkey PRIMARY KEY (id, occurred_at);
+
 --
 -- Name: _materialized_hypertable_3_bucket_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
 --
@@ -1262,6 +1288,7 @@ CREATE INDEX _materialized_hypertable_4_tool_name_bucket_idx ON _timescaledb_int
 --
 
 CREATE INDEX _materialized_hypertable_4_user_id_bucket_idx ON _timescaledb_internal._materialized_hypertable_4 USING btree (user_id, bucket DESC);
+
 --
 -- Name: idx_connector_event_dedup_event_id; Type: INDEX; Schema: public; Owner: -
 --
@@ -1797,6 +1824,24 @@ CREATE UNIQUE INDEX index_sanitization_policies_on_version ON public.sanitizatio
 CREATE UNIQUE INDEX index_user_personal_settings_on_user_id ON public.user_personal_settings USING btree (user_id);
 
 --
+-- Name: index_user_project_favorites_on_project_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_user_project_favorites_on_project_id ON public.user_project_favorites USING btree (project_id);
+
+--
+-- Name: index_user_project_favorites_on_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_user_project_favorites_on_user_id ON public.user_project_favorites USING btree (user_id);
+
+--
+-- Name: index_user_project_favorites_on_user_id_and_project_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_user_project_favorites_on_user_id_and_project_id ON public.user_project_favorites USING btree (user_id, project_id);
+
+--
 -- Name: index_user_settings_on_user_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1885,6 +1930,7 @@ CREATE INDEX idx_tool_events_user_occurred ON timeseries.tool_events USING btree
 --
 
 CREATE INDEX tool_events_occurred_at_idx ON timeseries.tool_events USING btree (occurred_at DESC);
+
 --
 -- Name: retention_purge_logs retention_purge_logs_append_only; Type: TRIGGER; Schema: public; Owner: -
 --
@@ -2023,6 +2069,20 @@ ALTER TABLE ONLY public.audit_logs
 
 ALTER TABLE ONLY public.organization_memberships
     ADD CONSTRAINT fk_rails_715ab7f4fe FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+
+--
+-- Name: user_project_favorites fk_rails_73553a4f87; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_project_favorites
+    ADD CONSTRAINT fk_rails_73553a4f87 FOREIGN KEY (project_id) REFERENCES public.projects(id);
+
+--
+-- Name: user_project_favorites fk_rails_770491029a; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_project_favorites
+    ADD CONSTRAINT fk_rails_770491029a FOREIGN KEY (user_id) REFERENCES public.users(id);
 
 --
 -- Name: organization_connectors fk_rails_7f3b48aa2e; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2220,6 +2280,7 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260520000001'),
 ('20260514090000'),
 ('20260513161604'),
 ('20260513150002'),
