@@ -34,7 +34,13 @@ import {
   useOrganizationMembers,
 } from "@/hooks/useApi";
 import { formatCount, formatCost, formatTokens } from "@/lib/formatters";
-import { formatDistanceToNow, getMemberDisplayName, humanizeToolName } from "@/lib/utils";
+import {
+  formatDistanceToNow,
+  getMemberDisplayName,
+  humanizeToolName,
+  organizationMemberUserId,
+} from "@/lib/utils";
+import { ApiError } from "@/lib/api";
 import type { OrganizationMember } from "@/lib/types";
 
 const ROLES = ["member", "owner", "viewer"];
@@ -57,6 +63,7 @@ export function ProjectMembersTab({
   const [showAddForm, setShowAddForm] = useState(false);
   const [addUserId, setAddUserId] = useState("");
   const [addRole, setAddRole] = useState("member");
+  const [addError, setAddError] = useState<string | null>(null);
 
   const { data: members = [] } = useProjectMembers(projectId);
   const { data: stats } = useProjectMemberStats(projectId, 30, isProjectOwner);
@@ -79,7 +86,7 @@ export function ProjectMembersTab({
   const availableToAdd = useMemo(
     () =>
       (orgMembers as OrganizationMember[]).filter((m) => {
-        const uid = m.userId ?? m.user_id;
+        const uid = organizationMemberUserId(m);
         return uid && !existingUserIds.has(uid);
       }),
     [orgMembers, existingUserIds]
@@ -96,6 +103,7 @@ export function ProjectMembersTab({
 
   const handleAddMember = () => {
     if (!addUserId) return;
+    setAddError(null);
     addMember.mutate(
       { user_id: addUserId, role: addRole },
       {
@@ -103,6 +111,20 @@ export function ProjectMembersTab({
           setAddUserId("");
           setAddRole("member");
           setShowAddForm(false);
+          setAddError(null);
+        },
+        onError: (err) => {
+          if (err instanceof ApiError && err.status === 422 && err.data) {
+            const data = err.data as { errors?: Record<string, string[]>; message?: string };
+            const messages = data.errors
+              ? Object.values(data.errors).flat()
+              : data.message
+                ? [data.message]
+                : [];
+            setAddError(messages.join(" ") || "Could not add member.");
+          } else {
+            setAddError(err instanceof Error ? err.message : "Could not add member.");
+          }
         },
       }
     );
@@ -178,7 +200,10 @@ export function ProjectMembersTab({
           <Button
             size="sm"
             variant="secondary"
-            onClick={() => setShowAddForm((v) => !v)}
+            onClick={() => {
+              setShowAddForm((v) => !v);
+              setAddError(null);
+            }}
           >
             <UserPlus className="mr-1.5 size-4" />
             Add Member
@@ -186,43 +211,56 @@ export function ProjectMembersTab({
         )}
       </div>
 
-      {showAddForm && availableToAdd.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border p-3">
-          <Select value={addUserId} onValueChange={setAddUserId}>
-            <SelectTrigger className="h-8 w-52 text-sm">
-              <SelectValue placeholder="Select org member…" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableToAdd.map((m) => {
-                const uid = (m.userId ?? m.user_id)!;
-                const label = m.user?.name || m.user?.email || uid;
-                return (
-                  <SelectItem key={uid} value={uid}>
-                    {label}
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-          <Select value={addRole} onValueChange={setAddRole}>
-            <SelectTrigger className="h-8 w-28 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {ROLES.map((r) => (
-                <SelectItem key={r} value={r}>
-                  {r}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            size="sm"
-            disabled={!addUserId || addMember.isPending}
-            onClick={handleAddMember}
-          >
-            Add
-          </Button>
+      {showAddForm && canManageMembers && (
+        <div className="space-y-2 rounded-lg border p-3">
+          {availableToAdd.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              All organization members are already on this project, or no org members are available.
+            </p>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={addUserId} onValueChange={setAddUserId}>
+                <SelectTrigger className="h-8 w-52 text-sm">
+                  <SelectValue placeholder="Select org member…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableToAdd.map((m) => {
+                    const uid = organizationMemberUserId(m)!;
+                    const label = m.user?.name || m.user?.email || uid;
+                    return (
+                      <SelectItem key={uid} value={uid}>
+                        {label}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+              <Select value={addRole} onValueChange={setAddRole}>
+                <SelectTrigger className="h-8 w-28 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ROLES.map((r) => (
+                    <SelectItem key={r} value={r}>
+                      {r}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                disabled={!addUserId || addMember.isPending}
+                onClick={handleAddMember}
+              >
+                Add
+              </Button>
+            </div>
+          )}
+          {addError && (
+            <p className="text-sm text-destructive" role="alert">
+              {addError}
+            </p>
+          )}
         </div>
       )}
 

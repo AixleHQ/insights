@@ -112,6 +112,15 @@ export function getMemberDisplayName(member: { name?: string | null; email: stri
   return member.name ?? member.email.split("@")[0];
 }
 
+/** Resolve user id from an organization membership (API nests id under `user`). */
+export function organizationMemberUserId(member: {
+  userId?: string;
+  user_id?: string;
+  user?: { id?: string };
+}): string | undefined {
+  return member.userId ?? member.user_id ?? member.user?.id;
+}
+
 /**
  * Humanize a tool name for display
  * Converts snake_case/kebab-case to Title Case with proper casing for known tools

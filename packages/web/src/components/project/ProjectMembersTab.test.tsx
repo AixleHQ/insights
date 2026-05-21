@@ -165,6 +165,40 @@ describe("ProjectMembersTab", () => {
       expect(screen.getByText("Add Member")).toBeInTheDocument();
     });
 
+    it("lists org members when API only provides user.id (not top-level userId)", async () => {
+      const user = userEvent.setup();
+      vi.mocked(useOrganizationMembers).mockReturnValue({
+        data: [
+          {
+            id: "om-3",
+            organization_id: "org-1",
+            role: "member",
+            user: {
+              id: "user-ana",
+              email: "edsger.dijkstra@example.com",
+              name: "Edsger Dijkstra",
+            },
+            created_at: "2024-01-01T00:00:00Z",
+            updated_at: "2024-01-01T00:00:00Z",
+          },
+        ],
+      } as ReturnType<typeof useOrganizationMembers>);
+
+      render(
+        <ProjectMembersTab
+          projectId="proj-1"
+          orgId="org-1"
+          isProjectOwner={true}
+          canManageMembers={true}
+        />
+      );
+
+      await user.click(screen.getByText("Add Member"));
+      const [memberSelect] = screen.getAllByRole("combobox");
+      await user.click(memberSelect);
+      expect(await screen.findByRole("option", { name: "Edsger Dijkstra" })).toBeInTheDocument();
+    });
+
     it("calls remove mutation when Remove from project is clicked", async () => {
       const user = userEvent.setup();
       render(

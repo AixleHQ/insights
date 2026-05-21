@@ -814,6 +814,7 @@ export function useAddProjectMember(projectId: string) {
       api.post<{ data: ProjectMember }>(`/projects/${projectId}/members`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects", projectId, "members"] });
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "members", "stats"] });
     },
   });
 }
