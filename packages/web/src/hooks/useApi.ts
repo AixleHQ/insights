@@ -854,6 +854,7 @@ export interface ProjectMemberStat {
   primaryTool: string | null;
 }
 
+// Pass enabled=false for non-project-owners — the API returns 403 for plain members.
 export function useProjectMemberStats(projectId: string, days = 30, enabled = true) {
   return useQuery({
     queryKey: ["projects", projectId, "members", "stats", days],

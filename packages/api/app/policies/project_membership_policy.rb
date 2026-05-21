@@ -9,7 +9,8 @@ class ProjectMembershipPolicy < ApplicationPolicy
     can_view_membership_list?
   end
 
-  # Collection stats (all members) and per-member breakdown — project leads only
+  # Aggregate stats (collection) and per-member breakdown — intentionally tighter than
+  # index?/show? because these expose cost/token data that plain members should not see.
   def stats?
     return true if global_admin?
 
