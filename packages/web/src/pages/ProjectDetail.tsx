@@ -57,6 +57,7 @@ import {
   ConnectRepoSheet,
   ProjectIssuesTab,
   ProjectConnectorsTab,
+  ProjectMembersTab,
 } from "@/components/project";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDistanceToNow, toEventRow, humanizeToolName } from "@/lib/utils";
@@ -266,6 +267,7 @@ export function ProjectDetail() {
   // Permission flags (reused by tab gates)
   const myProjectMembership = projectMembers?.find((m: ProjectMember) => m.userId === me?.id);
   const isProjectOwner = hasRole(["owner"]) || myProjectMembership?.role === "owner";
+  const canManageMembers = hasRole(["owner"]);
   const isMemberOfProject = isProjectOwner || !!myProjectMembership;
 
   const handleDelete = async () => {
@@ -603,12 +605,15 @@ export function ProjectDetail() {
           />
         </TabsContent>
 
-        {/* ── Members (stub — implemented in 01b) ── */}
+        {/* ── Members ── */}
         {isMemberOfProject && (
           <TabsContent value="members" className="mt-4">
-            <div className="flex items-center justify-center rounded-lg border border-dashed py-12">
-              <p className="text-sm text-muted-foreground">Members tab coming soon</p>
-            </div>
+            <ProjectMembersTab
+              projectId={id || ""}
+              orgId={currentOrg?.id || ""}
+              isProjectOwner={isProjectOwner}
+              canManageMembers={canManageMembers}
+            />
           </TabsContent>
         )}
 

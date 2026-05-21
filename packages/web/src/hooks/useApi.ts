@@ -836,6 +836,32 @@ export function useRemoveProjectMember(projectId: string) {
   });
 }
 
+export interface ProjectMemberStat {
+  userId: string;
+  email: string;
+  name: string | null;
+  role: string;
+  eventCount: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  lastEventAt: string | null;
+  primaryTool: string | null;
+}
+
+export function useProjectMemberStats(projectId: string, days = 30, enabled = true) {
+  return useQuery({
+    queryKey: ["projects", projectId, "members", "stats", days],
+    queryFn: async () => {
+      const res = await api.get<{ data: ProjectMemberStat[] }>(
+        `/projects/${projectId}/members/stats?days=${days}`
+      );
+      return res.data;
+    },
+    enabled: !!projectId && enabled,
+  });
+}
+
 // Personal settings
 export function usePersonalSettings() {
   return useQuery({

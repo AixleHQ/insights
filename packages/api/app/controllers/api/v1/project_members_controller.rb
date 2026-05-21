@@ -6,6 +6,56 @@ module Api
       before_action :set_project
       before_action :set_membership, only: %i[show update destroy stats]
 
+      # GET /api/v1/projects/:project_id/members/stats (collection — AIX-117 Members tab)
+      def index_stats
+        authorize! @project.project_memberships.new, to: :stats?
+
+        days = (params[:days] || 30).to_i
+        since = days.days.ago.beginning_of_day
+
+        rows = @project.tool_events
+          .where(occurred_at: since..)
+          .where.not(user_id: nil)
+          .group(:user_id)
+          .select(
+            "user_id",
+            "COUNT(*) AS event_count",
+            "COALESCE(SUM(tokens_in), 0) AS input_tokens",
+            "COALESCE(SUM(tokens_out), 0) AS output_tokens",
+            "COALESCE(SUM(cost_usd), 0) AS cost_usd",
+            "MAX(occurred_at) AS last_event_at"
+          )
+        stats_by_user = rows.index_by(&:user_id)
+
+        primary_tools = @project.tool_events
+          .where(occurred_at: since..)
+          .where.not(user_id: nil)
+          .group(:user_id, :tool_name)
+          .order(Arel.sql("COUNT(*) DESC"))
+          .pluck(:user_id, :tool_name)
+          .each_with_object({}) { |(uid, tool), h| h[uid] ||= tool }
+
+        memberships = @project.project_memberships.includes(:user).order("users.name")
+
+        data = memberships.map do |m|
+          row = stats_by_user[m.user_id]
+          {
+            userId: m.user_id,
+            email: m.user.email,
+            name: m.user.name,
+            role: m.role,
+            eventCount: row&.event_count || 0,
+            inputTokens: row&.input_tokens.to_i,
+            outputTokens: row&.output_tokens.to_i,
+            costUsd: row&.cost_usd.to_f,
+            lastEventAt: row&.last_event_at&.iso8601,
+            primaryTool: primary_tools[m.user_id]
+          }
+        end
+
+        render json: { data: data }
+      end
+
       # GET /api/v1/projects/:project_id/members
       def index
         authorize! @project.project_memberships.new, to: :index?
