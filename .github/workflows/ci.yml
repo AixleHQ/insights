@@ -179,10 +179,10 @@ jobs:
           done
           exit "$fail"
 
-  # --- db90-mcp package checks ---
+  # --- @db90/telemetry-mcp (packages/tools/db90-telemetry-mcp/) ---
 
-  mcp_check:
-    name: db90-mcp (build + test)
+  telemetry_mcp_check:
+    name: "@db90/telemetry-mcp (build + test)"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -230,7 +230,7 @@ jobs:
     name: Run DB Migrations
     runs-on: ubuntu-latest
     container: ghcr.io/artempartos/ecs_toolbox:latest
-    needs: [build, api_test, api_lint, api_security, web_test, web_lint, web_typecheck, cursor_check, claude_check, mcp_check, telemetry_mcp_windows_install]
+    needs: [build, api_test, api_lint, api_security, web_test, web_lint, web_typecheck, cursor_check, claude_check, telemetry_mcp_check, telemetry_mcp_windows_install]
     if: github.ref_name == 'staging' || github.ref_name == 'main'
     env:
       ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'staging' }}

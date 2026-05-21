@@ -41,7 +41,6 @@
     "build": "tsc",
     "test": "vitest run",
     "dev": "tsx src/cli.ts",
-    "prepare": "npm run build",
     "prepublishOnly": "npm run build",
     "prepack": "node ../scripts/stage-sdk-bundle.mjs"
   },
