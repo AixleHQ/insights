@@ -37,7 +37,6 @@ import { formatCount, formatCost, formatTokens } from "@/lib/formatters";
 import {
   formatDistanceToNow,
   getMemberDisplayName,
-  humanizeToolName,
   organizationMemberUserId,
 } from "@/lib/utils";
 import { ApiError } from "@/lib/api";
@@ -315,10 +314,8 @@ export function ProjectMembersTab({
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="text-sm">
-                    {stat?.primaryTool
-                      ? humanizeToolName(stat.primaryTool)
-                      : "—"}
+                  <TableCell>
+                    <RoleBadge role={m.role as "owner" | "member" | "viewer"} />
                   </TableCell>
                   <TableCell className="text-right font-mono text-sm">
                     {stat ? formatTokens(stat.inputTokens) : "—"}
