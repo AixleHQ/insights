@@ -11,6 +11,8 @@ export interface LoginAndPersistOptions {
   toolName?: string;
   tools?: TelemetryToolId[];
   deviceLabel?: string;
+  /** Optional org UUID for `X-Organization-ID` on MCP exchange (multi-org users). */
+  exchangeOrganizationId?: string;
   clientId?: string;
   appDir?: string;
   onVisitInstructions?: (verification_uri: string, user_code: string) => void;
@@ -52,6 +54,7 @@ export async function loginAndPersistCredentials(opts: LoginAndPersistOptions): 
         keycloakAccessToken: accessToken,
         tools: requestedTools,
         deviceLabel: opts.deviceLabel,
+        exchangeOrganizationId: opts.exchangeOrganizationId,
         fetchImpl: opts.fetchImpl,
       });
     } else {
@@ -60,6 +63,7 @@ export async function loginAndPersistCredentials(opts: LoginAndPersistOptions): 
         keycloakAccessToken: accessToken,
         toolName: requestedTools[0],
         deviceLabel: opts.deviceLabel,
+        exchangeOrganizationId: opts.exchangeOrganizationId,
         fetchImpl: opts.fetchImpl,
       });
     }

@@ -2,6 +2,10 @@
 
 All notable changes to `@db90/telemetry-mcp` will be documented in this file.
 
+## Unreleased
+
+- **`init`**: optional **`--organization-id <uuid>`** and env **`DB90_ORGANIZATION_ID`** (CLI wins when both set) — sent as **`X-Organization-ID`** on **`POST /api/v1/integrations/mcp/exchange`** so multi-org users can mint ingest tokens for a chosen membership instead of the API default (oldest).
+
 ## [0.1.0] - 2026-05-19
 
 First public npm release (`@db90/telemetry-mcp@0.1.0`): stdio MCP server for DB90 with Claude Code + Cursor ingestion, Keycloak/OIDC device login, bundled private `@db90/sdk`.

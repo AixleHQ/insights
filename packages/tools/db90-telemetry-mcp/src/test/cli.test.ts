@@ -1,8 +1,8 @@
 import { mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { describe, it, expect } from "vitest";
-import { parseArgs, runOnce, runInit } from "../cli.js";
+import { afterEach, beforeEach, describe, it, expect } from "vitest";
+import { parseArgs, runOnce, runInit, isValidDb90OrganizationUuid } from "../cli.js";
 import { DEFAULT_PRICING } from "../pricing.js";
 
 describe("parseArgs", () => {
@@ -94,6 +94,46 @@ describe("parseArgs", () => {
 
   it("treats run --host as help (host is init-only)", () => {
     expect(parseArgs(["node", "cli.js", "run", "--host", "http://x"]).command).toBe("help");
+  });
+});
+
+describe("isValidDb90OrganizationUuid", () => {
+  it("accepts lowercase v4 UUID", () => {
+    expect(isValidDb90OrganizationUuid("550e8400-e29b-41d4-a716-446655440000")).toBe(true);
+  });
+
+  it("accepts uppercase", () => {
+    expect(isValidDb90OrganizationUuid("550E8400-E29B-41D4-A716-446655440000")).toBe(true);
+  });
+
+  it("rejects non-UUID strings", () => {
+    expect(isValidDb90OrganizationUuid("org-123")).toBe(false);
+    expect(isValidDb90OrganizationUuid("")).toBe(false);
+  });
+});
+
+describe("parseArgs init --organization-id", () => {
+  it("parses --organization-id value form", () => {
+    const u = "550e8400-e29b-41d4-a716-446655440000";
+    const a = parseArgs([
+      "node",
+      "cli.js",
+      "init",
+      "--host",
+      "http://api",
+      "--keycloak-url",
+      "http://kc/realms/db90",
+      "--organization-id",
+      u,
+    ]);
+    expect(a.command).toBe("init");
+    expect(a.organizationId).toBe(u);
+  });
+
+  it("parses --organization-id=uuid", () => {
+    const u = "550e8400-e29b-41d4-a716-446655440000";
+    const a = parseArgs(["node", "cli.js", "init", "--organization-id=" + u, "--keycloak-url", "http://kc/r"]);
+    expect(a.organizationId).toBe(u);
   });
 });
 
@@ -416,6 +456,93 @@ describe("runInit", () => {
       }
     );
     expect(code).toBe(1);
+  });
+
+  describe("exchange organization id", () => {
+    let prevOrgEnv: string | undefined;
+
+    beforeEach(() => {
+      prevOrgEnv = process.env.DB90_ORGANIZATION_ID;
+      delete process.env.DB90_ORGANIZATION_ID;
+    });
+
+    afterEach(() => {
+      if (prevOrgEnv === undefined) {
+        delete process.env.DB90_ORGANIZATION_ID;
+      } else {
+        process.env.DB90_ORGANIZATION_ID = prevOrgEnv;
+      }
+    });
+
+    const baseArgs = {
+      command: "init" as const,
+      help: false,
+      once: false,
+      host: "http://localhost:3000",
+      keycloakUrl: "http://localhost:8080/realms/db90",
+      toolName: "claude_code",
+    };
+
+    it("returns 1 and skips login when --organization-id is not a valid UUID", async () => {
+      let loginCalled = false;
+      const errors: string[] = [];
+      const code = await runInit(
+        { ...baseArgs, organizationId: "not-a-uuid" },
+        {
+          loginAndPersistCredentials: async () => {
+            loginCalled = true;
+            return { ok: true, organizationId: "x" };
+          },
+          defaultKeycloakIssuer: () => "",
+          getAppDir: () => "/tmp/db90-mcp-init-test",
+          installClaudeUserMcp: () => ({ kind: "installed" }),
+          log: () => undefined,
+          error: (m) => errors.push(m),
+        }
+      );
+      expect(code).toBe(1);
+      expect(loginCalled).toBe(false);
+      expect(errors.some((e) => e.includes("UUID"))).toBe(true);
+    });
+
+    it("prefers CLI --organization-id over DB90_ORGANIZATION_ID", async () => {
+      process.env.DB90_ORGANIZATION_ID = "00000000-0000-4000-8000-000000000001";
+      let exchangeOrganizationId: string | undefined;
+      const code = await runInit(
+        { ...baseArgs, organizationId: "11111111-2222-4222-8222-333333333333" },
+        {
+          loginAndPersistCredentials: async (opts) => {
+            exchangeOrganizationId = opts.exchangeOrganizationId;
+            return { ok: true, organizationId: "org-1" };
+          },
+          defaultKeycloakIssuer: () => "",
+          getAppDir: () => "/tmp/db90-mcp-init-test",
+          installClaudeUserMcp: () => ({ kind: "already-configured" }),
+          log: () => undefined,
+          error: () => undefined,
+        }
+      );
+      expect(code).toBe(0);
+      expect(exchangeOrganizationId).toBe("11111111-2222-4222-8222-333333333333");
+    });
+
+    it("passes DB90_ORGANIZATION_ID when flag is omitted", async () => {
+      process.env.DB90_ORGANIZATION_ID = "00000000-0000-4000-8000-000000000001";
+      let exchangeOrganizationId: string | undefined;
+      const code = await runInit(baseArgs, {
+        loginAndPersistCredentials: async (opts) => {
+          exchangeOrganizationId = opts.exchangeOrganizationId;
+          return { ok: true, organizationId: "org-1" };
+        },
+        defaultKeycloakIssuer: () => "",
+        getAppDir: () => "/tmp/db90-mcp-init-test",
+        installClaudeUserMcp: () => ({ kind: "already-configured" }),
+        log: () => undefined,
+        error: () => undefined,
+      });
+      expect(code).toBe(0);
+      expect(exchangeOrganizationId).toBe("00000000-0000-4000-8000-000000000001");
+    });
   });
 });
 

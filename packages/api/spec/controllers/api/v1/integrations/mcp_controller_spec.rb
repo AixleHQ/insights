@@ -55,6 +55,96 @@ RSpec.describe Api::V1::Integrations::McpController, type: :controller do
       end
     end
 
+    context "when the user has two memberships and X-Organization-ID selects the newer one" do
+      let(:two_org_user) { create(:user) }
+      let(:older_org) { create(:organization) }
+      let(:newer_org) { create(:organization) }
+      let!(:older_membership) do
+        travel_to(3.days.ago) do
+          create(:organization_membership, user: two_org_user, organization: older_org)
+        end
+      end
+      let!(:newer_membership) do
+        travel_to(1.day.ago) do
+          create(:organization_membership, user: two_org_user, organization: newer_org)
+        end
+      end
+
+      before { authenticate_user(two_org_user) }
+
+      it "calls the service with the header-selected membership" do
+        result = Mcp::IngestTokenExchangeService::Result.new(
+          http_status: :created,
+          body: { data: { ingestHost: "http://test.host", organizationId: newer_org.id.to_s, accounts: {} } }
+        )
+        expect(Mcp::IngestTokenExchangeService).to receive(:call).with(
+          membership: newer_membership,
+          tool_name: "claude_code",
+          tools: nil,
+          ingest_host: "http://test.host"
+        ).and_return(result)
+
+        request.headers["X-Organization-ID"] = newer_org.id.to_s
+        post :exchange, params: { tool_name: "claude_code" }
+
+        expect(response).to have_http_status(:created)
+      end
+
+      it "falls back to primary (oldest) membership when the header is absent" do
+        result = Mcp::IngestTokenExchangeService::Result.new(
+          http_status: :created,
+          body: { data: { ingestHost: "http://test.host", organizationId: older_org.id.to_s, accounts: {} } }
+        )
+        expect(Mcp::IngestTokenExchangeService).to receive(:call).with(
+          membership: older_membership,
+          tool_name: "claude_code",
+          tools: nil,
+          ingest_host: "http://test.host"
+        ).and_return(result)
+
+        post :exchange, params: { tool_name: "claude_code" }
+
+        expect(response).to have_http_status(:created)
+      end
+
+      it "returns forbidden and does not call the service for an unrelated organization id" do
+        other = create(:organization)
+        expect(Mcp::IngestTokenExchangeService).not_to receive(:call)
+
+        request.headers["X-Organization-ID"] = other.id.to_s
+        post :exchange, params: { tool_name: "claude_code" }
+
+        expect(response).to have_http_status(:forbidden)
+        parsed = JSON.parse(response.body)
+        expect(parsed["error"]).to eq("Forbidden")
+        expect(parsed["message"]).to include("specified organization")
+      end
+
+      it "returns forbidden and does not call the service for a malformed organization id" do
+        expect(Mcp::IngestTokenExchangeService).not_to receive(:call)
+
+        request.headers["X-Organization-ID"] = "not-a-uuid"
+        post :exchange, params: { tool_name: "claude_code" }
+
+        expect(response).to have_http_status(:forbidden)
+        parsed = JSON.parse(response.body)
+        expect(parsed["error"]).to eq("Forbidden")
+        expect(parsed["message"]).to include("specified organization")
+      end
+
+      it "returns forbidden and does not call the service for a blank organization id" do
+        expect(Mcp::IngestTokenExchangeService).not_to receive(:call)
+
+        request.headers["X-Organization-ID"] = "   "
+        post :exchange, params: { tool_name: "claude_code" }
+
+        expect(response).to have_http_status(:forbidden)
+        parsed = JSON.parse(response.body)
+        expect(parsed["error"]).to eq("Forbidden")
+        expect(parsed["message"]).to include("specified organization")
+      end
+    end
+
     context "when the user has no organization membership" do
       let(:lonely_user) { create(:user) }
 

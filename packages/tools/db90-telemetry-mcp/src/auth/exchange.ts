@@ -21,6 +21,8 @@ export async function exchangeIngestToken(params: {
   /** Mint / rotate ingest tokens for all listed tools under one OAuth session. */
   tools?: readonly ExchangeToolId[];
   deviceLabel?: string;
+  /** When set, sent as `X-Organization-ID` so the API scopes exchange to that membership. */
+  exchangeOrganizationId?: string;
   fetchImpl?: typeof fetch;
 }): Promise<ExchangeResult> {
   const fetchFn = params.fetchImpl ?? fetch;
@@ -40,12 +42,18 @@ export async function exchangeIngestToken(params: {
     body.device_label = params.deviceLabel;
   }
 
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${params.keycloakAccessToken}`,
+  };
+  const orgHeader = params.exchangeOrganizationId?.trim();
+  if (orgHeader) {
+    headers["X-Organization-ID"] = orgHeader;
+  }
+
   const res = await fetchFn(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${params.keycloakAccessToken}`,
-    },
+    headers,
     body: JSON.stringify(body),
   });
   const text = await res.text();

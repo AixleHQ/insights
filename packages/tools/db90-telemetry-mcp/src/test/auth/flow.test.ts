@@ -110,4 +110,29 @@ describe("loginAndPersistCredentials", () => {
       "/tmp/db90-mcp-auth-flow-test"
     );
   });
+
+  it("passes exchangeOrganizationId through to exchangeIngestToken", async () => {
+    const orgUuid = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+    exchangeIngestToken.mockResolvedValue({
+      ingestHost: "http://localhost:3000",
+      organizationId: orgUuid,
+      ingestToken: "db90_one",
+      accounts: { claude_code: { ingestToken: "db90_one" } },
+    });
+
+    await loginAndPersistCredentials({
+      db90Host: "http://localhost:3000",
+      keycloakIssuer: "http://issuer.test",
+      toolName: "claude_code",
+      exchangeOrganizationId: orgUuid,
+      appDir: "/tmp/db90-mcp-auth-flow-test",
+    });
+
+    expect(exchangeIngestToken).toHaveBeenCalledWith(
+      expect.objectContaining({
+        exchangeOrganizationId: orgUuid,
+        toolName: "claude_code",
+      })
+    );
+  });
 });
