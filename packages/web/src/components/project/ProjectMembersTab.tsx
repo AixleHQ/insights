@@ -34,6 +34,7 @@ import {
   useOrganizationMembers,
 } from "@/hooks/useApi";
 import { formatCount, formatCost, formatTokens } from "@/lib/formatters";
+import { CliStatusBadge } from "@/components/ui/CliStatusBadge";
 import {
   formatDistanceToNow,
   getMemberDisplayName,
@@ -269,6 +270,7 @@ export function ProjectMembersTab({
             <TableRow>
               <TableHead>Member</TableHead>
               <TableHead>Seat Type</TableHead>
+              <TableHead>CLI</TableHead>
               <TableHead className="text-right">Tokens In</TableHead>
               <TableHead className="text-right">Tokens Out</TableHead>
               <TableHead className="text-right">Events</TableHead>
@@ -281,7 +283,7 @@ export function ProjectMembersTab({
             {filtered.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={canManageMembers ? 8 : 7}
+                  colSpan={canManageMembers ? 9 : 8}
                   className="py-8 text-center text-sm text-muted-foreground"
                 >
                   No members found.
@@ -316,6 +318,9 @@ export function ProjectMembersTab({
                   </TableCell>
                   <TableCell>
                     <RoleBadge role={m.role as "owner" | "member" | "viewer"} />
+                  </TableCell>
+                  <TableCell>
+                    <CliStatusBadge connected={m.cliConnected} />
                   </TableCell>
                   <TableCell className="text-right font-mono text-sm">
                     {stat ? formatTokens(stat.inputTokens) : "—"}

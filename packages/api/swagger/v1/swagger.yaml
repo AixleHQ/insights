@@ -5178,6 +5178,9 @@ components:
               format: date-time
               nullable: true
               description: Most recent tool event time for this member within the organization (MAX(occurred_at)); null if no events
+            cli_connected:
+              type: boolean
+              description: True when the member has at least one active user_tool_account on their organization membership
 
     OrganizationConnector:
       type: object
@@ -5565,6 +5568,9 @@ components:
               format: date-time
               nullable: true
               description: Most recent tool event for this member in this project; null if none
+            cli_connected:
+              type: boolean
+              description: True when the member has at least one active user_tool_account on their organization membership for this project's organization
 
     ProjectMemberStats:
       type: object

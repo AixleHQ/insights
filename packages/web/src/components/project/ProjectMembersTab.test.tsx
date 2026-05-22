@@ -22,8 +22,8 @@ const mockRemoveMutate = vi.fn();
 const mockAddMutate = vi.fn();
 
 const mockMembers = [
-  { id: "m1", userId: "user-1", email: "alice@example.com", name: "Alice Johnson", avatarUrl: null, role: "owner", joinedAt: "2024-01-01T00:00:00Z" },
-  { id: "m2", userId: "user-2", email: "bob@example.com", name: "Bob Smith", avatarUrl: null, role: "member", joinedAt: "2024-01-01T00:00:00Z" },
+  { id: "m1", userId: "user-1", email: "alice@example.com", name: "Alice Johnson", avatarUrl: null, role: "owner", joinedAt: "2024-01-01T00:00:00Z", totalEvents: 0, totalCost: 0, lastActiveAt: null, cliConnected: true },
+  { id: "m2", userId: "user-2", email: "bob@example.com", name: "Bob Smith", avatarUrl: null, role: "member", joinedAt: "2024-01-01T00:00:00Z", totalEvents: 0, totalCost: 0, lastActiveAt: null, cliConnected: false },
 ];
 
 const mockStats = [
@@ -85,7 +85,7 @@ describe("ProjectMembersTab", () => {
       vi.mocked(useProjectMemberStats).mockReturnValue({ data: mockStats } as ReturnType<typeof useProjectMemberStats>);
     });
 
-    it("shows stats columns", () => {
+    it("shows stats columns including CLI", () => {
       render(
         <ProjectMembersTab
           projectId="proj-1"
@@ -95,11 +95,56 @@ describe("ProjectMembersTab", () => {
         />
       );
 
+      expect(screen.getByText("CLI")).toBeInTheDocument();
       expect(screen.getByText("Tokens In")).toBeInTheDocument();
       expect(screen.getByText("Tokens Out")).toBeInTheDocument();
       expect(screen.getByText("Events")).toBeInTheDocument();
       expect(screen.getByText("Cost")).toBeInTheDocument();
       expect(screen.getByText("Last Active")).toBeInTheDocument();
+    });
+
+    it("shows Connected badge for cliConnected=true members", () => {
+      render(
+        <ProjectMembersTab
+          projectId="proj-1"
+          orgId="org-1"
+          isProjectOwner={true}
+          canManageMembers={false}
+        />
+      );
+
+      expect(screen.getByText("Connected")).toBeInTheDocument();
+    });
+
+    it("shows Not set up badge for cliConnected=false members", () => {
+      render(
+        <ProjectMembersTab
+          projectId="proj-1"
+          orgId="org-1"
+          isProjectOwner={true}
+          canManageMembers={false}
+        />
+      );
+
+      expect(screen.getByText("Not set up")).toBeInTheDocument();
+    });
+
+    it("renders no CLI badge when cliConnected is absent", () => {
+      vi.mocked(useProjectMembers).mockReturnValue({
+        data: [{ id: "m3", userId: "user-3", email: "carol@example.com", name: "Carol", avatarUrl: null, role: "member", joinedAt: "2024-01-01T00:00:00Z", totalEvents: 0, totalCost: 0, lastActiveAt: null }],
+      } as ReturnType<typeof useProjectMembers>);
+
+      render(
+        <ProjectMembersTab
+          projectId="proj-1"
+          orgId="org-1"
+          isProjectOwner={true}
+          canManageMembers={false}
+        />
+      );
+
+      expect(screen.queryByText("Connected")).not.toBeInTheDocument();
+      expect(screen.queryByText("Not set up")).not.toBeInTheDocument();
     });
 
     it("shows search input", () => {

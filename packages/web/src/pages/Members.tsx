@@ -70,6 +70,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RoleBadge } from "@/components/ui/role-badge";
+import { CliStatusBadge } from "@/components/ui/CliStatusBadge";
 import { OrgPolicyPanel } from "@/components/org/OrgPolicyPanel";
 
 type MemberSortField = "name" | "role" | "last_active_at" | "total_events" | "total_cost";
@@ -85,6 +86,7 @@ type MemberData = {
   total_tokens?: number;
   total_events?: number;
   total_cost?: number;
+  cli_connected?: boolean;
 };
 
 const roleOrder: Record<MemberRole, number> = {
@@ -130,6 +132,7 @@ function MemberSkeleton() {
         </div>
       </TableCell>
       <TableCell className="p-4"><Skeleton className="h-5 w-16" /></TableCell>
+      <TableCell className="hidden sm:table-cell p-4"><Skeleton className="h-5 w-20" /></TableCell>
       <TableCell className="hidden md:table-cell p-4"><Skeleton className="h-4 w-20" /></TableCell>
       <TableCell className="hidden sm:table-cell p-4"><Skeleton className="h-4 w-12" /></TableCell>
       <TableCell className="hidden sm:table-cell p-4"><Skeleton className="h-4 w-16" /></TableCell>
@@ -165,6 +168,7 @@ export function Members() {
       total_tokens: m.total_tokens,
       total_events: m.total_events,
       total_cost: m.total_cost,
+      cli_connected: m.cli_connected,
     })) ?? [];
   }, [membersData]);
 
@@ -316,7 +320,7 @@ export function Members() {
       )}
 
       <div className="rounded-md border overflow-x-auto">
-        <Table className="min-w-[640px]">
+        <Table className="min-w-[720px]">
           <TableHeader>
             <TableRow>
               <TableHead className="w-[220px] sm:w-[280px]">
@@ -329,6 +333,7 @@ export function Members() {
                   Seat Type
                 </SortButton>
               </TableHead>
+              <TableHead className="hidden sm:table-cell w-[120px]">CLI</TableHead>
               <TableHead className="hidden md:table-cell w-[120px]">
                 <SortButton field="last_active_at" currentField={sortField} currentDirection={sortDirection} onSort={handleSort}>
                   Last Active
@@ -352,7 +357,7 @@ export function Members() {
               Array.from({ length: 5 }).map((_, i) => <MemberSkeleton key={i} />)
             ) : filteredMembers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">
+                <TableCell colSpan={7} className="h-24 text-center">
                   <div className="flex flex-col items-center gap-2">
                     <Users className="size-8 text-muted-foreground" />
                     <p className="text-muted-foreground">
@@ -456,6 +461,9 @@ function MemberTableRow({
         </TableCell>
         <TableCell className="p-4">
           <RoleBadge role={member.role} />
+        </TableCell>
+        <TableCell className="hidden sm:table-cell p-4">
+          <CliStatusBadge connected={member.cli_connected} />
         </TableCell>
         <TableCell className="hidden md:table-cell p-4 text-sm text-muted-foreground">
           {formatLastActive(member.last_active_at)}

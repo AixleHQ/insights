@@ -798,6 +798,7 @@ interface RawProjectMember {
   total_events?: number;
   total_cost?: number;
   last_active_at?: string | null;
+  cli_connected?: boolean;
 }
 
 export interface ProjectMember {
@@ -812,6 +813,7 @@ export interface ProjectMember {
   totalEvents: number;
   totalCost: number;
   lastActiveAt: string | null;
+  cliConnected?: boolean;
 }
 
 export function useProjectMembers(projectId: string) {
@@ -824,6 +826,7 @@ export function useProjectMembers(projectId: string) {
         totalEvents: m.total_events ?? 0,
         totalCost: m.total_cost ?? 0,
         lastActiveAt: m.last_active_at ?? null,
+        cliConnected: m.cli_connected,
       }));
     },
     enabled: !!projectId,

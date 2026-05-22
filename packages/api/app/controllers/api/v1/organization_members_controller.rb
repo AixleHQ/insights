@@ -32,6 +32,11 @@ module Api
           )
           .index_by(&:user_id)
 
+        cli_connected_user_ids = MemberCliConnectionQuery.connected_user_ids(
+          organization_id: current_organization.id,
+          user_ids: user_ids
+        )
+
         # Build response with stats
         data = memberships.map do |membership|
           stats = user_stats[membership.user_id]
@@ -39,7 +44,8 @@ module Api
             total_tokens: stats&.total_tokens&.to_i || 0,
             total_events: stats&.total_events&.to_i || 0,
             total_cost:   stats&.total_cost&.to_f  || 0.0,
-            last_active_at: stats&.last_active_at&.in_time_zone&.iso8601
+            last_active_at: stats&.last_active_at&.in_time_zone&.iso8601,
+            cli_connected: cli_connected_user_ids.include?(membership.user_id)
           )
         end
 

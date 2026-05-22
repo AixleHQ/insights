@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow, getMemberDisplayName, organizationMemberUserId } from "@/lib/utils";
 import { formatCost, formatCount } from "@/lib/formatters";
 import { RoleBadge } from "@/components/ui/role-badge";
+import { CliStatusBadge } from "@/components/ui/CliStatusBadge";
 import type { ProjectMember } from "@/hooks/useApi";
 import {
   useAddProjectMember as useAddMember,
@@ -94,6 +95,7 @@ function ProjectTeamManageList({
             </p>
             <p className="truncate text-xs text-muted-foreground">{member.email}</p>
           </div>
+          <CliStatusBadge connected={member.cliConnected} />
           <MemberStatBlock member={member} />
           <Select
             value={member.role}
@@ -281,7 +283,10 @@ export function ProjectTeamSection({
                     <p className="truncate text-sm font-medium group-hover:underline">
                       {getMemberDisplayName(member)}
                     </p>
-                    <RoleBadge role={member.role as "owner" | "member" | "viewer"} className="text-[10px] px-1.5 py-0" />
+                    <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                      <RoleBadge role={member.role as "owner" | "member" | "viewer"} className="text-[10px] px-1.5 py-0" />
+                      <CliStatusBadge connected={member.cliConnected} className="text-[10px] px-1.5 py-0" />
+                    </div>
                   </div>
                   <MemberStatBlock member={member} />
                 </Link>

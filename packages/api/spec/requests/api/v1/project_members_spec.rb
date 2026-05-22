@@ -84,6 +84,34 @@ RSpec.describe "Api::V1::ProjectMembers", type: :request do
       expect(record[:last_active_at]).to be_nil
     end
 
+    it "includes cli_connected true when member has an active user_tool_account in the org" do
+      create(:user_tool_account, organization_membership: member_org_membership, is_active: true)
+
+      authenticated_get "/api/v1/projects/#{project.id}/members", user: project_owner_user
+
+      expect_success
+      record = json_data.find { |m| m[:userId] == member.id }
+      expect(record[:cli_connected]).to eq(true)
+    end
+
+    it "includes cli_connected false when member has only inactive user_tool_accounts" do
+      create(:user_tool_account, organization_membership: member_org_membership, is_active: false)
+
+      authenticated_get "/api/v1/projects/#{project.id}/members", user: project_owner_user
+
+      expect_success
+      record = json_data.find { |m| m[:userId] == member.id }
+      expect(record[:cli_connected]).to eq(false)
+    end
+
+    it "includes cli_connected false when member has no user_tool_account" do
+      authenticated_get "/api/v1/projects/#{project.id}/members", user: project_owner_user
+
+      expect_success
+      record = json_data.find { |m| m[:userId] == member.id }
+      expect(record[:cli_connected]).to eq(false)
+    end
+
     it "filters by role" do
       authenticated_get "/api/v1/projects/#{project.id}/members", user: project_owner_user, params: { role: "owner" }
 

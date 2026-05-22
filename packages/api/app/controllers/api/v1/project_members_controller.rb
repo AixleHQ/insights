@@ -101,13 +101,24 @@ module Api
               .index_by(&:user_id)
           end
 
+        cli_connected_user_ids =
+          if @project.organization_id.present?
+            MemberCliConnectionQuery.connected_user_ids(
+              organization_id: @project.organization_id,
+              user_ids: user_ids
+            )
+          else
+            Set.new
+          end
+
         data = paginated.map do |membership|
           stats = user_stats[membership.user_id]
           ProjectMembershipSerializer.new(membership).serializable_hash.merge(
             total_tokens: stats&.total_tokens&.to_i || 0,
             total_events: stats&.total_events&.to_i || 0,
             total_cost:   stats&.total_cost&.to_f  || 0.0,
-            last_active_at: stats&.last_active_at&.in_time_zone&.iso8601
+            last_active_at: stats&.last_active_at&.in_time_zone&.iso8601,
+            cli_connected: cli_connected_user_ids.include?(membership.user_id)
           )
         end
 

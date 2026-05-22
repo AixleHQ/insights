@@ -104,6 +104,40 @@ RSpec.describe 'Api::V1::OrganizationMembers', type: :request do
       expect(member_data[:total_cost]).to eq(0.0)
     end
 
+    it 'includes cli_connected true when member has an active user_tool_account' do
+      create(:user_tool_account, organization_membership: member_membership, is_active: true)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/members",
+                        user: member,
+                        organization: organization
+
+      expect_success
+      member_data = json_data.find { |m| m[:user][:email] == member.email }
+      expect(member_data[:cli_connected]).to eq(true)
+    end
+
+    it 'includes cli_connected false when member has no active user_tool_account' do
+      create(:user_tool_account, organization_membership: member_membership, is_active: false)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/members",
+                        user: member,
+                        organization: organization
+
+      expect_success
+      member_data = json_data.find { |m| m[:user][:email] == member.email }
+      expect(member_data[:cli_connected]).to eq(false)
+    end
+
+    it 'includes cli_connected false when member has no user_tool_account' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/members",
+                        user: member,
+                        organization: organization
+
+      expect_success
+      member_data = json_data.find { |m| m[:user][:email] == member.email }
+      expect(member_data[:cli_connected]).to eq(false)
+    end
+
     it 'filters by role' do
       authenticated_get "/api/v1/organizations/#{organization.id}/members",
                         user: member,

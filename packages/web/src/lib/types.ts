@@ -59,6 +59,7 @@ export interface OrganizationMember {
   total_events?: number;
   total_cost?: number;
   last_active_at?: string | null;
+  cli_connected?: boolean;
 }
 
 // Project types
