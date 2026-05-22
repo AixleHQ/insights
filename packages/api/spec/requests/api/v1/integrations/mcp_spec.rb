@@ -9,29 +9,48 @@ RSpec.describe "Api::V1::Integrations::Mcp", type: :request do
     create(:organization_membership, user: internal_user, organization: organization)
   end
 
+  TOKEN_RE = /\Adb90_[a-f0-9]{64}\z/
+
+  def expect_single_tool_shape(body)
+    expect(body["data"]).to be_a(Hash)
+    expect(body["data"]["ingestToken"]).to match(TOKEN_RE)
+    expect(body["data"]["accounts"]).to be_a(Hash)
+    expect(body["data"]["accounts"]).not_to be_empty
+    body["data"]["accounts"].each_value do |entry|
+      expect(entry["ingestToken"]).to match(TOKEN_RE)
+    end
+    expect(body["data"]["ingestHost"]).to eq(request.base_url)
+    expect(body["data"]["organizationId"]).to eq(organization.id.to_s)
+  end
+
   describe "POST /api/v1/integrations/mcp/exchange" do
     context "with a valid OIDC session and supported tool_name" do
       it "mints an ingest token for claude_code" do
         expect {
           authenticated_post "/api/v1/integrations/mcp/exchange",
                              user: internal_user,
-                             params: { tool_name: "claude_code" }
+                             params: {
+                               tool_name: "claude_code",
+                               device_label: "test device"
+                             }
         }.to change { internal_membership.user_tool_accounts.count }.by(1)
 
         expect(response).to have_http_status(:created)
         body = JSON.parse(response.body)
-        expect(body["tool_name"]).to eq("claude_code")
-        expect(body["ingest_token"]).to match(/\Adb90_[a-f0-9]{64}\z/)
-        expect(body["host"]).to be_a(String)
+        expect_single_tool_shape(body)
+        expect(body["data"]["toolName"]).to eq("claude_code")
+        expect(body["data"]["accounts"].keys.sort).to eq([ "claude_code" ])
       end
 
       it "mints an ingest token for cursor" do
         authenticated_post "/api/v1/integrations/mcp/exchange",
-                           user: internal_user,
-                           params: { tool_name: "cursor" }
+                             user: internal_user,
+                             params: { tool_name: "cursor" }
 
         expect(response).to have_http_status(:created)
-        expect(JSON.parse(response.body)["tool_name"]).to eq("cursor")
+        body = JSON.parse(response.body)
+        expect_single_tool_shape(body)
+        expect(body["data"]["accounts"]["cursor"]["ingestToken"]).to match(TOKEN_RE)
       end
 
       it "rotates the token on each call (one account, fresh credential)" do
@@ -39,11 +58,51 @@ RSpec.describe "Api::V1::Integrations::Mcp", type: :request do
           authenticated_post "/api/v1/integrations/mcp/exchange",
                              user: internal_user,
                              params: { tool_name: "claude_code" }
-          JSON.parse(response.body)["ingest_token"]
+          JSON.parse(response.body)["data"]["ingestToken"]
         end
 
         expect(internal_membership.reload.user_tool_accounts.count).to eq(1)
         expect(tokens.uniq.size).to eq(2)
+      end
+    end
+
+    context "with a valid OIDC session and supported tools payload" do
+      it "mints ingest tokens for claude_code and cursor in one call" do
+        expect {
+          authenticated_post "/api/v1/integrations/mcp/exchange",
+                             user: internal_user,
+                             params: {
+                               tools: [ "cursor", "claude_code", "cursor" ],
+                               device_label: "multi MCP"
+                             }
+        }.to change { internal_membership.user_tool_accounts.count }.by(2)
+
+        expect(response).to have_http_status(:created)
+        data = JSON.parse(response.body)["data"]
+        expect(data["ingestToken"]).to be_nil
+        accounts = data["accounts"]
+        expect(accounts.keys.sort).to eq([ "claude_code", "cursor" ])
+        expect(accounts["claude_code"]["ingestToken"]).to match(TOKEN_RE)
+        expect(accounts["cursor"]["ingestToken"]).to match(TOKEN_RE)
+      end
+
+      it "rotates tokens for requested accounts independently" do
+        authenticated_post "/api/v1/integrations/mcp/exchange",
+                           user: internal_user,
+                           params: { tools: [ "claude_code", "cursor" ] }
+        cc1 = JSON.parse(response.body)["data"]["accounts"]["claude_code"]["ingestToken"]
+        cr1 = JSON.parse(response.body)["data"]["accounts"]["cursor"]["ingestToken"]
+
+        authenticated_post "/api/v1/integrations/mcp/exchange",
+                           user: internal_user,
+                           params: { tools: [ "claude_code", "cursor" ] }
+        cc2 = JSON.parse(response.body)["data"]["accounts"]["claude_code"]["ingestToken"]
+        cr2 = JSON.parse(response.body)["data"]["accounts"]["cursor"]["ingestToken"]
+
+        expect(internal_membership.reload.user_tool_accounts.count).to eq(2)
+        expect([ cc1, cr1 ].uniq.size).to eq(2)
+        expect(cc1).not_to eq(cc2)
+        expect(cr1).not_to eq(cr2)
       end
     end
 
@@ -54,17 +113,32 @@ RSpec.describe "Api::V1::Integrations::Mcp", type: :request do
                            params: { tool_name: "github_copilot" }
 
         expect(response).to have_http_status(:unprocessable_content)
-        expect(JSON.parse(response.body)["errors"]).to include("tool_name")
+        parsed = JSON.parse(response.body)
+        expect(parsed["errors"]).to have_key("tool_name")
       end
     end
 
-    context "with no tool_name" do
+    context "with an unsupported tools array entry" do
+      it "returns 422" do
+        authenticated_post "/api/v1/integrations/mcp/exchange",
+                           user: internal_user,
+                           params: { tools: [ "claude_code", "github_copilot" ] }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        parsed = JSON.parse(response.body)
+        expect(parsed["errors"]).to have_key("tools")
+      end
+    end
+
+    context "without tool_name nor tools" do
       it "returns 422" do
         authenticated_post "/api/v1/integrations/mcp/exchange",
                            user: internal_user,
                            params: {}
 
         expect(response).to have_http_status(:unprocessable_content)
+        parsed = JSON.parse(response.body)
+        expect(parsed["errors"]).to have_key("base")
       end
     end
 
@@ -78,25 +152,26 @@ RSpec.describe "Api::V1::Integrations::Mcp", type: :request do
       end
     end
 
-    context "with a non-DBP email" do
+    context "with a non-DBP email but valid membership" do
       let(:external_user) { create(:user, email: "outsider@example.com") }
       let!(:external_membership) do
         create(:organization_membership, user: external_user, organization: organization)
       end
 
-      it "returns 403" do
+      it "returns 201 (UserToolAccountPolicy on membership)" do
         authenticated_post "/api/v1/integrations/mcp/exchange",
                            user: external_user,
                            params: { tool_name: "claude_code" }
 
-        expect(response).to have_http_status(:forbidden)
+        expect(response).to have_http_status(:created)
+        expect_single_tool_shape(JSON.parse(response.body))
       end
     end
 
-    context "when the DBP user has no organization membership" do
+    context "when the user has no organization membership" do
       let(:lonely_user) { create(:user, email: "newhire@example.com") }
 
-      it "returns 403 (policy guard)" do
+      it "returns 403" do
         authenticated_post "/api/v1/integrations/mcp/exchange",
                            user: lonely_user,
                            params: { tool_name: "claude_code" }

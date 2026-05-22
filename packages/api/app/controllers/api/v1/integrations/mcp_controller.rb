@@ -3,65 +3,39 @@
 module Api
   module V1
     module Integrations
-      # Exchanges an authenticated user's OIDC session for a fresh
-      # UserToolAccount ingest token, scoped to the requested tool. The MCP
-      # client (packages/tools/db90-mcp) calls this once after a successful
-      # Keycloak device-flow login to obtain the ingest credential it stores
-      # in the OS keychain.
+      # Exchanges Keycloak Bearer tokens for ingest tokens on one or more
+      # `UserToolAccount` rows (scoped to the user's oldest org membership).
       class McpController < BaseController
-        SUPPORTED_TOOLS = %w[claude_code cursor].freeze
-
         # POST /api/v1/integrations/mcp/exchange
         def exchange
-          authorize! current_user, to: :exchange?, with: ::Integrations::McpPolicy
-
-          tool_name = params[:tool_name].to_s
-          unless SUPPORTED_TOOLS.include?(tool_name)
-            return render json: {
-              error: "Unprocessable Entity",
-              errors: { tool_name: [ "must be one of: #{SUPPORTED_TOOLS.join(', ')}" ] }
-            }, status: :unprocessable_content
-          end
-
           membership = primary_membership
-          tool_account = membership.user_tool_accounts.find_or_initialize_by(tool_name: tool_name)
-          tool_account.is_active = true
-
-          if tool_account.new_record?
-            unless tool_account.save
-              return render json: {
-                error: "Unprocessable Entity",
-                errors: format_validation_errors(tool_account.errors)
-              }, status: :unprocessable_content
-            end
-          else
-            tool_account.rotate_ingest_token!
+          if membership.blank?
+            return render json: {
+              error: "Forbidden",
+              message: "No organization membership found for this user"
+            }, status: :forbidden
           end
 
-          render json: {
-            ingest_token: tool_account.plaintext_token,
-            host: ingest_host,
-            tool_name: tool_name
-          }, status: :created
+          authorize! membership, to: :create?, with: ::UserToolAccountPolicy
+
+          result = ::Mcp::IngestTokenExchangeService.call(
+            membership: membership,
+            tool_name: exchange_params[:tool_name],
+            tools: exchange_params[:tools],
+            ingest_host: request.base_url
+          )
+
+          render json: result.body, status: result.http_status
         end
 
         private
 
-        # Resolves the user's organization. Internal users typically belong to a
-        # single Dualboot org; pick the oldest membership for stability across
-        # repeat exchanges. When client-org support lands (deferred — Slack
-        # 2026-04-27), this resolution will need an X-Organization-ID header.
-        #
-        # Safe to call without a nil-guard here because McpPolicy#exchange?
-        # checks organization_memberships.any? before the action body runs.
-        # AIX-164 will replace McpPolicy with UserToolAccountPolicy, which
-        # does NOT check membership existence — add a nil guard at that point.
-        def primary_membership
-          current_user.organization_memberships.order(:created_at).first
+        def exchange_params
+          params.permit(:tool_name, :device_label, tools: [])
         end
 
-        def ingest_host
-          ENV.fetch("DB90_PUBLIC_HOST", request.base_url)
+        def primary_membership
+          current_user.organization_memberships.order(:created_at).first
         end
       end
     end

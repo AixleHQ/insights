@@ -5,10 +5,7 @@ on:
     tags:
       - 'cli-claude-v*'
       - 'cli-cursor-v*'
-      # NOTE: cli-mcp-v* intentionally excluded.
-      # @db90/mcp ships a scaffold sync.ts (runClaudeSync/runCursorSync return
-      # empty results) per plans/npm-distribution-AIX-157/tasks/10-mcp-publish.md.
-      # Re-enable this tag prefix once Task 10 lands the real sync wiring.
+      - 'cli-mcp-v*'
   workflow_dispatch:
     inputs:
       package:
@@ -18,8 +15,7 @@ on:
         options:
           - claude
           - cursor
-          # mcp intentionally omitted — see tags note above. Add back with
-          # Task 10's publish PR.
+          - mcp
       version:
         description: 'Version to publish (must equal package.json version; no leading v). Required.'
         required: true
@@ -53,6 +49,10 @@ jobs:
             echo "package=cursor" >> "$GITHUB_OUTPUT"
             echo "working_directory=packages/tools/db90-cursor" >> "$GITHUB_OUTPUT"
             echo "tag_version=${REF#refs/tags/cli-cursor-v}" >> "$GITHUB_OUTPUT"
+          elif [[ "$REF" == refs/tags/cli-mcp-v* ]]; then
+            echo "package=mcp" >> "$GITHUB_OUTPUT"
+            echo "working_directory=packages/tools/db90-telemetry-mcp" >> "$GITHUB_OUTPUT"
+            echo "tag_version=${REF#refs/tags/cli-mcp-v}" >> "$GITHUB_OUTPUT"
           elif [[ -n "$INPUT_PACKAGE" ]]; then
             # workflow_dispatch: require an explicit version input so the
             # package.json-version check below always runs. An empty version
@@ -62,7 +62,11 @@ jobs:
               exit 1
             fi
             echo "package=$INPUT_PACKAGE" >> "$GITHUB_OUTPUT"
-            echo "working_directory=packages/tools/db90-$INPUT_PACKAGE" >> "$GITHUB_OUTPUT"
+            if [[ "$INPUT_PACKAGE" == "mcp" ]]; then
+              echo "working_directory=packages/tools/db90-telemetry-mcp" >> "$GITHUB_OUTPUT"
+            else
+              echo "working_directory=packages/tools/db90-$INPUT_PACKAGE" >> "$GITHUB_OUTPUT"
+            fi
             echo "tag_version=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
           else
             echo "Could not resolve target package from ref=$REF / input=$INPUT_PACKAGE" >&2
@@ -156,7 +160,7 @@ jobs:
         run: npm test
         working-directory: ${{ needs.resolve.outputs.working_directory }}
 
-      - name: Verify pack contents (dist + README + LICENSE only)
+      - name: Verify pack contents (dist + staged SDK + README + LICENSE)
         working-directory: ${{ needs.resolve.outputs.working_directory }}
         env:
           PACKAGE: ${{ needs.resolve.outputs.package }}
@@ -167,24 +171,27 @@ jobs:
           const out = require('/tmp/pack.json');
           const allow = new Set(['README.md', 'LICENSE', 'package.json']);
           const paths = out[0].files.map((f) => f.path);
+          const isStagedSdkFile = (p) =>
+            p === 'node_modules/@db90/sdk/package.json' ||
+            p.startsWith('node_modules/@db90/sdk/dist/');
           const leaks = paths.filter(
-            (p) => !allow.has(p) && !p.startsWith('dist/') && !p.startsWith('node_modules/@db90/sdk/'),
+            (p) => !allow.has(p) && !p.startsWith('dist/') && !isStagedSdkFile(p),
           );
           if (leaks.length > 0) {
-            console.error("Tarball contains files outside the allowlist (dist/**, node_modules/@db90/sdk/**, README.md, LICENSE, package.json):");
+            console.error("Tarball contains files outside the allowlist (dist/**, node_modules/@db90/sdk/dist/**, node_modules/@db90/sdk/package.json, README.md, LICENSE, package.json):");
             for (const p of leaks) console.error('  ' + p);
             console.error("Fix the 'files' field in package.json.");
             process.exit(1);
           }
-          // Fail-closed: claude/cursor declare @db90/sdk in bundledDependencies
+          // Fail-closed: claude/cursor/mcp declare @db90/sdk in bundledDependencies
           // and the SDK is private (not on npm). If the staged SDK is missing
           // from the tarball, end-users would hit "no matching version" on install.
           const pkg = process.env.PACKAGE;
-          if (pkg === 'claude' || pkg === 'cursor') {
+          if (pkg === 'claude' || pkg === 'cursor' || pkg === 'mcp') {
             const hasSdkDist = paths.some((p) => p.startsWith('node_modules/@db90/sdk/dist/'));
             if (!hasSdkDist) {
               console.error("BLOCKER: tarball is missing node_modules/@db90/sdk/dist/** — the prepack staging step did not run or failed silently.");
-              console.error("Without bundled SDK, end-user 'npm install @db90/" + pkg + "' resolves @db90/sdk@* against npm registry and fails (SDK is private).");
+              console.error("Without bundled SDK, end-user install resolves @db90/sdk@* against npm registry and fails (SDK is private).");
               process.exit(1);
             }
           }

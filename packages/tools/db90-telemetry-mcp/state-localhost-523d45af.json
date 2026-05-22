@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "sessions": {
+    "claude_code:f9c1f496-14f1-43ba-a7d3-cee784487c4f": {
+      "fileSize": 751963,
+      "sentAt": "2026-05-18T15:27:09.822Z"
+    },
+    "claude_code:949aaebf-e913-4dbe-9d5f-a7702b2d632e": {
+      "fileSize": 801595,
+      "sentAt": "2026-05-18T15:27:12.074Z"
+    }
+  }
+}

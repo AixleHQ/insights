@@ -39,10 +39,10 @@ Out of scope for this README. See `CLAUDE.md` → "Release secrets" in the repo 
 
 ## Or install once with the MCP server
 
-Prefer a "set and forget" experience? Install [`@db90/mcp`](https://www.npmjs.com/package/@db90/mcp) instead — it auto-forwards usage telemetry from every Claude Code and Cursor session, no cron / launchd needed:
+Prefer a "set and forget" experience? Install [`@db90/telemetry-mcp`](https://www.npmjs.com/package/@db90/telemetry-mcp) instead — it auto-forwards usage telemetry from every Claude Code and Cursor session, no cron / launchd needed:
 
 ```bash
-npx -y @db90/mcp init
+npx -y @db90/telemetry-mcp init
 ```
 
 The instructions below cover the standalone CLI for users who prefer cron / launchd or a lighter install.
