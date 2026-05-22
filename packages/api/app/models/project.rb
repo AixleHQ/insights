@@ -40,7 +40,12 @@ class Project < ApplicationRecord
 
   def self.normalize_git_remote(url)
     return nil if url.blank?
-    url.strip.downcase.delete_suffix(".git")
+
+    normalized = url.strip
+    if (match = normalized.match(/\Agit@([^:]+):(.+)\z/i))
+      normalized = "https://#{match[1]}/#{match[2]}"
+    end
+    normalized.downcase.delete_suffix(".git")
   end
 
   private

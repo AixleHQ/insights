@@ -1,6 +1,41 @@
 require 'rails_helper'
 
 RSpec.describe Project, type: :model do
+  describe '.normalize_git_remote' do
+    it 'returns nil for blank input' do
+      expect(described_class.normalize_git_remote(nil)).to be_nil
+      expect(described_class.normalize_git_remote('')).to be_nil
+      expect(described_class.normalize_git_remote('   ')).to be_nil
+    end
+
+    it 'normalizes GitHub SCP-style SSH to canonical HTTPS without .git suffix' do
+      expect(described_class.normalize_git_remote('git@github.com:owner/repo.git')).to eq('https://github.com/owner/repo')
+    end
+
+    it 'normalizes SCP-style SSH case-insensitively for the git@ prefix' do
+      expect(described_class.normalize_git_remote('GIT@github.com:owner/repo.git')).to eq('https://github.com/owner/repo')
+    end
+
+    it 'normalizes HTTPS with .git suffix to the same canonical form as SSH' do
+      ssh = 'git@github.com:owner/repo.git'
+      https = 'https://github.com/owner/repo.git'
+      expect(described_class.normalize_git_remote(ssh)).to eq(described_class.normalize_git_remote(https))
+      expect(described_class.normalize_git_remote(https)).to eq('https://github.com/owner/repo')
+    end
+
+    it 'normalizes GitLab SCP-style SSH to canonical HTTPS' do
+      expect(described_class.normalize_git_remote('git@gitlab.com:group/project.git')).to eq('https://gitlab.com/group/project')
+    end
+
+    it 'strips whitespace before matching and normalizing' do
+      expect(described_class.normalize_git_remote("  git@github.com:owner/repo.git  \n")).to eq('https://github.com/owner/repo')
+    end
+
+    it 'preserves non-SSH URLs with strip, downcase, and .git removal only' do
+      expect(described_class.normalize_git_remote('HTTPS://Example.COM/foo/bar.GIT')).to eq('https://example.com/foo/bar')
+    end
+  end
+
   describe 'associations' do
     it { should belong_to(:organization).optional }
     it { should belong_to(:owner).class_name('User').optional }
