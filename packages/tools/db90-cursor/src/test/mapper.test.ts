@@ -380,7 +380,7 @@ describe("mapDailyStats", () => {
 describe("mapRecentCommit", () => {
   const dbPath = "/tmp/global/state.vscdb";
 
-  it("maps aiCodeTracking.recentCommit JSON to a chat event with metadata", () => {
+  it("maps aiCodeTracking.recentCommit JSON to a commit event with metadata", () => {
     const snapshot: RecentCommitSnapshot = {
       dbPath,
       value: {
@@ -396,7 +396,7 @@ describe("mapRecentCommit", () => {
     };
     const result = mapRecentCommit(snapshot);
     expect(result).not.toBeNull();
-    expect(result!.event_type).toBe("chat");
+    expect(result!.event_type).toBe("commit");
     expect(result!.metadata.source).toBe("recent_commit");
     expect(result!.metadata.commit_hash).toBe("deadbeef");
     expect(result!.metadata.commit_message).toBe("feat: hello");
@@ -407,6 +407,9 @@ describe("mapRecentCommit", () => {
     expect(result!.tokens_out).toBe(10);
     expect(result!.occurred_at).toBe(new Date(1704067200000).toISOString());
     expect(result!.metadata.cost_model).toBe("estimated_line_count");
+    // Same line-cost path as pre-fix (computeLineCost("chat", …)) — only event_type label changed.
+    // linesAddedProxy + linesDeletedProxy = 28 → 28 × 15 × (15 + 3×2) / 1e6 = 0.00882
+    expect(result!.cost_usd).toBeCloseTo(0.00882, 10);
   });
 
   it("returns null when timestamp is missing or invalid", () => {

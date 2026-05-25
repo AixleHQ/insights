@@ -627,7 +627,7 @@ export type Db90CursorPayloadMetadata = {
 
 export interface CursorDb90Payload extends IngestPayload {
   tool_name: "cursor";
-  event_type: "completion" | "chat";
+  event_type: "completion" | "chat" | "commit";
   model: string;
   tokens_in: number;
   tokens_out: number;
@@ -787,6 +787,11 @@ export function mapDailyStats(
   return results;
 }
 
+/**
+ * Maps Cursor’s latest-commit snapshot (`aiCodeTracking.recentCommit`) to a single commit-classified event.
+ * Cursor only keeps one recent commit row (overwritten on each new commit).
+ * Line-cost math still follows the chat-style line proxy (`computeLineCost("chat", …)`); only `event_type` differs.
+ */
 export function mapRecentCommit(
   entry: RecentCommitSnapshot,
   projectId?: string,
@@ -816,7 +821,7 @@ export function mapRecentCommit(
 
   const payload: CursorDb90Payload = {
     tool_name: "cursor",
-    event_type: "chat",
+    event_type: "commit",
     model: "unknown",
     tokens_in: linesAddedProxy,
     tokens_out: linesDeletedProxy,
