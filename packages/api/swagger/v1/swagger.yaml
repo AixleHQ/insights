@@ -86,6 +86,46 @@ paths:
                   meta:
                     $ref: '#/components/schemas/PaginationMeta'
 
+  /api/v1/users/me/tool_accounts:
+    get:
+      summary: List current user's ingest tool account metadata (current org)
+      description: |
+        Returns `claude_code` and `cursor` tool accounts for the authenticated user's membership
+        in the organization named by `X-Organization-ID`. Does not include any persisted token
+        values or hashes. `lastUsedAt` is derived from the latest matching `ToolEvent` in this org
+        for this user and tool.
+      tags:
+        - Users
+      parameters:
+        - $ref: '#/components/parameters/X-Organization-ID'
+      responses:
+        '200':
+          description: Ingest tool account metadata (no token material)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MeToolAccountMetadata'
+        '400':
+          description: Organization context required
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   /api/v1/users/me/settings:
     get:
       summary: Get current user's settings
@@ -5429,6 +5469,39 @@ components:
           type: boolean
         alertSlack:
           type: boolean
+
+    MeToolAccountMetadata:
+      type: object
+      description: Ingest tool account row for Settings (no token values)
+      properties:
+        id:
+          type: string
+          format: uuid
+        toolName:
+          type: string
+          enum: [claude_code, cursor]
+        displayName:
+          type: string
+          example: Claude Code
+        isActive:
+          type: boolean
+        lastUsedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - toolName
+        - displayName
+        - isActive
+        - createdAt
+        - updatedAt
 
     UserToolAccount:
       type: object

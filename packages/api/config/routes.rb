@@ -24,6 +24,7 @@ Rails.application.routes.draw do
       get "users/me/organizations", to: "users#organizations"
       get "users/me/favorites", to: "users#favorites"
       get "users/me/settings", to: "users#settings"
+      get "users/me/tool_accounts", to: "users#tool_accounts"
       put "users/me/settings/:key", to: "users#update_setting"
       delete "users/me/settings/:key", to: "users#destroy_setting"
       get   "users/me/personal_settings", to: "user_personal_settings#show"

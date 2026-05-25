@@ -36,6 +36,31 @@ export function truncateModelName(name: string): string {
   return name.length > 30 ? `${name.slice(0, 30)}…` : name;
 }
 
+const US_DATETIME_DISPLAY: Intl.DateTimeFormatOptions = {
+  dateStyle: "medium",
+  timeStyle: "short",
+};
+
+const US_LONG_DATE: Intl.DateTimeFormatOptions = {
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+};
+
+/** ISO (or parseable) timestamp for tables; en-US; invalid → em dash. */
+export function formatDateTime(iso: string | null | undefined): string {
+  if (iso == null || String(iso).trim() === "") return "—";
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "—";
+  return d.toLocaleString("en-US", US_DATETIME_DISPLAY);
+}
+
+/** Calendar date only (e.g. invitation expiry fallback); invalid Date → em dash. */
+export function formatLongUsDate(date: Date): string {
+  if (!Number.isFinite(date.getTime())) return "—";
+  return date.toLocaleDateString("en-US", US_LONG_DATE);
+}
+
 // Event attribution — classifies who performed an event.
 // The backend serializer sets `attribution` on each event; this maps it to a display label.
 export const EventAttribution = {

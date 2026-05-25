@@ -47,8 +47,6 @@ module Api
         def resolve_exchange_membership
           raw_org_id = request.headers["X-Organization-ID"]
 
-          puts "raw_org_id: #{raw_org_id}"
-
           return primary_membership if raw_org_id.nil?
 
           org_id = raw_org_id.to_s.strip

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   Building2,
@@ -10,10 +10,13 @@ import {
   AlertTriangle,
   UserPlus,
   Shield,
+  Copy,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrg } from "@/contexts/OrgContext";
 import { useInvitationByToken, useAcceptInvitation } from "@/hooks/useApi";
+import { DB90_CLI_CLAUDE_SETUP_COMMAND } from "@/lib/db90-cli";
+import { formatLongUsDate } from "@/lib/formatters";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -33,11 +36,7 @@ function formatExpirationDate(dateString: string): string {
   if (days <= 0) return "today";
   if (days === 1) return "tomorrow";
   if (days <= 7) return `in ${days} days`;
-  return date.toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
+  return formatLongUsDate(date);
 }
 
 function getRoleBadgeVariant(role: string): "default" | "secondary" | "outline" {
@@ -64,18 +63,27 @@ function getRoleDescription(role: string): string {
   }
 }
 
+function getAcceptedInvitationStorageKey(token: string): string {
+  return `db90:accepted-invitation:${token}`;
+}
+
 export function InvitationAccept() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
   const { isAuthenticated, profile } = useAuth();
   const { refreshOrganizations, setCurrentOrg } = useOrg();
+  const acceptedInvitationStorageKey = token ? getAcceptedInvitationStorageKey(token) : null;
 
   const [isAccepting, setIsAccepting] = useState(false);
   const [acceptError, setAcceptError] = useState<string | null>(null);
-  const [acceptSuccess, setAcceptSuccess] = useState(false);
-  const redirectTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [acceptSuccess, setAcceptSuccess] = useState(() => {
+    if (!acceptedInvitationStorageKey || typeof window === "undefined") {
+      return false;
+    }
 
-  useEffect(() => () => clearTimeout(redirectTimer.current), []);
+    return window.sessionStorage.getItem(acceptedInvitationStorageKey) === "true";
+  });
+  const [commandCopied, setCommandCopied] = useState(false);
 
   // Fetch invitation details
   const {
@@ -94,24 +102,30 @@ export function InvitationAccept() {
 
     try {
       const result = await acceptInvitation.mutateAsync(token);
+      const acceptedOrganization = result.data?.organization;
 
-      // Refresh organizations and set the new one as current
-      await refreshOrganizations();
-
+      if (acceptedInvitationStorageKey) {
+        window.sessionStorage.setItem(acceptedInvitationStorageKey, "true");
+      }
       setAcceptSuccess(true);
 
-      // Brief pause to show success state, then redirect
-      redirectTimer.current = setTimeout(() => {
-        if (result.data?.organization) {
+      if (acceptedOrganization) {
+        try {
           setCurrentOrg({
-            id: result.data.organization.id,
-            name: result.data.organization.name,
-            slug: result.data.organization.slug,
+            id: acceptedOrganization.id,
+            name: acceptedOrganization.name,
+            slug: acceptedOrganization.slug,
             is_active: true,
           });
+        } catch (orgError) {
+          console.error("Failed to set accepted organization:", orgError);
         }
-        navigate("/");
-      }, 1500);
+      }
+
+      // Refresh the org list in the background so the success card is not blocked by it.
+      void refreshOrganizations().catch((refreshError) => {
+        console.error("Failed to refresh organizations after invitation accept:", refreshError);
+      });
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to accept invitation";
@@ -126,6 +140,13 @@ export function InvitationAccept() {
   const isExpired = invitation?.expired || invitation?.status === "expired";
   const isRevoked = invitation?.status === "revoked";
   const isAlreadyAccepted = invitation?.status === "accepted";
+
+  const handleContinueToDashboard = () => {
+    if (acceptedInvitationStorageKey) {
+      window.sessionStorage.removeItem(acceptedInvitationStorageKey);
+    }
+    navigate("/");
+  };
 
   return (
     <div className="flex min-h-svh flex-col bg-background">
@@ -264,7 +285,7 @@ export function InvitationAccept() {
           )}
 
           {/* Already Accepted State */}
-          {!isLoading && !isNotFound && isAlreadyAccepted && (
+          {!isLoading && !isNotFound && isAlreadyAccepted && !acceptSuccess && (
             <Card className="border-2 border-green-500/20">
               <CardHeader className="items-center pb-2">
                 <div className="flex size-16 items-center justify-center rounded-2xl bg-green-500/10">
@@ -300,20 +321,49 @@ export function InvitationAccept() {
                   <CheckCircle2 className="size-8 text-green-500 animate-in zoom-in-50 duration-300" />
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4 text-center">
+              <CardContent className="space-y-6 text-center">
                 <div className="space-y-2">
-                  <CardTitle className="text-xl">Welcome Aboard!</CardTitle>
+                  <CardTitle className="text-xl">You&apos;re connected</CardTitle>
                   <CardDescription className="text-base">
-                    You've successfully joined{" "}
+                    Your account is linked to{" "}
                     <span className="font-medium text-foreground">
                       {invitation?.organization.name}
                     </span>
-                    . Redirecting you to your profile...
+                    . Link your AI tools next so DB90 can receive telemetry.
                   </CardDescription>
                 </div>
-                <div className="flex justify-center">
-                  <Loader2 className="size-5 animate-spin text-primary" />
+                <div className="rounded-lg border bg-muted/40 p-4 text-left space-y-3">
+                  <p className="text-sm font-medium text-foreground">Get started</p>
+                  <p className="text-sm text-muted-foreground">
+                    Install the DB90 CLI and run login on the machine where you use your coding
+                    assistant:
+                  </p>
+                  <pre className="overflow-x-auto rounded-md bg-background border p-3 text-xs font-mono">
+                    {DB90_CLI_CLAUDE_SETUP_COMMAND}
+                  </pre>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full sm:w-auto"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(DB90_CLI_CLAUDE_SETUP_COMMAND);
+                        setCommandCopied(true);
+                        window.setTimeout(() => setCommandCopied(false), 2000);
+                      } catch {
+                        setCommandCopied(false);
+                      }
+                    }}
+                  >
+                    <Copy className="mr-2 size-4" />
+                    {commandCopied ? "Copied" : "Copy command"}
+                  </Button>
                 </div>
+                <Button size="lg" className="w-full" onClick={handleContinueToDashboard}>
+                  Continue to dashboard
+                  <ArrowRight className="ml-2 size-4" />
+                </Button>
               </CardContent>
             </Card>
           )}

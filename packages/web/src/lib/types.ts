@@ -210,6 +210,26 @@ export interface ToolAccount {
   ingestToken?: string; // one-time, only present immediately after create/regenerate
 }
 
+/** Current user's ingest tool rows from GET /users/me/tool_accounts (no persisted token). */
+export interface MyToolAccountMetadata {
+  id: string;
+  toolName: string;
+  displayName: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastUsedAt: string | null;
+}
+
+/** Response body `data` from POST /integrations/mcp/exchange (subset used by Settings). */
+export interface McpIngestExchangeData {
+  ingestHost: string;
+  organizationId: string;
+  ingestToken?: string;
+  toolName?: string;
+  accounts?: Record<string, { ingestToken: string }>;
+}
+
 // Event types
 export type RiskLevel = "none" | "low" | "medium" | "high" | "critical";
 export type EventType =

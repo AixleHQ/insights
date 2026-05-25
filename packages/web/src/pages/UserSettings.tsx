@@ -39,7 +39,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ToolAccounts } from "./ToolAccounts";
+import { SettingsToolsSection } from "./SettingsToolsSection";
 
 const navItems = [
   { title: "Profile", href: "/profile", icon: User },
@@ -642,7 +642,7 @@ export function UserSettings() {
             <Route path="settings" element={<PreferencesSection />} />
             <Route path="settings/notifications" element={<NotificationsSection />} />
             <Route path="settings/security" element={<SecuritySection />} />
-            <Route path="tools" element={<ToolAccounts embedded />} />
+            <Route path="tools" element={<SettingsToolsSection />} />
             <Route path="*" element={<Navigate to="/profile" replace />} />
           </Routes>
         </div>

@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { UserSettings } from "./UserSettings";
 
 const notificationSettings = vi.hoisted<{ value: Record<string, string> }>(() => ({ value: {} }));
+const myToolAccountsState = vi.hoisted<{ value: unknown[] }>(() => ({ value: [] }));
 
 vi.mock("@/contexts/AuthContext", () => ({
   useAuth: () => ({
@@ -54,6 +55,17 @@ vi.mock("@/hooks/useApi", () => {
   ];
 
   return {
+  useMyToolAccounts: () => ({
+    data: myToolAccountsState.value,
+    isLoading: false,
+    isError: false,
+  }),
+  useMcpIngestExchange: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+    isError: false,
+    error: null,
+  }),
   useToolAccounts: () => ({ data: [], isLoading: false }),
   useCreateToolAccount: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteToolAccount: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -145,6 +157,7 @@ describe("UserSettings", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     notificationSettings.value = {};
+    myToolAccountsState.value = [];
   });
 
   describe("Header", () => {
@@ -269,7 +282,29 @@ describe("UserSettings", () => {
     it("renders Tools section at /profile/tools", () => {
       renderAtPath("/profile/tools");
 
+      expect(screen.getByText(/ingest tokens/i)).toBeInTheDocument();
+      expect(screen.getByText(/no ingest-linked tools yet/i)).toBeInTheDocument();
+      expect(screen.getByText(/npm install -g @db90\/cli-claude && db90 login/)).toBeInTheDocument();
       expect(screen.getByRole("tab", { name: /available/i })).toBeInTheDocument();
+    });
+
+    it("lists ingest token rows when my tool accounts are present", () => {
+      myToolAccountsState.value = [
+        {
+          id: "acc-1",
+          toolName: "claude_code",
+          displayName: "Claude Code",
+          isActive: true,
+          createdAt: "2025-01-01T00:00:00.000Z",
+          updatedAt: "2025-01-02T00:00:00.000Z",
+          lastUsedAt: "2025-01-10T12:00:00.000Z",
+        },
+      ];
+
+      renderAtPath("/profile/tools");
+
+      expect(screen.getByRole("table")).toHaveTextContent("Claude Code");
+      expect(screen.getByRole("button", { name: /rotate/i })).toBeInTheDocument();
     });
 
     it("does not render ToolAccounts back button when embedded", () => {
