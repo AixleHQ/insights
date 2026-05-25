@@ -106,6 +106,24 @@ Decision hierarchy: standard Rails patterns first → existing codebase patterns
 
 Use Grep, Glob, and Read directly for known files/symbols. Use the Explore subagent for broader open-ended exploration.
 
+## Jira ticket discipline — MANDATORY
+
+**Before suggesting that a new Jira ticket be created (or calling `createJiraIssue`), you MUST first search Jira via the Atlassian MCP to verify no existing ticket already covers the work.**
+
+This rule is non-negotiable. The team files tickets ahead of code — most "discoveries" mid-PR are already on the board. Filing a duplicate wastes triage time and fragments the conversation across two issues.
+
+**Required steps before proposing or filing:**
+
+1. **Search Jira** via `mcp__…__searchJiraIssuesUsingJql` with keywords from the finding. Start broad (`text ~ "<topic>"`), narrow if too noisy. Filter by `statusCategory != Done` to see live work.
+2. **Check sub-tasks of the parent ticket** (the bug or epic the current PR addresses) — the gap may already be tracked as a sub-task you haven't seen.
+3. **Only file a new ticket** if no existing one fits. When you do file, link the parent ticket (or related context) so triage understands the lineage.
+
+**If you find an existing ticket:** link to it in the PR description or comment, and update its status/description if your discovery adds material context. Don't duplicate.
+
+**If JQL results exceed the MCP token limit:** save the JSON output (the tool surfaces a file path on overflow) and use `jq` to extract just `key + summary + status` before reasoning over it.
+
+Searches should be cheap — they run in the same turn as the discovery. There is no acceptable shortcut around this rule, even under time pressure.
+
 ## Plans and tasks (in-repo memory bank)
 
 Multi-PR feature plans live in the repo at `plans/` so context survives across Claude sessions and is reviewable in PRs.
