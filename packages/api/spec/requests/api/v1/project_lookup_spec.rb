@@ -34,6 +34,33 @@ RSpec.describe 'Api::V1::ProjectLookup', type: :request do
       end
     end
 
+    context 'when project was registered with HTTPS and lookup uses SSH' do
+      let!(:https_registered_project) do
+        create(:project, organization: organization, owner: nil,
+               git_remote_url: 'https://github.com/cross/format-repo')
+      end
+
+      it 'returns 200 matching SSH query to HTTPS stored URL' do
+        lookup_get(git_remote: 'git@github.com:cross/format-repo.git')
+        expect(response).to have_http_status(:ok)
+        expect(json_data[:project_id]).to eq(https_registered_project.id)
+      end
+    end
+
+    context 'when project was registered with SSH and lookup uses HTTPS' do
+      let!(:ssh_registered_project) do
+        create(:project, organization: organization, owner: nil,
+               git_remote_url: 'git@github.com:cross/ssh-origin-repo.git')
+      end
+
+      it 'returns 200 matching HTTPS query to persisted canonical URL from SSH registration' do
+        expect(ssh_registered_project.reload.git_remote_url).to eq('https://github.com/cross/ssh-origin-repo')
+        lookup_get(git_remote: 'https://github.com/cross/ssh-origin-repo.git')
+        expect(response).to have_http_status(:ok)
+        expect(json_data[:project_id]).to eq(ssh_registered_project.id)
+      end
+    end
+
     context 'with .git suffix difference (normalization)' do
       it 'returns 200 when stored URL has no .git but query has .git' do
         # matched_project already stored without .git (normalized).
