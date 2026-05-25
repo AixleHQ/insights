@@ -359,4 +359,42 @@ namespace :db90 do
     puts "[db90:wipe_org_events] Deleted #{deleted} tool event(s)."
     puts "[db90:wipe_org_events] Done."
   end
+
+  desc <<~DESC
+    Backfill project_id on historical timeseries.tool_events where it is safe to infer the
+    project from organization-scoped project membership.
+
+    Rules (conservative):
+      - Only users who belong to exactly ONE project in the organization (via project_memberships)
+        get their NULL project_id events updated for that org.
+      - Users with multiple projects in the org: no UPDATE; their NULL project_id rows stay NULL.
+      - Events with user_id NULL are never updated (no membership key).
+
+    Idempotent: each UPDATE only touches rows with project_id IS NULL, so re-runs skip already
+    attributed events.
+
+    Writes are batched: each iteration selects up to 1000 row ids still having project_id NULL,
+    then issues UPDATE ... WHERE id IN (...) AND project_id IS NULL to reduce lock duration on
+    the Timescale hypertable.
+
+    Usage (from packages/api):
+      rails db90:backfill_project_attribution
+      rails db90:backfill_project_attribution[dry_run]  # report only, no writes
+  DESC
+  task :backfill_project_attribution, [ :dry_run ] => :environment do |_t, args|
+    dry_run = args[:dry_run].to_s.strip.downcase == "dry_run"
+
+    puts "[db90:backfill_project_attribution] #{dry_run ? '[DRY RUN] ' : ''}Starting backfill"
+
+    stats = Backfills::ProjectAttributionBackfill.run(dry_run: dry_run)
+
+    if dry_run
+      puts "[db90:backfill_project_attribution] Summary: organizations_scanned=#{stats[:organizations_scanned]} " \
+           "would_update_events=#{stats[:would_update_events]}"
+    else
+      puts "[db90:backfill_project_attribution] Summary: organizations_scanned=#{stats[:organizations_scanned]} " \
+           "events_updated=#{stats[:events_updated]}"
+    end
+    puts "[db90:backfill_project_attribution] Done."
+  end
 end
