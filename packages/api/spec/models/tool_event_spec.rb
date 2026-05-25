@@ -22,6 +22,20 @@ RSpec.describe ToolEvent, type: :model do
     end
   end
 
+  describe 'PostgreSQL event_type enum' do
+    it 'persists tool_use without PG enum coercion errors' do
+      org = create(:organization)
+      event = ToolEvent.create!(
+        organization: org,
+        tool_name: 'claude_code',
+        event_type: 'tool_use',
+        occurred_at: Time.current
+      )
+
+      expect(event.reload.event_type).to eq('tool_use')
+    end
+  end
+
   describe 'validations' do
     it 'requires tool_name' do
       event = ToolEvent.new(tool_name: nil)
