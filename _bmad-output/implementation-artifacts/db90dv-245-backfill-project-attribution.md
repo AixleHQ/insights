@@ -16,7 +16,7 @@ so that project cards and project-scoped stats show non-zero historical activity
 2. Users with **more than one** project in the org: their events with `project_id IS NULL` remain `NULL` (no guessing).
 3. Users with **zero** projects in the org: no updates (events stay `NULL`).
 4. **Idempotent:** re-running skips rows already attributed (`project_id IS NULL` in `WHERE`).
-5. **Dry-run:** when `DRY_RUN=true` is set in the environment (e.g. `DRY_RUN=true rails db90:backfill_project_attribution`), the task prints counts and per-user/org summaries of what **would** be updated, without writing.
+5. **Dry-run:** when the task is invoked with the rake argument `dry_run` (e.g. `rails db90:backfill_project_attribution[dry_run]` from `packages/api/`), it prints counts and per-user/org summaries of what **would** be updated, without writing. **`ENV["DRY_RUN"]` is not used** — same pattern as other `db90:*` tasks that take `[dry_run]`.
 6. **Batched writes:** each live `UPDATE` affects at most **1000** rows per iteration (loop until no rows match), using `update_all` with a stable `WHERE` clause — not per-row Ruby updates — to reduce lock pressure on the TimescaleDB hypertable.
 7. **Logging:** for each attributed batch (or aggregated per user/project), log how many events were attributed to project X for user Y (use `Rails.logger` and/or `puts` consistent with other `db90:*` tasks in `db90.rake`).
 8. **Visibility for ambiguous users:** for users with `>1` project in the org, log the count of events that remain unattributed (`project_id IS NULL` for that user+org) for operational visibility.
@@ -32,9 +32,9 @@ so that project cards and project-scoped stats show non-zero historical activity
 - [x] **Ambiguous users** (AC: 2, 8)
   - [x] For users with `>1` project in the org, `count` `ToolEvent` where `organization_id`, `user_id`, `project_id: nil` and log (no `UPDATE`).
 - [x] **Dry-run** (AC: 5)
-  - [x] If `ENV["DRY_RUN"].to_s == "true"` (case-insensitive), run the same enumeration and print counts / sample lines; never call `update_all` with writes.
+  - [x] If the rake task argument is `dry_run` (see `db90.rake`, `args[:dry_run].to_s.strip.downcase == "dry_run"`), run the same enumeration and print counts / sample lines; never call `update_all` with writes.
 - [x] **File / namespace** (AC: 1)
-  - [x] Implement in `packages/api/lib/tasks/db90.rake` under `namespace :db90`, task name `backfill_project_attribution`, with a `desc` documenting usage, idempotency, Timescale batching rationale, and `DRY_RUN=true`.
+  - [x] Implement in `packages/api/lib/tasks/db90.rake` under `namespace :db90`, task name `backfill_project_attribution`, with a `desc` documenting usage, idempotency, Timescale batching rationale, and dry-run via `...[dry_run]` only (no `ENV["DRY_RUN"]`).
 - [x] **Verification** (recommended, not in original AC list)
   - [x] From `packages/api/`: `bundle exec rubocop packages/api/lib/tasks/db90.rake`
   - [x] Optional: lightweight RSpec that loads the task file and invokes the task body in dry-run with factories — only if a fast pattern exists; otherwise manual staging verification with SQL `COUNT(*)` before/after.
@@ -76,7 +76,7 @@ All events ingested **before** `project_id` is reliably set at ingest time (AIX-
 1. **Scope joins:** `ProjectMembership` → `project` → filter `projects.organization_id == organization.id`. Do not confuse org-level `OrganizationMembership` with project membership; this backfill is **project_membership**-based only.
 2. **Query safety:** Use `update_all(project_id:)` only; do not load full row objects for updates. Do not touch `repository_id` in this task.
 3. **Users with NULL `user_id`:** Skip — no membership key; optionally log org-level count once.
-4. **Dry-run detection:** `dry_run = ActiveModel::Type::Boolean.new.cast(ENV.fetch("DRY_RUN", false))` or equivalent so `"true"` / `"1"` work.
+4. **Dry-run detection:** only the rake task argument `dry_run` (e.g. `rails db90:backfill_project_attribution[dry_run]`). The service receives `dry_run:` from the task; do **not** read `ENV["DRY_RUN"]` — matches sibling `db90:*` tasks and avoids operators assuming `DRY_RUN=true` triggers dry-run while the task still writes.
 5. **Re-run safety:** Always keep `project_id IS NULL` in the update scope so already-attributed rows are never reassigned.
 
 ### File structure
@@ -120,7 +120,7 @@ Composer (Cursor agent) — dev-story execution.
 ### Completion Notes List
 
 - Added `Backfills::ProjectAttributionBackfill` (org iteration, unambiguous pairs via `ProjectMembership` + `projects.organization_id`, batched `pluck(:id)` + `update_all` in chunks of 1000, ambiguous-user unattributed counts, NULL-`user_id` event logging).
-- Wired `db90:backfill_project_attribution` in `db90.rake` with `ActiveModel::Type::Boolean` for `DRY_RUN`.
+- Wired `db90:backfill_project_attribution` in `db90.rake` with optional argument `[dry_run]` (no `ENV["DRY_RUN"]`).
 - RSpec: `spec/services/backfills/project_attribution_backfill_spec.rb` (single-project, multi-project, no membership, dry-run, batching >1000, NULL user_id log).
 - RuboCop clean on touched files; full RSpec suite 2191 examples, 0 failures (Docker).
 

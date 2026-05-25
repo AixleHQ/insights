@@ -55,6 +55,39 @@ RSpec.describe Backfills::ProjectAttributionBackfill do
 
         expect(ToolEvent.where(organization: organization, user: user, project_id: project.id).count).to eq(1_005)
       end
+
+      it "when BACKFILL_FROM is set, only updates events with occurred_at on or after that time" do
+        floor = 1.day.ago.beginning_of_day
+        old_ev = create(
+          :tool_event,
+          user: user,
+          organization: organization,
+          project: nil,
+          occurred_at: 2.days.ago
+        )
+        new_ev = create(
+          :tool_event,
+          user: user,
+          organization: organization,
+          project: nil,
+          occurred_at: Time.current
+        )
+
+        original = ENV["BACKFILL_FROM"]
+        ENV["BACKFILL_FROM"] = floor.iso8601
+        begin
+          described_class.run(dry_run: false)
+        ensure
+          if original.nil?
+            ENV.delete("BACKFILL_FROM")
+          else
+            ENV["BACKFILL_FROM"] = original
+          end
+        end
+
+        expect(old_ev.reload.project_id).to be_nil
+        expect(new_ev.reload.project_id).to eq(project.id)
+      end
     end
 
     context "when the user belongs to more than one project in the org" do
