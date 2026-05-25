@@ -215,6 +215,44 @@ describe("runOnce", () => {
     expect(code).toBe(0);
     expect(messages).toContain("Sync complete: sent=2 failed=0 skipped=3");
   });
+
+  it("forwards the resolved project_id to syncTelemetryTools (AIX-245)", async () => {
+    let received: { projectId: string | null } | null = null;
+    const code = await runOnce({
+      loadCredentials: async () => creds,
+      migrateLegacyState: () => undefined,
+      getAppDir: () => "/tmp/db90-mcp-test",
+      pricing: DEFAULT_PRICING,
+      resolveProjectId: async () => ({ projectId: "proj-uuid-once", source: "auto-detect" }),
+      syncTelemetryTools: async (opts) => {
+        received = { projectId: opts.projectId };
+        return { sent: 1, failed: 0, skipped: 0 };
+      },
+      ...silentOutput,
+    });
+
+    expect(code).toBe(0);
+    expect(received).toEqual({ projectId: "proj-uuid-once" });
+  });
+
+  it("proceeds without project_id when resolver returns null (no git remote / 404)", async () => {
+    let received: { projectId: string | null } | null = null;
+    const code = await runOnce({
+      loadCredentials: async () => creds,
+      migrateLegacyState: () => undefined,
+      getAppDir: () => "/tmp/db90-mcp-test",
+      pricing: DEFAULT_PRICING,
+      resolveProjectId: async () => ({ projectId: null, source: "auto-detect-not-found" }),
+      syncTelemetryTools: async (opts) => {
+        received = { projectId: opts.projectId };
+        return { sent: 1, failed: 0, skipped: 0 };
+      },
+      ...silentOutput,
+    });
+
+    expect(code).toBe(0);
+    expect(received).toEqual({ projectId: null });
+  });
 });
 
 describe("runInit", () => {
