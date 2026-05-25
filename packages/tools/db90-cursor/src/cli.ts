@@ -1,9 +1,8 @@
 #!/usr/bin/env node
-import { loadBaseConfig } from "@db90/sdk";
+import { loadBaseConfig, resolveProjectId } from "@db90/sdk";
 import { APP_DIR } from "./state.js";
 import { DEFAULT_PRICING } from "./mapper.js";
 import type { PricingConfig } from "./mapper.js";
-import { resolveProjectId } from "./project-resolver.js";
 import { syncOnce } from "./sync.js";
 
 interface Config {

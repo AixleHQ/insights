@@ -4,7 +4,7 @@ import { mapEvent, mapDailyStats, type Db90Payload, type PricingConfig } from ".
 import { postEvents } from "./client.js";
 
 // Public surface re-exported so MCP consumers only need to import from "@db90/cursor/sync"
-export { resolveProjectId, type ProjectResolution } from "./project-resolver.js";
+export { resolveProjectId, type ProjectResolution } from "@db90/sdk";
 export { DEFAULT_PRICING, type PricingConfig } from "./mapper.js";
 
 export interface SyncResult {

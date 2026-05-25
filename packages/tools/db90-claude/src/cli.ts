@@ -1,7 +1,6 @@
 #!/usr/bin/env node
-import { loadBaseConfig } from "@db90/sdk";
+import { loadBaseConfig, resolveProjectId } from "@db90/sdk";
 import { migrateLegacyState, APP_DIR } from "./state.js";
-import { resolveProjectId } from "./project-resolver.js";
 import { type PricingTable, DEFAULT_PRICING, mergePricing } from "./pricing.js";
 import { syncOnce, type SyncOptions } from "./sync.js";
 
