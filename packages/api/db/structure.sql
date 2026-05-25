@@ -86,7 +86,8 @@ CREATE TYPE public.event_type AS ENUM (
     'other',
     'issue',
     'comment',
-    'sprint'
+    'sprint',
+    'tool_use'
 );
 
 --
@@ -2280,6 +2281,7 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260525100001'),
 ('20260520000001'),
 ('20260514090000'),
 ('20260513161604'),
@@ -2353,4 +2355,3 @@ INSERT INTO "schema_migrations" (version) VALUES
 ('20260125224613'),
 ('20260125224604'),
 ('20260125224539');
-
