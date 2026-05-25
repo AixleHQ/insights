@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { resolveProjectId } from "@db90/sdk";
 import { loadCredentials, type TelemetryToolId, type StoredCredentials, credentialsHaveAnyToken } from "./credentials.js";
 import { defaultKeycloakClientId, defaultKeycloakIssuer, startDeviceAuthorization } from "./auth/keycloak.js";
 import { migrateLegacyState, getAppDir } from "./state.js";
@@ -59,6 +60,34 @@ function syncResultOk(result: Awaited<ReturnType<typeof syncTelemetryTools>>): b
   return !result.locked && result.failed === 0;
 }
 
+// Process-lifetime cache for the resolved project_id. The MCP server runs for
+// hours/days, so we resolve once and reuse — but only when the result is
+// definitive. `source: "none"` covers both "no git remote" (won't change
+// in-process) and "lookup network error" (transient); re-resolving costs
+// milliseconds when there's no remote, so we always retry on `none` rather
+// than poison the cache with a transient failure.
+let cachedProjectId: { value: string | null } | null = null;
+
+async function getProjectIdForSync(creds: StoredCredentials): Promise<string | null> {
+  if (cachedProjectId) return cachedProjectId.value;
+  // Both tools' ingest tokens auth the same org in current product flows; the
+  // lookup endpoint is org-scoped, so either works. If a user ever authenticates
+  // the two tools to different orgs, attribution would silently follow whichever
+  // token wins object iteration order — flag for follow-up if that becomes real.
+  const token = Object.values(creds.accounts).find((t): t is string => typeof t === "string" && t.length > 0);
+  if (!token) return null;
+  const result = await resolveProjectId(undefined, undefined, creds.host, token, false);
+  mcpLog.info(
+    "project_attribution_resolved",
+    { project_id: result.projectId, source: result.source },
+    false
+  );
+  if (result.source !== "none") {
+    cachedProjectId = { value: result.projectId };
+  }
+  return result.projectId;
+}
+
 /** Structured status for `db90_status` — tolerates missing/malformed credentials and state. */
 export async function buildDb90StatusPayload(): Promise<Record<string, unknown>> {
   const snapshot = await buildHealthSnapshot();
@@ -76,7 +105,7 @@ async function executeSync(parsed: { tools?: TelemetryToolId[] }): Promise<unkno
     credentials: creds,
     dryRun: false,
     verbose: false,
-    projectId: null,
+    projectId: await getProjectIdForSync(creds),
     pricing: defaultPricing(),
     tools: parsed.tools,
   });
@@ -207,7 +236,7 @@ export async function startServer(): Promise<void> {
         credentials: creds,
         dryRun: false,
         verbose: false,
-        projectId: null,
+        projectId: await getProjectIdForSync(creds),
         pricing: defaultPricing(),
       });
     } catch (err) {

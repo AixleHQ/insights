@@ -222,4 +222,109 @@ describe("MCP server (in-process)", () => {
     expect(parsed).toMatchObject({ ok: false, error: "missing_credentials" });
     expect(readFileSync(join(home, "mcp.log"), "utf-8")).toContain("credential_validation_failed");
   });
+
+  // Project resolver wiring (AIX-245).
+  //
+  // The cache test below keeps a single server instance alive across multiple
+  // db90_sync_now calls, which is why it does not reuse the `callTool` helper
+  // (which resets modules each call and would defeat the module-level cache).
+  describe("project_id resolver wiring", () => {
+    async function setupServerWithMocks(
+      resolveMock: ReturnType<typeof vi.fn>,
+      syncMock: ReturnType<typeof vi.fn>
+    ) {
+      writeFileSync(
+        join(home, "credentials.json"),
+        JSON.stringify({ token: "db90_test", host: "http://localhost:3000" }),
+        "utf-8"
+      );
+
+      vi.resetModules();
+      vi.doMock("@db90/sdk", async () => {
+        const actual = await vi.importActual<typeof import("@db90/sdk")>("@db90/sdk");
+        return { ...actual, resolveProjectId: resolveMock };
+      });
+      vi.doMock("../sync.js", async () => {
+        const actual = await vi.importActual<typeof import("../sync.js")>("../sync.js");
+        return { ...actual, syncTelemetryTools: syncMock };
+      });
+
+      const { createDb90McpServer } = await import("../server.js");
+      const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+      const { InMemoryTransport } = await import("@modelcontextprotocol/sdk/inMemory.js");
+
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+      const server = createDb90McpServer();
+      const client = new Client({ name: "db90-mcp-test-client", version: "0.0.0" });
+      await server.connect(serverTransport);
+      await client.connect(clientTransport);
+      return { server, client };
+    }
+
+    it("resolves project_id once across multiple db90_sync_now calls (cache hit)", async () => {
+      const resolveMock = vi.fn().mockResolvedValue({
+        projectId: "proj-uuid-cached",
+        source: "auto-detect",
+      });
+      const syncMock = vi.fn().mockResolvedValue({ sent: 0, failed: 0, skipped: 0 });
+
+      const { server, client } = await setupServerWithMocks(resolveMock, syncMock);
+      try {
+        await client.callTool({ name: "db90_sync_now", arguments: {} });
+        await client.callTool({ name: "db90_sync_now", arguments: {} });
+        await client.callTool({ name: "db90_sync_now", arguments: {} });
+
+        expect(resolveMock).toHaveBeenCalledTimes(1);
+        expect(syncMock).toHaveBeenCalledTimes(3);
+        for (const call of syncMock.mock.calls) {
+          expect(call[0].projectId).toBe("proj-uuid-cached");
+        }
+      } finally {
+        await client.close();
+        await server.close();
+      }
+    });
+
+    it("does not cache source:none — retries resolver on next sync", async () => {
+      const resolveMock = vi.fn()
+        .mockResolvedValueOnce({ projectId: null, source: "none" })
+        .mockResolvedValueOnce({ projectId: "proj-uuid-after-retry", source: "auto-detect" });
+      const syncMock = vi.fn().mockResolvedValue({ sent: 0, failed: 0, skipped: 0 });
+
+      const { server, client } = await setupServerWithMocks(resolveMock, syncMock);
+      try {
+        await client.callTool({ name: "db90_sync_now", arguments: {} });
+        await client.callTool({ name: "db90_sync_now", arguments: {} });
+
+        expect(resolveMock).toHaveBeenCalledTimes(2);
+        expect(syncMock.mock.calls[0][0].projectId).toBeNull();
+        expect(syncMock.mock.calls[1][0].projectId).toBe("proj-uuid-after-retry");
+      } finally {
+        await client.close();
+        await server.close();
+      }
+    });
+
+    it("caches source:auto-detect-not-found (definitive miss — no retry)", async () => {
+      const resolveMock = vi.fn().mockResolvedValue({
+        projectId: null,
+        source: "auto-detect-not-found",
+      });
+      const syncMock = vi.fn().mockResolvedValue({ sent: 0, failed: 0, skipped: 0 });
+
+      const { server, client } = await setupServerWithMocks(resolveMock, syncMock);
+      try {
+        await client.callTool({ name: "db90_sync_now", arguments: {} });
+        await client.callTool({ name: "db90_sync_now", arguments: {} });
+
+        expect(resolveMock).toHaveBeenCalledTimes(1);
+        for (const call of syncMock.mock.calls) {
+          expect(call[0].projectId).toBeNull();
+        }
+      } finally {
+        await client.close();
+        await server.close();
+      }
+    });
+  });
 });
