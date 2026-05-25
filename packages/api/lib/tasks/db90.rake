@@ -359,4 +359,53 @@ namespace :db90 do
     puts "[db90:wipe_org_events] Deleted #{deleted} tool event(s)."
     puts "[db90:wipe_org_events] Done."
   end
+
+  desc <<~DESC
+    Backfill project_id on historical timeseries.tool_events where it is safe to infer the
+    project from organization-scoped project membership.
+
+    Rules (conservative):
+      - Only users who belong to exactly ONE project in the organization (via project_memberships)
+        get their NULL project_id events updated for that org.
+      - Users with multiple projects in the org: no UPDATE; their NULL project_id rows stay NULL.
+      - Events with user_id NULL are never updated (no membership key).
+
+    Idempotent: each UPDATE only touches rows with project_id IS NULL, so re-runs skip already
+    attributed events.
+
+    Writes are batched: each iteration selects up to 1000 row ids still having project_id NULL,
+    then issues UPDATE ... WHERE id IN (...) AND project_id IS NULL to reduce lock duration on
+    the Timescale hypertable.
+
+    Timescale / performance: those id plucks use org + user + NULL project_id without a time
+    predicate unless BACKFILL_FROM is set, so PostgreSQL may scan (and decompress) many chunks for
+    users with long history. Monitor hypertable chunk decompression and I/O during the run.
+
+    Optional ENV["BACKFILL_FROM"]: an ISO8601 (or other Time.zone.parse-able) lower bound; when set,
+    only rows with occurred_at >= that instant are counted and updated (narrows chunk scans; opt-in
+    for throughput, not required for correctness). Invalid values are logged and ignored.
+
+    Usage (from packages/api):
+      rails db90:backfill_project_attribution
+      rails db90:backfill_project_attribution[dry_run]  # report only, no writes
+      BACKFILL_FROM=2024-01-01T00:00:00Z rails db90:backfill_project_attribution
+
+    Dry-run is only via the [dry_run] rake argument above; ENV["DRY_RUN"] is not read.
+  DESC
+  task :backfill_project_attribution, [ :dry_run ] => :environment do |_t, args|
+    dry_run = args[:dry_run].to_s.strip.downcase == "dry_run"
+
+    puts "[db90:backfill_project_attribution] #{dry_run ? '[DRY RUN] ' : ''}Starting backfill"
+
+    stats = Backfills::ProjectAttributionBackfill.run(dry_run: dry_run)
+
+    if dry_run
+      puts "[db90:backfill_project_attribution] Summary: organizations_scanned=#{stats[:organizations_scanned]} " \
+           "would_update_events=#{stats[:would_update_events]}"
+    else
+      puts "[db90:backfill_project_attribution] Summary: organizations_scanned=#{stats[:organizations_scanned]} " \
+           "events_updated=#{stats[:events_updated]}"
+    end
+    puts "[db90:backfill_project_attribution] Done."
+  end
 end
