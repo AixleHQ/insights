@@ -51,6 +51,7 @@ module Api
           if @project.organization_project?
             @project.project_memberships.create!(user: current_user, role: "owner")
           end
+          log_project_created!
         end
 
         render_created(@project, ProjectSerializer)
@@ -78,7 +79,10 @@ module Api
       # DELETE /api/v1/projects/:id
       def destroy
         authorize! @project
-        @project.destroy!
+        ApplicationRecord.transaction do
+          log_project_deleted!
+          @project.destroy!
+        end
         render_no_content
       end
 
@@ -368,12 +372,12 @@ module Api
 
         policy.updated_by = current_user
         if policy.update(retention_policy_params)
-          ProjectAuditLog.log(
+          AuditLogRetentionPolicyLogger.log!(
             project: @project,
             actor: current_user,
-            action: "settings.update",
-            resource: policy,
-            tracked_changes: { before: changes_before, after: policy.attributes.slice(*retention_policy_params.keys) },
+            policy: policy,
+            param_keys: retention_policy_params.keys,
+            changes_before: changes_before,
             request: request
           )
           render_resource(policy, ProjectRetentionPolicySerializer)
@@ -389,6 +393,52 @@ module Api
 
       def set_project
         @project = Project.includes(:retention_policy, :project_settings, :issues).find(params[:id])
+      end
+
+      def log_project_created!
+        tracked = { name: @project.name, slug: @project.slug }
+        tracked[:is_personal] = true unless @project.organization_project?
+
+        ProjectAuditLog.log(
+          project: @project,
+          actor: current_user,
+          action: "project.create",
+          resource: @project,
+          tracked_changes: tracked,
+          request: request
+        )
+
+        return unless @project.organization_project?
+
+        OrganizationAuditLog.log(
+          organization: @project.organization,
+          actor: current_user,
+          action: "project.create",
+          resource: @project,
+          tracked_changes: tracked.except(:is_personal),
+          request: request
+        )
+      end
+
+      def log_project_deleted!
+        tracked = {
+          project_id: @project.id,
+          name: @project.name,
+          slug: @project.slug
+        }
+
+        # ProjectAuditLog rows are dependent: :destroy on the project, so user-initiated
+        # deletes are recorded on the organization audit log only (durable after destroy).
+        return unless @project.organization_project?
+
+        OrganizationAuditLog.log(
+          organization: @project.organization,
+          actor: current_user,
+          action: "project.delete",
+          resource: @project,
+          tracked_changes: tracked,
+          request: request
+        )
       end
 
       def project_params

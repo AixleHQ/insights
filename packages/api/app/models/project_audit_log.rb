@@ -2,9 +2,13 @@
 
 class ProjectAuditLog < ApplicationRecord
   ACTIONS = %w[
+    project.create
+    project.delete
     settings.create
     settings.update
     settings.delete
+    retention.update
+    alert.update
     connector.create
     connector.update
     connector.delete

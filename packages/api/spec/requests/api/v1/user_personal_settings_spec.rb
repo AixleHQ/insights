@@ -4,6 +4,8 @@ require 'rails_helper'
 
 RSpec.describe 'Api::V1::UserPersonalSettings', type: :request do
   let(:user) { create(:user) }
+  let(:organization) { create(:organization) }
+  let!(:membership) { create(:organization_membership, user: user, organization: organization, role: 'owner') }
 
   describe 'GET /api/v1/users/me/personal_settings' do
     context 'when no settings row exists' do
@@ -77,6 +79,27 @@ RSpec.describe 'Api::V1::UserPersonalSettings', type: :request do
       expect_success
       expect(json_data[:alertEmail]).to be true
       expect(json_data[:alertSlack]).to be false
+    end
+
+    it 'creates alert.update on the organization when X-Organization-ID is present' do
+      expect {
+        authenticated_patch '/api/v1/users/me/personal_settings',
+                            user: user,
+                            organization: organization,
+                            params: { personal_settings: { cost_threshold_cents: 750 } }
+      }.to change(OrganizationAuditLog, :count).by(1)
+
+      log = OrganizationAuditLog.last
+      expect(log.action).to eq('alert.update')
+      expect(log.tracked_changes['scope']).to eq('user_personal')
+    end
+
+    it 'does not create an organization audit log without org context' do
+      expect {
+        authenticated_patch '/api/v1/users/me/personal_settings',
+                            user: user,
+                            params: { personal_settings: { cost_threshold_cents: 750 } }
+      }.not_to change(OrganizationAuditLog, :count)
     end
 
     it 'returns 400 when personal_settings param is missing' do

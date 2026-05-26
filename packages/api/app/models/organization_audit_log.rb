@@ -2,14 +2,25 @@
 
 class OrganizationAuditLog < ApplicationRecord
   ACTIONS = %w[
+    project.create
+    project.delete
     settings.create
     settings.update
     settings.delete
+    retention.update
+    alert.update
     connector.create
     connector.update
     connector.delete
     connector.test
     connector.sync
+    notification_route.create
+    notification_route.update
+    notification_route.delete
+    tool_account.create
+    tool_account.update
+    tool_account.delete
+    tool_account.regenerate
     member.invited
     member.role_changed
     member.removed

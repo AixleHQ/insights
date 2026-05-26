@@ -2468,6 +2468,74 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /api/v1/organizations/{organization_id}/audit_logs/unified/export:
+    get:
+      summary: Export unified audit log as CSV
+      description: >
+        Exports filtered audit log entries as CSV (up to 50,000 rows per source table).
+        Returns 422 if the result set exceeds that limit — apply date or scope filters to narrow results.
+        Note: tracked_changes and metadata columns are not included in the CSV export.
+        Requires org owner or global admin role.
+      tags:
+        - Organization Audit Logs
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: scope
+          in: query
+          description: Limit results to one source table. Omit to include all three.
+          schema:
+            type: string
+            enum: [organization, project, admin]
+        - name: severity
+          in: query
+          schema:
+            type: string
+            enum: [info, warning, critical]
+        - name: outcome
+          in: query
+          schema:
+            type: string
+            enum: [success, failure]
+        - name: from_date
+          in: query
+          description: Filter entries on or after this ISO 8601 datetime (alias from accepted)
+          schema:
+            type: string
+            format: date-time
+        - name: to_date
+          in: query
+          description: Filter entries on or before this ISO 8601 datetime (alias to accepted)
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: CSV file download
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: Export row limit exceeded (50,000 rows per source table) — apply date or scope filters to narrow results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Export exceeds row limit. Apply date or scope filters to narrow results."
+
   /api/v1/organizations/{organization_id}/retention_logs:
     get:
       summary: List retention purge logs for an organization

@@ -393,4 +393,146 @@ RSpec.describe "Api::V1::UnifiedAuditLogs", type: :request do
       end
     end
   end
+
+  describe "GET /api/v1/organizations/:organization_id/audit_logs/unified/export" do
+    let!(:org_log) do
+      create(:organization_audit_log, organization: organization, actor: owner,
+                                      action: "settings.update", severity: "info", outcome: "success")
+    end
+    let!(:warning_log) do
+      create(:organization_audit_log, organization: organization, actor: owner,
+                                      action: "connector.delete", severity: "warning", outcome: "failure")
+    end
+    let!(:project_log) do
+      create(:project_audit_log, project: project, actor: owner, action: "connector.create")
+    end
+
+    def get_export(user:, **params)
+      authenticated_get "/api/v1/organizations/#{organization.id}/audit_logs/unified/export",
+                        user: user,
+                        organization: organization,
+                        params: params
+    end
+
+    context "when authenticated as owner" do
+      it "returns 200 with text/csv content type" do
+        get_export(user: owner)
+
+        expect(response).to have_http_status(:ok)
+        expect(response.content_type).to include("text/csv")
+      end
+
+      it "includes a Content-Disposition attachment header" do
+        get_export(user: owner)
+
+        expect(response.headers["Content-Disposition"]).to include("attachment")
+        expect(response.headers["Content-Disposition"]).to include("audit_log_")
+        expect(response.headers["Content-Disposition"]).to include(".csv")
+      end
+
+      it "includes the expected CSV header row" do
+        get_export(user: owner)
+
+        csv = CSV.parse(response.body, headers: true)
+        expect(csv.headers).to eq(%w[timestamp scope actor_email actor_name action
+                                     resource_type resource_id severity outcome ip_address user_agent])
+      end
+
+      it "includes all audit log entries in the CSV body" do
+        get_export(user: owner)
+
+        csv = CSV.parse(response.body, headers: true)
+        actions = csv.map { |row| row["action"] }
+        expect(actions).to include("settings.update", "connector.delete", "connector.create")
+      end
+
+      it "filters by severity when severity param is provided" do
+        get_export(user: owner, severity: "warning")
+
+        csv = CSV.parse(response.body, headers: true)
+        expect(csv.length).to eq(1)
+        expect(csv.first["severity"]).to eq("warning")
+      end
+
+      it "filters by outcome when outcome param is provided" do
+        get_export(user: owner, outcome: "failure")
+
+        csv = CSV.parse(response.body, headers: true)
+        expect(csv.length).to eq(1)
+        expect(csv.first["outcome"]).to eq("failure")
+      end
+
+      it "includes actor email in each row" do
+        get_export(user: owner, scope: "organization")
+
+        csv = CSV.parse(response.body, headers: true)
+        expect(csv.first["actor_email"]).to eq(owner.email)
+      end
+
+      it "returns 400 for an invalid severity value" do
+        get_export(user: owner, severity: "extreme")
+
+        expect(response).to have_http_status(:bad_request)
+      end
+
+      it "returns 400 for an invalid scope value" do
+        get_export(user: owner, scope: "global")
+
+        expect(response).to have_http_status(:bad_request)
+      end
+    end
+
+    context "when authenticated as global admin" do
+      it "returns 200 CSV" do
+        get_export(user: global_admin)
+
+        expect(response).to have_http_status(:ok)
+        expect(response.content_type).to include("text/csv")
+      end
+    end
+
+    context "when authenticated as member" do
+      it "returns 403 forbidden" do
+        get_export(user: member)
+
+        expect(response).to have_http_status(:forbidden)
+      end
+    end
+
+    context "without authentication" do
+      it "returns 401 unauthorized" do
+        get "/api/v1/organizations/#{organization.id}/audit_logs/unified/export"
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    context "when PER_TABLE_CAP would normally truncate results" do
+      before do
+        stub_const("UnifiedAuditLogQueryBuilder::PER_TABLE_CAP", 1)
+        create_list(:organization_audit_log, 3, organization: organization, actor: owner)
+      end
+
+      it "exports all rows up to EXPORT_PER_TABLE_LIMIT without being bounded by PER_TABLE_CAP" do
+        get_export(user: owner, scope: "organization")
+
+        csv = CSV.parse(response.body, headers: true)
+        expect(csv.length).to be > 1
+      end
+    end
+
+    context "when EXPORT_PER_TABLE_LIMIT is exceeded" do
+      before do
+        stub_const("Api::V1::UnifiedAuditLogsController::EXPORT_PER_TABLE_LIMIT", 1)
+        create_list(:organization_audit_log, 3, organization: organization, actor: owner)
+      end
+
+      it "returns 422 unprocessable_entity with a helpful error message" do
+        get_export(user: owner, scope: "organization")
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(json_response[:error]).to include("Export exceeds row limit")
+      end
+    end
+  end
 end

@@ -1,9 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { AUDIT_ACTION_LABELS, AUDIT_ACTION_OPTIONS } from "./audit-actions";
+import {
+  AUDIT_ACTION_LABELS,
+  AUDIT_ACTION_OPTIONS,
+  SCOPE_AUDIT_ACTION_KEYS,
+  SCOPE_AUDIT_ACTION_OPTIONS,
+} from "./audit-actions";
 
 describe("AUDIT_ACTION_LABELS", () => {
   it("maps every expected action to a human-readable label", () => {
     const expectedActions = [
+      "project.create",
+      "project.delete",
       "settings.create",
       "settings.update",
       "settings.delete",
@@ -30,6 +37,19 @@ describe("AUDIT_ACTION_LABELS", () => {
     for (const [key, label] of Object.entries(AUDIT_ACTION_LABELS)) {
       expect(label.trim(), `Label for "${key}" should not be empty`).not.toBe("");
     }
+  });
+});
+
+describe("SCOPE_AUDIT_ACTION_OPTIONS", () => {
+  it('starts with "All Actions" option', () => {
+    expect(SCOPE_AUDIT_ACTION_OPTIONS[0]).toEqual({ value: "all", label: "All Actions" });
+  });
+
+  it("includes only organization/project scope actions", () => {
+    expect(SCOPE_AUDIT_ACTION_OPTIONS).toHaveLength(SCOPE_AUDIT_ACTION_KEYS.length + 1);
+    const values = SCOPE_AUDIT_ACTION_OPTIONS.slice(1).map((o) => o.value);
+    expect(values).not.toContain("destroy");
+    expect(values).toContain("settings.update");
   });
 });
 

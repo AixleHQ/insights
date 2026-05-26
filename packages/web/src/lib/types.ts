@@ -334,6 +334,21 @@ export interface AuditLog {
 export type OrganizationAuditLog = AuditLog;
 export type ProjectAuditLog = AuditLog;
 
+export interface UnifiedAuditLog extends AuditLog {
+  scope: "organization" | "project" | "admin";
+  severity: "info" | "warning" | "critical" | null;
+  outcome: "success" | "failure" | null;
+  userAgent?: string | null;
+}
+
+export interface UnifiedPaginatedMeta {
+  current_page: number;
+  total_pages: number;
+  total_count: number;
+  per_page: number;
+  truncated: boolean;
+}
+
 // Pagination types
 export interface PaginatedResponse<T> {
   data: T[];

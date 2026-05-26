@@ -98,6 +98,18 @@ module Api
         render_bad_request("Invalid #{param_name} format — expected ISO 8601")
         nil
       end
+
+      # Date-only params (YYYY-MM-DD from HTML date inputs) need inclusive day bounds.
+      def parse_audit_log_date_param(value, param_name, boundary: :start)
+        parsed = parse_date_param(value, param_name) or return nil
+        return parsed unless date_only_param?(value)
+
+        boundary == :end ? parsed.end_of_day : parsed.beginning_of_day
+      end
+
+      def date_only_param?(value)
+        value.to_s.match?(/\A\d{4}-\d{2}-\d{2}\z/)
+      end
     end
   end
 end

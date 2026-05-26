@@ -6,9 +6,10 @@ class UnifiedAuditLogQueryBuilder
 
   attr_reader :truncated
 
-  def initialize(organization:, params:)
+  def initialize(organization:, params:, cap: PER_TABLE_CAP)
     @organization = organization
     @params = params
+    @cap = cap  # nil = no limit (used by export action)
     @truncated = false
   end
 
@@ -16,20 +17,20 @@ class UnifiedAuditLogQueryBuilder
     results = []
 
     if include_scope?("organization")
-      batch = build_org_scope.limit(PER_TABLE_CAP).to_a
-      @truncated ||= batch.length == PER_TABLE_CAP
+      batch = @cap ? build_org_scope.limit(@cap).to_a : build_org_scope.to_a
+      @truncated ||= @cap && batch.length == @cap
       results.concat(batch)
     end
 
     if include_scope?("project")
-      batch = build_project_scope.limit(PER_TABLE_CAP).to_a
-      @truncated ||= batch.length == PER_TABLE_CAP
+      batch = @cap ? build_project_scope.limit(@cap).to_a : build_project_scope.to_a
+      @truncated ||= @cap && batch.length == @cap
       results.concat(batch)
     end
 
     if include_scope?("admin")
-      batch = build_admin_scope.limit(PER_TABLE_CAP).to_a
-      @truncated ||= batch.length == PER_TABLE_CAP
+      batch = @cap ? build_admin_scope.limit(@cap).to_a : build_admin_scope.to_a
+      @truncated ||= @cap && batch.length == @cap
       results.concat(batch)
     end
 

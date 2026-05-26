@@ -84,12 +84,12 @@ module Api
         changes_before = policy.attributes.slice(*retention_policy_params.keys)
 
         if policy.update(retention_policy_params)
-          OrganizationAuditLog.log(
+          AuditLogRetentionPolicyLogger.log!(
             organization: @organization,
             actor: current_user,
-            action: "settings.update",
-            resource: policy,
-            tracked_changes: { before: changes_before, after: policy.attributes.slice(*retention_policy_params.keys) },
+            policy: policy,
+            param_keys: retention_policy_params.keys,
+            changes_before: changes_before,
             request: request
           )
           render_resource(policy, OrganizationRetentionPolicySerializer)

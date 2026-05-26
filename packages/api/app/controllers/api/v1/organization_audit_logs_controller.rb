@@ -20,12 +20,12 @@ module Api
         logs = logs.by_action(params[:log_action]) if params[:log_action].present?
         logs = logs.by_resource_type(params[:resource_type]) if params[:resource_type].present?
         if params[:from_date].present?
-          from_date = parse_date_param(params[:from_date], :from_date) or return
+          from_date = parse_audit_log_date_param(params[:from_date], :from_date, boundary: :start) or return
           logs = logs.from_date(from_date)
         end
 
         if params[:to_date].present?
-          to_date = parse_date_param(params[:to_date], :to_date) or return
+          to_date = parse_audit_log_date_param(params[:to_date], :to_date, boundary: :end) or return
           logs = logs.to_date(to_date)
         end
 

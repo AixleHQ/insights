@@ -201,6 +201,26 @@ RSpec.describe 'Api::V1::Organizations', type: :request do
       expect(organization.retention_policy.reload.cost_threshold_cents).to eq(500)
     end
 
+    it 'creates alert.update audit log when alert thresholds change' do
+      expect {
+        authenticated_patch "/api/v1/organizations/#{organization.id}/retention_policy",
+                            user: user,
+                            params: { cost_threshold_cents: 500, alert_enabled: true }
+      }.to change(OrganizationAuditLog, :count).by(1)
+
+      expect(OrganizationAuditLog.last.action).to eq('alert.update')
+    end
+
+    it 'creates retention.update audit log when retention TTLs change' do
+      expect {
+        authenticated_patch "/api/v1/organizations/#{organization.id}/retention_policy",
+                            user: user,
+                            params: { tool_events_retention: '180_days' }
+      }.to change(OrganizationAuditLog, :count).by(1)
+
+      expect(OrganizationAuditLog.last.action).to eq('retention.update')
+    end
+
     it 'allows clearing alert thresholds to nil' do
       organization.retention_policy.update!(cost_threshold_cents: 500)
 

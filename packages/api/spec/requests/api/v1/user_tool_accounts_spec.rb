@@ -78,6 +78,19 @@ RSpec.describe 'Api::V1::UserToolAccounts', type: :request do
       expect(json_data[:toolName]).to eq('cursor')
     end
 
+    it 'creates a tool_account.create audit log without secrets' do
+      expect {
+        authenticated_post "/api/v1/organizations/#{organization.id}/tool_accounts",
+                           user: user,
+                           organization: organization,
+                           params: { tool_name: 'windsurf', access_token: 'secret' }
+      }.to change(OrganizationAuditLog, :count).by(1)
+
+      log = OrganizationAuditLog.last
+      expect(log.action).to eq('tool_account.create')
+      expect(log.tracked_changes.to_s).not_to include('secret')
+    end
+
     it 'prevents duplicate tool accounts' do
       authenticated_post "/api/v1/organizations/#{organization.id}/tool_accounts",
                          user: user,
@@ -159,6 +172,17 @@ RSpec.describe 'Api::V1::UserToolAccounts', type: :request do
       expect(tool_account.reload.is_active).to be false
     end
 
+    it 'creates a tool_account.update audit log' do
+      expect {
+        authenticated_patch "/api/v1/organizations/#{organization.id}/tool_accounts/#{tool_account.id}",
+                            user: user,
+                            organization: organization,
+                            params: { is_active: false }
+      }.to change(OrganizationAuditLog, :count).by(1)
+
+      expect(OrganizationAuditLog.last.action).to eq('tool_account.update')
+    end
+
     it 'does not allow another user to update the account' do
       authenticated_patch "/api/v1/organizations/#{organization.id}/tool_accounts/#{tool_account.id}",
                           user: other_user,
@@ -179,6 +203,16 @@ RSpec.describe 'Api::V1::UserToolAccounts', type: :request do
       expect(UserToolAccount.find_by(id: tool_account.id)).to be_nil
     end
 
+    it 'creates a tool_account.delete audit log' do
+      expect {
+        authenticated_delete "/api/v1/organizations/#{organization.id}/tool_accounts/#{tool_account.id}",
+                             user: user,
+                             organization: organization
+      }.to change(OrganizationAuditLog, :count).by(1)
+
+      expect(OrganizationAuditLog.last.action).to eq('tool_account.delete')
+    end
+
     it 'does not allow another user to delete the account' do
       authenticated_delete "/api/v1/organizations/#{organization.id}/tool_accounts/#{tool_account.id}",
                            user: other_user,
@@ -197,6 +231,18 @@ RSpec.describe 'Api::V1::UserToolAccounts', type: :request do
       expect_success
       expect(json_data[:ingestToken]).to be_present
       expect(json_data[:ingestToken]).to start_with('db90_')
+    end
+
+    it 'creates a tool_account.regenerate audit log without the token value' do
+      expect {
+        authenticated_post "/api/v1/organizations/#{organization.id}/tool_accounts/#{tool_account.id}/regenerate_token",
+                           user: user,
+                           organization: organization
+      }.to change(OrganizationAuditLog, :count).by(1)
+
+      log = OrganizationAuditLog.last
+      expect(log.action).to eq('tool_account.regenerate')
+      expect(log.tracked_changes.to_s).not_to include('db90_')
     end
 
     it 'issues a different token each time' do

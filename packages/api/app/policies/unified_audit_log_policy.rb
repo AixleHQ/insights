@@ -5,4 +5,8 @@ class UnifiedAuditLogPolicy < ApplicationPolicy
   def index?
     org_owner?(record) || global_admin?
   end
+
+  def export?
+    index?
+  end
 end

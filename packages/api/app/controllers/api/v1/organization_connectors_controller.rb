@@ -273,6 +273,7 @@ module Api
 
         connector = current_organization.organization_connectors
                                         .find_or_initialize_by(connector_type: connector_type)
+        creating = connector.new_record?
         connector.assign_attributes(
           access_token: token_data[:access_token],
           refresh_token: token_data[:refresh_token],
@@ -285,6 +286,14 @@ module Api
         )
 
         if connector.save
+          OrganizationAuditLog.log(
+            organization: current_organization,
+            actor: current_user,
+            action: creating ? "connector.create" : "connector.update",
+            resource: connector,
+            tracked_changes: { connector_type: connector.connector_type, via: "oauth_callback" },
+            request: request
+          )
           render_resource(connector, OrganizationConnectorSerializer)
         else
           render json: {

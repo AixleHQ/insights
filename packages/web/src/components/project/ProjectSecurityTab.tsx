@@ -7,7 +7,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useProjectAuditLogs, type AuditLogFilters } from "@/hooks/useApi";
-import { AUDIT_ACTION_LABELS, AUDIT_ACTION_OPTIONS } from "@/lib/audit-actions";
+import { AUDIT_ACTION_LABELS, SCOPE_AUDIT_ACTION_OPTIONS } from "@/lib/audit-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,17 +37,18 @@ import {
 
 export function ProjectSecurityTab({ projectId }: { projectId: string }) {
   const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState<AuditLogFilters>({});
   const [actionFilter, setActionFilter] = useState("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [appliedFromDate, setAppliedFromDate] = useState("");
+  const [appliedToDate, setAppliedToDate] = useState("");
 
   const activeFilters: AuditLogFilters = {
     page,
     per_page: 20,
-    ...(filters.log_action ? { log_action: filters.log_action } : {}),
-    ...(filters.from_date ? { from_date: filters.from_date } : {}),
-    ...(filters.to_date ? { to_date: filters.to_date } : {}),
+    ...(actionFilter !== "all" ? { log_action: actionFilter } : {}),
+    ...(appliedFromDate ? { from_date: appliedFromDate } : {}),
+    ...(appliedToDate ? { to_date: appliedToDate } : {}),
   };
 
   const { data, isLoading } = useProjectAuditLogs(projectId, activeFilters);
@@ -55,24 +56,28 @@ export function ProjectSecurityTab({ projectId }: { projectId: string }) {
   const logs = data?.data ?? [];
   const meta = data?.meta;
 
-  const applyFilters = () => {
+  const handleActionChange = (value: string) => {
+    setActionFilter(value);
     setPage(1);
-    setFilters({
-      log_action: actionFilter !== "all" ? actionFilter : undefined,
-      from_date: fromDate || undefined,
-      to_date: toDate || undefined,
-    });
+  };
+
+  const applyDateFilters = () => {
+    setAppliedFromDate(fromDate);
+    setAppliedToDate(toDate);
+    setPage(1);
   };
 
   const clearFilters = () => {
     setActionFilter("all");
     setFromDate("");
     setToDate("");
+    setAppliedFromDate("");
+    setAppliedToDate("");
     setPage(1);
-    setFilters({});
   };
 
-  const hasActiveFilters = !!(filters.log_action || filters.from_date || filters.to_date);
+  const hasActiveFilters =
+    actionFilter !== "all" || !!appliedFromDate || !!appliedToDate;
 
   return (
     <div className="space-y-6">
@@ -90,12 +95,12 @@ export function ProjectSecurityTab({ projectId }: { projectId: string }) {
         <CardContent>
           <div className="flex flex-wrap gap-3">
             <div className="w-48">
-              <Select value={actionFilter} onValueChange={setActionFilter}>
+              <Select value={actionFilter} onValueChange={handleActionChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="Filter by action" />
                 </SelectTrigger>
                 <SelectContent>
-                  {AUDIT_ACTION_OPTIONS.map((opt) => (
+                  {SCOPE_AUDIT_ACTION_OPTIONS.map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>
                       {opt.label}
                     </SelectItem>
@@ -123,9 +128,9 @@ export function ProjectSecurityTab({ projectId }: { projectId: string }) {
                 onChange={(e) => setToDate(e.target.value)}
               />
             </div>
-            <Button size="sm" onClick={applyFilters}>
+            <Button size="sm" onClick={applyDateFilters}>
               <Search className="mr-1 size-3" />
-              Apply
+              Apply dates
             </Button>
             {hasActiveFilters && (
               <Button size="sm" variant="ghost" onClick={clearFilters}>

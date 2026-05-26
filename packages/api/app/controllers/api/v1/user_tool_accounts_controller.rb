@@ -33,6 +33,7 @@ module Api
         authorize! @membership, to: :create?, with: UserToolAccountPolicy
 
         if @tool_account.save
+          log_tool_account!(:create, @tool_account)
           data = UserToolAccountSerializer.new(@tool_account).serialize
           data[:ingestToken] = @tool_account.plaintext_token if @tool_account.plaintext_token
           render json: { data: data }, status: :created
@@ -48,7 +49,9 @@ module Api
       def update
         authorize! @tool_account
 
+        changes_before = tool_account_audit_snapshot(@tool_account)
         if @tool_account.update(tool_account_update_params)
+          log_tool_account!(:update, @tool_account, changes_before: changes_before)
           render_resource(@tool_account, UserToolAccountSerializer)
         else
           render json: {
@@ -61,7 +64,9 @@ module Api
       # DELETE /api/v1/organizations/:organization_id/tool_accounts/:id
       def destroy
         authorize! @tool_account
+        snapshot = tool_account_audit_snapshot(@tool_account)
         @tool_account.destroy!
+        log_tool_account!(:delete, @tool_account, snapshot: snapshot)
         render_no_content
       end
 
@@ -69,6 +74,7 @@ module Api
       def regenerate_token
         authorize! @tool_account, to: :update?
         @tool_account.rotate_ingest_token!
+        log_tool_account!(:regenerate, @tool_account)
         data = UserToolAccountSerializer.new(@tool_account).serialize
         render json: { data: data.merge(ingestToken: @tool_account.plaintext_token) }, status: :ok
       end
@@ -91,6 +97,37 @@ module Api
       def tool_account_update_params
         params.permit(:access_token, :refresh_token, :token_expires_at,
                       :external_user_id, :external_username, :is_active)
+      end
+
+      def tool_account_audit_snapshot(account)
+        account.slice(:tool_name, :is_active, :external_user_id, :external_username)
+      end
+
+      def log_tool_account!(verb, account, changes_before: nil, snapshot: nil)
+        action = verb == :regenerate ? "tool_account.regenerate" : "tool_account.#{verb}"
+        tracked_changes =
+          case verb
+          when :create
+            { after: tool_account_audit_snapshot(account) }
+          when :update
+            {
+              before: changes_before,
+              after: tool_account_audit_snapshot(account)
+            }
+          when :delete
+            { before: snapshot }
+          when :regenerate
+            { tool_name: account.tool_name }
+          end
+
+        OrganizationAuditLog.log(
+          organization: current_organization,
+          actor: current_user,
+          action: action,
+          resource: account,
+          tracked_changes: tracked_changes,
+          request: request
+        )
       end
     end
   end

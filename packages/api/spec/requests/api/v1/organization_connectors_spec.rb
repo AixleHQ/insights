@@ -588,6 +588,23 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
       expect(json_data[:externalAccountName]).to eq('octocat')
     end
 
+    it 'creates a connector.create audit log on OAuth callback' do
+      connector.destroy!
+
+      expect {
+        authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
+                           user: admin,
+                           organization: organization,
+                           params: { connector_type: 'github', code: 'oauth_code_abc' }
+      }.to change(OrganizationAuditLog, :count).by(1)
+
+      log = OrganizationAuditLog.order(:created_at).last
+      expect(log.action).to eq('connector.create')
+      expect(log.organization).to eq(organization)
+      expect(log.actor).to eq(admin)
+      expect(log.tracked_changes).to include('connector_type' => 'github', 'via' => 'oauth_callback')
+    end
+
     it 'updates an existing connector when one already exists' do
       expect {
         authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
@@ -598,6 +615,19 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
 
       expect_success
       expect(connector.reload.status).to eq('connected')
+    end
+
+    it 'creates a connector.update audit log when reconnecting via OAuth callback' do
+      expect {
+        authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
+                           user: admin,
+                           organization: organization,
+                           params: { connector_type: 'github', code: 'oauth_code_abc' }
+      }.to change(OrganizationAuditLog, :count).by(1)
+
+      log = OrganizationAuditLog.order(:created_at).last
+      expect(log.action).to eq('connector.update')
+      expect(log.tracked_changes).to include('connector_type' => 'github', 'via' => 'oauth_callback')
     end
 
     it 'returns 403 for org members' do

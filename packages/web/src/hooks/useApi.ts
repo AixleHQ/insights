@@ -21,6 +21,8 @@ import type {
   EventAuditEntry,
   OrganizationAuditLog,
   ProjectAuditLog,
+  UnifiedAuditLog,
+  UnifiedPaginatedMeta,
   OverviewStats,
   DailyStats,
   HourlyStats,
@@ -152,6 +154,10 @@ export const queryKeys = {
   projectAuditLogs: {
     all: (projectId: string, params?: Record<string, unknown>) =>
       ["projects", projectId, "audit_logs", params] as const,
+  },
+  unifiedAuditLogs: {
+    all: (orgId: string, params?: Record<string, unknown>) =>
+      ["organizations", orgId, "audit_logs", "unified", params] as const,
   },
   webhookDeliveries: {
     all: (orgId: string) => ["admin", "webhook_deliveries", orgId] as const,
@@ -1897,6 +1903,17 @@ export interface AuditLogFilters {
   to_date?: string;
 }
 
+export interface UnifiedAuditLogFilters {
+  page?: number;
+  per_page?: number;
+  scope?: "organization" | "project" | "admin";
+  severity?: "info" | "warning" | "critical";
+  outcome?: "success" | "failure";
+  from_date?: string;
+  to_date?: string;
+  actor_id?: string;
+}
+
 export function useOrganizationAuditLogs(orgId: string, filters: AuditLogFilters = {}) {
   return useQuery({
     queryKey: queryKeys.auditLogs.all(orgId, filters as Record<string, unknown>),
@@ -1937,6 +1954,54 @@ export function useProjectAuditLogs(projectId: string, filters: AuditLogFilters 
     },
     enabled: !!projectId,
   });
+}
+
+export function useUnifiedAuditLogs(orgId: string, filters: UnifiedAuditLogFilters = {}) {
+  return useQuery({
+    queryKey: queryKeys.unifiedAuditLogs.all(orgId, filters as Record<string, unknown>),
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (filters.page) params.set("page", String(filters.page));
+      if (filters.per_page) params.set("per_page", String(filters.per_page));
+      if (filters.scope) params.set("scope", filters.scope);
+      if (filters.severity) params.set("severity", filters.severity);
+      if (filters.outcome) params.set("outcome", filters.outcome);
+      if (filters.from_date) params.set("from_date", filters.from_date);
+      if (filters.to_date) params.set("to_date", filters.to_date);
+      if (filters.actor_id) params.set("actor_id", filters.actor_id);
+      const query = params.toString();
+      return api.get<{ data: UnifiedAuditLog[]; meta: UnifiedPaginatedMeta }>(
+        `/organizations/${orgId}/audit_logs/unified${query ? `?${query}` : ""}`
+      );
+    },
+    enabled: !!orgId,
+  });
+}
+
+export function useExportUnifiedAuditLogs(orgId: string) {
+  const [isExporting, setIsExporting] = useState(false);
+
+  const exportLogs = useCallback(
+    async (filters: Omit<UnifiedAuditLogFilters, "page" | "per_page">) => {
+      if (!orgId) return;
+      setIsExporting(true);
+      try {
+        const searchParams = new URLSearchParams();
+        Object.entries(filters).forEach(([k, v]) => {
+          if (v !== undefined && v !== null && v !== "") searchParams.append(k, String(v));
+        });
+        const query = searchParams.toString();
+        const endpoint = `/organizations/${orgId}/audit_logs/unified/export${query ? `?${query}` : ""}`;
+        const filename = `audit_log_${new Date().toISOString().slice(0, 10)}.csv`;
+        return await downloadBlob(endpoint, filename, "text/csv", orgId);
+      } finally {
+        setIsExporting(false);
+      }
+    },
+    [orgId]
+  );
+
+  return { exportLogs, isExporting };
 }
 
 // ============================================================================

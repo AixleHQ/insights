@@ -208,6 +208,22 @@ RSpec.describe "Api::V1::OrganizationAuditLogs", type: :request do
         expect(ids).not_to include(future_log.id)
       end
 
+      it "includes same-day entries for date-only to_date (HTML date input)" do
+        today = Time.zone.parse("2026-05-26 15:30:00")
+        today_log = create(:organization_audit_log, organization: organization, actor: admin,
+                                                    action: "connector.sync", created_at: today)
+
+        travel_to Time.zone.parse("2026-05-26 12:00:00") do
+          authenticated_get "/api/v1/organizations/#{organization.id}/audit_logs",
+                            user: owner,
+                            organization: organization,
+                            params: { to_date: "2026-05-26" }
+
+          expect_success
+          expect(json_data.map { |l| l[:id] }).to include(today_log.id)
+        end
+      end
+
       it "filters by resource_type" do
         authenticated_get "/api/v1/organizations/#{organization.id}/audit_logs",
                           user: owner,

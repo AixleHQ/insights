@@ -118,6 +118,19 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       expect(json_data[:isPersonal]).to be true
       expect(json_data[:ownerId]).to eq(user.id)
     end
+
+    it 'creates a project.create audit log' do
+      expect {
+        authenticated_post '/api/v1/projects', user: user, params: { name: 'My Project' }
+      }.to change(ProjectAuditLog, :count).by(1)
+
+      expect(OrganizationAuditLog.count).to eq(0)
+
+      log = ProjectAuditLog.last
+      expect(log.action).to eq('project.create')
+      expect(log.actor).to eq(user)
+      expect(log.tracked_changes).to include('name' => 'My Project', 'is_personal' => true)
+    end
   end
 
   describe 'POST /api/v1/organizations/:organization_id/projects' do
@@ -131,6 +144,29 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       expect(json_data[:name]).to eq('Org Project')
       expect(json_data[:isPersonal]).to be false
       expect(json_data[:organizationId]).to eq(organization.id)
+    end
+
+    it 'creates project.create audit logs on the project and organization' do
+      expect {
+        authenticated_post "/api/v1/organizations/#{organization.id}/projects",
+                           user: user,
+                           organization: organization,
+                           params: { name: 'Org Project' }
+      }.to change(ProjectAuditLog, :count).by(1)
+         .and change(OrganizationAuditLog, :count).by(1)
+
+      expect_created
+      project = Project.find(json_data[:id])
+      project_log = ProjectAuditLog.find_by!(project: project, action: 'project.create')
+      org_log = OrganizationAuditLog.find_by!(organization: organization, action: 'project.create')
+
+      expect(project_log.actor).to eq(user)
+      expect(project_log.tracked_changes).to include('name' => 'Org Project')
+      expect(org_log.actor).to eq(user)
+      expect(org_log.resource_type).to eq('Project')
+      expect(org_log.resource_id).to eq(project.id)
+      expect(org_log.tracked_changes).to include('name' => 'Org Project')
+      expect(org_log.tracked_changes).not_to have_key('is_personal')
     end
   end
 
@@ -159,6 +195,56 @@ RSpec.describe 'Api::V1::Projects', type: :request do
 
       expect_no_content
       expect(Project.find_by(id: project.id)).to be_nil
+    end
+
+    it 'does not create an organization audit log for personal projects' do
+      expect {
+        authenticated_delete "/api/v1/projects/#{project.id}", user: user
+      }.not_to change(OrganizationAuditLog, :count)
+    end
+  end
+
+  describe 'DELETE /api/v1/projects/:id (organization project)' do
+    let!(:org_project) { create(:project, organization: organization, owner: nil) }
+
+    it 'creates a project.delete organization audit log before destroy' do
+      project_id = org_project.id
+
+      expect {
+        authenticated_delete "/api/v1/projects/#{org_project.id}",
+                           user: user,
+                           organization: organization
+      }.to change(OrganizationAuditLog, :count).by(1)
+
+      expect_no_content
+      expect(Project.find_by(id: project_id)).to be_nil
+
+      log = OrganizationAuditLog.order(:created_at).last
+      expect(log.action).to eq('project.delete')
+      expect(log.organization).to eq(organization)
+      expect(log.actor).to eq(user)
+      expect(log.resource_type).to eq('Project')
+      expect(log.resource_id).to eq(project_id)
+      expect(log.tracked_changes).to include(
+        'project_id' => project_id,
+        'name' => org_project.name,
+        'slug' => org_project.slug
+      )
+    end
+
+    it 'rolls back the audit log if destroy! raises' do
+      allow_any_instance_of(Project).to receive(:destroy!).and_raise(ActiveRecord::RecordNotDestroyed)
+
+      initial_count = OrganizationAuditLog.count
+      begin
+        authenticated_delete "/api/v1/projects/#{org_project.id}",
+                             user: user,
+                             organization: organization
+      rescue ActiveRecord::RecordNotDestroyed
+        nil
+      end
+
+      expect(OrganizationAuditLog.count).to eq(initial_count)
     end
   end
 
@@ -477,8 +563,18 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       }.to change(ProjectAuditLog, :count).by(1)
 
       log = ProjectAuditLog.last
-      expect(log.action).to eq('settings.update')
+      expect(log.action).to eq('retention.update')
       expect(log.actor).to eq(user)
+    end
+
+    it 'creates alert.update when alert thresholds change' do
+      expect {
+        authenticated_patch "/api/v1/projects/#{project.id}/retention_policy",
+                            user: user,
+                            params: { cost_threshold_cents: 500, alert_enabled: true }
+      }.to change(ProjectAuditLog, :count).by(1)
+
+      expect(ProjectAuditLog.last.action).to eq('alert.update')
     end
 
     it 'returns 422 with errors for invalid enum value' do

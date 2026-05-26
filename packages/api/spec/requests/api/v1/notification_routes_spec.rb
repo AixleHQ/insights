@@ -57,6 +57,17 @@ RSpec.describe 'Api::V1::NotificationRoutes', type: :request do
         expect(json_response[:data][:notificationType]).to eq('token_alert')
         expect(json_response[:data][:recipientRole]).to eq('member')
       end
+
+      it 'creates a notification_route.create audit log' do
+        expect {
+          authenticated_post "/api/v1/organizations/#{organization.id}/notification_routes",
+                             user: owner, organization: organization,
+                             params: { notification_type: 'token_alert', recipient_type: 'role',
+                                       recipient_role: 'member' }
+        }.to change(OrganizationAuditLog, :count).by(1)
+
+        expect(OrganizationAuditLog.last.action).to eq('notification_route.create')
+      end
     end
 
     context 'with user recipient' do
@@ -128,6 +139,16 @@ RSpec.describe 'Api::V1::NotificationRoutes', type: :request do
       expect(route.reload.enabled).to eq(false)
     end
 
+    it 'creates a notification_route.update audit log' do
+      expect {
+        authenticated_patch "/api/v1/organizations/#{organization.id}/notification_routes/#{route.id}",
+                            user: owner, organization: organization,
+                            params: { enabled: false }
+      }.to change(OrganizationAuditLog, :count).by(1)
+
+      expect(OrganizationAuditLog.last.action).to eq('notification_route.update')
+    end
+
     it 'returns 403 for non-owner member' do
       authenticated_patch "/api/v1/organizations/#{organization.id}/notification_routes/#{route.id}",
                           user: member, organization: organization,
@@ -164,6 +185,15 @@ RSpec.describe 'Api::V1::NotificationRoutes', type: :request do
 
       expect_no_content
       expect(NotificationRoute.exists?(route.id)).to be(false)
+    end
+
+    it 'creates a notification_route.delete audit log' do
+      expect {
+        authenticated_delete "/api/v1/organizations/#{organization.id}/notification_routes/#{route.id}",
+                             user: owner, organization: organization
+      }.to change(OrganizationAuditLog, :count).by(1)
+
+      expect(OrganizationAuditLog.last.action).to eq('notification_route.delete')
     end
 
     it 'returns 403 for non-owner member' do
