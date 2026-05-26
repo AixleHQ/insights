@@ -6,7 +6,7 @@ import { type PricingTable, getCostWarning } from "./pricing.js";
 // Public surface re-exported so MCP consumers only need to import from "@db90/claude/sync"
 export type { PricingTable, ModelPricing } from "./pricing.js";
 export { DEFAULT_PRICING, mergePricing } from "./pricing.js";
-export { resolveProjectId, type ProjectResolution } from "./project-resolver.js";
+export { resolveProjectId, type ProjectResolution } from "@db90/sdk";
 
 export interface SyncResult {
   sent: number;
