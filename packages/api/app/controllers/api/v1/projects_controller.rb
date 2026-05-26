@@ -21,13 +21,20 @@ module Api
         projects = projects.active if params[:active] == "true"
         projects = projects.order(:name)
 
-        render_collection(projects, ProjectSerializer)
+        render_collection(
+          projects,
+          ProjectSerializer,
+          serializer_params: ->(paginated) {
+            { project_aggregate_stats: ProjectToolEventAggregates.for_project_ids(paginated.map(&:id)) }
+          }
+        )
       end
 
       # GET /api/v1/projects/:id
       def show
         authorize! @project
-        render_resource(@project, ProjectFullSerializer)
+        stats = ProjectToolEventAggregates.for_project_ids([ @project.id ])
+        render_resource(@project, ProjectFullSerializer, serializer_params: { project_aggregate_stats: stats })
       end
 
       # POST /api/v1/projects
@@ -54,7 +61,8 @@ module Api
           log_project_created!
         end
 
-        render_created(@project, ProjectSerializer)
+        stats = ProjectToolEventAggregates.for_project_ids([ @project.id ])
+        render_created(@project, ProjectSerializer, serializer_params: { project_aggregate_stats: stats })
       rescue ActiveRecord::RecordInvalid => e
         render json: {
           error: "Unprocessable Entity",
@@ -67,7 +75,8 @@ module Api
         authorize! @project
 
         if @project.update(project_update_params)
-          render_resource(@project, ProjectSerializer)
+          stats = ProjectToolEventAggregates.for_project_ids([ @project.id ])
+          render_resource(@project, ProjectSerializer, serializer_params: { project_aggregate_stats: stats })
         else
           render json: {
             error: "Unprocessable Entity",

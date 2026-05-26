@@ -14,6 +14,25 @@ const baseProject: ProjectWithStats = {
 };
 
 describe("ProjectCard", () => {
+  it("renders serializer-backed event count and formatted cost", () => {
+    render(
+      <ProjectCard
+        project={{
+          id: "proj-1",
+          name: "Alpha",
+          is_active: true,
+          event_count: 1234,
+          total_cost_usd: 5.5,
+          created_at: "2026-01-01T00:00:00Z",
+        }}
+      />,
+    );
+
+    expect(screen.getByText("1,234")).toBeInTheDocument();
+    expect(screen.getByText("$5.50")).toBeInTheDocument();
+    expect(screen.getByText("Alpha")).toBeInTheDocument();
+  });
+
   it("shows Unlinked badge and tooltip when git remote is missing", async () => {
     const user = userEvent.setup();
     render(<ProjectCard project={{ ...baseProject, gitRemoteUrl: null }} />);

@@ -3,7 +3,7 @@ import { MoreHorizontal, GitBranch, Activity, DollarSign, Calendar, Star, AlertC
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { formatCost } from "@/lib/formatters";
+import { formatCost, formatCount } from "@/lib/formatters";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -126,7 +126,7 @@ export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFa
               Events
             </div>
             <p className="font-mono-display text-sm font-medium">
-              {(project.event_count || 0).toLocaleString()}
+              {formatCount(project.event_count || 0)}
             </p>
           </div>
           <div className="space-y-1">

@@ -35,7 +35,6 @@ const mockUseDeleteProject = vi.fn();
 const mockUseProjectDailyByTool = vi.fn();
 const mockUseProjectRepositories = vi.fn();
 const mockUseProjectMembers = vi.fn();
-const mockUseProjectStats = vi.fn();
 const mockUseCurrentUser = vi.fn();
 const mockUseEventsSummary = vi.fn();
 const mockUseExportEvents = vi.fn();
@@ -48,7 +47,6 @@ vi.mock("@/hooks/useApi", () => ({
   useProjectDailyByTool: (...args: unknown[]) => mockUseProjectDailyByTool(...args),
   useProjectRepositories: (...args: unknown[]) => mockUseProjectRepositories(...args),
   useProjectMembers: (...args: unknown[]) => mockUseProjectMembers(...args),
-  useProjectStats: (...args: unknown[]) => mockUseProjectStats(...args),
   useCurrentUser: (...args: unknown[]) => mockUseCurrentUser(...args),
   useEventsSummary: (...args: unknown[]) => mockUseEventsSummary(...args),
   useExportEvents: (...args: unknown[]) => mockUseExportEvents(...args),
@@ -110,7 +108,6 @@ function setupDefaultMocks() {
   mockUseProjectDailyByTool.mockReturnValue({ data: undefined, isLoading: false });
   mockUseProjectRepositories.mockReturnValue({ data: undefined, isLoading: false });
   mockUseProjectMembers.mockReturnValue({ data: mockMembers, isLoading: false });
-  mockUseProjectStats.mockReturnValue({ data: { daily: [], totalEvents: 0, totalCost: 0 } });
   mockUseCurrentUser.mockReturnValue({ data: { id: "user-99", globalAdmin: false }, isLoading: false });
   mockUseEventsSummary.mockReturnValue({ data: undefined });
   mockUseExportEvents.mockReturnValue({ exportEvents: vi.fn().mockResolvedValue({}), isExporting: false });
@@ -143,13 +140,31 @@ describe("ProjectDetail", () => {
     expect(screen.getByText("A test project")).toBeInTheDocument();
   });
 
-  it("renders stat cards", () => {
+  it("renders stat cards with serializer-backed aggregates", () => {
     render(<ProjectDetail />);
 
     expect(screen.getByText("Total Events")).toBeInTheDocument();
     expect(screen.getByText("Total Cost")).toBeInTheDocument();
     expect(screen.getByText("Created")).toBeInTheDocument();
     expect(screen.getByText("Last Activity")).toBeInTheDocument();
+    expect(screen.getAllByText("All-time attributed").length).toBeGreaterThanOrEqual(3);
+    expect(screen.getByText("42")).toBeInTheDocument();
+    expect(screen.getByText("$12.50")).toBeInTheDocument();
+  });
+
+  it("shows unavailable placeholders when aggregate fields are absent", () => {
+    const projectWithoutAggregates = { ...mockProject };
+    for (const key of ["eventCount", "totalCostUsd", "lastEventAt"] as const) {
+      Reflect.deleteProperty(projectWithoutAggregates, key);
+    }
+    mockUseProject.mockReturnValue({
+      data: projectWithoutAggregates,
+      isLoading: false,
+    });
+
+    render(<ProjectDetail />);
+
+    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(3);
   });
 
   it("renders source control summary when available", () => {
