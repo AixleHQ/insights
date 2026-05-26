@@ -1,8 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { resolveProjectId } from "@db90/sdk";
-import { loadCredentials, type TelemetryToolId, type StoredCredentials, credentialsHaveAnyToken } from "./credentials.js";
+import { getGitRemote, resolveProjectId } from "@db90/sdk";
+import { loadCredentials, type TelemetryToolId, type StoredCredentials, credentialsHaveAnyToken, pickProjectLookupToken } from "./credentials.js";
 import { defaultKeycloakClientId, defaultKeycloakIssuer, startDeviceAuthorization } from "./auth/keycloak.js";
 import { migrateLegacyState, getAppDir } from "./state.js";
 import { syncTelemetryTools } from "./sync.js";
@@ -60,22 +60,23 @@ function syncResultOk(result: Awaited<ReturnType<typeof syncTelemetryTools>>): b
   return !result.locked && result.failed === 0;
 }
 
-// Process-lifetime cache for the resolved project_id. The MCP server runs for
-// hours/days, so we resolve once and reuse — but only when the result is
-// definitive. `source: "none"` covers both "no git remote" (won't change
-// in-process) and "lookup network error" (transient); re-resolving costs
-// milliseconds when there's no remote, so we always retry on `none` rather
-// than poison the cache with a transient failure.
-let cachedProjectId: { value: string | null } | null = null;
+// Process-lifetime cache keyed on the inputs that drive resolveProjectId: host,
+// lookup token, and the current repo's git remote. Re-resolve when any of them
+// changes (re-auth, repo cwd change). `source: "none"` is never cached so a
+// transient lookup failure doesn't poison the cache.
+let cachedProjectId: { key: string; value: string | null } | null = null;
 
 async function getProjectIdForSync(creds: StoredCredentials): Promise<string | null> {
-  if (cachedProjectId) return cachedProjectId.value;
-  // Both tools' ingest tokens auth the same org in current product flows; the
-  // lookup endpoint is org-scoped, so either works. If a user ever authenticates
-  // the two tools to different orgs, attribution would silently follow whichever
-  // token wins object iteration order — flag for follow-up if that becomes real.
-  const token = Object.values(creds.accounts).find((t): t is string => typeof t === "string" && t.length > 0);
+  const token = pickProjectLookupToken(creds);
   if (!token) return null;
+
+  const gitRemote = getGitRemote(false) ?? "no-remote";
+  const cacheKey = `${creds.host}|${token}|${gitRemote}`;
+
+  if (cachedProjectId?.key === cacheKey) {
+    return cachedProjectId.value;
+  }
+
   const result = await resolveProjectId(undefined, undefined, creds.host, token, false);
   mcpLog.info(
     "project_attribution_resolved",
@@ -83,7 +84,7 @@ async function getProjectIdForSync(creds: StoredCredentials): Promise<string | n
     false
   );
   if (result.source !== "none") {
-    cachedProjectId = { value: result.projectId };
+    cachedProjectId = { key: cacheKey, value: result.projectId };
   }
   return result.projectId;
 }

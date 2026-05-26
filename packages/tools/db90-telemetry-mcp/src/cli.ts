@@ -2,7 +2,7 @@
 import { fileURLToPath } from "node:url";
 import { realpathSync } from "node:fs";
 import { resolveProjectId } from "@db90/sdk";
-import { loadCredentials, credentialsHaveAnyToken } from "./credentials.js";
+import { loadCredentials, credentialsHaveAnyToken, pickProjectLookupToken } from "./credentials.js";
 import type { TelemetryToolId } from "./credentials.js";
 import { loginAndPersistCredentials } from "./auth/flow.js";
 import { defaultKeycloakIssuer } from "./auth/keycloak.js";
@@ -356,13 +356,7 @@ export async function runOnce(deps?: Partial<RunOnceDeps>): Promise<number> {
       runtime.migrateLegacyState(appDirRuntime, creds.host, tok);
     }
   }
-  // Both tools' ingest tokens auth the same org in current product flows; the
-  // lookup endpoint is org-scoped, so either works. If a user ever authenticates
-  // the two tools to different orgs, attribution would silently follow whichever
-  // token wins object iteration order — flag for follow-up if that becomes real.
-  const lookupToken = Object.values(creds.accounts).find(
-    (t): t is string => typeof t === "string" && t.length > 0
-  );
+  const lookupToken = pickProjectLookupToken(creds);
   let projectId: string | null = null;
   if (lookupToken) {
     const resolution = await runtime.resolveProjectId(undefined, undefined, creds.host, lookupToken, false);
