@@ -67,7 +67,8 @@ Rails.application.routes.draw do
         # Notification routing configuration
         resources :notification_routes, only: %i[index create update destroy]
 
-        # Organization audit logs
+        # Organization audit logs (unified must precede the resource to avoid capture by :index)
+        get "audit_logs/unified", to: "unified_audit_logs#index"
         resources :audit_logs, controller: "organization_audit_logs", only: [ :index ]
 
         # Retention purge logs (compliance evidence)

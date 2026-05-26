@@ -2385,6 +2385,89 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /api/v1/organizations/{organization_id}/audit_logs/unified:
+    get:
+      summary: Unified audit log across all three scopes
+      description: >
+        Returns a merged, paginated audit log timeline for the organization, combining
+        organization-level, project-level, and admin audit entries. Results are sorted
+        by `createdAt` DESC across all three source tables (Ruby-level merge, not SQL UNION).
+
+        Each entry includes a `scope` field indicating its source table. Admin logs are
+        filtered to actions directly on this organization (`resource_type=Organization`) or
+        on any project belonging to it (`resource_type=Project`).
+
+        **Performance note:** each source table is capped at 1 000 records per request.
+        Use `scope`, `from`/`to`, `severity`, or `outcome` to narrow results when dealing
+        with high-volume audit trails.
+
+        Requires org owner or global admin role.
+      tags:
+        - Organization Audit Logs
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - name: scope
+          in: query
+          description: Limit results to one source table. Omit to include all three.
+          schema:
+            type: string
+            enum: [organization, project, admin]
+        - name: actor_id
+          in: query
+          description: Filter by actor user ID (maps to actor_id for org/project logs and admin_user_id for admin logs)
+          schema:
+            type: string
+            format: uuid
+        - name: severity
+          in: query
+          description: Filter by severity level
+          schema:
+            type: string
+            enum: [info, warning, critical]
+        - name: outcome
+          in: query
+          description: Filter by outcome
+          schema:
+            type: string
+            enum: [success, failure]
+        - name: from
+          in: query
+          description: Filter entries on or after this ISO 8601 datetime (alias from_date accepted)
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: Filter entries on or before this ISO 8601 datetime (alias to_date accepted)
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Paginated unified audit log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UnifiedAuditLog'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   /api/v1/organizations/{organization_id}/retention_logs:
     get:
       summary: List retention purge logs for an organization
@@ -5005,6 +5088,63 @@ components:
         - trackedChanges
         - metadata
         - ipAddress
+        - createdAt
+
+    UnifiedAuditLog:
+      type: object
+      description: >
+        Merged audit log entry sourced from one of three tables: organization audit logs,
+        project audit logs, or admin audit logs. The `scope` field identifies the source.
+        Admin entries are scoped to actions on this organization or its projects.
+      properties:
+        id:
+          type: string
+          format: uuid
+        scope:
+          type: string
+          enum: [organization, project, admin]
+          description: Source table for this entry
+        action:
+          type: string
+          example: settings.update
+        resourceType:
+          type: string
+          nullable: true
+        resourceId:
+          type: string
+          format: uuid
+          nullable: true
+        trackedChanges:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+        ipAddress:
+          type: string
+          nullable: true
+        userAgent:
+          type: string
+          nullable: true
+        severity:
+          type: string
+          nullable: true
+          enum: [info, warning, critical]
+        outcome:
+          type: string
+          nullable: true
+          enum: [success, failure]
+        createdAt:
+          type: string
+          format: date-time
+        actor:
+          $ref: '#/components/schemas/AuditLogActor'
+      required:
+        - id
+        - scope
+        - action
+        - trackedChanges
+        - metadata
         - createdAt
 
     RetentionPurgeLog:
