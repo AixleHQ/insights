@@ -12,9 +12,21 @@ module Admin
     end
 
     def batch_delete
-      ids = params[:ids]
-      Project.where(id: ids).destroy_all
-      redirect_to admin_projects_path, notice: "Successfully deleted #{ids.count} projects."
+      ids      = Array(params[:ids])
+      return redirect_to(admin_projects_path) if ids.empty?
+
+      projects = Project.where(id: ids)
+      projects.each do |project|
+        AdminAuditLog.log_action(
+          admin_user:      current_admin_user,
+          action:          "batch_delete",
+          resource:        project,
+          tracked_changes: { name: project.name, slug: project.slug },
+          request:         request
+        )
+      end
+      deleted = projects.destroy_all.size
+      redirect_to admin_projects_path, notice: "Successfully deleted #{deleted} projects."
     end
 
     private
