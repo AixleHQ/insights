@@ -30,6 +30,10 @@ export function credentialsHaveAnyToken(creds: StoredCredentials): boolean {
   return Object.values(acc).some((t) => typeof t === "string" && t.length > 0);
 }
 
+export function pickProjectLookupToken(creds: StoredCredentials): string | null {
+  return creds.accounts.claude_code ?? creds.accounts.cursor ?? null;
+}
+
 function normalizeLoadedCredentials(raw: unknown): StoredCredentials | null {
   if (typeof raw !== "object" || raw === null) return null;
   const o = raw as Record<string, unknown>;

@@ -6,4 +6,5 @@ export {
   clearCredentials,
   loadCredentialsFromFileOnly,
   credentialsHaveAnyToken,
+  pickProjectLookupToken,
 } from "./auth/credentials.js";

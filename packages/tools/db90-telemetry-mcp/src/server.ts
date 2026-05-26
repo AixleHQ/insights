@@ -1,7 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { loadCredentials, type TelemetryToolId, type StoredCredentials, credentialsHaveAnyToken } from "./credentials.js";
+import { getGitRemote, resolveProjectId } from "@db90/sdk";
+import { loadCredentials, type TelemetryToolId, type StoredCredentials, credentialsHaveAnyToken, pickProjectLookupToken } from "./credentials.js";
 import { defaultKeycloakClientId, defaultKeycloakIssuer, startDeviceAuthorization } from "./auth/keycloak.js";
 import { migrateLegacyState, getAppDir } from "./state.js";
 import { syncTelemetryTools } from "./sync.js";
@@ -59,6 +60,35 @@ function syncResultOk(result: Awaited<ReturnType<typeof syncTelemetryTools>>): b
   return !result.locked && result.failed === 0;
 }
 
+// Process-lifetime cache keyed on the inputs that drive resolveProjectId: host,
+// lookup token, and the current repo's git remote. Re-resolve when any of them
+// changes (re-auth, repo cwd change). `source: "none"` is never cached so a
+// transient lookup failure doesn't poison the cache.
+let cachedProjectId: { key: string; value: string | null } | null = null;
+
+async function getProjectIdForSync(creds: StoredCredentials): Promise<string | null> {
+  const token = pickProjectLookupToken(creds);
+  if (!token) return null;
+
+  const gitRemote = getGitRemote(false) ?? "no-remote";
+  const cacheKey = `${creds.host}|${token}|${gitRemote}`;
+
+  if (cachedProjectId?.key === cacheKey) {
+    return cachedProjectId.value;
+  }
+
+  const result = await resolveProjectId(undefined, undefined, creds.host, token, false);
+  mcpLog.info(
+    "project_attribution_resolved",
+    { project_id: result.projectId, source: result.source },
+    false
+  );
+  if (result.source !== "none") {
+    cachedProjectId = { key: cacheKey, value: result.projectId };
+  }
+  return result.projectId;
+}
+
 /** Structured status for `db90_status` — tolerates missing/malformed credentials and state. */
 export async function buildDb90StatusPayload(): Promise<Record<string, unknown>> {
   const snapshot = await buildHealthSnapshot();
@@ -76,7 +106,7 @@ async function executeSync(parsed: { tools?: TelemetryToolId[] }): Promise<unkno
     credentials: creds,
     dryRun: false,
     verbose: false,
-    projectId: null,
+    projectId: await getProjectIdForSync(creds),
     pricing: defaultPricing(),
     tools: parsed.tools,
   });
@@ -207,7 +237,7 @@ export async function startServer(): Promise<void> {
         credentials: creds,
         dryRun: false,
         verbose: false,
-        projectId: null,
+        projectId: await getProjectIdForSync(creds),
         pricing: defaultPricing(),
       });
     } catch (err) {

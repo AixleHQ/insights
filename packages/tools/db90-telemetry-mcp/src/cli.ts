@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { fileURLToPath } from "node:url";
 import { realpathSync } from "node:fs";
-import { loadCredentials, credentialsHaveAnyToken } from "./credentials.js";
+import { resolveProjectId } from "@db90/sdk";
+import { loadCredentials, credentialsHaveAnyToken, pickProjectLookupToken } from "./credentials.js";
 import type { TelemetryToolId } from "./credentials.js";
 import { loginAndPersistCredentials } from "./auth/flow.js";
 import { defaultKeycloakIssuer } from "./auth/keycloak.js";
@@ -29,6 +30,7 @@ interface RunOnceDeps {
   migrateLegacyState: typeof migrateLegacyState;
   getAppDir: typeof getAppDir;
   syncTelemetryTools: typeof syncTelemetryTools;
+  resolveProjectId: typeof resolveProjectId;
   pricing: ReturnType<typeof mergePricing>;
   log: (message: string) => void;
   error: (message: string) => void;
@@ -333,6 +335,7 @@ export async function runOnce(deps?: Partial<RunOnceDeps>): Promise<number> {
     migrateLegacyState,
     getAppDir,
     syncTelemetryTools,
+    resolveProjectId,
     pricing: mergePricing(DEFAULT_PRICING, {}),
     log: console.log,
     error: console.error,
@@ -353,11 +356,22 @@ export async function runOnce(deps?: Partial<RunOnceDeps>): Promise<number> {
       runtime.migrateLegacyState(appDirRuntime, creds.host, tok);
     }
   }
+  const lookupToken = pickProjectLookupToken(creds);
+  let projectId: string | null = null;
+  if (lookupToken) {
+    const resolution = await runtime.resolveProjectId(undefined, undefined, creds.host, lookupToken, false);
+    projectId = resolution.projectId;
+    mcpLog.info(
+      "project_attribution_resolved",
+      { project_id: resolution.projectId, source: resolution.source },
+      false
+    );
+  }
   const result = await runtime.syncTelemetryTools({
     credentials: creds,
     dryRun: false,
     verbose: false,
-    projectId: null,
+    projectId,
     pricing: runtime.pricing,
     appDir: appDirRuntime,
   });
