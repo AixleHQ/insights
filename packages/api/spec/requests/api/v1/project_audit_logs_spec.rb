@@ -71,6 +71,22 @@ RSpec.describe "Api::V1::ProjectAuditLogs", type: :request do
         end
       end
 
+      it "omits user_agent (restricted for non-org-admin)" do
+        authenticated_get "/api/v1/projects/#{project.id}/audit_logs", user: owner_user
+
+        expect_success
+        json_data.each { |log| expect(log).not_to have_key(:userAgent) }
+      end
+
+      it "includes severity and outcome" do
+        authenticated_get "/api/v1/projects/#{project.id}/audit_logs", user: owner_user
+
+        expect_success
+        log = json_data.find { |l| l[:action] == "connector.create" }
+        expect(log[:severity]).to eq("info")
+        expect(log[:outcome]).to eq("success")
+      end
+
       it "returns logs ordered by created_at desc" do
         authenticated_get "/api/v1/projects/#{project.id}/audit_logs", user: owner_user
 
@@ -100,6 +116,13 @@ RSpec.describe "Api::V1::ProjectAuditLogs", type: :request do
 
         expect_success
         json_data.each { |log| expect(log).not_to have_key(:trackedChanges) }
+      end
+
+      it "omits user_agent" do
+        authenticated_get "/api/v1/projects/#{project.id}/audit_logs", user: admin_user
+
+        expect_success
+        json_data.each { |log| expect(log).not_to have_key(:userAgent) }
       end
     end
 
@@ -133,6 +156,16 @@ RSpec.describe "Api::V1::ProjectAuditLogs", type: :request do
         log = json_data.find { |l| l[:action] == "settings.update" }
         expect(log).to have_key(:trackedChanges)
         expect(log[:trackedChanges]).to have_key(:key)
+      end
+
+      it "includes user_agent" do
+        authenticated_get "/api/v1/projects/#{project.id}/audit_logs",
+                          user: org_admin,
+                          organization: organization
+
+        expect_success
+        log = json_data.find { |l| l[:action] == "connector.create" }
+        expect(log).to have_key(:userAgent)
       end
     end
 

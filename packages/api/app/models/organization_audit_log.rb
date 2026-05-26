@@ -28,16 +28,20 @@ class OrganizationAuditLog < ApplicationRecord
   scope :from_date, ->(date) { where("created_at >= ?", date) }
   scope :to_date, ->(date) { where("created_at <= ?", date) }
 
-  def self.log(organization:, actor:, action:, resource: nil, tracked_changes: {}, metadata: {}, request: nil)
+  def self.log(organization:, actor:, action:, resource: nil, tracked_changes: {}, metadata: {},
+               request: nil, severity: "info", outcome: "success")
     create!(
-      organization: organization,
-      actor: actor,
-      action: action,
-      resource_type: resource&.class&.name,
-      resource_id: resource&.id,
+      organization:    organization,
+      actor:           actor,
+      action:          action,
+      resource_type:   resource&.class&.name,
+      resource_id:     resource&.id,
       tracked_changes: tracked_changes,
-      metadata: metadata,
-      ip_address: request&.remote_ip
+      metadata:        metadata,
+      ip_address:      request&.remote_ip,
+      user_agent:      request&.user_agent,
+      severity:        severity,
+      outcome:         outcome
     )
   rescue StandardError => e
     Rails.logger.error("[OrganizationAuditLog] Failed to log action '#{action}': #{e.message}")

@@ -66,6 +66,31 @@ RSpec.describe "Api::V1::OrganizationAuditLogs", type: :request do
         expect(log).to have_key(:ipAddress)
       end
 
+      it "includes severity and outcome" do
+        authenticated_get "/api/v1/organizations/#{organization.id}/audit_logs",
+                          user: owner,
+                          organization: organization
+
+        expect_success
+        log = json_data.find { |l| l[:action] == "connector.create" }
+        expect(log[:severity]).to eq("info")
+        expect(log[:outcome]).to eq("success")
+      end
+
+      it "includes user_agent" do
+        log_with_ua = create(:organization_audit_log, organization: organization, actor: admin,
+                                                      action: "connector.delete",
+                                                      user_agent: "Mozilla/5.0")
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/audit_logs",
+                          user: owner,
+                          organization: organization
+
+        expect_success
+        log = json_data.find { |l| l[:id] == log_with_ua.id }
+        expect(log[:userAgent]).to eq("Mozilla/5.0")
+      end
+
       it "returns logs ordered by created_at desc" do
         authenticated_get "/api/v1/organizations/#{organization.id}/audit_logs",
                           user: owner,

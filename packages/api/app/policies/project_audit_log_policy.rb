@@ -16,7 +16,7 @@ class ProjectAuditLogPolicy < ApplicationPolicy
     index?
   end
 
-  # Full access = ip_address and tracked_changes visible (org-admin level and above)
+  # Full access = ip_address, tracked_changes, and user_agent visible (org-admin level and above)
   def full_access?
     @full_access ||= begin
       return true if global_admin?

@@ -79,6 +79,32 @@ RSpec.describe AdminAuditLog, type: :model do
       expect(log.metadata).to eq('reason' => 'Test')
     end
 
+    it 'defaults severity to info and outcome to success' do
+      AdminAuditLog.log_action(
+        admin_user: admin,
+        action: 'organizations#update',
+        resource: organization
+      )
+
+      log = AdminAuditLog.last
+      expect(log.severity).to eq('info')
+      expect(log.outcome).to eq('success')
+    end
+
+    it 'persists explicit severity and outcome when provided' do
+      AdminAuditLog.log_action(
+        admin_user: admin,
+        action: 'organizations#update',
+        resource: organization,
+        severity: 'critical',
+        outcome: 'failure'
+      )
+
+      log = AdminAuditLog.last
+      expect(log.severity).to eq('critical')
+      expect(log.outcome).to eq('failure')
+    end
+
     it 'captures request information when provided' do
       request = double('request', remote_ip: '192.168.1.1', user_agent: 'Mozilla/5.0')
 
@@ -90,7 +116,7 @@ RSpec.describe AdminAuditLog, type: :model do
       )
 
       log = AdminAuditLog.last
-      expect(log.ip_address).to eq('192.168.1.1')
+      expect(log.ip_address.to_s).to eq('192.168.1.1')
       expect(log.user_agent).to eq('Mozilla/5.0')
     end
 

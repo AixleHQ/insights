@@ -353,11 +353,13 @@ CREATE TABLE public.admin_audit_logs (
     action character varying NOT NULL,
     resource_type character varying NOT NULL,
     resource_id uuid,
-    ip_address character varying,
+    ip_address inet,
     user_agent character varying,
     tracked_changes jsonb DEFAULT '{}'::jsonb,
     metadata jsonb DEFAULT '{}'::jsonb,
-    created_at timestamp(6) without time zone NOT NULL
+    created_at timestamp(6) without time zone NOT NULL,
+    severity character varying,
+    outcome character varying
 );
 
 --
@@ -548,8 +550,11 @@ CREATE TABLE public.organization_audit_logs (
     resource_id uuid,
     tracked_changes jsonb DEFAULT '{}'::jsonb NOT NULL,
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
-    ip_address character varying,
-    created_at timestamp(6) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+    ip_address inet,
+    created_at timestamp(6) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    user_agent character varying,
+    severity character varying,
+    outcome character varying
 );
 
 --
@@ -657,8 +662,11 @@ CREATE TABLE public.project_audit_logs (
     resource_id uuid,
     tracked_changes jsonb DEFAULT '{}'::jsonb NOT NULL,
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
-    ip_address character varying,
-    created_at timestamp(6) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+    ip_address inet,
+    created_at timestamp(6) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    user_agent character varying,
+    severity character varying,
+    outcome character varying
 );
 
 --
@@ -1375,6 +1383,12 @@ CREATE INDEX index_admin_audit_logs_on_admin_user_id ON public.admin_audit_logs 
 CREATE INDEX index_admin_audit_logs_on_created_at ON public.admin_audit_logs USING btree (created_at);
 
 --
+-- Name: index_admin_audit_logs_on_created_at_desc; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_admin_audit_logs_on_created_at_desc ON public.admin_audit_logs USING btree (created_at DESC);
+
+--
 -- Name: index_admin_audit_logs_on_resource_type_and_resource_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1561,6 +1575,12 @@ CREATE INDEX index_organization_audit_logs_on_actor_id ON public.organization_au
 CREATE INDEX index_organization_audit_logs_on_created_at ON public.organization_audit_logs USING btree (created_at);
 
 --
+-- Name: index_organization_audit_logs_on_org_id_and_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_organization_audit_logs_on_org_id_and_created_at ON public.organization_audit_logs USING btree (organization_id, created_at DESC);
+
+--
 -- Name: index_organization_audit_logs_on_organization_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1661,6 +1681,12 @@ CREATE INDEX index_project_audit_logs_on_created_at ON public.project_audit_logs
 --
 
 CREATE INDEX index_project_audit_logs_on_project_id ON public.project_audit_logs USING btree (project_id);
+
+--
+-- Name: index_project_audit_logs_on_project_id_and_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_project_audit_logs_on_project_id_and_created_at ON public.project_audit_logs USING btree (project_id, created_at DESC);
 
 --
 -- Name: index_project_audit_logs_on_resource_type; Type: INDEX; Schema: public; Owner: -
@@ -2281,6 +2307,7 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260525234350'),
 ('20260525100001'),
 ('20260520000001'),
 ('20260514090000'),
@@ -2355,3 +2382,4 @@ INSERT INTO "schema_migrations" (version) VALUES
 ('20260125224613'),
 ('20260125224604'),
 ('20260125224539');
+

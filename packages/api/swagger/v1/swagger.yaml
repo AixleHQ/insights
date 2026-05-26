@@ -4980,6 +4980,20 @@ components:
           type: string
           nullable: true
           description: IP address of the actor at the time of the action
+        userAgent:
+          type: string
+          nullable: true
+          description: Browser or client user-agent string at the time of the action
+        severity:
+          type: string
+          nullable: true
+          enum: [info, warning, critical]
+          description: Severity classification of the action
+        outcome:
+          type: string
+          nullable: true
+          enum: [success, failure]
+          description: Whether the action completed successfully
         createdAt:
           type: string
           format: date-time
@@ -5069,8 +5083,8 @@ components:
       type: object
       description: >
         Project-level audit log entry.
-        `ipAddress` and `trackedChanges` are omitted (key absent, not null) for project-admin callers
-        who are not org admins. Org admins and global admins receive all fields.
+        `ipAddress`, `trackedChanges`, and `userAgent` are omitted (key absent, not null) for
+        project-admin callers who are not org admins. Org admins and global admins receive all fields.
       properties:
         id:
           type: string
@@ -5096,6 +5110,20 @@ components:
           type: string
           nullable: true
           description: IP of the actor at action time. Omitted for project-admin callers (non-org-admin).
+        userAgent:
+          type: string
+          nullable: true
+          description: Browser or client user-agent string. Omitted for project-admin callers (non-org-admin).
+        severity:
+          type: string
+          nullable: true
+          enum: [info, warning, critical]
+          description: Severity classification of the action
+        outcome:
+          type: string
+          nullable: true
+          enum: [success, failure]
+          description: Whether the action completed successfully
         createdAt:
           type: string
           format: date-time

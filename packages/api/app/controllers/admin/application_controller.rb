@@ -63,17 +63,19 @@ module Admin
     def log_admin_action
       return unless current_admin_user
 
-      AdminAuditLog.create!(
-        admin_user: current_admin_user,
-        action: action_name,
-        resource_type: resource_class.name,
-        resource_id: params[:id],
+      AdminAuditLog.log_action(
+        admin_user:      current_admin_user,
+        action:          action_name,
+        resource:        admin_audit_log_resource,
         tracked_changes: filtered_params,
-        ip_address: request.remote_ip,
-        user_agent: request.user_agent
+        request:         request
       )
-    rescue StandardError => e
-      Rails.logger.error "Failed to log admin action: #{e.message}"
+    end
+
+    def admin_audit_log_resource
+      return resource_class.new unless params[:id].present?
+
+      resource_class.find_by(id: params[:id]) || resource_class.new(id: params[:id])
     end
 
     def filtered_params

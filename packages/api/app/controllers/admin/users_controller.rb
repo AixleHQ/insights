@@ -23,14 +23,12 @@ module Admin
     def impersonate
       user = User.find(params[:id])
 
-      AdminAuditLog.create!(
+      AdminAuditLog.log_action(
         admin_user: current_admin_user,
-        action: "impersonate",
-        resource_type: "User",
-        resource_id: user.id,
-        metadata: { impersonated_user_email: user.email },
-        ip_address: request.remote_ip,
-        user_agent: request.user_agent
+        action:     "impersonate",
+        resource:   user,
+        metadata:   { impersonated_user_email: user.email },
+        request:    request
       )
 
       ImpersonationAuditService.log_started(user: user, actor: current_admin_user, request: request)
