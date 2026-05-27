@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   Building2,
@@ -15,7 +15,10 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrg } from "@/contexts/OrgContext";
 import { useInvitationByToken, useAcceptInvitation } from "@/hooks/useApi";
-import { DB90_CLI_CLAUDE_SETUP_COMMAND } from "@/lib/db90-cli";
+import {
+  buildDb90ClaudeIngestExampleCommand,
+  buildDb90CursorIngestExampleCommand,
+} from "@/lib/db90-cli";
 import { formatLongUsDate } from "@/lib/formatters";
 import { Button } from "@/components/ui/button";
 import {
@@ -83,7 +86,10 @@ export function InvitationAccept() {
 
     return window.sessionStorage.getItem(acceptedInvitationStorageKey) === "true";
   });
-  const [commandCopied, setCommandCopied] = useState(false);
+  const [copiedExampleCli, setCopiedExampleCli] = useState<"claude" | "cursor" | null>(null);
+
+  const claudeExampleCommand = useMemo(() => buildDb90ClaudeIngestExampleCommand(), []);
+  const cursorExampleCommand = useMemo(() => buildDb90CursorIngestExampleCommand(), []);
 
   // Fetch invitation details
   const {
@@ -333,32 +339,64 @@ export function InvitationAccept() {
                   </CardDescription>
                 </div>
                 <div className="rounded-lg border bg-muted/40 p-4 text-left space-y-3">
-                  <p className="text-sm font-medium text-foreground">Get started</p>
+                  <p className="text-sm font-medium text-foreground">Link your AI tools</p>
                   <p className="text-sm text-muted-foreground">
-                    Install the DB90 CLI and run login on the machine where you use your coding
-                    assistant:
+                    After you create an ingest token in Settings → Tools (or Integrations), replace{" "}
+                    <code className="rounded bg-background px-1 py-0.5 text-xs">
+                      &lt;YOUR_INGEST_TOKEN&gt;
+                    </code>{" "}
+                    and run the command for your editor on the machine where you work:
                   </p>
-                  <pre className="overflow-x-auto rounded-md bg-background border p-3 text-xs font-mono">
-                    {DB90_CLI_CLAUDE_SETUP_COMMAND}
-                  </pre>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="w-full sm:w-auto"
-                    onClick={async () => {
-                      try {
-                        await navigator.clipboard.writeText(DB90_CLI_CLAUDE_SETUP_COMMAND);
-                        setCommandCopied(true);
-                        window.setTimeout(() => setCommandCopied(false), 2000);
-                      } catch {
-                        setCommandCopied(false);
-                      }
-                    }}
-                  >
-                    <Copy className="mr-2 size-4" />
-                    {commandCopied ? "Copied" : "Copy command"}
-                  </Button>
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-medium text-muted-foreground">Claude Code</p>
+                      <pre className="overflow-x-auto rounded-md bg-background border p-3 text-xs font-mono whitespace-pre-wrap break-all">
+                        {claudeExampleCommand}
+                      </pre>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-full sm:w-auto"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(claudeExampleCommand);
+                            setCopiedExampleCli("claude");
+                            window.setTimeout(() => setCopiedExampleCli(null), 2000);
+                          } catch {
+                            setCopiedExampleCli(null);
+                          }
+                        }}
+                      >
+                        <Copy className="mr-2 size-4" />
+                        {copiedExampleCli === "claude" ? "Copied" : "Copy command"}
+                      </Button>
+                    </div>
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-medium text-muted-foreground">Cursor</p>
+                      <pre className="overflow-x-auto rounded-md bg-background border p-3 text-xs font-mono whitespace-pre-wrap break-all">
+                        {cursorExampleCommand}
+                      </pre>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-full sm:w-auto"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(cursorExampleCommand);
+                            setCopiedExampleCli("cursor");
+                            window.setTimeout(() => setCopiedExampleCli(null), 2000);
+                          } catch {
+                            setCopiedExampleCli(null);
+                          }
+                        }}
+                      >
+                        <Copy className="mr-2 size-4" />
+                        {copiedExampleCli === "cursor" ? "Copied" : "Copy command"}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
                 <Button size="lg" className="w-full" onClick={handleContinueToDashboard}>
                   Continue to dashboard

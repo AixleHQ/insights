@@ -100,6 +100,18 @@ describe("ProjectConnectorsTab", () => {
       expect(screen.getByText("Connected")).toBeInTheDocument();
     });
 
+    it("does not show Last error panel when status is connected but lastError is stale", () => {
+      const stale: ProjectConnector = {
+        ...connectedAnthropicConnector,
+        status: "connected",
+        lastError: "stale from prior failure",
+      };
+      mockProjectConnectors.mockReturnValue({ data: [stale], isLoading: false });
+      renderComponent();
+      expect(screen.getByText("Connected")).toBeInTheDocument();
+      expect(screen.queryByText("Last error")).not.toBeInTheDocument();
+    });
+
     it("shows Error status badge for a connector with an error", () => {
       const errorConnector: ProjectConnector = {
         ...connectedAnthropicConnector,

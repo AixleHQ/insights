@@ -160,7 +160,11 @@ describe("IngestTokenConnectSheet", () => {
 
     it("shows npx @db90/cursor command for cursor", async () => {
       await goToSetupStep(cursorProvider);
-      expect(screen.getByText(/npx @db90\/cursor --token/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          /npx -y @db90\/cursor --token db90_abc123testtoken --host http:\/\/localhost:3000/,
+        ),
+      ).toBeInTheDocument();
     });
 
     it("defaults MCP (recommended) tab with npx telemetry-mcp init for claude-code", async () => {
@@ -176,7 +180,11 @@ describe("IngestTokenConnectSheet", () => {
       const user = userEvent.setup();
       await goToSetupStep(claudeCodeProvider);
       await user.click(screen.getByRole("tab", { name: /Standalone CLI/i }));
-      expect(screen.getByText(/npx @db90\/claude --token/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          /npx -y @db90\/claude --token db90_abc123testtoken --host http:\/\/localhost:3000/,
+        ),
+      ).toBeInTheDocument();
     });
 
     it("shows ~/.claude/settings.json hook snippet on Advanced hooks tab", async () => {

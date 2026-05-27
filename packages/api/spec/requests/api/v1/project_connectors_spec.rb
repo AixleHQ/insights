@@ -68,6 +68,19 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
       expect_success
       expect(json_data.map { |c| c[:id] }).not_to include(inactive.id)
     end
+
+    it 'does not expose stale lastError when status is connected' do
+      connector.update_columns(status: 'connected', is_active: true, last_error: 'stale from prior failure')
+
+      authenticated_get "/api/v1/projects/#{project.id}/connectors",
+                        user: org_admin,
+                        organization: organization
+
+      expect_success
+      row = json_data.find { |c| c[:id] == connector.id }
+      expect(row[:status]).to eq('connected')
+      expect(row[:lastError]).to be_nil
+    end
   end
 
   describe 'GET /api/v1/projects/:project_id/connectors/:id' do

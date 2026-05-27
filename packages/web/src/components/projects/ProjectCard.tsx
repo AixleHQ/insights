@@ -126,7 +126,7 @@ export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFa
               Events
             </div>
             <p className="font-mono-display text-sm font-medium">
-              {formatCount(project.event_count || 0)}
+              {formatCount(project.eventCount || 0)}
             </p>
           </div>
           <div className="space-y-1">
@@ -135,7 +135,7 @@ export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFa
               Cost
             </div>
             <p className="font-mono-display text-sm font-medium">
-              {formatCost(project.total_cost_usd || 0)}
+              {formatCost(project.totalCostUsd || 0)}
             </p>
           </div>
           <div className="space-y-1">

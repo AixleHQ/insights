@@ -8,24 +8,15 @@ const baseProject: ProjectWithStats = {
   id: "p1",
   name: "Alpha",
   isActive: true,
-  event_count: 0,
-  total_cost_usd: 0,
+  eventCount: 1234,
+  totalCostUsd: 5.5,
   createdAt: "2026-01-01T00:00:00Z",
 };
 
 describe("ProjectCard", () => {
   it("renders serializer-backed event count and formatted cost", () => {
     render(
-      <ProjectCard
-        project={{
-          id: "proj-1",
-          name: "Alpha",
-          is_active: true,
-          event_count: 1234,
-          total_cost_usd: 5.5,
-          created_at: "2026-01-01T00:00:00Z",
-        }}
-      />,
+      <ProjectCard project={baseProject}/>,
     );
 
     expect(screen.getByText("1,234")).toBeInTheDocument();

@@ -125,6 +125,10 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
       const lastSyncAt = c.lastSyncAt || c.last_sync_at;
       const status: ConnectorStatus = c.status;
       const providerInfo = PROVIDERS.find((p) => p.id === connectorType);
+      // Only show error copy when the connector is actually in error state,
+      // so a stale last_error from a previous attempt does not appear after reconnect.
+      const syncError =
+        status === "error" && lastError ? lastError : undefined;
 
       return {
         id: c.id,
@@ -132,7 +136,7 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
         name: externalAccountName || providerInfo?.name || connectorType,
         status,
         last_sync_at: lastSyncAt || undefined,
-        sync_error: lastError || undefined,
+        sync_error: syncError,
         metadata: {
           account_name: externalAccountName || "",
           resources_count: 0,

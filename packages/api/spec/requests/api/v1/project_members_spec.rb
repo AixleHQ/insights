@@ -396,6 +396,20 @@ RSpec.describe "Api::V1::ProjectMembers", type: :request do
       expect(row[:primaryTool]).to eq("claude_code")
       expect(row[:eventCount]).to eq(3)
     end
+
+    it "does not include tool events from other projects in stats aggregates" do
+      other_project = create(:project, organization: organization)
+      create(:tool_event, user: member, project: project,
+             organization: organization, tool_name: "cursor", occurred_at: 1.day.ago)
+      create(:tool_event, user: member, project: other_project,
+             organization: organization, tool_name: "cursor", occurred_at: 1.hour.ago)
+
+      authenticated_get "/api/v1/projects/#{project.id}/members/stats", user: org_owner
+
+      expect_success
+      row = json_data.find { |r| r[:userId] == member.id }
+      expect(row[:eventCount]).to eq(1)
+    end
   end
 
   describe "DELETE /api/v1/projects/:project_id/members/:id" do

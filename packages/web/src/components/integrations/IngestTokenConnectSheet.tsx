@@ -16,6 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProviderLogo } from "@/components/icons";
 import type { ProviderInfo } from "./IntegrationCard";
+import { resolveDb90IngestHost } from "@/lib/ingest-host";
+import { buildDb90ClaudeIngestCommand, buildDb90CursorIngestCommand } from "@/lib/db90-cli";
 
 interface IngestTokenConnectSheetProps {
   provider: ProviderInfo | null;
@@ -46,17 +48,6 @@ function ingestEndpointUrl(): string {
   }
   // Last resort: same origin (works in production where web and API share a domain).
   return `${window.location.origin}${apiBase}/ingest/events`;
-}
-
-/** Returns just the host origin for CLI --host flag (no /api/v1 path). */
-function ingestHostUrl(): string {
-  const ingestBase = import.meta.env.VITE_INGEST_BASE_URL;
-  if (ingestBase) return String(ingestBase);
-  const apiBase = import.meta.env.VITE_API_URL ?? "/api/v1";
-  if (apiBase.startsWith("http")) {
-    return String(apiBase).replace(/\/api\/v1\/?$/, "");
-  }
-  return window.location.origin;
 }
 
 function buildClaudeCodeSettingsSnippet(token: string): string {
@@ -104,9 +95,9 @@ function ClaudeCodeSetupInstructions({ token }: { token: string }) {
     if (settingsTimerRef.current) clearTimeout(settingsTimerRef.current);
   }, []);
 
-  const host = ingestHostUrl();
+  const host = resolveDb90IngestHost();
   const initCommand = `${MCP_TELEMETRY_INIT} --host ${host}`;
-  const npxCommand = `npx @db90/claude --token ${token} --host ${host}`;
+  const npxCommand = buildDb90ClaudeIngestCommand(token);
   const settingsSnippet = buildClaudeCodeSettingsSnippet(token);
 
   const handleCopyInit = async () => {
@@ -221,8 +212,8 @@ function SetupInstructions({ providerId, token }: { providerId: string; token: s
   return (
     <div className="space-y-2">
       <p className="text-sm font-medium">Run the db90 Cursor reporter</p>
-      <pre className="text-xs bg-muted rounded p-3 overflow-x-auto">
-        {`npx @db90/cursor --token ${token}`}
+      <pre className="text-xs bg-muted rounded p-3 overflow-x-auto whitespace-pre-wrap break-all">
+        {buildDb90CursorIngestCommand(token)}
       </pre>
     </div>
   );
