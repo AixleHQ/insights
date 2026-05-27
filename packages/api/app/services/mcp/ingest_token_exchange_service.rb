@@ -41,7 +41,7 @@ module Mcp
         @membership.user_tool_accounts.transaction do
           requested_tools.each do |name|
             tool_account = @membership.user_tool_accounts.find_or_initialize_by(tool_name: name)
-            tool_account.is_active = true
+            tool_account.mark_waiting_for_connection if tool_account.may_mark_waiting_for_connection?
 
             unless tool_account.save
               validation_errors = tool_account.errors

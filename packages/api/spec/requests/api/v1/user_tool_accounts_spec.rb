@@ -112,6 +112,16 @@ RSpec.describe 'Api::V1::UserToolAccounts', type: :request do
         expect(json_data[:ingestToken]).to start_with('db90_')
       end
 
+      it 'creates ingest accounts as inactive until the first successful ingest event' do
+        authenticated_post "/api/v1/organizations/#{organization.id}/tool_accounts",
+                           user: user,
+                           organization: organization,
+                           params: { tool_name: 'cursor' }
+
+        expect_created
+        expect(json_data[:connectionState]).to eq('waiting_for_connection')
+      end
+
       it 'includes ingestToken in the response for claude_code' do
         tool_account.destroy! # remove the existing cursor account
 
@@ -144,32 +154,32 @@ RSpec.describe 'Api::V1::UserToolAccounts', type: :request do
       authenticated_patch "/api/v1/organizations/#{organization.id}/tool_accounts/#{tool_account.id}",
                           user: user,
                           organization: organization,
-                          params: { is_active: false }
+                          params: { connection_state: 'inactive' }
 
       expect_success
-      expect(json_data[:isActive]).to be false
+      expect(json_data[:connectionState]).to eq('inactive')
     end
 
     it 're-enables a disabled tool account' do
-      tool_account.update!(is_active: false)
+      tool_account.deactivate_connection!
 
       authenticated_patch "/api/v1/organizations/#{organization.id}/tool_accounts/#{tool_account.id}",
                           user: user,
                           organization: organization,
-                          params: { is_active: true }
+                          params: { connection_state: 'active' }
 
       expect_success
-      expect(json_data[:isActive]).to be true
+      expect(json_data[:connectionState]).to eq('active')
     end
 
-    it 'persists is_active change to the database' do
+    it 'persists connection_state change to the database' do
       authenticated_patch "/api/v1/organizations/#{organization.id}/tool_accounts/#{tool_account.id}",
                           user: user,
                           organization: organization,
-                          params: { is_active: false }
+                          params: { connection_state: 'inactive' }
 
       expect_success
-      expect(tool_account.reload.is_active).to be false
+      expect(tool_account.reload.connection_state).to eq('inactive')
     end
 
     it 'creates a tool_account.update audit log' do
@@ -177,7 +187,7 @@ RSpec.describe 'Api::V1::UserToolAccounts', type: :request do
         authenticated_patch "/api/v1/organizations/#{organization.id}/tool_accounts/#{tool_account.id}",
                             user: user,
                             organization: organization,
-                            params: { is_active: false }
+                            params: { connection_state: 'inactive' }
       }.to change(OrganizationAuditLog, :count).by(1)
 
       expect(OrganizationAuditLog.last.action).to eq('tool_account.update')
@@ -187,7 +197,7 @@ RSpec.describe 'Api::V1::UserToolAccounts', type: :request do
       authenticated_patch "/api/v1/organizations/#{organization.id}/tool_accounts/#{tool_account.id}",
                           user: other_user,
                           organization: organization,
-                          params: { is_active: false }
+                          params: { connection_state: 'inactive' }
 
       expect(response).to have_http_status(:not_found)
     end

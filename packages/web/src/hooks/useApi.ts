@@ -592,7 +592,7 @@ export interface MemberStats {
     id: string;
     tool_name: string;
     external_username: string | null;
-    is_active: boolean;
+    connection_state: "inactive" | "active" | "waiting_for_connection";
   }[];
 }
 
@@ -1447,16 +1447,16 @@ export function useUpdateToolAccount() {
     mutationFn: ({
       orgId,
       accountId,
-      isActive,
+      connectionState,
       accessToken,
     }: {
       orgId: string;
       accountId: string;
-      isActive?: boolean;
+      connectionState?: "inactive" | "active" | "waiting_for_connection";
       accessToken?: string;
     }) =>
       api.patch<{ data: ToolAccount }>(`/organizations/${orgId}/tool_accounts/${accountId}`, {
-        ...(isActive !== undefined && { is_active: isActive }),
+        ...(connectionState !== undefined && { connection_state: connectionState }),
         ...(accessToken !== undefined && { access_token: accessToken }),
       }),
     onSuccess: (_, { orgId }) => {

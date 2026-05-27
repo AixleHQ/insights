@@ -52,7 +52,7 @@ vi.mock("@/components/integrations", () => ({
 const mockAccount = (overrides: Partial<ToolAccount> = {}): ToolAccount => ({
   id: "acct-1",
   toolName: "claude_code",
-  isActive: true,
+  connectionState: "active",
   externalUserId: "user-123",
   externalUsername: "anaure",
   externalEmail: null,
@@ -143,15 +143,27 @@ describe("ToolAccounts", () => {
       expect(screen.getByRole("tab", { name: /connected \(1\)/i })).toBeInTheDocument();
     });
 
-    it("shows Connected badge when isActive", () => {
-      mockUseToolAccounts.mockReturnValue({ data: [mockAccount({ isActive: true })], isLoading: false });
+    it("shows Connected badge when connectionState is active", () => {
+      mockUseToolAccounts.mockReturnValue({ data: [mockAccount({ connectionState: "active" })], isLoading: false });
       renderToolAccounts();
       // The connected badge inside the card
       expect(screen.getByText("Connected")).toBeInTheDocument();
     });
 
-    it("shows Disabled badge when isActive is false", () => {
-      mockUseToolAccounts.mockReturnValue({ data: [mockAccount({ isActive: false })], isLoading: false });
+    it("shows Setup required badge when ingest account has not sent its first event yet", () => {
+      mockUseToolAccounts.mockReturnValue({
+        data: [mockAccount({ connectionState: "waiting_for_connection" })],
+        isLoading: false,
+      });
+      renderToolAccounts();
+      expect(screen.getByText("Setup required")).toBeInTheDocument();
+    });
+
+    it("shows Disabled badge when a previously used account is inactive", () => {
+      mockUseToolAccounts.mockReturnValue({
+        data: [mockAccount({ connectionState: "inactive", lastUsedAt: "2026-02-01T00:00:00Z" })],
+        isLoading: false,
+      });
       renderToolAccounts();
       expect(screen.getByText("Disabled")).toBeInTheDocument();
     });
@@ -340,19 +352,34 @@ describe("ToolAccounts", () => {
 
   describe("enable/disable flow", () => {
     it("shows Disable button for an active connected account", () => {
-      mockUseToolAccounts.mockReturnValue({ data: [mockAccount({ isActive: true })], isLoading: false });
+      mockUseToolAccounts.mockReturnValue({ data: [mockAccount({ connectionState: "active" })], isLoading: false });
       renderToolAccounts();
       expect(screen.getByRole("button", { name: "Disable" })).toBeInTheDocument();
     });
 
-    it("shows Enable button for an inactive connected account", () => {
-      mockUseToolAccounts.mockReturnValue({ data: [mockAccount({ isActive: false })], isLoading: false });
+    it("shows a setup hint for a waiting_for_connection ingest account", () => {
+      mockUseToolAccounts.mockReturnValue({
+        data: [mockAccount({ connectionState: "waiting_for_connection" })],
+        isLoading: false,
+      });
+      renderToolAccounts();
+      expect(
+        screen.getByText("This tool will become active after it sends its first event to DB90.")
+      ).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Complete setup" })).not.toBeInTheDocument();
+    });
+
+    it("shows Enable button for an inactive account that was previously used", () => {
+      mockUseToolAccounts.mockReturnValue({
+        data: [mockAccount({ connectionState: "inactive", lastUsedAt: "2026-02-01T00:00:00Z" })],
+        isLoading: false,
+      });
       renderToolAccounts();
       expect(screen.getByRole("button", { name: "Enable" })).toBeInTheDocument();
     });
 
-    it("calls updateAccount with isActive: false when Disable is clicked", async () => {
-      mockUseToolAccounts.mockReturnValue({ data: [mockAccount({ id: "acct-1", isActive: true })], isLoading: false });
+    it("calls updateAccount with connectionState: inactive when Disable is clicked", async () => {
+      mockUseToolAccounts.mockReturnValue({ data: [mockAccount({ id: "acct-1", connectionState: "active" })], isLoading: false });
       const user = userEvent.setup();
       renderToolAccounts();
 
@@ -362,13 +389,16 @@ describe("ToolAccounts", () => {
         expect(mockUpdateMutateAsync).toHaveBeenCalledWith({
           orgId: "org-1",
           accountId: "acct-1",
-          isActive: false,
+          connectionState: "inactive",
         });
       });
     });
 
-    it("calls updateAccount with isActive: true when Enable is clicked", async () => {
-      mockUseToolAccounts.mockReturnValue({ data: [mockAccount({ id: "acct-1", isActive: false })], isLoading: false });
+    it("calls updateAccount with connectionState: active when Enable is clicked", async () => {
+      mockUseToolAccounts.mockReturnValue({
+        data: [mockAccount({ id: "acct-1", connectionState: "inactive", lastUsedAt: "2026-02-01T00:00:00Z" })],
+        isLoading: false,
+      });
       const user = userEvent.setup();
       renderToolAccounts();
 
@@ -378,13 +408,16 @@ describe("ToolAccounts", () => {
         expect(mockUpdateMutateAsync).toHaveBeenCalledWith({
           orgId: "org-1",
           accountId: "acct-1",
-          isActive: true,
+          connectionState: "active",
         });
       });
     });
 
     it("applies opacity-60 to an inactive account row", () => {
-      mockUseToolAccounts.mockReturnValue({ data: [mockAccount({ isActive: false })], isLoading: false });
+      mockUseToolAccounts.mockReturnValue({
+        data: [mockAccount({ connectionState: "inactive" })],
+        isLoading: false,
+      });
       const { container } = renderToolAccounts();
       expect(container.querySelector(".opacity-60")).toBeInTheDocument();
     });
@@ -393,12 +426,12 @@ describe("ToolAccounts", () => {
       mockUseUpdateToolAccount.mockReturnValue({
         mutateAsync: mockUpdateMutateAsync,
         isPending: true,
-        variables: { accountId: "acct-1", orgId: "org-1", isActive: false },
+        variables: { accountId: "acct-1", orgId: "org-1", connectionState: "inactive" },
       });
       mockUseToolAccounts.mockReturnValue({
         data: [
-          mockAccount({ id: "acct-1", toolName: "claude_code", isActive: true }),
-          mockAccount({ id: "acct-2", toolName: "cursor", isActive: true }),
+          mockAccount({ id: "acct-1", toolName: "claude_code", connectionState: "active" }),
+          mockAccount({ id: "acct-2", toolName: "cursor", connectionState: "active" }),
         ],
         isLoading: false,
       });

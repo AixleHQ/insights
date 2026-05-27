@@ -7,7 +7,7 @@ class UserToolAccountDashboard < Administrate::BaseDashboard
     id: Field::String,
     organization_membership: Field::BelongsTo,
     tool_name: Field::Select.with_options(searchable: false, collection: UserToolAccount::TOOL_NAMES),
-    is_active: Field::Boolean,
+    connection_state: Field::String,
     external_account_id: Field::String,
     external_account_name: Field::String,
     token_expires_at: Field::DateTime,
@@ -19,7 +19,7 @@ class UserToolAccountDashboard < Administrate::BaseDashboard
     id
     organization_membership
     tool_name
-    is_active
+    connection_state
     external_account_name
   ].freeze
 
@@ -27,7 +27,7 @@ class UserToolAccountDashboard < Administrate::BaseDashboard
     id
     organization_membership
     tool_name
-    is_active
+    connection_state
     external_account_id
     external_account_name
     token_expires_at
@@ -38,13 +38,13 @@ class UserToolAccountDashboard < Administrate::BaseDashboard
   FORM_ATTRIBUTES = %i[
     organization_membership
     tool_name
-    is_active
+    connection_state
     external_account_id
     external_account_name
   ].freeze
 
   COLLECTION_FILTERS = {
-    active: ->(resources) { resources.where(is_active: true) }
+    active: ->(resources) { resources.where(connection_state: "active") }
   }.freeze
 
   def display_resource(account)

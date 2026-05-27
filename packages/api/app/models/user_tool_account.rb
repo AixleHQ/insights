@@ -1,4 +1,6 @@
 class UserToolAccount < ApplicationRecord
+  include ToolStateMachine
+
   TOOL_NAMES = %w[
     claude_code cursor windsurf github_copilot
     aider continue cody tabnine amazon_q
@@ -12,17 +14,18 @@ class UserToolAccount < ApplicationRecord
 
   validates :tool_name, presence: true, inclusion: { in: TOOL_NAMES }
   validates :tool_name, uniqueness: { scope: :organization_membership_id, message: "account already exists for this membership" }
-  validates :is_active, inclusion: { in: [ true, false ] }
+  validates :connection_state, inclusion: { in: %w[inactive active waiting_for_connection] }
   validates :connector_scope, inclusion: { in: %w[persona] }
 
   before_validation :assign_scope, on: :create
+  before_validation :assign_default_connection_state, on: :create
 
   encrypts :access_token
   encrypts :refresh_token
 
   INGEST_TOOLS = %w[claude_code cursor].freeze
 
-  scope :active, -> { where(is_active: true) }
+  scope :active, -> { where(connection_state: "active") }
   scope :by_tool, ->(tool) { where(tool_name: tool) }
 
   validates :token_hash, presence: true, if: :ingest_tool?
@@ -30,6 +33,10 @@ class UserToolAccount < ApplicationRecord
   attr_reader :plaintext_token
 
   before_validation :generate_ingest_token, if: -> { ingest_tool? && token_hash.blank? }, on: :create
+
+  def ingest_tool?
+    INGEST_TOOLS.include?(tool_name)
+  end
 
   def self.find_by_ingest_token(raw_token)
     return nil if raw_token.blank?
@@ -54,8 +61,10 @@ class UserToolAccount < ApplicationRecord
     self.connector_scope = "persona"
   end
 
-  def ingest_tool?
-    INGEST_TOOLS.include?(tool_name)
+  def assign_default_connection_state
+    return if connection_state.present?
+
+    self.connection_state = ingest_tool? ? "waiting_for_connection" : "active"
   end
 
   def generate_ingest_token

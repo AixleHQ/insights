@@ -5,7 +5,7 @@ FactoryBot.define do
     external_user_id { SecureRandom.hex(8) }
     external_username { Faker::Internet.username }
     external_email { Faker::Internet.email }
-    is_active { true }
+    connection_state { nil }
 
     trait :cursor do
       tool_name { 'cursor' }
@@ -16,7 +16,11 @@ FactoryBot.define do
     end
 
     trait :inactive do
-      is_active { false }
+      connection_state { "inactive" }
+    end
+
+    trait :waiting_for_connection do
+      connection_state { "waiting_for_connection" }
     end
   end
 end

@@ -1,6 +1,8 @@
 GEM
   remote: https://rubygems.org/
   specs:
+    aasm (5.5.2)
+      concurrent-ruby (~> 1.0)
     action_policy (0.7.6)
       ruby-next-core (>= 1.0)
     action_text-trix (2.1.16)
@@ -539,6 +541,7 @@ PLATFORMS
   x86_64-linux-musl
 
 DEPENDENCIES
+  aasm
   action_policy
   administrate
   alba

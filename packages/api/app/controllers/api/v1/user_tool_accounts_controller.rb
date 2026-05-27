@@ -16,8 +16,20 @@ module Api
         accounts = accounts.by_tool(params[:tool]) if params[:tool].present?
         accounts = accounts.active if params[:active] == "true"
 
+        last_used_by_tool = ToolEvent
+          .where(
+            organization_id: current_organization.id,
+            user_id: current_user.id,
+            tool_name: accounts.map(&:tool_name)
+          )
+          .group(:tool_name)
+          .maximum(:occurred_at)
+
         render json: {
-          data: UserToolAccountSerializer.new(accounts).serialize
+          data: UserToolAccountSerializer.new(
+            accounts,
+            params: { last_used_by_tool: last_used_by_tool }
+          ).serialize
         }
       end
 
@@ -31,6 +43,12 @@ module Api
       def create
         @tool_account = @membership.user_tool_accounts.new(tool_account_params)
         authorize! @membership, to: :create?, with: UserToolAccountPolicy
+
+        if @tool_account.ingest_tool?
+          @tool_account.mark_waiting_for_connection
+        elsif @tool_account.may_activate_connection?
+          @tool_account.activate_connection
+        end
 
         if @tool_account.save
           log_tool_account!(:create, @tool_account)
@@ -50,7 +68,13 @@ module Api
         authorize! @tool_account
 
         changes_before = tool_account_audit_snapshot(@tool_account)
-        if @tool_account.update(tool_account_update_params)
+        attrs = tool_account_update_params.to_h
+        next_state = attrs.delete("connection_state")
+
+        @tool_account.assign_attributes(attrs)
+        transition_connection_state!(@tool_account, next_state) unless next_state.nil?
+
+        if @tool_account.save
           log_tool_account!(:update, @tool_account, changes_before: changes_before)
           render_resource(@tool_account, UserToolAccountSerializer)
         else
@@ -91,16 +115,27 @@ module Api
 
       def tool_account_params
         params.permit(:tool_name, :access_token, :refresh_token, :token_expires_at,
-                      :external_user_id, :external_username, :is_active)
+                      :external_user_id, :external_username, :connection_state)
       end
 
       def tool_account_update_params
         params.permit(:access_token, :refresh_token, :token_expires_at,
-                      :external_user_id, :external_username, :is_active)
+                      :external_user_id, :external_username, :connection_state)
       end
 
       def tool_account_audit_snapshot(account)
-        account.slice(:tool_name, :is_active, :external_user_id, :external_username)
+        account.slice(:tool_name, :connection_state, :external_user_id, :external_username)
+      end
+
+      def transition_connection_state!(account, next_state)
+        case next_state
+        when "active"
+          account.activate_connection if account.may_activate_connection?
+        when "inactive"
+          account.deactivate_connection if account.may_deactivate_connection?
+        when "waiting_for_connection"
+          account.mark_waiting_for_connection if account.may_mark_waiting_for_connection?
+        end
       end
 
       def log_tool_account!(verb, account, changes_before: nil, snapshot: nil)

@@ -40,6 +40,9 @@ RSpec.describe "Api::V1::Integrations::Mcp", type: :request do
         expect_single_tool_shape(body)
         expect(body["data"]["toolName"]).to eq("claude_code")
         expect(body["data"]["accounts"].keys.sort).to eq([ "claude_code" ])
+        expect(
+          internal_membership.reload.user_tool_accounts.find_by!(tool_name: "claude_code").connection_state
+        ).to eq("waiting_for_connection")
       end
 
       it "mints an ingest token for cursor" do
@@ -51,6 +54,9 @@ RSpec.describe "Api::V1::Integrations::Mcp", type: :request do
         body = JSON.parse(response.body)
         expect_single_tool_shape(body)
         expect(body["data"]["accounts"]["cursor"]["ingestToken"]).to match(TOKEN_RE)
+        expect(
+          internal_membership.reload.user_tool_accounts.find_by!(tool_name: "cursor").connection_state
+        ).to eq("waiting_for_connection")
       end
 
       it "rotates the token on each call (one account, fresh credential)" do

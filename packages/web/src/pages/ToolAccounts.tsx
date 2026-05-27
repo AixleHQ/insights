@@ -332,14 +332,19 @@ function ToolCard({
   linkedAccount?: ToolAccount;
   onConnect: (provider: ToolProvider) => void;
   onDisconnect: (accountId: string) => void;
-  onToggleActive?: (accountId: string, newValue: boolean) => void;
+  onToggleActive?: (accountId: string, newValue: "inactive" | "active") => void;
   onReconnect?: (accountId: string) => void;
   isToggling?: boolean;
 }) {
   const isLinked = !!linkedAccount;
+  const connectionState = linkedAccount?.connectionState;
+  const requiresSetup = connectionState === "waiting_for_connection";
+  const isActive = connectionState === "active";
+  const isInactive = connectionState === "inactive";
+  const statusLabel = requiresSetup ? "Setup required" : isActive ? "Connected" : "Disabled";
 
   return (
-    <Card className={cn(isLinked && !linkedAccount.isActive && "opacity-60")}>
+    <Card className={cn(isLinked && isInactive && "opacity-60")}>
       <CardContent className="flex flex-col gap-4 p-4">
         <div className="flex items-start gap-3">
           <ProviderLogo provider={provider.id} showBackground size="md" className="shrink-0" />
@@ -349,10 +354,16 @@ function ToolCard({
               {isLinked && (
                 <Badge
                   variant="outline"
-                  className={linkedAccount.isActive ? "text-success" : "text-muted-foreground"}
+                  className={
+                    isActive
+                      ? "text-success"
+                      : requiresSetup
+                        ? "text-warning"
+                        : "text-muted-foreground"
+                  }
                 >
                   <Check className="mr-1 size-3" />
-                  {linkedAccount.isActive ? "Connected" : "Disabled"}
+                  {statusLabel}
                 </Badge>
               )}
               {isLinked && linkedAccount.tokenExpired && (
@@ -371,6 +382,11 @@ function ToolCard({
                   }`
                 : provider.description}
             </p>
+            {isLinked && requiresSetup && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                This tool will become active after it sends its first event to DB90.
+              </p>
+            )}
           </div>
         </div>
 
@@ -387,14 +403,16 @@ function ToolCard({
                   Reconnect
                 </Button>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onToggleActive?.(linkedAccount.id, !linkedAccount.isActive)}
-                disabled={isToggling}
-              >
-                {linkedAccount.isActive ? "Disable" : "Enable"}
-              </Button>
+              {!requiresSetup && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onToggleActive?.(linkedAccount.id, isActive ? "inactive" : "active")}
+                  disabled={isToggling}
+                >
+                  {isActive ? "Disable" : "Enable"}
+                </Button>
+              )}
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="ghost" size="icon">
@@ -491,10 +509,13 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
     }
   };
 
-  const handleToggleActive = async (accountId: string, isActive: boolean) => {
+  const handleToggleActive = async (
+    accountId: string,
+    connectionState: "inactive" | "active"
+  ) => {
     if (!selectedOrgId) return;
     try {
-      await updateAccount.mutateAsync({ orgId: selectedOrgId, accountId, isActive });
+      await updateAccount.mutateAsync({ orgId: selectedOrgId, accountId, connectionState });
     } catch (error) {
       console.error("Failed to update account status:", error);
     }

@@ -70,6 +70,7 @@ vi.mock("@/hooks/useApi", () => {
   useCreateToolAccount: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteToolAccount: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateToolAccount: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useRegenerateIngestToken: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useOrganizationMembers: () => ({
     data: [
       {

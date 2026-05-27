@@ -29,6 +29,7 @@ module Api
 
         raw_key = store_raw_event(request.raw_post, org)
         workflow_result = start_ingestion_workflow(raw_key, event_params, org)
+        activate_tool_account_if_needed!
 
         data = { accepted: true, rawEventKey: raw_key }
         data[:workflowId] = workflow_result[:workflow_id] if workflow_result[:workflow_id]
@@ -122,6 +123,12 @@ module Api
         end
 
         { workflow_id: nil, tool_event_id: tool_event.id, fallback: true }
+      end
+
+      def activate_tool_account_if_needed!
+        return unless @tool_account.may_activate_connection?
+
+        @tool_account.activate_connection!
       end
 
       def permitted_params
