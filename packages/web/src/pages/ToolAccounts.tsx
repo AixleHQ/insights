@@ -408,7 +408,11 @@ function ToolCard({
             </div>
             <p className="mt-0.5 text-sm text-muted-foreground">
               {isLinked
-                ? `Linked as ${linkedAccount.externalUsername || linkedAccount.externalUserId}`
+                ? `Linked as ${
+                    linkedAccount.externalUsername ||
+                    linkedAccount.externalUserId ||
+                    "DB90"
+                  }`
                 : provider.description}
             </p>
           </div>

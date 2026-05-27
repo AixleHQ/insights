@@ -171,6 +171,15 @@ describe("ToolAccounts", () => {
       expect(screen.getByText("Linked as user-123")).toBeInTheDocument();
     });
 
+    it("falls back to DB90 when no external linked identity is available", () => {
+      mockUseToolAccounts.mockReturnValue({
+        data: [mockAccount({ externalUsername: null, externalUserId: null })],
+        isLoading: false,
+      });
+      renderToolAccounts();
+      expect(screen.getByText("Linked as DB90")).toBeInTheDocument();
+    });
+
     it('shows "all tools connected" message when no providers are available', async () => {
       // Mock all 14 toolProviders as connected by providing accounts for each
       const allToolNames = [

@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { formatCost, formatTokens, getEventActorLabel, EventAttribution } from "./formatters";
+import {
+  formatCost,
+  formatTokens,
+  formatDateTime,
+  formatLongUsDate,
+  getEventActorLabel,
+  EventAttribution,
+} from "./formatters";
 
 describe("formatCost", () => {
   it("returns $0.00 for zero", () => {
@@ -34,6 +41,33 @@ describe("formatTokens", () => {
 
   it("returns M suffix for millions", () => {
     expect(formatTokens(1200000)).toBe("1.2M");
+  });
+});
+
+describe("formatDateTime", () => {
+  it("returns em dash for null, undefined, empty, and invalid", () => {
+    expect(formatDateTime(null)).toBe("—");
+    expect(formatDateTime(undefined)).toBe("—");
+    expect(formatDateTime("")).toBe("—");
+    expect(formatDateTime("   ")).toBe("—");
+    expect(formatDateTime("not-a-date")).toBe("—");
+  });
+
+  it("returns a non-empty en-US datetime for valid ISO", () => {
+    const s = formatDateTime("2024-06-15T14:30:00.000Z");
+    expect(s).not.toBe("—");
+    expect(s.length).toBeGreaterThan(4);
+    expect(s).toMatch(/2024/);
+  });
+});
+
+describe("formatLongUsDate", () => {
+  it("returns em dash for invalid Date", () => {
+    expect(formatLongUsDate(new Date(Number.NaN))).toBe("—");
+  });
+
+  it("formats June 15, 2024 in en-US long form", () => {
+    expect(formatLongUsDate(new Date(2024, 5, 15))).toMatch(/June\s+15,\s+2024/);
   });
 });
 

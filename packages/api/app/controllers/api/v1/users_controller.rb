@@ -83,6 +83,35 @@ module Api
         }
       end
 
+      # GET /api/v1/users/me/tool_accounts
+      # Requires X-Organization-ID. Lists ingest-capable accounts for the current membership only.
+      def tool_accounts
+        authorize! current_user, to: :tool_accounts?
+        require_organization!
+        return unless current_organization
+
+        membership = current_user.organization_memberships.find_by!(organization: current_organization)
+        accounts = membership.user_tool_accounts
+                               .where(tool_name: UserToolAccount::INGEST_TOOLS)
+                               .order(:tool_name)
+
+        last_used_by_tool = ToolEvent
+          .where(
+            organization_id: current_organization.id,
+            user_id: current_user.id,
+            tool_name: UserToolAccount::INGEST_TOOLS
+          )
+          .group(:tool_name)
+          .maximum(:occurred_at)
+
+        render json: {
+          data: MeToolAccountMetadataSerializer.new(
+            accounts,
+            params: { last_used_by_tool: last_used_by_tool }
+          ).serialize
+        }
+      end
+
       # PUT /api/v1/users/me/settings/:key
       def update_setting
         authorize! current_user, to: :settings?

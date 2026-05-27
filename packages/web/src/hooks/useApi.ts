@@ -52,6 +52,8 @@ import type {
   RetentionPurgeLog,
   UserPersonalSettings,
   NotificationRoute,
+  MyToolAccountMetadata,
+  McpIngestExchangeData,
 } from "@/lib/types";
 
 // Query keys factory
@@ -60,6 +62,7 @@ export const queryKeys = {
     current: ["user", "current"] as const,
     organizations: ["user", "organizations"] as const,
     settings: ["user", "settings"] as const,
+    myToolAccounts: (orgId: string) => ["user", "me", "tool_accounts", orgId] as const,
   },
   organizations: {
     all: ["organizations"] as const,
@@ -1409,6 +1412,7 @@ export function useCreateToolAccount() {
       }),
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.toolAccounts.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.myToolAccounts(orgId) });
     },
   });
 }
@@ -1421,6 +1425,7 @@ export function useDeleteToolAccount() {
       api.delete(`/organizations/${orgId}/tool_accounts/${accountId}`),
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.toolAccounts.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.myToolAccounts(orgId) });
     },
   });
 }
@@ -1446,6 +1451,7 @@ export function useUpdateToolAccount() {
       }),
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.toolAccounts.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.myToolAccounts(orgId) });
     },
   });
 }
@@ -1457,6 +1463,44 @@ export function useRegenerateIngestToken() {
     mutationFn: ({ orgId, accountId }: { orgId: string; accountId: string }) =>
       api.post<{ data: ToolAccount }>(`/organizations/${orgId}/tool_accounts/${accountId}/regenerate_token`),
     onSuccess: (_, { orgId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.toolAccounts.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.myToolAccounts(orgId) });
+    },
+  });
+}
+
+export function useMyToolAccounts(orgId: string) {
+  return useQuery({
+    queryKey: queryKeys.user.myToolAccounts(orgId),
+    queryFn: async () => {
+      const response = await api.get<{ data: MyToolAccountMetadata[] }>("/users/me/tool_accounts", {
+        headers: { "X-Organization-ID": orgId },
+      });
+      return response.data;
+    },
+    enabled: !!orgId,
+    staleTime: 60_000,
+  });
+}
+
+export function useMcpIngestExchange() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ toolName, orgId }: { toolName: string; orgId: string }) => {
+      const response = await api.post<{ data: McpIngestExchangeData }>(
+        "/integrations/mcp/exchange",
+        {
+          tool_name: toolName,
+        },
+        {
+          headers: { "X-Organization-ID": orgId },
+        }
+      );
+      return response.data;
+    },
+    onSuccess: (_data, { orgId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.myToolAccounts(orgId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.toolAccounts.all(orgId) });
     },
   });
