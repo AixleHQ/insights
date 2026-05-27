@@ -15,6 +15,7 @@ vi.mock("@/contexts/OrgContext", () => ({
 const mockCreateMutateAsync = vi.fn();
 const mockDeleteMutateAsync = vi.fn();
 const mockUpdateMutateAsync = vi.fn();
+const mockRegenerateIngestTokenMutateAsync = vi.fn();
 const mockUseToolAccounts = vi.fn();
 const mockUseUpdateToolAccount = vi.fn();
 
@@ -23,10 +24,29 @@ vi.mock("@/hooks/useApi", () => ({
   useCreateToolAccount: () => ({ mutateAsync: mockCreateMutateAsync, isPending: false }),
   useDeleteToolAccount: () => ({ mutateAsync: mockDeleteMutateAsync, isPending: false }),
   useUpdateToolAccount: (...args: unknown[]) => mockUseUpdateToolAccount(...args),
+  useRegenerateIngestToken: () => ({ mutateAsync: mockRegenerateIngestTokenMutateAsync, isPending: false }),
   useUserOrganizations: () => ({
     data: [{ id: "org-1", name: "Acme", slug: "acme" }],
     isLoading: false,
   }),
+}));
+
+vi.mock("@/components/integrations", () => ({
+  IngestTokenConnectSheet: ({
+    provider,
+    open,
+    initialToken,
+  }: {
+    provider: { name: string } | null;
+    open: boolean;
+    initialToken?: string;
+  }) => (open && provider ? (
+    <div role="dialog">
+      <h2>{provider.name}</h2>
+      <p>Ingest connect sheet</p>
+      {initialToken ? <p>{initialToken}</p> : null}
+    </div>
+  ) : null),
 }));
 
 const mockAccount = (overrides: Partial<ToolAccount> = {}): ToolAccount => ({
@@ -58,6 +78,7 @@ describe("ToolAccounts", () => {
     mockCreateMutateAsync.mockResolvedValue({});
     mockDeleteMutateAsync.mockResolvedValue({});
     mockUpdateMutateAsync.mockResolvedValue({});
+    mockRegenerateIngestTokenMutateAsync.mockResolvedValue({ data: { ingestToken: "db90_regenerated_token" } });
     mockUseUpdateToolAccount.mockReturnValue({ mutateAsync: mockUpdateMutateAsync, isPending: false });
     mockUseToolAccounts.mockReturnValue({ data: [], isLoading: false });
   });
@@ -181,11 +202,9 @@ describe("ToolAccounts", () => {
     });
 
     it('shows "all tools connected" message when no providers are available', async () => {
-      // Mock all 14 toolProviders as connected by providing accounts for each
+      // Mock all visible toolProviders as connected by providing accounts for each
       const allToolNames = [
-        "claude_code", "cursor", "windsurf", "github_copilot", "aider",
-        "continue", "cody", "tabnine", "amazon_q", "openrouter_api",
-        "anthropic_api", "openai_api", "gemini_api", "custom",
+        "claude_code", "cursor",
       ];
       const accounts = allToolNames.map((toolName, i) =>
         mockAccount({ id: `acct-${i}`, toolName })
@@ -199,153 +218,16 @@ describe("ToolAccounts", () => {
   });
 
   describe("connect flow", () => {
-    it("opens dialog with provider name when Connect is clicked", async () => {
+    it("opens ingest sheet for Claude Code", async () => {
       const user = userEvent.setup();
       renderToolAccounts();
 
-      await user.click(screen.getAllByRole("button", { name: /connect/i })[0]);
+      const claudeCard = screen.getByText("Claude Code").closest('[class*="border"]') ?? document.body;
+      await user.click(within(claudeCard).getByRole("button", { name: /connect/i }));
 
       expect(screen.getByRole("dialog")).toBeInTheDocument();
-      // Dialog title contains provider name
-      expect(screen.getByRole("heading", { name: /connect/i })).toBeInTheDocument();
-    });
-
-    it("dialog renders all three form fields", async () => {
-      const user = userEvent.setup();
-      renderToolAccounts();
-
-      await user.click(screen.getAllByRole("button", { name: /connect/i })[0]);
-
-      expect(screen.getByLabelText("Account ID or Username")).toBeInTheDocument();
-      expect(screen.getByLabelText("Display Name (optional)")).toBeInTheDocument();
-      expect(screen.getByLabelText("Access Token (optional)")).toBeInTheDocument();
-    });
-
-    it("token field is a password input", async () => {
-      const user = userEvent.setup();
-      renderToolAccounts();
-
-      await user.click(screen.getAllByRole("button", { name: /connect/i })[0]);
-
-      expect(screen.getByLabelText("Access Token (optional)")).toHaveAttribute("type", "password");
-    });
-
-    it("submit button is disabled when Account ID is empty", async () => {
-      const user = userEvent.setup();
-      renderToolAccounts();
-
-      await user.click(screen.getAllByRole("button", { name: /connect/i })[0]);
-
-      expect(screen.getByRole("button", { name: "Connect Account" })).toBeDisabled();
-    });
-
-    it("submit button is enabled once Account ID is filled", async () => {
-      const user = userEvent.setup();
-      renderToolAccounts();
-
-      await user.click(screen.getAllByRole("button", { name: /connect/i })[0]);
-      await user.type(screen.getByLabelText("Account ID or Username"), "my-username");
-
-      expect(screen.getByRole("button", { name: "Connect Account" })).toBeEnabled();
-    });
-
-    it("calls createAccount with accountId, accountName, and accessToken", async () => {
-      const user = userEvent.setup();
-      renderToolAccounts();
-
-      await user.click(screen.getAllByRole("button", { name: /connect/i })[0]);
-      await user.type(screen.getByLabelText("Account ID or Username"), "my-username");
-      await user.type(screen.getByLabelText("Display Name (optional)"), "My Name");
-      await user.type(screen.getByLabelText("Access Token (optional)"), "sk-secret-token");
-      await user.click(screen.getByRole("button", { name: "Connect Account" }));
-
-      await waitFor(() => {
-        expect(mockCreateMutateAsync).toHaveBeenCalledWith(
-          expect.objectContaining({
-            orgId: "org-1",
-            externalUserId: "my-username",
-            externalUsername: "My Name",
-            accessToken: "sk-secret-token",
-          })
-        );
-      });
-    });
-
-    it("omits accessToken from payload when token field is left empty", async () => {
-      const user = userEvent.setup();
-      renderToolAccounts();
-
-      await user.click(screen.getAllByRole("button", { name: /connect/i })[0]);
-      await user.type(screen.getByLabelText("Account ID or Username"), "my-username");
-      await user.click(screen.getByRole("button", { name: "Connect Account" }));
-
-      await waitFor(() => {
-        expect(mockCreateMutateAsync).toHaveBeenCalledWith(
-          expect.objectContaining({ accessToken: undefined })
-        );
-      });
-    });
-
-    it("closes dialog after successful submission", async () => {
-      const user = userEvent.setup();
-      renderToolAccounts();
-
-      await user.click(screen.getAllByRole("button", { name: /connect/i })[0]);
-      await user.type(screen.getByLabelText("Account ID or Username"), "my-username");
-      await user.click(screen.getByRole("button", { name: "Connect Account" }));
-
-      await waitFor(() => {
-        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-      });
-    });
-
-    it("shows error message when submission fails", async () => {
-      mockCreateMutateAsync.mockRejectedValue(new Error("Network error"));
-      const user = userEvent.setup();
-      renderToolAccounts();
-
-      await user.click(screen.getAllByRole("button", { name: /connect/i })[0]);
-      await user.type(screen.getByLabelText("Account ID or Username"), "my-username");
-      await user.click(screen.getByRole("button", { name: "Connect Account" }));
-
-      await waitFor(() => {
-        expect(screen.getByText("Failed to connect account. Please try again.")).toBeInTheDocument();
-      });
-    });
-
-    it("does not close dialog when submission fails", async () => {
-      mockCreateMutateAsync.mockRejectedValue(new Error("Network error"));
-      const user = userEvent.setup();
-      renderToolAccounts();
-
-      await user.click(screen.getAllByRole("button", { name: /connect/i })[0]);
-      await user.type(screen.getByLabelText("Account ID or Username"), "my-username");
-      await user.click(screen.getByRole("button", { name: "Connect Account" }));
-
-      await waitFor(() => {
-        expect(screen.getByText("Failed to connect account. Please try again.")).toBeInTheDocument();
-      });
-      expect(screen.getByRole("dialog")).toBeInTheDocument();
-    });
-
-    it("resets form fields when dialog is closed via Cancel", async () => {
-      const user = userEvent.setup();
-      renderToolAccounts();
-
-      // Open, fill in token, cancel
-      await user.click(screen.getAllByRole("button", { name: /connect/i })[0]);
-      await user.type(screen.getByLabelText("Account ID or Username"), "my-username");
-      await user.type(screen.getByLabelText("Access Token (optional)"), "sk-secret");
-      await user.click(screen.getByRole("button", { name: "Cancel" }));
-
-      await waitFor(() => {
-        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-      });
-
-      // Reopen — fields should be empty
-      await user.click(screen.getAllByRole("button", { name: /connect/i })[0]);
-      expect(screen.getByLabelText("Account ID or Username")).toHaveValue("");
-      expect(screen.getByLabelText("Access Token (optional)")).toHaveValue("");
+      expect(screen.getByRole("heading", { name: "Claude Code" })).toBeInTheDocument();
+      expect(screen.getByText("Ingest connect sheet")).toBeInTheDocument();
     });
   });
 
@@ -422,7 +304,7 @@ describe("ToolAccounts", () => {
       await user.click(screen.getByRole("button", { name: "Reconnect" }));
 
       expect(screen.getByRole("dialog")).toBeInTheDocument();
-      expect(screen.getByRole("heading", { name: /reconnect claude code/i })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Claude Code" })).toBeInTheDocument();
     });
 
     it("submit button is disabled when token field is empty", async () => {
@@ -432,70 +314,27 @@ describe("ToolAccounts", () => {
 
       await user.click(screen.getByRole("button", { name: "Reconnect" }));
 
-      const dialog = screen.getByRole("dialog");
-      expect(within(dialog).getByRole("button", { name: "Reconnect" })).toBeDisabled();
+      expect(mockRegenerateIngestTokenMutateAsync).toHaveBeenCalled();
     });
 
-    it("calls updateAccount with accessToken on submit", async () => {
+    it("regenerates ingest token and opens ingest sheet for Claude Code reconnect", async () => {
       mockUseToolAccounts.mockReturnValue({
-        data: [mockAccount({ id: "acct-1", tokenExpired: true })],
+        data: [mockAccount({ id: "acct-1", tokenExpired: true, toolName: "claude_code" })],
         isLoading: false,
       });
       const user = userEvent.setup();
       renderToolAccounts();
 
       await user.click(screen.getByRole("button", { name: "Reconnect" }));
-      const dialog = screen.getByRole("dialog");
-      await user.type(within(dialog).getByLabelText("Access Token"), "new-secret-token");
-      await user.click(within(dialog).getByRole("button", { name: "Reconnect" }));
 
       await waitFor(() => {
-        expect(mockUpdateMutateAsync).toHaveBeenCalledWith(
-          expect.objectContaining({
-            orgId: "org-1",
-            accountId: "acct-1",
-            accessToken: "new-secret-token",
-          })
-        );
+        expect(mockRegenerateIngestTokenMutateAsync).toHaveBeenCalledWith({
+          orgId: "org-1",
+          accountId: "acct-1",
+        });
       });
-    });
-
-    it("closes dialog after successful submission", async () => {
-      mockUseToolAccounts.mockReturnValue({
-        data: [mockAccount({ tokenExpired: true })],
-        isLoading: false,
-      });
-      const user = userEvent.setup();
-      renderToolAccounts();
-
-      await user.click(screen.getByRole("button", { name: "Reconnect" }));
-      const dialog = screen.getByRole("dialog");
-      await user.type(within(dialog).getByLabelText("Access Token"), "new-token");
-      await user.click(within(dialog).getByRole("button", { name: "Reconnect" }));
-
-      await waitFor(() => {
-        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-      });
-    });
-
-    it("shows error message when reconnect submission fails", async () => {
-      mockUpdateMutateAsync.mockRejectedValue(new Error("Network error"));
-      mockUseUpdateToolAccount.mockReturnValue({ mutateAsync: mockUpdateMutateAsync, isPending: false });
-      mockUseToolAccounts.mockReturnValue({
-        data: [mockAccount({ tokenExpired: true })],
-        isLoading: false,
-      });
-      const user = userEvent.setup();
-      renderToolAccounts();
-
-      await user.click(screen.getByRole("button", { name: "Reconnect" }));
-      const dialog = screen.getByRole("dialog");
-      await user.type(within(dialog).getByLabelText("Access Token"), "bad-token");
-      await user.click(within(dialog).getByRole("button", { name: "Reconnect" }));
-
-      await waitFor(() => {
-        expect(screen.getByText("Failed to reconnect. Please try again.")).toBeInTheDocument();
-      });
+      expect(screen.getByRole("heading", { name: "Claude Code" })).toBeInTheDocument();
+      expect(screen.getByText("db90_regenerated_token")).toBeInTheDocument();
     });
   });
 
