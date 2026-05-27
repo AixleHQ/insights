@@ -2,27 +2,6 @@
 
 > For commands, agents, skills, workflows, and reference docs (Makefile cheatsheet, git conventions, worktree setup), see [AGENTS.md](AGENTS.md).
 
-## Executor / Advisor Pattern
-
-This project uses the [Advisor Strategy](https://claude.com/blog/the-advisor-strategy): Sonnet executes, Opus advises. Default behavior for all substantive work — no per-command wiring.
-
-**Escalate to Opus before proceeding when:**
-- Writing or modifying source files that others depend on (components, controllers, migrations, services, policies)
-- Making an architectural decision (new pattern, new abstraction, data model change, choosing between approaches)
-- A single task touches more than 3 files
-- You are uncertain which approach is correct
-
-**How to escalate:**
-```
-Spawn Agent(model=opus):
-  - What you are about to do
-  - The key decision point(s)
-  - Your proposed approach and any alternatives considered
-→ Execute within the guidance returned. Do not deviate without re-escalating.
-```
-
-**Do not escalate for:** reference lookups, single-file edits matching an existing pattern, lint/typo fixes, tests matching existing patterns.
-
 ## Stack
 
 - Backend: Ruby 3.4.8, Rails 8.1.2 API-only, PostgreSQL 17 + TimescaleDB, RSpec
@@ -181,7 +160,7 @@ Whenever a developer (or Claude) enters plan mode and the work is expected to sp
 
 ### Task sizing — every task must fit Sonnet 4.6 without compaction
 
-The implementation session for any task must fit Sonnet 4.6's 200K context window without forcing compaction. Compaction loses fidelity on locked decisions and degrades quality. Sized tasks let the team default to cheap Sonnet executors.
+The implementation session for any task must fit Sonnet 4.6's 200K context window without forcing compaction. Compaction loses fidelity on locked decisions and degrades quality.
 
 **Per-task budget** (working set during implementation):
 
@@ -223,57 +202,3 @@ Output is a markdown table classifying each task as ✅ green (≤ 80K), ⚠️ 
 **Default: one ticket = one PR.** Use option 2 only when there is a concrete reason to ship subsystems separately.
 
 The plan-task-budget script doesn't distinguish between sub-tasks and standalone tasks — both must fit individually. Sub-tasks share a branch but each must still pass the 130K budget check on its own.
-
-## PR cost footer (advisor/executor accounting)
-
-Every PR ends with a cost footer that compares **three strategies on the same workload**:
-
-- **A. Single Sonnet** — no pattern, no advisor, no model split.
-- **B. Single Opus** — no pattern, no advisor, no model split.
-- **C. Pattern** — Sonnet (or Opus) executor + N Opus advisor calls.
-
-Two delta lines (C vs A, C vs B) and one bottom-line decision string answer the actual question: **is the advisor/executor pattern worth using on this PR?**
-
-**Generate with:**
-
-```bash
-node --experimental-strip-types --no-warnings .claude/scripts/pr-cost-footer.ts \
-  --ref develop..HEAD \
-  --executor sonnet \
-  --advisor-calls 2
-```
-
-Flags:
-- `--ref` — git range, default `develop..HEAD`. Use `<base-branch>..HEAD` for stacked PRs.
-- `--executor` — `sonnet` (default, recommended) or `opus`. Pass what you actually ran, not what was recommended.
-- `--advisor-calls` — count of `advisor()` invocations or `Agent(model=opus)` spawns this session. Default 2.
-
-**Append the script's stdout to the PR body** after the test plan.
-
-### How to read the bottom-line decision
-
-The script returns one of three verdicts:
-
-| Verdict | What it means | Lever to pull |
-|---|---|---|
-| ✅ **pattern is the cheapest option** | Pattern beat both single-Sonnet and single-Opus. Rare; only on huge sessions. | Keep using the pattern. |
-| **pattern is a quality premium of $X over single Sonnet** | Pattern adds advisor-call fixed cost on top of executor cost. The $X is what you're paying for the advisor's deeper reasoning. | Keep using the pattern only if those advisor calls prevent rework worth more than $X (typical break-even: an advisor call that catches a logic bug saves > $1.20 in engineering time). |
-| ⚠️ **pattern is the most expensive option** | Both levers hurt — Opus executor on a small PR with too many advisor calls. | Switch executor to Sonnet *or* drop advisor calls (or both). |
-
-### What the pattern actually buys
-
-The advisor/executor pattern **does not reduce token cost vs single-Sonnet** for typical PR sizes. Single-Sonnet has the same caching benefit as the pattern's executor; the pattern strictly *adds* the advisor's tokens on top. The pattern is a **quality strategy** — Opus's deeper reasoning on architectural / security-sensitive moments is the value, not raw cost reduction.
-
-The pattern *does* reduce cost vs single-Opus, because the Sonnet executor is 5× cheaper per token. So:
-
-- If you'd reach for Opus anyway → pattern saves money (use it).
-- If you'd reach for Sonnet anyway → pattern adds quality at a per-PR premium (use it only on PRs where decision quality matters: architectural changes, security-sensitive code, ambiguous specs, large refactors).
-
-### Aggregate signal
-
-Track the bottom-line verdict across PRs over time:
-- ✅ trending across many small PRs → genuine pattern wins; team is using it well.
-- "quality premium" trending → pattern is being used for quality on routine work; check whether advisor calls are catching real issues in review.
-- ⚠️ trending → pattern is being applied to PRs that don't need it; nudge default-Sonnet, fewer advisor calls.
-
-Estimates are heuristic (±50%), based on git diff size + standard model rates. The point is the *ratio*, not exact billing.

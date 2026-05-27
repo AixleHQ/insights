@@ -27,31 +27,15 @@ Works identically in Claude Code CLI (terminal) and in Agent SDK sessions. Same 
 
 ```mermaid
 flowchart TD
-    User[User request] --> Router{Router\nclassify task}
-    Router -->|trivial| SoloHaiku[Haiku solo]
-    Router -->|standard| Planner
-    Router -->|high-complexity| OpusDirect[Opus executor\nno advisor]
-
-    Planner[Planner - Opus\nproduces written plan] --> Executor
-
-    Executor[Executor - Sonnet/Haiku\nbound to plan\n+ escalation tripwires] -->|tripwire fires| Advisor[Advisor - Opus\nreturns guidance]
-    Advisor --> Executor
-
-    Executor --> Reviewer{Reviewer gate\nauto-runs on\nflagged paths}
-    SoloHaiku --> Reviewer
-    OpusDirect --> Reviewer
-
+    User[User request] --> Work[Claude does the work\nbound to skills + tripwires]
+    Work --> Reviewer{Reviewer gate\nauto-runs on\nflagged paths}
     Reviewer -->|pass| CI[CI hooks\nRuboCop / ESLint / Swagger diff]
-    Reviewer -->|fail| Executor
+    Reviewer -->|fail| Work
     CI -->|pass| Done[Merged]
-    CI -->|fail| Executor
+    CI -->|fail| Work
 ```
 
-### Why this shape
-
-Anthropic's Advisor Strategy (Sonnet executor + Opus advisor) promises Opus quality at Sonnet cost. Real-world testing showed a failure mode: **the executor cannot reliably self-identify when to escalate.** We address that with five layers of defense rather than trusting the executor alone.
-
-> **Note:** The Router and Planner boxes in this diagram are **aspirational**. Current implementation relies on hard-coded tripwires in executor agents + reviewer/auditor gates + CI hooks. The Router is manual today — the engineer chooses the right command. The Planner is the "call advisor before starting" step in the executor timing block, not a separate agent.
+Reviewer/auditor agents gate sensitive paths; CI hooks backstop everything. The model itself is single-tier — no executor/advisor split.
 
 ---
 
@@ -102,7 +86,7 @@ Type `/` in Claude Code to see them all autocomplete. Not sure which to use? Jus
 | `/onboard` | *"I'm new, walk me through this"* | — (guided) |
 | `/review-architecture` | Before a big PR — deep architectural review | Reviewer agents |
 | `/review-commit` | Pre-push sanity check | Reviewer agents |
-| `/review-changes` | Risk-scored review: runs `risk-score.ts` (tier + 2-hop callers + churn + method coverage) → escalates HIGH/CRITICAL to Opus advisor | Reviewer agents |
+| `/review-changes` | Risk-scored review: runs `risk-score.ts` (tier + 2-hop callers + churn + method coverage) | Reviewer agents |
 | `/debug-issue` | Hunting a specific bug | — |
 | `/migrate-component` | Migrating one component to new design system | component-builder + component-reviewer + ui-visual-reviewer |
 | `/manage-worktrees` | Creating/opening/cleaning worktrees | — |
@@ -115,7 +99,7 @@ Every agent is either an **executor** (does work) or a **reviewer** (gates work)
 ```mermaid
 flowchart TB
     subgraph Executors
-      CB[component-builder\nSonnet + Opus advisor]
+      CB[component-builder\nSonnet]
     end
     subgraph Reviewers
       SA[swagger-auditor\nHaiku]
@@ -131,7 +115,7 @@ flowchart TB
 | Agent | Role | Scope | Model |
 |---|---|---|---|
 | `swagger-auditor` | Auditor (hard gate) | Controller diff + swagger.yaml diff | Haiku |
-| `component-builder` | Executor | Figma node → shadcn/Radix component | Sonnet + Opus advisor |
+| `component-builder` | Executor | Figma node → shadcn/Radix component | Sonnet |
 | `component-reviewer` | Reviewer | Token usage, dark mode, a11y | Sonnet |
 | `ui-visual-reviewer` | Reviewer | Screenshots in both themes, visual regression | Sonnet |
 
@@ -156,8 +140,7 @@ flowchart LR
 
 Triggered by Claude Code events, not the model. Run shell commands; output is visible to Claude but side effects (e.g. RuboCop auto-correct) apply immediately.
 
-- `PostToolUse` on `Edit|Write` → `on-edit-lint.ts` runs ESLint/RuboCop on just the edited file and prints a **green Haiku banner** to stderr so you can see the lightweight executor is active (Node.js, cross-platform — works on Windows, macOS, and Linux).
-- `PreToolUse` on `Agent` → `model-indicator.ts` prints a colored model banner before every agent spawn: **red = Opus advisor**, **yellow = Sonnet executor**, **green = Haiku executor**. Also callable directly via Bash (`node model-indicator.ts opus`) for visible banners in the execution steps panel.
+- `PostToolUse` on `Edit|Write` → `on-edit-lint.ts` runs ESLint/RuboCop on just the edited file (Node.js, cross-platform — works on Windows, macOS, and Linux).
 - Pre-approved Bash permissions remove prompt fatigue for safe commands.
 
 ---
@@ -195,15 +178,12 @@ sequenceDiagram
     participant MC as /migrate-component
     participant Figma as Figma MCP
     participant Builder as component-builder (executor)
-    participant Advisor as Opus advisor
     participant Reviewer as component-reviewer (reviewer)
     participant Visual as ui-visual-reviewer
 
     Dev->>MC: /migrate-component Button
     MC->>Figma: get_design_context + get_code_connect_map
     MC->>Builder: execute build
-    Builder->>Advisor: tripwire: new variant detected
-    Advisor-->>Builder: guidance
     Builder-->>MC: new Button.tsx
     MC->>Reviewer: gate
     Reviewer-->>MC: token violations: none ✓
@@ -247,21 +227,6 @@ flowchart TD
 ```
 
 ---
-
-## Advisor pattern — Claude Code
-
-The executor/advisor pattern in this repo is implemented entirely within Claude Code tooling (no API-layer advisor tool needed):
-
-- **Executor agents** (Sonnet) do the work with hard-coded tripwires that force a reviewer call at decision points.
-- **Reviewer/auditor agents** act as the advisor — they return findings and pass/fail verdicts, not code.
-- **Model pairing**: executors use `claude-sonnet-4-6`; complex decisions escalate to `claude-opus-4-7` (or the latest stable Opus) via the Task tool.
-
-The timing block every executor follows: call reviewer/advisor **before** substantive work, **when stuck**, **when changing approach**, and **before declaring done**. Never silently switch when evidence conflicts — surface the conflict via another call.
-
-| Executor | When to escalate to Opus |
-|---|---|
-| `component-builder` | Any of the 5 hard-coded tripwires fires |
-| Other executors | When task complexity exceeds routine work |
 
 ## UI tooling stack
 
@@ -360,7 +325,7 @@ claude
 3. Claude edits the page; TanStack Query handles fetching.
 4. `on-edit-lint` hook runs ESLint automatically.
 5. Manually verify in browser at `http://localhost:5173`.
-6. `/review-changes` before pushing — risk-scored review (runs `risk-score.ts`, escalates to Opus if HIGH/CRITICAL).
+6. `/review-changes` before pushing — risk-scored review (runs `risk-score.ts`).
 
 ### D. Debug a bug
 
@@ -371,7 +336,7 @@ claude
 ### E. Pre-PR architecture review
 
 1. `/review-architecture` — deep dive on maintainability, security, performance.
-2. `/review-changes` — risk-scored review (runs `risk-score.ts`, escalates to Opus if HIGH/CRITICAL).
+2. `/review-changes` — risk-scored review (runs `risk-score.ts`).
 3. `/review-commit` — lint + test context.
 4. All three together before a non-trivial PR.
 

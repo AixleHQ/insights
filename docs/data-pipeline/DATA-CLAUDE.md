@@ -505,45 +505,6 @@ sequenceDiagram
 
 ---
 
-### 2.9 `advisor()` calls (Sonnet → Opus escalation)
-
-**Source.** No native vendor surface — `advisor()` is a DB90 convention (see `CLAUDE.md` Executor/Advisor Pattern). At runtime, the advisor surfaces as either:
-- A nested `Task` tool call with `subagent_type` ≈ "advisor" / an Opus model name, OR
-- An out-of-band Opus API call by the Sonnet executor that arrives in the same JSONL (no special discriminator, but `model` flips to `claude-opus-4-7` for the advisor turn).
-
-**Cadence.** Per executor decision point. Typical PR: 2 advisor calls per Sonnet session.
-
-**Granularity knobs (DB90-side, not vendor):**
-- Per-session count is captured in PR footer via `.claude/scripts/pr-cost-footer.ts --advisor-calls N`.
-- The executor model is controlled by `ANTHROPIC_DEFAULT_OPUS_MODEL` / `ANTHROPIC_DEFAULT_SONNET_MODEL` env vars.
-
-**Fields available for distinguishing an advisor turn:**
-- `entry.message.model` — the Opus model ID flips to `claude-opus-4-7` on advisor turns.
-- `entry.requestId` — distinct per HTTP request, can be joined to OTEL `claude_code.api_request` events.
-- `query_source` attribute on OTEL `claude_code.api_request` events — distinguishes `main` vs `subagent` vs `auxiliary`.
-
-**Anonymized example — model-flip pattern in JSONL:**
-
-```json
-[
-  { "type": "assistant", "message": { "model": "claude-sonnet-4-6", "usage": { /* Sonnet usage */ } } },
-  { "type": "assistant", "message": { "model": "claude-opus-4-7",   "usage": { /* Opus usage  */ } } },
-  { "type": "assistant", "message": { "model": "claude-sonnet-4-6", "usage": { /* Sonnet usage */ } } }
-]
-```
-
-```mermaid
-flowchart LR
-    A[Sonnet executor turn] -->|decision point| B[advisor call]
-    B -->|model=claude-opus-4-7| C[Opus reasoning turn]
-    C --> D[Sonnet resumes with guidance]
-    D --> E[Sonnet implements]
-```
-
-This is a per-session escalation cost knob that `db90-claude` currently can't disambiguate from a "user manually switched models" event. Adding `metadata.advisor_model` (TOKENS.md §8 #3) requires only the model-flip detection above.
-
----
-
 ### 2.10 File edits / writes (with diff size as a metric)
 
 **Source.** Two signals overlap:
@@ -764,12 +725,11 @@ Six diagrams are embedded above (one per major domain that warrants visualizatio
 3. **§2.5** Session lifecycle with hook firing order (`sequenceDiagram`).
 4. **§2.6** Hook control flow over a turn (`flowchart TD`).
 5. **§2.8** Subagent dispatch (`sequenceDiagram`).
-6. **§2.9** Advisor escalation (`flowchart LR`).
-7. **§2.11** Agent SDK loop (`flowchart LR`).
-8. **§2.12** Session ↔ Message ↔ Content_block ER diagram (`erDiagram`).
-9. **§2.13** JSONL vs OTEL ingestion paths (`flowchart LR`).
+6. **§2.11** Agent SDK loop (`flowchart LR`).
+7. **§2.12** Session ↔ Message ↔ Content_block ER diagram (`erDiagram`).
+8. **§2.13** JSONL vs OTEL ingestion paths (`flowchart LR`).
 
-Total: 9 diagrams (exceeds the ≥ 6 floor).
+Total: 8 diagrams (exceeds the ≥ 6 floor).
 
 ---
 
@@ -792,23 +752,13 @@ Where `baseInputTokens = tokensIn - cacheWriteTokens - cacheReadTokens` (recover
 
 **Known approximation #1 — TTL split.** Anthropic bills `ephemeral_5m_input_tokens` at 1.25x base and `ephemeral_1h_input_tokens` at 2x base. Our table uses a single `cache_write_per_mtok` per model (1.25x for most Sonnet/Opus rows in `pricing.ts:33-111`), which understates cost for sessions with 1h cache writes. Per query #8 the API returns the split in `usage.cache_creation.ephemeral_*_input_tokens`; we currently ignore it.
 
-**Known approximation #2 — single model per session.** `pricing.ts` header comment notes: "Sessions may use multiple models but `SessionAggregate` stores only the last-seen model. Cost is calculated as if all tokens in the session used that model." This is the model-flip-on-advisor case from §2.9 — Opus turns are billed at Sonnet rates if the last assistant turn was Sonnet.
+**Known approximation #2 — single model per session.** `pricing.ts` header comment notes: "Sessions may use multiple models but `SessionAggregate` stores only the last-seen model. Cost is calculated as if all tokens in the session used that model." When a session uses multiple models (e.g., a user switches Opus → Sonnet mid-session), only the last-seen model's pricing applies to the whole aggregate.
 
 ### 4.2 Cache writes vs cache reads
 
 A session's first turn typically has high `cache_creation_input_tokens` (cold cache write, billed at 1.25x or 2x base) and zero `cache_read_input_tokens`. Subsequent turns within the TTL window (5m or 1h) flip: `cache_read_input_tokens` dominates (0.1x base), and `cache_creation_input_tokens` is small (only the new turn's content). The ratio `cache_read / (cache_read + cache_create + base_input)` is a session **cache-hit-rate** that we don't currently surface.
 
-### 4.3 Advisor escalation cost
-
-Per `CLAUDE.md` Executor/Advisor pattern, a Sonnet executor running with N=2 advisor calls per session pays:
-
-```text
-cost_sonnet_executor + 2 * (cost_opus_advisor_call)
-```
-
-Where each advisor call adds the Opus-priced input + output for that one turn. Detection: model-flip in the JSONL (§2.9) is the only on-disk signal today. OTEL surfaces `query_source` ∈ {`main`, `subagent`, `auxiliary`} which would distinguish advisor (subagent) from main (executor).
-
-### 4.4 Model selection vs `iterations`
+### 4.3 Model selection vs `iterations`
 
 `usage.iterations` (§2.4 / §2.11) is a per-turn array of per-iteration usage blocks for agent-loop turns. Higher iteration counts = the model is using more tools per turn. This is a direct measure of agent autonomy intensity that doesn't require reading the model's text.
 

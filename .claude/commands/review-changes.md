@@ -1,5 +1,5 @@
 ---
-description: Risk-scored code review (runs risk-score.ts) with auto-escalation to Opus on HIGH/CRITICAL.
+description: Risk-scored code review (runs risk-score.ts).
 allowed-tools: Bash(git diff:*), Bash(git log:*), Bash(git grep:*), Bash(node --experimental-strip-types*), Read, Glob, Grep
 ---
 
@@ -18,33 +18,10 @@ node --experimental-strip-types --no-warnings ${CLAUDE_PROJECT_DIR}/.claude/scri
 Parse the JSON output. It contains:
 - `overall_risk` — LOW / MEDIUM / HIGH / CRITICAL
 - `overall_score` — 0–100
-- `escalate_to_advisor` — boolean
-- `escalation_reason` — human-readable trigger
 - `hard_flags_triggered` — list of rule-based overrides
 - `files[]` — per-file breakdown (tier, callers, churn, spec coverage, score)
 
-### Step 2 — Advisor escalation (tripwire)
-
-**If `escalate_to_advisor` is true**, print the Opus banner first, then spawn the advisor:
-
-```bash
-node --experimental-strip-types --no-warnings ${CLAUDE_PROJECT_DIR}/.claude/hooks/model-indicator.ts opus
-```
-
-Then spawn the advisor:
-
-```
-Spawn Agent(model=opus):
-  - What: writing a risk-scored review report for <N> files (ref: <ref_range>)
-  - Risk data: <paste the full JSON report>
-  - Key decision: <escalation_reason from JSON>
-  - Proposed approach: flag <highest-scoring file> as <risk_level> because <reason>
-→ Execute within the guidance returned. Do not deviate without re-escalating.
-```
-
-**Do NOT escalate for `overall_risk` LOW or MEDIUM with no hard flags.**
-
-### Step 3 — Read the diff
+### Step 2 — Read the diff
 
 ```bash
 git diff <ref_range>
@@ -54,7 +31,7 @@ For each file flagged HIGH or CRITICAL by the risk report:
 - Use Read to examine the file in full context
 - Use Grep to spot-check caller patterns if caller_score ≥ 20
 
-### Step 4 — Write the review report
+### Step 3 — Write the review report
 
 Group findings by risk level. Use the score report as the structural backbone — the model provides the narrative, the script provides the signal.
 
