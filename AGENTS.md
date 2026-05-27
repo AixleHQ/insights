@@ -56,18 +56,15 @@ Reviewer/auditor agents gate sensitive paths; CI hooks backstop everything. The 
 │   ├── migrate-component.md      # orchestrated component migration
 │   ├── onboard.md
 │   ├── review-architecture.md
-│   ├── review-changes.md
 │   └── review-commit.md
 ├── skills/
 │   ├── actionpolicy-check/SKILL.md  # auto-triggered — controller actions
 │   ├── design-system-guide/SKILL.md # auto-triggered — components/ui/**
 │   └── swagger-sync/SKILL.md        # auto-triggered — controllers/routes
 ├── hooks/
-│   ├── on-edit-lint.ts           # PostToolUse: ESLint/RuboCop on edited file + Haiku banner (Node.js, cross-platform)
-│   └── model-indicator.ts        # PreToolUse(Agent) + direct Bash mode: colored model banner (Opus=red, Sonnet=yellow, Haiku=green)
+│   └── on-edit-lint.ts           # PostToolUse: ESLint/RuboCop on edited file (Node.js, cross-platform)
 ├── scripts/
-│   ├── risk-score.ts             # Deterministic risk scorer — tier + 2-hop callers + churn + method coverage → JSON
-│   └── convention-check.ts       # Branch name + commit message format checker (Haiku task)
+│   └── convention-check.ts       # Branch name + commit message format checker
 ├── settings.json                 # committed, portable (DB90_COACHING=true default)
 └── settings.local.json           # gitignored, per-dev overrides
 ```
@@ -86,7 +83,6 @@ Type `/` in Claude Code to see them all autocomplete. Not sure which to use? Jus
 | `/onboard` | *"I'm new, walk me through this"* | — (guided) |
 | `/review-architecture` | Before a big PR — deep architectural review | Reviewer agents |
 | `/review-commit` | Pre-push sanity check | Reviewer agents |
-| `/review-changes` | Risk-scored review: runs `risk-score.ts` (tier + 2-hop callers + churn + method coverage) | Reviewer agents |
 | `/debug-issue` | Hunting a specific bug | — |
 | `/migrate-component` | Migrating one component to new design system | component-builder + component-reviewer + ui-visual-reviewer |
 | `/manage-worktrees` | Creating/opening/cleaning worktrees | — |
@@ -119,7 +115,7 @@ flowchart TB
 | `component-reviewer` | Reviewer | Token usage, dark mode, a11y | Sonnet |
 | `ui-visual-reviewer` | Reviewer | Screenshots in both themes, visual regression | Sonnet |
 
-Backend review work is covered by `/review-architecture`, `/review-changes`, and `/review-commit` (no dedicated reviewer agent).
+Backend review work is covered by `/review-architecture` and `/review-commit` (no dedicated reviewer agent).
 
 ### Skills — auto-triggered (silent domain knowledge)
 
@@ -204,7 +200,7 @@ sequenceDiagram
     Claude-->>Dev: hook list + usage map
     Dev->>Claude: "wire useToolOverview to Cursor tab"
     Claude->>Claude: implements via TanStack Query patterns
-    Dev->>Claude: "/review-changes"
+    Dev->>Claude: "/review-commit"
     Claude->>Claude: git diff + Read changed files
     Claude-->>Dev: green / findings
 ```
@@ -325,7 +321,7 @@ claude
 3. Claude edits the page; TanStack Query handles fetching.
 4. `on-edit-lint` hook runs ESLint automatically.
 5. Manually verify in browser at `http://localhost:5173`.
-6. `/review-changes` before pushing — risk-scored review (runs `risk-score.ts`).
+6. `/review-commit` before pushing — runs the swagger-auditor and lint hooks.
 
 ### D. Debug a bug
 
@@ -336,9 +332,8 @@ claude
 ### E. Pre-PR architecture review
 
 1. `/review-architecture` — deep dive on maintainability, security, performance.
-2. `/review-changes` — risk-scored review (runs `risk-score.ts`).
-3. `/review-commit` — lint + test context.
-4. All three together before a non-trivial PR.
+2. `/review-commit` — lint + test context.
+3. Both together before a non-trivial PR.
 
 ---
 
@@ -410,7 +405,7 @@ Every primitive in `.claude/` is **self-teaching**. You never need to memorize a
 **1. Ask the primitive directly.**
 ```
 "How does swagger-auditor work?"
-"When should I use /review-architecture vs /review-changes?"
+"When should I use /review-architecture vs /review-commit?"
 "What does the actionpolicy-check skill actually do?"
 ```
 Any agent/skill/command switches to Tutor Mode and explains itself in under 200 words.

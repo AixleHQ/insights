@@ -153,7 +153,6 @@ Both source tools expose much richer event data than we currently use. The Rails
 | Claude Code — `entrypoint` | `claude` CLI vs claude.ai/code (Ultraplan) vs IDE plugin | metadata | Not extracted | Would let you slice by surface |
 | Claude Code — `version` | Claude Code CLI version | metadata | Not extracted | |
 | Claude Code — `stop_reason` (`tool_use` / `end_turn` / `max_tokens` / refusal) | Why the turn ended | metadata or new event | Not extracted | Refusals especially valuable for risk monitoring |
-| Claude Code — `advisorModel` | Which model (Opus) the `advisor()` call used | metadata | Not extracted | Lets you track Sonnet→Opus escalation cost |
 
 ---
 
@@ -198,7 +197,7 @@ If you want to expand the taxonomy beyond `chat` / `completion` without adding t
 
 1. **Tag Cursor's `recentCommit` as `commit`** — single-line change in `packages/tools/db90-cursor/src/mapper.ts:259`.
 2. **Extract Claude Code `tool_use` blocks into per-tool child events** — `claude-reader.ts:155-205`: enumerate `message.content[type=tool_use]` and emit one event per tool with appropriate `event_type` mapping (Edit/Write/MultiEdit → `edit`; Bash with `git commit` → `commit`; tests touching `*.spec.*` → `test`).
-3. **Surface metadata that doesn't change the schema** — add `entrypoint`, `advisorModel`, `gitBranch`, `iterations`, `stop_reason`, `service_tier` to `metadata` on existing events. Pure additive change in the reader.
+3. **Surface metadata that doesn't change the schema** — add `entrypoint`, `gitBranch`, `iterations`, `stop_reason`, `service_tier` to `metadata` on existing events. Pure additive change in the reader.
 4. **Sub-agent + skill tagging** — set `metadata.subagent_type` / `metadata.skill_name` when those markers are present in the JSONL entry.
 
 None of these require schema changes on the Rails side or any change in egress profile.

@@ -19,16 +19,6 @@ import path from "node:path";
 
 const projectDir: string = process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
 
-function printHaikuBanner(file: string): void {
-  const BOLD_GREEN = "\x1b[1;32m";
-  const DIM_GREEN  = "\x1b[2;32m";
-  const X          = "\x1b[0m";
-  process.stderr.write("\n");
-  process.stderr.write(`${BOLD_GREEN}⚑  HAIKU EXECUTOR ACTIVE${X}\n`);
-  process.stderr.write(`${DIM_GREEN}   linting · ${file}${X}\n`);
-  process.stderr.write("\n");
-}
-
 function run(cmd: string, args: string[], cwd: string): void {
   spawnSync(cmd, args, { cwd, stdio: "inherit", shell: true });
   // Always exit 0 — lint findings are advisory; the model reads stdout and acts on them.
@@ -80,7 +70,6 @@ async function getFilePath(): Promise<string | undefined> {
 async function main(): Promise<void> {
   const filePath = await getFilePath();
   if (filePath) {
-    printHaikuBanner(filePath);
     lint(filePath);
   }
 }

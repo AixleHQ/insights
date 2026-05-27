@@ -7,7 +7,7 @@ Canonical home for documentation about **what data the DB90 CLI connectors captu
 1. **[TOKENS.md](TOKENS.md)** — baseline reference (May 2026). Authoritative map of the `tool_events.event_type` enum, what each CLI emits today, and a first-pass inventory of available-but-uncaptured signal. Start here.
 2. **[DATA-CURRENT.md](DATA-CURRENT.md)** — validated view of what we capture today, with code-level traceability (mapper.ts and claude-reader.ts → tool_events columns), and the **proposed sub-task backlog** for closing gaps. Cursor + Claude sections; ends with a cross-tool summary table.
 3. **[DATA-CURSOR.md](DATA-CURSOR.md)** — full Cursor vendor surface: tab completion, Composer, Chat, background agents, BugBot, MCP, settings. Mermaid flow + ER diagrams, granularity knobs, JSON payload examples, hidden-flag research trail.
-4. **[DATA-CLAUDE.md](DATA-CLAUDE.md)** — full Claude Code vendor surface: chat turns, tool_use blocks, thinking blocks, session lifecycle, hooks, slash commands, sub-agents, advisor, usage block. Mermaid lifecycle + ER diagrams, JSON payload examples.
+4. **[DATA-CLAUDE.md](DATA-CLAUDE.md)** — full Claude Code vendor surface: chat turns, tool_use blocks, thinking blocks, session lifecycle, hooks, slash commands, sub-agents, usage block. Mermaid lifecycle + ER diagrams, JSON payload examples.
 
 ## Scope
 

@@ -1,5 +1,5 @@
 /**
- * convention-check.ts — Git convention checker (Haiku task)
+ * convention-check.ts — Git convention checker
  *
  * Checks that the current branch and its commits follow DB90 conventions:
  *   Branch : feature/AIX-XX-short-description  (or hotfix/...)
@@ -13,10 +13,8 @@
 
 import { spawnSync } from "node:child_process";
 
-// Model color: haiku = green (this is a Haiku task)
 const BOLD_GREEN = "\x1b[1;32m";
 const DIM_GREEN  = "\x1b[2;32m";
-// Neutral colors for check results (avoid red/yellow — those are Opus/Sonnet model colors)
 const BOLD_WHITE = "\x1b[1;37m";
 const DIM_WHITE  = "\x1b[2;37m";
 const X          = "\x1b[0m";
@@ -37,12 +35,6 @@ function check(label: string, pass: boolean, detail: string): void {
 }
 
 function main(): void {
-  // Haiku banner — green (model color)
-  process.stderr.write("\n");
-  process.stderr.write(`${BOLD_GREEN}⚑  HAIKU EXECUTOR ACTIVE${X}\n`);
-  process.stderr.write(`${DIM_GREEN}   convention-check · branch + commit format${X}\n`);
-  process.stderr.write("\n");
-
   const branch  = git(["branch", "--show-current"]);
   const commits = git(["log", "develop..HEAD", "--format=%s"]).split("\n").filter(Boolean);
 
