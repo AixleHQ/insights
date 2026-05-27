@@ -107,6 +107,8 @@ Searches should be cheap — they run in the same turn as the discovery. There i
 
 Multi-PR feature plans live in the repo at `plans/` so context survives across Claude sessions and is reviewable in PRs.
 
+**Superpowers plugin override:** the `writing-plans` and `brainstorming` skills default to `docs/superpowers/plans/` and `docs/superpowers/specs/`. In this project, save all plans and specs under `plans/<feature-slug>-<ticket>/` per the layout below — not under `docs/`.
+
 **Folder layout** — one folder per epic / feature, named after the epic ticket:
 
 ```
@@ -157,6 +159,8 @@ Whenever a developer (or Claude) enters plan mode and the work is expected to sp
 **When uncertain:** err on the side of creating the plan folder. Persisting it costs ~5 minutes; reconstructing intent in a fresh session three weeks later costs an hour.
 
 **Re-entering plan mode on existing work:** if a `plans/<feature>/` folder already exists for the current epic, **read it first** (`orientation.md` → `plan.md` → relevant task files). Update in place rather than starting a parallel plan. Add a "Re-evaluation history" entry to `orientation.md` documenting what changed and why.
+
+**After completing implementation work on a task:** append a `## Session Record` section to the bottom of the active task file before committing or opening a PR. Include: files changed (from `git diff develop..HEAD --name-only`), what was implemented (from commit messages), deferred/out-of-scope items (unchecked `- [ ]` items in the task file), and any tradeoffs made. This is the lightweight post-session record that makes multi-session features coherent across `/clear` and new conversations.
 
 ### Task sizing — every task must fit Sonnet 4.6 without compaction
 
