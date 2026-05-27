@@ -71,6 +71,7 @@ const mockProject = {
   totalCostUsd: 12.5,
   createdAt: "2026-01-15T00:00:00Z",
   lastEventAt: "2026-03-20T10:30:00Z",
+  gitRemoteUrl: "git@github.com:org/repo.git",
   sourceControlSummary: [
     {
       provider: "gitlab",
@@ -236,6 +237,21 @@ describe("ProjectDetail", () => {
       render(<ProjectDetail />);
 
       expect(screen.getByRole("tab", { name: "Integrations" })).toBeInTheDocument();
+    });
+  });
+
+  describe("Git remote attribution warning", () => {
+    it("shows warning and settings link when git remote is missing (camelCase empty)", () => {
+      mockUseProject.mockReturnValue({
+        data: { ...mockProject, gitRemoteUrl: null },
+        isLoading: false,
+      });
+      render(<ProjectDetail />);
+
+      expect(screen.getByRole("alert")).toBeInTheDocument();
+      expect(screen.getByText(/No git remote configured for CLI attribution/i)).toBeInTheDocument();
+      const settingsLink = screen.getByRole("link", { name: /open project settings/i });
+      expect(settingsLink).toHaveAttribute("href", "/projects/proj-1/settings");
     });
   });
 });

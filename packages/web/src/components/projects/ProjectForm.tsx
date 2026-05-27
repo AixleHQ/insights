@@ -162,7 +162,7 @@ export function ProjectForm({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="git_remote_url">Git Remote URL</Label>
+              <Label htmlFor="git_remote_url">Git remote URL (for auto CLI attribution)</Label>
               <Input
                 id="git_remote_url"
                 placeholder="git@github.com:org/repo.git"
@@ -170,9 +170,8 @@ export function ProjectForm({
                 onChange={(e) => updateField("git_remote_url", e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                Used by the db90 Claude and Cursor CLIs to auto-detect this project. Paste the output of{" "}
-                <code className="font-mono">git remote get-url origin</code>
-                {" "}— the <code className="font-mono">.git</code> suffix and casing are normalized automatically.
+                Paste the output of <code className="font-mono">git remote get-url origin</code> from the repository where
+                developers run the CLI. When the CLI runs inside that repo, events are auto-attributed to this project.
               </p>
             </div>
 

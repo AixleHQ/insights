@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { MoreHorizontal, GitBranch, Activity, DollarSign, Calendar, Star } from "lucide-react";
+import { MoreHorizontal, GitBranch, Activity, DollarSign, Calendar, Star, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,25 +12,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-
-export interface ProjectData {
-  id: string;
-  name: string;
-  description?: string;
-  repository_url?: string;
-  is_active: boolean;
-  event_count: number;
-  total_cost_usd: number;
-  last_event_at?: string;
-  created_at: string;
-  connectors?: Array<{
-    id: string;
-    provider: string;
-  }>;
-}
+import { isGitRemoteMissing } from "@/lib/project-git-remote";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { type ProjectWithStats } from "@/lib/types";
 
 interface ProjectCardProps {
-  project: ProjectData;
+  project: ProjectWithStats;
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
   isFavorited?: boolean;
@@ -46,6 +33,8 @@ function formatDate(dateStr: string | undefined | null): string {
 }
 
 export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFavorite, className }: ProjectCardProps) {
+  const showUnlinkedRemote = isGitRemoteMissing(project);
+
   return (
     <Card className={cn("group relative transition-shadow hover:shadow-md", className)}>
       <CardHeader className="pb-3">
@@ -79,9 +68,26 @@ export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFa
                 />
               </Button>
             )}
-            <Badge variant={project.is_active ? "default" : "secondary"} className="text-xs">
-              {project.is_active ? "Active" : "Inactive"}
+            <Badge variant={project.isActive ? "default" : "secondary"} className="text-xs">
+              {project.isActive ? "Active" : "Inactive"}
             </Badge>
+            {showUnlinkedRemote && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge
+                    variant="outline"
+                    className="cursor-default gap-1 border-amber-500/40 bg-amber-500/10 text-xs text-amber-900 dark:text-amber-100"
+                    aria-label="No git remote configured"
+                  >
+                    <AlertCircle className="size-3 text-amber-600 dark:text-amber-400" />
+                    Unlinked
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  No git remote configured — CLI events won&apos;t be attributed.
+                </TooltipContent>
+              </Tooltip>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -137,20 +143,20 @@ export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFa
               <Calendar className="size-3" />
               Created
             </div>
-            <p className="text-sm font-medium">{formatDate(project.created_at)}</p>
+            <p className="text-sm font-medium">{formatDate(project.createdAt)}</p>
           </div>
         </div>
 
-        {project.repository_url && (
+        {project.repositoryUrl && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <GitBranch className="size-3" />
             <a
-              href={project.repository_url}
+              href={project.repositoryUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="truncate hover:text-foreground hover:underline"
             >
-              {project.repository_url.replace(/^https?:\/\/(github|gitlab|bitbucket)\.com\//, "")}
+              {project.repositoryUrl.replace(/^https?:\/\/(github|gitlab|bitbucket)\.com\//, "")}
             </a>
           </div>
         )}

@@ -726,7 +726,12 @@ export function useUpdateProject() {
     mutationFn: ({ id, data }: { id: string; data: Partial<Project> }) =>
       api.patch<Project>(`/projects/${id}`, data),
     onSuccess: (_, { id }) => {
+      const cached = queryClient.getQueryData<ProjectWithStats>(queryKeys.projects.detail(id));
+      const orgId = cached?.organization_id ?? cached?.organizationId;
       queryClient.invalidateQueries({ queryKey: queryKeys.projects.detail(id) });
+      if (orgId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.projects.all(orgId) });
+      }
       queryClient.invalidateQueries({ queryKey: ["organizations"] });
     },
   });

@@ -56,9 +56,8 @@ const mockProject = {
   id: "proj-1",
   name: "My Project",
   description: "A test project",
-  repository_url: "https://github.com/org/repo",
   repositoryUrl: "https://github.com/org/repo",
-  is_active: true,
+  gitRemoteUrl: "git@github.com:org/repo.git",
   isActive: true,
 };
 
@@ -254,6 +253,31 @@ describe("ProjectSettings", () => {
       await waitFor(() => {
         expect(screen.getByText("Failed to delete project. Please try again.")).toBeInTheDocument();
       });
+    });
+
+    it("shows git remote attribution warning when git remote is missing", () => {
+      mockUseProject.mockReturnValue({
+        data: {
+          ...mockProject,
+          gitRemoteUrl: null,
+        },
+        isLoading: false,
+      });
+      renderAtPath("/projects/proj-1/settings");
+
+      expect(screen.getByText(/CLI events cannot be auto-attributed yet/i)).toBeInTheDocument();
+    });
+
+    it("does not show git remote warning when remote is configured", () => {
+      renderAtPath("/projects/proj-1/settings");
+
+      expect(screen.queryByText(/CLI events cannot be auto-attributed yet/i)).not.toBeInTheDocument();
+    });
+
+    it("uses Git remote URL (for auto CLI attribution) field label", () => {
+      renderAtPath("/projects/proj-1/settings");
+
+      expect(screen.getByLabelText(/Git remote URL \(for auto CLI attribution\)/i)).toBeInTheDocument();
     });
   });
 
