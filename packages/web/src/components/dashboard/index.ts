@@ -12,3 +12,4 @@ export { ToolUsersTable } from "./ToolUsersTable";
 export { ToolEventTypesTable } from "./ToolEventTypesTable";
 export { WeeklyToolUsageChart } from "./WeeklyToolUsageChart";
 export { RiskAlertsTable } from "./RiskAlertsTable";
+export { PromptInsightsSection } from "./PromptInsightsSection";

@@ -868,6 +868,77 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /api/v1/organizations/{organization_id}/members/{id}/prompt_insights:
+    get:
+      summary: Prompt quality insights for a member
+      description: Returns a heuristic prompt quality score and dimension breakdown for the selected period. Self-or-admin only (same access policy as dashboard_stats).
+      tags:
+        - Organization Members
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: id
+          in: path
+          required: true
+          description: Membership ID or user UUID
+          schema:
+            type: string
+        - name: period
+          in: query
+          required: false
+          description: Time window (7d, 30d, 90d). Default 30d.
+          schema:
+            type: string
+            enum: [7d, 30d, 90d]
+      responses:
+        '200':
+          description: Prompt insights for the period
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  score:
+                    type: number
+                    format: float
+                    description: Overall quality score 0–10 (1 decimal)
+                  dimensions:
+                    type: object
+                    properties:
+                      structure:
+                        type: number
+                        format: float
+                        description: Structure dimension score 0–10
+                      context:
+                        type: number
+                        format: float
+                        description: Context dimension score 0–10
+                      specificity:
+                        type: number
+                        format: float
+                        description: Specificity dimension score 0–10
+                  callouts:
+                    type: array
+                    description: Empty when no events in period
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                          enum: [strength, tool, opportunity]
+                        label:
+                          type: string
+                        text:
+                          type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /api/v1/organizations/{organization_id}/members/{id}/stats/heatmap:
     get:
       summary: Activity heatmap for a member (last 365 days)

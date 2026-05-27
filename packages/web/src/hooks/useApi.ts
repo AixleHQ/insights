@@ -75,6 +75,8 @@ export const queryKeys = {
       ["organizations", orgId, "members", userId, "dashboard_stats", period] as const,
     heatmap: (orgId: string, userId: string) =>
       ["organizations", orgId, "members", userId, "heatmap"] as const,
+    promptInsights: (orgId: string, userId: string, period: string) =>
+      ["organizations", orgId, "members", userId, "prompt_insights", period] as const,
   },
   projects: {
     all: (orgId: string) => ["organizations", orgId, "projects"] as const,
@@ -643,6 +645,36 @@ export function useMemberHeatmap(orgId: string, userId: string) {
     },
     enabled: !!orgId && !!userId,
     staleTime: 5 * 60_000,
+  });
+}
+
+export interface PromptInsightsCallout {
+  type: "strength" | "tool" | "opportunity";
+  label: string;
+  text: string;
+}
+
+export interface PromptInsights {
+  score: number;
+  dimensions: {
+    structure: number;
+    context: number;
+    specificity: number;
+  };
+  callouts: PromptInsightsCallout[];
+}
+
+export function usePromptInsights(orgId: string, userId: string, period = "30d") {
+  return useQuery({
+    queryKey: queryKeys.members.promptInsights(orgId, userId, period),
+    queryFn: async () => {
+      const response = await api.get<PromptInsights>(
+        `/organizations/${orgId}/members/${userId}/prompt_insights?period=${period}`
+      );
+      return response;
+    },
+    enabled: !!orgId && !!userId,
+    staleTime: 60_000,
   });
 }
 

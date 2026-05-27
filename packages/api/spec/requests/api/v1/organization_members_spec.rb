@@ -548,4 +548,115 @@ RSpec.describe 'Api::V1::OrganizationMembers', type: :request do
       expect(response).to have_http_status(:forbidden)
     end
   end
+
+  describe 'GET /api/v1/organizations/:organization_id/members/:id/prompt_insights' do
+    before do
+      create(:tool_event,
+             organization: organization,
+             user: member,
+             tool_name: 'claude_code',
+             event_type: 'chat',
+             tokens_in: 300,
+             tokens_out: 600,
+             occurred_at: 10.days.ago)
+      create(:tool_event,
+             organization: organization,
+             user: member,
+             tool_name: 'cursor',
+             event_type: 'edit',
+             tokens_in: 150,
+             tokens_out: 300,
+             occurred_at: 15.days.ago)
+      create(:tool_event,
+             organization: organization,
+             user: member,
+             tool_name: 'claude_code',
+             event_type: 'commit',
+             tokens_in: 200,
+             tokens_out: 400,
+             occurred_at: 20.days.ago)
+    end
+
+    it 'returns prompt insights with correct shape' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/prompt_insights",
+                        user: owner,
+                        organization: organization
+
+      expect_success
+      expect(json_response[:score]).to be_a(Numeric)
+      expect(json_response[:dimensions]).to include(:structure, :context, :specificity)
+      expect(json_response[:dimensions][:structure]).to be_a(Numeric)
+      expect(json_response[:callouts]).to be_an(Array)
+      expect(json_response[:callouts].length).to eq(3)
+      callout = json_response[:callouts].first
+      expect(callout).to have_key(:type)
+      expect(callout).to have_key(:label)
+      expect(callout).to have_key(:text)
+    end
+
+    it 'scores are in 0–10 range' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/prompt_insights",
+                        user: owner,
+                        organization: organization
+
+      expect_success
+      expect(json_response[:score]).to be_between(0, 10)
+      %i[structure context specificity].each do |dim|
+        expect(json_response[:dimensions][dim]).to be_between(0, 10)
+      end
+    end
+
+    it 'returns empty state when period has no events' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/prompt_insights",
+                        user: owner,
+                        organization: organization,
+                        params: { period: '7d' }
+
+      # All events are older than 7 days
+      expect_success
+      expect(json_response[:score]).to eq(0)
+      expect(json_response[:dimensions]).to eq({ structure: 0, context: 0, specificity: 0 })
+      expect(json_response[:callouts]).to eq([])
+    end
+
+    it 'allows member to view their own prompt insights' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/prompt_insights",
+                        user: member,
+                        organization: organization
+
+      expect_success
+    end
+
+    it 'denies a member from viewing another member prompt insights' do
+      other_member = create(:user)
+      create(:organization_membership, user: other_member, organization: organization, role: 'member')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/prompt_insights",
+                        user: other_member,
+                        organization: organization
+
+      expect(response).to have_http_status(:forbidden)
+    end
+
+    it 'allows owner to view any member prompt insights' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/prompt_insights",
+                        user: owner,
+                        organization: organization
+
+      expect_success
+    end
+
+    it 'returns empty payload for member with no events ever' do
+      empty_member = create(:user)
+      empty_membership = create(:organization_membership, user: empty_member, organization: organization, role: 'member')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{empty_membership.id}/prompt_insights",
+                        user: owner,
+                        organization: organization
+
+      expect_success
+      expect(json_response[:score]).to eq(0)
+      expect(json_response[:callouts]).to be_empty
+    end
+  end
 end

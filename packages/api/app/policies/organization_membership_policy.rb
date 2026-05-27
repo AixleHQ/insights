@@ -24,7 +24,8 @@ class OrganizationMembershipPolicy < ApplicationPolicy
       (org_member?(record.organization) && record.user_id == user.id)
   end
 
-  alias_method :member_heatmap?, :dashboard_stats?
+  alias_method :member_heatmap?,   :dashboard_stats?
+  alias_method :prompt_insights?,  :dashboard_stats?
 
   # Members can view events of other members
   def events?

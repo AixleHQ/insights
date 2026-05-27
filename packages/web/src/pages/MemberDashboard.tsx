@@ -7,6 +7,7 @@ import {
   MetricGrid,
   TopToolsChart,
   ActivityHeatmap,
+  PromptInsightsSection,
   type ToolUsageData,
 } from "@/components/dashboard";
 import { Button } from "@/components/ui/button";
@@ -136,14 +137,9 @@ export function MemberDashboard({ hideHeader = false }: { hideHeader?: boolean }
           }
           description={`${formatTokens(stats?.total_tokens_in ?? 0)} in / ${formatTokens(stats?.total_tokens_out ?? 0)} out`}
         />
-        <div className="opacity-60 pointer-events-none">
-          <MetricCard
-            title="Prompt Quality"
-            value="—"
-            description="Coming soon"
-          />
-        </div>
       </MetricGrid>
+
+      <PromptInsightsSection orgId={orgId} userId={userId} period={period} />
 
       <div>
         <p className="text-sm text-muted-foreground mb-2">

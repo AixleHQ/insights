@@ -113,4 +113,15 @@ RSpec.describe OrganizationMembershipPolicy, type: :policy do
       expect(policy(member_membership, current_user: owner).apply(:member_heatmap?)).to be true
     end
   end
+
+  describe '#prompt_insights?' do
+    it 'delegates to dashboard_stats? — member can view own, denied for another member' do
+      other_member = create(:user)
+      create(:organization_membership, user: other_member, organization: organization, role: 'member')
+
+      expect(policy(member_membership, current_user: member).apply(:prompt_insights?)).to be true
+      expect(policy(member_membership, current_user: other_member).apply(:prompt_insights?)).to be false
+      expect(policy(member_membership, current_user: owner).apply(:prompt_insights?)).to be true
+    end
+  end
 end

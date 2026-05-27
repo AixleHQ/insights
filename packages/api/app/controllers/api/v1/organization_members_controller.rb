@@ -4,7 +4,20 @@ module Api
   module V1
     class OrganizationMembersController < BaseController
       before_action :require_organization!
-      before_action :set_membership, only: %i[show update destroy stats events dashboard_stats member_heatmap]
+      before_action :set_membership, only: %i[show update destroy stats events dashboard_stats member_heatmap prompt_insights]
+
+      PROMPT_DIMENSION_TEXT = {
+        strength: {
+          structure:   "Well-formed, detailed prompts",
+          context:     "Good context variety across event types",
+          specificity: "Focused, concise requests"
+        },
+        opportunity: {
+          structure:   "Add more structure to your prompts",
+          context:     "Vary your usage across event types",
+          specificity: "Try more targeted requests"
+        }
+      }.freeze
 
       # GET /api/v1/organizations/:organization_id/members
       def index
@@ -321,11 +334,7 @@ module Api
       def dashboard_stats
         authorize! @membership
 
-        days = case params[:period]
-        when "7d"  then 7
-        when "90d" then 90
-        else 30
-        end
+        days = period_days(params[:period])
 
         current_start = days.days.ago.beginning_of_day
         prev_start    = (days * 2).days.ago.beginning_of_day
@@ -382,6 +391,84 @@ module Api
         }
       end
 
+      # GET /api/v1/organizations/:organization_id/members/:id/prompt_insights?period=30d
+      def prompt_insights
+        authorize! @membership
+
+        # Heuristic stub for AIX-120; replace with real LLM/Temporal scoring in follow-up ticket.
+        # When doing so, extract scoring logic to app/services/prompt_quality_scorer.rb.
+        # Structure is inflated by IDE-injected file context (system prompts, file reads) — user
+        # prompt quality alone is not measurable from token counts. Document in follow-up scope.
+        days = period_days(params[:period])
+
+        current_start = days.days.ago.beginning_of_day
+        events = current_organization.tool_events
+          .where(user_id: @membership.user_id, occurred_at: current_start..Time.current)
+
+        # Aggregate with no GROUP BY always returns one row (COUNT(*) = 0 when empty) — agg is never nil.
+        agg = events.select(Arel.sql(<<~SQL.squish)).take
+          COUNT(*)                                   AS total_count,
+          COALESCE(SUM(tokens_in), 0)                AS total_tokens_in,
+          COALESCE(SUM(tokens_out), 0)               AS total_tokens_out,
+          COUNT(DISTINCT event_type)                 AS distinct_event_types
+        SQL
+
+        return render json: {
+          score: 0,
+          dimensions: { structure: 0, context: 0, specificity: 0 },
+          callouts: []
+        } if agg.total_count.to_i == 0
+
+        avg_tokens_in = agg.total_tokens_in.to_f / agg.total_count.to_i
+
+        structure    = ([ [ avg_tokens_in / 200.0, 0 ].max, 1 ].min * 10).round(1)
+        context      = ([ [ agg.distinct_event_types.to_f / 5.0, 0 ].max, 1 ].min * 10).round(1)
+        tokens_in    = agg.total_tokens_in.to_i
+        tokens_out   = agg.total_tokens_out.to_i
+        specificity  = ([ [ tokens_out.to_f / [ tokens_in, 1 ].max, 0 ].max, 1 ].min * 10).round(1)
+
+        score = ((structure + context + specificity) / 3.0).round(1)
+
+        dimensions = [
+          [ :structure,   structure   ],
+          [ :context,     context     ],
+          [ :specificity, specificity ]
+        ]
+
+        top_strength    = dimensions.max_by { |_, v| v }.first
+        biggest_opp     = dimensions.min_by { |_, v| v }.first
+
+        best_tool_row = events
+          .group(:tool_name)
+          .select("tool_name, COUNT(*) as event_count")
+          .order("event_count DESC")
+          .first
+
+        callouts = [
+          {
+            type:  "strength",
+            label: "Top Strength",
+            text:  "#{top_strength.to_s.capitalize}: #{PROMPT_DIMENSION_TEXT[:strength][top_strength]}"
+          },
+          {
+            type:  "tool",
+            label: "Best Tool",
+            text:  best_tool_row ? "#{best_tool_row.tool_name} · #{best_tool_row.event_count} events" : "No tool data"
+          },
+          {
+            type:  "opportunity",
+            label: "Biggest Opportunity",
+            text:  "#{biggest_opp.to_s.capitalize}: #{PROMPT_DIMENSION_TEXT[:opportunity][biggest_opp]}"
+          }
+        ]
+
+        render json: {
+          score:      score,
+          dimensions: { structure: structure, context: context, specificity: specificity },
+          callouts:   callouts
+        }
+      end
+
       # GET /api/v1/organizations/:organization_id/members/:id/stats/heatmap
       def member_heatmap
         authorize! @membership
@@ -399,6 +486,14 @@ module Api
       end
 
       private
+
+      def period_days(period)
+        case period
+        when "7d"  then 7
+        when "90d" then 90
+        else 30
+        end
+      end
 
       def set_membership
         @membership = current_organization.organization_memberships
