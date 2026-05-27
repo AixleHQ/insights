@@ -7,7 +7,7 @@ import { useFavorites } from "@/hooks/useFavorites";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ProjectCard, type ProjectData } from "@/components/projects";
+import { ProjectCard } from "@/components/projects";
 import { cn } from "@/lib/utils";
 
 type ViewMode = "grid" | "list";
@@ -40,26 +40,12 @@ export function Projects() {
   const favoritedIds = useMemo(() => new Set(favorites.map((f) => f.id)), [favorites]);
   const isFavorite = (id: string) => favoritedIds.has(id);
 
-  const { data: projectsData, isLoading } = useProjects(currentOrg?.id || "");
+  const { data: projects, isLoading } = useProjects(currentOrg?.id || "");
   const deleteProject = useDeleteProject();
 
-  // Transform API response to component format
-  const projects: ProjectData[] = useMemo(() => {
-    return projectsData?.map((p) => ({
-      id: p.id,
-      name: p.name,
-      description: p.description || undefined,
-      repository_url: p.repositoryUrl || undefined,
-      is_active: p.isActive ?? true,
-      event_count: p.event_count,
-      total_cost_usd: p.total_cost_usd,
-      last_event_at: p.last_event_at || undefined,
-      created_at: p.created_at,
-      connectors: p.connectors,
-    })) || [];
-  }, [projectsData]);
-
   const filteredProjects = useMemo(() => {
+    if (!projects) return [];
+
     return projects.filter((project) =>
       project.name.toLowerCase().includes(search.toLowerCase()) ||
       project.description?.toLowerCase().includes(search.toLowerCase())

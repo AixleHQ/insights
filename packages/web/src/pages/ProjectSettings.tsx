@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/card";
 import { ProjectSecurityTab, ProjectSettingsSection, ProjectNotFound, ProjectRetentionPolicySection, ProjectAlertsSection } from "@/components/project";
 import { cn } from "@/lib/utils";
+import { isGitRemoteMissing } from "@/lib/project-git-remote";
 
 const getNavItems = (id: string) => [
   { title: "General", href: `/projects/${id}/settings`, icon: Building2 },
@@ -81,9 +82,11 @@ interface GeneralFormData {
 function ProjectGeneralSettingsForm({
   projectId,
   defaultValues,
+  serverGitRemoteMissing,
 }: {
   projectId: string;
   defaultValues: GeneralFormData;
+  serverGitRemoteMissing: boolean;
 }) {
   const updateProject = useUpdateProject();
   const deleteProject = useDeleteProject();
@@ -135,6 +138,23 @@ function ProjectGeneralSettingsForm({
           <CardTitle className="text-base">Project Details</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {serverGitRemoteMissing && (
+            <Alert
+              className="border-amber-500/30 bg-amber-500/10 text-amber-950 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-50 [&>svg]:text-amber-600 dark:[&>svg]:text-amber-400"
+            >
+              <AlertCircle className="size-4 shrink-0" />
+              <AlertDescription className="text-amber-900 dark:text-amber-100">
+                <p className="font-medium text-amber-800 dark:text-amber-200">
+                  CLI events cannot be auto-attributed yet
+                </p>
+                <p className="mt-1 text-sm text-amber-900/90 dark:text-amber-100/90">
+                  Add the Git remote URL below (paste the output of{" "}
+                  <code className="rounded bg-amber-500/15 px-1 py-0.5 font-mono text-xs">git remote get-url origin</code>
+                  ) so the db90 CLI can match events to this project.
+                </p>
+              </AlertDescription>
+            </Alert>
+          )}
           <div className="space-y-2">
             <Label htmlFor="proj-name">Name</Label>
             <Input
@@ -162,7 +182,7 @@ function ProjectGeneralSettingsForm({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="proj-git-remote">Git Remote URL</Label>
+            <Label htmlFor="proj-git-remote">Git remote URL (for auto CLI attribution)</Label>
             <Input
               id="proj-git-remote"
               value={formData.git_remote_url}
@@ -170,8 +190,8 @@ function ProjectGeneralSettingsForm({
               placeholder="git@github.com:org/repo.git"
             />
             <p className="text-xs text-muted-foreground">
-              Used by the db90 Claude and Cursor CLIs to auto-detect this project. Must match the output of{" "}
-              <code className="font-mono">git remote get-url origin</code> exactly.
+              Paste the output of <code className="font-mono">git remote get-url origin</code> from the repository where
+              developers run the CLI. When the CLI runs inside that repo, events are auto-attributed to this project.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -267,7 +287,16 @@ function ProjectGeneralSettings({
     is_active: project.isActive ?? project.is_active,
   };
 
-  return <ProjectGeneralSettingsForm key={project.id} projectId={projectId} defaultValues={defaultValues} />;
+  const serverGitRemoteMissing = isGitRemoteMissing(project);
+
+  return (
+    <ProjectGeneralSettingsForm
+      key={project.id}
+      projectId={projectId}
+      defaultValues={defaultValues}
+      serverGitRemoteMissing={serverGitRemoteMissing}
+    />
+  );
 }
 
 export function ProjectSettings() {

@@ -62,6 +62,7 @@ import {
 } from "@/components/project";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDistanceToNow } from "@/lib/utils";
+import { isGitRemoteMissing } from "@/lib/project-git-remote";
 
 function StatCard({
   icon: Icon,
@@ -233,6 +234,28 @@ export function ProjectDetail() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {isGitRemoteMissing(project) && (
+        <Alert
+          className="border-amber-500/30 bg-amber-500/10 text-amber-950 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-50 [&>svg]:text-amber-600 dark:[&>svg]:text-amber-400"
+        >
+          <AlertCircle className="size-4 shrink-0" />
+          <AlertDescription className="text-amber-900 dark:text-amber-100">
+            <p className="font-medium text-amber-800 dark:text-amber-200">
+              No git remote configured for CLI attribution
+            </p>
+            <p className="mt-1 text-sm text-amber-900/90 dark:text-amber-100/90">
+              Events from the db90 CLI will not be automatically matched to this project until you set the
+              repository&apos;s{" "}
+              <code className="rounded bg-amber-500/15 px-1 py-0.5 font-mono text-xs">git remote get-url origin</code>{" "}
+              value in project settings.
+            </p>
+            <Button asChild variant="link" className="mt-2 h-auto p-0 text-amber-800 underline dark:text-amber-200">
+              <Link to={`/projects/${id}/settings`}>Open project settings</Link>
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Tabs
         value={activeTab}

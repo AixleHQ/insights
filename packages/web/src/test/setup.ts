@@ -10,6 +10,12 @@ Element.prototype.setPointerCapture = () => {};
 Element.prototype.releasePointerCapture = () => {};
 Element.prototype.scrollIntoView = () => {};
 
+global.ResizeObserver = class ResizeObserver {
+  observe(): void {}
+  unobserve(): void {}
+  disconnect(): void {}
+};
+
 // jsdom does not implement matchMedia
 Object.defineProperty(window, "matchMedia", {
   writable: true,
