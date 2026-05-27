@@ -1,8 +1,4 @@
 {
-  "model": "sonnet",
-  "env": {
-    "DB90_COACHING": "true"
-  },
   "permissions": {
     "allow": [
       "Bash(make lint-api)",
@@ -38,5 +34,11 @@
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "context7@claude-plugins-official": true,
+    "ruby-lsp@claude-plugins-official": true,
+    "typescript-lsp@claude-plugins-official": true,
+    "andrej-karpathy-skills@karpathy-skills": true
   }
 }
