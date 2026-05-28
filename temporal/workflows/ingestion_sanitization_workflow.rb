@@ -37,7 +37,12 @@ module Workflows
           "bucket" => params["raw_event_bucket"],
           "key" => params["raw_event_key"]
         },
-        start_to_close_timeout: 30
+        start_to_close_timeout: 30,
+        retry_policy: Temporalio::RetryPolicy.new(
+          initial_interval: 1.0,
+          backoff_coefficient: 2.0,
+          max_attempts: 3
+        )
       )
 
       # Step 2: Get sanitization policy for the organization
