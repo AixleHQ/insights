@@ -69,3 +69,6 @@ infrastructure/tfvars/
 # Misc
 *.log
 *.pid
+
+# Personal Spanish copy of telemetry-mcp local guide (committed doc: LOCAL-DEV.md)
+packages/tools/db90-telemetry-mcp/LOCAL-DEV.es.md

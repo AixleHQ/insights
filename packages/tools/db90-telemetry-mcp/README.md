@@ -4,6 +4,8 @@ stdio **MCP server** for [DB90](https://db90.io): ingests Claude Code JSONL tran
 
 ## Integration with db90-rails
 
+> **Package not on npm yet?** Follow **[LOCAL-DEV.md](./LOCAL-DEV.md)** for the full local monorepo workflow (build, `init`, patch `~/.claude.json`, `make worker`, verify Events UI).
+
 The package speaks to **db90-rails API** deployments (local Docker Compose, staging, production). Decide which hat you are wearing:
 
 ### Developer (capture your own Claude Code + Cursor usage)
