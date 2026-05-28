@@ -296,7 +296,7 @@ export function ProjectMembersTab({
                 <TableRow
                   key={m.id}
                   className="cursor-pointer"
-                  onClick={() => navigate(`/members/${m.userId}`)}
+                  onClick={() => navigate(`/members/${m.userId}?projectId=${projectId}`)}
                 >
                   <TableCell>
                     <div className="flex items-center gap-2">

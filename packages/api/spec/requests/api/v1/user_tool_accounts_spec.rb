@@ -182,6 +182,19 @@ RSpec.describe 'Api::V1::UserToolAccounts', type: :request do
       expect(tool_account.reload.connection_state).to eq('inactive')
     end
 
+    it 'returns 422 for an invalid connection_state' do
+      original_state = tool_account.connection_state
+
+      authenticated_patch "/api/v1/organizations/#{organization.id}/tool_accounts/#{tool_account.id}",
+                          user: user,
+                          organization: organization,
+                          params: { connection_state: 'paused' }
+
+      expect_unprocessable
+      expect(json_response[:errors][:connection_state]).to include('Connection state is not included in the list')
+      expect(tool_account.reload.connection_state).to eq(original_state)
+    end
+
     it 'creates a tool_account.update audit log' do
       expect {
         authenticated_patch "/api/v1/organizations/#{organization.id}/tool_accounts/#{tool_account.id}",

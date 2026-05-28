@@ -68,19 +68,15 @@ module Api
         authorize! @tool_account
 
         changes_before = tool_account_audit_snapshot(@tool_account)
-        attrs = tool_account_update_params.to_h
-        next_state = attrs.delete("connection_state")
+        form = Api::V1::UserToolUpdateForm.new(@tool_account)
 
-        @tool_account.assign_attributes(attrs)
-        transition_connection_state!(@tool_account, next_state) unless next_state.nil?
-
-        if @tool_account.save
+        if form.update(tool_account_update_params)
           log_tool_account!(:update, @tool_account, changes_before: changes_before)
           render_resource(@tool_account, UserToolAccountSerializer)
         else
           render json: {
             error: "Unprocessable Entity",
-            errors: format_validation_errors(@tool_account.errors)
+            errors: format_validation_errors(form.errors)
           }, status: :unprocessable_content
         end
       end
@@ -125,17 +121,6 @@ module Api
 
       def tool_account_audit_snapshot(account)
         account.slice(:tool_name, :connection_state, :external_user_id, :external_username)
-      end
-
-      def transition_connection_state!(account, next_state)
-        case next_state
-        when "active"
-          account.activate_connection if account.may_activate_connection?
-        when "inactive"
-          account.deactivate_connection if account.may_deactivate_connection?
-        when "waiting_for_connection"
-          account.mark_waiting_for_connection if account.may_mark_waiting_for_connection?
-        end
       end
 
       def log_tool_account!(verb, account, changes_before: nil, snapshot: nil)
