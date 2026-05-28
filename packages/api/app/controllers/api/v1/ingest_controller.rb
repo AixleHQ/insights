@@ -76,6 +76,11 @@ module Api
         # NOTE: The Temporal worker that completes this workflow is responsible for
         # broadcasting via EventsChannel after the upsert. The fallback path below
         # handles the broadcast inline when Temporal is unavailable.
+        if raw_key.blank?
+          Rails.logger.warn "[Ingest] Raw event key missing, using direct insert fallback"
+          return fallback_direct_insert(event_params, org)
+        end
+
         workflow_id = "ingest-#{org.id}-#{SecureRandom.uuid}"
 
         Temporal::Client.start_workflow(
