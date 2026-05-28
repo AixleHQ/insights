@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { MemberDashboard } from "@/pages/MemberDashboard";
+import { StatCardSkeleton } from "@/components/ui/skeletons";
 import { formatPercent } from "@/lib/formatters";
 
 function ProjectFilterDropdown({
@@ -72,7 +73,7 @@ export function OrgDashboard() {
 
   const orgId = currentOrg?.id || "";
 
-  const { data: stats } = useOverviewStats(orgId, selectedProjectId);
+  const { data: stats, isLoading: isLoadingStats } = useOverviewStats(orgId, selectedProjectId);
   const { data: dailyData, isLoading: isLoadingDaily } = useDailyStats(orgId, 30);
   const { data: eventsResponse, isLoading: isLoadingEvents } = useEvents(orgId, { per_page: 10 });
 
@@ -169,6 +170,15 @@ export function OrgDashboard() {
           <WeeklyToolUsageChart orgId={orgId} projectId={selectedProjectId} />
 
           <MetricGrid>
+            {isLoadingStats ? (
+              <>
+                <StatCardSkeleton showDescription />
+                <StatCardSkeleton showDescription />
+                <StatCardSkeleton showDescription />
+                <StatCardSkeleton showDescription />
+              </>
+            ) : (
+              <>
             <MetricCard
               title="Total Events"
               value={stats?.total_events ?? 0}
@@ -221,6 +231,8 @@ export function OrgDashboard() {
               icon={<Users className="size-5" />}
               description="Last 7 days"
             />
+              </>
+            )}
           </MetricGrid>
 
           <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">

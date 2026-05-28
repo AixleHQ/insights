@@ -15,6 +15,7 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import type { ChartConfig } from "@/components/ui/chart";
+import { ChartSkeleton } from "@/components/ui/skeletons";
 import { cn } from "@/lib/utils";
 
 export interface DailyCostData {
@@ -101,9 +102,7 @@ export function CostTrendChart({ data, isLoading, className }: CostTrendChartPro
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="flex h-[200px] items-center justify-center">
-            <div className="size-8 animate-spin rounded-full border-2 border-muted border-t-primary" />
-          </div>
+          <ChartSkeleton height={200} />
         ) : (
           <ChartContainer config={chartConfig} className="h-[200px] w-full">
             <ResponsiveContainer width="100%" height="100%">

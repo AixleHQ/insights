@@ -68,7 +68,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Skeleton } from "@/components/ui/skeleton";
+import { MemberRowSkeleton } from "@/components/ui/skeletons";
 import { RoleBadge } from "@/components/ui/role-badge";
 import { CliStatusBadge } from "@/components/ui/CliStatusBadge";
 import { OrgPolicyPanel } from "@/components/org/OrgPolicyPanel";
@@ -117,28 +117,6 @@ function formatLastActive(dateStr?: string | null): string {
   if (diffDays < 30) return `${diffDays}d ago`;
   if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`;
   return `${Math.floor(diffDays / 365)}y ago`;
-}
-
-function MemberSkeleton() {
-  return (
-    <TableRow>
-      <TableCell className="p-4">
-        <div className="flex items-center gap-3">
-          <Skeleton className="size-8 rounded-full" />
-          <div className="space-y-1">
-            <Skeleton className="h-4 w-28" />
-            <Skeleton className="h-3 w-40" />
-          </div>
-        </div>
-      </TableCell>
-      <TableCell className="p-4"><Skeleton className="h-5 w-16" /></TableCell>
-      <TableCell className="hidden sm:table-cell p-4"><Skeleton className="h-5 w-20" /></TableCell>
-      <TableCell className="hidden md:table-cell p-4"><Skeleton className="h-4 w-20" /></TableCell>
-      <TableCell className="hidden sm:table-cell p-4"><Skeleton className="h-4 w-12" /></TableCell>
-      <TableCell className="hidden sm:table-cell p-4"><Skeleton className="h-4 w-16" /></TableCell>
-      <TableCell className="p-4" />
-    </TableRow>
-  );
 }
 
 export function Members() {
@@ -354,7 +332,7 @@ export function Members() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => <MemberSkeleton key={i} />)
+              Array.from({ length: 5 }).map((_, i) => <MemberRowSkeleton key={i} />)
             ) : filteredMembers.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="h-24 text-center">

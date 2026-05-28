@@ -6,6 +6,7 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import type { ChartConfig } from "@/components/ui/chart";
+import { ChartSkeleton } from "@/components/ui/skeletons";
 import { cn, humanizeToolName } from "@/lib/utils";
 
 export interface ToolUsageData {
@@ -47,9 +48,7 @@ export function TopToolsChart({ data, isLoading, className }: TopToolsChartProps
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="flex h-[200px] items-center justify-center">
-            <div className="size-8 animate-spin rounded-full border-2 border-muted border-t-primary" />
-          </div>
+          <ChartSkeleton variant="bars" barCount={5} />
         ) : sortedData.length === 0 ? (
           <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">
             No tool data available

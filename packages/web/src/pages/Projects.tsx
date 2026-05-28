@@ -6,30 +6,11 @@ import { useProjects, useDeleteProject } from "@/hooks/useApi";
 import { useFavorites } from "@/hooks/useFavorites";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
+import { ProjectCardSkeleton } from "@/components/ui/skeletons";
 import { ProjectCard } from "@/components/projects";
 import { cn } from "@/lib/utils";
 
 type ViewMode = "grid" | "list";
-
-function ProjectSkeleton() {
-  return (
-    <div className="rounded-lg border p-4 space-y-4">
-      <div className="flex items-start justify-between">
-        <div className="space-y-2">
-          <Skeleton className="h-5 w-32" />
-          <Skeleton className="h-4 w-48" />
-        </div>
-        <Skeleton className="h-5 w-16" />
-      </div>
-      <div className="grid grid-cols-3 gap-4">
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-      </div>
-    </div>
-  );
-}
 
 export function Projects() {
   const { currentOrg, currentRole } = useOrg();
@@ -127,7 +108,7 @@ export function Projects() {
           )}
         >
           {Array.from({ length: 6 }).map((_, i) => (
-            <ProjectSkeleton key={i} />
+            <ProjectCardSkeleton key={i} />
           ))}
         </div>
       ) : filteredProjects.length === 0 ? (
