@@ -3,7 +3,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 
 export function MemberRowSkeleton() {
   return (
-    <TableRow>
+    <TableRow className="skeleton-block">
       <TableCell className="p-4">
         <div className="flex items-center gap-3">
           <Skeleton className="size-8 rounded-full" />

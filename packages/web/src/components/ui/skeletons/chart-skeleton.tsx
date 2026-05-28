@@ -16,7 +16,7 @@ export function ChartSkeleton({
 }: ChartSkeletonProps) {
   if (variant === "bars") {
     return (
-      <div className={cn("space-y-2 pt-2", className)}>
+      <div className={cn("skeleton-block space-y-2 pt-2", className)}>
         {Array.from({ length: barCount }).map((_, i) => (
           <Skeleton key={i} className="h-5 w-full" />
         ))}
@@ -26,7 +26,7 @@ export function ChartSkeleton({
 
   return (
     <div
-      className={cn("flex w-full items-end gap-2", className)}
+      className={cn("skeleton-block flex w-full items-end gap-2", className)}
       style={{ height: `${height}px` }}
     >
       <Skeleton className="h-[40%] flex-1" />

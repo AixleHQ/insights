@@ -165,6 +165,50 @@
   animation: metric-pulse 0.6s ease-in-out;
 }
 
+/* Block-level skeleton shimmer — a single sweep crosses the whole block,
+   lighting every Skeleton inside in sync. Pair `.skeleton-block` on the
+   container with `<Skeleton>` children. */
+@keyframes skeleton-shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.skeleton-block {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.skeleton-block::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.6) 50%,
+    transparent 100%
+  );
+  animation: skeleton-shimmer 1.4s linear infinite;
+}
+
+.dark .skeleton-block::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.07) 50%,
+    transparent 100%
+  );
+}
+
+/* Inside a skeleton-block, suppress the default per-shape pulse so the
+   block-level sweep is the only animation. */
+.skeleton-block [data-slot="skeleton"] {
+  animation: none;
+}
+
 /* Gradient backgrounds for cards */
 .gradient-card {
   background: linear-gradient(135deg, var(--card) 0%, oklch(from var(--card) l c h / 0.8) 100%);

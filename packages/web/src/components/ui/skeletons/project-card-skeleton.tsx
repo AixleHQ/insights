@@ -7,7 +7,7 @@ interface ProjectCardSkeletonProps {
 
 export function ProjectCardSkeleton({ className }: ProjectCardSkeletonProps) {
   return (
-    <div className={cn("rounded-lg border p-4 space-y-4", className)}>
+    <div className={cn("skeleton-block rounded-lg border p-4 space-y-4", className)}>
       <div className="flex items-start justify-between">
         <div className="space-y-2">
           <Skeleton className="h-5 w-32" />

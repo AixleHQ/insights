@@ -14,7 +14,7 @@ export function StatCardSkeleton({
   showDescription = false,
 }: StatCardSkeletonProps) {
   return (
-    <Card className={cn("relative overflow-hidden", className)}>
+    <Card className={cn("skeleton-block", className)}>
       <CardContent className="p-6">
         <div className="flex items-start justify-between">
           <div className="space-y-2">
