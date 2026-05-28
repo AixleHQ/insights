@@ -37,6 +37,21 @@ export async function resolveProjectId(
   return { projectId: null, source: "none" };
 }
 
+export async function resolveProjectIdForRepoPath(
+  repoPath: string,
+  host: string,
+  token: string,
+  verbose: boolean
+): Promise<ProjectResolution> {
+  const gitRemote = getGitRemoteForPath(repoPath, verbose);
+  if (gitRemote === null) return { projectId: null, source: "none" };
+
+  const result = await lookupProjectByRemote(gitRemote, host, token, verbose);
+  if (result === "not-found") return { projectId: null, source: "auto-detect-not-found" };
+  if (result !== null) return { projectId: result.project_id, source: "auto-detect" };
+  return { projectId: null, source: "none" };
+}
+
 export function getGitRemote(verbose: boolean): string | null {
   try {
     const out = execFileSync("git", ["remote", "get-url", "origin"], {
@@ -47,6 +62,20 @@ export function getGitRemote(verbose: boolean): string | null {
     return out || null;
   } catch {
     if (verbose) console.log("[verbose] Could not determine git remote");
+    return null;
+  }
+}
+
+export function getGitRemoteForPath(repoPath: string, verbose: boolean): string | null {
+  try {
+    const out = execFileSync("git", ["-C", repoPath, "remote", "get-url", "origin"], {
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 5000,
+    }).trim();
+    return out || null;
+  } catch {
+    if (verbose) console.log(`[verbose] Could not determine git remote for path: ${repoPath}`);
     return null;
   }
 }

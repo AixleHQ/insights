@@ -34,6 +34,7 @@ interface ClaudeTranscriptLine {
   sessionId?: string;
   promptId?: string;
   timestamp?: string;
+  cwd?: string;
   message?: ClaudeMessage;
 }
 
@@ -43,6 +44,7 @@ export interface ClaudeTranscriptTurn {
   promptId?: string;
   filePath: string;
   fileSize: number;
+  cwd?: string;
   model: string | null;
   tokensIn: number;
   tokensOut: number;
@@ -156,6 +158,7 @@ function newTurn(
     promptId,
     filePath,
     fileSize,
+    cwd: undefined,
     model: null,
     tokensIn: 0,
     tokensOut: 0,
@@ -241,6 +244,7 @@ export async function parseTranscriptFile(
       const sessionId = entry.sessionId;
       const promptId = entry.promptId;
       const timestamp = entry.timestamp ?? new Date().toISOString();
+      const cwd = typeof entry.cwd === "string" && entry.cwd.trim().length > 0 ? entry.cwd : undefined;
 
       if (entry.type === "user") {
         if (!sessionId || !entry.message?.content) continue;
@@ -252,15 +256,18 @@ export async function parseTranscriptFile(
           flushCurrentTurn();
           currentTurnIndex += 1;
           currentTurn = newTurn(sessionId, currentTurnIndex, filePath, fileSize, timestamp, promptId);
+          currentTurn.cwd = cwd ?? currentTurn.cwd;
           currentTurn.promptText = appendText(currentTurn.promptText, text);
           currentTurn.occurredAt = timestamp;
           if (promptId) turnsByPromptId.set(promptId, currentTurn);
         } else if (promptId && turnsByPromptId.has(promptId)) {
           currentTurn = turnsByPromptId.get(promptId) ?? null;
           if (currentTurn) {
+            currentTurn.cwd = cwd ?? currentTurn.cwd;
             currentTurn.occurredAt = timestamp > currentTurn.occurredAt ? timestamp : currentTurn.occurredAt;
           }
         } else if (currentTurn && currentTurn.sessionId === sessionId) {
+          currentTurn.cwd = cwd ?? currentTurn.cwd;
           currentTurn.occurredAt = timestamp > currentTurn.occurredAt ? timestamp : currentTurn.occurredAt;
         }
         continue;
@@ -273,6 +280,7 @@ export async function parseTranscriptFile(
           currentTurnIndex += 1;
           currentTurn = newTurn(sessionId, currentTurnIndex, filePath, fileSize, timestamp);
         }
+        currentTurn.cwd = cwd ?? currentTurn.cwd;
 
         const usage = entry.message.usage;
         if (usage) {

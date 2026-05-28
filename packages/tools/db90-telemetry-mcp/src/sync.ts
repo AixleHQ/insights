@@ -1,4 +1,5 @@
 import type { TelemetryToolId, StoredCredentials } from "./auth/credentials.js";
+import { execFileSync } from "node:child_process";
 import {
   readState,
   writeState,
@@ -32,7 +33,12 @@ import {
 import { postEvent } from "./client.js";
 import { type PricingTable, getCostWarning } from "./pricing.js";
 import { acquireSyncLock } from "./lock.js";
-import { enrichCommitProjectAttribution, type ProjectResolution } from "@db90/sdk";
+import {
+  canonicalizeGitRemote,
+  enrichCommitProjectAttribution,
+  lookupProjectByRemote,
+  type ProjectResolution,
+} from "@db90/sdk";
 import { mcpLog } from "./log.js";
 
 /** Prefix for Claude Code session keys in shared MCP state. */
@@ -69,9 +75,18 @@ export interface SyncOptions {
   dryRun: boolean;
   verbose: boolean;
   projectId: string | null;
+  projectIdSource?: ProjectResolution["source"];
   pricing: PricingTable;
   appDir?: string;
   transcriptBaseDirs?: string[];
+  /**
+   * When set, only Claude turns whose `cwd` matches this directory (exact or
+   * subdirectory) are synced. All matching turns use `projectId` directly
+   * — no per-turn remote lookup. Turns from other directories are skipped.
+   * Typically set to `process.cwd()` so each MCP instance is scoped to the
+   * repo it was launched from.
+   */
+  scopeDir?: string;
 }
 
 export interface MultiSyncOptions {
@@ -89,6 +104,8 @@ export interface MultiSyncOptions {
   cursorBaseDir?: string;
   cursorTranscriptProjectDirs?: string[];
   tools?: TelemetryToolId[];
+  /** See SyncOptions.scopeDir. */
+  scopeDir?: string;
 }
 
 const backoffUntilByCredential = new Map<string, Date>();
@@ -198,6 +215,65 @@ function dedupeTools(tools: readonly TelemetryToolId[]): TelemetryToolId[] {
   return [...new Set(tools)];
 }
 
+function explicitProjectId(
+  projectId: string | null,
+  projectIdSource?: ProjectResolution["source"]
+): string | undefined {
+  return projectId && (projectIdSource === "flag" || projectIdSource === "config")
+    ? projectId
+    : undefined;
+}
+
+async function resolveProjectIdForRepoPathCached(
+  repoPath: string | undefined,
+  host: string,
+  token: string,
+  verbose: boolean,
+  cache: Map<string, string | null>
+): Promise<string | null> {
+  const normalized = repoPath?.trim();
+  if (!normalized) return null;
+  if (cache.has(normalized)) return cache.get(normalized) ?? null;
+
+  let gitRemote: string | null = null;
+  try {
+    const out = execFileSync("git", ["-C", normalized, "remote", "get-url", "origin"], {
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 5000,
+    }).trim();
+    gitRemote = out || null;
+  } catch {
+    if (verbose) console.log(`[verbose] Could not determine git remote for path: ${normalized}`);
+  }
+
+  if (!gitRemote) {
+    cache.set(normalized, null);
+    return null;
+  }
+
+  const canonicalRemote = canonicalizeGitRemote(gitRemote, verbose);
+  const result = await lookupProjectByRemote(canonicalRemote, host, token, verbose);
+  const projectId = result && typeof result === "object" && "project_id" in result ? result.project_id : null;
+  cache.set(normalized, projectId);
+  return projectId;
+}
+
+function cursorRepoPathFromPayload(payload: CursorDb90Payload): string | undefined {
+  const metadata = payload.metadata as Record<string, unknown> | undefined;
+  if (!metadata) return undefined;
+
+  if (typeof metadata.workspace_folder === "string" && metadata.workspace_folder.length > 0) {
+    return metadata.workspace_folder;
+  }
+
+  if (typeof metadata.transcript_source === "string" && typeof metadata.workspace === "string" && metadata.workspace.length > 0) {
+    return metadata.workspace;
+  }
+
+  return undefined;
+}
+
 async function runClaudeSlice(options: SyncOptions): Promise<SyncResult> {
   const { token, host, dryRun, verbose, projectId, pricing } = options;
   const appDir = options.appDir ?? getAppDir();
@@ -239,13 +315,30 @@ async function runClaudeSlice(options: SyncOptions): Promise<SyncResult> {
     }
   }
 
+  const { scopeDir } = options;
+
   let state = readState(appDir, host, token);
   let totalSent = 0;
   let totalFailed = 0;
   let totalSkipped = 0;
   let shouldStopForBackoff = false;
+  const explicitProject = explicitProjectId(projectId, options.projectIdSource);
+  const projectLookupCache = new Map<string, string | null>();
 
   for (const turn of bestTurns.values()) {
+    // When scopeDir is set, skip turns from other directories.
+    if (scopeDir) {
+      const cwd = turn.cwd?.trim();
+      const inScope = cwd && (cwd === scopeDir || cwd.startsWith(scopeDir + "/"));
+      if (!inScope) {
+        totalSkipped++;
+        if (verbose) {
+          console.log(`[verbose] Skipping Claude turn ${turn.turnId} — cwd=${cwd ?? "(none)"} not under scopeDir=${scopeDir}`);
+        }
+        continue;
+      }
+    }
+
     const sKey = sessionStateKey(turn.turnId);
     const known = state.sessions[sKey];
 
@@ -262,7 +355,14 @@ async function runClaudeSlice(options: SyncOptions): Promise<SyncResult> {
       continue;
     }
 
-    const payload = mapClaudeTranscriptTurn(turn, { projectId, pricing });
+    // When scoped to a directory, use the pre-resolved projectId directly (the project
+    // was already looked up from scopeDir's git remote). Skip per-turn network lookup.
+    const resolvedProjectId = scopeDir
+      ? (projectId ?? undefined)
+      : (explicitProject ??
+         (await resolveProjectIdForRepoPathCached(turn.cwd, host, token, verbose, projectLookupCache)) ??
+         undefined);
+    const payload = mapClaudeTranscriptTurn(turn, { projectId: resolvedProjectId, pricing });
 
     if (verbose && payload.cost_usd === null) {
       if (!turn.model) {
@@ -349,6 +449,7 @@ async function runCursorSlice(params: {
   appDir: string;
   cursorBaseDir?: string;
   cursorTranscriptProjectDirs?: string[];
+  scopeDir?: string;
 }): Promise<SyncResult> {
   const {
     token,
@@ -361,6 +462,7 @@ async function runCursorSlice(params: {
     appDir,
     cursorBaseDir,
     cursorTranscriptProjectDirs,
+    scopeDir,
   } = params;
   const backoffKey = credentialStateKey(host, token);
   const backoffUntil = backoffUntilByCredential.get(backoffKey) ?? null;
@@ -382,6 +484,8 @@ async function runCursorSlice(params: {
   }
 
   const stateBefore = readState(appDir, host, token);
+  const explicitProject = explicitProjectId(projectId, projectIdSource);
+  const projectLookupCache = new Map<string, string | null>();
   const eventsSince = cursorWatermarkDate(stateBefore, CURSOR_EVENTS_WATERMARK_KEY, CURSOR_WATERMARK_KEY);
   const dailyStatsSince = cursorWatermarkDate(stateBefore, CURSOR_DAILY_STATS_WATERMARK_KEY, CURSOR_WATERMARK_KEY);
   const recentCommitSince = cursorWatermarkDate(
@@ -396,7 +500,7 @@ async function runCursorSlice(params: {
   const dailyStats = readDailyStats(dailyStatsSince, baseDir, verbose);
   const recentCommitSnapshots = readRecentCommitSnapshots(recentCommitSince, baseDir, verbose);
 
-  const projectIdOpt = projectId ?? undefined;
+  const projectIdOpt = explicitProject;
   const transcriptTurnsById = new Map<string, CursorTranscriptTurn>();
   for (const turn of transcriptTurns) {
     transcriptTurnsById.set(turn.turnId, turn);
@@ -432,6 +536,49 @@ async function runCursorSlice(params: {
     token: lookupToken,
     verbose,
   });
+
+  if (scopeDir) {
+    // Filter Cursor payloads to only those whose workspace matches scopeDir,
+    // then assign the pre-resolved projectId to all of them.
+    const inScope = (payload: CursorDb90Payload): boolean => {
+      const ws = cursorRepoPathFromPayload(payload);
+      if (!ws) return false;
+      return ws === scopeDir || ws.startsWith(scopeDir + "/");
+    };
+    for (const arr of [transcriptPayloads, mappedFromEvents, mappedFromStats, mappedFromCommits]) {
+      const out: CursorDb90Payload[] = [];
+      for (const payload of arr) {
+        if (inScope(payload)) {
+          if (projectId) payload.project_id = projectId;
+          else delete payload.project_id;
+          out.push(payload);
+        } else {
+          if (verbose) {
+            const ws = cursorRepoPathFromPayload(payload) ?? "(none)";
+            console.log(`[verbose][cursor] Skipping payload — workspace=${ws} not under scopeDir=${scopeDir}`);
+          }
+        }
+      }
+      arr.length = 0;
+      arr.push(...out);
+    }
+  } else if (!explicitProject) {
+    const cursorPayloadGroups = [transcriptPayloads, mappedFromEvents, mappedFromStats];
+    for (const payloads of cursorPayloadGroups) {
+      for (const payload of payloads) {
+        const repoPath = cursorRepoPathFromPayload(payload);
+        const resolvedProjectId = await resolveProjectIdForRepoPathCached(
+          repoPath,
+          host,
+          lookupToken,
+          verbose,
+          projectLookupCache
+        );
+        if (resolvedProjectId) payload.project_id = resolvedProjectId;
+        else delete payload.project_id;
+      }
+    }
+  }
 
   const groups: Array<{ key: string; label: string; payloads: CursorDb90Payload[] }> = [
     {
@@ -590,7 +737,7 @@ export async function syncTelemetryTools(options: MultiSyncOptions): Promise<Syn
   }
 
   try {
-    const { credentials, dryRun, verbose, projectId, projectIdSource, projectLookupToken, pricing } =
+    const { credentials, dryRun, verbose, projectId, projectIdSource, projectLookupToken, pricing, scopeDir } =
       options;
     const host = credentials.host;
 
@@ -643,6 +790,7 @@ export async function syncTelemetryTools(options: MultiSyncOptions): Promise<Syn
           pricing,
           appDir,
           transcriptBaseDirs: options.transcriptBaseDirs,
+          scopeDir,
         }).then((r) => ({ ...r, tag: "claude_code" as const }));
       tasks.push(task);
     }
@@ -660,6 +808,7 @@ export async function syncTelemetryTools(options: MultiSyncOptions): Promise<Syn
           appDir,
           cursorBaseDir: options.cursorBaseDir,
           cursorTranscriptProjectDirs: options.cursorTranscriptProjectDirs,
+          scopeDir,
         }).then((r) => ({ ...r, tag: "cursor" as const }));
       tasks.push(task);
     }

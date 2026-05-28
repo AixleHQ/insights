@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   findTranscriptFiles: vi.fn(),
   parseTranscriptFile: vi.fn(),
   mapClaudeTranscriptTurn: vi.fn(),
+  resolveProjectIdForRepoPath: vi.fn(),
+  enrichCommitProjectAttribution: vi.fn(),
   readCursorEvents: vi.fn(),
   readDailyStats: vi.fn(),
   readRecentCommitSnapshots: vi.fn(),
@@ -47,6 +49,11 @@ vi.mock("../client.js", () => ({
   postEvent: mocks.postEvent,
 }));
 
+vi.mock("@db90/sdk", () => ({
+  enrichCommitProjectAttribution: mocks.enrichCommitProjectAttribution,
+  resolveProjectIdForRepoPath: mocks.resolveProjectIdForRepoPath,
+}));
+
 import {
   CURSOR_DAILY_STATS_WATERMARK_KEY,
   CURSOR_EVENTS_WATERMARK_KEY,
@@ -69,6 +76,8 @@ describe("syncTelemetryTools", () => {
     mocks.findTranscriptFiles.mockReturnValue([]);
     mocks.parseTranscriptFile.mockResolvedValue([]);
     mocks.mapClaudeTranscriptTurn.mockReturnValue(null);
+    mocks.resolveProjectIdForRepoPath.mockResolvedValue({ projectId: null, source: "none" });
+    mocks.enrichCommitProjectAttribution.mockResolvedValue(undefined);
     mocks.readCursorEvents.mockReturnValue([]);
     mocks.readDailyStats.mockReturnValue([]);
     mocks.readRecentCommitSnapshots.mockReturnValue([]);
@@ -419,6 +428,122 @@ describe("syncTelemetryTools", () => {
     const state = readState(appDir, host, cursorToken);
     expect(state.sessions[CURSOR_RECENT_COMMIT_WATERMARK_KEY]?.sentAt).toBe(
       "2026-05-20T14:30:00.000Z"
+    );
+  });
+
+  it("overrides Claude auto-detected cwd project instead of reusing the sync cwd project", async () => {
+    const sharedToken = "db90_shared_token";
+    mocks.findTranscriptFiles.mockReturnValue(["/tmp/session.jsonl"]);
+    mocks.parseTranscriptFile.mockResolvedValue([
+      {
+        sessionId: "sess-claude",
+        turnId: "sess-claude:1",
+        filePath: "/tmp/session.jsonl",
+        fileSize: 123,
+        cwd: "/repos/right-project",
+        model: "claude-sonnet-4",
+        tokensIn: 10,
+        tokensOut: 5,
+        cacheWriteTokens: 0,
+        cacheReadTokens: 0,
+        occurredAt: "2026-05-19T11:00:00.000Z",
+        promptText: "Check project attribution",
+        assistantText: "Using the repo-specific cwd.",
+        riskLevel: "low",
+        riskScore: 0,
+        riskCategories: [],
+      },
+    ]);
+    mocks.resolveProjectIdForRepoPath.mockResolvedValue({ projectId: "proj-from-cwd", source: "auto-detect" });
+    mocks.mapClaudeTranscriptTurn.mockImplementation((_turn, options) => ({
+      tool_name: "claude_code",
+      event_type: "chat",
+      model: "claude-sonnet-4",
+      tokens_in: 10,
+      tokens_out: 5,
+      tokens_total: 15,
+      cost_usd: 0.1,
+      occurred_at: "2026-05-19T11:00:00.000Z",
+      project_id: options?.projectId ?? undefined,
+      metadata: {
+        session_id: "sess-claude:1",
+        claude_session_id: "sess-claude",
+        transcript_source: "claude_jsonl",
+        model: "claude-sonnet-4",
+        base_input_tokens: 10,
+        output_tokens: 5,
+        cache_write_tokens: 0,
+        cache_read_tokens: 0,
+        risk_level: "low",
+        risk_categories: [],
+        risk_score: 0,
+        prompt_text: "Check project attribution",
+        assistant_text: "Using the repo-specific cwd.",
+        scannable: true,
+      },
+    }));
+
+    await syncTelemetryTools({
+      credentials: { host, accounts: { claude_code: sharedToken } },
+      dryRun: false,
+      verbose: false,
+      projectId: "wrong-sync-cwd-project",
+      projectIdSource: "auto-detect",
+      pricing: DEFAULT_PRICING,
+      appDir,
+      tools: ["claude_code"],
+    });
+
+    expect(mocks.mapClaudeTranscriptTurn).toHaveBeenCalledWith(
+      expect.objectContaining({ cwd: "/repos/right-project" }),
+      expect.objectContaining({ projectId: "proj-from-cwd" })
+    );
+  });
+
+  it("overrides Cursor workspace payloads with workspace-specific project attribution", async () => {
+    const cursorToken = "db90_cursor_token";
+    mocks.readCursorEvents.mockReturnValue([
+      { row: { requestId: "r1" }, workspacePath: "/tmp/storage/workspace-a" },
+    ]);
+    mocks.mapCursorEvent.mockReturnValue({
+      tool_name: "cursor",
+      event_type: "chat",
+      model: "gpt-4.1",
+      tokens_in: 3,
+      tokens_out: 1,
+      cost_usd: 0.1,
+      occurred_at: "2026-05-19T09:00:00.000Z",
+      project_id: "wrong-sync-cwd-project",
+      metadata: {
+        cursor_session_id: "r1",
+        workspace: "/tmp/storage/workspace-a",
+        workspace_folder: "/repos/right-project",
+        cost_model: "estimated_line_count",
+        scannable: false,
+        risk_level: "none",
+      },
+    });
+    mocks.resolveProjectIdForRepoPath.mockResolvedValue({ projectId: "proj-from-workspace", source: "auto-detect" });
+
+    await syncTelemetryTools({
+      credentials: { host, accounts: { cursor: cursorToken } },
+      dryRun: false,
+      verbose: false,
+      projectId: "wrong-sync-cwd-project",
+      projectIdSource: "auto-detect",
+      pricing: DEFAULT_PRICING,
+      appDir,
+      tools: ["cursor"],
+    });
+
+    expect(mocks.postEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        project_id: "proj-from-workspace",
+        metadata: expect.objectContaining({ workspace_folder: "/repos/right-project" }),
+      }),
+      host,
+      cursorToken,
+      expect.any(Object)
     );
   });
 });

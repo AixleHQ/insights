@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   resolveProjectId,
+  resolveProjectIdForRepoPath,
   getGitRemote,
+  getGitRemoteForPath,
   lookupProjectByRemote,
   lookupProjectByRepoName,
   repoNameToGitRemoteCandidates,
@@ -115,6 +117,25 @@ describe("resolveProjectId", () => {
     expect(result.projectId).toBeNull();
     expect(result.source).toBe("none");
   });
+
+  it("resolves project from an explicit repo path", async () => {
+    mockExecFileSync.mockReturnValue("git@github.com:org/repo.git\n" as unknown as Buffer);
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ data: { project_id: "path-uuid", name: "Path Repo" } }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const result = await resolveProjectIdForRepoPath("/repos/right-project", host, token, false);
+    expect(result.projectId).toBe("path-uuid");
+    expect(result.source).toBe("auto-detect");
+    expect(mockExecFileSync).toHaveBeenCalledWith(
+      "git",
+      ["-C", "/repos/right-project", "remote", "get-url", "origin"],
+      expect.any(Object)
+    );
+  });
 });
 
 describe("getGitRemote", () => {
@@ -137,6 +158,11 @@ describe("getGitRemote", () => {
   it("returns null when output is empty string", () => {
     mockExecFileSync.mockReturnValue("" as unknown as Buffer);
     expect(getGitRemote(false)).toBeNull();
+  });
+
+  it("returns trimmed remote URL for an explicit repo path", () => {
+    mockExecFileSync.mockReturnValue("git@github.com:org/repo.git\n" as unknown as Buffer);
+    expect(getGitRemoteForPath("/repos/right-project", false)).toBe("git@github.com:org/repo.git");
   });
 });
 
