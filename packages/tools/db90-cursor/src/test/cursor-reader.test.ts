@@ -8,6 +8,8 @@ import {
   findStateVscDbs,
   readLegacyEvents,
   readDailyStats,
+  dedupeDailyStatsEntries,
+  isGlobalStateDbPath,
   readEvents,
   readRecentCommitSnapshots,
 } from "../cursor-reader.js";
@@ -274,6 +276,45 @@ describe("readDailyStats", () => {
     createEmptyDb(join(dir, "state.vscdb")); // no tables
 
     expect(readDailyStats(null, tempDir)).toHaveLength(0);
+  });
+
+  it("prefers globalStorage when the same date exists in global and workspace DBs", () => {
+    makeGlobalDb([
+      {
+        key: "aiCodeTracking.dailyStats.v1.5.2026-05-20",
+        value: JSON.stringify({ tabSuggestedLines: 100, tabAcceptedLines: 10 }),
+      },
+    ]);
+
+    const wsDir = join(tempDir, "workspaceStorage", "ws-dup");
+    mkdirSync(wsDir, { recursive: true });
+    createItemTableDb(join(wsDir, "state.vscdb"), [
+      {
+        key: "aiCodeTracking.dailyStats.v1.5.2026-05-20",
+        value: JSON.stringify({ tabSuggestedLines: 999, tabAcceptedLines: 99 }),
+      },
+    ]);
+
+    const results = readDailyStats(null, tempDir);
+    expect(results).toHaveLength(1);
+    expect(isGlobalStateDbPath(results[0].dbPath)).toBe(true);
+    expect((results[0].value as Record<string, number>).tabSuggestedLines).toBe(100);
+  });
+
+  it("dedupeDailyStatsEntries keeps distinct dates across files", () => {
+    const deduped = dedupeDailyStatsEntries([
+      {
+        date: "2026-05-01",
+        value: { tabSuggestedLines: 1 },
+        dbPath: join(tempDir, "globalStorage", "state.vscdb"),
+      },
+      {
+        date: "2026-05-02",
+        value: { composerSuggestedLines: 2 },
+        dbPath: join(tempDir, "workspaceStorage", "ws1", "state.vscdb"),
+      },
+    ]);
+    expect(deduped).toHaveLength(2);
   });
 
   it("aggregates entries from multiple state.vscdb files", () => {

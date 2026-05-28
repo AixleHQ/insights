@@ -44,8 +44,17 @@
     "mcp"
   ],
   "scripts": {
+    "prebuild": "npm run build --prefix ../db90-sdk",
     "build": "tsc",
     "test": "vitest run",
+    "verify:dry-run-matrix": "tsx scripts/verify-dry-run-matrix.ts",
+    "audit:local-stores": "tsx scripts/audit-local-stores.ts",
+    "spotcheck:disk-kv": "tsx scripts/spotcheck-disk-kv.ts",
+    "install:hooks-feasibility": "tsx scripts/install-hooks-feasibility.ts",
+    "verify:hooks-feasibility": "tsx scripts/verify-hooks-feasibility.ts",
+    "verify:cli-mcp-parity": "tsx scripts/verify-cli-mcp-parity.ts",
+    "verify:commit-ingest": "tsx scripts/verify-commit-ingest.ts",
+    "verify:commit-message-sanitization": "tsx scripts/verify-commit-message-sanitization.ts",
     "dev": "tsx src/cli.ts",
     "prepublishOnly": "npm run build",
     "prepack": "node ../scripts/stage-sdk-bundle.mjs"

@@ -49,6 +49,27 @@ RSpec.describe RawEventStore do
         expect(args[:metadata]['source']).to eq('webhook')
       end
     end
+
+    it 'does not double-encode a raw JSON string body (ingest raw_post)' do
+      allow(s3_client).to receive(:put_object)
+      json = payload.to_json
+
+      described_class.store(json, organization_id: organization_id)
+
+      expect(s3_client).to have_received(:put_object) do |args|
+        encryption_key = 'default_dev_key_32_characters__'.byteslice(0, 32).ljust(32, "\0")
+        iv = Base64.strict_decode64(args[:metadata]['iv'])
+        auth_tag = Base64.strict_decode64(args[:metadata]['auth-tag'])
+        decipher = OpenSSL::Cipher.new('aes-256-gcm')
+        decipher.decrypt
+        decipher.key = encryption_key
+        decipher.iv = iv
+        decipher.auth_tag = auth_tag
+        decipher.auth_data = ''
+        decrypted = decipher.update(args[:body]) + decipher.final
+        expect(JSON.parse(decrypted)).to eq(payload.stringify_keys)
+      end
+    end
   end
 
   describe '.fetch' do

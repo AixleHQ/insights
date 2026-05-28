@@ -23,6 +23,7 @@ RSpec.describe 'Api::V1::Telemetry', type: :request do
 
     before do
       # Mock RawEventStore and Temporal::Client for testing
+      allow(RawEventStore).to receive(:ensure_bucket_exists!).and_return(nil)
       allow(RawEventStore).to receive(:store).and_return('events/test-key.json')
       allow(Temporal::Client).to receive(:start_workflow).and_return({ workflow_id: 'test-workflow-id' })
     end
@@ -74,6 +75,7 @@ RSpec.describe 'Api::V1::Telemetry', type: :request do
     end
 
     before do
+      allow(RawEventStore).to receive(:ensure_bucket_exists!).and_return(nil)
       allow(RawEventStore).to receive(:store).and_return('events/test-key.json')
       allow(Temporal::Client).to receive(:start_workflow).and_return({ workflow_id: 'test-workflow-id' })
     end

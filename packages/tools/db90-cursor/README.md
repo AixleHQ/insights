@@ -120,6 +120,36 @@ Run with `--verbose` and `--dry-run` to see which database files are found and w
 node dist/cli.js --token <token> --host <host> --verbose --dry-run
 ```
 
+To validate payload shape against the ingest contract (no token required) and capture a path matrix:
+
+```bash
+npm run verify:dry-run-matrix
+```
+
+This writes redacted samples to `docs/data-pipeline/fixtures/cursor-dry-run-matrix.json` (gitignored — local only).
+
+### Audit local stores (CUR-V07)
+
+Inventory `state.vscdb` vs legacy `cursor.db` without posting:
+
+```bash
+npm run audit:local-stores
+```
+
+Reports Path C verdict (`no_legacy_dbs`, `legacy_present_empty`, or `legacy_has_rows`). See `docs/data-pipeline/CURSOR-INGEST-VERIFICATION.md` § CUR-V07 results.
+
+Additional verification scripts (no POST): `spotcheck:disk-kv` (CUR-V12), `install:hooks-feasibility` / `verify:hooks-feasibility` (CUR-V13), `verify:cli-mcp-parity` (CUR-V14). See `docs/data-pipeline/CURSOR-INGEST-VERIFICATION.md`.
+
+### Verify commit ingest (CUR-V08)
+
+POST a sample `event_type: commit` payload to staging or local API:
+
+```bash
+DB90_HOST=https://your-app.example DB90_TOKEN=db90_... npm run verify:commit-ingest
+```
+
+Expect `HTTP 202`. Confirm the event in DB90 (filter by `metadata.commit_hash=cur-v08-verify-deadbeef`). API coverage is also in `packages/api/spec/requests/api/v1/ingest_spec.rb`.
+
 Expected output shows paths like:
 
 ```
@@ -200,7 +230,20 @@ Create `~/.db90-cursor/config.json`:
 
 ### State file
 
-The CLI stores the timestamp of the last processed event in `~/.db90-cursor/state.json` to avoid re-sending events on subsequent runs. This file is managed automatically.
+The CLI stores the timestamp of the last processed event in `~/.db90-cursor/`, **one file per db90 host + ingest token** (same scheme as `db90-claude`):
+
+```
+~/.db90-cursor/state-<hostname>-<token-hash>.json
+```
+
+Examples:
+
+- `state-localhost-a1b2c3d4.json` — local Rails
+- `state-insights.example.com-e5f6a7b8.json` — staging
+
+On first run after upgrade, a legacy `~/.db90-cursor/state.json` is renamed to match your current `--host` / `--token` so local watermarks are preserved.
+
+Use `--verbose` to print which state file is loaded. Syncing against staging no longer inherits watermarks from localhost.
 
 The watermark is set to the maximum `occurred_at` of all successfully sent events — not the current wall-clock time. This means backfilled or clock-skewed events are never silently skipped.
 
@@ -291,7 +334,7 @@ Older Cursor versions stored per-request data in `workspaceStorage/**/cursor.db`
 ### Pipeline
 
 1. Find all `state.vscdb` and `cursor.db` files matching the above paths
-2. Filter entries newer than the last processed timestamp (from `~/.db90-cursor/state.json`)
+2. Filter entries newer than the last processed timestamp (from the credential-scoped file under `~/.db90-cursor/`)
 3. Map each entry to the db90 ingest payload format
 4. POST each event to `{host}/api/v1/ingest/events` with your Bearer token
 5. On success, update the watermark to `max(occurred_at)` of sent events
@@ -338,6 +381,12 @@ Use `--verbose` to see which source was used:
 [verbose] Project attribution: none (source: auto-detect-not-found)
 [verbose] Project attribution: none (source: none)
 ```
+
+### Commit events (`recentCommit`)
+
+When Cursor writes `aiCodeTracking.recentCommit`, the payload includes `metadata.repo_name` (e.g. `dualboot-partners/db90-rails`). If you did **not** pass `--project-id` or set `project_id` in config, the CLI looks up the DB90 project from that slug (GitHub `owner/repo` → HTTPS/SSH remotes) and sets `project_id` on the commit event. This avoids mis-attribution when you run `db90-cursor` from a different directory than the repo you committed in.
+
+Daily-stats and legacy events still use CWD git-remote attribution only. `--project-id` / config always wins for every event type.
 
 ### Setup
 

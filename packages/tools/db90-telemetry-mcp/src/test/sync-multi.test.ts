@@ -11,10 +11,12 @@ const mocks = vi.hoisted(() => ({
   mapClaudeTranscriptTurn: vi.fn(),
   readCursorEvents: vi.fn(),
   readDailyStats: vi.fn(),
+  readRecentCommitSnapshots: vi.fn(),
   readCursorTranscriptSessions: vi.fn(),
   mapCursorEvent: vi.fn(),
   mapCursorTranscriptTurn: vi.fn(),
   mapDailyStats: vi.fn(),
+  mapRecentCommit: vi.fn(),
   postEvent: vi.fn(),
 }));
 
@@ -27,10 +29,12 @@ vi.mock("../readers/claude.js", () => ({
 vi.mock("../readers/cursor.js", () => ({
   readEvents: mocks.readCursorEvents,
   readDailyStats: mocks.readDailyStats,
+  readRecentCommitSnapshots: mocks.readRecentCommitSnapshots,
   readCursorTranscriptSessions: mocks.readCursorTranscriptSessions,
   mapEvent: mocks.mapCursorEvent,
   mapTranscriptTurn: mocks.mapCursorTranscriptTurn,
   mapDailyStats: mocks.mapDailyStats,
+  mapRecentCommit: mocks.mapRecentCommit,
   DEFAULT_CURSOR_PRICING: {
     tokens_per_line: 15,
     completion_output_per_mtok: 0.6,
@@ -46,6 +50,7 @@ vi.mock("../client.js", () => ({
 import {
   CURSOR_DAILY_STATS_WATERMARK_KEY,
   CURSOR_EVENTS_WATERMARK_KEY,
+  CURSOR_RECENT_COMMIT_WATERMARK_KEY,
   cursorTranscriptTurnStateKey,
   sessionStateKey,
   syncTelemetryTools,
@@ -66,10 +71,12 @@ describe("syncTelemetryTools", () => {
     mocks.mapClaudeTranscriptTurn.mockReturnValue(null);
     mocks.readCursorEvents.mockReturnValue([]);
     mocks.readDailyStats.mockReturnValue([]);
+    mocks.readRecentCommitSnapshots.mockReturnValue([]);
     mocks.readCursorTranscriptSessions.mockResolvedValue([]);
     mocks.mapCursorEvent.mockReturnValue(null);
     mocks.mapCursorTranscriptTurn.mockReturnValue(null);
     mocks.mapDailyStats.mockReturnValue([]);
+    mocks.mapRecentCommit.mockReturnValue(null);
     mocks.postEvent.mockResolvedValue(true);
   });
 
@@ -363,5 +370,55 @@ describe("syncTelemetryTools", () => {
     const state = readState(appDir, host, sharedToken);
     expect(state.sessions[sessionStateKey("sess-1:1")]).toBeDefined();
     expect(state.sessions[CURSOR_EVENTS_WATERMARK_KEY]?.sentAt).toBe("2026-05-19T12:00:00.000Z");
+  });
+
+  it("posts recent-commit snapshots and advances the recent-commit watermark", async () => {
+    const cursorToken = "db90_cursor_token";
+    mocks.readRecentCommitSnapshots.mockReturnValue([
+      {
+        dbPath: "/tmp/state.vscdb",
+        value: {
+          timestamp: 1716215400000,
+          commitHash: "deadbeef",
+          linesAdded: 8,
+          linesDeleted: 2,
+        },
+      },
+    ]);
+    mocks.mapRecentCommit.mockReturnValue({
+      tool_name: "cursor",
+      event_type: "commit",
+      model: "unknown",
+      tokens_in: 8,
+      tokens_out: 2,
+      cost_usd: 0.1,
+      occurred_at: "2026-05-20T14:30:00.000Z",
+      metadata: {
+        cursor_session_id: null,
+        workspace: "/tmp/state.vscdb",
+        cost_model: "estimated_line_count",
+        scannable: false,
+        risk_level: "none",
+        source: "recent_commit",
+        commit_hash: "deadbeef",
+      },
+    });
+
+    const result = await syncTelemetryTools({
+      credentials: { host, accounts: { cursor: cursorToken } },
+      dryRun: false,
+      verbose: false,
+      projectId: null,
+      pricing: DEFAULT_PRICING,
+      appDir,
+      tools: ["cursor"],
+    });
+
+    expect(result.sent).toBe(1);
+    expect(mocks.mapRecentCommit).toHaveBeenCalled();
+    const state = readState(appDir, host, cursorToken);
+    expect(state.sessions[CURSOR_RECENT_COMMIT_WATERMARK_KEY]?.sentAt).toBe(
+      "2026-05-20T14:30:00.000Z"
+    );
   });
 });

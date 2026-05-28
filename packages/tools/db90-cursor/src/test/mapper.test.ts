@@ -29,7 +29,7 @@ describe("mapEvent", () => {
     expect(result!.metadata.cursor_session_id).toBe("session-xyz");
     expect(result!.metadata.workspace).toBe(workspace);
     expect(result!.cost_usd).toBeTypeOf("number");
-    expect(result!.metadata.cost_model).toBe("estimated_line_count");
+    expect(result!.metadata.cost_model).toBe("token_count");
     expect(result!.metadata.scannable).toBe(false);
     expect(result!.metadata.risk_level).toBe("none");
   });
@@ -52,7 +52,7 @@ describe("mapEvent", () => {
     expect(result!.model).toBe("claude-3-sonnet");
     expect(result!.metadata.cursor_session_id).toBe("req-def-456");
     expect(result!.cost_usd).toBeTypeOf("number");
-    expect(result!.metadata.cost_model).toBe("estimated_line_count");
+    expect(result!.metadata.cost_model).toBe("token_count");
     expect(result!.metadata.scannable).toBe(false);
     expect(result!.metadata.risk_level).toBe("none");
   });
@@ -72,7 +72,7 @@ describe("mapEvent", () => {
     expect(result).not.toBeNull();
     expect(result!.occurred_at).toBe(new Date(1700000000 * 1000).toISOString());
     expect(result!.cost_usd).toBeTypeOf("number");
-    expect(result!.metadata.cost_model).toBe("estimated_line_count");
+    expect(result!.metadata.cost_model).toBe("token_count");
   });
 
   it("returns null when timestamp is missing", () => {
@@ -116,7 +116,7 @@ describe("mapEvent", () => {
     expect(result!.tokens_in).toBe(0);
     expect(result!.tokens_out).toBe(0);
     expect(result!.cost_usd).toBe(0);
-    expect(result!.metadata.cost_model).toBe("estimated_line_count");
+    expect(result!.metadata.cost_model).toBe("token_count");
   });
 
   it("falls back to requestId for session_id when sessionId is null", () => {
@@ -134,7 +134,7 @@ describe("mapEvent", () => {
     expect(result).not.toBeNull();
     expect(result!.metadata.cursor_session_id).toBe("req-fallback");
     expect(result!.cost_usd).toBeTypeOf("number");
-    expect(result!.metadata.cost_model).toBe("estimated_line_count");
+    expect(result!.metadata.cost_model).toBe("token_count");
   });
 
   it("treats type=undefined as completion", () => {
@@ -150,7 +150,7 @@ describe("mapEvent", () => {
     expect(result).not.toBeNull();
     expect(result!.event_type).toBe("completion");
     expect(result!.cost_usd).toBeTypeOf("number");
-    expect(result!.metadata.cost_model).toBe("estimated_line_count");
+    expect(result!.metadata.cost_model).toBe("token_count");
   });
 
   it("sets cost_usd to 0 when tokens are zero (completion, type=0)", () => {
@@ -166,7 +166,7 @@ describe("mapEvent", () => {
     const result = mapEvent(row, workspace);
     expect(result).not.toBeNull();
     expect(result!.cost_usd).toBe(0);
-    expect(result!.metadata.cost_model).toBe("estimated_line_count");
+    expect(result!.metadata.cost_model).toBe("token_count");
     // same holds for chat (type=1) with zero tokens
     const resultChat = mapEvent({ ...row, type: 1 }, workspace);
     expect(resultChat!.cost_usd).toBe(0);
@@ -278,7 +278,7 @@ describe("mapDailyStats", () => {
     expect(results[0].tokens_in).toBe(5000);
     expect(results[0].tokens_out).toBe(1200);
     expect(results[0].cost_usd).toBeTypeOf("number");
-    expect(results[0].metadata.cost_model).toBe("estimated_line_count");
+    expect(results[0].metadata.cost_model).toBe("token_count");
   });
 
   it("returns empty array for unknown shape", () => {

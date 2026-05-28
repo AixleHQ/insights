@@ -1,6 +1,16 @@
 import type { IngestPayload } from "@db90/sdk";
+import {
+  cursorWorkspaceMetadata,
+  cursorWorkspaceMetadataFromStorageDir,
+  type WorkspaceScope,
+} from "./workspace-metadata.js";
 
-const COST_MODEL = "estimated_line_count" as const;
+/** Line-proxy paths: dailyStats + recentCommit (CUR-V10: not used on legacy cursor.db). */
+export const LINE_COST_MODEL = "estimated_line_count" as const;
+/** Legacy CursorRequestFeedback rows carry real prompt/generated token counts. */
+export const TOKEN_COST_MODEL = "token_count" as const;
+
+export type CursorCostModel = typeof LINE_COST_MODEL | typeof TOKEN_COST_MODEL;
 
 export interface PricingConfig {
   tokens_per_line: number;
@@ -29,8 +39,13 @@ export interface CursorRow {
 
 export type Db90PayloadMetadata = {
   cursor_session_id: string | null;
+  /** Path to the SQLite file (state.vscdb) or workspaceStorage hash directory (legacy). */
   workspace: string;
-  cost_model: typeof COST_MODEL;
+  /** `global` = install-wide aggregate DB; `workspace` = per-folder hash store. */
+  workspace_scope: WorkspaceScope;
+  /** Resolved from `workspace.json` when present (workspace-scoped stores only). */
+  workspace_folder?: string;
+  cost_model: CursorCostModel;
   scannable: false;
   risk_level: "none";
   /** Set when the event comes from Cursor’s `aiCodeTracking.recentCommit` row (one per install, last commit only). */
@@ -78,7 +93,7 @@ function toIsoString(timestamp: number | string | null | undefined): string | nu
 // Defensive: callers may receive a PricingConfig from CLI/SDK consumers that
 // bypassed the cli.ts validation guard. Clamping at the math layer guarantees
 // no negative cost ever lands in an outbound payload.
-const nn = (n: number): number => (n > 0 ? n : 0);
+const clampPositive = (n: number): number => (n > 0 ? n : 0);
 
 // For line-count layout (daily stats v1.5).
 // Line counts are clamped to >= 0 alongside pricing rates so a malformed DB
@@ -89,10 +104,10 @@ function computeLineCost(
   pricing: PricingConfig
 ): number {
   const safeLines = Math.max(0, lines);
-  const tokensPerLine = nn(pricing.tokens_per_line);
+  const tokensPerLine = clampPositive(pricing.tokens_per_line);
   if (eventType === "completion")
-    return (safeLines * tokensPerLine * nn(pricing.completion_output_per_mtok)) / 1_000_000;
-  return (safeLines * tokensPerLine * (nn(pricing.chat_output_per_mtok) + nn(pricing.chat_input_per_mtok) * 2)) / 1_000_000;
+    return (safeLines * tokensPerLine * clampPositive(pricing.completion_output_per_mtok)) / 1_000_000;
+  return (safeLines * tokensPerLine * (clampPositive(pricing.chat_output_per_mtok) + clampPositive(pricing.chat_input_per_mtok) * 2)) / 1_000_000;
 }
 
 // For token-based events (legacy cursor.db + model-keyed fallback).
@@ -107,8 +122,8 @@ function computeTokenCost(
   const safeIn  = Math.max(0, tokensIn);
   const safeOut = Math.max(0, tokensOut);
   if (eventType === "completion")
-    return (safeOut * nn(pricing.completion_output_per_mtok)) / 1_000_000;
-  return (safeIn * nn(pricing.chat_input_per_mtok) + safeOut * nn(pricing.chat_output_per_mtok)) / 1_000_000;
+    return (safeOut * clampPositive(pricing.completion_output_per_mtok)) / 1_000_000;
+  return (safeIn * clampPositive(pricing.chat_input_per_mtok) + safeOut * clampPositive(pricing.chat_output_per_mtok)) / 1_000_000;
 }
 
 // ─── Daily stats mapping (state.vscdb / ItemTable) ───────────────────────────
@@ -133,8 +148,19 @@ function buildPayload(opts: {
   dbPath: string;
   model?: string;
   projectId?: string;
+  costModel?: CursorCostModel;
 }): Db90Payload {
-  const { eventType, tokensIn, tokensOut, costUsd, occurredAt, dbPath, model = "unknown", projectId } = opts;
+  const {
+    eventType,
+    tokensIn,
+    tokensOut,
+    costUsd,
+    occurredAt,
+    dbPath,
+    model = "unknown",
+    projectId,
+    costModel = LINE_COST_MODEL,
+  } = opts;
   const payload: Db90Payload = {
     tool_name: "cursor",
     event_type: eventType,
@@ -143,7 +169,13 @@ function buildPayload(opts: {
     tokens_out: tokensOut,
     cost_usd: costUsd,
     occurred_at: occurredAt,
-    metadata: { cursor_session_id: null, workspace: dbPath, cost_model: COST_MODEL, scannable: false, risk_level: "none" },
+    metadata: {
+      cursor_session_id: null,
+      ...cursorWorkspaceMetadata(dbPath),
+      cost_model: costModel,
+      scannable: false,
+      risk_level: "none",
+    },
   };
   if (projectId) payload.project_id = projectId;
   return payload;
@@ -212,9 +244,14 @@ export function mapDailyStats(
     if (tokensIn === 0 && tokensOut === 0) continue;
     results.push(buildPayload({
       eventType: "chat",
-      tokensIn, tokensOut,
+      tokensIn,
+      tokensOut,
       costUsd: computeTokenCost("chat", tokensIn, tokensOut, pricing),
-      occurredAt, dbPath, model, projectId,
+      occurredAt,
+      dbPath,
+      model,
+      projectId,
+      costModel: TOKEN_COST_MODEL,
     }));
   }
 
@@ -265,8 +302,8 @@ export function mapRecentCommit(
     occurred_at: occurredAt,
     metadata: {
       cursor_session_id: null,
-      workspace: dbPath,
-      cost_model: COST_MODEL,
+      ...cursorWorkspaceMetadata(dbPath),
+      cost_model: LINE_COST_MODEL,
       source: "recent_commit",
       commit_hash: typeof commitHash === "string" ? commitHash : undefined,
       commit_message: typeof commitMessage === "string" ? commitMessage : undefined,
@@ -309,8 +346,8 @@ export function mapEvent(
     occurred_at: occurredAt,
     metadata: {
       cursor_session_id: row.sessionId ?? row.requestId ?? null,
-      workspace: workspacePath,
-      cost_model: COST_MODEL,
+      ...cursorWorkspaceMetadataFromStorageDir(workspacePath),
+      cost_model: TOKEN_COST_MODEL,
       scannable: false,
       risk_level: "none",
     },

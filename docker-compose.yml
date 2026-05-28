@@ -147,6 +147,7 @@ services:
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
+      RAW_EVENTS_BUCKET: raw-events
     depends_on:
       postgres:
         condition: service_healthy
@@ -211,8 +212,17 @@ services:
       TEMPORAL_HOST: temporal:7233
       TEMPORAL_NAMESPACE: default
       TEMPORAL_TASK_QUEUE: db90-tasks
+      RAILS_API_URL: http://api:3000
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: raw-events
+      RAW_EVENTS_BUCKET: raw-events
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
     depends_on:
       - temporal
+      - api
+      - minio
     profiles:
       - worker
 

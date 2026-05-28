@@ -78,11 +78,11 @@ module Api
         workflow_id = "ingest-#{org.id}-#{SecureRandom.uuid}"
 
         Temporal::Client.start_workflow(
-          "Workflows::IngestionSanitizationWorkflow",
+          Temporal::Client::INGESTION_SANITIZATION_WORKFLOW,
           workflow_id: workflow_id,
           args: {
             raw_event_key: raw_key,
-            raw_event_bucket: ENV.fetch("MINIO_BUCKET", "db90-raw-events"),
+            raw_event_bucket: ENV.fetch("RAW_EVENTS_BUCKET", "raw-events"),
             event: event_params.merge(
               organization_id: org.id,
               occurred_at: event_params[:occurred_at] || Time.current.iso8601

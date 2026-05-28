@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { resolveProjectId, getGitRemote, lookupProjectByRemote } from "../project-resolver.js";
+import {
+  resolveProjectId,
+  getGitRemote,
+  lookupProjectByRemote,
+  lookupProjectByRepoName,
+  repoNameToGitRemoteCandidates,
+  enrichCommitProjectAttribution,
+} from "../project-resolver.js";
 
 vi.mock("node:child_process", () => ({
   execFileSync: vi.fn(),
@@ -130,6 +137,133 @@ describe("getGitRemote", () => {
   it("returns null when output is empty string", () => {
     mockExecFileSync.mockReturnValue("" as unknown as Buffer);
     expect(getGitRemote(false)).toBeNull();
+  });
+});
+
+describe("repoNameToGitRemoteCandidates", () => {
+  it("expands owner/repo to GitHub HTTPS and SSH remotes", () => {
+    expect(repoNameToGitRemoteCandidates("acme/demo")).toEqual([
+      "https://github.com/acme/demo",
+      "git@github.com:acme/demo.git",
+    ]);
+  });
+
+  it("passes through full git remote URLs unchanged", () => {
+    expect(repoNameToGitRemoteCandidates("git@github.com:org/repo.git")).toEqual([
+      "git@github.com:org/repo.git",
+    ]);
+  });
+
+  it("returns empty for blank input", () => {
+    expect(repoNameToGitRemoteCandidates("  ")).toEqual([]);
+  });
+});
+
+describe("lookupProjectByRepoName", () => {
+  const host = "https://app.db90.io";
+  const token = "db90_testtoken";
+
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("tries HTTPS candidate first and returns on match", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ data: { project_id: "proj-from-slug", name: "Demo" } }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const result = await lookupProjectByRepoName("org/repo", host, token, false);
+    expect(result).toEqual({ project_id: "proj-from-slug", name: "Demo" });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const url = mockFetch.mock.calls[0][0] as string;
+    expect(url).toContain(encodeURIComponent("https://github.com/org/repo"));
+  });
+
+  it("falls through to SSH when HTTPS returns 404", async () => {
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 404 })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: { project_id: "proj-ssh", name: "SSH" } }),
+      });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const result = await lookupProjectByRepoName("org/repo", host, token, false);
+    expect(result).toEqual({ project_id: "proj-ssh", name: "SSH" });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("enrichCommitProjectAttribution", () => {
+  const host = "https://app.db90.io";
+  const token = "db90_testtoken";
+
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("skips repo lookup when project_id was set via flag or config", async () => {
+    const mockFetch = vi.fn();
+    vi.stubGlobal("fetch", mockFetch);
+
+    const payloads = [
+      {
+        event_type: "commit",
+        project_id: "explicit-proj",
+        metadata: { source: "recent_commit", repo_name: "org/repo" },
+      },
+    ];
+    await enrichCommitProjectAttribution(payloads, {
+      projectIdSource: "flag",
+      host,
+      token,
+      verbose: false,
+    });
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(payloads[0].project_id).toBe("explicit-proj");
+  });
+
+  it("overrides commit project_id from metadata.repo_name lookup", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ data: { project_id: "proj-from-commit", name: "Repo" } }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const payloads = [
+      {
+        event_type: "commit",
+        project_id: "wrong-cwd-proj",
+        metadata: { source: "recent_commit", repo_name: "org/repo" },
+      },
+      {
+        event_type: "chat",
+        project_id: "wrong-cwd-proj",
+        metadata: {},
+      },
+    ];
+    await enrichCommitProjectAttribution(payloads, {
+      projectIdSource: "auto-detect",
+      host,
+      token,
+      verbose: false,
+    });
+    expect(payloads[0].project_id).toBe("proj-from-commit");
+    expect(payloads[1].project_id).toBe("wrong-cwd-proj");
   });
 });
 

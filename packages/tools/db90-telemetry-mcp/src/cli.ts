@@ -358,9 +358,11 @@ export async function runOnce(deps?: Partial<RunOnceDeps>): Promise<number> {
   }
   const lookupToken = pickProjectLookupToken(creds);
   let projectId: string | null = null;
+  let projectIdSource: Awaited<ReturnType<typeof runtime.resolveProjectId>>["source"] = "none";
   if (lookupToken) {
     const resolution = await runtime.resolveProjectId(undefined, undefined, creds.host, lookupToken, false);
     projectId = resolution.projectId;
+    projectIdSource = resolution.source;
     mcpLog.info(
       "project_attribution_resolved",
       { project_id: resolution.projectId, source: resolution.source },
@@ -372,6 +374,8 @@ export async function runOnce(deps?: Partial<RunOnceDeps>): Promise<number> {
     dryRun: false,
     verbose: false,
     projectId,
+    projectIdSource,
+    projectLookupToken: lookupToken,
     pricing: runtime.pricing,
     appDir: appDirRuntime,
   });

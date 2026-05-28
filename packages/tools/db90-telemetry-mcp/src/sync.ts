@@ -19,10 +19,12 @@ import {
 import {
   readEvents as readCursorEvents,
   readDailyStats,
+  readRecentCommitSnapshots,
   readCursorTranscriptSessions,
   mapEvent as mapCursorEvent,
   mapTranscriptTurn as mapCursorTranscriptTurn,
   mapDailyStats,
+  mapRecentCommit,
   DEFAULT_CURSOR_PRICING,
   type CursorTranscriptTurn,
   type CursorDb90Payload,
@@ -30,6 +32,7 @@ import {
 import { postEvent } from "./client.js";
 import { type PricingTable, getCostWarning } from "./pricing.js";
 import { acquireSyncLock } from "./lock.js";
+import { enrichCommitProjectAttribution, type ProjectResolution } from "@db90/sdk";
 import { mcpLog } from "./log.js";
 
 /** Prefix for Claude Code session keys in shared MCP state. */
@@ -39,6 +42,7 @@ export const CLAUDE_STATE_PREFIX = "claude_code:" as const;
 export const CURSOR_WATERMARK_KEY = "cursor:watermark" as const;
 export const CURSOR_EVENTS_WATERMARK_KEY = "cursor:events_watermark" as const;
 export const CURSOR_DAILY_STATS_WATERMARK_KEY = "cursor:daily_stats_watermark" as const;
+export const CURSOR_RECENT_COMMIT_WATERMARK_KEY = "cursor:recent_commit_watermark" as const;
 export const CURSOR_TRANSCRIPT_TURN_PREFIX = "cursor:transcript_turn:" as const;
 
 export function sessionStateKey(sessionId: string): string {
@@ -75,6 +79,9 @@ export interface MultiSyncOptions {
   dryRun: boolean;
   verbose: boolean;
   projectId: string | null;
+  projectIdSource?: ProjectResolution["source"];
+  /** Token for GET /projects/lookup (defaults to cursor ingest token in cursor slice). */
+  projectLookupToken?: string | null;
   pricing: PricingTable;
   appDir?: string;
   transcriptBaseDirs?: string[];
@@ -337,11 +344,24 @@ async function runCursorSlice(params: {
   dryRun: boolean;
   verbose: boolean;
   projectId: string | null;
+  projectIdSource?: ProjectResolution["source"];
+  projectLookupToken?: string | null;
   appDir: string;
   cursorBaseDir?: string;
   cursorTranscriptProjectDirs?: string[];
 }): Promise<SyncResult> {
-  const { token, host, dryRun, verbose, projectId, appDir, cursorBaseDir, cursorTranscriptProjectDirs } = params;
+  const {
+    token,
+    host,
+    dryRun,
+    verbose,
+    projectId,
+    projectIdSource,
+    projectLookupToken,
+    appDir,
+    cursorBaseDir,
+    cursorTranscriptProjectDirs,
+  } = params;
   const backoffKey = credentialStateKey(host, token);
   const backoffUntil = backoffUntilByCredential.get(backoffKey) ?? null;
 
@@ -364,11 +384,17 @@ async function runCursorSlice(params: {
   const stateBefore = readState(appDir, host, token);
   const eventsSince = cursorWatermarkDate(stateBefore, CURSOR_EVENTS_WATERMARK_KEY, CURSOR_WATERMARK_KEY);
   const dailyStatsSince = cursorWatermarkDate(stateBefore, CURSOR_DAILY_STATS_WATERMARK_KEY, CURSOR_WATERMARK_KEY);
+  const recentCommitSince = cursorWatermarkDate(
+    stateBefore,
+    CURSOR_RECENT_COMMIT_WATERMARK_KEY,
+    CURSOR_WATERMARK_KEY
+  );
 
   const baseDir = cursorBaseDir;
   const transcriptTurns = await readCursorTranscriptSessions(baseDir, cursorTranscriptProjectDirs, verbose);
   const rawEvents = readCursorEvents(eventsSince, baseDir, verbose);
   const dailyStats = readDailyStats(dailyStatsSince, baseDir, verbose);
+  const recentCommitSnapshots = readRecentCommitSnapshots(recentCommitSince, baseDir, verbose);
 
   const projectIdOpt = projectId ?? undefined;
   const transcriptTurnsById = new Map<string, CursorTranscriptTurn>();
@@ -394,6 +420,19 @@ async function runCursorSlice(params: {
     mapDailyStats(entry, projectIdOpt, DEFAULT_CURSOR_PRICING)
   ).filter((payload) => !transcriptModeEnabled || payload.event_type !== "chat");
 
+  const mappedFromCommits = recentCommitSnapshots
+    .map((snapshot) => mapRecentCommit(snapshot, projectIdOpt, DEFAULT_CURSOR_PRICING))
+    .filter((payload): payload is CursorDb90Payload => payload !== null)
+    .sort((a, b) => a.occurred_at.localeCompare(b.occurred_at));
+
+  const lookupToken = projectLookupToken ?? token;
+  await enrichCommitProjectAttribution(mappedFromCommits, {
+    projectIdSource,
+    host,
+    token: lookupToken,
+    verbose,
+  });
+
   const groups: Array<{ key: string; label: string; payloads: CursorDb90Payload[] }> = [
     {
       key: CURSOR_TRANSCRIPT_TURN_PREFIX,
@@ -409,6 +448,11 @@ async function runCursorSlice(params: {
       key: CURSOR_DAILY_STATS_WATERMARK_KEY,
       label: "daily_stats",
       payloads: mappedFromStats.sort((a, b) => a.occurred_at.localeCompare(b.occurred_at)),
+    },
+    {
+      key: CURSOR_RECENT_COMMIT_WATERMARK_KEY,
+      label: "recent_commit",
+      payloads: mappedFromCommits,
     },
   ];
 
@@ -546,7 +590,8 @@ export async function syncTelemetryTools(options: MultiSyncOptions): Promise<Syn
   }
 
   try {
-    const { credentials, dryRun, verbose, projectId, pricing } = options;
+    const { credentials, dryRun, verbose, projectId, projectIdSource, projectLookupToken, pricing } =
+      options;
     const host = credentials.host;
 
     const requested: TelemetryToolId[] = dedupeTools(options.tools ?? ["claude_code", "cursor"]);
@@ -610,6 +655,8 @@ export async function syncTelemetryTools(options: MultiSyncOptions): Promise<Syn
           dryRun,
           verbose,
           projectId,
+          projectIdSource,
+          projectLookupToken,
           appDir,
           cursorBaseDir: options.cursorBaseDir,
           cursorTranscriptProjectDirs: options.cursorTranscriptProjectDirs,

@@ -2,42 +2,9 @@
 
 require 'rails_helper'
 
-# Stub Temporalio module since it's not installed in Rails
-module Temporalio
-  class Client
-    def self.connect(host, namespace)
-      new
-    end
-
-    def start_workflow(*args)
-    end
-
-    def execute_workflow(*args)
-    end
-
-    def workflow_handle(workflow_id, run_id: nil)
-      WorkflowHandle.new
-    end
-  end
-
-  class WorkflowHandle
-    def query(name)
-    end
-
-    def signal(name, args)
-    end
-
-    def cancel
-    end
-
-    def terminate(reason: nil)
-    end
-  end
-end unless defined?(Temporalio)
-
 RSpec.describe Temporal::Client do
   let(:mock_client) { instance_double(Temporalio::Client) }
-  let(:mock_handle) { instance_double(Temporalio::WorkflowHandle) }
+  let(:mock_handle) { instance_double(Temporalio::Client::WorkflowHandle) }
 
   before do
     described_class.reset!
@@ -134,7 +101,7 @@ RSpec.describe Temporal::Client do
       expect(mock_client).to receive(:workflow_handle)
         .with('workflow-123', run_id: nil)
         .and_return(mock_handle)
-      expect(mock_handle).to receive(:terminate).with(reason: 'Test termination')
+      expect(mock_handle).to receive(:terminate).with('Test termination')
 
       described_class.terminate_workflow('workflow-123', reason: 'Test termination')
     end

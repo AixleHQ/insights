@@ -20,7 +20,7 @@ The 12 allowed values:
 | `chat` | Conversational AI request (Composer / Cmd+K / Claude Code chat) | **Active** |
 | `completion` | Inline / tab completion (model auto-suggests as you type) | **Active** |
 | `edit` | AI-driven file edits | Reserved |
-| `commit` | Commit-scoped event (e.g. AI commit message) | Reserved |
+| `commit` | Commit-scoped event (e.g. AI commit message) | **Active** (Cursor `recentCommit` since AIX-235) |
 | `review` | Code review (e.g. Cursor BugBot) | Reserved |
 | `test` | Test generation | Reserved |
 | `debug` | Debug session | Reserved |
@@ -41,7 +41,7 @@ The 12 allowed values:
 | `completion` | Tab completion (inline autocomplete) | **Yes** | Not a feature | N/A |
 | `chat` | Composer (Cmd+K / Cmd+I) + Chat panel | **Yes** | Every assistant turn in a conversation | **Yes** |
 | `edit` | Composer multi-file edits, Cmd+K inline edits | Captured but tagged as `chat` | Tool use: `Edit`, `Write`, `MultiEdit` | Not extracted (rolled into `chat`) |
-| `commit` | AI commit-message gen + `aiCodeTracking.recentCommit` row | Captured but tagged as `chat` | Tool use: `Bash(git commit ...)` | Not extracted |
+| `commit` | AI commit-message gen + `aiCodeTracking.recentCommit` row | **Yes** (`event_type: commit`, `metadata.source: recent_commit`) | Tool use: `Bash(git commit ...)` | Not extracted |
 | `review` | BugBot (PR review) | No (not in SQLite stores we read) | N/A | N/A |
 | `test` | Composer-driven test gen | Lumped into `chat` | Tool use writing `*.spec.*` / `*.test.*` files | Lumped into `chat` |
 | `debug` | Chat-driven debugging | Lumped into `chat` | Chat-driven debugging | Lumped into `chat` |
@@ -51,7 +51,7 @@ The 12 allowed values:
 | `comment` | N/A | N/A | N/A | N/A |
 | `other` | catch-all | N/A | catch-all | N/A |
 
-**Coverage summary:** Cursor populates **2/12** enum values today (`completion`, `chat`); Claude Code populates **1/12** (`chat`). Everything else is reserved enum space.
+**Coverage summary:** Cursor populates **3/12** enum values today (`completion`, `chat`, `commit`); Claude Code populates **1/12** (`chat`). Everything else is reserved enum space.
 
 ---
 
@@ -59,17 +59,17 @@ The 12 allowed values:
 
 ### 3.1 Cursor (`packages/tools/db90-cursor`)
 
-Three input streams, all emit either `chat` or `completion`:
+Four input streams; emit `completion`, `chat`, or `commit`:
 
 | Source | Cursor key / table | Emitted as | `tokens_in` | `tokens_out` |
 |---|---|---|---|---|
 | Tab completions (daily aggregate) | `state.vscdb` → `ItemTable.aiCodeTracking.dailyStats.v1.5.<DATE>` → `tabSuggestedLines` / `tabAcceptedLines` | `completion` | suggested lines | accepted lines |
 | Composer / chat (daily aggregate) | `state.vscdb` → `ItemTable.aiCodeTracking.dailyStats.v1.5.<DATE>` → `composerSuggestedLines` / `composerAcceptedLines` | `chat` | suggested lines | accepted lines |
-| Commit snapshot | `state.vscdb` → `ItemTable.aiCodeTracking.recentCommit` (literal key, overwritten on each commit) | `chat` (would naturally be `commit`) | `linesAdded` | `linesDeleted` |
+| Commit snapshot | `state.vscdb` → `ItemTable.aiCodeTracking.recentCommit` (literal key, overwritten on each commit) | `commit` | `linesAdded` | `linesDeleted` |
 | Legacy per-request | Workspace `cursor.db` → `CursorRequestFeedback` table | `chat` if `type=1`, else `completion` | `promptTokens` | `generatedTokens` |
 
 **Notes:**
-- The version prefix `v1.5` is hardcoded at `cursor-reader.ts:170`. If Cursor bumps to `v1.6`, that constant must be updated.
+- Dated keys use any `aiCodeTracking.dailyStats.v*.<DATE>` prefix; run `npm run audit:local-stores` (CUR-V11) to list versions on disk. New JSON shapes still need mapper updates (`cursor-6`).
 - Daily-stats tokens are **lines, not real tokens**. The mapper multiplies by `tokens_per_line` (default 15) when computing cost.
 - Legacy per-request rows DO have real `promptTokens` / `generatedTokens` from the model.
 
@@ -132,7 +132,7 @@ Both source tools expose much richer event data than we currently use. The Rails
 | Source field / signal | What it means | Maps to Rails enum? | Capturing now? | Notes |
 |---|---|---|---|---|
 | Cursor — `aiCodeTracking.dailyStats.v1.5.<date>` | Daily line-count totals | `chat` + `completion` | Yes | 5 fields total; we use all 4 line-count ones |
-| Cursor — `aiCodeTracking.recentCommit` | Most recent commit's AI %, lines added/deleted, branch, commit hash | should be `commit` | Tagged as `chat` | One-row, overwritten per commit |
+| Cursor — `aiCodeTracking.recentCommit` | Most recent commit's AI %, lines added/deleted, branch, commit hash | `commit` | **Yes** (AIX-235) | One-row, overwritten per commit; wired in `sync.ts` |
 | Cursor — `cursorDiskKV` table | Composer/Cmd+K session payloads (per-session granular data, including chat text) | could be `chat` / `edit` + raw prompt text | Not read | ~200K rows on a typical install; schema varies per session; would need a separate parser |
 | Cursor — BugBot reviews | AI PR-review activity | `review` | Not read | Stored in Cursor cloud, not local SQLite |
 | Cursor — background agent activity | Long-running agent runs | could be `chat` or new type | Not read | No clean local store identified |
@@ -195,7 +195,7 @@ User prompt text and assistant response text are both technically available but 
 
 If you want to expand the taxonomy beyond `chat` / `completion` without adding text capture:
 
-1. **Tag Cursor's `recentCommit` as `commit`** — single-line change in `packages/tools/db90-cursor/src/mapper.ts:259`.
+1. ~~**Tag Cursor's `recentCommit` as `commit`**~~ — **Done (AIX-235):** `mapper.ts` + `sync.ts` wire Path B with `event_type: commit`.
 2. **Extract Claude Code `tool_use` blocks into per-tool child events** — `claude-reader.ts:155-205`: enumerate `message.content[type=tool_use]` and emit one event per tool with appropriate `event_type` mapping (Edit/Write/MultiEdit → `edit`; Bash with `git commit` → `commit`; tests touching `*.spec.*` → `test`).
 3. **Surface metadata that doesn't change the schema** — add `entrypoint`, `gitBranch`, `iterations`, `stop_reason`, `service_tier` to `metadata` on existing events. Pure additive change in the reader.
 4. **Sub-agent + skill tagging** — set `metadata.subagent_type` / `metadata.skill_name` when those markers are present in the JSONL entry.

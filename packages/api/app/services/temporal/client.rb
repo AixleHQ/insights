@@ -1,7 +1,12 @@
 # frozen_string_literal: true
 
+require "temporalio/client"
+
 module Temporal
   class Client
+    # Must match the workflow name registered on the Temporal worker (see ingestion_worker.rb).
+    INGESTION_SANITIZATION_WORKFLOW = "IngestionSanitizationWorkflow"
+
     class << self
       def start_workflow(workflow_class, workflow_id:, args: nil, task_queue: nil)
         client.start_workflow(
@@ -42,7 +47,7 @@ module Temporal
 
       def terminate_workflow(workflow_id, reason: nil, run_id: nil)
         handle = get_workflow_handle(workflow_id, run_id: run_id)
-        handle.terminate(reason: reason)
+        handle.terminate(reason)
       end
 
       def connected?

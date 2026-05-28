@@ -2,10 +2,11 @@
  * Consolidated SQLite reader + ingest mapper copied from `@db90/cursor`'s internal
  * `cursor-reader.ts` and `mapper.ts`. Not imported from the package — public export is `./sync`.
  */
-import { createReadStream, statSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
 import { finished } from "node:stream/promises";
 import { createInterface } from "node:readline";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 import { glob } from "glob";
 import Database from "better-sqlite3";
@@ -143,6 +144,134 @@ export interface DailyStatsEntry {
   dbPath: string;
 }
 
+export function isGlobalStateDbPath(dbPath: string): boolean {
+  return dbPath.replace(/\\/g, "/").includes("/globalStorage/state.vscdb");
+}
+
+type WorkspaceScope = "global" | "workspace";
+
+function fileUriToPath(uri: string): string | null {
+  try {
+    if (uri.startsWith("file://")) return fileURLToPath(uri);
+    return uri;
+  } catch {
+    return null;
+  }
+}
+
+function readWorkspaceFolderFromJson(workspaceStorageDir: string): string | null {
+  const jsonPath = join(workspaceStorageDir, "workspace.json");
+  if (!existsSync(jsonPath)) return null;
+  try {
+    const parsed = JSON.parse(readFileSync(jsonPath, "utf-8")) as Record<string, unknown>;
+    if (typeof parsed.folder === "string") return fileUriToPath(parsed.folder);
+    const folders = parsed.folders;
+    if (Array.isArray(folders) && folders.length > 0) {
+      const first = folders[0] as Record<string, unknown>;
+      if (typeof first.path === "string") return fileUriToPath(first.path);
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function resolveCursorWorkspaceFolder(dbPathOrWorkspaceDir: string): string | null {
+  if (isGlobalStateDbPath(dbPathOrWorkspaceDir)) return null;
+  const normalized = dbPathOrWorkspaceDir.replace(/\\/g, "/");
+  const wsDir = normalized.endsWith("/state.vscdb")
+    ? dirname(dbPathOrWorkspaceDir)
+    : dbPathOrWorkspaceDir;
+  return readWorkspaceFolderFromJson(wsDir);
+}
+
+function cursorWorkspaceMetadata(dbPath: string): {
+  workspace: string;
+  workspace_scope: WorkspaceScope;
+  workspace_folder?: string;
+} {
+  const workspace_scope: WorkspaceScope = isGlobalStateDbPath(dbPath) ? "global" : "workspace";
+  const folder =
+    workspace_scope === "workspace" ? resolveCursorWorkspaceFolder(dbPath) : null;
+  return {
+    workspace: dbPath,
+    workspace_scope,
+    ...(folder ? { workspace_folder: folder } : {}),
+  };
+}
+
+function cursorWorkspaceMetadataFromStorageDir(workspaceStorageDir: string): {
+  workspace: string;
+  workspace_scope: WorkspaceScope;
+  workspace_folder?: string;
+} {
+  const folder = resolveCursorWorkspaceFolder(workspaceStorageDir);
+  return {
+    workspace: workspaceStorageDir,
+    workspace_scope: "workspace",
+    ...(folder ? { workspace_folder: folder } : {}),
+  };
+}
+
+function dailyStatsActivityTotal(value: unknown): number {
+  if (typeof value !== "object" || value === null) return 0;
+  const o = value as Record<string, unknown>;
+  const fields = [
+    "tabSuggestedLines",
+    "tabAcceptedLines",
+    "composerSuggestedLines",
+    "composerAcceptedLines",
+  ] as const;
+  return fields.reduce((sum, field) => {
+    const n = o[field];
+    return sum + (typeof n === "number" && n > 0 ? n : 0);
+  }, 0);
+}
+
+function dailyStatsValuesEqual(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+export function dedupeDailyStatsEntries(entries: DailyStatsEntry[]): DailyStatsEntry[] {
+  const byDate = new Map<string, DailyStatsEntry[]>();
+  for (const entry of entries) {
+    const group = byDate.get(entry.date) ?? [];
+    group.push(entry);
+    byDate.set(entry.date, group);
+  }
+
+  const deduped: DailyStatsEntry[] = [];
+
+  for (const group of byDate.values()) {
+    if (group.length === 1) {
+      deduped.push(group[0]);
+      continue;
+    }
+
+    const fromGlobal = group.filter((e) => isGlobalStateDbPath(e.dbPath));
+    if (fromGlobal.length > 0) {
+      deduped.push(fromGlobal[0]);
+      continue;
+    }
+
+    const distinct: DailyStatsEntry[] = [];
+    for (const entry of group) {
+      if (distinct.some((d) => dailyStatsValuesEqual(d.value, entry.value))) continue;
+      distinct.push(entry);
+    }
+    if (distinct.length === 1) {
+      deduped.push(distinct[0]);
+      continue;
+    }
+    distinct.sort(
+      (a, b) => dailyStatsActivityTotal(b.value) - dailyStatsActivityTotal(a.value)
+    );
+    deduped.push(distinct[0]);
+  }
+
+  return deduped.sort((a, b) => a.date.localeCompare(b.date));
+}
+
 export function findStateVscDbs(baseDir?: string): string[] {
   const userDir = baseDir ?? cursorUserDir();
   const results: string[] = [];
@@ -209,10 +338,10 @@ function readDailyStatsFromDb(
   }
 }
 
-export function readDailyStats(
+function readDailyStatsRaw(
   since: Date | null,
-  baseDir?: string,
-  verbose = false
+  baseDir: string | undefined,
+  verbose: boolean
 ): DailyStatsEntry[] {
   const dbPaths = findStateVscDbs(baseDir);
 
@@ -221,11 +350,26 @@ export function readDailyStats(
     console.log(`Found ${dbPaths.length} state.vscdb file(s)`);
   }
 
-  const results: DailyStatsEntry[] = [];
+  const raw: DailyStatsEntry[] = [];
   for (const dbPath of dbPaths) {
-    results.push(...readDailyStatsFromDb(dbPath, since, verbose));
+    raw.push(...readDailyStatsFromDb(dbPath, since, verbose));
   }
-  return results;
+  return raw;
+}
+
+export function readDailyStats(
+  since: Date | null,
+  baseDir?: string,
+  verbose = false
+): DailyStatsEntry[] {
+  const raw = readDailyStatsRaw(since, baseDir, verbose);
+  const deduped = dedupeDailyStatsEntries(raw);
+  if (verbose && raw.length !== deduped.length) {
+    console.log(
+      `  dailyStats dedupe: ${raw.length} raw row(s) → ${deduped.length} after preferring globalStorage per date`
+    );
+  }
+  return deduped;
 }
 
 // ─── recentCommit ────────────────────────────────────────────────────────────
@@ -587,8 +731,12 @@ export async function readCursorTranscriptSessions(
 
 // ─── Mapper ──────────────────────────────────────────────────────────────────
 
-const COST_MODEL = "estimated_line_count" as const;
+const LINE_COST_MODEL = "estimated_line_count" as const;
+const TOKEN_COST_MODEL = "token_count" as const;
 const TRANSCRIPT_COST_MODEL = "estimated_transcript_text" as const;
+
+type CursorLineCostModel = typeof LINE_COST_MODEL;
+type CursorTokenCostModel = typeof TOKEN_COST_MODEL;
 
 export interface PricingConfig {
   tokens_per_line: number;
@@ -608,7 +756,9 @@ export type Db90CursorPayloadMetadata = {
   session_id?: string;
   cursor_session_id: string | null;
   workspace: string;
-  cost_model: typeof COST_MODEL | typeof TRANSCRIPT_COST_MODEL;
+  workspace_scope?: WorkspaceScope;
+  workspace_folder?: string;
+  cost_model: CursorLineCostModel | CursorTokenCostModel | typeof TRANSCRIPT_COST_MODEL;
   scannable: boolean;
   risk_level: RiskLevel | "none";
   source?: "recent_commit";
@@ -700,8 +850,19 @@ function buildPayload(opts: {
   dbPath: string;
   model?: string;
   projectId?: string;
+  costModel?: CursorLineCostModel | CursorTokenCostModel;
 }): CursorDb90Payload {
-  const { eventType, tokensIn, tokensOut, costUsd, occurredAt, dbPath, model = "unknown", projectId } = opts;
+  const {
+    eventType,
+    tokensIn,
+    tokensOut,
+    costUsd,
+    occurredAt,
+    dbPath,
+    model = "unknown",
+    projectId,
+    costModel = LINE_COST_MODEL,
+  } = opts;
   const payload: CursorDb90Payload = {
     tool_name: "cursor",
     event_type: eventType,
@@ -710,7 +871,13 @@ function buildPayload(opts: {
     tokens_out: tokensOut,
     cost_usd: costUsd,
     occurred_at: occurredAt,
-    metadata: { cursor_session_id: null, workspace: dbPath, cost_model: COST_MODEL, scannable: false, risk_level: "none" },
+    metadata: {
+      cursor_session_id: null,
+      ...cursorWorkspaceMetadata(dbPath),
+      cost_model: costModel,
+      scannable: false,
+      risk_level: "none",
+    },
   };
   if (projectId) payload.project_id = projectId;
   return payload;
@@ -780,6 +947,7 @@ export function mapDailyStats(
         dbPath,
         model,
         projectId,
+        costModel: TOKEN_COST_MODEL,
       })
     );
   }
@@ -829,8 +997,8 @@ export function mapRecentCommit(
     occurred_at: occurredAt,
     metadata: {
       cursor_session_id: null,
-      workspace: dbPath,
-      cost_model: COST_MODEL,
+      ...cursorWorkspaceMetadata(dbPath),
+      cost_model: LINE_COST_MODEL,
       source: "recent_commit",
       commit_hash: typeof commitHash === "string" ? commitHash : undefined,
       commit_message: typeof commitMessage === "string" ? commitMessage : undefined,
@@ -876,8 +1044,8 @@ export function mapEvent(
     occurred_at: occurredAt,
     metadata: {
       cursor_session_id: row.sessionId ?? row.requestId ?? null,
-      workspace: workspacePath,
-      cost_model: COST_MODEL,
+      ...cursorWorkspaceMetadataFromStorageDir(workspacePath),
+      cost_model: TOKEN_COST_MODEL,
       scannable: false,
       risk_level: "none",
     },

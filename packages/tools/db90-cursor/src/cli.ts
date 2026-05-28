@@ -43,6 +43,7 @@ import { type BaseArgs, BASE_ARGS_DEFAULTS, extractEqualsValue } from "@db90/sdk
 
 export interface Args extends BaseArgs {
   since?: string;
+  full?: boolean;
 }
 
 export function parseArgs(argv: string[]): Args {
@@ -71,6 +72,9 @@ export function parseArgs(argv: string[]): Args {
       case "--since":
         result.since = args[++i];
         break;
+      case "--full":
+        result.full = true;
+        break;
       case "--help":
       case "-h":
         result.help = true;
@@ -84,6 +88,7 @@ export function parseArgs(argv: string[]): Args {
         else if (hostEq !== undefined) result.host = hostEq;
         else if (projectIdEq !== undefined) result.projectId = projectIdEq;
         else if (sinceEq !== undefined) result.since = sinceEq;
+        else if (arg === "--full") result.full = true;
         break;
       }
     }
@@ -105,6 +110,7 @@ Options:
   --project-id <uuid>  Associate events with this project UUID
   --dry-run            Print events without posting or updating state
   --since <date>       Process events since this ISO date (overrides saved state)
+  --full               Ignore watermark; scan all local Cursor rows (pairs with --dry-run)
   --verbose, -v        Print Cursor DB paths, table names, and event counts
   --help, -h           Show this help message
 
@@ -180,17 +186,26 @@ async function main(): Promise<void> {
     dryRun: cliArgs.dryRun,
     verbose: cliArgs.verbose,
     projectId: resolution.projectId,
-    since: parseSinceArg(cliArgs.since),
+    projectIdSource: resolution.source,
+    since: cliArgs.full ? null : parseSinceArg(cliArgs.since),
+    fullScan: cliArgs.full === true,
     pricing,
   });
 
   if (result.sent === 0 && result.failed === 0) {
-    console.log("No new Cursor events found.");
+    console.log(
+      cliArgs.full
+        ? "No Cursor events found in local stores."
+        : "No new Cursor events found. Tip: use --full --dry-run --verbose to inspect everything already on disk."
+    );
     return;
   }
 
   if (cliArgs.dryRun) {
-    // syncOnce already printed per-event JSON + the cost-model dry-run note.
+    if (result.validationFailed) {
+      console.error("[dry-run] One or more payloads failed contract validation.");
+      process.exit(1);
+    }
     return;
   }
 

@@ -77,22 +77,26 @@ module Api
       end
 
       def store_raw_event(raw_payload)
+        RawEventStore.ensure_bucket_exists!
         RawEventStore.store(
           raw_payload,
           organization_id: current_organization.id,
           metadata: { content_type: request.content_type }
         )
+      rescue StandardError => e
+        Rails.logger.warn "[Telemetry] Raw event storage failed (continuing): #{e.message}"
+        nil
       end
 
       def start_ingestion_workflow(raw_key, event_params)
         workflow_id = "ingest-#{current_organization.id}-#{SecureRandom.uuid}"
 
         Temporal::Client.start_workflow(
-          "Workflows::IngestionSanitizationWorkflow",
+          Temporal::Client::INGESTION_SANITIZATION_WORKFLOW,
           workflow_id: workflow_id,
           args: {
             raw_event_key: raw_key,
-            raw_event_bucket: ENV.fetch("MINIO_BUCKET", "db90-raw-events"),
+            raw_event_bucket: ENV.fetch("RAW_EVENTS_BUCKET", "raw-events"),
             event: event_params.merge(
               organization_id: current_organization.id,
               occurred_at: event_params[:occurred_at] || Time.current.iso8601

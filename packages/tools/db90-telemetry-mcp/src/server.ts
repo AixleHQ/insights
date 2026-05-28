@@ -64,17 +64,22 @@ function syncResultOk(result: Awaited<ReturnType<typeof syncTelemetryTools>>): b
 // lookup token, and the current repo's git remote. Re-resolve when any of them
 // changes (re-auth, repo cwd change). `source: "none"` is never cached so a
 // transient lookup failure doesn't poison the cache.
-let cachedProjectId: { key: string; value: string | null } | null = null;
+let cachedProjectResolution: {
+  key: string;
+  value: Awaited<ReturnType<typeof resolveProjectId>>;
+} | null = null;
 
-async function getProjectIdForSync(creds: StoredCredentials): Promise<string | null> {
+async function getProjectResolutionForSync(
+  creds: StoredCredentials
+): Promise<Awaited<ReturnType<typeof resolveProjectId>>> {
   const token = pickProjectLookupToken(creds);
-  if (!token) return null;
+  if (!token) return { projectId: null, source: "none" };
 
   const gitRemote = getGitRemote(false) ?? "no-remote";
   const cacheKey = `${creds.host}|${token}|${gitRemote}`;
 
-  if (cachedProjectId?.key === cacheKey) {
-    return cachedProjectId.value;
+  if (cachedProjectResolution?.key === cacheKey) {
+    return cachedProjectResolution.value;
   }
 
   const result = await resolveProjectId(undefined, undefined, creds.host, token, false);
@@ -84,9 +89,9 @@ async function getProjectIdForSync(creds: StoredCredentials): Promise<string | n
     false
   );
   if (result.source !== "none") {
-    cachedProjectId = { key: cacheKey, value: result.projectId };
+    cachedProjectResolution = { key: cacheKey, value: result };
   }
-  return result.projectId;
+  return result;
 }
 
 /** Structured status for `db90_status` — tolerates missing/malformed credentials and state. */
@@ -102,11 +107,14 @@ async function executeSync(parsed: { tools?: TelemetryToolId[] }): Promise<unkno
     return { ok: false, error: "missing_credentials" };
   }
   migrateAllLegacyState(creds);
+  const projectResolution = await getProjectResolutionForSync(creds);
   const result = await syncTelemetryTools({
     credentials: creds,
     dryRun: false,
     verbose: false,
-    projectId: await getProjectIdForSync(creds),
+    projectId: projectResolution.projectId,
+    projectIdSource: projectResolution.source,
+    projectLookupToken: pickProjectLookupToken(creds),
     pricing: defaultPricing(),
     tools: parsed.tools,
   });
@@ -233,11 +241,14 @@ export async function startServer(): Promise<void> {
     }
     try {
       migrateAllLegacyState(creds);
+      const projectResolution = await getProjectResolutionForSync(creds);
       await syncTelemetryTools({
         credentials: creds,
         dryRun: false,
         verbose: false,
-        projectId: await getProjectIdForSync(creds),
+        projectId: projectResolution.projectId,
+        projectIdSource: projectResolution.source,
+        projectLookupToken: pickProjectLookupToken(creds),
         pricing: defaultPricing(),
       });
     } catch (err) {

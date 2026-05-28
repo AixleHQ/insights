@@ -32,6 +32,13 @@ export function formatPercent(n: number, decimals = 1): string {
   return `${n.toFixed(decimals)}%`;
 }
 
+// For AI contribution percentages from Cursor recentCommit metadata.
+// Omits decimals when the value is a whole number (60 → "60%", 66.67 → "66.67%").
+export function formatAiPercentage(value: number): string {
+  const decimals = value % 1 === 0 ? 0 : 2;
+  return `${value.toFixed(decimals)}%`;
+}
+
 export function truncateModelName(name: string): string {
   return name.length > 30 ? `${name.slice(0, 30)}…` : name;
 }

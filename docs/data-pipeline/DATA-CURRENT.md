@@ -32,11 +32,11 @@
 
 ## 1. Cursor — What we capture today
 
-Validated against `packages/tools/db90-cursor/src/mapper.ts` at HEAD of `feature/AIX-136-epic-baseline`. Three emit paths flow through the mapper today; every field they actually put on the wire is listed below. Numeric and metadata field names are taken verbatim from the `Db90Payload` interface (`mapper.ts:45-55`) and the `Db90PayloadMetadata` type (`mapper.ts:30-43`).
+Validated against `packages/tools/db90-cursor` at HEAD of `feature/AIX-235-cursor-review-data-being-sent-by-db-90-tools` (`mapper.ts`, `sync.ts`, `cursor-reader.ts`, `collect-payloads.ts`). Three emit paths are mapped in `mapper.ts` and **all are wired in `sync.ts`** via `collectSyncPayloads` (`sync.ts` + `collect-payloads.ts`). Numeric and metadata field names are taken verbatim from the `Db90Payload` interface (`mapper.ts:45-55`) and the `Db90PayloadMetadata` type (`mapper.ts:30-43`).
 
 ### 1a. Path A — Daily stats (tab + composer aggregates)
 
-Reads `state.vscdb` → `ItemTable.aiCodeTracking.dailyStats.v1.5.<DATE>` (see `cursor-reader.ts:170` for the `v1.5` literal). Handled by `mapDailyStats` (`mapper.ts:164-222`). Emits **one to two** payloads per `<DATE>` row.
+Reads `state.vscdb` → `ItemTable` keys `aiCodeTracking.dailyStats.v*.<DATE>` (date suffix match in `cursor-reader.ts`; v1.5 is what Cursor writes today). Handled by `mapDailyStats` (`mapper.ts:164-222`). Emits **one to two** payloads per `<DATE>` row. Version inventory: `npm run audit:local-stores` → `daily_stats_versions` (CUR-V11).
 
 | Domain | Field | Source (mapper.ts line) | Stored as | Enum value used |
 |---|---|---|---|---|
@@ -59,13 +59,13 @@ Reads `state.vscdb` → `ItemTable.aiCodeTracking.dailyStats.v1.5.<DATE>` (see `
 
 ### 1b. Path B — Recent commit snapshot
 
-Reads `state.vscdb` → `ItemTable.aiCodeTracking.recentCommit` (one row per install, overwritten on each new commit; key constant at `cursor-reader.ts:216`). Handled by `mapRecentCommit` (`mapper.ts:228-283`). Emits **at most one** payload per snapshot.
+Reads `state.vscdb` → `ItemTable.aiCodeTracking.recentCommit` (one row per install, overwritten on each new commit; key constant at `cursor-reader.ts:347`). Handled by `mapRecentCommit` (`mapper.ts:228-283`). Wired in `sync.ts` via `readRecentCommitSnapshots` + separate `lastRecentCommitAt` watermark. Emits **at most one** payload per sync when the row is newer than the watermark.
 
 | Domain | Field | Source (mapper.ts line) | Stored as | Enum value used |
 |---|---|---|---|---|
 | Identity | `tool_name` | `258` | `tool_events.tool_name` | `cursor` |
 | Identity | `model` | `260`, hardcoded `"unknown"` | `tool_events.model` | n/a |
-| Classification | `event_type` | `259` | `tool_events.event_type` | `chat` _(should be `commit`)_ |
+| Classification | `event_type` | `260` | `tool_events.event_type` | `commit` |
 | Metric | `tokens_in` | `261` ← `linesAdded + tabLinesAdded + composerLinesAdded` (proxy) | `tool_events.tokens_in` | n/a |
 | Metric | `tokens_out` | `262` ← `linesDeleted + tabLinesDeleted + composerLinesDeleted` (proxy) | `tool_events.tokens_out` | n/a |
 | Cost | `cost_usd` | `263` via `computeLineCost("chat", ...)` | `tool_events.cost_usd` | n/a |
@@ -86,6 +86,8 @@ Reads `state.vscdb` → `ItemTable.aiCodeTracking.recentCommit` (one row per ins
 
 Reads workspace `cursor.db` → `CursorRequestFeedback` table. Handled by `mapEvent` (`mapper.ts:285-319`). One payload per row. Only path that carries real per-request token counts (`promptTokens` / `generatedTokens`).
 
+**CUR-V07 (May 2026):** Ana's Mac — `findCursorDbs` → **0** files, global `state.vscdb` → **19** `dailyStats` keys, sync `legacy=0`. Treat Path C as **inactive on modern Cursor**; keep the reader for older installs. Audit: `npm run audit:local-stores` in `db90-cursor`.
+
 | Domain | Field | Source (mapper.ts line) | Stored as | Enum value used |
 |---|---|---|---|---|
 | Identity | `tool_name` | `302` | `tool_events.tool_name` | `cursor` |
@@ -97,7 +99,7 @@ Reads workspace `cursor.db` → `CursorRequestFeedback` table. Handled by `mapEv
 | Time | `occurred_at` | `291` from `row.timestamp` | `tool_events.occurred_at` | n/a |
 | Metadata | `cursor_session_id` | `310` ← `row.sessionId ?? row.requestId` | `metadata.cursor_session_id` | n/a |
 | Metadata | `workspace` | `311` ← `workspacePath` | `metadata.workspace` | n/a |
-| Metadata | `cost_model` | `312` ← `"estimated_line_count"` _(note: misleading — this path uses real tokens, not lines; see §7)_ | `metadata.cost_model` | n/a |
+| Metadata | `cost_model` | `329` ← `"token_count"` (CUR-V10) | `metadata.cost_model` | n/a |
 | Metadata | `scannable` | `313`, hardcoded `false` | `metadata.scannable` | n/a |
 | Metadata | `risk_level` | `314`, hardcoded `"none"` | `metadata.risk_level` | n/a |
 
@@ -105,10 +107,40 @@ Reads workspace `cursor.db` → `CursorRequestFeedback` table. Handled by `mapEv
 
 When `mapDailyStats` finds no line-count keys, it iterates over the remaining object entries (`mapper.ts:204-219`) and emits one `chat` payload per model bucket holding `inputTokens` / `outputTokens`. The metadata shape is identical to Path A; the only difference is `model` is set to the bucket key instead of `"unknown"`. This branch is dead code on `v1.5` installs today but ships as forward-compat for `v1.6+`.
 
-### Cross-cutting notes (validated against `mapper.ts`)
+### 1e. Sync orchestration (AIX-235)
+
+| Concern | Implementation |
+|---|---|
+| Read + map | `collectSyncPayloads` (`collect-payloads.ts`) — legacy rows, deduped daily stats, recent commit |
+| Post | `sync.ts` — aggregate events and commits in separate batches; advances `lastProcessedAt` + `lastRecentCommitAt` in `~/.db90-cursor/state.json` |
+| Daily-stats dedupe | `dedupeDailyStatsEntries` (`cursor-reader.ts`) — per calendar date, prefer `globalStorage/state.vscdb` over workspace copies (CUR-V06) |
+| Dry-run contract | `validateCursorPayload` (`payload-contract.ts`) — checks payloads against DATA-CURSOR.md §3.5 |
+| Full rescan | CLI `--full` ignores watermark; `npm run verify:dry-run-matrix` always uses `since: null` |
+
+### 1f. Project attribution (CUR-V04)
+
+| Event paths | How `project_id` is chosen |
+|---|---|
+| Daily stats, legacy `cursor.db` | **Batch only:** CLI `--project-id` → config `project_id` → CWD `git remote` lookup (`resolveProjectId`). Same `project_id` on every payload in the sync. |
+| Recent commit (`recentCommit`) | **Batch first** at map time, then **`enrichCommitProjectAttribution`** unless user set flag/config: derives git remotes from `metadata.repo_name` (`owner/repo` → `https://github.com/owner/repo`, `git@github.com:owner/repo.git`) and calls `GET /api/v1/projects/lookup`. On match, **overrides** batch `project_id` (fixes sync-from-wrong-directory). |
+| Explicit override | `--project-id` or config `project_id` wins for **all** paths including commits — repo lookup skipped. |
+
+`metadata.repo_name` always reflects Cursor’s commit row regardless of attribution. Dashboards can show repo/branch even when `project_id` is null (no matching DB90 project).
+
+### 1g. Workspace metadata (CUR-V05)
+
+| Field | Meaning |
+|---|---|
+| `metadata.workspace` | **Unchanged:** absolute path to `state.vscdb` (daily stats, recent commit) or `workspaceStorage/<hash>/` directory (legacy `cursor.db`). Stable ingest key; do not repurpose for display. |
+| `metadata.workspace_scope` | `global` — install-wide `globalStorage/state.vscdb` (aggregates all folders). `workspace` — per-hash store under `workspaceStorage/`. |
+| `metadata.workspace_folder` | Optional. Resolved from `workspace.json` → `folder` / `folders[0].path` file URI when the store is workspace-scoped and the file exists. Omitted for global DBs. |
+
+**Decision:** keep `workspace` as the DB path for backward compatibility; use `workspace_folder` for human-readable project paths in dashboards. MCP transcript events may omit `workspace_scope` (they already carry composer/fs paths).
+
+### Cross-cutting notes (validated against `mapper.ts` + `sync.ts`)
 
 - `tool_name` is **always** `"cursor"` (type-narrowed at `mapper.ts:46`).
-- `event_type` is **always** one of `"chat"` or `"completion"` (type-narrowed at `mapper.ts:47`) — even the commit snapshot (which should semantically be `"commit"`) is forced into `"chat"`. This is the canonical example of the §3 vocabulary gap.
+- `event_type` is one of `"completion"`, `"chat"`, or `"commit"` (`mapper.ts:47`) — Path B emits `"commit"` since AIX-235.
 - `scannable: false` and `risk_level: "none"` are emitted by all three paths because cursor never ships scannable text payloads. They exist in the metadata schema only to keep the server-side risk-scanning pipeline a no-op for cursor events.
 - `cost_model` is `"estimated_line_count"` on every path, including Path C where it is technically wrong (Path C does carry real tokens). Cleanup is captured in §6.
 - `cursor_session_id` is populated only on Path C. Paths A and B have it as `null`, which means the `ToolEvents::Upsert` dedup path (which keys on `metadata.session_id`, see `upsert.rb:32-34`) does **not** apply to dailyStats or recent-commit events. They follow a different idempotency story driven by `(organization_id, occurred_at, event_type)` natural keys at the database layer.
@@ -122,9 +154,8 @@ Cross-refs are forward-links into `./DATA-CURSOR.md` (AIX-233). Until that file 
 | Source field / signal | What it would tell us | Mapper.ts treatment | DATA-CURSOR.md anchor |
 |---|---|---|---|
 | `aiCodeTracking.dailyStats.v1.5.<DATE>.<modelKey>.inputTokens` (when present) | Per-model breakdown of daily activity | Only consumed if all four line-count keys are zero (`mapper.ts:204-219`); never combined with line-count rows | `./DATA-CURSOR.md#dailystats-model-buckets` |
-| `aiCodeTracking.dailyStats.<other versions, e.g. v1.6>` | New Cursor schema versions | Not read — `v1.5` is hardcoded at `cursor-reader.ts:170` | `./DATA-CURSOR.md#version-pinning` |
-| `aiCodeTracking.recentCommit.aiPercentage` _(captured but tagged `chat`)_ | % of commit attributable to AI | Surfaced as `metadata.ai_percentage` but downstream consumers do not slice on it | `./DATA-CURSOR.md#recent-commit` |
-| `aiCodeTracking.recentCommit` event-type semantics | This is a commit, not a chat | Forced into `event_type: "chat"` at `mapper.ts:259` | `./DATA-CURSOR.md#recent-commit` |
+| `aiCodeTracking.dailyStats.<other versions, e.g. v1.6>` | New Cursor schema versions | Keys are read if they end with `YYYY-MM-DD`; mapper may not understand new JSON shapes | `cursor-6` — `audit:local-stores` / CUR-V11 |
+| `aiCodeTracking.recentCommit.aiPercentage` | % of commit attributable to AI | Emitted as `metadata.ai_percentage` on Path B (`event_type: commit`) | `./DATA-CURSOR.md#recent-commit` |
 | `cursorDiskKV` table — `composerData:<uuid>` blobs | Per-composer-session granular events (start, end, model, edits) | Not read | `./DATA-CURSOR.md#cursordiskkv-composer-sessions` |
 | `cursorDiskKV` table — `bubbleId:<uuid>` blobs | Bubble graph (individual chat turns within a composer session) | Not read | `./DATA-CURSOR.md#cursordiskkv-bubbles` |
 | `cursorDiskKV` table — `mcp*` keys | MCP server invocations from Cursor | Not read | `./DATA-CURSOR.md#mcp-tool-calls` |
@@ -247,16 +278,16 @@ Each item is sized to one PR. Tags: `[Schema]` `[Extractor]` `[Sanitization]` `[
 
 | ID | Tag | Title | Concrete change | Files touched |
 |---|---|---|---|---|
-| `cursor-1` | Schema | Add `commit` enum guardrail + retag cursor recent-commit | (a) Verify `commit` is in the PG enum (it is); (b) update `mapper.ts:259` to emit `event_type: "commit"` when `metadata.source === "recent_commit"`; (c) backfill historic rows via one-off rake task. **From TOKENS.md §8 item 1.** | `packages/tools/db90-cursor/src/mapper.ts:259`, `packages/api/lib/tasks/backfill_recent_commit_event_type.rake` _(new)_ |
+| `cursor-1` | Schema | Add `commit` enum guardrail + retag cursor recent-commit | ✅ **Shipped (AIX-235)** — `mapRecentCommit` emits `event_type: "commit"`; wired in `sync.ts`. Optional follow-up: backfill historic rows tagged `chat` via rake task. | `packages/tools/db90-cursor/src/mapper.ts`, `packages/api/lib/tasks/backfill_recent_commit_event_type.rake` _(optional)_ |
 | `cursor-2` | Schema | Extend `event_type` PG enum + Ruby constant + Swagger | Migration adds `tab_completion`, `composer_chat`, `composer_agent`, `mcp_tool_call`, `inline_edit`, `tab_acceptance`, `background_agent_run`. Update `EVENT_TYPES` constant and `swagger.yaml` in the same commit. | `packages/api/db/migrate/<new>.rb`, `packages/api/app/models/tool_event.rb:12-13`, `packages/api/swagger/v1/swagger.yaml` (Ingest section ~lines 1380–1480) |
 | `cursor-3` | Schema | PG↔Ruby enum-invariant CI check | Rake/CI job that diffs `pg_enum` rows against `ToolEvent::EVENT_TYPES`; fails build on drift. Closes the live divergence documented in §3a (`tool_use`, `issue`, `comment`, `sprint` in Ruby but not PG). Also fix the live bug by either adding the missing PG values or removing them from Ruby. | `packages/api/lib/tasks/enum_invariant_check.rake` _(new)_, CI workflow update |
 | `cursor-4` | Extractor | Surface `recentCommit.aiPercentage`, `branchName`, `commitHash` as documented `metadata.*` keys | They're already on the wire (per `mapper.ts:269-279`) but undocumented. Add Swagger schema and TS types. **From TOKENS.md §8 item 3.** | `packages/api/swagger/v1/swagger.yaml`, `packages/web/src/lib/types.ts:224-250` |
 | `cursor-5` | Extractor | Read `cursorDiskKV` composer sessions | New parser module that scans `cursorDiskKV` for `composerData:<uuid>` blobs, walks the bubble graph, and emits one `composer_chat` (or `composer_agent`) event per session with `composer_id`, `model`, `mcp_server` (if used). **From TOKENS.md §8 item 1 (cursor side).** | `packages/tools/db90-cursor/src/cursor-disk-kv-reader.ts` _(new)_, `packages/tools/db90-cursor/src/mapper.ts`, `packages/tools/db90-cursor/src/index.ts` |
-| `cursor-6` | Extractor | Version-prefix discovery (deprecate `v1.5` hardcode) | Replace literal `v1.5` at `cursor-reader.ts:170` with a discovery scan that picks up `v1.5`, `v1.6`, and future versions. Emit a structured log when a new version is observed so we can monitor schema drift. | `packages/tools/db90-cursor/src/cursor-reader.ts:170` |
+| `cursor-6` | Extractor | Version-prefix discovery + mapper for new shapes | ✅ Discovery shipped in `audit:local-stores` (`daily-stats-versions.ts`, CUR-V11). Remaining: mapper/log when `v1.6+` JSON differs from v1.5 line layout. | `packages/tools/db90-cursor/src/daily-stats-versions.ts` |
 | `cursor-7` | Sanitization | Extend policy with internal-hostname + customer-identifier patterns | Per §5. Add two regex patterns + redact actions to the default `SanitizationPolicy` seed; backfill `seeds.rb:7-35`; document override mechanism (org-level patterns). | `packages/api/db/seeds.rb:7-35`, `packages/api/app/services/sanitization_service.rb` (if present) |
 | `cursor-8` | Sanitization | Server-side metadata allow-list | Tighten `ingest_controller.rb#permitted_params` so `metadata` accepts only the documented standardized keys; unknown keys are dropped (logged at `:info`). Stops payload-shape drift from the CLI side bypassing the documented schema. | `packages/api/app/controllers/api/v1/ingest_controller.rb:127-133` |
 | `cursor-9` | Front-end | Replace hardcoded `eventTypes` in `EventFilters.tsx` with summary-driven options | Mirrors the AIX-115 pattern for the tool filter: fetch event-type options from `GET /events/summary` so the UI only shows values present in the org's data. Removes the stale `function_call` / `file_operation` values (per §4). | `packages/web/src/components/events/EventFilters.tsx:50-55`, `packages/web/src/hooks/useEventsSummary.ts` _(new or existing)_ |
-| `cursor-10` | Front-end | Recent-commit detail card on event drawer | When `event.metadata.source === "recent_commit"`, render a dedicated detail strip showing `commit_hash`, `branch_name`, `repo_name`, `ai_percentage` (rather than just dumping metadata JSON). Drives §3c adoption. | `packages/web/src/components/events/EventDrawer.tsx`, `packages/web/src/components/events/EventDetail.tsx` |
+| `cursor-10` | Front-end | Recent-commit detail card on event drawer | ✅ Shipped (CUR-V15) — `RecentCommitDetail` when `event_type=commit` or `metadata.source=recent_commit`. | `packages/web/src/components/events/RecentCommitDetail.tsx`, `EventDrawer.tsx`, `EventDetail.tsx` |
 
 **Group coverage:** Schema (3) · Extractor (3) · Sanitization (2) · Front-end (2) — all four groups, ten total. Exceeds the ≥ 6 / ≥ 3-of-4 bar.
 
@@ -269,7 +300,7 @@ Each item is sized to one PR. Tags: `[Schema]` `[Extractor]` `[Sanitization]` `[
 | TimescaleDB compression after 7 days | `tool_events` is a hypertable; rows older than 7 days are compressed (chunk-level). Adding columns or changing column types after compression requires uncompress → alter → recompress, which is expensive on the prod hypertable. | All new fields land in `metadata` (JSONB) rather than as new columns. The proposals in §3b/§3c follow this discipline by design. New top-level columns (e.g. `prompt_text`) are explicitly out-of-scope. |
 | Retention windows | `tool_events_retention` enum (`30/60/90/180/365/730 days` per the migration) determines how long raw events live before drop. New event types inherit retention by default — no per-type policy. | Document as expected. If a new event type (e.g. `mcp_tool_call`) has substantially different volume, propose a per-type retention story in a follow-up — not in scope for §6. |
 | Unique-on-session-id upsert | `ToolEvents::Upsert` (`packages/api/app/services/tool_events/upsert.rb:32-34`) dedups on `metadata->>'session_id'` under advisory lock. Cursor paths A and B emit `cursor_session_id: null`, so neither benefits from this dedup. Cursor path C populates `cursor_session_id` but the dedup key looks for `session_id`, not `cursor_session_id` — they will not collide. | Sub-task `cursor-5` (composerData parser) should emit `metadata.session_id` (canonical key) using the composer UUID, so cursor composer events get the same dedup treatment as Claude Code sessions. Document the `cursor_session_id` legacy key as superseded. |
-| `v1.5` hardcode at `cursor-reader.ts:170` | If Cursor bumps the daily-stats schema to `v1.6`, the CLI silently emits zero events until we ship a new release. There is no telemetry today that would alert us to this — just a quiet drop to zero. | Sub-task `cursor-6` (version discovery + structured log on new version) addresses this. Short-term, add a smoke check to `db90-cursor doctor` (if not present) that reports the highest `v*` prefix observed. |
+| `v1.6+` dailyStats JSON shape | Dated keys are ingested, but unknown field layouts may map to zero payloads. | Run `npm run audit:local-stores` — flags `has_version_newer_than_v1_5` and unmatched keys (CUR-V11). Extend mapper when a new version appears on hardware. |
 | Backfill on retag (`cursor-1`) | Changing `event_type` on existing rows means dashboards that group by `event_type` will appear to retroactively change. | Backfill rake task should write to `metadata.previous_event_type` so we have an audit trail. Coordinate with whichever dashboards group by `event_type` (the `WeeklyToolUsageChart` and `RiskAlertsTable` from PR #151 merged at `0ceaa46`). |
 | Mapper line-count clamping | `mapper.ts:81` clamps negative tokens to zero defensively. If we expose `accepted_lines` as its own metadata key (per §3c), the same clamping discipline must apply. | Keep `nn(n)` helper as the single chokepoint; new fields go through it. |
 
@@ -495,8 +526,8 @@ Closes the loop between cursor (§1–§7) and claude (§8–§14). One row per 
 
 | Dimension | Cursor today | Claude Code today | Gap action |
 |---|---|---|---|
-| `event_type` coverage | `chat`, `completion` only (2/14) | `chat` only (1/14) — every tool_use, edit, commit, test, subagent, skill, MCP call is collapsed (§8a, `claude-reader.ts:241`) | `claude-2` (extract `tool_use` blocks into per-tool child events) jumps claude coverage to ~6/14 without schema changes beyond `claude-1`. Cursor's `cursor-5` (composer parser) gets cursor to ~6/14. Net: both tools to 6/14 after the §3a invariant lands (`cursor-3`). |
-| Commit detection | Captured but mis-tagged as `chat` (§1b) | Captured as JSONL `Bash(git commit ...)` tool_use blocks but **not extracted** (§9 row `Bash tool_input.command`) | `cursor-1` retags cursor recent-commit to `commit`; `claude-2` extracts `Bash` blocks with `git commit` command into `commit` events. Both then populate the same enum value — consistent dashboard story. |
+| `event_type` coverage | `chat`, `completion`, `commit` (3/14) | `chat` only (1/14) — every tool_use, edit, commit, test, subagent, skill, MCP call is collapsed (§8a, `claude-reader.ts:241`) | `claude-2` (extract `tool_use` blocks into per-tool child events) jumps claude coverage to ~6/14 without schema changes beyond `claude-1`. Cursor's `cursor-5` (composer parser) gets cursor to ~6/14. Net: both tools to 6/14 after the §3a invariant lands (`cursor-3`). |
+| Commit detection | `recentCommit` → `event_type: commit` (§1b, AIX-235) | Captured as JSONL `Bash(git commit ...)` tool_use blocks but **not extracted** (§9 row `Bash tool_input.command`) | Cursor side done. `claude-2` extracts `Bash` blocks with `git commit` into `commit` events for a consistent dashboard story. |
 | Tool-use granularity | None — single daily aggregate per (tool, model, event_type) (§1a) | None — single per-session aggregate per (tool, model) (§8a). `content[].name` is never iterated. | `cursor-5` (composer / inline-edit / mcp parsing) on the cursor side; `claude-2` + `claude-4` on the claude side. Adopt `metadata.tool_name_inner` as the shared key (`Bash`, `Edit`, `Read`, etc., or `composer_chat`/`inline_edit` for cursor) so the front-end tile (`claude-11`) works for both. |
 | Sub-agent / skill markers | n/a today — Cursor's "agent mode" is the closest analogue (§3b row `composer_agent`); not parsed | n/a today — `subagent_type` and `skill_name` are present in the JSONL (`Task` / `Skill` tool blocks) but skipped (§9). | Sub-task pair `cursor-5` + `claude-4`. Shared metadata keys `metadata.subagent_type` / `metadata.skill_name`. Front-end tile: `claude-11` covers both. |
 | Cache token capture | n/a — Cursor cost is line-based; cache concept does not apply | Captured at the rollup level (`metadata.cache_write_tokens` / `cache_read_tokens`, §8a). 5m vs 1h TTL split is **collapsed** at `claude-reader.ts:174`, undercounting cost on 1h sessions. | None on cursor side. On claude side: `claude-3` surfaces `metadata.cache_ttl_split`; `claude-5` consumes it in `pricing.ts` so the 1h portion is billed at 2× base. Net: claude cost accuracy improves; cursor unchanged. |

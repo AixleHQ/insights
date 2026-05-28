@@ -28,8 +28,10 @@ import { RiskBadge } from "@/components/dashboard/ActivityFeed";
 import { useOrg } from "@/contexts/OrgContext";
 import { useEvent } from "@/hooks/useApi";
 import { cn, humanizeToolName } from "@/lib/utils";
-import { formatTokens } from "@/lib/formatters";
+import { formatCost, formatTokens } from "@/lib/formatters";
 import { canViewEventPrompt } from "@/lib/eventAccess";
+import { parseRecentCommitFields } from "@/lib/recentCommitEvent";
+import { RecentCommitDetail } from "./RecentCommitDetail";
 
 interface EventDrawerProps {
   eventId: string | null;
@@ -121,6 +123,10 @@ export function EventDrawer({
     event?.tokensTotal ??
     (event?.inputTokens || 0) + (event?.outputTokens || 0);
 
+  const recentCommit = event
+    ? parseRecentCommitFields(event.metadata, event.eventType)
+    : null;
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
@@ -149,7 +155,7 @@ export function EventDrawer({
                     <RiskBadge level={event.riskLevel || "none"} />
                   </div>
                   <SheetDescription className="mt-1">
-                    <span className="capitalize">{(event.eventType || "unknown").replace("_", " ")}</span>
+                    <span className="capitalize">{(event.eventType || "unknown").replaceAll("_", " ")}</span>
                     {" · "}
                     {formattedDate}
                   </SheetDescription>
@@ -242,7 +248,7 @@ export function EventDrawer({
                       value={
                         event.costUsd !== undefined ? (
                           <span className="font-mono-display">
-                            ${Number(event.costUsd).toFixed(4)}
+                            {formatCost(event.costUsd)}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">-</span>
@@ -264,6 +270,13 @@ export function EventDrawer({
                     />
                   </div>
                 </div>
+
+                {recentCommit && (
+                  <>
+                    <Separator />
+                    <RecentCommitDetail commit={recentCommit} />
+                  </>
+                )}
 
                 <Separator />
 

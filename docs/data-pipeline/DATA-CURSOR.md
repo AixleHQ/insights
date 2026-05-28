@@ -19,7 +19,7 @@ Copied verbatim from the Cursor rows of [`TOKENS.md` §2](TOKENS.md). Status as 
 | `completion` | Tab completion (inline autocomplete) | **Yes** |
 | `chat` | Composer (Cmd+K / Cmd+I) + Chat panel | **Yes** |
 | `edit` | Composer multi-file edits, Cmd+K inline edits | Captured but tagged as `chat` |
-| `commit` | AI commit-message gen + `aiCodeTracking.recentCommit` row | Captured but tagged as `chat` |
+| `commit` | AI commit-message gen + `aiCodeTracking.recentCommit` row | **Yes** (`event_type: commit`, `metadata.source: recent_commit`) |
 | `review` | BugBot (PR review) | **No** (not in local SQLite stores we read) |
 | `test` | Composer-driven test gen | Lumped into `chat` |
 | `debug` | Chat-driven debugging | Lumped into `chat` |
@@ -29,7 +29,7 @@ Copied verbatim from the Cursor rows of [`TOKENS.md` §2](TOKENS.md). Status as 
 | `comment` | N/A | N/A |
 | `other` | catch-all | N/A |
 
-**Headline:** 2 / 12 enum values populated; rich vendor signal (per-language, per-tool, per-turn, agent-lifecycle, BugBot, MCP) exists either in cloud APIs or in undocumented local stores we don't read.
+**Headline:** 3 / 12 enum values populated (`completion`, `chat`, `commit` since AIX-235); rich vendor signal (per-language, per-tool, per-turn, agent-lifecycle, BugBot, MCP) exists either in cloud APIs or in undocumented local stores we don't read.
 
 ---
 
@@ -147,7 +147,7 @@ Multi-turn, multi-file edit surface. The same Cmd+K can target inline (selection
 | **JSON payload example** (anonymized) | See below. |
 
 ```json
-// Cursor key: composerData:cmp_abc123def (in cursorDiskKV)
+// Cursor key: composerData:cmp_abc123def (in cursorDiskKV) — simplified reference
 {
   "composerId": "cmp_abc123def",
   "version": 3,
@@ -159,7 +159,7 @@ Multi-turn, multi-file edit surface. The same Cmd+K can target inline (selection
 ```
 
 ```json
-// Cursor key: bubbleId:cmp_abc123def:bub_xyz789 (in cursorDiskKV)
+// Cursor key: bubbleId:cmp_abc123def:bub_xyz789 (in cursorDiskKV) — simplified reference
 {
   "bubbleId": "bub_xyz789",
   "composerId": "cmp_abc123def",
@@ -171,6 +171,8 @@ Multi-turn, multi-file edit surface. The same Cmd+K can target inline (selection
   "thinking": null
 }
 ```
+
+**Observed on disk (May 2026, CUR-V12 — `npm run spotcheck:disk-kv`):** current builds use larger blobs than the examples above. Typical composer rows expose `_v` (e.g. `16`), `unifiedMode` (e.g. `"agent"`), `isAgentic`, `agentBackend`, epoch-ms `createdAt` / `lastUpdatedAt`, and many UI/state fields. Bubble rows often omit `composerId` in the JSON (it is in the key prefix), use ISO-8601 `createdAt` strings, and store `toolFormerData` as a **single object** (tool enum + `name` like `run_terminal_command_v2`) rather than the array shape in the simplified example. Any `cursor-5` parser must target observed fields, not the minimal JSON above.
 
 ```mermaid
 sequenceDiagram
@@ -371,7 +373,7 @@ Cursor generates commit messages via the sparkle icon (source-control panel) or 
 }
 ```
 
-**Known bug to surface (TOKENS §8 #1):** this row is currently emitted as `event_type: "chat"` (`mapper.ts:259`) when it should be `commit`. One-line fix; documented as a future optimization in AIX-235.
+**Ingest status (AIX-235):** `mapRecentCommit` emits `event_type: "commit"` with `metadata.source: "recent_commit"`. Wired in `sync.ts` and `@db90/telemetry-mcp` with a separate `lastRecentCommitAt` watermark. **CUR-V04:** when `--project-id` / config are unset, `enrichCommitProjectAttribution` (`@db90/sdk`) resolves `project_id` from `metadata.repo_name` via `GET /projects/lookup` (GitHub `owner/repo` slug → HTTPS/SSH remotes).
 
 ---
 
@@ -430,7 +432,7 @@ The single biggest unmonitored surface. 20+ lifecycle events; each hook is a chi
 | **Granularity knobs** | Per-event opt-in (declare only the events you want). Hook can return `permission: "allow" | "deny" | "ask"` to gate execution. |
 | **Common input fields** (every hook) | `conversation_id`, `generation_id`, `model`, `hook_event_name`, `cursor_version`, `workspace_roots`, `user_email`, `transcript_path`. |
 | **Lifecycle events that would emit db90-relevant signal** (selected) | `sessionStart`, `sessionEnd` (session boundaries + reason); `preToolUse` / `postToolUse` (every tool call); `beforeShellExecution` / `afterShellExecution` (shell commands incl. `git commit`); `beforeMCPExecution` / `afterMCPExecution` (MCP traffic — see §2.6); `afterFileEdit` (file edits); `beforeSubmitPrompt` (every prompt **before** redaction — out of scope per epic); `afterAgentResponse` (response text — out of scope); `afterAgentThought` (extended-thinking blocks); `subagentStart` / `subagentStop` (Task tool dispatch); `preCompact` (context-window compaction); `stop` (loop ends). |
-| **Fields read by db90-cursor today** | **None.** No hook executable is installed by the CLI. |
+| **Fields read by db90-cursor today** | **None** for ingest. CUR-V13 ships `install:hooks-feasibility` / `verify:hooks-feasibility` to log redacted hook stdin to `~/.cursor/db90-hooks-feasibility.ndjson` (verification only). |
 | **JSON payload example** (`sessionEnd` hook stdin, anonymized) | See below. |
 
 ```json
@@ -622,7 +624,7 @@ The mapper produces a `Db90Payload` object (`packages/tools/db90-cursor/src/mapp
 | Field | Type | Source | Notes |
 |---|---|---|---|
 | `tool_name` | `"cursor"` literal | constant | identifies the CLI to Rails |
-| `event_type` | `"completion" \| "chat"` | `mapper.ts:140,195,259,297,302` | only two enum values populated; commit row is tagged `chat` (TOKENS §8 #1 known fix) |
+| `event_type` | `"completion" \| "chat" \| "commit"` | `mapper.ts:140,195,260,297,302` | three enum values populated; Path B (`recentCommit`) emits `commit` |
 | `model` | string | `dailyStats` mapper emits `"unknown"`; legacy `cursor.db` row emits `CursorRow.model`; model-keyed fallback emits the key (e.g. `"claude-3-5-sonnet"`) | Auto-mode resolved name not present locally |
 | `tokens_in` | number (lines or tokens) | `tab*Suggested` / `composer*Suggested` / `linesAdded+tabLinesAdded+composerLinesAdded` / legacy `promptTokens` | mislabeled as tokens — see §3.1 |
 | `tokens_out` | number (lines or tokens) | `tab*Accepted` / `composer*Accepted` / `linesDeleted+...` / legacy `generatedTokens` | same |
@@ -635,8 +637,10 @@ The mapper produces a `Db90Payload` object (`packages/tools/db90-cursor/src/mapp
 | Field | Type | Source | Notes |
 |---|---|---|---|
 | `cursor_session_id` | string \| null | legacy `CursorRow.sessionId ?? CursorRow.requestId`; null for daily / commit | daily/commit have no session id |
-| `workspace` | string | DB file path (per-workspace `.../workspaceStorage/<hash>/` or the global `state.vscdb` path) | used downstream for project attribution |
-| `cost_model` | `"estimated_line_count"` literal | constant in `mapper.ts:3` | server-side cost-formula switch |
+| `workspace` | string | DB file path (per-workspace `.../workspaceStorage/<hash>/state.vscdb` or global `state.vscdb`) | stable store identifier; not the opened folder path |
+| `workspace_scope` | `"global" \| "workspace"` | `workspace-metadata.ts` from `dbPath` | `global` for install-wide rollups |
+| `workspace_folder` | string (optional) | `workspace.json` in the hash directory when present | human project path (`file://` URI decoded) |
+| `cost_model` | `"estimated_line_count"` \| `"token_count"` | line paths vs legacy `cursor.db` (`mapper.ts`) | `token_count` when `cursor_session_id` set (Path C) |
 | `scannable` | `false` literal | constant | mapper never sets `true` |
 | `risk_level` | `"none"` literal | constant | mapper never sets risk |
 | `source` | `"recent_commit"` (optional) | only set for the `recentCommit` mapper | absent for daily / legacy |
@@ -706,9 +710,9 @@ When Cursor's "Auto" routing picks a model, the **resolved** model name is never
 
 Ghost Mode kills outbound telemetry but does **not** stop Cursor writing local rows. db90-cursor continues to function in Ghost Mode — relevant if an engineer enables Ghost Mode for upstream privacy but expects all telemetry to stop. This is a compliance / employee-trust angle worth surfacing internally.
 
-### 5.6 Hardcoded `aiCodeTracking.dailyStats.v1.5.` prefix at `cursor-reader.ts:170`
+### 5.6 `dailyStats` version prefixes (CUR-V11)
 
-The version is **hardcoded** in the regex that extracts the date. Any Cursor minor-version bump that ships a `v1.6.` prefix silently zeroes ingest from `state.vscdb`. Already mentioned in TOKENS.md note; re-flagged here because the search did not produce a public schema diff for v1.5 → v1.6, raising the probability that the change has happened (or will happen) under the radar.
+The reader selects `ItemTable` keys under `aiCodeTracking.%` whose names end in `YYYY-MM-DD`, so `v1.6.2026-06-01` is not dropped solely for the version segment. Risk shifts to **JSON shape**: if `v1.6` drops `tab*` / `composer*` fields, `mapDailyStats` may emit nothing until the mapper is updated. Inventory: `npm run audit:local-stores` in `db90-cursor` → `daily_stats_versions` in the JSON report.
 
 ---
 

@@ -45,9 +45,8 @@ module Activities
       uri = URI("#{api_url}/api/internal/tool_events")
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = uri.scheme == "https"
-
-      payload = sanitization["sanitized_payload"]
-      parsed_payload = payload.is_a?(String) ? (JSON.parse(payload) rescue {}) : payload
+      http.open_timeout = 5
+      http.read_timeout = 10
 
       request = Net::HTTP::Post.new(uri)
       request["Authorization"] = "Bearer #{api_key}" if api_key
@@ -65,11 +64,7 @@ module Activities
           cost_usd: event_params["cost_usd"],
           duration_ms: event_params["duration_ms"],
           occurred_at: event_params["occurred_at"],
-          metadata: parsed_payload.merge(
-            "sanitization_applied" => sanitization["change_count"].to_i > 0,
-            "original_size" => sanitization["original_size"],
-            "sanitized_size" => sanitization["sanitized_size"]
-          )
+          metadata: metadata_from_sanitized(sanitization, event_params)
         }
       }.to_json
 
@@ -82,10 +77,47 @@ module Activities
       JSON.parse(response.body)["data"]
     end
 
+    def metadata_from_sanitized(sanitization, event_params)
+      base = event_params["metadata"].is_a?(Hash) ? event_params["metadata"].dup : {}
+
+      envelope = parse_jsonish(sanitization["sanitized_payload"])
+      if envelope.is_a?(Hash)
+        overlay = envelope["metadata"]
+        if overlay.nil?
+          overlay = envelope.slice("commit_hash", "commit_message", "repo_name",
+                                   "branch_name", "ai_percentage", "source")
+        end
+        base.merge!(overlay) if overlay.is_a?(Hash)
+      end
+
+      base.merge(
+        "sanitization_applied" => sanitization["change_count"].to_i > 0,
+        "original_size" => sanitization["original_size"],
+        "sanitized_size" => sanitization["sanitized_size"]
+      )
+    end
+
+    def parse_jsonish(value)
+      parsed = case value
+      when String
+        JSON.parse(value)
+      when Hash
+        value
+      else
+        {}
+      end
+      parsed = JSON.parse(parsed) if parsed.is_a?(String)
+      parsed
+    rescue JSON::ParserError
+      {}
+    end
+
     def create_audit_log(api_url, api_key, tool_event_id:, organization_id:, raw_event_key:, classification:, sanitization:, workflow_id:)
       uri = URI("#{api_url}/api/internal/audit_logs")
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = uri.scheme == "https"
+      http.open_timeout = 5
+      http.read_timeout = 10
 
       request = Net::HTTP::Post.new(uri)
       request["Authorization"] = "Bearer #{api_key}" if api_key

@@ -1,26 +1,15 @@
 require 'rails_helper'
 
-# Pre-register so `require "temporalio/activity"` is a no-op (gem not in Rails bundle)
-$LOADED_FEATURES << "temporalio/activity" unless $LOADED_FEATURES.include?("temporalio/activity")
-
-# Stub the constants the activity uses — guard on the specific class to handle
-# full-suite runs where Temporalio module may be partially defined by another spec
-unless defined?(Temporalio::Activity::Definition)
-  module Temporalio
-    module Activity
-      class Definition; end
-      class Context
-        def self.current = new
-        def heartbeat(*); end
-      end
-    end
-  end
-end
-
 require_relative '../../../../../temporal/activities/classification_activity'
 
 RSpec.describe Activities::ClassificationActivity, type: :unit do
   subject(:activity) { described_class.new }
+
+  let(:activity_context) { instance_double(Temporalio::Activity::Context, heartbeat: nil) }
+
+  before do
+    allow(Temporalio::Activity::Context).to receive(:current).and_return(activity_context)
+  end
 
   # Minimal DEFAULT_POLICY-shape policy for Path 3 tests
   let(:default_policy) do
@@ -32,6 +21,13 @@ RSpec.describe Activities::ClassificationActivity, type: :unit do
           "patterns" => {
             "email" => '[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}'
           }
+        },
+        "secrets" => {
+          "enabled" => true,
+          "action" => "redact",
+          "patterns" => {
+            "api_key" => '(?i)api[_-]?key\s*=\s*[a-zA-Z0-9_-]{20,}'
+          }
         }
       },
       "risk_thresholds" => { "medium" => 1, "high" => 3, "critical" => 5 }
@@ -39,7 +35,7 @@ RSpec.describe Activities::ClassificationActivity, type: :unit do
   end
 
   describe "Path 1: unscannable (cursor) payload" do
-    it "returns risk_level 'none' with empty detections" do
+    it "returns risk_level 'none' with empty detections when metadata has no secrets" do
       params = {
         "raw_payload" => JSON.generate({ "metadata" => { "scannable" => false } }),
         "policy"      => default_policy
@@ -51,6 +47,31 @@ RSpec.describe Activities::ClassificationActivity, type: :unit do
       expect(result["detections"]).to eq([])
       expect(result["requires_sanitization"]).to be false
       expect(result["risk_score"]).to eq(0)
+    end
+
+    # CUR-V16 — commit_message can embed credentials; metadata must still be scanned.
+    it "flags metadata.commit_message containing a fake API key for sanitization" do
+      fake_key = "sk_live_" + "EXAMPLEEXAMPLEEXAMPLEexampleexample"
+      params = {
+        "raw_payload" => JSON.generate({
+          "tool_name" => "cursor",
+          "event_type" => "commit",
+          "metadata" => {
+            "scannable" => false,
+            "source" => "recent_commit",
+            "commit_hash" => "cur-v16-classify-deadbeef",
+            "commit_message" => "chore: rotate api_key=#{fake_key} before deploy"
+          }
+        }),
+        "policy" => default_policy
+      }
+
+      result = activity.execute(params)
+
+      expect(result["requires_sanitization"]).to be true
+      expect(result["detections"]).not_to be_empty
+      expect(result["detections"].first["category"]).to eq("secrets")
+      expect(result["detections"].first["pattern"]).to eq("api_key")
     end
   end
 

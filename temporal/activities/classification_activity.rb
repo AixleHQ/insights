@@ -13,14 +13,21 @@ module Activities
 
       metadata = extract_metadata(raw_payload)
 
-      # Path 1: cursor / unscannable — no prompt content, return 'none'
+      # Path 1: cursor / unscannable — no prompt body, but metadata (e.g. commit_message) may
+      # still carry secrets; scan metadata text only (CUR-V16).
       if metadata["scannable"] == false
+        metadata_content = extract_text_from_hash(metadata).byteslice(0, 100_000) || ''
+        scan_result = scan_content(metadata_content, policy)
+        if scan_result["detections"].any?
+          return scan_result
+        end
+
         return {
           "detections"            => [],
           "risk_score"            => 0,
           "risk_level"            => "none",
           "requires_sanitization" => false,
-          "detection_summary"     => "No content available for scanning"
+          "detection_summary"     => "No sensitive data detected in metadata"
         }
       end
 
@@ -44,11 +51,21 @@ module Activities
       end
 
       # Path 3: standard server-side scan (web events, anything without scannable flag)
-      content    = extract_text_content(raw_payload)
+      content = extract_text_content(raw_payload).byteslice(0, 100_000) || ''
+      scan_content(content, policy)
+    end
+
+    private
+
+    def scan_content(content, policy)
       detections = []
       risk_score = 0
+      rules = policy["rules"] || {}
+      thresholds = policy["risk_thresholds"] || {
+        "medium" => 1, "high" => 3, "critical" => 5
+      }
 
-      policy["rules"].each do |category, config|
+      rules.each do |category, config|
         next unless config["enabled"]
 
         Temporalio::Activity::Context.current.heartbeat("Checking #{category}")
@@ -57,20 +74,20 @@ module Activities
           regex = Regexp.new(pattern, Regexp::IGNORECASE)
           matches = content.scan(regex)
 
-          if matches.any?
-            detections << {
-              "category" => category,
-              "pattern" => pattern_name,
-              "count" => matches.length,
-              "action" => config["action"]
-            }
+          next if matches.empty?
 
-            risk_score += category_risk_weight(category) * matches.length
-          end
+          detections << {
+            "category" => category,
+            "pattern" => pattern_name,
+            "count" => matches.length,
+            "action" => config["action"]
+          }
+
+          risk_score += category_risk_weight(category) * matches.length
         end
       end
 
-      risk_level = calculate_risk_level(risk_score, policy["risk_thresholds"])
+      risk_level = calculate_risk_level(risk_score, thresholds)
 
       {
         "detections" => detections,
@@ -80,8 +97,6 @@ module Activities
         "detection_summary" => summarize_detections(detections)
       }
     end
-
-    private
 
     def extract_metadata(raw_payload)
       data = raw_payload.is_a?(String) ? JSON.parse(raw_payload) : raw_payload

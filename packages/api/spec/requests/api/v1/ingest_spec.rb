@@ -239,6 +239,63 @@ RSpec.describe 'Api::V1::Ingest', type: :request do
       end
     end
 
+    # CUR-V08 — cursor recentCommit payload (Path B) must ingest as event_type commit
+    context 'with a cursor recent_commit payload (CUR-V08)' do
+      let(:cursor_commit_payload) do
+        {
+          event_type: 'commit',
+          model: 'unknown',
+          tokens_in: 507,
+          tokens_out: 36,
+          cost_usd: 0.171,
+          occurred_at: '2026-05-27T17:45:14.899Z',
+          metadata: {
+            cursor_session_id: nil,
+            workspace: '/tmp/globalStorage/state.vscdb',
+            workspace_scope: 'global',
+            cost_model: 'estimated_line_count',
+            source: 'recent_commit',
+            commit_hash: '1080c8e38aa694380e5e5d14c950123e6e1a2942',
+            commit_message: '[AIX-235] Example commit ingest verification',
+            repo_name: 'acme/demo',
+            branch_name: 'feature/example',
+            ai_percentage: 100,
+            scannable: false,
+            risk_level: 'none'
+          }
+        }
+      end
+
+      it 'returns 202 Accepted and passes event_type commit to Temporal' do
+        ingest_post(payload: cursor_commit_payload)
+        expect(response).to have_http_status(:accepted)
+        expect(json_data[:accepted]).to be true
+        expect(Temporal::Client).to have_received(:start_workflow) do |_workflow, **kwargs|
+          expect(kwargs[:args][:event][:event_type]).to eq('commit')
+          expect(kwargs[:args][:event][:metadata]['source']).to eq('recent_commit')
+        end
+      end
+
+      context 'when Temporal workflow fails (fallback direct insert)' do
+        before do
+          allow(Temporal::Client).to receive(:start_workflow).and_raise(StandardError, 'skip workflow')
+        end
+
+        it 'persists ToolEvent with event_type commit and recent_commit metadata' do
+          expect {
+            ingest_post(payload: cursor_commit_payload)
+          }.to change(ToolEvent, :count).by(1)
+
+          event = ToolEvent.last
+          expect(event.tool_name).to eq('cursor')
+          expect(event.event_type).to eq('commit')
+          expect(event.metadata['source']).to eq('recent_commit')
+          expect(event.metadata['commit_hash']).to eq('1080c8e38aa694380e5e5d14c950123e6e1a2942')
+          expect(event.metadata['repo_name']).to eq('acme/demo')
+        end
+      end
+    end
+
     context 'with rate limiting' do
       it 'returns 202 when under the per-minute limit' do
         OrganizationSetting.set(organization, 'ingest_rate_limit_per_minute', '3')

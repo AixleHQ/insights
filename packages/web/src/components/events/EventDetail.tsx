@@ -10,8 +10,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RiskBadge } from "@/components/dashboard/ActivityFeed";
 import { useOrg } from "@/contexts/OrgContext";
 import { cn, humanizeToolName } from "@/lib/utils";
-import { formatTokens } from "@/lib/formatters";
+import { formatCost, formatTokens } from "@/lib/formatters";
 import { canViewEventPrompt } from "@/lib/eventAccess";
+import { parseRecentCommitFields } from "@/lib/recentCommitEvent";
+import { RecentCommitDetail } from "./RecentCommitDetail";
 
 export interface EventDetailData {
   id: string;
@@ -125,6 +127,8 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
     timeStyle: "short",
   });
 
+  const recentCommit = parseRecentCommitFields(event.metadata, event.event_type);
+
   return (
     <div className={cn("space-y-6", className)}>
       <div className="flex items-start justify-between">
@@ -140,7 +144,7 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
               <RiskBadge level={event.risk_level || "none"} />
             </div>
             <p className="text-sm text-muted-foreground">
-              {(event.event_type || "unknown").replace("_", " ")} · {formattedDate}
+              {(event.event_type || "unknown").replaceAll("_", " ")} · {formattedDate}
             </p>
           </div>
         </div>
@@ -190,7 +194,7 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
               label="Cost"
               value={
                 event.cost_usd !== undefined ? (
-                  <span className="font-mono-display">${Number(event.cost_usd).toFixed(4)}</span>
+                  <span className="font-mono-display">{formatCost(event.cost_usd)}</span>
                 ) : (
                   <span className="text-muted-foreground">-</span>
                 )
@@ -216,6 +220,14 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
             />
           </CardContent>
         </Card>
+
+        {recentCommit && (
+          <Card className="md:col-span-3">
+            <CardContent className="pt-6">
+              <RecentCommitDetail commit={recentCommit} />
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="md:col-span-2">
           <CardHeader>

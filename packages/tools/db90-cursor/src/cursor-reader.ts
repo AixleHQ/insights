@@ -42,6 +42,48 @@ function logDbTables(db: Database.Database, dbPath: string, label: string): void
   console.log(`  tables: ${tables.join(", ") || "(none)"}`);
 }
 
+let sqliteReadFailureBannerShown = false;
+
+function logSqliteReadFailure(dbPath: string, err: unknown, verbose: boolean): void {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (verbose) {
+    console.warn(`  [sqlite] Could not read ${dbPath}: ${msg}`);
+    return;
+  }
+  if (!sqliteReadFailureBannerShown) {
+    sqliteReadFailureBannerShown = true;
+    console.warn(
+      `[db90-cursor] Could not read Cursor SQLite (${msg}). Try closing Cursor or: cd packages/tools && npm rebuild better-sqlite3`
+    );
+  }
+}
+
+/** @internal test helper */
+export function resetSqliteReadFailureBannerForTests(): void {
+  sqliteReadFailureBannerShown = false;
+}
+
+/** Quick health check for better-sqlite3 + global state.vscdb (used by verify:dry-run-matrix). */
+export function probeCursorGlobalStateDb(verbose = false): boolean {
+  const dbPath = join(cursorUserDir(), "globalStorage", "state.vscdb");
+  try {
+    const db = new Database(dbPath, { readonly: true });
+    const row = db
+      .prepare(
+        `SELECT count(*) AS c FROM ${STATE_TABLE} WHERE key LIKE 'aiCodeTracking.dailyStats%'`
+      )
+      .get() as { c: number };
+    db.close();
+    if (verbose) {
+      console.log(`  [probe] global state.vscdb OK — ${row.c} dailyStats key(s)`);
+    }
+    return true;
+  } catch (err) {
+    logSqliteReadFailure(dbPath, err, true);
+    return false;
+  }
+}
+
 // ─── Legacy: cursor.db / CursorRequestFeedback ───────────────────────────────
 
 export function findCursorDbs(baseDir?: string): string[] {
@@ -87,7 +129,8 @@ function readLegacyFromDb(
       });
     }
     return rows;
-  } catch {
+  } catch (err) {
+    logSqliteReadFailure(dbPath, err, verbose);
     return [];
   } finally {
     db?.close();
@@ -122,6 +165,75 @@ export interface DailyStatsEntry {
   value: unknown;
   /** Path to the state.vscdb file this entry came from */
   dbPath: string;
+}
+
+import { isGlobalStateDbPath } from "./workspace-metadata.js";
+
+export { isGlobalStateDbPath } from "./workspace-metadata.js";
+
+function dailyStatsActivityTotal(value: unknown): number {
+  if (typeof value !== "object" || value === null) return 0;
+  const o = value as Record<string, unknown>;
+  const fields = [
+    "tabSuggestedLines",
+    "tabAcceptedLines",
+    "composerSuggestedLines",
+    "composerAcceptedLines",
+  ] as const;
+  return fields.reduce((sum, field) => {
+    const n = o[field];
+    return sum + (typeof n === "number" && n > 0 ? n : 0);
+  }, 0);
+}
+
+function dailyStatsValuesEqual(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/**
+ * Collapse duplicate `dailyStats` rows for the same calendar day across multiple
+ * `state.vscdb` files. Cursor writes install-wide rollups to globalStorage; workspace
+ * copies for the same date are skipped when global is present (CUR-V06).
+ */
+export function dedupeDailyStatsEntries(entries: DailyStatsEntry[]): DailyStatsEntry[] {
+  const byDate = new Map<string, DailyStatsEntry[]>();
+  for (const entry of entries) {
+    const group = byDate.get(entry.date) ?? [];
+    group.push(entry);
+    byDate.set(entry.date, group);
+  }
+
+  const deduped: DailyStatsEntry[] = [];
+
+  for (const group of byDate.values()) {
+    if (group.length === 1) {
+      deduped.push(group[0]);
+      continue;
+    }
+
+    const fromGlobal = group.filter((e) => isGlobalStateDbPath(e.dbPath));
+    if (fromGlobal.length > 0) {
+      deduped.push(fromGlobal[0]);
+      continue;
+    }
+
+    // Workspace-only: drop identical JSON blobs, then keep the busiest row.
+    const distinct: DailyStatsEntry[] = [];
+    for (const entry of group) {
+      if (distinct.some((d) => dailyStatsValuesEqual(d.value, entry.value))) continue;
+      distinct.push(entry);
+    }
+    if (distinct.length === 1) {
+      deduped.push(distinct[0]);
+      continue;
+    }
+    distinct.sort(
+      (a, b) => dailyStatsActivityTotal(b.value) - dailyStatsActivityTotal(a.value)
+    );
+    deduped.push(distinct[0]);
+  }
+
+  return deduped.sort((a, b) => a.date.localeCompare(b.date));
 }
 
 export function findStateVscDbs(baseDir?: string): string[] {
@@ -185,17 +297,18 @@ function readDailyStatsFromDb(
     }
 
     return entries;
-  } catch {
+  } catch (err) {
+    logSqliteReadFailure(dbPath, err, verbose);
     return [];
   } finally {
     db?.close();
   }
 }
 
-export function readDailyStats(
+function readDailyStatsRaw(
   since: Date | null,
-  baseDir?: string,
-  verbose = false
+  baseDir: string | undefined,
+  verbose: boolean
 ): DailyStatsEntry[] {
   const dbPaths = findStateVscDbs(baseDir);
 
@@ -204,11 +317,39 @@ export function readDailyStats(
     console.log(`Found ${dbPaths.length} state.vscdb file(s)`);
   }
 
-  const results: DailyStatsEntry[] = [];
+  const raw: DailyStatsEntry[] = [];
   for (const dbPath of dbPaths) {
-    results.push(...readDailyStatsFromDb(dbPath, since, verbose));
+    raw.push(...readDailyStatsFromDb(dbPath, since, verbose));
   }
-  return results;
+  return raw;
+}
+
+export interface DailyStatsReadResult {
+  raw: DailyStatsEntry[];
+  deduped: DailyStatsEntry[];
+}
+
+export function readDailyStatsWithDedupe(
+  since: Date | null,
+  baseDir?: string,
+  verbose = false
+): DailyStatsReadResult {
+  const raw = readDailyStatsRaw(since, baseDir, verbose);
+  const deduped = dedupeDailyStatsEntries(raw);
+  if (verbose && raw.length !== deduped.length) {
+    console.log(
+      `  dailyStats dedupe: ${raw.length} raw row(s) → ${deduped.length} after preferring globalStorage per date`
+    );
+  }
+  return { raw, deduped };
+}
+
+export function readDailyStats(
+  since: Date | null,
+  baseDir?: string,
+  verbose = false
+): DailyStatsEntry[] {
+  return readDailyStatsWithDedupe(since, baseDir, verbose).deduped;
 }
 
 // ─── Recent commit snapshot: aiCodeTracking.recentCommit (single key, no date in name) ─
@@ -287,7 +428,8 @@ function readRecentCommitFromDb(
     }
 
     return [{ value: obj, dbPath }];
-  } catch {
+  } catch (err) {
+    logSqliteReadFailure(dbPath, err, verbose);
     return [];
   } finally {
     db?.close();

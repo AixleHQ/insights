@@ -9,7 +9,7 @@ module Workflows
     # Workflow input structure:
     # {
     #   "raw_event_key" => "events/2024/01/25/abc123.json",
-    #   "raw_event_bucket" => "db90-raw-events",
+    #   "raw_event_bucket" => "raw-events",
     #   "event" => {
     #     "organization_id" => "uuid",
     #     "user_id" => "uuid or nil",
