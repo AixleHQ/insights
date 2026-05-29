@@ -5,6 +5,7 @@
 import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
 import { finished } from "node:stream/promises";
 import { createInterface } from "node:readline";
+import { createHash } from "node:crypto";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
@@ -54,6 +55,28 @@ function logDbTables(db: Database.Database, dbPath: string, label: string): void
   const tables = getTableNames(db);
   console.log(`  [${label}] ${dbPath}`);
   console.log(`  tables: ${tables.join(", ") || "(none)"}`);
+}
+
+/** Smoke-test better-sqlite3 against the global Cursor state DB (CUR-V02 / verify scripts). */
+export function probeCursorGlobalStateDb(verbose = false): boolean {
+  const dbPath = join(cursorUserDir(), "globalStorage", "state.vscdb");
+  try {
+    const db = new Database(dbPath, { readonly: true });
+    const row = db
+      .prepare(
+        `SELECT count(*) AS c FROM ${STATE_TABLE} WHERE key LIKE 'aiCodeTracking.dailyStats%'`
+      )
+      .get() as { c: number };
+    db.close();
+    if (verbose) {
+      console.log(`  [probe] global state.vscdb OK — ${row.c} dailyStats key(s)`);
+    }
+    return true;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`  [probe] failed to read ${dbPath}: ${msg}`);
+    return false;
+  }
 }
 
 // ─── Legacy: cursor.db / CursorRequestFeedback ─────────────────────────────────
@@ -357,11 +380,16 @@ function readDailyStatsRaw(
   return raw;
 }
 
-export function readDailyStats(
+export interface DailyStatsReadResult {
+  raw: DailyStatsEntry[];
+  deduped: DailyStatsEntry[];
+}
+
+export function readDailyStatsWithDedupe(
   since: Date | null,
   baseDir?: string,
   verbose = false
-): DailyStatsEntry[] {
+): DailyStatsReadResult {
   const raw = readDailyStatsRaw(since, baseDir, verbose);
   const deduped = dedupeDailyStatsEntries(raw);
   if (verbose && raw.length !== deduped.length) {
@@ -369,7 +397,15 @@ export function readDailyStats(
       `  dailyStats dedupe: ${raw.length} raw row(s) → ${deduped.length} after preferring globalStorage per date`
     );
   }
-  return deduped;
+  return { raw, deduped };
+}
+
+export function readDailyStats(
+  since: Date | null,
+  baseDir?: string,
+  verbose = false
+): DailyStatsEntry[] {
+  return readDailyStatsWithDedupe(since, baseDir, verbose).deduped;
 }
 
 // ─── recentCommit ────────────────────────────────────────────────────────────
@@ -501,6 +537,8 @@ export interface CursorTranscriptTurn {
   sessionId: string;
   filePath: string;
   fileSize: number;
+  /** SHA-256 prefix (32 hex chars) of the JSONL content — preferred over fileSize for change detection. */
+  contentHash?: string;
   workspacePath: string | null;
   composerName: string | null;
   occurredAt: string;
@@ -618,6 +656,9 @@ export function findCursorTranscriptFiles(projectDirs?: string[]): string[] {
   return [...new Set(files)];
 }
 
+/** Skip JSONL files larger than this to avoid memory pressure on extremely long sessions. */
+const MAX_TRANSCRIPT_BYTES = 50 * 1024 * 1024; // 50 MB
+
 export async function parseCursorTranscriptFile(
   filePath: string,
   composerHeaders: Map<string, CursorComposerHeader>,
@@ -634,6 +675,13 @@ export async function parseCursorTranscriptFile(
     return [];
   }
 
+  if (fileSize > MAX_TRANSCRIPT_BYTES) {
+    if (verbose) {
+      console.warn(`[warn][cursor] ${filePath} exceeds ${MAX_TRANSCRIPT_BYTES / 1024 / 1024} MB limit — skipping`);
+    }
+    return [];
+  }
+
   const sessionId = basename(filePath, ".jsonl");
   const header = composerHeaders.get(sessionId);
   if (header?.lastUpdatedAt) occurredAt = header.lastUpdatedAt;
@@ -642,6 +690,7 @@ export async function parseCursorTranscriptFile(
   let currentPromptParts: string[] = [];
   let currentAssistantParts: string[] = [];
   let turnIndex = 0;
+  const hasher = createHash("sha256");
   const stream = createReadStream(filePath, { encoding: "utf-8" });
   const rl = createInterface({ input: stream, crlfDelay: Infinity });
 
@@ -674,6 +723,7 @@ export async function parseCursorTranscriptFile(
   try {
     for await (const line of rl) {
       lineNumber++;
+      hasher.update(line + "\n");
       const trimmed = line.trim();
       if (!trimmed) continue;
 
@@ -713,6 +763,8 @@ export async function parseCursorTranscriptFile(
   }
 
   finalizeTurn();
+  const contentHash = hasher.digest("hex").slice(0, 32);
+  for (const t of turns) t.contentHash = contentHash;
   return turns;
 }
 

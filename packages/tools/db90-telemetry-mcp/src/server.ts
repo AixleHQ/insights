@@ -7,6 +7,7 @@ import { defaultKeycloakClientId, defaultKeycloakIssuer, startDeviceAuthorizatio
 import { migrateLegacyState, getAppDir } from "./state.js";
 import { syncTelemetryTools } from "./sync.js";
 import { DEFAULT_PRICING, mergePricing } from "./pricing.js";
+import { resolveCursorPricing } from "./cursor-config.js";
 import { buildHealthSnapshot, healthSnapshotToStatusPayload } from "./health.js";
 import { mcpLog } from "./log.js";
 
@@ -43,6 +44,10 @@ function jsonContent(value: unknown) {
 
 function defaultPricing(): ReturnType<typeof mergePricing> {
   return mergePricing(DEFAULT_PRICING, {});
+}
+
+function cursorPricingForSync(): ReturnType<typeof resolveCursorPricing> {
+  return resolveCursorPricing(undefined, getAppDir());
 }
 
 function migrateAllLegacyState(creds: StoredCredentials): void {
@@ -116,6 +121,7 @@ async function executeSync(parsed: { tools?: TelemetryToolId[] }): Promise<unkno
     projectIdSource: projectResolution.source,
     projectLookupToken: pickProjectLookupToken(creds),
     pricing: defaultPricing(),
+    cursorPricing: cursorPricingForSync(),
     tools: parsed.tools,
   });
   return { ok: syncResultOk(result), result };
@@ -219,11 +225,13 @@ export async function startServer(): Promise<void> {
   await server.connect(transport);
 
   let intervalId: ReturnType<typeof setInterval> | undefined;
+  let jitterTimeout: ReturnType<typeof setTimeout> | undefined;
   let shuttingDown = false;
   let activeBackground: Promise<void> = Promise.resolve();
 
   const onSignal = () => {
     shuttingDown = true;
+    if (jitterTimeout !== undefined) clearTimeout(jitterTimeout);
     if (intervalId !== undefined) clearInterval(intervalId);
     activeBackground.finally(() => {
       process.exit(0);
@@ -250,6 +258,7 @@ export async function startServer(): Promise<void> {
         projectIdSource: projectResolution.source,
         projectLookupToken: pickProjectLookupToken(creds),
         pricing: defaultPricing(),
+        cursorPricing: cursorPricingForSync(),
       });
     } catch (err) {
       mcpLog.error(
@@ -262,7 +271,11 @@ export async function startServer(): Promise<void> {
 
   activeBackground = runBackground("startup");
 
-  intervalId = setInterval(() => {
-    activeBackground = activeBackground.finally(() => runBackground("interval"));
-  }, SYNC_INTERVAL_MS);
+  // Jitter the recurring interval start by up to 60 s to spread load across the install base.
+  jitterTimeout = setTimeout(() => {
+    if (shuttingDown) return;
+    intervalId = setInterval(() => {
+      activeBackground = activeBackground.finally(() => runBackground("interval"));
+    }, SYNC_INTERVAL_MS);
+  }, Math.floor(Math.random() * 60_000));
 }
