@@ -5896,6 +5896,21 @@ components:
         updatedAt:
           type: string
           format: date-time
+        eventCount:
+          type: integer
+          description: >
+            Lifetime count of attributed tool events for this project (tool_events.project_id).
+        totalCostUsd:
+          type: number
+          format: float
+          description: >
+            Lifetime sum of attributed event costs in USD for this project.
+        lastEventAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: >
+            Timestamp of the most recent attributed tool event, or null when none exist.
       required:
         - id
         - name

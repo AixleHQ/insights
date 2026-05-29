@@ -23,7 +23,6 @@ import {
   useProjectRepositories,
   useDisconnectRepo,
   useProjectMembers,
-  useProjectStats,
   useCurrentUser,
   type ProjectMember,
 } from "@/hooks/useApi";
@@ -111,7 +110,6 @@ export function ProjectDetail() {
   const { data: project, isLoading: isLoadingProject } = useProject(id || "");
   const { data: projectMembers, isLoading: isLoadingMembers } = useProjectMembers(id || "");
   const { data: me } = useCurrentUser();
-  const { data: projectStats } = useProjectStats(id || "");
   const { data: dailyByToolData, isLoading: isLoadingDailyByTool } = useProjectDailyByTool(id || "");
   const { data: projectRepositories, isLoading: isLoadingRepositories } = useProjectRepositories(id || "");
   const disconnectRepo = useDisconnectRepo(id || "");
@@ -138,23 +136,6 @@ export function ProjectDetail() {
     if (tabParam && allowed.has(tabParam)) return tabParam;
     return "overview";
   }, [tabParam, isMemberOfProject, isProjectOwner]);
-
-  const eventsDelta = useMemo(() => {
-    const prev = projectStats?.previousPeriod?.totalEvents;
-    const curr = projectStats?.totalEvents;
-    if (curr == null || prev == null) return undefined;
-    if (prev === 0) return curr > 0 ? "New activity" : undefined;
-    const pct = (((curr - prev) / prev) * 100).toFixed(1);
-    return `${curr >= prev ? "+" : ""}${pct}% vs prior 30d`;
-  }, [projectStats]);
-
-  const costDelta = useMemo(() => {
-    const prev = projectStats?.previousPeriod?.totalCost;
-    const curr = projectStats?.totalCost;
-    if (curr == null || prev == null) return undefined;
-    const diff = curr - prev;
-    return `${diff >= 0 ? "+" : "-"}${formatCost(Math.abs(diff))} vs prior 30d`;
-  }, [projectStats]);
 
   const handleDelete = async () => {
     if (!id) return;
@@ -191,6 +172,14 @@ export function ProjectDetail() {
   if (!project) {
     return <ProjectNotFound />;
   }
+
+  const hasAttributedEventCount = Object.prototype.hasOwnProperty.call(project, "eventCount");
+  const hasAttributedCostUsd = Object.prototype.hasOwnProperty.call(project, "totalCostUsd");
+  const hasLastAttributedAt = Object.prototype.hasOwnProperty.call(project, "lastEventAt");
+
+  const attributedEventCount = project.eventCount;
+  const attributedCostUsd = project.totalCostUsd;
+  const lastAttributedAt = project.lastEventAt;
 
   return (
     <div className="space-y-6">
@@ -283,18 +272,14 @@ export function ProjectDetail() {
             <StatCard
               icon={Activity}
               label="Total Events"
-              subtitle="Last 30 days"
-              value={projectStats ? formatCount(projectStats.totalEvents) : "—"}
-              delta={eventsDelta}
-              isLoading={!projectStats}
+              subtitle="All-time attributed"
+              value={hasAttributedEventCount ? formatCount(attributedEventCount ?? 0) : "—"}
             />
             <StatCard
               icon={DollarSign}
               label="Total Cost"
-              subtitle="Last 30 days"
-              value={projectStats ? formatCost(projectStats.totalCost) : "—"}
-              delta={costDelta}
-              isLoading={!projectStats}
+              subtitle="All-time attributed"
+              value={hasAttributedCostUsd ? formatCost(attributedCostUsd ?? 0) : "—"}
             />
             <StatCard
               icon={Calendar}
@@ -304,7 +289,8 @@ export function ProjectDetail() {
             <StatCard
               icon={GitBranch}
               label="Last Activity"
-              value={project.last_event_at || project.lastEventAt ? formatDistanceToNow(project.last_event_at || project.lastEventAt!) : "Never"}
+              subtitle="All-time attributed"
+              value={hasLastAttributedAt ? (lastAttributedAt ? formatDistanceToNow(lastAttributedAt) : "Never") : "—"}
             />
           </div>
 

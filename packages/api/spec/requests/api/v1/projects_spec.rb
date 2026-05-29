@@ -44,6 +44,40 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       expect_success
       expect(json_data.first[:id]).to eq(org_project.id)
     end
+
+    it 'includes batched lifetime aggregate stats for each project on the page' do
+      other = create(:project, organization: organization, owner: nil)
+      t1 = Time.zone.parse('2026-01-10T12:00:00Z')
+      t2 = Time.zone.parse('2026-01-11T15:30:00Z')
+      create(:tool_event, organization: organization, project: org_project, occurred_at: t1, cost_usd: 0.5)
+      create(:tool_event, organization: organization, project: org_project, occurred_at: t2, cost_usd: 1.25)
+      create(:tool_event, organization: organization, project: other, occurred_at: t1, cost_usd: 3.0)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/projects",
+                        user: user,
+                        organization: organization
+
+      expect_success
+      by_id = json_data.index_by { |p| p[:id] }
+      expect(by_id[org_project.id][:eventCount]).to eq(2)
+      expect(by_id[org_project.id][:totalCostUsd]).to eq(1.75)
+      expect(by_id[org_project.id][:lastEventAt]).to eq(t2.iso8601)
+      expect(by_id[other.id][:eventCount]).to eq(1)
+      expect(by_id[other.id][:totalCostUsd]).to eq(3.0)
+      expect(by_id[other.id][:lastEventAt]).to eq(t1.iso8601)
+    end
+
+    it 'returns zero aggregates when a project has no attributed tool events' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/projects",
+                        user: user,
+                        organization: organization
+
+      expect_success
+      row = json_data.find { |p| p[:id] == org_project.id }
+      expect(row[:eventCount]).to eq(0)
+      expect(row[:totalCostUsd]).to eq(0.0)
+      expect(row[:lastEventAt]).to be_nil
+    end
   end
 
   describe 'GET /api/v1/projects/:id' do
@@ -54,6 +88,29 @@ RSpec.describe 'Api::V1::Projects', type: :request do
 
       expect_success
       expect(json_data[:id]).to eq(project.id)
+    end
+
+    it 'includes lifetime aggregate stats from attributed tool_events' do
+      t1 = Time.zone.parse('2026-02-01T08:00:00Z')
+      t2 = Time.zone.parse('2026-02-02T09:00:00Z')
+      create(:tool_event, organization: organization, project: project, occurred_at: t1, cost_usd: 0.1)
+      create(:tool_event, organization: organization, project: project, occurred_at: t2, cost_usd: 0.2)
+
+      authenticated_get "/api/v1/projects/#{project.id}", user: user
+
+      expect_success
+      expect(json_data[:eventCount]).to eq(2)
+      expect(json_data[:totalCostUsd]).to eq(0.3)
+      expect(json_data[:lastEventAt]).to eq(t2.iso8601)
+    end
+
+    it 'returns zero event count and null lastEventAt when there are no attributed events' do
+      authenticated_get "/api/v1/projects/#{project.id}", user: user
+
+      expect_success
+      expect(json_data[:eventCount]).to eq(0)
+      expect(json_data[:totalCostUsd]).to eq(0.0)
+      expect(json_data[:lastEventAt]).to be_nil
     end
 
     it 'includes source control summary for linked gitlab repositories' do
