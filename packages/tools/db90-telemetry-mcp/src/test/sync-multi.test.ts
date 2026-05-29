@@ -5,11 +5,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_PRICING } from "../pricing.js";
 import { readState } from "../state.js";
 
+vi.mock("node:child_process", () => ({
+  execFileSync: vi.fn(),
+}));
+
+import { execFileSync } from "node:child_process";
+const mockExecFileSync = vi.mocked(execFileSync);
+
 const mocks = vi.hoisted(() => ({
   findTranscriptFiles: vi.fn(),
   parseTranscriptFile: vi.fn(),
   mapClaudeTranscriptTurn: vi.fn(),
-  resolveProjectIdForRepoPath: vi.fn(),
+  lookupProjectByRemote: vi.fn(),
   enrichCommitProjectAttribution: vi.fn(),
   readCursorEvents: vi.fn(),
   readDailyStats: vi.fn(),
@@ -51,7 +58,8 @@ vi.mock("../client.js", () => ({
 
 vi.mock("@db90/sdk", () => ({
   enrichCommitProjectAttribution: mocks.enrichCommitProjectAttribution,
-  resolveProjectIdForRepoPath: mocks.resolveProjectIdForRepoPath,
+  lookupProjectByRemote: mocks.lookupProjectByRemote,
+  canonicalizeGitRemote: (remote: string) => remote,
 }));
 
 import {
@@ -73,10 +81,13 @@ describe("syncTelemetryTools", () => {
     process.env.DB90_MCP_HOME = appDir;
     mkdirSync(appDir, { recursive: true });
     vi.clearAllMocks();
+    mockExecFileSync.mockImplementation(() => {
+      throw new Error("not a git repo");
+    });
     mocks.findTranscriptFiles.mockReturnValue([]);
     mocks.parseTranscriptFile.mockResolvedValue([]);
     mocks.mapClaudeTranscriptTurn.mockReturnValue(null);
-    mocks.resolveProjectIdForRepoPath.mockResolvedValue({ projectId: null, source: "none" });
+    mocks.lookupProjectByRemote.mockResolvedValue("not-found");
     mocks.enrichCommitProjectAttribution.mockResolvedValue(undefined);
     mocks.readCursorEvents.mockReturnValue([]);
     mocks.readDailyStats.mockReturnValue([]);
@@ -454,7 +465,8 @@ describe("syncTelemetryTools", () => {
         riskCategories: [],
       },
     ]);
-    mocks.resolveProjectIdForRepoPath.mockResolvedValue({ projectId: "proj-from-cwd", source: "auto-detect" });
+    mockExecFileSync.mockReturnValue("git@github.com:org/right-project.git\n" as unknown as Buffer);
+    mocks.lookupProjectByRemote.mockResolvedValue({ project_id: "proj-from-cwd", name: "Right Project" });
     mocks.mapClaudeTranscriptTurn.mockImplementation((_turn, options) => ({
       tool_name: "claude_code",
       event_type: "chat",
@@ -523,7 +535,8 @@ describe("syncTelemetryTools", () => {
         risk_level: "none",
       },
     });
-    mocks.resolveProjectIdForRepoPath.mockResolvedValue({ projectId: "proj-from-workspace", source: "auto-detect" });
+    mockExecFileSync.mockReturnValue("git@github.com:org/right-project.git\n" as unknown as Buffer);
+    mocks.lookupProjectByRemote.mockResolvedValue({ project_id: "proj-from-workspace", name: "Right Project" });
 
     await syncTelemetryTools({
       credentials: { host, accounts: { cursor: cursorToken } },
@@ -545,5 +558,79 @@ describe("syncTelemetryTools", () => {
       cursorToken,
       expect.any(Object)
     );
+  });
+
+  it("scopeDir: only syncs Claude turns whose cwd matches and uses pre-resolved projectId", async () => {
+    const token = "db90_scoped_token";
+    mocks.findTranscriptFiles.mockReturnValue(["/transcripts/a.jsonl"]);
+    mocks.parseTranscriptFile.mockResolvedValueOnce([
+      {
+        sessionId: "sess-a",
+        turnId: "sess-a:1",
+        filePath: "/transcripts/a.jsonl",
+        fileSize: 100,
+        cwd: "/repos/test-repo",         // in-scope
+        model: "claude-sonnet-4",
+        tokensIn: 10,
+        tokensOut: 5,
+        cacheWriteTokens: 0,
+        cacheReadTokens: 0,
+        occurredAt: "2026-05-19T10:00:00.000Z",
+        promptText: "in scope",
+        assistantText: "yes",
+        riskLevel: "low",
+        riskScore: 0,
+        riskCategories: [],
+      },
+      {
+        sessionId: "sess-b",
+        turnId: "sess-b:1",
+        filePath: "/transcripts/a.jsonl",
+        fileSize: 100,
+        cwd: "/repos/db90-rails",         // out-of-scope
+        model: "claude-sonnet-4",
+        tokensIn: 8,
+        tokensOut: 3,
+        cacheWriteTokens: 0,
+        cacheReadTokens: 0,
+        occurredAt: "2026-05-19T10:01:00.000Z",
+        promptText: "out of scope",
+        assistantText: "no",
+        riskLevel: "low",
+        riskScore: 0,
+        riskCategories: [],
+      },
+    ]);
+    mocks.mapClaudeTranscriptTurn.mockImplementation((_turn, options) => ({
+      tool_name: "claude_code",
+      event_type: "chat",
+      occurred_at: "2026-05-19T10:00:00.000Z",
+      cost_usd: null,
+      project_id: options?.projectId ?? undefined,
+      metadata: { session_id: _turn.turnId, claude_session_id: _turn.sessionId, transcript_source: "claude_jsonl", model: null, base_input_tokens: 0, output_tokens: 0, cache_write_tokens: 0, cache_read_tokens: 0, risk_level: "low", risk_categories: [], risk_score: 0, scannable: true as const },
+    }));
+
+    await syncTelemetryTools({
+      credentials: { host, accounts: { claude_code: token } },
+      dryRun: false,
+      verbose: false,
+      projectId: "scoped-project-id",
+      projectIdSource: "auto-detect",
+      pricing: DEFAULT_PRICING,
+      appDir,
+      tools: ["claude_code"],
+      scopeDir: "/repos/test-repo",
+    });
+
+    // Only the in-scope turn was posted
+    expect(mocks.postEvent).toHaveBeenCalledTimes(1);
+    expect(mocks.postEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ project_id: "scoped-project-id" }),
+      host,
+      token,
+      expect.any(Object)
+    );
+    // Per-turn git lookup should NOT have been called (scopeDir uses pre-resolved projectId)
+    expect(mockExecFileSync).not.toHaveBeenCalled();
   });
 });

@@ -34,6 +34,39 @@ RSpec.describe Project, type: :model do
     it 'preserves non-SSH URLs with strip, downcase, and .git removal only' do
       expect(described_class.normalize_git_remote('HTTPS://Example.COM/foo/bar.GIT')).to eq('https://example.com/foo/bar')
     end
+
+    it 'normalizes ssh:// scheme URLs to canonical HTTPS' do
+      expect(described_class.normalize_git_remote('ssh://git@github.com/owner/repo.git')).to eq('https://github.com/owner/repo')
+    end
+
+    it 'strips embedded credentials' do
+      expect(described_class.normalize_git_remote('https://x-access-token:SECRET@github.com/owner/repo.git')).to eq('https://github.com/owner/repo')
+    end
+
+    it 'strips ports' do
+      expect(described_class.normalize_git_remote('ssh://git@github.com:22/owner/repo.git')).to eq('https://github.com/owner/repo')
+    end
+
+    it 'strips trailing slashes, including after a .git suffix' do
+      expect(described_class.normalize_git_remote('https://github.com/owner/repo/')).to eq('https://github.com/owner/repo')
+      expect(described_class.normalize_git_remote('https://github.com/owner/repo.git/')).to eq('https://github.com/owner/repo')
+    end
+
+    it 'preserves the host for SSH aliases (path fallback handles them, not normalization)' do
+      expect(described_class.normalize_git_remote('git@github-work:owner/repo.git')).to eq('https://github-work/owner/repo')
+    end
+  end
+
+  describe '.git_remote_path' do
+    it 'returns the host-agnostic owner/repo path' do
+      expect(described_class.git_remote_path('https://github.com/owner/repo')).to eq('owner/repo')
+      expect(described_class.git_remote_path('https://github-work/owner/repo')).to eq('owner/repo')
+    end
+
+    it 'returns nil for blank input' do
+      expect(described_class.git_remote_path(nil)).to be_nil
+      expect(described_class.git_remote_path('')).to be_nil
+    end
   end
 
   describe 'associations' do

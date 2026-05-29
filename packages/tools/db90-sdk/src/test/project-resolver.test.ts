@@ -4,6 +4,7 @@ import {
   resolveProjectIdForRepoPath,
   getGitRemote,
   getGitRemoteForPath,
+  canonicalizeGitRemote,
   lookupProjectByRemote,
   lookupProjectByRepoName,
   repoNameToGitRemoteCandidates,
@@ -163,6 +164,52 @@ describe("getGitRemote", () => {
   it("returns trimmed remote URL for an explicit repo path", () => {
     mockExecFileSync.mockReturnValue("git@github.com:org/repo.git\n" as unknown as Buffer);
     expect(getGitRemoteForPath("/repos/right-project", false)).toBe("git@github.com:org/repo.git");
+  });
+});
+
+describe("canonicalizeGitRemote", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it("rewrites an SCP-style SSH host alias to its resolved hostname", () => {
+    mockExecFileSync.mockReturnValue(
+      "user git\nhostname github.com\nport 22\n" as unknown as Buffer
+    );
+    expect(canonicalizeGitRemote("git@github-work:org/repo.git", false)).toBe(
+      "git@github.com:org/repo.git"
+    );
+    expect(mockExecFileSync).toHaveBeenCalledWith("ssh", ["-G", "github-work"], expect.anything());
+  });
+
+  it("rewrites an ssh:// URL host alias to its resolved hostname", () => {
+    mockExecFileSync.mockReturnValue("hostname gitlab.com\n" as unknown as Buffer);
+    expect(canonicalizeGitRemote("ssh://git@gl-work:8022/group/proj.git", false)).toBe(
+      "ssh://git@gitlab.com/group/proj.git"
+    );
+  });
+
+  it("leaves the remote unchanged when the host resolves to itself", () => {
+    mockExecFileSync.mockReturnValue("hostname github.com\n" as unknown as Buffer);
+    expect(canonicalizeGitRemote("git@github.com:org/repo.git", false)).toBe(
+      "git@github.com:org/repo.git"
+    );
+  });
+
+  it("leaves the remote unchanged when ssh -G cannot be run", () => {
+    mockExecFileSync.mockImplementation(() => {
+      throw new Error("ssh: not found");
+    });
+    expect(canonicalizeGitRemote("git@github-work:org/repo.git", false)).toBe(
+      "git@github-work:org/repo.git"
+    );
+  });
+
+  it("leaves HTTPS remotes untouched", () => {
+    expect(canonicalizeGitRemote("https://github.com/org/repo.git", false)).toBe(
+      "https://github.com/org/repo.git"
+    );
+    expect(mockExecFileSync).not.toHaveBeenCalled();
   });
 });
 

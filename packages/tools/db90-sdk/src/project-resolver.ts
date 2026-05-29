@@ -59,7 +59,7 @@ export function getGitRemote(verbose: boolean): string | null {
       stdio: ["ignore", "pipe", "pipe"],
       timeout: 5000,
     }).trim();
-    return out || null;
+    return out ? canonicalizeGitRemote(out, verbose) : null;
   } catch {
     if (verbose) console.log("[verbose] Could not determine git remote");
     return null;
@@ -73,9 +73,53 @@ export function getGitRemoteForPath(repoPath: string, verbose: boolean): string 
       stdio: ["ignore", "pipe", "pipe"],
       timeout: 5000,
     }).trim();
-    return out || null;
+    return out ? canonicalizeGitRemote(out, verbose) : null;
   } catch {
     if (verbose) console.log(`[verbose] Could not determine git remote for path: ${repoPath}`);
+    return null;
+  }
+}
+
+/**
+ * `git remote get-url origin` returns the literal host from the URL, which may
+ * be an SSH host alias from the user's ~/.ssh/config (e.g. `git@github-work:...`
+ * where `github-work` maps to `github.com`). DB90 stores the real host, so the
+ * server-side normalized URLs never match. Resolve the alias to its real
+ * hostname via `ssh -G` before lookup so the remote is canonical at the source.
+ * Non-SSH remotes and unresolvable hosts are returned unchanged.
+ */
+export function canonicalizeGitRemote(remote: string, verbose: boolean): string {
+  const trimmed = remote.trim();
+  if (!trimmed) return remote;
+
+  const scp = trimmed.match(/^([\w.-]+)@([^:/]+):(.+)$/);
+  const sshUrl = trimmed.match(/^ssh:\/\/(?:([\w.-]+)@)?([^:/]+)(?::\d+)?\/(.+)$/i);
+  const host = scp?.[2] ?? sshUrl?.[2];
+  if (!host) return trimmed;
+
+  const resolved = resolveSshHostName(host, verbose);
+  if (!resolved || resolved.toLowerCase() === host.toLowerCase()) return trimmed;
+
+  if (verbose) console.log(`[verbose] Resolved SSH host alias ${host} -> ${resolved}`);
+  if (scp) return `${scp[1]}@${resolved}:${scp[3]}`;
+  const user = sshUrl?.[1] ? `${sshUrl[1]}@` : "";
+  return `ssh://${user}${resolved}/${sshUrl![3]}`;
+}
+
+function resolveSshHostName(host: string, verbose: boolean): string | null {
+  try {
+    const out = execFileSync("ssh", ["-G", host], {
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 5000,
+    });
+    for (const line of out.split("\n")) {
+      const m = line.match(/^hostname\s+(.+)$/i);
+      if (m) return m[1].trim();
+    }
+    return null;
+  } catch {
+    if (verbose) console.log(`[verbose] Could not resolve SSH host alias: ${host}`);
     return null;
   }
 }
