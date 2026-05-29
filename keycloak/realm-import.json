@@ -40,6 +40,7 @@
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": true,
+      "oauth2DeviceAuthorizationGrantEnabled": true,
       "serviceAccountsEnabled": false,
       "authorizationServicesEnabled": false,
       "fullScopeAllowed": true,

@@ -8,8 +8,6 @@ export interface SessionRecord {
   fileSize: number;
   /** ISO timestamp when this session was sent. */
   sentAt: string;
-  /** SHA-256 prefix (32 hex chars) of the transcript file at time of send — preferred over fileSize for change detection. */
-  contentHash?: string;
 }
 
 /** Persisted summary of the last sync run (for CLI/MCP health across processes). */
@@ -33,17 +31,6 @@ export interface State {
   version: number;
   /** Map of session ID → last known state. */
   sessions: Record<string, SessionRecord>;
-  /**
-   * All `metadata.commit_hash` values successfully POSTed for Cursor Path B (recent commit).
-   * Parity with `@db90/cursor` — hash dedupe is authoritative; timestamp watermarks alone
-   * can block retries after ingest accepted 202 but failed to persist.
-   */
-  lastRecentCommitHashes?: string[];
-  /**
-   * ISO timestamp: suspend sync for this credential until this time (persisted 429 backoff).
-   * Primed into the in-memory backoff map on startup so rate-limits survive process restarts.
-   */
-  rate_limited_until?: string | null;
   /** Optional MCP diagnostics for health / debugging (does not replace session checkpoints). */
   mcp_operator?: McpOperatorState;
 }
@@ -151,26 +138,13 @@ export function readState(dir?: string, host?: string, token?: string): State {
         typeof p.sessions === "object" &&
         p.sessions !== null
       ) {
-        const lastRecentCommitHashes = Array.isArray(p.lastRecentCommitHashes)
-          ? (p.lastRecentCommitHashes as string[]).filter((h) => typeof h === "string")
-          : undefined;
         const out: State = {
           version: p.version,
           sessions: p.sessions as Record<string, SessionRecord>,
         };
-        if (lastRecentCommitHashes !== undefined) {
-          out.lastRecentCommitHashes = lastRecentCommitHashes;
-        }
         if ("mcp_operator" in p) {
           const mcp = parseMcpOperator(p.mcp_operator);
           if (mcp) out.mcp_operator = mcp;
-        }
-        if ("rate_limited_until" in p) {
-          if (typeof p.rate_limited_until === "string") {
-            out.rate_limited_until = p.rate_limited_until;
-          } else if (p.rate_limited_until === null) {
-            out.rate_limited_until = null;
-          }
         }
         return out;
       }
@@ -196,16 +170,13 @@ export function writeState(state: State, dir?: string, host?: string, token?: st
 export function markSessionSent(
   state: State,
   sessionId: string,
-  fileSize: number,
-  contentHash?: string
+  fileSize: number
 ): State {
-  const record: SessionRecord = { fileSize, sentAt: new Date().toISOString() };
-  if (contentHash !== undefined) record.contentHash = contentHash;
   return {
     ...state,
     sessions: {
       ...state.sessions,
-      [sessionId]: record,
+      [sessionId]: { fileSize, sentAt: new Date().toISOString() },
     },
   };
 }

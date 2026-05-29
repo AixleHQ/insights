@@ -41,9 +41,6 @@
     "prebuild": "npm run build --prefix ../db90-sdk",
     "build": "tsc",
     "test": "vitest run",
-    "verify:cursor-dry-run": "tsx scripts/verify-cursor-dry-run.ts",
-    "audit:local-stores": "tsx scripts/audit-local-stores.ts",
-    "verify:cli-mcp-parity": "tsx scripts/verify-cli-mcp-parity.ts",
     "dev": "tsx src/cli.ts",
     "prepublishOnly": "npm run build",
     "prepack": "node ../scripts/stage-sdk-bundle.mjs"

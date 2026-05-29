@@ -16,36 +16,41 @@ import {
   mapTranscriptTurn as mapClaudeTranscriptTurn,
   type ClaudeTranscriptTurn,
 } from "./readers/claude.js";
-import { prepareCursorSliceGroups } from "./collect-cursor-payloads.js";
 import {
-  CURSOR_DAILY_STATS_WATERMARK_KEY,
-  CURSOR_RECENT_COMMIT_WATERMARK_KEY,
-  cursorTranscriptTurnStateKey,
-} from "./cursor-checkpoints.js";
-import { printCursorDryRunValidationReport } from "./cursor-payload-contract.js";
-import { resolveCursorPricing } from "./cursor-config.js";
-import { postEvent, postEvents } from "./client.js";
+  readEvents as readCursorEvents,
+  readDailyStats,
+  readRecentCommitSnapshots,
+  readCursorTranscriptSessions,
+  mapEvent as mapCursorEvent,
+  mapTranscriptTurn as mapCursorTranscriptTurn,
+  mapDailyStats,
+  mapRecentCommit,
+  DEFAULT_CURSOR_PRICING,
+  type CursorTranscriptTurn,
+  type CursorDb90Payload,
+} from "./readers/cursor.js";
+import { postEvent } from "./client.js";
 import { type PricingTable, getCostWarning } from "./pricing.js";
-import type { PricingConfig } from "./readers/cursor.js";
 import { acquireSyncLock } from "./lock.js";
-import { type ProjectResolution } from "@db90/sdk";
+import { enrichCommitProjectAttribution, type ProjectResolution } from "@db90/sdk";
 import { mcpLog } from "./log.js";
 
 /** Prefix for Claude Code session keys in shared MCP state. */
 export const CLAUDE_STATE_PREFIX = "claude_code:" as const;
 
-export {
-  CURSOR_WATERMARK_KEY,
-  CURSOR_EVENTS_WATERMARK_KEY,
-  CURSOR_DAILY_STATS_WATERMARK_KEY,
-  CURSOR_RECENT_COMMIT_WATERMARK_KEY,
-  CURSOR_TRANSCRIPT_TURN_PREFIX,
-  cursorTranscriptTurnStateKey,
-  filterRecentCommitsByHashDedup,
-} from "./cursor-checkpoints.js";
+/** Cursor SQLite watermark checkpoints — never collide with Claude `claude_code:*` session keys. */
+export const CURSOR_WATERMARK_KEY = "cursor:watermark" as const;
+export const CURSOR_EVENTS_WATERMARK_KEY = "cursor:events_watermark" as const;
+export const CURSOR_DAILY_STATS_WATERMARK_KEY = "cursor:daily_stats_watermark" as const;
+export const CURSOR_RECENT_COMMIT_WATERMARK_KEY = "cursor:recent_commit_watermark" as const;
+export const CURSOR_TRANSCRIPT_TURN_PREFIX = "cursor:transcript_turn:" as const;
 
 export function sessionStateKey(sessionId: string): string {
   return `${CLAUDE_STATE_PREFIX}${sessionId}`;
+}
+
+export function cursorTranscriptTurnStateKey(turnId: string): string {
+  return `${CURSOR_TRANSCRIPT_TURN_PREFIX}${turnId}`;
 }
 
 export interface SyncResult {
@@ -55,7 +60,6 @@ export interface SyncResult {
   locked?: boolean;
   errors?: string[];
   rateLimitedUntil?: string | null;
-  validationFailed?: boolean;
 }
 
 /** Legacy Claude-only sync options (backward compatible with existing tests/tooling). */
@@ -79,16 +83,12 @@ export interface MultiSyncOptions {
   /** Token for GET /projects/lookup (defaults to cursor ingest token in cursor slice). */
   projectLookupToken?: string | null;
   pricing: PricingTable;
-  /** Cursor line-cost rates (defaults + optional ~/.db90-mcp/config.json overrides). */
-  cursorPricing?: PricingConfig;
   appDir?: string;
   transcriptBaseDirs?: string[];
   /** Synthetic Cursor paths for Vitest isolation. Omit for real installs. */
   cursorBaseDir?: string;
   cursorTranscriptProjectDirs?: string[];
   tools?: TelemetryToolId[];
-  /** Ignore watermarks and commit hash dedupe (pairs with `--dry-run` on CLI). */
-  fullScan?: boolean;
 }
 
 const backoffUntilByCredential = new Map<string, Date>();
@@ -202,19 +202,8 @@ async function runClaudeSlice(options: SyncOptions): Promise<SyncResult> {
   const { token, host, dryRun, verbose, projectId, pricing } = options;
   const appDir = options.appDir ?? getAppDir();
   const backoffKey = credentialStateKey(host, token);
-  const errors: string[] = [];
-
-  // Read state first so we can restore a persisted rate-limit backoff from a prior process.
-  let state = readState(appDir, host, token);
-  const persistedRateLimit = state.rate_limited_until ? new Date(state.rate_limited_until) : null;
-  if (persistedRateLimit && !Number.isNaN(persistedRateLimit.getTime())) {
-    const existing = backoffUntilByCredential.get(backoffKey);
-    if (!existing || persistedRateLimit > existing) {
-      backoffUntilByCredential.set(backoffKey, persistedRateLimit);
-    }
-  }
-
   const backoffUntil = backoffUntilByCredential.get(backoffKey) ?? null;
+  const errors: string[] = [];
 
   if (backoffUntil && new Date() < backoffUntil) {
     const until = backoffUntil.toISOString();
@@ -250,6 +239,7 @@ async function runClaudeSlice(options: SyncOptions): Promise<SyncResult> {
     }
   }
 
+  let state = readState(appDir, host, token);
   let totalSent = 0;
   let totalFailed = 0;
   let totalSkipped = 0;
@@ -313,9 +303,6 @@ async function runClaudeSlice(options: SyncOptions): Promise<SyncResult> {
           true
         );
         console.warn(`[db90-mcp] ${reason}. Pausing until ${nextBackoff.toISOString()}.`);
-        // Persist backoff to state so it survives process restarts
-        state = { ...state, rate_limited_until: nextBackoff.toISOString() };
-        writeState(state, appDir, host, token);
       },
     });
     if (ok) {
@@ -339,6 +326,18 @@ async function runClaudeSlice(options: SyncOptions): Promise<SyncResult> {
   return result;
 }
 
+function cursorWatermarkDate(
+  state: { sessions: Record<string, { sentAt: string }> },
+  ...keys: string[]
+): Date | null {
+  const rec = keys
+    .map((key) => state.sessions[key])
+    .find((value) => value !== undefined);
+  if (!rec) return null;
+  const d = new Date(rec.sentAt);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 async function runCursorSlice(params: {
   token: string;
   host: string;
@@ -350,8 +349,6 @@ async function runCursorSlice(params: {
   appDir: string;
   cursorBaseDir?: string;
   cursorTranscriptProjectDirs?: string[];
-  cursorPricing?: PricingConfig;
-  fullScan?: boolean;
 }): Promise<SyncResult> {
   const {
     token,
@@ -364,23 +361,8 @@ async function runCursorSlice(params: {
     appDir,
     cursorBaseDir,
     cursorTranscriptProjectDirs,
-    fullScan = false,
-    cursorPricing = resolveCursorPricing(undefined, appDir),
   } = params;
   const backoffKey = credentialStateKey(host, token);
-
-  // Read state first so we can restore a persisted rate-limit backoff from a prior process.
-  const stateBefore = readState(appDir, host, token);
-  const persistedRateLimit = stateBefore.rate_limited_until
-    ? new Date(stateBefore.rate_limited_until)
-    : null;
-  if (persistedRateLimit && !Number.isNaN(persistedRateLimit.getTime())) {
-    const existing = backoffUntilByCredential.get(backoffKey);
-    if (!existing || persistedRateLimit > existing) {
-      backoffUntilByCredential.set(backoffKey, persistedRateLimit);
-    }
-  }
-
   const backoffUntil = backoffUntilByCredential.get(backoffKey) ?? null;
 
   if (backoffUntil && new Date() < backoffUntil) {
@@ -398,61 +380,95 @@ async function runCursorSlice(params: {
       rateLimitedUntil: until,
     };
   }
-  const lookupToken = projectLookupToken ?? token;
-  const { groups, skippedTranscriptCount, totalPayloadCount, transcriptTurnsById, counts } =
-    await prepareCursorSliceGroups({
-      stateBefore,
-      fullScan,
-      projectId,
-      projectIdSource,
-      host,
-      token,
-      projectLookupToken: lookupToken,
-      verbose,
-      cursorBaseDir,
-      cursorTranscriptProjectDirs,
-      cursorPricing,
-    });
 
+  const stateBefore = readState(appDir, host, token);
+  const eventsSince = cursorWatermarkDate(stateBefore, CURSOR_EVENTS_WATERMARK_KEY, CURSOR_WATERMARK_KEY);
+  const dailyStatsSince = cursorWatermarkDate(stateBefore, CURSOR_DAILY_STATS_WATERMARK_KEY, CURSOR_WATERMARK_KEY);
+  const recentCommitSince = cursorWatermarkDate(
+    stateBefore,
+    CURSOR_RECENT_COMMIT_WATERMARK_KEY,
+    CURSOR_WATERMARK_KEY
+  );
+
+  const baseDir = cursorBaseDir;
+  const transcriptTurns = await readCursorTranscriptSessions(baseDir, cursorTranscriptProjectDirs, verbose);
+  const rawEvents = readCursorEvents(eventsSince, baseDir, verbose);
+  const dailyStats = readDailyStats(dailyStatsSince, baseDir, verbose);
+  const recentCommitSnapshots = readRecentCommitSnapshots(recentCommitSince, baseDir, verbose);
+
+  const projectIdOpt = projectId ?? undefined;
+  const transcriptTurnsById = new Map<string, CursorTranscriptTurn>();
+  for (const turn of transcriptTurns) {
+    transcriptTurnsById.set(turn.turnId, turn);
+  }
+  const transcriptPayloads = [...transcriptTurnsById.values()]
+    .filter((turn) => {
+      const known = stateBefore.sessions[cursorTranscriptTurnStateKey(turn.turnId)];
+      return !known || known.fileSize !== turn.fileSize;
+    })
+    .map((turn) => mapCursorTranscriptTurn(turn, projectIdOpt, DEFAULT_CURSOR_PRICING))
+    .sort((a, b) => a.occurred_at.localeCompare(b.occurred_at));
+  const skippedTranscriptCount = transcriptTurns.length - transcriptPayloads.length;
+  const transcriptModeEnabled = transcriptTurnsById.size > 0;
+
+  const mappedFromEvents = rawEvents
+    .map(({ row, workspacePath }) => mapCursorEvent(row, workspacePath, projectIdOpt, DEFAULT_CURSOR_PRICING))
+    .filter((e): e is CursorDb90Payload => e !== null)
+    .filter((payload) => !transcriptModeEnabled || payload.event_type !== "chat");
+
+  const mappedFromStats = dailyStats.flatMap((entry) =>
+    mapDailyStats(entry, projectIdOpt, DEFAULT_CURSOR_PRICING)
+  ).filter((payload) => !transcriptModeEnabled || payload.event_type !== "chat");
+
+  const mappedFromCommits = recentCommitSnapshots
+    .map((snapshot) => mapRecentCommit(snapshot, projectIdOpt, DEFAULT_CURSOR_PRICING))
+    .filter((payload): payload is CursorDb90Payload => payload !== null)
+    .sort((a, b) => a.occurred_at.localeCompare(b.occurred_at));
+
+  const lookupToken = projectLookupToken ?? token;
+  await enrichCommitProjectAttribution(mappedFromCommits, {
+    projectIdSource,
+    host,
+    token: lookupToken,
+    verbose,
+  });
+
+  const groups: Array<{ key: string; label: string; payloads: CursorDb90Payload[] }> = [
+    {
+      key: CURSOR_TRANSCRIPT_TURN_PREFIX,
+      label: "transcripts",
+      payloads: transcriptPayloads,
+    },
+    {
+      key: CURSOR_EVENTS_WATERMARK_KEY,
+      label: "events",
+      payloads: mappedFromEvents.sort((a, b) => a.occurred_at.localeCompare(b.occurred_at)),
+    },
+    {
+      key: CURSOR_DAILY_STATS_WATERMARK_KEY,
+      label: "daily_stats",
+      payloads: mappedFromStats.sort((a, b) => a.occurred_at.localeCompare(b.occurred_at)),
+    },
+    {
+      key: CURSOR_RECENT_COMMIT_WATERMARK_KEY,
+      label: "recent_commit",
+      payloads: mappedFromCommits,
+    },
+  ];
+
+  const totalPayloadCount = groups.reduce((sum, group) => sum + group.payloads.length, 0);
   if (totalPayloadCount === 0) {
     return { sent: 0, failed: 0, skipped: 0 };
   }
 
   if (dryRun) {
     console.log(`[dry-run][cursor] Would send ${totalPayloadCount} event(s)`);
-    console.log(
-      `[dry-run][cursor] Note: cost_usd values are estimates (see cost_model in metadata).`
-    );
     for (const group of groups) {
       for (const ev of group.payloads) {
         console.log(JSON.stringify(ev, null, 2));
       }
     }
-    const allPayloads = groups.flatMap((group) => group.payloads);
-    const contractOk = printCursorDryRunValidationReport(allPayloads);
-    return {
-      sent: totalPayloadCount,
-      failed: 0,
-      skipped: 0,
-      validationFailed: !contractOk,
-    };
-  }
-
-  if (skippedTranscriptCount > 0 && verbose) {
-    mcpLog.info("cursor_transcript_dedupe_skip", { count: skippedTranscriptCount }, false);
-  }
-
-  if (counts.suppressedComposer > 0) {
-    mcpLog.info(
-      "cursor_composer_suppressed",
-      { reason: "transcript_mode", count: counts.suppressedComposer },
-      verbose
-    );
-    if (verbose) {
-      console.log(
-        `[verbose][cursor] ${counts.suppressedComposer} daily_composer event(s) suppressed — transcripts take precedence`
-      );
-    }
+    return { sent: totalPayloadCount, failed: 0, skipped: 0 };
   }
 
   let shouldStopForBackoff = false;
@@ -461,45 +477,45 @@ async function runCursorSlice(params: {
   let totalFailed = 0;
   let totalSkipped = skippedTranscriptCount;
   const errors: string[] = [];
+  let abortRemaining = false;
 
-  const on429 = (retryAfter: number, quotaExceeded: boolean) => {
-    const currentBackoff = backoffUntilByCredential.get(backoffKey);
-    const nextBackoff = new Date(Math.max(currentBackoff?.getTime() ?? 0, Date.now() + retryAfter * 1000));
-    backoffUntilByCredential.set(backoffKey, nextBackoff);
-    shouldStopForBackoff = true;
-    const reason = quotaExceeded ? "Monthly quota exceeded" : "Rate limited";
-    mcpLog.warn(
-      "sync_rate_limit_pause",
-      {
-        tool: "cursor",
-        retry_until: nextBackoff.toISOString(),
-        quota_exceeded: quotaExceeded,
-      },
-      true
-    );
-    console.warn(`[db90-mcp][cursor] ${reason}. Pausing until ${nextBackoff.toISOString()}.`);
-    // Persist backoff to state so it survives process restarts
-    stateMut = { ...stateMut, rate_limited_until: nextBackoff.toISOString() };
-    writeState(stateMut, appDir, host, token);
-  };
-
-  for (const group of groups) {
+  for (let groupIndex = 0; groupIndex < groups.length; groupIndex++) {
+    const group = groups[groupIndex];
     if (group.payloads.length === 0) continue;
-    if (shouldStopForBackoff) {
+    if (abortRemaining || shouldStopForBackoff) {
       totalSkipped += group.payloads.length;
       continue;
     }
 
-    if (group.label === "transcripts") {
-      for (const payload of group.payloads) {
-        if (shouldStopForBackoff) {
-          totalSkipped++;
-          continue;
-        }
+    let groupLastSentAt: string | null = null;
+    let groupFailed = false;
 
-        const ok = await postEvent(payload, host, token, { on429 });
-        if (ok) {
-          totalSent++;
+    for (let payloadIndex = 0; payloadIndex < group.payloads.length; payloadIndex++) {
+      const payload = group.payloads[payloadIndex];
+      const ok = await postEvent(payload, host, token, {
+        on429: (retryAfter, quotaExceeded) => {
+          const currentBackoff = backoffUntilByCredential.get(backoffKey);
+          const nextBackoff = new Date(Math.max(currentBackoff?.getTime() ?? 0, Date.now() + retryAfter * 1000));
+          backoffUntilByCredential.set(backoffKey, nextBackoff);
+          shouldStopForBackoff = true;
+          const reason = quotaExceeded ? "Monthly quota exceeded" : "Rate limited";
+          mcpLog.warn(
+            "sync_rate_limit_pause",
+            {
+              tool: "cursor",
+              retry_until: nextBackoff.toISOString(),
+              quota_exceeded: quotaExceeded,
+            },
+            true
+          );
+          console.warn(`[db90-mcp][cursor] ${reason}. Pausing until ${nextBackoff.toISOString()}.`);
+        },
+      });
+
+      if (ok) {
+        totalSent++;
+        groupLastSentAt = payload.occurred_at;
+        if (group.label === "transcripts") {
           const turnId = payload.metadata.session_id;
           const sourceTurn =
             typeof turnId === "string" ? transcriptTurnsById.get(turnId) : undefined;
@@ -507,69 +523,35 @@ async function runCursorSlice(params: {
             stateMut = markSessionSent(
               stateMut,
               cursorTranscriptTurnStateKey(sourceTurn.turnId),
-              sourceTurn.fileSize,
-              sourceTurn.contentHash
+              sourceTurn.fileSize
             );
             writeState(stateMut, appDir, host, token);
           }
-          continue;
         }
-
-        totalFailed++;
-        errors.push(`Cursor sync (${group.label}): failed to post ${payload.occurred_at}`);
-        mcpLog.error(
-          "sync_ingest_final_failure",
-          { tool: "cursor", group: group.label, occurred_at: payload.occurred_at },
-          true
-        );
+        continue;
       }
-      continue;
-    }
 
-    const batchResult = await postEvents(group.payloads, host, token, { on429 });
-    totalSent += batchResult.sent;
-    totalFailed += batchResult.failed;
-
-    if (batchResult.failed > 0) {
-      errors.push(
-        `Cursor sync (${group.label}): ${batchResult.failed} event(s) failed to post`
-      );
+      totalFailed++;
+      groupFailed = true;
+      abortRemaining = true;
+      errors.push(`Cursor sync (${group.label}): failed to post ${payload.occurred_at}`);
       mcpLog.error(
-        "sync_ingest_batch_failures",
-        { tool: "cursor", group: group.label, failed: batchResult.failed, sent: batchResult.sent },
+        "sync_ingest_final_failure",
+        { tool: "cursor", group: group.label, occurred_at: payload.occurred_at },
         true
       );
-      if (batchResult.sent > 0) {
-        // Partial failure: watermark advances past the succeeded events; failed events are not retried.
-        // This is best-effort delivery — events are sent in timestamp order so the window is bounded.
-        mcpLog.warn(
-          "sync_batch_partial_failure_events_dropped",
-          { tool: "cursor", group: group.label, sent: batchResult.sent, failed: batchResult.failed },
-          true
-        );
-        console.warn(
-          `[db90-mcp][cursor] Partial batch failure in ${group.label}: ` +
-          `${batchResult.sent} sent, ${batchResult.failed} dropped (watermark advances past sent events).`
-        );
-      }
+      totalSkipped += group.payloads.length - payloadIndex - 1;
+      break;
     }
 
-    if (batchResult.lastSentAt !== null) {
+    if (!groupFailed && groupLastSentAt !== null && group.label !== "transcripts") {
       stateMut = {
         ...stateMut,
         sessions: {
           ...stateMut.sessions,
-          [group.key]: { fileSize: 0, sentAt: batchResult.lastSentAt },
+          [group.key]: { fileSize: 0, sentAt: groupLastSentAt },
         },
       };
-      if (group.key === CURSOR_RECENT_COMMIT_WATERMARK_KEY && batchResult.sent > 0) {
-        const sentHashes = group.payloads
-          .map((payload) => payload.metadata.commit_hash)
-          .filter((hash): hash is string => typeof hash === "string" && hash.length > 0);
-        if (sentHashes.length > 0) {
-          stateMut = { ...stateMut, lastRecentCommitHashes: sentHashes };
-        }
-      }
       writeState(stateMut, appDir, host, token);
     }
   }
@@ -611,8 +593,6 @@ export async function syncTelemetryTools(options: MultiSyncOptions): Promise<Syn
     const { credentials, dryRun, verbose, projectId, projectIdSource, projectLookupToken, pricing } =
       options;
     const host = credentials.host;
-    const appDirResolved = options.appDir ?? getAppDir();
-    const cursorPricing = options.cursorPricing ?? resolveCursorPricing(undefined, appDirResolved);
 
     const requested: TelemetryToolId[] = dedupeTools(options.tools ?? ["claude_code", "cursor"]);
     const missingRequested = requested.filter((t) => !credentials.accounts[t]);
@@ -680,8 +660,6 @@ export async function syncTelemetryTools(options: MultiSyncOptions): Promise<Syn
           appDir,
           cursorBaseDir: options.cursorBaseDir,
           cursorTranscriptProjectDirs: options.cursorTranscriptProjectDirs,
-          fullScan: options.fullScan,
-          cursorPricing,
         }).then((r) => ({ ...r, tag: "cursor" as const }));
       tasks.push(task);
     }
@@ -704,7 +682,6 @@ export async function syncTelemetryTools(options: MultiSyncOptions): Promise<Syn
     let sent = 0;
     let failed = 0;
     let skipped = 0;
-    let validationFailed = false;
     const errorsAcc: string[] = [];
     const backoffKeysForMerge = new Set<string>();
 
@@ -717,7 +694,6 @@ export async function syncTelemetryTools(options: MultiSyncOptions): Promise<Syn
       sent += outcome.sent;
       failed += outcome.failed;
       skipped += outcome.skipped;
-      if (outcome.validationFailed) validationFailed = true;
       const tok =
         outcome.tag === "cursor" ? credentials.accounts.cursor : credentials.accounts.claude_code;
       if (tok) backoffKeysForMerge.add(credentialStateKey(host, tok));
@@ -726,7 +702,6 @@ export async function syncTelemetryTools(options: MultiSyncOptions): Promise<Syn
     }
 
     const merged: SyncResult = { sent, failed, skipped };
-    if (validationFailed) merged.validationFailed = true;
     const rl = mergeCredentialRateLimit(backoffKeysForMerge);
     if (rl) merged.rateLimitedUntil = rl;
     if (errorsAcc.length > 0) merged.errors = errorsAcc;

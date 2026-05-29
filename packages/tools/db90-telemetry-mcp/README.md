@@ -93,21 +93,6 @@ Environment variables commonly used:
 | **`DB90_KEYCLOAK_CLIENT_ID`** | Defaults **`db90-web`**; must allow device authorization in Keycloak.
 | **`DB90_MCP_HOME`** | Override state/log base (default **`~/.db90-mcp`**).
 | **`DB90_ORGANIZATION_ID`** | Optional UUID for **`init`**: scopes MCP token exchange to that organization (header **`X-Organization-ID`**). The CLI flag **`--organization-id`** overrides this variable when both are set. |
-
-Optional **`~/.db90-mcp/config.json`** (same shape as `@db90/cursor` for line-cost overrides):
-
-```json
-{
-  "pricing": {
-    "tokens_per_line": 15,
-    "completion_output_per_mtok": 0.60,
-    "chat_input_per_mtok": 3.00,
-    "chat_output_per_mtok": 15.00
-  }
-}
-```
-
-Invalid or negative pricing fields are ignored; defaults apply per field.
 | **`DB90_MCP_USE_LOCAL_KEYCLOAK_DEFAULT=true`** | *Local docker-compose hack only* → auto-default issuer `http://localhost:8080/realms/db90` when unset.
 
 Production / multi-tenant **must set issuer explicitly**. The published npm package refuses unsafe implicit issuers unless the local-default escape hatch flag is deliberately enabled.
@@ -131,7 +116,6 @@ You can set **`DB90_ORGANIZATION_ID`** instead (for example under **`mcpServers.
 |---|---|
 | **`run`** (default) | stdio MCP bridge + background sync timer (5 min cadence after connect + one startup flush when authenticated). Alias: legacy **`serve`**. |
 | **`run --once`** | Performs a single sync pass, exits **`1`** if ingestion posts fail — ideal for systemd/cron substitutes. |
-| **`run --once --full`** | Cursor backfill: ignores saved watermarks and commit-hash dedupe (re-reads all local Cursor stores). Pair with a one-shot sync when Events UI looks stale after watermark advances. |
 | **`init`** | Keycloak/OIDC onboarding, MCP merge, emits restart guidance. Supports **`--tool-name claude_code|cursor`**, **`--organization-id <uuid>`** (optional org for exchange). |
 | **`health`** | Human-readable rollup: issuer, ingest tools provisioned, last sync aggregates, **`mcp_operator`**, log path, persisted errors. |
 
@@ -147,38 +131,7 @@ You can set **`DB90_ORGANIZATION_ID`** instead (for example under **`mcpServers.
 
 Telemetry collectors run **inside** MCP: duplicated readers keep publish independence from `@db90/claude` / `@db90/cursor` packages. Successful init can provision **`claude_code`** *and* **`cursor`** ingestion accounts simultaneously—then one MCP process fans out events for both workspaces.
 
-### Cursor ingest paths
-
-| Path | Source | Notes |
-|---|---|---|
-| **daily_tab** / **daily_composer** | `state.vscdb` `aiCodeTracking.dailyStats.*` | Line-based cost estimates (`cost_model: estimated_line_count`). |
-| **recent_commit** | `aiCodeTracking.recentCommit` | Commit metadata + AI percentage. |
-| **legacy_request** | Legacy `cursor.db` / `CursorRequestFeedback` | Token-based cost when session IDs exist (Path C). |
-| **mcp_transcript** | `~/.cursor/projects/**/agent-transcripts/*.jsonl` | MCP-only: richer chat turns with risk scan + transcript text. |
-
-When agent transcripts are present, aggregate **daily_composer** rows from dailyStats are **suppressed** to avoid duplicating chat already captured in transcripts.
-
-### Cursor checkpoints & backfill
-
-SQLite / JSONL checkpoints live under **`~/.db90-mcp`** with namespaced keys preventing collisions across tools:
-
-- **`claude_code:<session>`** — Claude transcript turns (file-size checkpoint).
-- **`cursor:events_watermark`**, **`cursor:daily_stats_watermark`**, **`cursor:recent_commit_watermark`** — high-water marks per ingest slice.
-- **`cursor:transcript_turn:<turnId>`** — Cursor agent transcript turns.
-- **`lastRecentCommitHashes`** — commit-hash dedupe (authoritative when Cursor stores one `recentCommit` row; avoids missing retries after HTTP 202 without DB persist).
-
-Incremental sync respects watermarks + hash dedupe. **`run --once --full`** ignores both for a local backfill without deleting state files.
-
-### Cursor-only sync (without Claude MCP)
-
-If you initialized with **`--tool-name cursor`** or only need a shell one-shot:
-
-```bash
-db90-mcp run --once              # incremental
-db90-mcp run --once --full       # backfill all local Cursor rows
-```
-
-Requires **`cursor`** credentials in **`~/.db90-mcp/credentials.json`** (from dual-tool **`init`**). For local unpublished builds, see **[LOCAL-DEV.md](./LOCAL-DEV.md)**.
+SQLite / JSONL checkpoints live under **`~/.db90-mcp`** with namespaced keys like **`claude_code:<session>`** preventing collisions across tools.
 
 ## Operational logging & persisted state
 
@@ -195,40 +148,11 @@ db90-mcp health | sed -n '1,40p'
 
 ## Verifying end-to-end ingestion
 
-1. **Local**: watch Rails logs (`[Ingest]`) or Temporal UI for **`Workflows::IngestionSanitizationWorkflow`**. Fallback path logs **Temporal workflow failed, falling back to direct insert** when workers offline — start the worker with **`make worker`** (see **[LOCAL-DEV.md](./LOCAL-DEV.md)**).
+1. **Local**: watch Rails logs (`[Ingest]`) or Temporal UI for **`Workflows::IngestionSanitizationWorkflow`**. Fallback path logs **Temporal workflow failed, falling back to direct insert** when workers offline.
 2. **Dashboard**: confirm tool accounts show **recent usage** timestamps for each membership.
 3. **MCP self-check**: `db90_status` should show **`last_sync_at`** / aggregates moving after Claude or Cursor emits billable telemetry.
 
 Architectural ingestion reference: **`architecture/mcp-server.md`** in repo root ties MCP readers to **`POST /api/v1/ingest/events`**.
-
-### Cursor payload contract (CUR-V02)
-
-Validate local Cursor payloads against **`DATA-CURSOR.md` §3.5** without posting (no token required):
-
-```bash
-cd packages/tools/db90-telemetry-mcp
-npm run verify:cursor-dry-run
-```
-
-The script probes **`globalStorage/state.vscdb`** via **better-sqlite3**, collects payloads (including MCP agent transcripts), prints an ingest-path matrix, and writes redacted samples to **`docs/data-pipeline/fixtures/cursor-dry-run-matrix.json`** (gitignored — local only).
-
-If the probe fails with a **NODE_MODULE_VERSION** mismatch after a Node upgrade:
-
-```bash
-cd packages/tools && npm rebuild better-sqlite3
-```
-
-Parity checklist vs **`@db90/cursor`**: **`docs/data-pipeline/CURSOR-INGEST-VERIFICATION.md`**.
-
-Additional verification scripts (no POST):
-
-```bash
-cd packages/tools/db90-telemetry-mcp
-npm run audit:local-stores          # CUR-V07 / CUR-V11 — state.vscdb vs legacy cursor.db
-npm run verify:cli-mcp-parity       # CUR-V14 — CLI vs MCP ingest path counts
-```
-
-Remaining CLI-only scripts (`spotcheck:disk-kv`, hooks feasibility) live in **`@db90/cursor`** until ported.
 
 ## Troubleshooting
 
@@ -239,8 +163,6 @@ Remaining CLI-only scripts (`spotcheck:disk-kv`, hooks feasibility) live in **`@
 | **Conflicting MCP entry** (`db90` stanza mismatched shape) | `init --force` after inspecting **`~/.claude.json`** — ensure you intentionally replace stale commands. |
 | **Missing credentials** / malformed JSON files | Inspect **`credentials.json`** perms/content; rerun **`init`**; consult **`health`** diagnostics. |
 | **`postEvent` 429 bursts** | Backoff surfaced in **`db90_status`**; wait windows clear automatically (no naive tight retry storms). |
-| **`sent: N` but Events UI empty** | **`202 Accepted`** ≠ guaranteed DB row. Confirm **`make worker`** is running locally; retry with **`run --once --full`**. |
-| **better-sqlite3 / NODE_MODULE_VERSION** | After Node upgrade: **`cd packages/tools && npm rebuild better-sqlite3`**, then re-run **`verify:cursor-dry-run`**. |
 
 ## Local development contributors
 
@@ -252,9 +174,6 @@ npm ci
 npm run build --workspace=@db90/sdk
 npm run build --workspace=@db90/telemetry-mcp
 node db90-telemetry-mcp/dist/cli.js health   # Quick smoke against local ~/.db90-mcp
-npm run verify:cursor-dry-run --workspace=@db90/telemetry-mcp   # CUR-V02 local matrix (no POST)
-npm run audit:local-stores --workspace=@db90/telemetry-mcp    # CUR-V07 / CUR-V11 store inventory
-npm run verify:cli-mcp-parity --workspace=@db90/telemetry-mcp   # CUR-V14 CLI vs MCP parity
 ```
 
 Tests stay hermetic via Vitest overrides (`resetBackoffStateForTests`, ingest retry stubs). Prefer **`TMPDIR`/temp** + **`DB90_MCP_HOME`** for integration-style experiments.
