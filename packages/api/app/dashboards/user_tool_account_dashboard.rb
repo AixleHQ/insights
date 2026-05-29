@@ -8,8 +8,9 @@ class UserToolAccountDashboard < Administrate::BaseDashboard
     organization_membership: Field::BelongsTo,
     tool_name: Field::Select.with_options(searchable: false, collection: UserToolAccount::TOOL_NAMES),
     connection_state: Field::String,
-    external_account_id: Field::String,
-    external_account_name: Field::String,
+    external_user_id: Field::String,
+    external_username: Field::String,
+    external_email: Field::String,
     token_expires_at: Field::DateTime,
     created_at: Field::DateTime,
     updated_at: Field::DateTime
@@ -20,7 +21,7 @@ class UserToolAccountDashboard < Administrate::BaseDashboard
     organization_membership
     tool_name
     connection_state
-    external_account_name
+    external_username
   ].freeze
 
   SHOW_PAGE_ATTRIBUTES = %i[
@@ -28,8 +29,9 @@ class UserToolAccountDashboard < Administrate::BaseDashboard
     organization_membership
     tool_name
     connection_state
-    external_account_id
-    external_account_name
+    external_user_id
+    external_username
+    external_email
     token_expires_at
     created_at
     updated_at
@@ -39,8 +41,9 @@ class UserToolAccountDashboard < Administrate::BaseDashboard
     organization_membership
     tool_name
     connection_state
-    external_account_id
-    external_account_name
+    external_user_id
+    external_username
+    external_email
   ].freeze
 
   COLLECTION_FILTERS = {
@@ -48,6 +51,6 @@ class UserToolAccountDashboard < Administrate::BaseDashboard
   }.freeze
 
   def display_resource(account)
-    "#{account.tool_name} - #{account.external_account_name}"
+    "#{account.tool_name} - #{account.external_username}"
   end
 end

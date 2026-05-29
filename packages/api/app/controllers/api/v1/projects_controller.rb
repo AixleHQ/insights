@@ -25,7 +25,12 @@ module Api
           projects,
           ProjectSerializer,
           serializer_params: ->(paginated) {
-            { project_aggregate_stats: ProjectToolEventAggregates.for_project_ids(paginated.map(&:id)) }
+            {
+              project_aggregate_stats: ProjectToolEventAggregates.for_project_ids(
+                paginated.map(&:id),
+                **aggregate_scope_for_projects(paginated)
+              )
+            }
           }
         )
       end
@@ -33,7 +38,10 @@ module Api
       # GET /api/v1/projects/:id
       def show
         authorize! @project
-        stats = ProjectToolEventAggregates.for_project_ids([ @project.id ])
+        stats = ProjectToolEventAggregates.for_project_ids(
+          [ @project.id ],
+          **aggregate_scope_for_project(@project)
+        )
         render_resource(@project, ProjectFullSerializer, serializer_params: { project_aggregate_stats: stats })
       end
 
@@ -61,7 +69,10 @@ module Api
           log_project_created!
         end
 
-        stats = ProjectToolEventAggregates.for_project_ids([ @project.id ])
+        stats = ProjectToolEventAggregates.for_project_ids(
+          [ @project.id ],
+          **aggregate_scope_for_project(@project)
+        )
         render_created(@project, ProjectSerializer, serializer_params: { project_aggregate_stats: stats })
       rescue ActiveRecord::RecordInvalid => e
         render json: {
@@ -75,7 +86,10 @@ module Api
         authorize! @project
 
         if @project.update(project_update_params)
-          stats = ProjectToolEventAggregates.for_project_ids([ @project.id ])
+          stats = ProjectToolEventAggregates.for_project_ids(
+            [ @project.id ],
+            **aggregate_scope_for_project(@project)
+          )
           render_resource(@project, ProjectSerializer, serializer_params: { project_aggregate_stats: stats })
         else
           render json: {
@@ -400,8 +414,56 @@ module Api
 
       private
 
+      # Action-scoped eager loading. Most actions don't need any associations preloaded
+      # (favorite/unfavorite/destroy/sync_issues only touch the project row itself), so
+      # the default is a bare find. Actions that read multiple settings or render the
+      # full project payload opt in via PROJECT_INCLUDES_BY_ACTION.
+      PROJECT_INCLUDES_BY_ACTION = {
+        "show" => [ :retention_policy ],
+        "settings" => [ :project_settings ],
+        "update_setting" => [ :project_settings ],
+        "destroy_setting" => [ :project_settings ],
+        "link_jira" => [ :project_settings ],
+        "link_linear" => [ :project_settings ],
+        "sync_issues" => [ :project_settings ],
+        "retention_policy" => [ :retention_policy ],
+        "update_retention_policy" => [ :retention_policy ]
+      }.freeze
+
       def set_project
-        @project = Project.includes(:retention_policy, :project_settings, :issues).find(params[:id])
+        includes = PROJECT_INCLUDES_BY_ACTION[action_name] || []
+        scope = includes.any? ? Project.includes(*includes) : Project
+        @project = scope.find(params[:id])
+      end
+
+      # Defense-in-depth scoping kwargs for ProjectToolEventAggregates.
+      # Org projects → match events by organization_id.
+      # Personal projects → match events by user_id (the owner).
+      def aggregate_scope_for_project(project)
+        if project.organization_id.present?
+          { organization_id: project.organization_id }
+        else
+          { user_id: project.owner_id }
+        end
+      end
+
+      # List-endpoint variant — derive kwargs for a (possibly mixed) project collection.
+      # Each kwarg is added independently and the query builder ORs them together.
+      def aggregate_scope_for_projects(projects)
+        org_ids = projects.filter_map(&:organization_id).uniq
+        has_personal_project = projects.any? { |p| p.organization_id.blank? }
+
+        kwargs = {}
+        kwargs[:organization_id] = single_org_scope(org_ids) if org_ids.any?
+        kwargs[:user_id] = current_user.id if has_personal_project
+        kwargs.compact
+      end
+
+      # Prefer the projects' actual org when unambiguous; fall back to the request's
+      # current_organization for the rare multi-org list (should not happen for the
+      # /organizations/:id/projects route, which is already org-filtered).
+      def single_org_scope(org_ids)
+        org_ids.one? ? org_ids.first : current_organization&.id
       end
 
       def log_project_created!
