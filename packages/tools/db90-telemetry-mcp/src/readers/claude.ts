@@ -132,6 +132,7 @@ function extractContentText(content: unknown): string[] {
 }
 
 function hasTextContent(content: unknown): boolean {
+  if (typeof content === "string") return content.trim().length > 0;
   if (!Array.isArray(content)) return false;
   return content.some((block) => {
     if (typeof block !== "object" || block === null) return false;
