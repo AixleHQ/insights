@@ -206,6 +206,18 @@ RSpec.describe 'Api::V1::UserToolAccounts', type: :request do
       expect(OrganizationAuditLog.last.action).to eq('tool_account.update')
     end
 
+    it 'succeeds silently when connection_state is already at the requested value' do
+      tool_account.activate_connection! if tool_account.may_activate_connection?
+
+      authenticated_patch "/api/v1/organizations/#{organization.id}/tool_accounts/#{tool_account.id}",
+                          user: user,
+                          organization: organization,
+                          params: { connection_state: 'active' }
+
+      expect_success
+      expect(json_data[:connectionState]).to eq('active')
+    end
+
     it 'does not allow another user to update the account' do
       authenticated_patch "/api/v1/organizations/#{organization.id}/tool_accounts/#{tool_account.id}",
                           user: other_user,

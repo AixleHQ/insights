@@ -39,6 +39,7 @@ class Api::V1::UserToolUpdateForm
 
     account.assign_attributes(attributes_without_connection_state)
     apply_connection_state_transition!
+    return false if errors.any?
 
     return true if account.save
 
@@ -73,12 +74,21 @@ class Api::V1::UserToolUpdateForm
 
   def apply_connection_state_transition!
     return if connection_state.nil?
+    return if account.connection_state == connection_state
 
     case connection_state
     when "active"
-      account.activate_connection if account.may_activate_connection?
+      if account.may_activate_connection?
+        account.activate_connection
+      else
+        errors.add(:connection_state, "cannot transition from #{account.connection_state} to active")
+      end
     when "inactive"
-      account.deactivate_connection if account.may_deactivate_connection?
+      if account.may_deactivate_connection?
+        account.deactivate_connection
+      else
+        errors.add(:connection_state, "cannot transition from #{account.connection_state} to inactive")
+      end
     when "waiting_for_connection"
       account.mark_waiting_for_connection if account.may_mark_waiting_for_connection?
     end

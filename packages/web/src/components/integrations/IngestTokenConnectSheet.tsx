@@ -101,21 +101,33 @@ function ClaudeCodeSetupInstructions({ token }: { token: string }) {
   const settingsSnippet = buildClaudeCodeSettingsSnippet(token);
 
   const handleCopyInit = async () => {
-    await navigator.clipboard.writeText(initCommand);
-    setCopiedInit(true);
-    initTimerRef.current = setTimeout(() => setCopiedInit(false), 2000);
+    try {
+      await navigator.clipboard.writeText(initCommand);
+      setCopiedInit(true);
+      initTimerRef.current = setTimeout(() => setCopiedInit(false), 2000);
+    } catch {
+      // clipboard access denied — non-critical
+    }
   };
 
   const handleCopyNpx = async () => {
-    await navigator.clipboard.writeText(npxCommand);
-    setCopiedNpx(true);
-    npxTimerRef.current = setTimeout(() => setCopiedNpx(false), 2000);
+    try {
+      await navigator.clipboard.writeText(npxCommand);
+      setCopiedNpx(true);
+      npxTimerRef.current = setTimeout(() => setCopiedNpx(false), 2000);
+    } catch {
+      // clipboard access denied — non-critical
+    }
   };
 
   const handleCopySettings = async () => {
-    await navigator.clipboard.writeText(settingsSnippet);
-    setCopiedSettings(true);
-    settingsTimerRef.current = setTimeout(() => setCopiedSettings(false), 2000);
+    try {
+      await navigator.clipboard.writeText(settingsSnippet);
+      setCopiedSettings(true);
+      settingsTimerRef.current = setTimeout(() => setCopiedSettings(false), 2000);
+    } catch {
+      // clipboard access denied — non-critical
+    }
   };
 
   return (
@@ -220,15 +232,23 @@ function CursorSetupInstructions({ token }: { token: string }) {
   const npxCommand = buildDb90CursorIngestCommand(token);
 
   const handleCopyInit = async () => {
-    await navigator.clipboard.writeText(initCommand);
-    setCopiedInit(true);
-    initTimerRef.current = setTimeout(() => setCopiedInit(false), 2000);
+    try {
+      await navigator.clipboard.writeText(initCommand);
+      setCopiedInit(true);
+      initTimerRef.current = setTimeout(() => setCopiedInit(false), 2000);
+    } catch {
+      // clipboard access denied — non-critical
+    }
   };
 
   const handleCopyNpx = async () => {
-    await navigator.clipboard.writeText(npxCommand);
-    setCopiedNpx(true);
-    npxTimerRef.current = setTimeout(() => setCopiedNpx(false), 2000);
+    try {
+      await navigator.clipboard.writeText(npxCommand);
+      setCopiedNpx(true);
+      npxTimerRef.current = setTimeout(() => setCopiedNpx(false), 2000);
+    } catch {
+      // clipboard access denied — non-critical
+    }
   };
 
   return (
@@ -403,9 +423,13 @@ export function IngestTokenConnectSheet({
 
   const handleCopy = async () => {
     if (!token) return;
-    await navigator.clipboard.writeText(token);
-    setCopied(true);
-    copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(token);
+      setCopied(true);
+      copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard access denied — non-critical
+    }
   };
 
   const handleDone = () => {

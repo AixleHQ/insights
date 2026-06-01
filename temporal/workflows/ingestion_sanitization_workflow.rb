@@ -50,7 +50,12 @@ module Workflows
       policy = Temporalio::Workflow.execute_activity(
         Activities::GetPolicyActivity,
         { "organization_id" => params["event"]["organization_id"] },
-        start_to_close_timeout: 10
+        start_to_close_timeout: 10,
+        retry_policy: Temporalio::RetryPolicy.new(
+          initial_interval: 1.0,
+          backoff_coefficient: 2.0,
+          max_attempts: 5
+        )
       )
 
       # Step 3: Classify the content
@@ -61,7 +66,12 @@ module Workflows
           "raw_payload" => raw_event["raw_payload"],
           "policy" => policy
         },
-        start_to_close_timeout: 60
+        start_to_close_timeout: 60,
+        retry_policy: Temporalio::RetryPolicy.new(
+          initial_interval: 2.0,
+          backoff_coefficient: 2.0,
+          max_attempts: 5
+        )
       )
 
       # Step 4: Sanitize if needed
@@ -73,7 +83,12 @@ module Workflows
           "policy" => policy,
           "classification" => @classification_result
         },
-        start_to_close_timeout: 60
+        start_to_close_timeout: 60,
+        retry_policy: Temporalio::RetryPolicy.new(
+          initial_interval: 2.0,
+          backoff_coefficient: 2.0,
+          max_attempts: 5
+        )
       )
 
       # Step 5: Persist to database
@@ -88,7 +103,12 @@ module Workflows
           "sanitization" => @sanitization_result,
           "workflow_id" => workflow_id
         },
-        start_to_close_timeout: 30
+        start_to_close_timeout: 30,
+        retry_policy: Temporalio::RetryPolicy.new(
+          initial_interval: 1.0,
+          backoff_coefficient: 2.0,
+          max_attempts: 5
+        )
       )
 
       # Step 6: Broadcast to ActionCable (non-blocking)
@@ -100,7 +120,12 @@ module Workflows
           "tool_event_id" => persistence_result["tool_event_id"],
           "classification" => @classification_result
         },
-        start_to_close_timeout: 10
+        start_to_close_timeout: 10,
+        retry_policy: Temporalio::RetryPolicy.new(
+          initial_interval: 1.0,
+          backoff_coefficient: 2.0,
+          max_attempts: 3
+        )
       )
 
       # Step 7: Send alert if high risk
@@ -112,7 +137,12 @@ module Workflows
           "event" => params["event"],
           "tool_event_id" => persistence_result["tool_event_id"]
         },
-        start_to_close_timeout: 30
+        start_to_close_timeout: 30,
+        retry_policy: Temporalio::RetryPolicy.new(
+          initial_interval: 1.0,
+          backoff_coefficient: 2.0,
+          max_attempts: 3
+        )
       )
 
       @current_state = "completed"

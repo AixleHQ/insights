@@ -342,7 +342,6 @@ describe("ProjectConnectorsTab", () => {
 
   describe("Disconnect flow", () => {
     it("calls deleteConnector with projectId and connectorId on confirm", async () => {
-      vi.spyOn(window, "confirm").mockReturnValue(true);
       mockProjectConnectors.mockReturnValue({ data: [connectedAnthropicConnector], isLoading: false });
       const user = userEvent.setup();
       renderComponent();
@@ -350,6 +349,9 @@ describe("ProjectConnectorsTab", () => {
       // Open the actions dropdown (sr-only label: "Actions")
       await user.click(screen.getByRole("button", { name: /actions/i }));
       await user.click(screen.getByRole("menuitem", { name: /disconnect/i }));
+
+      // Confirm in the AlertDialog
+      await user.click(screen.getByRole("button", { name: /^disconnect$/i }));
 
       await waitFor(() => {
         expect(mockDeleteConnector).toHaveBeenCalledWith({
@@ -360,7 +362,6 @@ describe("ProjectConnectorsTab", () => {
     });
 
     it("does not call deleteConnector when confirm is cancelled", async () => {
-      vi.spyOn(window, "confirm").mockReturnValue(false);
       mockProjectConnectors.mockReturnValue({ data: [connectedAnthropicConnector], isLoading: false });
       const user = userEvent.setup();
       renderComponent();
@@ -368,11 +369,13 @@ describe("ProjectConnectorsTab", () => {
       await user.click(screen.getByRole("button", { name: /actions/i }));
       await user.click(screen.getByRole("menuitem", { name: /disconnect/i }));
 
+      // Cancel the AlertDialog
+      await user.click(screen.getByRole("button", { name: /cancel/i }));
+
       expect(mockDeleteConnector).not.toHaveBeenCalled();
     });
 
     it("shows inline error alert when disconnect mutation fails", async () => {
-      vi.spyOn(window, "confirm").mockReturnValue(true);
       mockDeleteConnector.mockRejectedValue(new Error("Network error"));
       mockProjectConnectors.mockReturnValue({ data: [connectedAnthropicConnector], isLoading: false });
       const user = userEvent.setup();
@@ -380,6 +383,7 @@ describe("ProjectConnectorsTab", () => {
 
       await user.click(screen.getByRole("button", { name: /actions/i }));
       await user.click(screen.getByRole("menuitem", { name: /disconnect/i }));
+      await user.click(screen.getByRole("button", { name: /^disconnect$/i }));
 
       await waitFor(() => {
         expect(screen.getByText("Failed to disconnect. Please try again.")).toBeInTheDocument();

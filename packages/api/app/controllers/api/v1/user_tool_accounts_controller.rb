@@ -110,8 +110,9 @@ module Api
       end
 
       def tool_account_params
+        # connection_state on create is always determined by the state machine per tool type
         params.permit(:tool_name, :access_token, :refresh_token, :token_expires_at,
-                      :external_user_id, :external_username, :connection_state)
+                      :external_user_id, :external_username)
       end
 
       def tool_account_update_params

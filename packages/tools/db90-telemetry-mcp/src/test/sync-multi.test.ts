@@ -60,6 +60,17 @@ vi.mock("@db90/sdk", () => ({
   enrichCommitProjectAttribution: mocks.enrichCommitProjectAttribution,
   lookupProjectByRemote: mocks.lookupProjectByRemote,
   canonicalizeGitRemote: (remote: string) => remote,
+  getGitRemoteForPath: (repoPath: string) => {
+    try {
+      const out = (execFileSync as ReturnType<typeof vi.fn>)(
+        "git", ["-C", repoPath, "remote", "get-url", "origin"],
+        { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"], timeout: 5000 }
+      ) as string;
+      return out?.trim() || null;
+    } catch {
+      return null;
+    }
+  },
 }));
 
 import {

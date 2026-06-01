@@ -1,5 +1,4 @@
 import type { TelemetryToolId, StoredCredentials } from "./auth/credentials.js";
-import { execFileSync } from "node:child_process";
 import {
   readState,
   writeState,
@@ -34,8 +33,8 @@ import { postEvent } from "./client.js";
 import { type PricingTable, getCostWarning } from "./pricing.js";
 import { acquireSyncLock } from "./lock.js";
 import {
-  canonicalizeGitRemote,
   enrichCommitProjectAttribution,
+  getGitRemoteForPath,
   lookupProjectByRemote,
   type ProjectResolution,
 } from "@db90/sdk";
@@ -235,24 +234,12 @@ async function resolveProjectIdForRepoPathCached(
   if (!normalized) return null;
   if (cache.has(normalized)) return cache.get(normalized) ?? null;
 
-  let gitRemote: string | null = null;
-  try {
-    const out = execFileSync("git", ["-C", normalized, "remote", "get-url", "origin"], {
-      encoding: "utf-8",
-      stdio: ["ignore", "pipe", "pipe"],
-      timeout: 5000,
-    }).trim();
-    gitRemote = out || null;
-  } catch {
-    if (verbose) console.log(`[verbose] Could not determine git remote for path: ${normalized}`);
-  }
-
-  if (!gitRemote) {
+  const canonicalRemote = getGitRemoteForPath(normalized, verbose);
+  if (!canonicalRemote) {
     cache.set(normalized, null);
     return null;
   }
 
-  const canonicalRemote = canonicalizeGitRemote(gitRemote, verbose);
   const result = await lookupProjectByRemote(canonicalRemote, host, token, verbose);
   const projectId = result && typeof result === "object" && "project_id" in result ? result.project_id : null;
   cache.set(normalized, projectId);
@@ -559,6 +546,8 @@ async function runCursorSlice(params: {
           }
         }
       }
+      // Replace contents in-place: scopeDir filter must update the same references
+      // used in the `groups` array built below.
       arr.length = 0;
       arr.push(...out);
     }

@@ -9,6 +9,16 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   IntegrationCard,
   IntegrationSkeleton,
   type IntegrationData,
@@ -113,6 +123,7 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
   const [testingConnectorId, setTestingConnectorId] = useState<string | null>(
     null,
   );
+  const [disconnectingConnectorId, setDisconnectingConnectorId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const integrations: IntegrationData[] = useMemo(() => {
@@ -170,16 +181,19 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
     });
   };
 
-  const handleDisconnect = async (id: string) => {
-    if (
-      window.confirm("Are you sure you want to disconnect this integration?")
-    ) {
-      setActionError(null);
-      try {
-        await deleteConnector.mutateAsync({ projectId, connectorId: id });
-      } catch {
-        setActionError("Failed to disconnect. Please try again.");
-      }
+  const handleDisconnect = (id: string) => {
+    setDisconnectingConnectorId(id);
+  };
+
+  const handleDisconnectConfirm = async () => {
+    if (!disconnectingConnectorId) return;
+    setActionError(null);
+    try {
+      await deleteConnector.mutateAsync({ projectId, connectorId: disconnectingConnectorId });
+    } catch {
+      setActionError("Failed to disconnect. Please try again.");
+    } finally {
+      setDisconnectingConnectorId(null);
     }
   };
 
@@ -283,6 +297,26 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
         onOpenChange={setSlackSheetOpen}
         onSuccess={() => setActiveTab("connected")}
       />
+
+      <AlertDialog
+        open={disconnectingConnectorId !== null}
+        onOpenChange={(open) => { if (!open) setDisconnectingConnectorId(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disconnect integration?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the integration from this project. You can reconnect it at any time.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDisconnectConfirm}>
+              Disconnect
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
