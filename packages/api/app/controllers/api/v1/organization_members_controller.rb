@@ -269,7 +269,7 @@ module Api
             id: ta.id,
             tool_name: ta.tool_name,
             external_username: ta.external_username,
-            is_active: ta.is_active
+            connection_state: ta.connection_state
           }
         end
 

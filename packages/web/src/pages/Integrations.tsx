@@ -7,15 +7,11 @@ import {
   useSyncConnector,
   useDeleteConnector,
   useTestConnector,
-  useToolAccounts,
-  useDeleteToolAccount,
-  useRegenerateIngestToken,
 } from "@/hooks/useApi";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   IntegrationCard,
   IntegrationSkeleton,
-  type IntegrationData,
   type IntegrationProvider,
   type ProviderInfo,
 } from "@/components/integrations";
@@ -23,17 +19,10 @@ import type { ConnectorStatus } from "@/lib/types";
 import type { IntegrationScope } from "@/components/integrations";
 import { ApiKeyConnectSheet } from "@/components/integrations/ApiKeyConnectSheet";
 import { OrgSlackConnectSheet } from "@/components/integrations/OrgSlackConnectSheet";
-import { IngestTokenConnectSheet } from "@/components/integrations/IngestTokenConnectSheet";
 import { OpenrouterWebhookSheet } from "@/components/integrations/OpenrouterWebhookSheet";
 
 const AI_PROVIDERS = new Set(["anthropic", "openai", "openrouter", "gemini"]);
 const SLACK_PROVIDERS = new Set(["slack"]);
-const INGEST_PROVIDERS = new Set(["cursor", "claude-code"]);
-
-const TOOL_NAME_TO_PROVIDER: Record<string, IntegrationProvider> = {
-  cursor: "cursor",
-  claude_code: "claude-code",
-};
 
 const availableProviders: ProviderInfo[] = [
   // Code Hosting / Version Control
@@ -118,20 +107,6 @@ const availableProviders: ProviderInfo[] = [
     comingSoon: true,
   },
   {
-    id: "claude-code",
-    name: "Claude Code",
-    description: "Monitor Claude Code CLI usage",
-    category: "ai",
-    scope: "persona",
-    features: [
-      "Session tracking",
-      "Code generation analytics",
-      "Token consumption",
-      "Project-level insights",
-    ],
-    available: true,
-  },
-  {
     id: "anthropic",
     name: "Anthropic API",
     description: "Track Anthropic API usage, costs, and model analytics",
@@ -157,7 +132,8 @@ const availableProviders: ProviderInfo[] = [
       "Token consumption",
       "Cost breakdown",
     ],
-    available: true,
+    available: false,
+    comingSoon: true,
   },
   {
     id: "openrouter",
@@ -185,7 +161,8 @@ const availableProviders: ProviderInfo[] = [
       "Token consumption",
       "Cost breakdown",
     ],
-    available: true,
+    available: false,
+    comingSoon: true,
   },
   {
     id: "github_copilot",
@@ -201,21 +178,6 @@ const availableProviders: ProviderInfo[] = [
     ],
     available: true,
   },
-  {
-    id: "cursor",
-    name: "Cursor",
-    description: "Monitor Cursor IDE AI usage",
-    category: "ai",
-    scope: "persona",
-    features: [
-      "AI completions tracking",
-      "Chat usage analytics",
-      "Token consumption",
-      "Session insights",
-    ],
-    available: true,
-  },
-
   // Design
   {
     id: "figma",
@@ -263,9 +225,8 @@ export function Integrations() {
   const { data: connectorsData, isLoading: connectorsLoading } = useConnectors(
     currentOrg?.id || "",
   );
-  const { data: toolAccountsData, isLoading: toolAccountsLoading } = useToolAccounts(currentOrg?.id || "");
   const { data: healthData } = useConnectorHealth(currentOrg?.id || "", { enabled: isOwner });
-  const isLoading = connectorsLoading || toolAccountsLoading;
+  const isLoading = connectorsLoading;
 
   const healthStatsById = useMemo(() => {
     const map = new Map(
@@ -275,9 +236,7 @@ export function Integrations() {
   }, [healthData]);
   const syncConnector = useSyncConnector();
   const deleteConnector = useDeleteConnector();
-  const deleteToolAccount = useDeleteToolAccount();
   const testConnector = useTestConnector();
-  const regenerateIngestToken = useRegenerateIngestToken();
 
   const activeTab = status === "available" ? "available" : "connected";
   const [scopeFilter, setScopeFilter] = useState<IntegrationScope | "all">("all");
@@ -285,10 +244,6 @@ export function Integrations() {
   const [connectingProvider, setConnectingProvider] =
     useState<ProviderInfo | null>(null);
   const [slackSheetOpen, setSlackSheetOpen] = useState(false);
-  const [ingestSheetOpen, setIngestSheetOpen] = useState(false);
-  const [ingestProvider, setIngestProvider] = useState<ProviderInfo | null>(null);
-  const [regeneratedToken, setRegeneratedToken] = useState<string | null>(null);
-  const [regenerateError, setRegenerateError] = useState<string | null>(null);
   const [testingConnectorId, setTestingConnectorId] = useState<string | null>(null);
   const [webhookSheetOpen, setWebhookSheetOpen] = useState(false);
   const [webhookSheetData, setWebhookSheetData] = useState<{
@@ -301,8 +256,8 @@ export function Integrations() {
   const handleConnectSuccess = () => navigate("/integrations/connected");
 
   // Transform API response to component format
-  const { integrations, ingestAccountIds } = useMemo(() => {
-    const connectorIntegrations: IntegrationData[] = (connectorsData ?? []).map((c) => {
+  const integrations = useMemo(() => {
+    return (connectorsData ?? []).map((c) => {
       const connectorType = c.connectorType || c.connector_type || "github";
       const lastError = c.lastError || c.last_error;
       const externalAccountName =
@@ -335,34 +290,10 @@ export function Integrations() {
         scope: c.scope as IntegrationScope,
       };
     });
-
-    const ingestIds = new Set<string>();
-    const ingestIntegrations: IntegrationData[] = (toolAccountsData ?? [])
-      .filter((a) => TOOL_NAME_TO_PROVIDER[a.toolName])
-      .map((a) => {
-        ingestIds.add(a.id);
-        const provider = TOOL_NAME_TO_PROVIDER[a.toolName];
-        const providerInfo = availableProviders.find((p) => p.id === provider);
-        return {
-          id: a.id,
-          provider,
-          name: providerInfo?.name ?? a.toolName,
-          status: (a.isActive ? "connected" : "disconnected") as ConnectorStatus,
-          scope: "persona" as IntegrationScope,
-        };
-      });
-
-    return {
-      integrations: [...connectorIntegrations, ...ingestIntegrations],
-      ingestAccountIds: ingestIds,
-    };
-  }, [connectorsData, toolAccountsData]);
+  }, [connectorsData]);
 
   const handleConnect = (providerId: string) => {
-    if (INGEST_PROVIDERS.has(providerId)) {
-      setIngestProvider(availableProviders.find((p) => p.id === providerId) ?? null);
-      setIngestSheetOpen(true);
-    } else if (AI_PROVIDERS.has(providerId)) {
+    if (AI_PROVIDERS.has(providerId)) {
       const provider = availableProviders.find((p) => p.id === providerId) ?? null;
       setConnectingProvider(provider);
       setSheetOpen(true);
@@ -391,11 +322,7 @@ export function Integrations() {
       window.confirm("Are you sure you want to disconnect this integration?")
     ) {
       try {
-        if (ingestAccountIds.has(id)) {
-          await deleteToolAccount.mutateAsync({ orgId: currentOrg.id, accountId: id });
-        } else {
-          await deleteConnector.mutateAsync({ orgId: currentOrg.id, connectorId: id });
-        }
+        await deleteConnector.mutateAsync({ orgId: currentOrg.id, connectorId: id });
       } catch (error) {
         console.error("Failed to disconnect integration:", error);
       }
@@ -414,25 +341,6 @@ export function Integrations() {
       console.error("Failed to test connector:", error);
     } finally {
       setTestingConnectorId(null);
-    }
-  };
-
-  const handleRegenerateToken = async (id: string) => {
-    if (!currentOrg) return;
-    setRegenerateError(null);
-    try {
-      const result = await regenerateIngestToken.mutateAsync({ orgId: currentOrg.id, accountId: id });
-      const newToken = result.data.ingestToken ?? null;
-      const integration = integrations.find((i) => i.id === id);
-      const provider = integration
-        ? availableProviders.find((p) => p.id === integration.provider) ?? null
-        : null;
-      setRegeneratedToken(newToken);
-      setIngestProvider(provider);
-      setIngestSheetOpen(true);
-    } catch (error) {
-      console.error("Failed to regenerate token:", error);
-      setRegenerateError(error instanceof Error ? error.message : "Failed to regenerate token. Please try again.");
     }
   };
 
@@ -508,9 +416,6 @@ export function Integrations() {
         </TabsList>
 
         <TabsContent value="connected" className="space-y-4">
-          {regenerateError && (
-            <p className="text-sm text-destructive">{regenerateError}</p>
-          )}
           {isOwner && healthData?.summary && healthData.summary.total > 0 && (
             <div className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
               <span className="text-muted-foreground">Connector health:</span>
@@ -585,12 +490,9 @@ export function Integrations() {
                   key={integration.id}
                   integration={integration}
                   healthStats={healthStatsById.get(integration.id) ?? null}
-                  onSync={ingestAccountIds.has(integration.id) ||
-                    integration.provider === "slack" ? undefined : handleSync
-                  }
-                  onTest={ingestAccountIds.has(integration.id) ? undefined : handleTest}
+                  onSync={integration.provider === "slack" ? undefined : handleSync}
+                  onTest={handleTest}
                   onDisconnect={handleDisconnect}
-                  onRegenerateToken={ingestAccountIds.has(integration.id) ? handleRegenerateToken : undefined}
                   onSetupWebhook={integration.provider === "openrouter" ? handleSetupWebhook : undefined}
                   isTesting={testingConnectorId === integration.id}
                 />
@@ -633,17 +535,6 @@ export function Integrations() {
         open={slackSheetOpen}
         onOpenChange={setSlackSheetOpen}
         onSuccess={handleConnectSuccess}
-      />
-
-      <IngestTokenConnectSheet
-        provider={ingestProvider}
-        open={ingestSheetOpen}
-        onOpenChange={(open) => {
-          setIngestSheetOpen(open);
-          if (!open) setRegeneratedToken(null);
-        }}
-        onSuccess={handleConnectSuccess}
-        initialToken={regeneratedToken ?? undefined}
       />
 
       {webhookSheetData && (

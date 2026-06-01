@@ -3,7 +3,7 @@
 # Metadata for the authenticated user's ingest tool accounts in the current org.
 # Never includes token material — only fields needed by Settings.
 class MeToolAccountMetadataSerializer < BaseSerializer
-  attributes :id, :tool_name, :is_active
+  attributes :id, :tool_name, :connection_state
   timestamps
 
   attribute :last_used_at do |account|

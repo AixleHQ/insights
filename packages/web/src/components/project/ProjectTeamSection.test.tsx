@@ -113,6 +113,21 @@ describe("ProjectTeamSection", () => {
       expect(links[0]).toHaveAttribute("href", "/members/user-1");
       expect(links[1]).toHaveAttribute("href", "/members/user-2");
     });
+
+    it("displays project-scoped usage totals on each member row", () => {
+      const members: ProjectMember[] = [
+        {
+          ...mockMembers[0],
+          totalEvents: 1200,
+          totalCost: 3.45,
+          lastActiveAt: "2026-01-01T12:00:00Z",
+        },
+        mockMembers[1],
+      ];
+      renderComponent({ members, projectId: "proj-1" });
+      expect(screen.getByText(/1,200 events/)).toBeInTheDocument();
+      expect(screen.getByText("$3.45")).toBeInTheDocument();
+    });
   });
 
   describe("Avatar Display", () => {

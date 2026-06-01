@@ -113,6 +113,21 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       expect(json_data[:lastEventAt]).to be_nil
     end
 
+    it 'scopes lifetime aggregates to this project only' do
+      other = create(:project, organization: organization, owner: nil)
+      t_here = Time.zone.parse('2026-02-02T09:00:00Z')
+      t_elsewhere = Time.zone.parse('2026-02-05T12:00:00Z')
+      create(:tool_event, organization: organization, project: project, occurred_at: t_here, cost_usd: 0.1)
+      create(:tool_event, organization: organization, project: other, occurred_at: t_elsewhere, cost_usd: 9.0)
+
+      authenticated_get "/api/v1/projects/#{project.id}", user: user
+
+      expect_success
+      expect(json_data[:eventCount]).to eq(1)
+      expect(json_data[:totalCostUsd]).to eq(0.1)
+      expect(json_data[:lastEventAt]).to eq(t_here.iso8601)
+    end
+
     it 'includes source control summary for linked gitlab repositories' do
       connector = create(:organization_connector, organization: organization, connector_type: 'gitlab')
       repository = create(:repository, organization_connector: connector, project: project)

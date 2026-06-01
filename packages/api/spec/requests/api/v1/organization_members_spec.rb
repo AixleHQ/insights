@@ -105,7 +105,7 @@ RSpec.describe 'Api::V1::OrganizationMembers', type: :request do
     end
 
     it 'includes cli_connected true when member has an active user_tool_account' do
-      create(:user_tool_account, organization_membership: member_membership, is_active: true)
+      create(:user_tool_account, organization_membership: member_membership, connection_state: 'active')
 
       authenticated_get "/api/v1/organizations/#{organization.id}/members",
                         user: member,
@@ -117,7 +117,7 @@ RSpec.describe 'Api::V1::OrganizationMembers', type: :request do
     end
 
     it 'includes cli_connected false when member has no active user_tool_account' do
-      create(:user_tool_account, organization_membership: member_membership, is_active: false)
+      create(:user_tool_account, organization_membership: member_membership, connection_state: 'inactive')
 
       authenticated_get "/api/v1/organizations/#{organization.id}/members",
                         user: member,

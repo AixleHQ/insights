@@ -117,6 +117,7 @@ async function executeSync(parsed: { tools?: TelemetryToolId[] }): Promise<unkno
     projectLookupToken: pickProjectLookupToken(creds),
     pricing: defaultPricing(),
     tools: parsed.tools,
+    scopeDir: process.cwd(),
   });
   return { ok: syncResultOk(result), result };
 }
@@ -250,6 +251,7 @@ export async function startServer(): Promise<void> {
         projectIdSource: projectResolution.source,
         projectLookupToken: pickProjectLookupToken(creds),
         pricing: defaultPricing(),
+        scopeDir: process.cwd(),
       });
     } catch (err) {
       mcpLog.error(

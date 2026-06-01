@@ -378,6 +378,7 @@ export async function runOnce(deps?: Partial<RunOnceDeps>): Promise<number> {
     projectLookupToken: lookupToken,
     pricing: runtime.pricing,
     appDir: appDirRuntime,
+    scopeDir: process.cwd(),
   });
   if (result.locked || result.failed > 0) {
     runtime.error(`Sync finished with failures: sent=${result.sent} failed=${result.failed} skipped=${result.skipped}`);

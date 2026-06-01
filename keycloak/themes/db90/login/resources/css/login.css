@@ -524,7 +524,15 @@ a:hover {
   text-decoration: underline;
 }
 
-/* login.ftl uses inline styles only; do not hide .card-pf on stock Keycloak pages. */
+/* Hide default Keycloak elements only on the custom DB90 login screen. */
+body.db90-custom-login .login-pf-page .card-pf,
+body.db90-custom-login .login-pf-page #kc-header,
+body.db90-custom-login .login-pf-page #kc-header-wrapper,
+body.db90-custom-login #kc-info-wrapper,
+body.db90-custom-login #kc-form-options,
+body.db90-custom-login #kc-registration {
+  display: none !important;
+}
 
 /* Keycloak body class overrides */
 body.kcBodyClass {

@@ -75,6 +75,19 @@ RSpec.describe 'Api::V1::Ingest', type: :request do
       end
     end
 
+    context 'with a pending ingest setup token' do
+      before do
+        tool_account.update!(connection_state: 'waiting_for_connection')
+      end
+
+      it 'accepts the first event and activates the account' do
+        ingest_post
+
+        expect(response).to have_http_status(:accepted)
+        expect(tool_account.reload.connection_state).to eq('active')
+      end
+    end
+
     context 'with a raw Claude Code PostToolUse hook payload' do
       let(:claude_code_post_tool_use_payload) do
         {
@@ -186,8 +199,15 @@ RSpec.describe 'Api::V1::Ingest', type: :request do
         expect(response).to have_http_status(:unauthorized)
       end
 
-      it 'returns 401 when account is inactive' do
-        tool_account.update!(is_active: false)
+      it 'returns 401 when account is inactive after it has already been used' do
+        create(
+          :tool_event,
+          organization: organization,
+          user: user,
+          tool_name: tool_account.tool_name,
+          event_type: 'completion'
+        )
+        tool_account.update!(connection_state: 'inactive')
         ingest_post
         expect(response).to have_http_status(:unauthorized)
       end
@@ -219,6 +239,24 @@ RSpec.describe 'Api::V1::Ingest', type: :request do
       it 'still returns 202 via fallback direct insert' do
         ingest_post
         expect(response).to have_http_status(:accepted)
+      end
+    end
+
+    context 'when raw event storage fails before Temporal starts' do
+      before do
+        allow(RawEventStore).to receive(:store).and_raise(StandardError, 'S3 unavailable')
+      end
+
+      it 'falls back directly without starting the workflow' do
+        expect {
+          ingest_post
+        }.to change(ToolEvent, :count).by(1)
+
+        expect(response).to have_http_status(:accepted)
+        expect(json_data[:fallback]).to be true
+        expect(json_data[:workflowId]).to be_nil
+        expect(json_data[:rawEventKey]).to be_nil
+        expect(Temporal::Client).not_to have_received(:start_workflow)
       end
     end
 

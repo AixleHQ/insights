@@ -18,6 +18,16 @@ vi.mock("@/hooks/useApi", () => ({
   useOrganizationMembers: vi.fn(),
 }));
 
+const mockNavigate = vi.fn();
+
+vi.mock("react-router-dom", async () => {
+  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  };
+});
+
 const mockRemoveMutate = vi.fn();
 const mockAddMutate = vi.fn();
 
@@ -189,6 +199,23 @@ describe("ProjectMembersTab", () => {
       );
 
       expect(screen.queryByText("Add Member")).not.toBeInTheDocument();
+    });
+
+    it("keeps projectId in member profile navigation", async () => {
+      const user = userEvent.setup();
+
+      render(
+        <ProjectMembersTab
+          projectId="proj-1"
+          orgId="org-1"
+          isProjectOwner={true}
+          canManageMembers={false}
+        />
+      );
+
+      await user.click(screen.getByText("Alice Johnson"));
+
+      expect(mockNavigate).toHaveBeenCalledWith("/members/user-1?projectId=proj-1");
     });
   });
 

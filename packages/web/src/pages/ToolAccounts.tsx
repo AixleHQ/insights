@@ -10,7 +10,14 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { useOrg } from "@/contexts/OrgContext";
-import { useToolAccounts, useDeleteToolAccount, useCreateToolAccount, useUpdateToolAccount, useUserOrganizations } from "@/hooks/useApi";
+import {
+  useToolAccounts,
+  useDeleteToolAccount,
+  useCreateToolAccount,
+  useUpdateToolAccount,
+  useUserOrganizations,
+  useRegenerateIngestToken,
+} from "@/hooks/useApi";
 import type { ToolAccount } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -49,8 +56,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProviderLogo } from "@/components/icons";
+import { IngestTokenConnectSheet } from "@/components/integrations";
+import type { ProviderInfo } from "@/components/integrations";
 
-type ToolCategory = "ai-editors" | "ai-apis" | "other";
+type ToolCategory = "ai-editors";
 
 interface ToolProvider {
   id: string;
@@ -76,101 +85,48 @@ const toolProviders: ToolProvider[] = [
     category: "ai-editors",
     tokenLabel: "API Key",
   },
-  {
-    id: "windsurf",
-    name: "Windsurf",
-    description: "Link your Windsurf account for AI-assisted coding attribution",
-    category: "ai-editors",
-    tokenLabel: "API Key",
-  },
-  {
-    id: "github_copilot",
-    name: "GitHub Copilot",
-    description: "Link your GitHub account to attribute Copilot events",
-    category: "ai-editors",
-    tokenLabel: "Personal Access Token",
-  },
-  {
-    id: "aider",
-    name: "Aider",
-    description: "Link your Aider account for AI pair programming attribution",
-    category: "ai-editors",
-    tokenLabel: "API Key",
-  },
-  {
-    id: "continue",
-    name: "Continue",
-    description: "Link your Continue account for open-source AI code assistant attribution",
-    category: "ai-editors",
-    tokenLabel: "API Key",
-  },
-  {
-    id: "cody",
-    name: "Cody",
-    description: "Link your Sourcegraph Cody account for AI coding attribution",
-    category: "ai-editors",
-    tokenLabel: "API Key",
-  },
-  {
-    id: "tabnine",
-    name: "Tabnine",
-    description: "Link your Tabnine account for AI code completion attribution",
-    category: "ai-editors",
-    tokenLabel: "API Key",
-  },
-  {
-    id: "amazon_q",
-    name: "Amazon Q",
-    description: "Link your Amazon Q account for AI developer tool attribution",
-    category: "ai-editors",
-    tokenLabel: "API Key",
-  },
-  // AI APIs
-  {
-    id: "openrouter_api",
-    name: "OpenRouter",
-    description: "Link your OpenRouter account for multi-model AI gateway tracking",
-    category: "ai-apis",
-    tokenLabel: "API Key",
-  },
-  {
-    id: "anthropic_api",
-    name: "Anthropic API",
-    description: "Link your Anthropic API account for direct API usage tracking",
-    category: "ai-apis",
-    tokenLabel: "API Key",
-  },
-  {
-    id: "openai_api",
-    name: "OpenAI API",
-    description: "Link your OpenAI account for ChatGPT / Codex tracking",
-    category: "ai-apis",
-    tokenLabel: "API Key",
-  },
-  {
-    id: "gemini_api",
-    name: "Gemini API",
-    description: "Link your Google account for Gemini API usage tracking",
-    category: "ai-apis",
-    tokenLabel: "API Key",
-  },
-  // Other
-  {
-    id: "custom",
-    name: "Custom Tool",
-    description: "Link a custom or internal AI tool for usage attribution",
-    category: "other",
-    tokenLabel: "API Key",
-  },
 ];
 
 const categoryLabels: Record<ToolCategory, string> = {
   "ai-editors": "AI Code Editors",
-  "ai-apis": "AI APIs",
-  "other": "Other",
 };
 
-const categoryOrder: ToolCategory[] = ["ai-editors", "ai-apis", "other"];
+const categoryOrder: ToolCategory[] = ["ai-editors"];
+const INGEST_PROVIDER_IDS = new Set(["claude_code", "cursor"]);
+const INGEST_PROVIDER_INFO: Record<string, ProviderInfo> = {
+  claude_code: {
+    id: "claude-code",
+    name: "Claude Code",
+    description: "Monitor Claude Code CLI usage",
+    category: "ai",
+    scope: "persona",
+    features: [
+      "Session tracking",
+      "Code generation analytics",
+      "Token consumption",
+      "Project-level insights",
+    ],
+    available: true,
+  },
+  cursor: {
+    id: "cursor",
+    name: "Cursor",
+    description: "Monitor Cursor IDE AI usage",
+    category: "ai",
+    scope: "persona",
+    features: [
+      "AI completions tracking",
+      "Chat usage analytics",
+      "Token consumption",
+      "Session insights",
+    ],
+    available: true,
+  },
+};
+
+function ingestProviderInfo(providerId: string): ProviderInfo | null {
+  return INGEST_PROVIDER_INFO[providerId] ?? null;
+}
 
 function AccountSkeleton() {
   return (
@@ -376,14 +332,19 @@ function ToolCard({
   linkedAccount?: ToolAccount;
   onConnect: (provider: ToolProvider) => void;
   onDisconnect: (accountId: string) => void;
-  onToggleActive?: (accountId: string, newValue: boolean) => void;
+  onToggleActive?: (accountId: string, newValue: "inactive" | "active") => void;
   onReconnect?: (accountId: string) => void;
   isToggling?: boolean;
 }) {
   const isLinked = !!linkedAccount;
+  const connectionState = linkedAccount?.connectionState;
+  const requiresSetup = connectionState === "waiting_for_connection";
+  const isActive = connectionState === "active";
+  const isInactive = connectionState === "inactive";
+  const statusLabel = requiresSetup ? "Setup required" : isActive ? "Connected" : "Disabled";
 
   return (
-    <Card className={cn(isLinked && !linkedAccount.isActive && "opacity-60")}>
+    <Card className={cn(isLinked && isInactive && "opacity-60")}>
       <CardContent className="flex flex-col gap-4 p-4">
         <div className="flex items-start gap-3">
           <ProviderLogo provider={provider.id} showBackground size="md" className="shrink-0" />
@@ -393,10 +354,16 @@ function ToolCard({
               {isLinked && (
                 <Badge
                   variant="outline"
-                  className={linkedAccount.isActive ? "text-success" : "text-muted-foreground"}
+                  className={
+                    isActive
+                      ? "text-success"
+                      : requiresSetup
+                        ? "text-warning"
+                        : "text-muted-foreground"
+                  }
                 >
                   <Check className="mr-1 size-3" />
-                  {linkedAccount.isActive ? "Connected" : "Disabled"}
+                  {statusLabel}
                 </Badge>
               )}
               {isLinked && linkedAccount.tokenExpired && (
@@ -415,6 +382,11 @@ function ToolCard({
                   }`
                 : provider.description}
             </p>
+            {isLinked && requiresSetup && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                This tool will become active after it sends its first event to DB90.
+              </p>
+            )}
           </div>
         </div>
 
@@ -431,14 +403,16 @@ function ToolCard({
                   Reconnect
                 </Button>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onToggleActive?.(linkedAccount.id, !linkedAccount.isActive)}
-                disabled={isToggling}
-              >
-                {linkedAccount.isActive ? "Disable" : "Enable"}
-              </Button>
+              {!requiresSetup && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onToggleActive?.(linkedAccount.id, isActive ? "inactive" : "active")}
+                  disabled={isToggling}
+                >
+                  {isActive ? "Disable" : "Enable"}
+                </Button>
+              )}
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="ghost" size="icon">
@@ -484,11 +458,14 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
   const selectedOrgId = userSelectedOrgId ?? currentOrg?.id ?? "";
   const [connectingProvider, setConnectingProvider] = useState<ToolProvider | null>(null);
   const [reconnectingAccountId, setReconnectingAccountId] = useState<string | null>(null);
+  const [ingestProvider, setIngestProvider] = useState<ProviderInfo | null>(null);
+  const [ingestInitialToken, setIngestInitialToken] = useState<string | null>(null);
 
   const { data: accounts, isLoading } = useToolAccounts(selectedOrgId);
   const createAccount = useCreateToolAccount();
   const deleteAccount = useDeleteToolAccount();
   const updateAccount = useUpdateToolAccount();
+  const regenerateIngestToken = useRegenerateIngestToken();
 
   const { linkedProviders, connectedProviders, availableProviders } = useMemo(() => {
     const linkedMap = new Map<string, ToolAccount>();
@@ -505,8 +482,6 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
   const providersByCategory = useMemo(() => {
     const grouped: Record<ToolCategory, ToolProvider[]> = {
       "ai-editors": [],
-      "ai-apis": [],
-      "other": [],
     };
     availableProviders.forEach((p) => {
       grouped[p.category].push(p);
@@ -534,10 +509,13 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
     }
   };
 
-  const handleToggleActive = async (accountId: string, isActive: boolean) => {
+  const handleToggleActive = async (
+    accountId: string,
+    connectionState: "inactive" | "active"
+  ) => {
     if (!selectedOrgId) return;
     try {
-      await updateAccount.mutateAsync({ orgId: selectedOrgId, accountId, isActive });
+      await updateAccount.mutateAsync({ orgId: selectedOrgId, accountId, connectionState });
     } catch (error) {
       console.error("Failed to update account status:", error);
     }
@@ -548,9 +526,39 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
     ? toolProviders.find((p) => p.id === reconnectingAccount.toolName) ?? null
     : null;
 
+  const openIngestSheet = (providerId: string, initialToken?: string | null) => {
+    setIngestProvider(ingestProviderInfo(providerId));
+    setIngestInitialToken(initialToken ?? null);
+  };
+
+  const handleConnect = (provider: ToolProvider) => {
+    if (INGEST_PROVIDER_IDS.has(provider.id)) {
+      openIngestSheet(provider.id);
+      return;
+    }
+    setConnectingProvider(provider);
+  };
+
   const handleReconnect = async (accessToken: string) => {
     if (!selectedOrgId || !reconnectingAccountId) return;
     await updateAccount.mutateAsync({ orgId: selectedOrgId, accountId: reconnectingAccountId, accessToken });
+  };
+
+  const handleReconnectClick = async (accountId: string) => {
+    const account = accounts?.find((item) => item.id === accountId);
+    if (!selectedOrgId || !account) return;
+
+    if (!INGEST_PROVIDER_IDS.has(account.toolName)) {
+      setReconnectingAccountId(accountId);
+      return;
+    }
+
+    try {
+      const result = await regenerateIngestToken.mutateAsync({ orgId: selectedOrgId, accountId });
+      openIngestSheet(account.toolName, result.data.ingestToken ?? null);
+    } catch (error) {
+      console.error("Failed to regenerate ingest token:", error);
+    }
   };
 
   return (
@@ -621,10 +629,10 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
                     key={provider.id}
                     provider={provider}
                     linkedAccount={linkedProviders.get(provider.id)}
-                    onConnect={setConnectingProvider}
+                    onConnect={handleConnect}
                     onDisconnect={handleDisconnect}
                     onToggleActive={handleToggleActive}
-                    onReconnect={setReconnectingAccountId}
+                    onReconnect={handleReconnectClick}
                     isToggling={updateAccount.isPending && updateAccount.variables?.accountId === linkedProviders.get(provider.id)?.id && !updateAccount.variables?.accessToken}
                   />
                 ))}
@@ -649,7 +657,7 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
                         <ToolCard
                           key={provider.id}
                           provider={provider}
-                          onConnect={setConnectingProvider}
+                          onConnect={handleConnect}
                           onDisconnect={handleDisconnect}
                         />
                       ))}
@@ -690,6 +698,22 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
         onOpenChange={(open) => !open && setReconnectingAccountId(null)}
         onSubmit={handleReconnect}
         isSubmitting={updateAccount.isPending && updateAccount.variables?.accountId === reconnectingAccountId}
+      />
+
+      <IngestTokenConnectSheet
+        provider={ingestProvider}
+        open={!!ingestProvider}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIngestProvider(null);
+            setIngestInitialToken(null);
+          }
+        }}
+        onSuccess={() => {
+          setIngestProvider(null);
+          setIngestInitialToken(null);
+        }}
+        initialToken={ingestInitialToken ?? undefined}
       />
     </div>
   );

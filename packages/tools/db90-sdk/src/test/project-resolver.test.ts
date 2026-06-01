@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   resolveProjectId,
+  resolveProjectIdForRepoPath,
   getGitRemote,
+  getGitRemoteForPath,
+  canonicalizeGitRemote,
   lookupProjectByRemote,
   lookupProjectByRepoName,
   repoNameToGitRemoteCandidates,
@@ -115,6 +118,25 @@ describe("resolveProjectId", () => {
     expect(result.projectId).toBeNull();
     expect(result.source).toBe("none");
   });
+
+  it("resolves project from an explicit repo path", async () => {
+    mockExecFileSync.mockReturnValue("git@github.com:org/repo.git\n" as unknown as Buffer);
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ data: { project_id: "path-uuid", name: "Path Repo" } }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const result = await resolveProjectIdForRepoPath("/repos/right-project", host, token, false);
+    expect(result.projectId).toBe("path-uuid");
+    expect(result.source).toBe("auto-detect");
+    expect(mockExecFileSync).toHaveBeenCalledWith(
+      "git",
+      ["-C", "/repos/right-project", "remote", "get-url", "origin"],
+      expect.any(Object)
+    );
+  });
 });
 
 describe("getGitRemote", () => {
@@ -137,6 +159,57 @@ describe("getGitRemote", () => {
   it("returns null when output is empty string", () => {
     mockExecFileSync.mockReturnValue("" as unknown as Buffer);
     expect(getGitRemote(false)).toBeNull();
+  });
+
+  it("returns trimmed remote URL for an explicit repo path", () => {
+    mockExecFileSync.mockReturnValue("git@github.com:org/repo.git\n" as unknown as Buffer);
+    expect(getGitRemoteForPath("/repos/right-project", false)).toBe("git@github.com:org/repo.git");
+  });
+});
+
+describe("canonicalizeGitRemote", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it("rewrites an SCP-style SSH host alias to its resolved hostname", () => {
+    mockExecFileSync.mockReturnValue(
+      "user git\nhostname github.com\nport 22\n" as unknown as Buffer
+    );
+    expect(canonicalizeGitRemote("git@github-work:org/repo.git", false)).toBe(
+      "git@github.com:org/repo.git"
+    );
+    expect(mockExecFileSync).toHaveBeenCalledWith("ssh", ["-G", "github-work"], expect.anything());
+  });
+
+  it("rewrites an ssh:// URL host alias to its resolved hostname", () => {
+    mockExecFileSync.mockReturnValue("hostname gitlab.com\n" as unknown as Buffer);
+    expect(canonicalizeGitRemote("ssh://git@gl-work:8022/group/proj.git", false)).toBe(
+      "ssh://git@gitlab.com/group/proj.git"
+    );
+  });
+
+  it("leaves the remote unchanged when the host resolves to itself", () => {
+    mockExecFileSync.mockReturnValue("hostname github.com\n" as unknown as Buffer);
+    expect(canonicalizeGitRemote("git@github.com:org/repo.git", false)).toBe(
+      "git@github.com:org/repo.git"
+    );
+  });
+
+  it("leaves the remote unchanged when ssh -G cannot be run", () => {
+    mockExecFileSync.mockImplementation(() => {
+      throw new Error("ssh: not found");
+    });
+    expect(canonicalizeGitRemote("git@github-work:org/repo.git", false)).toBe(
+      "git@github-work:org/repo.git"
+    );
+  });
+
+  it("leaves HTTPS remotes untouched", () => {
+    expect(canonicalizeGitRemote("https://github.com/org/repo.git", false)).toBe(
+      "https://github.com/org/repo.git"
+    );
+    expect(mockExecFileSync).not.toHaveBeenCalled();
   });
 });
 

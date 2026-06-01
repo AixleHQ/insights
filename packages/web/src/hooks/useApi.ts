@@ -592,7 +592,7 @@ export interface MemberStats {
     id: string;
     tool_name: string;
     external_username: string | null;
-    is_active: boolean;
+    connection_state: "inactive" | "active" | "waiting_for_connection";
   }[];
 }
 
@@ -845,6 +845,11 @@ interface RawProjectMember {
   total_cost?: number;
   last_active_at?: string | null;
   cli_connected?: boolean;
+  /** Present if the API ever sends camelCase stats alongside membership fields */
+  totalEvents?: number;
+  totalCost?: number;
+  lastActiveAt?: string | null;
+  cliConnected?: boolean;
 }
 
 export interface ProjectMember {
@@ -869,10 +874,10 @@ export function useProjectMembers(projectId: string) {
       const response = await api.get<{ data: RawProjectMember[] }>(`/projects/${projectId}/members`);
       return response.data.map((m): ProjectMember => ({
         ...m,
-        totalEvents: m.total_events ?? 0,
-        totalCost: m.total_cost ?? 0,
-        lastActiveAt: m.last_active_at ?? null,
-        cliConnected: m.cli_connected,
+        totalEvents: m.total_events ?? m.totalEvents ?? 0,
+        totalCost: m.total_cost ?? m.totalCost ?? 0,
+        lastActiveAt: m.last_active_at ?? m.lastActiveAt ?? null,
+        cliConnected: m.cli_connected ?? m.cliConnected,
       }));
     },
     enabled: !!projectId,
@@ -1442,16 +1447,16 @@ export function useUpdateToolAccount() {
     mutationFn: ({
       orgId,
       accountId,
-      isActive,
+      connectionState,
       accessToken,
     }: {
       orgId: string;
       accountId: string;
-      isActive?: boolean;
+      connectionState?: "inactive" | "active" | "waiting_for_connection";
       accessToken?: string;
     }) =>
       api.patch<{ data: ToolAccount }>(`/organizations/${orgId}/tool_accounts/${accountId}`, {
-        ...(isActive !== undefined && { is_active: isActive }),
+        ...(connectionState !== undefined && { connection_state: connectionState }),
         ...(accessToken !== undefined && { access_token: accessToken }),
       }),
     onSuccess: (_, { orgId }) => {

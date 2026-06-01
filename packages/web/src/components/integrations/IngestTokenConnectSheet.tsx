@@ -16,6 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProviderLogo } from "@/components/icons";
 import type { ProviderInfo } from "./IntegrationCard";
+import { resolveDb90IngestHost } from "@/lib/ingest-host";
+import { buildDb90ClaudeIngestCommand, buildDb90CursorIngestCommand } from "@/lib/db90-cli";
 
 interface IngestTokenConnectSheetProps {
   provider: ProviderInfo | null;
@@ -46,17 +48,6 @@ function ingestEndpointUrl(): string {
   }
   // Last resort: same origin (works in production where web and API share a domain).
   return `${window.location.origin}${apiBase}/ingest/events`;
-}
-
-/** Returns just the host origin for CLI --host flag (no /api/v1 path). */
-function ingestHostUrl(): string {
-  const ingestBase = import.meta.env.VITE_INGEST_BASE_URL;
-  if (ingestBase) return String(ingestBase);
-  const apiBase = import.meta.env.VITE_API_URL ?? "/api/v1";
-  if (apiBase.startsWith("http")) {
-    return String(apiBase).replace(/\/api\/v1\/?$/, "");
-  }
-  return window.location.origin;
 }
 
 function buildClaudeCodeSettingsSnippet(token: string): string {
@@ -104,27 +95,39 @@ function ClaudeCodeSetupInstructions({ token }: { token: string }) {
     if (settingsTimerRef.current) clearTimeout(settingsTimerRef.current);
   }, []);
 
-  const host = ingestHostUrl();
+  const host = resolveDb90IngestHost();
   const initCommand = `${MCP_TELEMETRY_INIT} --host ${host}`;
-  const npxCommand = `npx @db90/claude --token ${token} --host ${host}`;
+  const npxCommand = buildDb90ClaudeIngestCommand(token);
   const settingsSnippet = buildClaudeCodeSettingsSnippet(token);
 
   const handleCopyInit = async () => {
-    await navigator.clipboard.writeText(initCommand);
-    setCopiedInit(true);
-    initTimerRef.current = setTimeout(() => setCopiedInit(false), 2000);
+    try {
+      await navigator.clipboard.writeText(initCommand);
+      setCopiedInit(true);
+      initTimerRef.current = setTimeout(() => setCopiedInit(false), 2000);
+    } catch {
+      // clipboard access denied — non-critical
+    }
   };
 
   const handleCopyNpx = async () => {
-    await navigator.clipboard.writeText(npxCommand);
-    setCopiedNpx(true);
-    npxTimerRef.current = setTimeout(() => setCopiedNpx(false), 2000);
+    try {
+      await navigator.clipboard.writeText(npxCommand);
+      setCopiedNpx(true);
+      npxTimerRef.current = setTimeout(() => setCopiedNpx(false), 2000);
+    } catch {
+      // clipboard access denied — non-critical
+    }
   };
 
   const handleCopySettings = async () => {
-    await navigator.clipboard.writeText(settingsSnippet);
-    setCopiedSettings(true);
-    settingsTimerRef.current = setTimeout(() => setCopiedSettings(false), 2000);
+    try {
+      await navigator.clipboard.writeText(settingsSnippet);
+      setCopiedSettings(true);
+      settingsTimerRef.current = setTimeout(() => setCopiedSettings(false), 2000);
+    } catch {
+      // clipboard access denied — non-critical
+    }
   };
 
   return (
@@ -213,19 +216,137 @@ function ClaudeCodeSetupInstructions({ token }: { token: string }) {
   );
 }
 
+function CursorSetupInstructions({ token }: { token: string }) {
+  const [copiedInit, setCopiedInit] = useState(false);
+  const [copiedNpx, setCopiedNpx] = useState(false);
+  const initTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const npxTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (initTimerRef.current) clearTimeout(initTimerRef.current);
+    if (npxTimerRef.current) clearTimeout(npxTimerRef.current);
+  }, []);
+
+  const host = resolveDb90IngestHost();
+  const initCommand = `${MCP_TELEMETRY_INIT} --host ${host}`;
+  const npxCommand = buildDb90CursorIngestCommand(token);
+
+  const handleCopyInit = async () => {
+    try {
+      await navigator.clipboard.writeText(initCommand);
+      setCopiedInit(true);
+      initTimerRef.current = setTimeout(() => setCopiedInit(false), 2000);
+    } catch {
+      // clipboard access denied — non-critical
+    }
+  };
+
+  const handleCopyNpx = async () => {
+    try {
+      await navigator.clipboard.writeText(npxCommand);
+      setCopiedNpx(true);
+      npxTimerRef.current = setTimeout(() => setCopiedNpx(false), 2000);
+    } catch {
+      // clipboard access denied — non-critical
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <Tabs defaultValue="mcp-recommended">
+        <TabsList className="w-full justify-start gap-2 flex-wrap h-auto rounded-md">
+          <TabsTrigger value="mcp-recommended" className="text-xs shrink-0">
+            MCP (recommended)
+          </TabsTrigger>
+          <TabsTrigger value="standalone-cli" className="text-xs shrink-0">
+            Standalone CLI
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="mcp-recommended" className="space-y-2 pt-2">
+          <p className="text-xs text-muted-foreground">
+            One-time Keycloak device login stores credentials in{" "}
+            <code className="bg-muted px-1 rounded whitespace-pre-wrap break-all">~/.db90-mcp</code>.
+            After provisioning Cursor through this sheet, run{" "}
+            <code className="bg-muted px-1 rounded">init</code> — add{" "}
+            <code className="bg-muted px-1 rounded">--tool-name cursor</code> if you only use Cursor
+            (skips Claude MCP install in{" "}
+            <code className="bg-muted px-1 rounded whitespace-pre-wrap break-all">~/.claude.json</code>
+            ). Omit <code className="bg-muted px-1 rounded">--tool-name</code> when you also use Claude
+            Code. No pasted ingest token needed for this path.
+          </p>
+          <div className="flex items-start gap-2">
+            <pre
+              className="text-xs bg-muted rounded p-3 overflow-x-auto flex-1 whitespace-pre-wrap break-all"
+              aria-label="Recommended MCP install command"
+            >
+              {initCommand}
+            </pre>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopyInit}
+              aria-label={copiedInit ? "Copied MCP init command" : "Copy MCP init command"}
+              className="shrink-0 mt-0.5"
+            >
+              {copiedInit ? <Check className="size-3.5 mr-1" /> : <Copy className="size-3.5 mr-1" />}
+              {copiedInit ? "Copied" : "Copy"}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Cursor telemetry syncs from the MCP process (e.g.{" "}
+            <code className="bg-muted px-1 rounded">db90-mcp run --once</code> or{" "}
+            <code className="bg-muted px-1 rounded">db90_sync_now</code> when Claude Code has the db90
+            MCP). For Cursor-only workflows without Claude Code, prefer the Standalone CLI tab with cron or
+            launchd — see <code className="bg-muted px-1 rounded">@db90/cursor</code> README.
+          </p>
+        </TabsContent>
+
+        <TabsContent value="standalone-cli" className="space-y-2 pt-2">
+          <p className="text-sm font-medium">Run the db90 Cursor reporter</p>
+          <div className="flex items-start gap-2">
+            <pre className="text-xs bg-muted rounded p-3 overflow-x-auto flex-1 whitespace-pre-wrap break-all">
+              {npxCommand}
+            </pre>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopyNpx}
+              aria-label={copiedNpx ? "Copied Cursor CLI command" : "Copy Cursor CLI command"}
+              className="shrink-0 mt-0.5"
+            >
+              {copiedNpx ? <Check className="size-3.5 mr-1" /> : <Copy className="size-3.5 mr-1" />}
+              {copiedNpx ? "Copied" : "Copy"}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Reads Cursor IDE telemetry from{" "}
+            <code className="bg-muted px-1 rounded whitespace-pre-wrap break-all">
+              ~/Library/Application Support/Cursor/User
+            </code>{" "}
+            (macOS) and posts aggregated usage. Cursor has no watch mode — schedule via cron or launchd.
+          </p>
+        </TabsContent>
+      </Tabs>
+
+      <div className="rounded-md bg-muted/50 p-2 text-[11px] text-muted-foreground">
+        Prefer the MCP tab whenever possible — standalone CLI commands above still require copying the
+        ingest token shown above.
+      </div>
+    </div>
+  );
+}
+
 function SetupInstructions({ providerId, token }: { providerId: string; token: string }) {
   if (providerId === "claude-code") {
     return <ClaudeCodeSetupInstructions token={token} />;
   }
 
-  return (
-    <div className="space-y-2">
-      <p className="text-sm font-medium">Run the db90 Cursor reporter</p>
-      <pre className="text-xs bg-muted rounded p-3 overflow-x-auto">
-        {`npx @db90/cursor --token ${token}`}
-      </pre>
-    </div>
-  );
+  if (providerId === "cursor") {
+    return <CursorSetupInstructions token={token} />;
+  }
+
+  return null;
 }
 
 export function IngestTokenConnectSheet({
@@ -302,9 +423,13 @@ export function IngestTokenConnectSheet({
 
   const handleCopy = async () => {
     if (!token) return;
-    await navigator.clipboard.writeText(token);
-    setCopied(true);
-    copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(token);
+      setCopied(true);
+      copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard access denied — non-critical
+    }
   };
 
   const handleDone = () => {

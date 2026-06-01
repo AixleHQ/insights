@@ -4,7 +4,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { Integrations } from "./Integrations";
-import { useConnectors } from "../hooks/useApi";
+import { useConnectors, useToolAccounts } from "../hooks/useApi";
 
 vi.mock("@/contexts/OrgContext", () => ({
   useOrg: () => ({
@@ -69,6 +69,7 @@ describe("Integrations", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(useConnectors).mockReturnValue({ data: [], isLoading: false } as ReturnType<typeof useConnectors>);
+    vi.mocked(useToolAccounts).mockReturnValue({ data: [], isLoading: false } as ReturnType<typeof useToolAccounts>);
   });
 
   describe("URL → active tab", () => {
@@ -160,6 +161,23 @@ describe("Integrations", () => {
       expect(screen.getByText(/4 resources/i)).toBeInTheDocument();
       expect(screen.getByText(/12 synced events/i)).toBeInTheDocument();
     });
+
+    it("does not render personal tool accounts in Connected tab", () => {
+      vi.mocked(useToolAccounts).mockReturnValue({
+        data: [
+          {
+            id: "acct-1",
+            toolName: "cursor",
+            isActive: true,
+          },
+        ],
+        isLoading: false,
+      } as ReturnType<typeof useToolAccounts>);
+
+      renderAt("/integrations/connected");
+      expect(screen.getByText("No integrations configured")).toBeInTheDocument();
+      expect(screen.queryByText("Cursor")).not.toBeInTheDocument();
+    });
   });
 
   describe("Available tab content", () => {
@@ -167,6 +185,19 @@ describe("Integrations", () => {
       renderAt("/integrations/available");
       expect(screen.getByText("AI Tools")).toBeInTheDocument();
       expect(screen.getByText("Code Hosting")).toBeInTheDocument();
+    });
+
+    it("does not show personal tools in Available tab", () => {
+      renderAt("/integrations/available");
+      expect(screen.queryByText("Claude Code")).not.toBeInTheDocument();
+      expect(screen.queryByText("Cursor")).not.toBeInTheDocument();
+    });
+
+    it("shows OpenAI and Gemini as coming soon", () => {
+      renderAt("/integrations/available");
+      expect(screen.getByText("OpenAI")).toBeInTheDocument();
+      expect(screen.getByText("Gemini")).toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: "Coming Soon" }).length).toBeGreaterThanOrEqual(2);
     });
 
     it("does not show providers that are already connected", () => {

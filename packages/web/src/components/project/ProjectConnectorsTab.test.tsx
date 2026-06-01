@@ -100,6 +100,18 @@ describe("ProjectConnectorsTab", () => {
       expect(screen.getByText("Connected")).toBeInTheDocument();
     });
 
+    it("does not show Last error panel when status is connected but lastError is stale", () => {
+      const stale: ProjectConnector = {
+        ...connectedAnthropicConnector,
+        status: "connected",
+        lastError: "stale from prior failure",
+      };
+      mockProjectConnectors.mockReturnValue({ data: [stale], isLoading: false });
+      renderComponent();
+      expect(screen.getByText("Connected")).toBeInTheDocument();
+      expect(screen.queryByText("Last error")).not.toBeInTheDocument();
+    });
+
     it("shows Error status badge for a connector with an error", () => {
       const errorConnector: ProjectConnector = {
         ...connectedAnthropicConnector,
@@ -330,7 +342,6 @@ describe("ProjectConnectorsTab", () => {
 
   describe("Disconnect flow", () => {
     it("calls deleteConnector with projectId and connectorId on confirm", async () => {
-      vi.spyOn(window, "confirm").mockReturnValue(true);
       mockProjectConnectors.mockReturnValue({ data: [connectedAnthropicConnector], isLoading: false });
       const user = userEvent.setup();
       renderComponent();
@@ -338,6 +349,9 @@ describe("ProjectConnectorsTab", () => {
       // Open the actions dropdown (sr-only label: "Actions")
       await user.click(screen.getByRole("button", { name: /actions/i }));
       await user.click(screen.getByRole("menuitem", { name: /disconnect/i }));
+
+      // Confirm in the AlertDialog
+      await user.click(screen.getByRole("button", { name: /^disconnect$/i }));
 
       await waitFor(() => {
         expect(mockDeleteConnector).toHaveBeenCalledWith({
@@ -348,7 +362,6 @@ describe("ProjectConnectorsTab", () => {
     });
 
     it("does not call deleteConnector when confirm is cancelled", async () => {
-      vi.spyOn(window, "confirm").mockReturnValue(false);
       mockProjectConnectors.mockReturnValue({ data: [connectedAnthropicConnector], isLoading: false });
       const user = userEvent.setup();
       renderComponent();
@@ -356,11 +369,13 @@ describe("ProjectConnectorsTab", () => {
       await user.click(screen.getByRole("button", { name: /actions/i }));
       await user.click(screen.getByRole("menuitem", { name: /disconnect/i }));
 
+      // Cancel the AlertDialog
+      await user.click(screen.getByRole("button", { name: /cancel/i }));
+
       expect(mockDeleteConnector).not.toHaveBeenCalled();
     });
 
     it("shows inline error alert when disconnect mutation fails", async () => {
-      vi.spyOn(window, "confirm").mockReturnValue(true);
       mockDeleteConnector.mockRejectedValue(new Error("Network error"));
       mockProjectConnectors.mockReturnValue({ data: [connectedAnthropicConnector], isLoading: false });
       const user = userEvent.setup();
@@ -368,6 +383,7 @@ describe("ProjectConnectorsTab", () => {
 
       await user.click(screen.getByRole("button", { name: /actions/i }));
       await user.click(screen.getByRole("menuitem", { name: /disconnect/i }));
+      await user.click(screen.getByRole("button", { name: /^disconnect$/i }));
 
       await waitFor(() => {
         expect(screen.getByText("Failed to disconnect. Please try again.")).toBeInTheDocument();

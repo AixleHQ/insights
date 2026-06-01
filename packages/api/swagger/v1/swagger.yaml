@@ -1477,13 +1477,13 @@ paths:
                 token_expires_at:
                   type: string
                   format: date-time
-                external_account_id:
+                external_user_id:
                   type: string
-                external_account_name:
+                external_username:
                   type: string
-                is_active:
-                  type: boolean
-                  default: true
+                connection_state:
+                  type: string
+                  enum: [inactive, active, waiting_for_connection]
               required:
                 - tool_name
       responses:
@@ -1542,15 +1542,23 @@ paths:
                 token_expires_at:
                   type: string
                   format: date-time
-                external_account_id:
+                external_user_id:
                   type: string
-                external_account_name:
+                external_username:
                   type: string
-                is_active:
-                  type: boolean
+                connection_state:
+                  type: string
+                  enum: [inactive, active, waiting_for_connection]
       responses:
         '200':
           description: Tool account updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserToolAccount'
         '422':
           $ref: '#/components/responses/ValidationError'
     delete:
@@ -5823,12 +5831,16 @@ components:
         toolName:
           type: string
           enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom]
-        isActive:
-          type: boolean
-        externalAccountId:
+        connectionState:
+          type: string
+          enum: [inactive, active, waiting_for_connection]
+        externalUserId:
           type: string
           nullable: true
-        externalAccountName:
+        externalUsername:
+          type: string
+          nullable: true
+        externalEmail:
           type: string
           nullable: true
         tokenExpiresAt:
@@ -5837,6 +5849,10 @@ components:
           nullable: true
         tokenExpired:
           type: boolean
+        lastUsedAt:
+          type: string
+          format: date-time
+          nullable: true
         scope:
           type: string
           enum: [org, project, persona]
@@ -5851,7 +5867,7 @@ components:
         - id
         - organizationMembershipId
         - toolName
-        - isActive
+        - connectionState
         - scope
         - createdAt
         - updatedAt

@@ -40,7 +40,6 @@
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": true,
-      "oauth2DeviceAuthorizationGrantEnabled": true,
       "serviceAccountsEnabled": false,
       "authorizationServicesEnabled": false,
       "fullScopeAllowed": true,
@@ -55,6 +54,7 @@
         "http://localhost:3000"
       ],
       "attributes": {
+        "oauth2.device.authorization.grant.enabled": "true",
         "pkce.code.challenge.method": "S256",
         "post.logout.redirect.uris": "http://localhost:5173/*"
       },

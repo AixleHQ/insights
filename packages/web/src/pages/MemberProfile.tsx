@@ -642,8 +642,15 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
                         <div className="text-xs text-muted-foreground">@{account.external_username}</div>
                       )}
                     </div>
-                    <Badge variant={account.is_active ? "default" : "secondary"} className="text-xs">
-                      {account.is_active ? "Active" : "Inactive"}
+                    <Badge
+                      variant={account.connection_state === "active" ? "default" : "secondary"}
+                      className="text-xs"
+                    >
+                      {account.connection_state === "waiting_for_connection"
+                        ? "Setup required"
+                        : account.connection_state === "active"
+                          ? "Active"
+                          : "Inactive"}
                     </Badge>
                   </div>
                 ))}

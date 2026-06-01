@@ -197,7 +197,7 @@ export interface ProjectConnector {
 export interface ToolAccount {
   id: string;
   toolName: string;
-  isActive: boolean;
+  connectionState: "inactive" | "active" | "waiting_for_connection";
   externalUserId: string | null;
   externalUsername: string | null;
   externalEmail: string | null;
@@ -206,6 +206,7 @@ export interface ToolAccount {
   tokenExpiresAt: string | null;
   createdAt: string;
   updatedAt: string;
+  lastUsedAt?: string | null;
   scope: ConnectorScope;
   ingestToken?: string; // one-time, only present immediately after create/regenerate
 }
@@ -215,7 +216,7 @@ export interface MyToolAccountMetadata {
   id: string;
   toolName: string;
   displayName: string;
-  isActive: boolean;
+  connectionState: "inactive" | "active" | "waiting_for_connection";
   createdAt: string;
   updatedAt: string;
   lastUsedAt: string | null;

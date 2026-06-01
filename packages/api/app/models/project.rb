@@ -38,14 +38,37 @@ class Project < ApplicationRecord
     organization_id.present?
   end
 
+  # Canonicalizes a git remote to `https://<host>/<owner>/<repo>` so that the
+  # many shapes git emits (scp, ssh://, embedded credentials, ports, trailing
+  # slashes, `.git`) collapse to a single comparable identity. Note: the host
+  # is preserved as-is — SSH host aliases (e.g. `git@github-work:...`) cannot be
+  # resolved server-side (the mapping lives in the client's ~/.ssh/config), so
+  # they are handled by the host-agnostic path fallback in the lookup controller
+  # and by client-side `canonicalizeGitRemote`.
   def self.normalize_git_remote(url)
     return nil if url.blank?
 
     normalized = url.strip
-    if (match = normalized.match(/\Agit@([^:]+):(.+)\z/i))
+    if (match = normalized.match(%r{\A[\w.-]+@([^:/]+):(.+)\z}))
+      # scp-like: [user@]host:path
       normalized = "https://#{match[1]}/#{match[2]}"
+    elsif (match = normalized.match(%r{\A[a-z][a-z0-9+.\-]*://(.+)\z}i))
+      # explicit scheme (ssh://, git://, http(s)://): drop scheme, userinfo, port
+      rest = match[1].sub(%r{\A[^/@]+@}, "")
+      host, _, path = rest.partition("/")
+      host = host.sub(/:\d+\z/, "")
+      normalized = "https://#{host}/#{path}"
     end
-    normalized.downcase.delete_suffix(".git")
+
+    normalized = normalized.downcase.sub(%r{/+\z}, "")
+    normalized.delete_suffix(".git").sub(%r{/+\z}, "")
+  end
+
+  # Path identity (`<owner>/<repo>`) of a normalized remote, host-agnostic.
+  # Used as a fallback so SSH host aliases / host variants still resolve.
+  def self.git_remote_path(normalized)
+    return nil if normalized.blank?
+    normalized.sub(%r{\Ahttps://[^/]+/}, "").presence
   end
 
   private

@@ -21,7 +21,9 @@ class ProjectConnectorSerializer < BaseSerializer
   datetime_attribute :token_expires_at
 
   attribute :last_error do |connector|
-    connector.last_error
+    # Avoid leaking stale messages when status is healthy; DB may still hold
+    # last_error from a prior failed attempt until the next successful save.
+    connector.status == "error" ? connector.last_error : nil
   end
 
   attribute :token_expired do |connector|

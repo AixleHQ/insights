@@ -473,7 +473,7 @@
         }
     </style>
 </head>
-<body>
+<body class="db90-custom-login">
     <div class="db90-login-container">
         <!-- Left Panel -->
         <div class="db90-left-panel">

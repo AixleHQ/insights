@@ -70,6 +70,7 @@ vi.mock("@/hooks/useApi", () => {
   useCreateToolAccount: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteToolAccount: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateToolAccount: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useRegenerateIngestToken: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useOrganizationMembers: () => ({
     data: [
       {
@@ -284,7 +285,8 @@ describe("UserSettings", () => {
 
       expect(screen.getByText(/ingest tokens/i)).toBeInTheDocument();
       expect(screen.getByText(/no ingest-linked tools yet/i)).toBeInTheDocument();
-      expect(screen.getByText(/npm install -g @db90\/cli-claude && db90 login/)).toBeInTheDocument();
+      expect(screen.getByText(/npx -y @db90\/claude --token <YOUR_INGEST_TOKEN> --host/)).toBeInTheDocument();
+      expect(screen.getByText(/npx -y @db90\/cursor --token <YOUR_INGEST_TOKEN> --host/)).toBeInTheDocument();
       expect(screen.getByRole("tab", { name: /available/i })).toBeInTheDocument();
     });
 

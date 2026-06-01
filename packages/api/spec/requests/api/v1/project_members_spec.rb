@@ -85,7 +85,7 @@ RSpec.describe "Api::V1::ProjectMembers", type: :request do
     end
 
     it "includes cli_connected true when member has an active user_tool_account in the org" do
-      create(:user_tool_account, organization_membership: member_org_membership, is_active: true)
+      create(:user_tool_account, organization_membership: member_org_membership, connection_state: 'active')
 
       authenticated_get "/api/v1/projects/#{project.id}/members", user: project_owner_user
 
@@ -95,7 +95,7 @@ RSpec.describe "Api::V1::ProjectMembers", type: :request do
     end
 
     it "includes cli_connected false when member has only inactive user_tool_accounts" do
-      create(:user_tool_account, organization_membership: member_org_membership, is_active: false)
+      create(:user_tool_account, organization_membership: member_org_membership, connection_state: 'inactive')
 
       authenticated_get "/api/v1/projects/#{project.id}/members", user: project_owner_user
 
@@ -395,6 +395,20 @@ RSpec.describe "Api::V1::ProjectMembers", type: :request do
       row = json_data.find { |r| r[:userId] == project_owner_user.id }
       expect(row[:primaryTool]).to eq("claude_code")
       expect(row[:eventCount]).to eq(3)
+    end
+
+    it "does not include tool events from other projects in stats aggregates" do
+      other_project = create(:project, organization: organization)
+      create(:tool_event, user: member, project: project,
+             organization: organization, tool_name: "cursor", occurred_at: 1.day.ago)
+      create(:tool_event, user: member, project: other_project,
+             organization: organization, tool_name: "cursor", occurred_at: 1.hour.ago)
+
+      authenticated_get "/api/v1/projects/#{project.id}/members/stats", user: org_owner
+
+      expect_success
+      row = json_data.find { |r| r[:userId] == member.id }
+      expect(row[:eventCount]).to eq(1)
     end
   end
 

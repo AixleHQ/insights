@@ -84,6 +84,58 @@ RSpec.describe 'Api::V1::ProjectLookup', type: :request do
       end
     end
 
+    context 'when both org and personal projects share the same git remote' do
+      let(:shared_remote) { 'git@github.com:org/shared-repo.git' }
+      let(:shared_normalized) { Project.normalize_git_remote(shared_remote) }
+      let!(:org_project) do
+        create(:project, organization: organization, owner: nil, git_remote_url: shared_normalized)
+      end
+      let!(:personal_project) do
+        create(:project, :personal, owner: user, organization: nil, git_remote_url: shared_normalized)
+      end
+
+      it 'prefers the organization project for ingest-token lookups' do
+        lookup_get(git_remote: shared_remote)
+        expect(response).to have_http_status(:ok)
+        expect(json_data[:project_id]).to eq(org_project.id)
+        expect(json_data[:project_id]).not_to eq(personal_project.id)
+      end
+    end
+
+    context 'normalization variants of the same remote' do
+      # matched_project stores the canonical https://github.com/org/my-repo
+      [
+        'ssh://git@github.com/org/my-repo.git',
+        'https://github.com/org/my-repo/',
+        'https://github.com/org/my-repo.git/',
+        'https://x-access-token:SECRET@github.com/org/my-repo.git'
+      ].each do |variant|
+        it "resolves #{variant} to the canonical project" do
+          lookup_get(git_remote: variant)
+          expect(response).to have_http_status(:ok)
+          expect(json_data[:project_id]).to eq(matched_project.id)
+        end
+      end
+    end
+
+    context 'when the remote uses an SSH host alias (host differs, path matches)' do
+      let!(:aliased_project) do
+        create(:project, organization: organization, owner: nil,
+               git_remote_url: 'https://github.com/aliased/host-repo')
+      end
+
+      it 'resolves via the host-agnostic path fallback' do
+        lookup_get(git_remote: 'git@github-work:aliased/host-repo.git')
+        expect(response).to have_http_status(:ok)
+        expect(json_data[:project_id]).to eq(aliased_project.id)
+      end
+
+      it 'does not match a different path under the same alias host' do
+        lookup_get(git_remote: 'git@github-work:aliased/other-repo.git')
+        expect(response).to have_http_status(:not_found)
+      end
+    end
+
     context 'when no project matches' do
       it 'returns 404' do
         lookup_get(git_remote: 'git@github.com:org/unknown.git')

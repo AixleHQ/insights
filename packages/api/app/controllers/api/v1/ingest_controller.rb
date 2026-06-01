@@ -29,15 +29,28 @@ module Api
 
         raw_key = store_raw_event(request.raw_post, org)
         workflow_result = start_ingestion_workflow(raw_key, event_params, org)
+        activate_tool_account_if_needed!
 
         data = { accepted: true, rawEventKey: raw_key }
         data[:workflowId] = workflow_result[:workflow_id] if workflow_result[:workflow_id]
         data[:fallback] = true if workflow_result[:fallback]
         render json: { data: data }, status: :accepted
-      rescue StandardError => e
-        Rails.logger.error "[Ingest] Failed: #{e.message}"
-        render json: { error: "Processing failed", message: e.message }, status: :unprocessable_content
+      rescue ActiveRecord::RecordInvalid => e
+        Rails.logger.warn "[Ingest] Validation failed: #{e.message}"
+        render json: {
+          error: "Unprocessable Entity",
+          errors: e.record.errors.to_hash(true).transform_values { |msgs| msgs.map { |m| m.is_a?(Hash) ? m[:message] : m } }
+        }, status: :unprocessable_content
+      rescue ActionController::ParameterMissing, JSON::ParserError => e
+        Rails.logger.warn "[Ingest] Bad request: #{e.message}"
+        render json: { error: "Bad Request", message: e.message }, status: :bad_request
       end
+
+      # NOTE: Programming errors (NoMethodError, ArgumentError, NameError, etc.)
+      # are intentionally NOT rescued here. They must bubble up to Rails' default
+      # 500 handler so error-tracking (Sentry, etc.) can surface them — otherwise
+      # bugs are silently masked as 422 responses and ingest clients incorrectly
+      # treat them as their own bad input.
 
       private
 
@@ -67,7 +80,15 @@ module Api
           metadata: { content_type: request.content_type }
         )
       rescue StandardError => e
-        Rails.logger.warn "[Ingest] Raw event storage failed (continuing): #{e.message}"
+        Rails.logger.warn(
+          structured_log_line(
+            "ingest_raw_storage_failed",
+            organization_id: org.id,
+            error_class: e.class.name,
+            message: e.message
+          )
+        )
+        Rails.error.report(e, context: { component: "ingest", stage: "raw_storage", organization_id: org.id }, handled: true)
         nil
       end
 
@@ -75,6 +96,11 @@ module Api
         # NOTE: The Temporal worker that completes this workflow is responsible for
         # broadcasting via EventsChannel after the upsert. The fallback path below
         # handles the broadcast inline when Temporal is unavailable.
+        if raw_key.blank?
+          log_fallback!(reason: "raw_key_missing", organization_id: org.id)
+          return fallback_direct_insert(event_params, org)
+        end
+
         workflow_id = "ingest-#{org.id}-#{SecureRandom.uuid}"
 
         Temporal::Client.start_workflow(
@@ -92,8 +118,34 @@ module Api
 
         { workflow_id: workflow_id }
       rescue StandardError => e
-        Rails.logger.warn "[Ingest] Temporal workflow failed, falling back to direct insert: #{e.message}"
+        log_fallback!(
+          reason: "temporal_unavailable",
+          organization_id: org.id,
+          error_class: e.class.name,
+          message: e.message
+        )
+        Rails.error.report(e, context: { component: "ingest", stage: "temporal_start", organization_id: org.id }, handled: true)
         fallback_direct_insert(event_params, org)
+      end
+
+      # The direct-insert fallback bypasses the sanitization workflow (classification +
+      # PII scrubbing). This is acceptable as a recovery path but MUST be observable so
+      # ops can detect prolonged degraded ingest. Every fallback emits a structured
+      # WARN log with a stable event key (`ingest_fallback_taken`) plus a Rails.error
+      # report so the configured error tracker (Sentry, etc.) shows usage volume.
+      def log_fallback!(reason:, organization_id:, **extra)
+        Rails.logger.warn(
+          structured_log_line(
+            "ingest_fallback_taken",
+            reason: reason,
+            organization_id: organization_id,
+            **extra
+          )
+        )
+      end
+
+      def structured_log_line(event, **fields)
+        "[Ingest] event=#{event} " + fields.map { |k, v| "#{k}=#{v.inspect}" }.join(" ")
       end
 
       def fallback_direct_insert(event_params, org)
@@ -122,6 +174,12 @@ module Api
         end
 
         { workflow_id: nil, tool_event_id: tool_event.id, fallback: true }
+      end
+
+      def activate_tool_account_if_needed!
+        return unless @tool_account.may_activate_connection?
+
+        @tool_account.activate_connection!
       end
 
       def permitted_params

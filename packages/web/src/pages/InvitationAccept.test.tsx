@@ -84,7 +84,8 @@ describe("InvitationAccept", () => {
     );
 
     expect(screen.getByText(/you're connected/i)).toBeInTheDocument();
-    expect(screen.getByText(/npm install -g @db90\/cli-claude && db90 login/)).toBeInTheDocument();
+    expect(screen.getByText(/npx -y @db90\/claude --token <YOUR_INGEST_TOKEN> --host/)).toBeInTheDocument();
+    expect(screen.getByText(/npx -y @db90\/cursor --token <YOUR_INGEST_TOKEN> --host/)).toBeInTheDocument();
     expect(screen.queryByText(/redirecting you to your profile/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /continue to dashboard/i })).toBeInTheDocument();
   });

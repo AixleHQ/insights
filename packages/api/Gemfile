@@ -29,6 +29,7 @@ gem "kaminari"
 
 # Serialization
 gem "alba"
+gem "aasm"
 
 # Admin interface
 gem "administrate"
