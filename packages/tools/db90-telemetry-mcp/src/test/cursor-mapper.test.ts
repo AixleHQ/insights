@@ -338,6 +338,28 @@ describe("mapDailyStats", () => {
     expect(results.every((r) => r.project_id === "proj-uuid-123")).toBe(true);
   });
 
+  it("passes model param to tab and composer payloads", () => {
+    const entry: DailyStatsEntry = {
+      date: "2026-04-15",
+      dbPath,
+      value: { tabSuggestedLines: 5, tabAcceptedLines: 1, composerSuggestedLines: 7, composerAcceptedLines: 4 },
+    };
+    const results = mapDailyStats(entry, undefined, DEFAULT_CURSOR_PRICING, "claude-4-sonnet");
+    expect(results).toHaveLength(2);
+    expect(results.every((r) => r.model === "claude-4-sonnet")).toBe(true);
+  });
+
+  it("defaults model to unknown when not provided", () => {
+    const entry: DailyStatsEntry = {
+      date: "2026-04-15",
+      dbPath,
+      value: { tabSuggestedLines: 5, tabAcceptedLines: 1, composerSuggestedLines: 0, composerAcceptedLines: 0 },
+    };
+    const results = mapDailyStats(entry);
+    expect(results).toHaveLength(1);
+    expect(results[0].model).toBe("unknown");
+  });
+
   it("omits project_id when no projectId is provided", () => {
     const entry: DailyStatsEntry = {
       date: "2026-04-15",
@@ -401,6 +423,47 @@ describe("mapTranscriptTurn", () => {
     expect(payload.metadata.prompt_text).toContain("db90_status");
     expect(payload.metadata.assistant_text).toContain("not connected");
   });
+
+  it("passes model param to transcript turn payload", () => {
+    const turn: CursorTranscriptTurn = {
+      turnId: "composer-456:1",
+      sessionId: "composer-456",
+      filePath: "/tmp/composer-456.jsonl",
+      fileSize: 100,
+      workspacePath: "/Users/test/repo",
+      composerName: "Test session",
+      occurredAt: "2026-05-20T10:00:00.000Z",
+      promptText: "hello",
+      assistantText: "world",
+      tokensIn: 3,
+      tokensOut: 4,
+      riskLevel: "none",
+      riskScore: 0,
+      riskCategories: [],
+    };
+    const payload = mapTranscriptTurn(turn, undefined, DEFAULT_CURSOR_PRICING, "claude-sonnet-4-6");
+    expect(payload.model).toBe("claude-sonnet-4-6");
+  });
+
+  it("defaults transcript turn model to unknown when not provided", () => {
+    const turn: CursorTranscriptTurn = {
+      turnId: "composer-789:1",
+      sessionId: "composer-789",
+      filePath: "/tmp/composer-789.jsonl",
+      fileSize: 100,
+      workspacePath: "/Users/test/repo",
+      composerName: "Test session",
+      occurredAt: "2026-05-20T10:00:00.000Z",
+      promptText: "hello",
+      assistantText: "world",
+      tokensIn: 3,
+      tokensOut: 4,
+      riskLevel: "none",
+      riskScore: 0,
+      riskCategories: [],
+    };
+    expect(mapTranscriptTurn(turn).model).toBe("unknown");
+  });
 });
 
 describe("mapRecentCommit", () => {
@@ -449,6 +512,36 @@ describe("mapRecentCommit", () => {
       value: { timestamp: 1704067200000, commitHash: "abc" },
     };
     expect(mapRecentCommit(snapshot)).toBeNull();
+  });
+
+  it("passes model param to commit payload", () => {
+    const snapshot: RecentCommitSnapshot = {
+      dbPath,
+      value: {
+        timestamp: 1704067200000,
+        commitHash: "deadbeef",
+        linesAdded: 18,
+        linesDeleted: 10,
+      },
+    };
+    const result = mapRecentCommit(snapshot, undefined, DEFAULT_CURSOR_PRICING, "claude-4-sonnet");
+    expect(result).not.toBeNull();
+    expect(result!.model).toBe("claude-4-sonnet");
+  });
+
+  it("defaults model to unknown when not provided", () => {
+    const snapshot: RecentCommitSnapshot = {
+      dbPath,
+      value: {
+        timestamp: 1704067200000,
+        commitHash: "deadbeef",
+        linesAdded: 18,
+        linesDeleted: 10,
+      },
+    };
+    const result = mapRecentCommit(snapshot);
+    expect(result).not.toBeNull();
+    expect(result!.model).toBe("unknown");
   });
 });
 

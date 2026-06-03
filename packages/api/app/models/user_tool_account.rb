@@ -62,7 +62,7 @@ class UserToolAccount < ApplicationRecord
   end
 
   def assign_default_connection_state
-    return if connection_state.present?
+    return if connection_state.present? && connection_state != "inactive"
 
     self.connection_state = ingest_tool? ? "waiting_for_connection" : "active"
   end

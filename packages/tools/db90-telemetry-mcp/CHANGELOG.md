@@ -15,6 +15,7 @@ First public npm release (`@db90/telemetry-mcp@0.1.0`): stdio MCP server for DB9
 - **Resilience & observability**: Shared **`src/health.ts`** for **`db90-mcp health`** and MCP **`db90_status`**. Operational **`mcp.log`** (~/.db90-mcp, `DB90_MCP_HOME` override), **5 MiB** rotate to **`mcp.log.1`**. Credential-scoped state **`mcp_operator`** diagnostics. **`postEvent`** retries (1s / 4s / 16s) on transient failures; **429** uses backoff helper only.
 - **Scope-directory filtering** (`scopeDir`): MCP server captures `process.cwd()` at startup and filters Claude turns / Cursor payloads to only events whose `cwd` / `workspace_folder` is under that directory. Prevents events from unrelated repos being mis-attributed when multiple projects share one ingest token.
 - **SSH host alias resolution** (`canonicalizeGitRemote` in `@db90/sdk`): resolves SSH config host aliases (e.g. `github-work → github.com`) via `ssh -G` before sending git remotes to the lookup API. Fixes attribution for teams that use per-org SSH aliases in `~/.ssh/config`.
+- **Cursor model from settings**: reads active model from Cursor `settings.json` once per sync pass and applies it to daily-stats and recent-commit payloads (replacing hardcoded `model: "unknown"` when the file is present).
 
 ### Packaging
 

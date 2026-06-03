@@ -23,6 +23,9 @@ module IngestTokenAuthentication
     return false unless @tool_account&.organization.present?
     return true if @tool_account.active?
 
+    # Ingest tools are allowed through while waiting_for_connection so the first
+    # ingested event can auto-activate the account (see IngestController#activate_tool_account_if_needed!).
+    # Non-ingest tools (e.g. GitHub Copilot) must be explicitly activated before ingesting.
     @tool_account.ingest_tool? && @tool_account.waiting_for_connection?
   end
 

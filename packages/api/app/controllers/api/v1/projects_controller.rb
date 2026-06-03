@@ -463,7 +463,19 @@ module Api
       # current_organization for the rare multi-org list (should not happen for the
       # /organizations/:id/projects route, which is already org-filtered).
       def single_org_scope(org_ids)
-        org_ids.one? ? org_ids.first : current_organization&.id
+        return org_ids.first if org_ids.one?
+
+        # This branch should never be reached — the route scopes projects to a single
+        # org before pagination. Raise loudly in dev/test so the invariant is visible;
+        # in production, fall back and report to the error tracker rather than 500ing.
+        raise ArgumentError, "aggregate_scope_for_projects: expected 1 org, got #{org_ids.size} — route filter missing?" unless Rails.env.production?
+
+        Rails.error.report(
+          ArgumentError.new("aggregate_scope_for_projects: multi-org list (#{org_ids.size} orgs)"),
+          context: { org_ids: org_ids, user_id: current_user.id },
+          handled: true
+        )
+        current_organization&.id
       end
 
       def log_project_created!

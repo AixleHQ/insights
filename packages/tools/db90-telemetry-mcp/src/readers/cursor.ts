@@ -938,7 +938,8 @@ function buildPayload(opts: {
 export function mapDailyStats(
   entry: DailyStatsEntry,
   projectId?: string,
-  pricing: PricingConfig = DEFAULT_CURSOR_PRICING
+  pricing: PricingConfig = DEFAULT_CURSOR_PRICING,
+  model?: string
 ): CursorDb90Payload[] {
   const { date, value, dbPath } = entry;
   const occurredAt = `${date}T00:00:00.000Z`;
@@ -962,6 +963,7 @@ export function mapDailyStats(
         costUsd: computeLineCost("completion", tabSuggested, pricing),
         occurredAt,
         dbPath,
+        model,
         projectId,
       })
     );
@@ -976,6 +978,7 @@ export function mapDailyStats(
         costUsd: computeLineCost("chat", composerSuggested, pricing),
         occurredAt,
         dbPath,
+        model,
         projectId,
       })
     );
@@ -1015,7 +1018,8 @@ export function mapDailyStats(
 export function mapRecentCommit(
   entry: RecentCommitSnapshot,
   projectId?: string,
-  pricing: PricingConfig = DEFAULT_CURSOR_PRICING
+  pricing: PricingConfig = DEFAULT_CURSOR_PRICING,
+  model?: string
 ): CursorDb90Payload | null {
   const { value: obj, dbPath } = entry;
   const occurredAt = toIsoString(obj.timestamp as number | string | null | undefined);
@@ -1042,7 +1046,7 @@ export function mapRecentCommit(
   const payload: CursorDb90Payload = {
     tool_name: "cursor",
     event_type: "commit",
-    model: "unknown",
+    model: model ?? "unknown",
     tokens_in: linesAddedProxy,
     tokens_out: linesDeletedProxy,
     cost_usd: costUsd,
@@ -1109,12 +1113,13 @@ export function mapEvent(
 export function mapTranscriptTurn(
   turn: CursorTranscriptTurn,
   projectId?: string,
-  pricing: PricingConfig = DEFAULT_CURSOR_PRICING
+  pricing: PricingConfig = DEFAULT_CURSOR_PRICING,
+  model?: string
 ): CursorDb90Payload {
   const payload: CursorDb90Payload = {
     tool_name: "cursor",
     event_type: "chat",
-    model: "unknown",
+    model: model ?? "unknown",
     tokens_in: turn.tokensIn,
     tokens_out: turn.tokensOut,
     cost_usd: computeTokenCost("chat", turn.tokensIn, turn.tokensOut, pricing),

@@ -11,6 +11,7 @@ import {
   cursorWatermarkDate,
   filterRecentCommitsByHashDedup,
 } from "./cursor-checkpoints.js";
+import { readCursorActiveModel } from "./cursor-settings.js";
 import {
   readEvents as readCursorEvents,
   readDailyStatsWithDedupe,
@@ -116,6 +117,7 @@ export async function prepareCursorSliceGroups(
   }
 
   const baseDir = cursorBaseDir;
+  const activeModel = readCursorActiveModel(baseDir) ?? undefined;
   const transcriptTurns = await readCursorTranscriptSessions(baseDir, cursorTranscriptProjectDirs, verbose);
   const rawEvents = readCursorEvents(eventsSince, baseDir, verbose);
   const { raw: dailyStatsRaw, deduped: dailyStats } = readDailyStatsWithDedupe(
@@ -136,7 +138,7 @@ export async function prepareCursorSliceGroups(
       if (known.contentHash && turn.contentHash) return known.contentHash !== turn.contentHash;
       return known.fileSize !== turn.fileSize;
     })
-    .map((turn) => mapCursorTranscriptTurn(turn, projectIdOpt, cursorPricing))
+    .map((turn) => mapCursorTranscriptTurn(turn, projectIdOpt, cursorPricing, activeModel))
     .sort((a, b) => a.occurred_at.localeCompare(b.occurred_at));
   const skippedTranscriptCount = transcriptTurns.length - transcriptPayloads.length;
   const transcriptModeEnabled = transcriptTurnsById.size > 0;
@@ -145,7 +147,7 @@ export async function prepareCursorSliceGroups(
     .map(({ row, workspacePath }) => mapCursorEvent(row, workspacePath, projectIdOpt, cursorPricing))
     .filter((e): e is CursorDb90Payload => e !== null);
   const allMappedFromStats = dailyStats
-    .flatMap((entry) => mapDailyStats(entry, projectIdOpt, cursorPricing));
+    .flatMap((entry) => mapDailyStats(entry, projectIdOpt, cursorPricing, activeModel));
 
   // When transcripts are present they cover the same chat activity — suppress the daily aggregates
   // to prevent double-counting. Logged at info level in sync.ts via counts.suppressedComposer.
@@ -161,7 +163,7 @@ export async function prepareCursorSliceGroups(
     : 0;
 
   let mappedFromCommits = recentCommitSnapshots
-    .map((snapshot) => mapRecentCommit(snapshot, projectIdOpt, cursorPricing))
+    .map((snapshot) => mapRecentCommit(snapshot, projectIdOpt, cursorPricing, activeModel))
     .filter((payload): payload is CursorDb90Payload => payload !== null)
     .sort((a, b) => a.occurred_at.localeCompare(b.occurred_at));
 

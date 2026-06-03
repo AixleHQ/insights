@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   mapCursorTranscriptTurn: vi.fn(),
   mapDailyStats: vi.fn(),
   mapRecentCommit: vi.fn(),
+  readCursorActiveModel: vi.fn(),
   postEvent: vi.fn(),
 }));
 
@@ -50,6 +51,10 @@ vi.mock("../readers/cursor.js", () => ({
     chat_input_per_mtok: 3.0,
     chat_output_per_mtok: 15.0,
   },
+}));
+
+vi.mock("../cursor-settings.js", () => ({
+  readCursorActiveModel: mocks.readCursorActiveModel,
 }));
 
 vi.mock("../client.js", () => ({
@@ -140,6 +145,7 @@ describe("syncTelemetryTools", () => {
     mocks.mapCursorTranscriptTurn.mockReturnValue(null);
     mocks.mapDailyStats.mockReturnValue([]);
     mocks.mapRecentCommit.mockReturnValue(null);
+    mocks.readCursorActiveModel.mockReturnValue(null);
     mocks.postEvent.mockResolvedValue(true);
   });
 
@@ -692,6 +698,98 @@ describe("syncTelemetryTools", () => {
     expect(mocks.readCursorEvents.mock.calls[0]?.[0]).toBeNull();
     expect(mocks.readRecentCommitSnapshots.mock.calls[0]?.[0]).toBeNull();
     expect(result.sent).toBe(1);
+  });
+
+  it("passes active model from settings into daily stats and commit mappers", async () => {
+    const cursorToken = "db90_cursor_token";
+    mocks.readCursorActiveModel.mockReturnValue("claude-4-sonnet");
+    mocks.readDailyStats.mockReturnValue({
+      raw: [
+        {
+          date: "2026-05-20",
+          value: { tabSuggestedLines: 5, tabAcceptedLines: 2 },
+          dbPath: "/tmp/state.vscdb",
+        },
+      ],
+      deduped: [
+        {
+          date: "2026-05-20",
+          value: { tabSuggestedLines: 5, tabAcceptedLines: 2 },
+          dbPath: "/tmp/state.vscdb",
+        },
+      ],
+    });
+    mocks.mapDailyStats.mockReturnValue([
+      {
+        tool_name: "cursor",
+        event_type: "completion",
+        model: "claude-4-sonnet",
+        tokens_in: 5,
+        tokens_out: 2,
+        cost_usd: 0.1,
+        occurred_at: "2026-05-20T00:00:00.000Z",
+        metadata: {
+          cursor_session_id: null,
+          workspace: "/tmp/state.vscdb",
+          cost_model: "estimated_line_count",
+          scannable: false,
+          risk_level: "none",
+        },
+      },
+    ]);
+    mocks.readRecentCommitSnapshots.mockReturnValue([
+      {
+        dbPath: "/tmp/state.vscdb",
+        value: {
+          timestamp: 1716215400000,
+          commitHash: "deadbeef",
+          linesAdded: 8,
+          linesDeleted: 2,
+        },
+      },
+    ]);
+    mocks.mapRecentCommit.mockReturnValue({
+      tool_name: "cursor",
+      event_type: "commit",
+      model: "claude-4-sonnet",
+      tokens_in: 8,
+      tokens_out: 2,
+      cost_usd: 0.1,
+      occurred_at: "2026-05-20T14:30:00.000Z",
+      metadata: {
+        cursor_session_id: null,
+        workspace: "/tmp/state.vscdb",
+        cost_model: "estimated_line_count",
+        scannable: false,
+        risk_level: "none",
+        source: "recent_commit",
+        commit_hash: "deadbeef",
+      },
+    });
+
+    await syncTelemetryTools({
+      credentials: { host, accounts: { cursor: cursorToken } },
+      dryRun: false,
+      verbose: false,
+      projectId: null,
+      pricing: DEFAULT_PRICING,
+      appDir,
+      tools: ["cursor"],
+    });
+
+    expect(mocks.readCursorActiveModel).toHaveBeenCalledTimes(1);
+    expect(mocks.mapDailyStats).toHaveBeenCalledWith(
+      expect.anything(),
+      undefined,
+      expect.anything(),
+      "claude-4-sonnet"
+    );
+    expect(mocks.mapRecentCommit).toHaveBeenCalledWith(
+      expect.anything(),
+      undefined,
+      expect.anything(),
+      "claude-4-sonnet"
+    );
   });
 
   it("overrides Claude auto-detected cwd project instead of reusing the sync cwd project", async () => {

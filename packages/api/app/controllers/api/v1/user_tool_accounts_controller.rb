@@ -44,12 +44,6 @@ module Api
         @tool_account = @membership.user_tool_accounts.new(tool_account_params)
         authorize! @membership, to: :create?, with: UserToolAccountPolicy
 
-        if @tool_account.ingest_tool?
-          @tool_account.mark_waiting_for_connection
-        elsif @tool_account.may_activate_connection?
-          @tool_account.activate_connection
-        end
-
         if @tool_account.save
           log_tool_account!(:create, @tool_account)
           data = UserToolAccountSerializer.new(@tool_account).serialize

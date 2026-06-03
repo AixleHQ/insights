@@ -7,6 +7,7 @@ import {
   DollarSign,
   FileText,
   Shield,
+  Cpu,
   ExternalLink,
   ChevronLeft,
   ChevronRight,
@@ -268,6 +269,13 @@ export function EventDrawer({
                         )
                       }
                     />
+                    {event.model && event.model !== "unknown" && (
+                      <DetailRow
+                        icon={Cpu}
+                        label="Model"
+                        value={<span className="font-mono text-sm">{event.model}</span>}
+                      />
+                    )}
                   </div>
                 </div>
 

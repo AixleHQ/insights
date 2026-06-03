@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Clock, User, Folder, DollarSign, FileText, Shield } from "lucide-react";
+import { ArrowLeft, Clock, User, Folder, DollarSign, FileText, Shield, Cpu } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ export interface EventDetailData {
   id: string;
   tool_name?: string;
   event_type?: string;
+  model?: string | null;
   risk_level?: "critical" | "high" | "medium" | "low" | "none";
   cost_usd?: number;
   token_count?: number;
@@ -213,6 +214,13 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
                 )
               }
             />
+            {event.model && event.model !== "unknown" && (
+              <DetailRow
+                icon={Cpu}
+                label="Model"
+                value={<span className="font-mono text-sm">{event.model}</span>}
+              />
+            )}
             <DetailRow
               icon={Shield}
               label="Risk Level"

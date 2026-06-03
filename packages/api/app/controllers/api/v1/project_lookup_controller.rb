@@ -40,6 +40,10 @@ module Api
           project_by_path(Project.active.where(owner_id: user_id), normalized)
       end
 
+      # Fallback: match by path identity (owner/repo) ignoring host. Fetches all
+      # projects whose remote URL ends with the path, then filters in Ruby to confirm
+      # an exact path match. Safe because the scope is already bounded to a single org
+      # or user, and project count per org is small.
       def project_by_path(scope, normalized)
         path = Project.git_remote_path(normalized)
         return nil if path.blank?
