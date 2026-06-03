@@ -167,6 +167,190 @@ RSpec.describe AiUsageSyncJob, type: :job do
     end
   end
 
+  describe "#perform — OpenAI provider" do
+    let(:connector) do
+      create(:organization_connector,
+        organization: organization,
+        connector_type: "openai",
+        access_token: "sk-admin-test",
+        is_active: true)
+    end
+
+    let(:sample_usage) do
+      [
+        {
+          external_id: "openai-gpt-4o-2026-04-08",
+          model: "gpt-4o",
+          tokens_in: 50_000,
+          tokens_out: 15_000,
+          occurred_at: Time.utc(2026, 4, 8)
+        }
+      ]
+    end
+
+    before do
+      connector
+      allow_any_instance_of(Oauth::OpenaiProvider).to receive(:fetch_usage).and_return(sample_usage)
+    end
+
+    it "creates a ToolEvent for each usage entry" do
+      expect {
+        job.perform(organization.id, "openai")
+      }.to change(ToolEvent, :count).by(1)
+    end
+
+    it "sets tool_name to openai_api" do
+      job.perform(organization.id, "openai")
+
+      expect(find_synced_event("openai-gpt-4o-2026-04-08").tool_name).to eq("openai_api")
+    end
+
+    it "sets the correct model, tokens, and occurred_at" do
+      job.perform(organization.id, "openai")
+
+      event = find_synced_event("openai-gpt-4o-2026-04-08")
+      expect(event.model).to eq("gpt-4o")
+      expect(event.tokens_in).to eq(50_000)
+      expect(event.tokens_out).to eq(15_000)
+      expect(event.occurred_at).to be_within(1.second).of(Time.utc(2026, 4, 8))
+    end
+
+    it "stores external_id and reconciled flag in metadata" do
+      job.perform(organization.id, "openai")
+
+      event = find_synced_event("openai-gpt-4o-2026-04-08")
+      expect(event.metadata["external_id"]).to eq("openai-gpt-4o-2026-04-08")
+      expect(event.metadata["reconciled"]).to be true
+    end
+
+    it "calculates cost_usd via ModelPricingService" do
+      job.perform(organization.id, "openai")
+
+      expect(find_synced_event("openai-gpt-4o-2026-04-08").cost_usd).to be > 0
+    end
+
+    it "uses 90-day window on initial sync (no last_sync_at)" do
+      connector.update!(last_sync_at: nil)
+      provider = instance_double(Oauth::OpenaiProvider)
+      allow(provider).to receive(:fetch_usage).and_return(sample_usage)
+      allow(Oauth::OpenaiProvider).to receive(:new).and_return(provider)
+
+      travel_to Time.zone.now do
+        job.perform(organization.id, "openai")
+
+        expect(provider).to have_received(:fetch_usage)
+          .with(start_date: 90.days.ago.to_date, end_date: Date.today)
+      end
+    end
+
+    it "uses 7-day window on recurring sync (has last_sync_at)" do
+      connector.update!(last_sync_at: 1.hour.ago)
+      provider = instance_double(Oauth::OpenaiProvider)
+      allow(provider).to receive(:fetch_usage).and_return(sample_usage)
+      allow(Oauth::OpenaiProvider).to receive(:new).and_return(provider)
+
+      travel_to Time.zone.now do
+        job.perform(organization.id, "openai")
+
+        expect(provider).to have_received(:fetch_usage)
+          .with(start_date: 7.days.ago.to_date, end_date: Date.today)
+      end
+    end
+
+    it "does not create a duplicate ToolEvent when the same job runs twice" do
+      job.perform(organization.id, "openai")
+
+      expect {
+        job.perform(organization.id, "openai")
+      }.not_to change(ToolEvent, :count)
+    end
+
+    it "updates the existing event's sync fields on re-sync" do
+      job.perform(organization.id, "openai")
+
+      event = find_synced_event("openai-gpt-4o-2026-04-08")
+      updated_usage = sample_usage.map do |usage|
+        usage.merge(tokens_in: usage[:tokens_in] * 10, tokens_out: usage[:tokens_out] * 10)
+      end
+      allow_any_instance_of(Oauth::OpenaiProvider).to receive(:fetch_usage).and_return(updated_usage)
+
+      job.perform(organization.id, "openai")
+
+      event.reload
+      expect(event.tokens_in).to eq(500_000)
+      expect(event.tokens_out).to eq(150_000)
+      expect(event.tokens_total).to eq(650_000)
+      expect(event.cost_usd).to be > 0
+    end
+
+    context "when model is unknown" do
+      let(:sample_usage) do
+        [
+          {
+            external_id: "openai-gpt-unknown-model-2026-04-08",
+            model: "gpt-unknown-model",
+            tokens_in: 1_000,
+            tokens_out: 500,
+            occurred_at: Time.utc(2026, 4, 8)
+          }
+        ]
+      end
+
+      it "falls back to default pricing without raising" do
+        expect {
+          job.perform(organization.id, "openai")
+        }.not_to raise_error
+
+        expect(find_synced_event("openai-gpt-unknown-model-2026-04-08").cost_usd).to be > 0
+      end
+    end
+
+    it "does not create any ToolEvents when fetch_usage returns nil" do
+      allow_any_instance_of(Oauth::OpenaiProvider).to receive(:fetch_usage).and_return(nil)
+
+      expect {
+        job.perform(organization.id, "openai")
+      }.not_to change(ToolEvent, :count)
+    end
+
+    it "does not update connector status when fetch_usage returns nil" do
+      allow_any_instance_of(Oauth::OpenaiProvider).to receive(:fetch_usage).and_return(nil)
+      previous_status = connector.status
+      previous_sync_at = connector.last_sync_at
+
+      job.perform(organization.id, "openai")
+
+      connector.reload
+      expect(connector.status).to eq(previous_status)
+      expect(connector.last_sync_at).to eq(previous_sync_at)
+    end
+
+    it "marks the connector synced after a successful run" do
+      job.perform(organization.id, "openai")
+
+      expect(connector.reload.status).to eq("connected")
+      expect(connector.last_sync_at).to be_present
+    end
+
+    it "marks the connector synced when fetch_usage returns empty (no usage in period)" do
+      allow_any_instance_of(Oauth::OpenaiProvider).to receive(:fetch_usage).and_return([])
+
+      expect {
+        job.perform(organization.id, "openai")
+      }.not_to change(ToolEvent, :count)
+
+      expect(connector.reload.status).to eq("connected")
+    end
+
+    it "does not create any ToolEvents when no active OpenAI connector exists" do
+      connector.update!(is_active: false)
+
+      expect {
+        job.perform(organization.id, "openai")
+      }.not_to change(ToolEvent, :count)
+    end
+  end
+
   describe "#perform — OpenRouter provider" do
     let(:connector) do
       create(:organization_connector,

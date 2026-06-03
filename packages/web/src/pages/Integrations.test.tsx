@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { Integrations } from "./Integrations";
@@ -193,11 +193,16 @@ describe("Integrations", () => {
       expect(screen.queryByText("Cursor")).not.toBeInTheDocument();
     });
 
-    it("shows OpenAI and Gemini as coming soon", () => {
+    it("shows OpenAI as connectable and Gemini as coming soon", () => {
       renderAt("/integrations/available");
       expect(screen.getByText("OpenAI")).toBeInTheDocument();
       expect(screen.getByText("Gemini")).toBeInTheDocument();
-      expect(screen.getAllByRole("button", { name: "Coming Soon" }).length).toBeGreaterThanOrEqual(2);
+
+      const openaiCard = screen.getByTestId("provider-card-openai");
+      expect(within(openaiCard).getByRole("button", { name: "Connect" })).toBeInTheDocument();
+
+      const geminiCard = screen.getByTestId("provider-card-gemini");
+      expect(within(geminiCard).getByRole("button", { name: "Coming Soon" })).toBeInTheDocument();
     });
 
     it("does not show providers that are already connected", () => {

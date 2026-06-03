@@ -15,6 +15,9 @@ class AiUsageSyncJob
   ANTHROPIC_INITIAL_SYNC_DAYS = 90
   ANTHROPIC_RECURRING_SYNC_DAYS = 7
 
+  OPENAI_INITIAL_SYNC_DAYS = 90
+  OPENAI_RECURRING_SYNC_DAYS = 7
+
   OPENROUTER_MGMT_KEY_ERROR_FRAGMENT = "Only management keys can fetch activity for an account"
   OPENROUTER_DATE_RANGE_ERROR_FRAGMENT = "Date must be within the last 30"
 
@@ -189,8 +192,7 @@ class AiUsageSyncJob
     when "anthropic"
       fetch_anthropic_usage(connector, org)
     when "openai"
-      # org not passed — OpenAI returns pre-billed costs; pricing overrides don't apply
-      fetch_openai_usage(connector)
+      fetch_openai_usage(connector, org)
     when "gemini"
       nil # Not yet implemented — connector will be skipped without updating its status
     else
@@ -230,11 +232,21 @@ def fetch_anthropic_usage(connector, organization)
     end
   end
 
-  def fetch_openai_usage(connector)
-    # Not yet implemented — OpenAI usage API returns aggregated data
-    # that requires additional mapping work. Returning nil so the connector
-    # status is not falsely updated. See reconcile_provider nil-guard.
-    nil
+  def fetch_openai_usage(connector, organization)
+    days_back = connector.last_sync_at ? OPENAI_RECURRING_SYNC_DAYS : OPENAI_INITIAL_SYNC_DAYS
+    provider = Oauth::OpenaiProvider.new(connector)
+    data = provider.fetch_usage(start_date: days_back.days.ago.to_date, end_date: Date.today)
+    return nil unless data
+
+    data.map do |entry|
+      cost = ModelPricingService.calculate_cost(
+        tokens_in: entry[:tokens_in],
+        tokens_out: entry[:tokens_out],
+        model: entry[:model],
+        organization: organization
+      )
+      entry.merge(cost_usd: cost[:total_cost])
+    end
   end
 
   def find_matching_event(org, provider, usage)

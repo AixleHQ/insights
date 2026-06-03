@@ -132,8 +132,8 @@ const availableProviders: ProviderInfo[] = [
       "Token consumption",
       "Cost breakdown",
     ],
-    available: false,
-    comingSoon: true,
+    available: true,
+    inputPlaceholder: "sk-admin-...",
   },
   {
     id: "openrouter",
