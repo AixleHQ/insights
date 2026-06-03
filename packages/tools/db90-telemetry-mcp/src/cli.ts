@@ -9,6 +9,7 @@ import { defaultKeycloakIssuer } from "./auth/keycloak.js";
 import { migrateLegacyState, getAppDir } from "./state.js";
 import { syncTelemetryTools } from "./sync.js";
 import { DEFAULT_PRICING, mergePricing } from "./pricing.js";
+import { resolveCursorPricing } from "./cursor-config.js";
 import { buildHealthSnapshot, formatHealthForCli } from "./health.js";
 import { installClaudeUserMcp, type InstallClaudeUserMcpOptions, type InstallResult } from "./install/claude.js";
 import { mcpLog } from "./log.js";
@@ -17,6 +18,8 @@ export interface Args {
   command: "init" | "health" | "run" | "help";
   help: boolean;
   once: boolean;
+  /** With `run --once`: ignore Cursor watermarks and commit hash dedupe. */
+  full?: boolean;
   host?: string;
   keycloakUrl?: string;
   toolName?: string;
@@ -45,7 +48,7 @@ interface InitDeps {
   error: (message: string) => void;
 }
 
-const GLOBAL_FLAGS = new Set(["--help", "-h", "--once"]);
+const GLOBAL_FLAGS = new Set(["--help", "-h", "--once", "--full"]);
 const INIT_VALUE_FLAGS = new Set(["--host", "--keycloak-url", "--tool-name", "--organization-id"]);
 const INIT_BOOLEAN_FLAGS = new Set(["--force"]);
 
@@ -129,6 +132,7 @@ export function parseArgs(argv: string[]): Args {
   const args = argv.slice(2);
   const help = args.includes("--help") || args.includes("-h");
   const once = args.includes("--once");
+  const full = args.includes("--full");
 
   const positional = args.filter((a) => !a.startsWith("-") && a !== "-h");
   const raw = positional[0];
@@ -167,23 +171,23 @@ export function parseArgs(argv: string[]): Args {
       return { command: "help", help: true, once: false };
     }
     if (!raw && once) {
-      return { command: "run", help, once: true };
+      return { command: "run", help, once: true, full: full || undefined };
     }
     if (!raw) {
-      return { command: "run", help, once: false };
+      return { command: "run", help, once: false, full: full || undefined };
     }
     return { command: "help", help: true, once: false };
   }
 
-  if ((raw === "init" || raw === "health") && once) {
+  if ((raw === "init" || raw === "health") && (once || full)) {
     return { command: "help", help: true, once: false };
   }
 
   if (raw === "init" || raw === "health" || raw === "run") {
-    return { command: raw, help, once };
+    return { command: raw, help, once, full: full || undefined };
   }
   if (raw === "serve") {
-    return { command: "run", help, once };
+    return { command: "run", help, once, full: full || undefined };
   }
 
   return { command: "help", help: true, once: false };
@@ -203,6 +207,7 @@ Commands:
 
 Options:
   --once      With 'run': perform a multi-tool sync then exit (no MCP server).
+  --full      With 'run --once': ignore Cursor watermarks and commit hash dedupe (backfill).
   --help, -h  Show this help message.
 
 init options:
@@ -329,7 +334,10 @@ export async function runInit(cliArgs: Args, deps?: Partial<InitDeps>): Promise<
   return 0;
 }
 
-export async function runOnce(deps?: Partial<RunOnceDeps>): Promise<number> {
+export async function runOnce(
+  deps?: Partial<RunOnceDeps>,
+  options?: { fullScan?: boolean }
+): Promise<number> {
   const runtime: RunOnceDeps = {
     loadCredentials,
     migrateLegacyState,
@@ -377,8 +385,10 @@ export async function runOnce(deps?: Partial<RunOnceDeps>): Promise<number> {
     projectIdSource,
     projectLookupToken: lookupToken,
     pricing: runtime.pricing,
+    cursorPricing: resolveCursorPricing(undefined, appDirRuntime),
     appDir: appDirRuntime,
     scopeDir: process.cwd(),
+    fullScan: options?.fullScan === true,
   });
   if (result.locked || result.failed > 0) {
     runtime.error(`Sync finished with failures: sent=${result.sent} failed=${result.failed} skipped=${result.skipped}`);
@@ -388,8 +398,8 @@ export async function runOnce(deps?: Partial<RunOnceDeps>): Promise<number> {
   return 0;
 }
 
-async function runOnceAndExit(): Promise<void> {
-  const exitCode = await runOnce();
+async function runOnceAndExit(fullScan?: boolean): Promise<void> {
+  const exitCode = await runOnce(undefined, { fullScan });
   if (exitCode !== 0) process.exit(exitCode);
 }
 
@@ -413,7 +423,7 @@ async function main(): Promise<void> {
     }
     case "run":
       if (args.once) {
-        await runOnceAndExit();
+        await runOnceAndExit(args.full);
         return;
       }
       await runMcpServer();

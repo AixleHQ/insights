@@ -32,6 +32,23 @@ describe("parseArgs", () => {
     });
   });
 
+  it("parses run --once --full", () => {
+    expect(parseArgs(["node", "cli.js", "run", "--once", "--full"])).toEqual({
+      command: "run",
+      help: false,
+      once: true,
+      full: true,
+    });
+  });
+
+  it("rejects --full with non-run commands", () => {
+    expect(parseArgs(["node", "cli.js", "health", "--full"])).toEqual({
+      command: "help",
+      help: true,
+      once: false,
+    });
+  });
+
   it("parses run --once", () => {
     expect(parseArgs(["node", "cli.js", "run", "--once"])).toEqual({
       command: "run",
@@ -233,6 +250,27 @@ describe("runOnce", () => {
 
     expect(code).toBe(0);
     expect(received).toEqual({ projectId: "proj-uuid-once" });
+  });
+
+  it("forwards fullScan to syncTelemetryTools when requested", async () => {
+    let received: { fullScan?: boolean } | null = null;
+    const code = await runOnce(
+      {
+        loadCredentials: async () => creds,
+        migrateLegacyState: () => undefined,
+        getAppDir: () => "/tmp/db90-mcp-test",
+        pricing: DEFAULT_PRICING,
+        syncTelemetryTools: async (opts) => {
+          received = { fullScan: opts.fullScan };
+          return { sent: 1, failed: 0, skipped: 0 };
+        },
+        ...silentOutput,
+      },
+      { fullScan: true }
+    );
+
+    expect(code).toBe(0);
+    expect(received).toEqual({ fullScan: true });
   });
 
   it("proceeds without project_id when resolver returns null (no git remote / 404)", async () => {

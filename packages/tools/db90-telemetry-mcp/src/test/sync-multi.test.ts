@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_PRICING } from "../pricing.js";
-import { readState } from "../state.js";
+import { readState, writeState } from "../state.js";
 
 vi.mock("node:child_process", () => ({
   execFileSync: vi.fn(),
@@ -37,7 +37,7 @@ vi.mock("../readers/claude.js", () => ({
 
 vi.mock("../readers/cursor.js", () => ({
   readEvents: mocks.readCursorEvents,
-  readDailyStats: mocks.readDailyStats,
+  readDailyStatsWithDedupe: mocks.readDailyStats,
   readRecentCommitSnapshots: mocks.readRecentCommitSnapshots,
   readCursorTranscriptSessions: mocks.readCursorTranscriptSessions,
   mapEvent: mocks.mapCursorEvent,
@@ -54,6 +54,36 @@ vi.mock("../readers/cursor.js", () => ({
 
 vi.mock("../client.js", () => ({
   postEvent: mocks.postEvent,
+  postEvents: async (
+    events: Array<{ occurred_at: string }>,
+    host: string,
+    token: string,
+    options?: Record<string, unknown>
+  ) => {
+    const outcomes = await Promise.allSettled(
+      events.map(async (event) => ({
+        event,
+        ok: await mocks.postEvent(event, host, token, options),
+      }))
+    );
+    let sent = 0;
+    let failed = 0;
+    let lastSentAt: string | null = null;
+    for (const outcome of outcomes) {
+      if (outcome.status === "rejected") {
+        failed++;
+        continue;
+      }
+      if (outcome.value.ok) {
+        sent++;
+        const t = outcome.value.event.occurred_at;
+        if (lastSentAt === null || t > lastSentAt) lastSentAt = t;
+      } else {
+        failed++;
+      }
+    }
+    return { sent, failed, lastSentAt };
+  },
 }));
 
 vi.mock("@db90/sdk", () => ({
@@ -71,6 +101,7 @@ vi.mock("@db90/sdk", () => ({
       return null;
     }
   },
+  loadBaseConfig: () => ({ pricing: {} }),
 }));
 
 import {
@@ -79,6 +110,7 @@ import {
   CURSOR_RECENT_COMMIT_WATERMARK_KEY,
   cursorTranscriptTurnStateKey,
   sessionStateKey,
+  filterRecentCommitsByHashDedup,
   syncTelemetryTools,
   resetBackoffStateForTests,
 } from "../sync.js";
@@ -101,7 +133,7 @@ describe("syncTelemetryTools", () => {
     mocks.lookupProjectByRemote.mockResolvedValue("not-found");
     mocks.enrichCommitProjectAttribution.mockResolvedValue(undefined);
     mocks.readCursorEvents.mockReturnValue([]);
-    mocks.readDailyStats.mockReturnValue([]);
+    mocks.readDailyStats.mockReturnValue({ raw: [], deduped: [] });
     mocks.readRecentCommitSnapshots.mockReturnValue([]);
     mocks.readCursorTranscriptSessions.mockResolvedValue([]);
     mocks.mapCursorEvent.mockReturnValue(null);
@@ -117,7 +149,7 @@ describe("syncTelemetryTools", () => {
     resetBackoffStateForTests();
   });
 
-  it("does not advance the cursor events watermark when a cursor event fails", async () => {
+  it("does not advance the cursor events watermark when all cursor events fail", async () => {
     mocks.readCursorEvents.mockReturnValue([
       { row: { requestId: "r1" }, workspacePath: "/tmp/ws" },
       { row: { requestId: "r2" }, workspacePath: "/tmp/ws" },
@@ -155,12 +187,58 @@ describe("syncTelemetryTools", () => {
       tools: ["cursor"],
     });
 
-    expect(result.failed).toBe(1);
+    expect(result.failed).toBe(2);
     expect(result.sent).toBe(0);
-    expect(result.skipped).toBe(1);
+    expect(result.skipped).toBe(0);
 
     const state = readState(appDir, host, "db90_cursor_token");
     expect(state.sessions[CURSOR_EVENTS_WATERMARK_KEY]).toBeUndefined();
+  });
+
+  it("advances the cursor events watermark through partial batch failures", async () => {
+    mocks.readCursorEvents.mockReturnValue([
+      { row: { requestId: "r1" }, workspacePath: "/tmp/ws" },
+      { row: { requestId: "r2" }, workspacePath: "/tmp/ws" },
+    ]);
+    mocks.mapCursorEvent
+      .mockReturnValueOnce({
+        tool_name: "cursor",
+        event_type: "chat",
+        model: "gpt-4.1",
+        tokens_in: 1,
+        tokens_out: 1,
+        cost_usd: 0.1,
+        occurred_at: "2026-05-19T10:00:00.000Z",
+        metadata: { cursor_session_id: null, workspace: "/tmp/ws", cost_model: "estimated_line_count", scannable: false, risk_level: "none" },
+      })
+      .mockReturnValueOnce({
+        tool_name: "cursor",
+        event_type: "chat",
+        model: "gpt-4.1",
+        tokens_in: 1,
+        tokens_out: 1,
+        cost_usd: 0.1,
+        occurred_at: "2026-05-19T12:00:00.000Z",
+        metadata: { cursor_session_id: null, workspace: "/tmp/ws", cost_model: "estimated_line_count", scannable: false, risk_level: "none" },
+      });
+    mocks.postEvent.mockImplementation(async (payload: { occurred_at: string }) =>
+      payload.occurred_at === "2026-05-19T12:00:00.000Z"
+    );
+
+    const result = await syncTelemetryTools({
+      credentials: { host, accounts: { cursor: "db90_cursor_token" } },
+      dryRun: false,
+      verbose: false,
+      projectId: null,
+      pricing: DEFAULT_PRICING,
+      appDir,
+      tools: ["cursor"],
+    });
+
+    expect(result.sent).toBe(1);
+    expect(result.failed).toBe(1);
+    const state = readState(appDir, host, "db90_cursor_token");
+    expect(state.sessions[CURSOR_EVENTS_WATERMARK_KEY]?.sentAt).toBe("2026-05-19T12:00:00.000Z");
   });
 
   it("tracks cursor daily stats independently from cursor event watermarks", async () => {
@@ -199,7 +277,8 @@ describe("syncTelemetryTools", () => {
     mocks.readCursorEvents.mockReturnValue([]);
     mocks.readDailyStats.mockImplementation((since: Date | null) => {
       expect(since).toBeNull();
-      return [{ date: "2026-05-19", value: { tabSuggestedLines: 5, tabAcceptedLines: 2 }, dbPath: "/tmp/state.vscdb" }];
+      const entry = [{ date: "2026-05-19", value: { tabSuggestedLines: 5, tabAcceptedLines: 2 }, dbPath: "/tmp/state.vscdb" }];
+      return { raw: entry, deduped: entry };
     });
     mocks.mapDailyStats.mockReturnValue([
       {
@@ -251,9 +330,10 @@ describe("syncTelemetryTools", () => {
       },
     ]);
     mocks.readCursorEvents.mockReturnValue([]);
-    mocks.readDailyStats.mockReturnValue([
-      { date: "2026-05-20", value: { composerSuggestedLines: 12, composerAcceptedLines: 3 }, dbPath: "/tmp/state.vscdb" },
-    ]);
+    mocks.readDailyStats.mockReturnValue({
+      raw: [{ date: "2026-05-20", value: { composerSuggestedLines: 12, composerAcceptedLines: 3 }, dbPath: "/tmp/state.vscdb" }],
+      deduped: [{ date: "2026-05-20", value: { composerSuggestedLines: 12, composerAcceptedLines: 3 }, dbPath: "/tmp/state.vscdb" }],
+    });
     mocks.mapCursorTranscriptTurn.mockReturnValue({
       tool_name: "cursor",
       event_type: "chat",
@@ -451,6 +531,167 @@ describe("syncTelemetryTools", () => {
     expect(state.sessions[CURSOR_RECENT_COMMIT_WATERMARK_KEY]?.sentAt).toBe(
       "2026-05-20T14:30:00.000Z"
     );
+    expect(state.lastRecentCommitHashes).toEqual(["deadbeef"]);
+    expect(mocks.readRecentCommitSnapshots.mock.calls[0]?.[0]).toBeNull();
+  });
+
+  it("reads recent commits with since=null when hash dedupe is enabled", async () => {
+    const cursorToken = "db90_cursor_token";
+    writeState(
+      {
+        version: 1,
+        sessions: {
+          [CURSOR_RECENT_COMMIT_WATERMARK_KEY]: {
+            fileSize: 0,
+            sentAt: "2026-05-19T12:00:00.000Z",
+          },
+        },
+      },
+      appDir,
+      host,
+      cursorToken
+    );
+
+    await syncTelemetryTools({
+      credentials: { host, accounts: { cursor: cursorToken } },
+      dryRun: false,
+      verbose: false,
+      projectId: null,
+      pricing: DEFAULT_PRICING,
+      appDir,
+      tools: ["cursor"],
+    });
+
+    expect(mocks.readRecentCommitSnapshots.mock.calls[0]?.[0]).toBeNull();
+  });
+
+  it("skips recent commit when lastRecentCommitHashes already contains the hash", async () => {
+    const cursorToken = "db90_cursor_token";
+    writeState(
+      {
+        version: 1,
+        sessions: {
+          [CURSOR_RECENT_COMMIT_WATERMARK_KEY]: {
+            fileSize: 0,
+            sentAt: "2026-05-19T12:00:00.000Z",
+          },
+        },
+        lastRecentCommitHashes: ["deadbeef"],
+      },
+      appDir,
+      host,
+      cursorToken
+    );
+    mocks.readRecentCommitSnapshots.mockReturnValue([
+      {
+        dbPath: "/tmp/state.vscdb",
+        value: {
+          timestamp: 1716215400000,
+          commitHash: "deadbeef",
+          linesAdded: 8,
+          linesDeleted: 2,
+        },
+      },
+    ]);
+    mocks.mapRecentCommit.mockReturnValue({
+      tool_name: "cursor",
+      event_type: "commit",
+      model: "unknown",
+      tokens_in: 8,
+      tokens_out: 2,
+      cost_usd: 0.1,
+      occurred_at: "2026-05-20T14:30:00.000Z",
+      metadata: {
+        cursor_session_id: null,
+        workspace: "/tmp/state.vscdb",
+        cost_model: "estimated_line_count",
+        scannable: false,
+        risk_level: "none",
+        source: "recent_commit",
+        commit_hash: "deadbeef",
+      },
+    });
+
+    const result = await syncTelemetryTools({
+      credentials: { host, accounts: { cursor: cursorToken } },
+      dryRun: false,
+      verbose: false,
+      projectId: null,
+      pricing: DEFAULT_PRICING,
+      appDir,
+      tools: ["cursor"],
+    });
+
+    expect(mocks.readRecentCommitSnapshots.mock.calls[0]?.[0]).toBeNull();
+    expect(mocks.postEvent).not.toHaveBeenCalled();
+    expect(result.sent).toBe(0);
+  });
+
+  it("fullScan ignores watermarks and commit hash dedupe", async () => {
+    const cursorToken = "db90_cursor_token";
+    writeState(
+      {
+        version: 1,
+        sessions: {
+          [CURSOR_EVENTS_WATERMARK_KEY]: {
+            fileSize: 0,
+            sentAt: "2026-05-19T12:00:00.000Z",
+          },
+          [CURSOR_RECENT_COMMIT_WATERMARK_KEY]: {
+            fileSize: 0,
+            sentAt: "2026-05-19T12:00:00.000Z",
+          },
+        },
+        lastRecentCommitHashes: ["deadbeef"],
+      },
+      appDir,
+      host,
+      cursorToken
+    );
+    mocks.readRecentCommitSnapshots.mockReturnValue([
+      {
+        dbPath: "/tmp/state.vscdb",
+        value: {
+          timestamp: 1716215400000,
+          commitHash: "deadbeef",
+          linesAdded: 8,
+          linesDeleted: 2,
+        },
+      },
+    ]);
+    mocks.mapRecentCommit.mockReturnValue({
+      tool_name: "cursor",
+      event_type: "commit",
+      model: "unknown",
+      tokens_in: 8,
+      tokens_out: 2,
+      cost_usd: 0.1,
+      occurred_at: "2026-05-20T14:30:00.000Z",
+      metadata: {
+        cursor_session_id: null,
+        workspace: "/tmp/state.vscdb",
+        cost_model: "estimated_line_count",
+        scannable: false,
+        risk_level: "none",
+        source: "recent_commit",
+        commit_hash: "deadbeef",
+      },
+    });
+
+    const result = await syncTelemetryTools({
+      credentials: { host, accounts: { cursor: cursorToken } },
+      dryRun: false,
+      verbose: false,
+      projectId: null,
+      pricing: DEFAULT_PRICING,
+      appDir,
+      tools: ["cursor"],
+      fullScan: true,
+    });
+
+    expect(mocks.readCursorEvents.mock.calls[0]?.[0]).toBeNull();
+    expect(mocks.readRecentCommitSnapshots.mock.calls[0]?.[0]).toBeNull();
+    expect(result.sent).toBe(1);
   });
 
   it("overrides Claude auto-detected cwd project instead of reusing the sync cwd project", async () => {
@@ -571,6 +812,40 @@ describe("syncTelemetryTools", () => {
     );
   });
 
+  it("sets validationFailed on cursor dry-run when payload contract fails", async () => {
+    const cursorToken = "db90_cursor_token";
+    mocks.readCursorEvents.mockReturnValue([{ row: { requestId: "r1" }, workspacePath: "/tmp/ws" }]);
+    mocks.mapCursorEvent.mockReturnValue({
+      tool_name: "cursor",
+      event_type: "completion",
+      model: "unknown",
+      tokens_in: 1,
+      tokens_out: 1,
+      cost_usd: 0.01,
+      occurred_at: "2026-05-20T00:00:00.000Z",
+      metadata: {
+        cursor_session_id: null,
+        workspace: "/tmp/state.vscdb",
+        cost_model: "estimated_line_count",
+        scannable: false,
+        risk_level: "none",
+      },
+    });
+
+    const result = await syncTelemetryTools({
+      credentials: { host, accounts: { cursor: cursorToken } },
+      dryRun: true,
+      verbose: false,
+      projectId: null,
+      pricing: DEFAULT_PRICING,
+      appDir,
+      tools: ["cursor"],
+    });
+
+    expect(result.sent).toBe(1);
+    expect(result.validationFailed).toBe(true);
+  });
+
   it("scopeDir: only syncs Claude turns whose cwd matches and uses pre-resolved projectId", async () => {
     const token = "db90_scoped_token";
     mocks.findTranscriptFiles.mockReturnValue(["/transcripts/a.jsonl"]);
@@ -580,7 +855,7 @@ describe("syncTelemetryTools", () => {
         turnId: "sess-a:1",
         filePath: "/transcripts/a.jsonl",
         fileSize: 100,
-        cwd: "/repos/test-repo",         // in-scope
+        cwd: "/repos/test-repo",
         model: "claude-sonnet-4",
         tokensIn: 10,
         tokensOut: 5,
@@ -598,7 +873,7 @@ describe("syncTelemetryTools", () => {
         turnId: "sess-b:1",
         filePath: "/transcripts/a.jsonl",
         fileSize: 100,
-        cwd: "/repos/db90-rails",         // out-of-scope
+        cwd: "/repos/db90-rails",
         model: "claude-sonnet-4",
         tokensIn: 8,
         tokensOut: 3,
@@ -618,7 +893,20 @@ describe("syncTelemetryTools", () => {
       occurred_at: "2026-05-19T10:00:00.000Z",
       cost_usd: null,
       project_id: options?.projectId ?? undefined,
-      metadata: { session_id: _turn.turnId, claude_session_id: _turn.sessionId, transcript_source: "claude_jsonl", model: null, base_input_tokens: 0, output_tokens: 0, cache_write_tokens: 0, cache_read_tokens: 0, risk_level: "low", risk_categories: [], risk_score: 0, scannable: true as const },
+      metadata: {
+        session_id: _turn.turnId,
+        claude_session_id: _turn.sessionId,
+        transcript_source: "claude_jsonl",
+        model: null,
+        base_input_tokens: 0,
+        output_tokens: 0,
+        cache_write_tokens: 0,
+        cache_read_tokens: 0,
+        risk_level: "low",
+        risk_categories: [],
+        risk_score: 0,
+        scannable: true as const,
+      },
     }));
 
     await syncTelemetryTools({
@@ -633,7 +921,6 @@ describe("syncTelemetryTools", () => {
       scopeDir: "/repos/test-repo",
     });
 
-    // Only the in-scope turn was posted
     expect(mocks.postEvent).toHaveBeenCalledTimes(1);
     expect(mocks.postEvent).toHaveBeenCalledWith(
       expect.objectContaining({ project_id: "scoped-project-id" }),
@@ -641,7 +928,159 @@ describe("syncTelemetryTools", () => {
       token,
       expect.any(Object)
     );
-    // Per-turn git lookup should NOT have been called (scopeDir uses pre-resolved projectId)
     expect(mockExecFileSync).not.toHaveBeenCalled();
+  });
+});
+
+describe("filterRecentCommitsByHashDedup", () => {
+  it("drops payloads whose commit_hash is in the seen set", () => {
+    const payloads = [
+      {
+        metadata: { commit_hash: "deadbeef" },
+      },
+      {
+        metadata: { commit_hash: "cafebabe" },
+      },
+    ] as Parameters<typeof filterRecentCommitsByHashDedup>[0];
+
+    const filtered = filterRecentCommitsByHashDedup(payloads, ["deadbeef"]);
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0]?.metadata.commit_hash).toBe("cafebabe");
+  });
+
+  it("passes through payloads with undefined commit_hash even when seen set contains empty string", () => {
+    const payloads = [
+      { metadata: {} },
+      { metadata: { commit_hash: "cafebabe" } },
+    ] as Parameters<typeof filterRecentCommitsByHashDedup>[0];
+
+    // "" in the seen set must not match a payload with no commit_hash
+    const filtered = filterRecentCommitsByHashDedup(payloads, ["", "deadbeef"]);
+    expect(filtered).toHaveLength(2);
+    expect(filtered[1]?.metadata.commit_hash).toBe("cafebabe");
+  });
+
+  it("passes all payloads through when seen list is empty", () => {
+    const payloads = [
+      { metadata: { commit_hash: "abc" } },
+    ] as Parameters<typeof filterRecentCommitsByHashDedup>[0];
+
+    expect(filterRecentCommitsByHashDedup(payloads, [])).toHaveLength(1);
+    expect(filterRecentCommitsByHashDedup(payloads, undefined)).toHaveLength(1);
+  });
+});
+
+describe("lastRecentCommitHashes partial batch failure guard", () => {
+  let appDir: string;
+  const host = "http://localhost:3000";
+  const cursorToken = "db90_cursor_token";
+
+  function makeCommitPayload(hash: string, occurredAt: string) {
+    return {
+      tool_name: "cursor" as const,
+      event_type: "commit" as const,
+      model: "unknown",
+      tokens_in: 1,
+      tokens_out: 1,
+      cost_usd: 0.01,
+      occurred_at: occurredAt,
+      metadata: {
+        cursor_session_id: null,
+        workspace: "/tmp/state.vscdb",
+        cost_model: "estimated_line_count" as const,
+        scannable: false as const,
+        risk_level: "none" as const,
+        source: "recent_commit",
+        commit_hash: hash,
+      },
+    };
+  }
+
+  beforeEach(() => {
+    appDir = mkdtempSync(join(tmpdir(), "db90-mcp-partial-"));
+    process.env.DB90_MCP_HOME = appDir;
+    mkdirSync(appDir, { recursive: true });
+    vi.clearAllMocks();
+    mockExecFileSync.mockImplementation(() => { throw new Error("not a git repo"); });
+    mocks.findTranscriptFiles.mockReturnValue([]);
+    mocks.parseTranscriptFile.mockResolvedValue([]);
+    mocks.mapClaudeTranscriptTurn.mockReturnValue(null);
+    mocks.lookupProjectByRemote.mockResolvedValue("not-found");
+    mocks.enrichCommitProjectAttribution.mockResolvedValue(undefined);
+    mocks.readCursorEvents.mockReturnValue([]);
+    mocks.readDailyStats.mockReturnValue({ raw: [], deduped: [] });
+    mocks.readRecentCommitSnapshots.mockReturnValue([]);
+    mocks.readCursorTranscriptSessions.mockResolvedValue([]);
+    mocks.mapCursorEvent.mockReturnValue(null);
+    mocks.mapCursorTranscriptTurn.mockReturnValue(null);
+    mocks.mapDailyStats.mockReturnValue([]);
+    mocks.mapRecentCommit.mockReturnValue(null);
+    mocks.postEvent.mockResolvedValue(true);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete process.env.DB90_MCP_HOME;
+    resetBackoffStateForTests();
+  });
+
+  it("does not persist lastRecentCommitHashes when batch partially fails", async () => {
+    mocks.readRecentCommitSnapshots.mockReturnValue([
+      { dbPath: "/tmp/state.vscdb", value: { timestamp: 1716215400000, commitHash: "aaa", linesAdded: 1, linesDeleted: 0 } },
+      { dbPath: "/tmp/state.vscdb", value: { timestamp: 1716215401000, commitHash: "bbb", linesAdded: 1, linesDeleted: 0 } },
+    ]);
+    mocks.mapRecentCommit
+      .mockReturnValueOnce(makeCommitPayload("aaa", "2026-05-20T14:30:00.000Z"))
+      .mockReturnValueOnce(makeCommitPayload("bbb", "2026-05-20T14:31:00.000Z"));
+
+    // First commit succeeds, second fails — partial batch
+    mocks.postEvent
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+
+    const result = await syncTelemetryTools({
+      credentials: { host, accounts: { cursor: cursorToken } },
+      dryRun: false,
+      verbose: false,
+      projectId: null,
+      pricing: DEFAULT_PRICING,
+      appDir,
+      tools: ["cursor"],
+    });
+
+    expect(result.sent).toBe(1);
+    expect(result.failed).toBe(1);
+
+    const state = readState(appDir, host, cursorToken);
+    // Hashes must NOT be persisted — the failed commit (bbb) must remain retryable
+    expect(state.lastRecentCommitHashes).toBeUndefined();
+  });
+
+  it("persists lastRecentCommitHashes only when the entire batch succeeds", async () => {
+    mocks.readRecentCommitSnapshots.mockReturnValue([
+      { dbPath: "/tmp/state.vscdb", value: { timestamp: 1716215400000, commitHash: "aaa", linesAdded: 1, linesDeleted: 0 } },
+      { dbPath: "/tmp/state.vscdb", value: { timestamp: 1716215401000, commitHash: "bbb", linesAdded: 1, linesDeleted: 0 } },
+    ]);
+    mocks.mapRecentCommit
+      .mockReturnValueOnce(makeCommitPayload("aaa", "2026-05-20T14:30:00.000Z"))
+      .mockReturnValueOnce(makeCommitPayload("bbb", "2026-05-20T14:31:00.000Z"));
+
+    mocks.postEvent.mockResolvedValue(true);
+
+    const result = await syncTelemetryTools({
+      credentials: { host, accounts: { cursor: cursorToken } },
+      dryRun: false,
+      verbose: false,
+      projectId: null,
+      pricing: DEFAULT_PRICING,
+      appDir,
+      tools: ["cursor"],
+    });
+
+    expect(result.sent).toBe(2);
+    expect(result.failed).toBe(0);
+
+    const state = readState(appDir, host, cursorToken);
+    expect(state.lastRecentCommitHashes).toEqual(["aaa", "bbb"]);
   });
 });
