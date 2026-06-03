@@ -196,10 +196,11 @@ export function InviteForm({ onSubmit, className }: InviteFormProps) {
               <p className="font-medium">Role Permissions</p>
               <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
                 <li>
-                  <strong>Admin:</strong> Full access, can manage team and settings
+                  <strong>Owner:</strong> Full access — manage members, settings, and all projects{" "}
+                  <span className="italic">(assigned post-invite via the Members table)</span>
                 </li>
                 <li>
-                  <strong>Member:</strong> Can view all data and create projects
+                  <strong>Member:</strong> View dashboards and contribute to projects
                 </li>
                 <li>
                   <strong>Viewer:</strong> Read-only access to events and dashboards
