@@ -293,3 +293,39 @@ npx -y @db90/telemetry-mcp init --host http://localhost:3000
 and let `init` write the `npx` stanza in `~/.claude.json` without manual patching. Until then, this guide is the supported path for local monorepo development.
 
 See also: [README.md](./README.md), [RELEASING.md](../RELEASING.md), [CURSOR-INGEST-VERIFICATION.md](../../../docs/data-pipeline/CURSOR-INGEST-VERIFICATION.md).
+
+## 11. Cursor Hooks setup (opt-in)
+
+Installs the per-turn hook forwarder so each Agent turn records the resolved model name.
+
+```bash
+cd packages/tools
+npm run build --workspace=@db90/telemetry-mcp   # ensures dist/hooks/hook-forwarder.mjs is current
+
+node db90-telemetry-mcp/dist/cli.js init --hooks
+# Output: backup path + "Restart Cursor to activate"
+```
+
+1. **Restart Cursor** after install.
+2. Open a Cursor Agent chat, select a model (e.g. "claude-sonnet-4-5"), and trigger a tool use.
+3. Run a sync cycle:
+
+```bash
+node db90-telemetry-mcp/dist/cli.js run --once
+```
+
+4. Check health to confirm hooks fired:
+
+```bash
+node db90-telemetry-mcp/dist/cli.js health
+# hooks_installed: true
+# hooks_queue_depth: 0  (queue was drained)
+```
+
+5. Open DB90 Events UI → filter by `ingest_source: cursor_hook` → event should show the actual model name.
+
+To uninstall:
+
+```bash
+node db90-telemetry-mcp/dist/cli.js uninstall-hooks
+```

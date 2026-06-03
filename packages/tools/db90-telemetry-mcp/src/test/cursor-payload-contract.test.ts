@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CursorDb90Payload } from "../readers/cursor.js";
+import { HOOK_COST_MODEL } from "../readers/cursor.js";
 import {
   inferIngestPath,
   summarizeDryRunMatrix,
@@ -121,6 +122,58 @@ describe("validateCursorPayload", () => {
     expect(result.path).toBe("recent_commit");
   });
 
+  it("accepts cursor hook payloads and classifies them before legacy requests", () => {
+    const result = validateCursorPayload(
+      basePayload({
+        event_type: "chat",
+        model: "claude-sonnet-4-20250514",
+        tokens_in: 0,
+        tokens_out: 0,
+        cost_usd: 0,
+        metadata: {
+          cursor_session_id: "cmp-123",
+          workspace: "/tmp/repo",
+          workspace_scope: "global",
+          cost_model: HOOK_COST_MODEL,
+          scannable: false,
+          risk_level: "none",
+          ingest_source: "cursor_hook",
+          hook_event_name: "sessionEnd",
+          generation_id: "gen-123",
+          session_id: "cursor:hook:cmp-123:gen-123:sessionEnd",
+        },
+      })
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.path).toBe("cursor_hook");
+  });
+
+  it("rejects cursor hook payloads with mismatched ingest_source", () => {
+    const result = validateCursorPayload(
+      basePayload({
+        event_type: "chat",
+        model: "claude-sonnet-4-20250514",
+        metadata: {
+          cursor_session_id: "cmp-123",
+          workspace: "/tmp/repo",
+          workspace_scope: "global",
+          cost_model: HOOK_COST_MODEL,
+          scannable: false,
+          risk_level: "none",
+          ingest_source: "not_cursor_hook",
+          hook_event_name: "sessionEnd",
+          generation_id: "gen-123",
+          session_id: "cursor:hook:cmp-123:gen-123:sessionEnd",
+        },
+      })
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.path).toBe("cursor_hook");
+    expect(result.errors).toContain('metadata.ingest_source must be "cursor_hook"');
+  });
+
   it("rejects unexpected top-level keys", () => {
     const payload = { ...basePayload(), extra: true } as CursorDb90Payload;
     const result = validateCursorPayload(payload);
@@ -178,12 +231,32 @@ describe("summarizeDryRunMatrix", () => {
           transcript_source: "agent_transcript",
         },
       }),
+      basePayload({
+        event_type: "chat",
+        model: "claude-sonnet-4-20250514",
+        tokens_in: 0,
+        tokens_out: 0,
+        cost_usd: 0,
+        metadata: {
+          cursor_session_id: "cmp-123",
+          workspace: "/tmp/ws",
+          workspace_scope: "global",
+          cost_model: HOOK_COST_MODEL,
+          scannable: false,
+          risk_level: "none",
+          ingest_source: "cursor_hook",
+          hook_event_name: "sessionEnd",
+          generation_id: "gen-123",
+          session_id: "cursor:hook:cmp-123:gen-123:sessionEnd",
+        },
+      }),
     ]);
     expect(matrix.map((r) => r.path)).toEqual([
       "daily_tab",
       "daily_composer",
       "recent_commit",
       "mcp_transcript",
+      "cursor_hook",
     ]);
     expect(inferIngestPath(basePayload())).toBe("daily_tab");
   });

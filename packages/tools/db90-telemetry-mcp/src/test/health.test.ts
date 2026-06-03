@@ -28,11 +28,20 @@ describe("buildHealthSnapshot", () => {
     process.env.DB90_MCP_HOME = home;
     process.env.DB90_MCP_DISABLE_KEYTAR = "true";
     mkdirSync(home, { recursive: true });
+    // Redirect homedir() to the sandbox so verifyHooksConfig() reads an
+    // isolated ~/.cursor/hooks.json instead of the developer's real one.
+    vi.resetModules();
+    vi.doMock("node:os", async () => {
+      const actual = await vi.importActual<typeof import("node:os")>("node:os");
+      return { ...actual, homedir: () => home };
+    });
   });
 
   afterEach(() => {
     delete process.env.DB90_MCP_HOME;
     delete process.env.DB90_MCP_DISABLE_KEYTAR;
+    vi.doUnmock("node:os");
+    vi.resetModules();
     vi.restoreAllMocks();
   });
 
@@ -72,5 +81,26 @@ describe("buildHealthSnapshot", () => {
     expect(s.configured).toBe(true);
     expect(s.persisted?.recent_errors.join(" ")).toContain("persisted failure");
     expect(s.state_file_paths.some((p) => p.endsWith(".json"))).toBe(true);
+  });
+
+  it("reports hooks installation status and queue depth", async () => {
+    writeFileSync(
+      join(home, "hooks-queue.ndjson"),
+      JSON.stringify({
+        captured_at: "2026-05-27T00:00:00.000Z",
+        hook_event_name: "sessionEnd",
+        conversation_id: "cmp-1",
+        model: "claude-sonnet-4-20250514",
+        workspace_roots: ["/tmp/repo"],
+      }) + "\n",
+      "utf-8"
+    );
+
+    vi.resetModules();
+    const { buildHealthSnapshot } = await import("../health.js");
+    const s = await buildHealthSnapshot();
+
+    expect(s.hooks_installed).toBe(false);
+    expect(s.hooks_queue_depth).toBe(1);
   });
 });

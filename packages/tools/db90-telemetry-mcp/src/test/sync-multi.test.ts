@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -51,6 +51,7 @@ vi.mock("../readers/cursor.js", () => ({
     chat_input_per_mtok: 3.0,
     chat_output_per_mtok: 15.0,
   },
+  HOOK_COST_MODEL: "cursor_hook",
 }));
 
 vi.mock("../cursor-settings.js", () => ({
@@ -153,6 +154,56 @@ describe("syncTelemetryTools", () => {
     vi.restoreAllMocks();
     delete process.env.DB90_MCP_HOME;
     resetBackoffStateForTests();
+  });
+
+  it("processes cursor hook queue events during cursor sync", async () => {
+    const queuePath = join(appDir, "hooks-queue.ndjson");
+    writeFileSync(
+      queuePath,
+      JSON.stringify({
+        captured_at: "2026-05-27T00:01:00.000Z",
+        hook_event_name: "sessionEnd",
+        conversation_id: "cmp-sync",
+        generation_id: "gen-sync",
+        model: "claude-sonnet-4-20250514",
+        workspace_roots: ["/tmp/sync-repo"],
+        cursor_version: "1.7.4",
+      }) + "\n",
+      "utf-8"
+    );
+
+    const result = await syncTelemetryTools({
+      credentials: { host, accounts: { cursor: "db90_cursor_token" } },
+      dryRun: false,
+      verbose: false,
+      projectId: null,
+      pricing: DEFAULT_PRICING,
+      appDir,
+      tools: ["cursor"],
+    });
+
+    expect(result.sent).toBe(1);
+    expect(result.failed).toBe(0);
+    expect(mocks.postEvent).toHaveBeenCalledTimes(1);
+    expect(mocks.postEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tool_name: "cursor",
+        event_type: "chat",
+        model: "claude-sonnet-4-20250514",
+        metadata: expect.objectContaining({
+          cost_model: "cursor_hook",
+          ingest_source: "cursor_hook",
+          session_id: "cursor:hook:cmp-sync:gen-sync:sessionEnd",
+        }),
+      }),
+      host,
+      "db90_cursor_token",
+      expect.any(Object)
+    );
+    expect(readFileSync(queuePath, "utf-8").trim()).toBe("");
+
+    const state = readState(appDir, host, "db90_cursor_token");
+    expect(state.sessions["cursor:hook:cmp-sync:gen-sync:sessionEnd"]).toBeDefined();
   });
 
   it("does not advance the cursor events watermark when all cursor events fail", async () => {

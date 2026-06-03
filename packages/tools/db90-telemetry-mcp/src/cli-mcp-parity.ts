@@ -5,8 +5,8 @@ import type { CollectedCursorPayloads } from "./collect-cursor-payloads.js";
 import { inferIngestPath, type CursorIngestPath } from "./cursor-payload-contract.js";
 import type { CursorDb90Payload } from "./readers/cursor.js";
 
-/** MCP-only path (composer JSONL transcripts). */
-export type McpOnlyPath = "mcp_transcript";
+/** MCP-only paths (composer JSONL transcripts; cursor_hook events from hooks.json). */
+export type McpOnlyPath = "mcp_transcript" | "cursor_hook";
 
 export type ParityPath = CursorIngestPath | McpOnlyPath | "unknown";
 
@@ -16,6 +16,7 @@ export interface ParityPathCounts {
   legacy_request: number;
   recent_commit: number;
   mcp_transcript: number;
+  cursor_hook: number;
   unknown: number;
 }
 
@@ -67,6 +68,7 @@ export function countByParityPath(payloads: CursorDb90Payload[]): ParityPathCoun
     legacy_request: 0,
     recent_commit: 0,
     mcp_transcript: 0,
+    cursor_hook: 0,
     unknown: 0,
   };
   for (const p of payloads) {
@@ -97,7 +99,7 @@ export function buildCliMcpParityReport(
   const mcpCounts = countByParityPath(mcp.payloads);
 
   const rows: CliMcpParityRow[] = [];
-  const allPaths: ParityPath[] = [...SHARED_PATHS, "mcp_transcript", "unknown"];
+  const allPaths: ParityPath[] = [...SHARED_PATHS, "mcp_transcript", "cursor_hook", "unknown"];
 
   for (const path of allPaths) {
     const cli_count = countForPath(cliCounts, path);

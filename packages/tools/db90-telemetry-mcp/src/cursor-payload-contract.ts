@@ -1,4 +1,5 @@
 import type { CursorDb90Payload } from "./readers/cursor.js";
+import { HOOK_COST_MODEL } from "./readers/cursor.js";
 
 /** Ingest paths for Cursor payloads emitted by telemetry-mcp. */
 export type CursorIngestPath =
@@ -6,7 +7,8 @@ export type CursorIngestPath =
   | "daily_composer"
   | "legacy_request"
   | "recent_commit"
-  | "mcp_transcript";
+  | "mcp_transcript"
+  | "cursor_hook";
 
 export interface PayloadValidationResult {
   ok: boolean;
@@ -61,10 +63,30 @@ const METADATA_TRANSCRIPT_KEYS = new Set([
   "assistant_text",
 ]);
 
+const METADATA_HOOK_KEYS = new Set([
+  "cursor_session_id",
+  "workspace",
+  "workspace_scope",
+  "cost_model",
+  "scannable",
+  "risk_level",
+  "ingest_source",
+  "hook_event_name",
+  "generation_id",
+  "hook_tool_name",
+  "duration_ms",
+  "session_id",
+]);
+
 const EVENT_TYPES = new Set(["completion", "chat", "commit"]);
 
-// Priority: transcript_source > event_type/source discriminants > session-based legacy path
+// Priority: cursor_hook (cost_model discriminant) > transcript_source > event_type/source > session-based legacy path
+// IMPORTANT: cursor_hook must be checked first — hook payloads set cursor_session_id (conversation_id)
+// which would otherwise misclassify as "legacy_request".
 export function inferIngestPath(payload: CursorDb90Payload): CursorIngestPath | "unknown" {
+  if (payload.metadata.cost_model === HOOK_COST_MODEL) {
+    return "cursor_hook";
+  }
   if (payload.metadata.transcript_source === "agent_transcript") {
     return "mcp_transcript";
   }
@@ -133,7 +155,9 @@ export function validateCursorPayload(payload: CursorDb90Payload): PayloadValida
         ? METADATA_COMMIT_KEYS
         : path === "mcp_transcript"
           ? METADATA_TRANSCRIPT_KEYS
-          : METADATA_BASE_KEYS;
+          : path === "cursor_hook"
+            ? METADATA_HOOK_KEYS
+            : METADATA_BASE_KEYS;
     errors.push(
       ...unexpectedKeys(meta as unknown as Record<string, unknown>, allowedMeta, "metadata")
     );
@@ -145,7 +169,7 @@ export function validateCursorPayload(payload: CursorDb90Payload): PayloadValida
       errors.push("metadata.workspace must be a non-empty string");
     }
 
-    if (path !== "mcp_transcript") {
+    if (path !== "mcp_transcript" && path !== "cursor_hook") {
       if (meta.workspace_scope !== "global" && meta.workspace_scope !== "workspace") {
         errors.push('metadata.workspace_scope must be "global" or "workspace"');
       }
@@ -157,7 +181,17 @@ export function validateCursorPayload(payload: CursorDb90Payload): PayloadValida
       }
     }
 
-    if (path === "legacy_request") {
+    if (path === "cursor_hook") {
+      if (meta.cost_model !== HOOK_COST_MODEL) {
+        errors.push(`metadata.cost_model must be "${HOOK_COST_MODEL}" for hook ingest`);
+      }
+      if (meta.ingest_source !== "cursor_hook") {
+        errors.push('metadata.ingest_source must be "cursor_hook"');
+      }
+      if (typeof meta.session_id !== "string" || meta.session_id.length === 0) {
+        errors.push("metadata.session_id must be a non-empty string for hook ingest");
+      }
+    } else if (path === "legacy_request") {
       if (meta.cost_model !== "token_count") {
         errors.push('metadata.cost_model must be "token_count" for legacy cursor.db ingest');
       }
@@ -178,8 +212,11 @@ export function validateCursorPayload(payload: CursorDb90Payload): PayloadValida
       errors.push('metadata.cost_model must be "estimated_line_count" for line-based cursor ingest');
     }
 
-    if (path !== "mcp_transcript" && meta.scannable !== false) {
+    if (path !== "mcp_transcript" && path !== "cursor_hook" && meta.scannable !== false) {
       errors.push("metadata.scannable must be false");
+    }
+    if (path === "cursor_hook" && meta.scannable !== false) {
+      errors.push("metadata.scannable must be false for hook ingest");
     }
     if (path !== "mcp_transcript" && meta.risk_level !== "none") {
       errors.push('metadata.risk_level must be "none"');
@@ -219,6 +256,7 @@ export function summarizeDryRunMatrix(payloads: CursorDb90Payload[]): DryRunMatr
     "legacy_request",
     "recent_commit",
     "mcp_transcript",
+    "cursor_hook",
     "unknown",
   ];
 

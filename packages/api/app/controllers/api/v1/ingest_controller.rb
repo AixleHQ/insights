@@ -180,6 +180,10 @@ module Api
         return unless @tool_account.may_activate_connection?
 
         @tool_account.activate_connection!
+      rescue AASM::InvalidTransition
+        # A concurrent ingest request already activated the account — reload to get
+        # current state and continue normally; the transition is idempotent.
+        @tool_account.reload
       end
 
       def permitted_params

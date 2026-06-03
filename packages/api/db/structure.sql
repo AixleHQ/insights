@@ -268,7 +268,6 @@ CREATE VIEW _timescaledb_internal._direct_view_4 AS
     sum(cost_usd) AS total_cost
    FROM timeseries.tool_events
   GROUP BY (public.time_bucket('1 day'::interval, occurred_at)), organization_id, user_id, project_id, tool_name, event_type;
-
 --
 -- Name: _materialized_hypertable_3; Type: TABLE; Schema: _timescaledb_internal; Owner: -
 --
@@ -286,7 +285,6 @@ CREATE TABLE _timescaledb_internal._materialized_hypertable_3 (
     total_tokens bigint,
     total_cost numeric
 );
-
 --
 -- Name: _materialized_hypertable_4; Type: TABLE; Schema: _timescaledb_internal; Owner: -
 --
@@ -906,7 +904,6 @@ CREATE TABLE public.user_tool_accounts (
     updated_at timestamp(6) without time zone NOT NULL,
     external_account_id character varying,
     external_account_name character varying,
-    is_active boolean DEFAULT true NOT NULL,
     token_hash character varying,
     connector_scope character varying DEFAULT 'persona'::character varying NOT NULL,
     connection_state character varying DEFAULT 'inactive'::character varying NOT NULL
@@ -983,7 +980,6 @@ CREATE VIEW timeseries.hourly_token_usage AS
     total_tokens,
     total_cost
    FROM _timescaledb_internal._materialized_hypertable_3;
-
 --
 -- Name: connector_event_dedup id; Type: DEFAULT; Schema: public; Owner: -
 --
@@ -995,7 +991,6 @@ ALTER TABLE ONLY public.connector_event_dedup ALTER COLUMN id SET DEFAULT nextva
 --
 
 ALTER TABLE ONLY public.retention_purge_logs ALTER COLUMN id SET DEFAULT nextval('public.retention_purge_logs_id_seq'::regclass);
-
 --
 -- Name: admin_audit_logs admin_audit_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
@@ -1226,7 +1221,6 @@ ALTER TABLE ONLY public.webhook_deliveries
 
 ALTER TABLE ONLY timeseries.tool_events
     ADD CONSTRAINT tool_events_pkey PRIMARY KEY (id, occurred_at);
-
 --
 -- Name: _materialized_hypertable_3_bucket_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
 --
@@ -1970,7 +1964,6 @@ CREATE INDEX tool_events_occurred_at_idx ON timeseries.tool_events USING btree (
 --
 
 CREATE TRIGGER retention_purge_logs_append_only BEFORE DELETE OR UPDATE ON public.retention_purge_logs FOR EACH ROW EXECUTE FUNCTION public.prevent_retention_purge_log_mutation();
-
 --
 -- Name: project_memberships fk_project_memberships_created_by_id; Type: FK CONSTRAINT; Schema: public; Owner: -
 --

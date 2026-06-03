@@ -31,7 +31,13 @@ export interface McpOperatorState {
 
 export interface State {
   version: number;
-  /** Map of session ID → last known state. */
+  /**
+   * Map of session ID → last known state.
+   * Key namespaces:
+   *   `claude_code:<sessionId>` — Claude transcript turns
+   *   `cursor:watermark` / `cursor:events:watermark` / etc. — Cursor timestamp watermarks
+   *   `cursor:hook:<conversation_id>:<generation_id>:<hook_event_name>` — Cursor hook event dedup (AIX-286)
+   */
   sessions: Record<string, SessionRecord>;
   /**
    * All `metadata.commit_hash` values successfully POSTed for Cursor Path B (recent commit).

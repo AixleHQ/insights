@@ -2,6 +2,13 @@
 
 All notable changes to `@db90/telemetry-mcp` will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **Cursor Hooks (opt-in)** [AIX-286]: `db90-mcp init --hooks` installs a forwarder script into `~/.cursor/hooks.json` that captures `sessionEnd` and `postToolUse` events on every turn. The background sync picks up the queue (`~/.db90-mcp/hooks-queue.ndjson`) and POSTs hook-sourced events with accurate model attribution (`model` from the resolved turn, not the global settings default). New commands: `uninstall-hooks` (restores backup), `verify-hooks` (prints feasibility report). Health output gains `hooks_installed` and `hooks_queue_depth` fields.
+- `cursor_hook` ingest path: hook events carry `metadata.cost_model: "cursor_hook"` and `metadata.ingest_source: "cursor_hook"` — excluded from cost dashboards (tokens/cost = 0 on all hook events). Dedup key: `cursor:hook:{conversation_id}:{generation_id}:{hook_event_name}` (also set as `metadata.session_id` for server-side upsert surviving MCP state wipe).
+
 ## [0.1.0] - 2026-05-29
 
 First public npm release (`@db90/telemetry-mcp@0.1.0`): stdio MCP server for DB90 with Claude Code + Cursor ingestion, Keycloak/OIDC device login, bundled private `@db90/sdk`.

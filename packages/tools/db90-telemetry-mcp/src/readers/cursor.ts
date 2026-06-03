@@ -786,9 +786,11 @@ export async function readCursorTranscriptSessions(
 const LINE_COST_MODEL = "estimated_line_count" as const;
 const TOKEN_COST_MODEL = "token_count" as const;
 const TRANSCRIPT_COST_MODEL = "estimated_transcript_text" as const;
+export const HOOK_COST_MODEL = "cursor_hook" as const;
 
 type CursorLineCostModel = typeof LINE_COST_MODEL;
 type CursorTokenCostModel = typeof TOKEN_COST_MODEL;
+export type CursorHookCostModel = typeof HOOK_COST_MODEL;
 
 export interface PricingConfig {
   tokens_per_line: number;
@@ -810,7 +812,7 @@ export type Db90CursorPayloadMetadata = {
   workspace: string;
   workspace_scope?: WorkspaceScope;
   workspace_folder?: string;
-  cost_model: CursorLineCostModel | CursorTokenCostModel | typeof TRANSCRIPT_COST_MODEL;
+  cost_model: CursorLineCostModel | CursorTokenCostModel | typeof TRANSCRIPT_COST_MODEL | CursorHookCostModel;
   scannable: boolean;
   risk_level: RiskLevel | "none";
   source?: "recent_commit";
@@ -825,6 +827,12 @@ export type Db90CursorPayloadMetadata = {
   repo_name?: string;
   branch_name?: string;
   ai_percentage?: number;
+  // cursor_hook path fields
+  ingest_source?: "cursor_hook";
+  hook_event_name?: string;
+  generation_id?: string;
+  hook_tool_name?: string;
+  duration_ms?: number;
 };
 
 export interface CursorDb90Payload extends IngestPayload {

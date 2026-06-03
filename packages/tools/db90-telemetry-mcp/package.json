@@ -39,7 +39,7 @@
   ],
   "scripts": {
     "prebuild": "npm run build --prefix ../db90-sdk",
-    "build": "tsc",
+    "build": "tsc && node -e \"const{mkdirSync,copyFileSync}=require('fs');mkdirSync('dist/hooks',{recursive:true});copyFileSync('src/hooks/hook-forwarder.mjs','dist/hooks/hook-forwarder.mjs');\"",
     "test": "vitest run",
     "verify:cursor-dry-run": "tsx scripts/verify-cursor-dry-run.ts",
     "audit:local-stores": "tsx scripts/audit-local-stores.ts",

@@ -86,6 +86,16 @@ RSpec.describe 'Api::V1::Ingest', type: :request do
         expect(response).to have_http_status(:accepted)
         expect(tool_account.reload.connection_state).to eq('active')
       end
+
+      it 'returns accepted even when a concurrent request already activated the account' do
+        # Simulate race: account is already active by the time activate_connection! fires.
+        tool_account.update_column(:connection_state, 'active')
+
+        ingest_post
+
+        expect(response).to have_http_status(:accepted)
+        expect(tool_account.reload.connection_state).to eq('active')
+      end
     end
 
     context 'with a raw Claude Code PostToolUse hook payload' do

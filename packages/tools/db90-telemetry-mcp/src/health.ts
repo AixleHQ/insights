@@ -9,6 +9,7 @@ import {
 } from "./state.js";
 import { getSyncTelemetry, type SyncResult } from "./sync.js";
 import { getMcpLogPath } from "./log.js";
+import { verifyHooksConfig } from "./hooks/hooks-config.js";
 
 export interface HealthSnapshot {
   authenticated: boolean;
@@ -19,6 +20,10 @@ export interface HealthSnapshot {
   log_path: string;
   state_file_paths: string[];
   state_tracked_sessions: number;
+  /** Whether the Cursor hooks forwarder is installed in ~/.cursor/hooks.json. */
+  hooks_installed: boolean;
+  /** Number of unprocessed events waiting in the hooks queue file. */
+  hooks_queue_depth: number;
   /** Best-effort merge of credential-scoped `mcp_operator` (latest `last_sync_at`). */
   persisted: McpOperatorState | null;
   /** In-process telemetry (same fields as `getSyncTelemetry`). */
@@ -92,6 +97,8 @@ export async function buildHealthSnapshot(): Promise<HealthSnapshot> {
   const logPath = getMcpLogPath(appDir);
   const telemetry = getSyncTelemetry();
 
+  const hooksReport = verifyHooksConfig(appDir);
+
   try {
     const creds = await loadCredentials();
     if (!creds || !credentialsHaveAnyToken(creds)) {
@@ -104,6 +111,8 @@ export async function buildHealthSnapshot(): Promise<HealthSnapshot> {
         log_path: logPath,
         state_file_paths: [],
         state_tracked_sessions: 0,
+        hooks_installed: hooksReport.hooks_json_installed,
+        hooks_queue_depth: hooksReport.queue_depth,
         persisted: null,
         process: {
           last_sync_at: telemetry.lastSyncAt,
@@ -131,6 +140,8 @@ export async function buildHealthSnapshot(): Promise<HealthSnapshot> {
       log_path: logPath,
       state_file_paths: paths.sort(),
       state_tracked_sessions: tracked,
+      hooks_installed: hooksReport.hooks_json_installed,
+      hooks_queue_depth: hooksReport.queue_depth,
       persisted: merged,
       process: {
         last_sync_at: telemetry.lastSyncAt,
@@ -148,6 +159,8 @@ export async function buildHealthSnapshot(): Promise<HealthSnapshot> {
       log_path: logPath,
       state_file_paths: [],
       state_tracked_sessions: 0,
+      hooks_installed: hooksReport.hooks_json_installed,
+      hooks_queue_depth: hooksReport.queue_depth,
       persisted: null,
       process: {
         last_sync_at: telemetry.lastSyncAt,

@@ -37,20 +37,19 @@ module Mcp
       tool_accounts_by_name = {}
       validation_errors = nil
 
-      @membership.with_lock do
-        @membership.user_tool_accounts.transaction do
-          requested_tools.each do |name|
-            tool_account = @membership.user_tool_accounts.find_or_initialize_by(tool_name: name)
-            tool_account.mark_waiting_for_connection if tool_account.may_mark_waiting_for_connection?
+      ApplicationRecord.transaction do
+        @membership.lock!
+        requested_tools.each do |name|
+          tool_account = @membership.user_tool_accounts.find_or_initialize_by(tool_name: name)
+          tool_account.mark_waiting_for_connection if tool_account.may_mark_waiting_for_connection?
 
-            unless tool_account.save
-              validation_errors = tool_account.errors
-              raise ActiveRecord::Rollback
-            end
-
-            tool_account.rotate_ingest_token!
-            tool_accounts_by_name[name] = tool_account
+          unless tool_account.save
+            validation_errors = tool_account.errors
+            raise ActiveRecord::Rollback
           end
+
+          tool_account.rotate_ingest_token!
+          tool_accounts_by_name[name] = tool_account
         end
       end
 

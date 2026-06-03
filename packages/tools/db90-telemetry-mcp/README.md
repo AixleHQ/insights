@@ -230,6 +230,49 @@ npm run verify:cli-mcp-parity       # CUR-V14 — CLI vs MCP ingest path counts
 
 Remaining CLI-only scripts (`spotcheck:disk-kv`, hooks feasibility) live in **`@db90/cursor`** until ported.
 
+## Advanced: Cursor Hooks (opt-in)
+
+Cursor 1.7+ emits a lifecycle event on every turn (`sessionEnd`, `postToolUse`) carrying the **resolved model name** — even when Auto-mode routes to a specific model. This opt-in path supplements transcript sync with accurate model attribution.
+
+### Install
+
+```bash
+db90-mcp init --hooks
+```
+
+This:
+1. Backs up `~/.cursor/hooks.json` → `~/.cursor/hooks.json.db90-backup`
+2. Copies the forwarder script to `~/.db90-mcp/hook-forwarder.mjs`
+3. Adds a `sessionEnd` + `postToolUse` entry pointing at the forwarder
+
+**Restart Cursor after install** to activate the hooks.
+
+### How it works
+
+- The forwarder (no credentials, no network) appends redacted events to `~/.db90-mcp/hooks-queue.ndjson`
+- The background MCP server picks up the queue on each sync cycle and POSTs to `/api/v1/ingest/events`
+- Hook rows appear as separate events alongside existing transcript turns (cost dashboards exclude `cost_model: cursor_hook` rows — tokens/cost = 0 on all hook events)
+- Event counts may increase until a merge follow-up ships that consolidates hook attribution into transcript rows
+
+### Privacy redaction
+
+The forwarder redacts before writing to the queue: `user_email`, `transcript_path` → `"[redacted]"`; `workspace_roots` → path-redacted; `tool_input/output/text/agent_message/error_message/command` → `"[redacted, N chars]"`. No raw prompt text or file content leaves the local queue.
+
+### Uninstall
+
+```bash
+db90-mcp uninstall-hooks
+```
+
+Restores the backup. If the queue has unprocessed events, a warning is printed but the uninstall completes.
+
+### Verify
+
+```bash
+db90-mcp verify-hooks
+db90-mcp health   # shows hooks_installed + hooks_queue_depth
+```
+
 ## Troubleshooting
 
 | Symptom | Mitigation |

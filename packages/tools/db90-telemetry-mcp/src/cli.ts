@@ -12,10 +12,13 @@ import { DEFAULT_PRICING, mergePricing } from "./pricing.js";
 import { resolveCursorPricing } from "./cursor-config.js";
 import { buildHealthSnapshot, formatHealthForCli } from "./health.js";
 import { installClaudeUserMcp, type InstallClaudeUserMcpOptions, type InstallResult } from "./install/claude.js";
+import { installHooksConfig, uninstallHooksConfig, verifyHooksConfig, FORWARDER_FILENAME } from "./hooks/hooks-config.js";
+import { join } from "node:path";
+import { fileURLToPath as nodeFileURLToPath } from "node:url";
 import { mcpLog } from "./log.js";
 
 export interface Args {
-  command: "init" | "health" | "run" | "help";
+  command: "init" | "health" | "run" | "help" | "uninstall-hooks" | "verify-hooks";
   help: boolean;
   once: boolean;
   /** With `run --once`: ignore Cursor watermarks and commit hash dedupe. */
@@ -26,6 +29,8 @@ export interface Args {
   /** When set on init, sent as `X-Organization-ID` on MCP exchange (overrides DB90_ORGANIZATION_ID). */
   organizationId?: string;
   force?: boolean;
+  /** When set on init, install the Cursor hooks forwarder into ~/.cursor/hooks.json. */
+  hooks?: boolean;
 }
 
 interface RunOnceDeps {
@@ -50,7 +55,7 @@ interface InitDeps {
 
 const GLOBAL_FLAGS = new Set(["--help", "-h", "--once", "--full"]);
 const INIT_VALUE_FLAGS = new Set(["--host", "--keycloak-url", "--tool-name", "--organization-id"]);
-const INIT_BOOLEAN_FLAGS = new Set(["--force"]);
+const INIT_BOOLEAN_FLAGS = new Set(["--force", "--hooks"]);
 
 /** Matches DB90 Rails `McpController` UUID check for `X-Organization-ID` (RFC 4122 variant). */
 export const DB90_ORGANIZATION_UUID_PATTERN =
@@ -154,7 +159,8 @@ export function parseArgs(argv: string[]): Args {
     const toolName = takeFlagValue(args, "--tool-name");
     const organizationId = takeFlagValue(args, "--organization-id");
     const force = args.includes("--force");
-    return { command: "init", help, once: false, host, keycloakUrl, toolName, organizationId, force };
+    const hooks = args.includes("--hooks");
+    return { command: "init", help, once: false, host, keycloakUrl, toolName, organizationId, force, hooks };
   }
 
   const nonInitBad = args.filter((a) => {
@@ -189,6 +195,9 @@ export function parseArgs(argv: string[]): Args {
   if (raw === "serve") {
     return { command: "run", help, once, full: full || undefined };
   }
+  if (raw === "uninstall-hooks" || raw === "verify-hooks") {
+    return { command: raw, help: false, once: false };
+  }
 
   return { command: "help", help: true, once: false };
 }
@@ -201,9 +210,11 @@ Usage:
   db90-mcp [command] [options]
 
 Commands:
-  run         Start the MCP stdio server (default — used by Claude Code).
-  init        Keycloak device login once, then persist DB90 ingest credentials (keychain or file).
-  health      Multi-line diagnostic (credentials, sync, log path, state files).
+  run              Start the MCP stdio server (default — used by Claude Code).
+  init             Keycloak device login once, then persist DB90 ingest credentials (keychain or file).
+  health           Multi-line diagnostic (credentials, sync, log path, state files).
+  uninstall-hooks  Remove DB90 from ~/.cursor/hooks.json and restore backup (if any).
+  verify-hooks     Print hooks install status and queue depth as JSON.
 
 Options:
   --once      With 'run': perform a multi-tool sync then exit (no MCP server).
@@ -211,11 +222,13 @@ Options:
   --help, -h  Show this help message.
 
 init options:
-  --host <url>            DB90 API base URL (default: env DB90_API_URL or http://localhost:3000)
-  --keycloak-url <issuer> Keycloak realm issuer (default: env KEYCLOAK_ISSUER / DB90_KEYCLOAK_ISSUER; local default only with DB90_MCP_USE_LOCAL_KEYCLOAK_DEFAULT=true)
-  --tool-name <name>      Optional: mint only \`claude_code\`, only \`cursor\`, or omit to mint BOTH in one OAuth session.
-  --organization-id <uuid> Optional: scope MCP token exchange to this org (sent as \`X-Organization-ID\`; overrides env DB90_ORGANIZATION_ID).
-  --force                 Replace an existing user "db90" MCP entry in ~/.claude.json if it differs
+  --host <url>             DB90 API base URL (default: env DB90_API_URL or http://localhost:3000)
+  --keycloak-url <issuer>  Keycloak realm issuer (default: env KEYCLOAK_ISSUER / DB90_KEYCLOAK_ISSUER)
+  --tool-name <name>       Optional: mint only \`claude_code\`, only \`cursor\`, or omit to mint BOTH.
+  --organization-id <uuid> Optional: scope MCP token exchange to this org (overrides env DB90_ORGANIZATION_ID).
+  --force                  Replace an existing user "db90" MCP entry in ~/.claude.json if it differs.
+  --hooks                  (opt-in) Install Cursor hook forwarder for per-turn model attribution.
+                           Requires Cursor restart. Run 'db90-mcp uninstall-hooks' to remove.
 
 Multi-org:
   Set \`DB90_ORGANIZATION_ID\` to a UUID, or pass \`--organization-id\` on \`init\`, so ingest tokens are minted for that membership instead of the default (oldest) org.
@@ -307,6 +320,28 @@ export async function runInit(cliArgs: Args, deps?: Partial<InitDeps>): Promise<
     return 1;
   }
   runtime.log(`Credentials saved (organization ${result.organizationId}).`);
+
+  if (cliArgs.hooks) {
+    const appDir = runtime.getAppDir();
+    const thisFile = nodeFileURLToPath(import.meta.url);
+    const pkgRoot = join(thisFile, "..", "..", "..");
+    const srcForwarder = join(pkgRoot, "dist", "hooks", FORWARDER_FILENAME);
+    try {
+      const { forwarderInstalled, backupPath } = installHooksConfig(srcForwarder, appDir);
+      runtime.log(`Cursor hooks installed (forwarder: ${forwarderInstalled}).`);
+      if (backupPath) {
+        runtime.log(`Existing hooks.json backed up to: ${backupPath}`);
+      }
+      runtime.log("Restart Cursor to activate hook-based model attribution.");
+    } catch (err) {
+      runtime.error(
+        `Warning: --hooks install failed: ${err instanceof Error ? err.message : String(err)}`
+      );
+      runtime.error(
+        `Run 'db90-mcp init --hooks' again after verifying ${srcForwarder} exists.`
+      );
+    }
+  }
 
   const shouldInstall = provisionTools.includes("claude_code");
 
@@ -419,6 +454,25 @@ async function main(): Promise<void> {
     case "init": {
       const code = await runInit(args);
       if (code !== 0) process.exit(code);
+      return;
+    }
+    case "uninstall-hooks": {
+      const appDir = getAppDir();
+      const { restored, backupPath, queueWarning } = uninstallHooksConfig(appDir);
+      if (queueWarning) console.warn(`Warning: ${queueWarning}`);
+      if (restored) {
+        console.log(backupPath ? `Hooks uninstalled; hooks.json restored from ${backupPath}.` : "Hooks uninstalled; hooks.json removed.");
+      } else {
+        console.log("No DB90 hooks entry found in ~/.cursor/hooks.json — nothing to uninstall.");
+      }
+      return;
+    }
+    case "verify-hooks": {
+      const report = verifyHooksConfig(getAppDir());
+      console.log(JSON.stringify(report, null, 2));
+      if (report.next_steps.length > 0) {
+        for (const step of report.next_steps) console.log(`Next: ${step}`);
+      }
       return;
     }
     case "run":

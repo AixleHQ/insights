@@ -1,4 +1,7 @@
 import type { TelemetryToolId, StoredCredentials } from "./auth/credentials.js";
+import { join } from "node:path";
+import { existsSync } from "node:fs";
+import { processHooksQueue } from "./hooks/cursor-hooks-reader.js";
 import {
   readState,
   writeState,
@@ -541,7 +544,7 @@ async function runCursorSlice(params: {
   }
 
   const totalPayloadCount = groups.reduce((sum, group) => sum + group.payloads.length, 0);
-  if (totalPayloadCount === 0) {
+  if (totalPayloadCount === 0 && !existsSync(join(appDir, "hooks-queue.ndjson"))) {
     return { sent: 0, failed: 0, skipped: 0 };
   }
 
@@ -701,6 +704,39 @@ async function runCursorSlice(params: {
         }
       }
       writeState(stateMut, appDir, host, token);
+    }
+  }
+
+  // Process cursor hooks queue if present (opt-in; no-op when hooks not installed)
+  if (!shouldStopForBackoff) {
+    const hooksQueuePath = join(appDir, "hooks-queue.ndjson");
+    if (existsSync(hooksQueuePath)) {
+      try {
+        const hooksResult = await processHooksQueue({
+          queuePath: hooksQueuePath,
+          scopeDir,
+          state: stateMut,
+          host,
+          token,
+          on429,
+          resolveProjectId: explicitProject
+            ? undefined
+            : (workspace) =>
+                resolveProjectIdForRepoPathCached(workspace, host, lookupToken, verbose, projectLookupCache),
+          verbose,
+        });
+        totalSent += hooksResult.sent;
+        totalFailed += hooksResult.failed;
+        totalSkipped += hooksResult.skipped;
+        stateMut = hooksResult.state;
+        if (hooksResult.sent > 0 || hooksResult.failed > 0) {
+          writeState(stateMut, appDir, host, token);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        errors.push(`cursor-hooks queue processing failed: ${msg}`);
+        mcpLog.error("sync_hooks_queue_error", { error: msg }, true);
+      }
     }
   }
 
