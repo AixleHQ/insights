@@ -8,6 +8,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useCallback } from "react";
 import { api, downloadBlob } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 import type {
   CurrentUser,
   Organization,
@@ -176,12 +177,14 @@ export const queryKeys = {
 // ============================================================================
 
 export function useCurrentUser() {
+  const { isAuthenticated, isLoading } = useAuth();
   return useQuery({
     queryKey: queryKeys.user.current,
     queryFn: async () => {
       const response = await api.get<{ data: CurrentUser }>("/users/me");
       return response.data;
     },
+    enabled: !isLoading && isAuthenticated,
   });
 }
 

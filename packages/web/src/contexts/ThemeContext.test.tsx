@@ -17,12 +17,15 @@ vi.mock("@/lib/queryClient", () => ({
   },
 }));
 
+// Mutable mock so individual tests can override useCurrentUser return value
+const mockUseCurrentUser = vi.fn(() => ({ data: undefined }));
+
 // Mock queryKeys and useCurrentUser
 vi.mock("@/hooks/useApi", () => ({
   queryKeys: {
     user: { current: ["user", "current"] },
   },
-  useCurrentUser: () => ({ data: undefined }),
+  useCurrentUser: () => mockUseCurrentUser(),
 }));
 
 // localStorage mock
@@ -146,5 +149,29 @@ describe("ThemeContext", () => {
     localStorage.setItem("db90_theme", "purple");
     const { result } = renderHook(() => useTheme(), { wrapper });
     expect(result.current.theme).toBe("system");
+  });
+
+  it("ThemeSyncFromServer does not apply theme when useCurrentUser returns no data (auth still loading)", () => {
+    // Simulate the enabled: false state — no user data returned during auth initialization
+    mockUseCurrentUser.mockReturnValue({ data: undefined });
+    localStorage.setItem("db90_theme", "light");
+
+    renderHook(() => useTheme(), { wrapper });
+
+    // Theme should remain as stored in localStorage, not overridden
+    const { result } = renderHook(() => useTheme(), { wrapper });
+    expect(result.current.theme).toBe("light");
+  });
+
+  it("ThemeSyncFromServer applies server theme once user data is available", () => {
+    mockUseCurrentUser.mockReturnValue({
+      data: { settings: { theme: "dark" } },
+    });
+    localStorage.setItem("db90_theme", "light");
+
+    const { result } = renderHook(() => useTheme(), { wrapper });
+
+    // After mount, ThemeSyncFromServer should have synced the dark theme from server
+    expect(result.current.theme).toBe("dark");
   });
 });
