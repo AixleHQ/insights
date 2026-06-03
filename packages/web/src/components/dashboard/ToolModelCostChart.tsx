@@ -6,7 +6,7 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import type { ChartConfig } from "@/components/ui/chart";
-import { Skeleton } from "@/components/ui/skeleton";
+import { ChartSkeleton } from "@/components/ui/skeletons";
 import type { ToolModelStat } from "@/lib/types";
 import { formatCost, truncateModelName } from "@/lib/formatters";
 
@@ -46,11 +46,7 @@ export function ToolModelCostChart({ models, isLoading }: ToolModelCostChartProp
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="space-y-2 pt-2">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-5 w-full" />
-            ))}
-          </div>
+          <ChartSkeleton variant="bars" barCount={4} />
         ) : chartData.length === 0 ? (
           <div className="flex h-[120px] items-center justify-center text-sm text-muted-foreground">
             No model data for this period.

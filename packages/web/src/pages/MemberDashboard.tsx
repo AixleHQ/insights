@@ -12,6 +12,7 @@ import {
 } from "@/components/dashboard";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatCardSkeleton } from "@/components/ui/skeletons";
 import { formatTokens, formatPercent, formatCount } from "@/lib/formatters";
 
 const PERIODS = ["7d", "30d", "90d"] as const;
@@ -80,6 +81,15 @@ export function MemberDashboard({ hideHeader = false }: { hideHeader?: boolean }
       )}
 
       <MetricGrid>
+        {isLoadingStats ? (
+          <>
+            <StatCardSkeleton showDescription />
+            <StatCardSkeleton showDescription />
+            <StatCardSkeleton showDescription />
+            <StatCardSkeleton showDescription />
+          </>
+        ) : (
+          <>
         <MetricCard
           title="Total Events"
           value={stats?.total_events ?? 0}
@@ -137,6 +147,8 @@ export function MemberDashboard({ hideHeader = false }: { hideHeader?: boolean }
           }
           description={`${formatTokens(stats?.total_tokens_in ?? 0)} in / ${formatTokens(stats?.total_tokens_out ?? 0)} out`}
         />
+          </>
+        )}
       </MetricGrid>
 
       <PromptInsightsSection orgId={orgId} userId={userId} period={period} />

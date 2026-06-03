@@ -23,6 +23,7 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import type { ChartConfig } from "@/components/ui/chart";
+import { ChartSkeleton } from "@/components/ui/skeletons";
 import { cn, humanizeToolName } from "@/lib/utils";
 import { useDailyByTool, useDailyByModel } from "@/hooks/useApi";
 
@@ -163,9 +164,7 @@ export function WeeklyToolUsageChart({ orgId, projectId, className }: WeeklyTool
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="flex h-[280px] items-center justify-center">
-            <div className="size-8 animate-spin rounded-full border-2 border-muted border-t-primary" />
-          </div>
+          <ChartSkeleton height={280} />
         ) : chartData.length === 0 ? (
           <div className="flex h-[280px] items-center justify-center text-sm text-muted-foreground">
             No data for this period.
