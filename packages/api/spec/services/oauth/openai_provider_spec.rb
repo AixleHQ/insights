@@ -222,15 +222,27 @@ RSpec.describe Oauth::OpenaiProvider, type: :service do
       end
     end
 
-    context "when the API returns a non-success status on page 1" do
+    context "when the API returns 403 on page 1" do
       before do
         stub_request(:get, usage_url)
           .with(query: hash_including("bucket_width" => "1d"))
           .to_return(status: 403, body: '{"error":"forbidden"}')
       end
 
-      it "returns nil and does not raise" do
-        expect { provider.fetch_usage(start_date: start_date, end_date: end_date) }.not_to raise_error
+      it "raises PermissionDeniedError" do
+        expect { provider.fetch_usage(start_date: start_date, end_date: end_date) }
+          .to raise_error(Oauth::PermissionDeniedError)
+      end
+    end
+
+    context "when the API returns a non-403 non-success status on page 1" do
+      before do
+        stub_request(:get, usage_url)
+          .with(query: hash_including("bucket_width" => "1d"))
+          .to_return(status: 500, body: '{"error":"server_error"}')
+      end
+
+      it "returns nil without raising" do
         expect(provider.fetch_usage(start_date: start_date, end_date: end_date)).to be_nil
       end
     end
@@ -390,6 +402,250 @@ RSpec.describe Oauth::OpenaiProvider, type: :service do
         results = provider.fetch_usage(start_date: start_date, end_date: end_date)
         expect(results.size).to eq(1)
         expect(WebMock).to have_requested(:get, /completions/).once
+      end
+    end
+
+    context "when page 2 returns 403" do
+      let(:page1_response) do
+        {
+          "data" => [
+            {
+              "start_time" => Time.utc(2026, 4, 8).to_i,
+              "results" => [ { "model" => "gpt-4o", "input_tokens" => 1_000, "output_tokens" => 500, "input_cached_tokens" => 0 } ]
+            }
+          ],
+          "has_more" => true,
+          "next_page" => "cursor-abc"
+        }.to_json
+      end
+
+      before do
+        stub_request(:get, usage_url)
+          .with(query: hash_excluding("page"))
+          .to_return(status: 200, body: page1_response, headers: { "Content-Type" => "application/json" })
+
+        stub_request(:get, usage_url)
+          .with(query: hash_including("page" => "cursor-abc"))
+          .to_return(status: 403, body: '{"error":"forbidden"}')
+      end
+
+      it "raises PermissionDeniedError even mid-pagination" do
+        expect { provider.fetch_usage(start_date: start_date, end_date: end_date) }
+          .to raise_error(Oauth::PermissionDeniedError)
+      end
+    end
+  end
+
+  describe "#fetch_costs" do
+    let(:costs_url) { "https://api.openai.com/v1/organization/costs" }
+    let(:start_date) { Date.new(2026, 4, 8) }
+    let(:end_date) { Date.new(2026, 4, 9) }
+
+    def stub_costs(status:, body:)
+      stub_request(:get, costs_url)
+        .with(query: hash_including("bucket_width" => "1d"))
+        .to_return(status: status, body: body.is_a?(Hash) ? body.to_json : body,
+                   headers: { "Content-Type" => "application/json" })
+    end
+
+    context "when the API returns cost data keyed by model" do
+      let(:response_body) do
+        {
+          "data" => [
+            {
+              "start_time" => Time.utc(2026, 4, 8).to_i,
+              "results" => [
+                { "model" => "gpt-4o", "amount" => { "value" => 0.0125, "currency" => "usd" } },
+                { "model" => "gpt-4o-mini", "amount" => { "value" => 0.003, "currency" => "usd" } }
+              ]
+            }
+          ],
+          "has_more" => false,
+          "next_page" => nil
+        }
+      end
+
+      before { stub_costs(status: 200, body: response_body) }
+
+      it "returns a hash keyed by [model, date] with the cost value" do
+        costs = provider.fetch_costs(start_date: start_date, end_date: end_date)
+
+        expect(costs[[ "gpt-4o", Date.new(2026, 4, 8) ]]).to eq(0.0125)
+        expect(costs[[ "gpt-4o-mini", Date.new(2026, 4, 8) ]]).to eq(0.003)
+      end
+    end
+
+    context "when the API returns cost data keyed by line_item (model- prefix)" do
+      let(:response_body) do
+        {
+          "data" => [
+            {
+              "start_time" => Time.utc(2026, 4, 8).to_i,
+              "results" => [
+                { "line_item" => "model-gpt-4o", "amount" => { "value" => 0.05, "currency" => "usd" } }
+              ]
+            }
+          ],
+          "has_more" => false,
+          "next_page" => nil
+        }
+      end
+
+      before { stub_costs(status: 200, body: response_body) }
+
+      it "normalizes line_item by stripping the model- prefix" do
+        costs = provider.fetch_costs(start_date: start_date, end_date: end_date)
+
+        expect(costs[[ "gpt-4o", Date.new(2026, 4, 8) ]]).to eq(0.05)
+      end
+    end
+
+    context "when multiple result rows share the same [model, date]" do
+      let(:response_body) do
+        {
+          "data" => [
+            {
+              "start_time" => Time.utc(2026, 4, 8).to_i,
+              "results" => [
+                { "model" => "gpt-4o", "amount" => { "value" => 0.01, "currency" => "usd" } },
+                { "model" => "gpt-4o", "amount" => { "value" => 0.02, "currency" => "usd" } }
+              ]
+            }
+          ],
+          "has_more" => false,
+          "next_page" => nil
+        }
+      end
+
+      before { stub_costs(status: 200, body: response_body) }
+
+      it "sums the amounts for the same [model, date] key" do
+        costs = provider.fetch_costs(start_date: start_date, end_date: end_date)
+
+        expect(costs[[ "gpt-4o", Date.new(2026, 4, 8) ]]).to be_within(0.0001).of(0.03)
+      end
+    end
+
+    context "when a result has a non-USD currency" do
+      let(:response_body) do
+        {
+          "data" => [
+            {
+              "start_time" => Time.utc(2026, 4, 8).to_i,
+              "results" => [
+                { "model" => "gpt-4o", "amount" => { "value" => 5.0, "currency" => "eur" } },
+                { "model" => "gpt-4o-mini", "amount" => { "value" => 0.003, "currency" => "usd" } }
+              ]
+            }
+          ],
+          "has_more" => false,
+          "next_page" => nil
+        }
+      end
+
+      before { stub_costs(status: 200, body: response_body) }
+
+      it "skips the non-USD row and includes the USD row" do
+        costs = provider.fetch_costs(start_date: start_date, end_date: end_date)
+
+        expect(costs.key?([ "gpt-4o", Date.new(2026, 4, 8) ])).to be false
+        expect(costs[[ "gpt-4o-mini", Date.new(2026, 4, 8) ]]).to eq(0.003)
+      end
+    end
+
+    context "when the API returns 403 on page 1" do
+      before { stub_costs(status: 403, body: '{"error":"forbidden"}') }
+
+      it "raises PermissionDeniedError" do
+        expect { provider.fetch_costs(start_date: start_date, end_date: end_date) }
+          .to raise_error(Oauth::PermissionDeniedError)
+      end
+    end
+
+    context "when page 2 returns 403" do
+      let(:page1_body) do
+        {
+          "data" => [
+            {
+              "start_time" => Time.utc(2026, 4, 8).to_i,
+              "results" => [ { "model" => "gpt-4o", "amount" => { "value" => 0.01, "currency" => "usd" } } ]
+            }
+          ],
+          "has_more" => true,
+          "next_page" => "cursor-abc"
+        }.to_json
+      end
+
+      before do
+        stub_request(:get, costs_url)
+          .with(query: hash_excluding("page"))
+          .to_return(status: 200, body: page1_body, headers: { "Content-Type" => "application/json" })
+
+        stub_request(:get, costs_url)
+          .with(query: hash_including("page" => "cursor-abc"))
+          .to_return(status: 403, body: '{"error":"forbidden"}')
+      end
+
+      it "raises PermissionDeniedError even mid-pagination" do
+        expect { provider.fetch_costs(start_date: start_date, end_date: end_date) }
+          .to raise_error(Oauth::PermissionDeniedError)
+      end
+    end
+
+    context "when MAX_PAGES is reached before has_more becomes false" do
+      before do
+        stub_const("Oauth::OpenaiProvider::MAX_PAGES", 1)
+        stub_request(:get, costs_url)
+          .with(query: hash_excluding("page"))
+          .to_return(
+            status: 200,
+            body: {
+              "data" => [
+                {
+                  "start_time" => Time.utc(2026, 4, 8).to_i,
+                  "results" => [ { "model" => "gpt-4o", "amount" => { "value" => 0.05, "currency" => "usd" } } ]
+                }
+              ],
+              "has_more" => true,
+              "next_page" => "cursor-more"
+            }.to_json,
+            headers: { "Content-Type" => "application/json" }
+          )
+      end
+
+      it "stops at MAX_PAGES and returns costs accumulated so far" do
+        costs = provider.fetch_costs(start_date: start_date, end_date: end_date)
+
+        expect(costs[[ "gpt-4o", Date.new(2026, 4, 8) ]]).to eq(0.05)
+        expect(WebMock).to have_requested(:get, /organization\/costs/).once
+      end
+    end
+
+    context "when the API returns a non-403 non-success status" do
+      before { stub_costs(status: 500, body: "{}") }
+
+      it "returns an empty hash without raising" do
+        expect(provider.fetch_costs(start_date: start_date, end_date: end_date)).to eq({})
+      end
+    end
+
+    context "when a network error occurs" do
+      before do
+        stub_request(:get, costs_url)
+          .with(query: hash_including("bucket_width" => "1d"))
+          .to_raise(Faraday::ConnectionFailed.new("connection refused"))
+      end
+
+      it "returns an empty hash without raising" do
+        expect(provider.fetch_costs(start_date: start_date, end_date: end_date)).to eq({})
+      end
+    end
+
+    context "when the API responds 200 with invalid JSON" do
+      before { stub_costs(status: 200, body: "not json") }
+
+      it "returns an empty hash without raising" do
+        expect(provider.fetch_costs(start_date: start_date, end_date: end_date)).to eq({})
       end
     end
   end

@@ -90,6 +90,9 @@ class AiUsageSyncJob
 
     connector.mark_synced!(sync_started_at: sync_started_at)
     reconciled
+  rescue Oauth::PermissionDeniedError => e
+    Rails.logger.warn("[AiUsageSyncJob] OpenAI permission denied for org #{org.slug} — #{e.message}")
+    0
   rescue StandardError => e
     error_message = normalize_sync_error(provider, e.message)
     connector.mark_error!(error_message, sync_started_at: sync_started_at)
@@ -233,19 +236,37 @@ def fetch_anthropic_usage(connector, organization)
   end
 
   def fetch_openai_usage(connector, organization)
-    days_back = connector.last_sync_at ? OPENAI_RECURRING_SYNC_DAYS : OPENAI_INITIAL_SYNC_DAYS
+    days_back  = connector.last_sync_at ? OPENAI_RECURRING_SYNC_DAYS : OPENAI_INITIAL_SYNC_DAYS
+    date_range = { start_date: days_back.days.ago.to_date, end_date: Date.today }
+
     provider = Oauth::OpenaiProvider.new(connector)
-    data = provider.fetch_usage(start_date: days_back.days.ago.to_date, end_date: Date.today)
+    data = provider.fetch_usage(**date_range)
     return nil unless data
+    return [] if data.empty?
+
+    # PermissionDeniedError from fetch_costs propagates to reconcile_provider (warns + skips).
+    # Non-permission failures are rescued inside fetch_costs (returns partial hash);
+    # entries without a match fall back to ModelPricingService.
+    costs = provider.fetch_costs(**date_range)
 
     data.map do |entry|
-      cost = ModelPricingService.calculate_cost(
-        tokens_in: entry[:tokens_in],
-        tokens_out: entry[:tokens_out],
-        model: entry[:model],
-        organization: organization
-      )
-      entry.merge(cost_usd: cost[:total_cost])
+      model    = entry[:model]
+      date     = entry[:occurred_at].to_date
+      api_cost = costs[[ model, date ]]
+
+      cost_usd =
+        if !api_cost.nil?
+          api_cost
+        else
+          ModelPricingService.calculate_cost(
+            tokens_in:    entry[:tokens_in],
+            tokens_out:   entry[:tokens_out],
+            model:        model,
+            organization: organization
+          )[:total_cost]
+        end
+
+      entry.merge(cost_usd: cost_usd)
     end
   end
 

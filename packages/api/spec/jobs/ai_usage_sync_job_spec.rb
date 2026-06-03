@@ -191,6 +191,7 @@ RSpec.describe AiUsageSyncJob, type: :job do
     before do
       connector
       allow_any_instance_of(Oauth::OpenaiProvider).to receive(:fetch_usage).and_return(sample_usage)
+      allow_any_instance_of(Oauth::OpenaiProvider).to receive(:fetch_costs).and_return({})
     end
 
     it "creates a ToolEvent for each usage entry" do
@@ -233,6 +234,7 @@ RSpec.describe AiUsageSyncJob, type: :job do
       connector.update!(last_sync_at: nil)
       provider = instance_double(Oauth::OpenaiProvider)
       allow(provider).to receive(:fetch_usage).and_return(sample_usage)
+      allow(provider).to receive(:fetch_costs).and_return({})
       allow(Oauth::OpenaiProvider).to receive(:new).and_return(provider)
 
       travel_to Time.zone.now do
@@ -247,6 +249,7 @@ RSpec.describe AiUsageSyncJob, type: :job do
       connector.update!(last_sync_at: 1.hour.ago)
       provider = instance_double(Oauth::OpenaiProvider)
       allow(provider).to receive(:fetch_usage).and_return(sample_usage)
+      allow(provider).to receive(:fetch_costs).and_return({})
       allow(Oauth::OpenaiProvider).to receive(:new).and_return(provider)
 
       travel_to Time.zone.now do
@@ -342,12 +345,301 @@ RSpec.describe AiUsageSyncJob, type: :job do
       expect(connector.reload.status).to eq("connected")
     end
 
+    it "does not call fetch_costs when fetch_usage returns empty" do
+      provider_double = instance_double(Oauth::OpenaiProvider)
+      allow(Oauth::OpenaiProvider).to receive(:new).and_return(provider_double)
+      allow(provider_double).to receive(:fetch_usage).and_return([])
+      expect(provider_double).not_to receive(:fetch_costs)
+
+      job.perform(organization.id, "openai")
+    end
+
     it "does not create any ToolEvents when no active OpenAI connector exists" do
       connector.update!(is_active: false)
 
       expect {
         job.perform(organization.id, "openai")
       }.not_to change(ToolEvent, :count)
+    end
+
+    context "cost source — API vs ModelPricingService" do
+      let(:usage_date) { Date.new(2026, 4, 8) }
+      let(:provider_double) { instance_double(Oauth::OpenaiProvider) }
+
+      before do
+        connector
+        allow(Oauth::OpenaiProvider).to receive(:new).and_return(provider_double)
+        allow(provider_double).to receive(:fetch_usage).and_return([
+          {
+            external_id: "openai-gpt-4o-2026-04-08",
+            model: "gpt-4o",
+            tokens_in: 50_000,
+            tokens_out: 15_000,
+            occurred_at: Time.utc(2026, 4, 8)
+          }
+        ])
+      end
+
+      context "when the costs endpoint returns a matching cost" do
+        before do
+          allow(provider_double).to receive(:fetch_costs)
+            .and_return({ [ "gpt-4o", usage_date ] => 0.05 })
+        end
+
+        it "uses the API cost directly" do
+          expect(ModelPricingService).not_to receive(:calculate_cost)
+
+          job.perform(organization.id, "openai")
+
+          expect(find_synced_event("openai-gpt-4o-2026-04-08").cost_usd).to eq(0.05)
+        end
+      end
+
+      context "when the API cost is 0.0 (zero is a valid authoritative value)" do
+        before do
+          allow(provider_double).to receive(:fetch_costs)
+            .and_return({ [ "gpt-4o", usage_date ] => 0.0 })
+        end
+
+        it "stores 0.0 and does not fall back to ModelPricingService" do
+          expect(ModelPricingService).not_to receive(:calculate_cost)
+
+          job.perform(organization.id, "openai")
+
+          expect(find_synced_event("openai-gpt-4o-2026-04-08").cost_usd).to eq(0.0)
+        end
+      end
+
+      context "when the costs hash has no matching entry" do
+        before do
+          allow(provider_double).to receive(:fetch_costs).and_return({})
+        end
+
+        it "falls back to ModelPricingService" do
+          job.perform(organization.id, "openai")
+
+          expect(find_synced_event("openai-gpt-4o-2026-04-08").cost_usd).to be > 0
+        end
+      end
+
+      context "when some entries have API cost and some do not" do
+        before do
+          allow(provider_double).to receive(:fetch_usage).and_return([
+            {
+              external_id: "openai-gpt-4o-2026-04-08",
+              model: "gpt-4o",
+              tokens_in: 50_000,
+              tokens_out: 15_000,
+              occurred_at: Time.utc(2026, 4, 8)
+            },
+            {
+              external_id: "openai-gpt-4o-mini-2026-04-08",
+              model: "gpt-4o-mini",
+              tokens_in: 10_000,
+              tokens_out: 3_000,
+              occurred_at: Time.utc(2026, 4, 8)
+            }
+          ])
+          allow(provider_double).to receive(:fetch_costs)
+            .and_return({ [ "gpt-4o", usage_date ] => 0.07 })
+        end
+
+        it "uses API cost for the matched entry and ModelPricingService for the other" do
+          job.perform(organization.id, "openai")
+
+          gpt4o_event = find_synced_event("openai-gpt-4o-2026-04-08")
+          mini_event  = find_synced_event("openai-gpt-4o-mini-2026-04-08")
+
+          expect(gpt4o_event.cost_usd).to eq(0.07)
+          expect(mini_event.cost_usd).to be > 0
+        end
+      end
+    end
+
+    context "when fetch_usage raises PermissionDeniedError (403 on usage endpoint)" do
+      let(:provider_double) { instance_double(Oauth::OpenaiProvider) }
+
+      before do
+        connector
+        allow(Oauth::OpenaiProvider).to receive(:new).and_return(provider_double)
+        allow(provider_double).to receive(:fetch_usage)
+          .and_raise(Oauth::PermissionDeniedError, "OpenAI admin key lacks permissions (403).")
+      end
+
+      it "does not create any ToolEvents" do
+        expect { job.perform(organization.id, "openai") }.not_to change(ToolEvent, :count)
+      end
+
+      it "does not update connector status or last_sync_at" do
+        previous_status  = connector.status
+        previous_sync_at = connector.last_sync_at
+
+        job.perform(organization.id, "openai")
+
+        connector.reload
+        expect(connector.status).to eq(previous_status)
+        expect(connector.last_sync_at).to eq(previous_sync_at)
+      end
+
+      it "does not call mark_error! on the connector" do
+        expect(connector).not_to receive(:mark_error!)
+
+        job.perform(organization.id, "openai")
+      end
+
+      it "logs a warning mentioning permission denied" do
+        expect(Rails.logger).to receive(:warn).with(/permission denied/i).at_least(:once)
+
+        job.perform(organization.id, "openai")
+      end
+    end
+
+    context "when fetch_costs raises PermissionDeniedError (403 on costs endpoint)" do
+      let(:provider_double) { instance_double(Oauth::OpenaiProvider) }
+
+      before do
+        connector
+        allow(Oauth::OpenaiProvider).to receive(:new).and_return(provider_double)
+        allow(provider_double).to receive(:fetch_usage).and_return([
+          {
+            external_id: "openai-gpt-4o-2026-04-08",
+            model: "gpt-4o",
+            tokens_in: 50_000,
+            tokens_out: 15_000,
+            occurred_at: Time.utc(2026, 4, 8)
+          }
+        ])
+        allow(provider_double).to receive(:fetch_costs)
+          .and_raise(Oauth::PermissionDeniedError, "OpenAI admin key lacks permissions (403).")
+      end
+
+      it "does not create any ToolEvents" do
+        expect { job.perform(organization.id, "openai") }.not_to change(ToolEvent, :count)
+      end
+
+      it "does not update connector status or last_sync_at" do
+        previous_status  = connector.status
+        previous_sync_at = connector.last_sync_at
+
+        job.perform(organization.id, "openai")
+
+        connector.reload
+        expect(connector.status).to eq(previous_status)
+        expect(connector.last_sync_at).to eq(previous_sync_at)
+      end
+
+      it "does not call mark_error! on the connector" do
+        expect(connector).not_to receive(:mark_error!)
+
+        job.perform(organization.id, "openai")
+      end
+
+      it "logs a warning mentioning permission denied" do
+        expect(Rails.logger).to receive(:warn).with(/permission denied/i).at_least(:once)
+
+        job.perform(organization.id, "openai")
+      end
+    end
+
+    context "integration — WebMock wiring (no doubles)" do
+      let(:usage_url) { "https://api.openai.com/v1/organization/usage/completions" }
+      let(:costs_url) { "https://api.openai.com/v1/organization/costs" }
+      let(:usage_date) { Date.new(2026, 4, 8) }
+
+      before do
+        connector
+        # Override the outer describe-level allow_any_instance_of stubs so real methods run
+        # and WebMock can intercept the HTTP calls.
+        allow_any_instance_of(Oauth::OpenaiProvider).to receive(:fetch_usage).and_call_original
+        allow_any_instance_of(Oauth::OpenaiProvider).to receive(:fetch_costs).and_call_original
+
+        stub_request(:get, usage_url)
+          .with(query: hash_including("bucket_width" => "1d"))
+          .to_return(
+            status: 200,
+            body: {
+              "data" => [
+                {
+                  "start_time" => Time.utc(2026, 4, 8).to_i,
+                  "results" => [
+                    { "model" => "gpt-4o", "input_tokens" => 1_000, "output_tokens" => 500, "input_cached_tokens" => 0 }
+                  ]
+                }
+              ],
+              "has_more" => false,
+              "next_page" => nil
+            }.to_json,
+            headers: { "Content-Type" => "application/json" }
+          )
+
+        stub_request(:get, costs_url)
+          .with(query: hash_including("bucket_width" => "1d"))
+          .to_return(
+            status: 200,
+            body: {
+              "data" => [
+                {
+                  "start_time" => Time.utc(2026, 4, 8).to_i,
+                  "results" => [
+                    { "model" => "gpt-4o", "amount" => { "value" => 0.042, "currency" => "usd" } }
+                  ]
+                }
+              ],
+              "has_more" => false,
+              "next_page" => nil
+            }.to_json,
+            headers: { "Content-Type" => "application/json" }
+          )
+      end
+
+      it "calls both completions and costs URLs and stores the API cost" do
+        job.perform(organization.id, "openai")
+
+        expect(WebMock).to have_requested(:get, /organization\/usage\/completions/).once
+        expect(WebMock).to have_requested(:get, /organization\/costs/).once
+
+        event = find_synced_event("openai-gpt-4o-2026-04-08")
+        expect(event).to be_present
+        expect(event.cost_usd).to eq(0.042)
+        expect(event.tool_name).to eq("openai_api")
+      end
+    end
+
+    context "re-sync updates cost_usd when API value becomes available" do
+      let(:usage_date) { Date.new(2026, 4, 8) }
+      let(:provider_double) { instance_double(Oauth::OpenaiProvider) }
+
+      before do
+        connector
+        allow(Oauth::OpenaiProvider).to receive(:new).and_return(provider_double)
+        allow(provider_double).to receive(:fetch_usage).and_return([
+          {
+            external_id: "openai-gpt-4o-2026-04-08",
+            model: "gpt-4o",
+            tokens_in: 50_000,
+            tokens_out: 15_000,
+            occurred_at: Time.utc(2026, 4, 8)
+          }
+        ])
+      end
+
+      it "updates cost_usd on re-sync when API cost differs from initial estimate" do
+        # First sync: no API cost, ModelPricingService provides estimate
+        allow(provider_double).to receive(:fetch_costs).and_return({})
+        job.perform(organization.id, "openai")
+
+        event = find_synced_event("openai-gpt-4o-2026-04-08")
+        estimated_cost = event.cost_usd
+        expect(estimated_cost).to be > 0
+
+        # Second sync: API now returns authoritative cost
+        allow(provider_double).to receive(:fetch_costs)
+          .and_return({ [ "gpt-4o", usage_date ] => 0.05 })
+        job.perform(organization.id, "openai")
+
+        expect(event.reload.cost_usd).to eq(0.05)
+        expect(event.reload.cost_usd).not_to eq(estimated_cost)
+      end
     end
   end
 

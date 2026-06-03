@@ -3,6 +3,7 @@
 module Oauth
   MissingCredentialsError = Class.new(StandardError)
   TokenRefreshError = Class.new(StandardError)
+  PermissionDeniedError = Class.new(StandardError)
 
   class BaseProvider
     attr_reader :connector
