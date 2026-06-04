@@ -50,8 +50,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { EventsTable, EventDrawer, EventFilters } from "@/components/events";
 import { ToolUsageByDayChart } from "@/components/dashboard";
-import { getDaysForRange } from "@/components/dashboard/ToolUsageByDayChart";
-import type { TimeRange } from "@/components/dashboard/ToolUsageByDayChart";
+import { getDaysForRange, type TimeRange } from "@/lib/chartUtils";
 import {
   ProjectReposSection,
   ProjectNotFound,

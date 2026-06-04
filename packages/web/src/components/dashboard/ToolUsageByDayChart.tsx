@@ -24,8 +24,7 @@ import {
 import type { ChartConfig } from "@/components/ui/chart";
 import { cn, getToolColor, humanizeToolName } from "@/lib/utils";
 import type { DailyToolData } from "@/hooks/useApi";
-
-export type TimeRange = "7d" | "30d" | "60d" | "90d" | "1y";
+import { type TimeRange, TIME_RANGE_OPTIONS } from "@/lib/chartUtils";
 
 interface ToolUsageByDayChartProps {
   data: DailyToolData[];
@@ -35,15 +34,6 @@ interface ToolUsageByDayChartProps {
   timeRange: TimeRange;
   onTimeRangeChange: (range: TimeRange) => void;
 }
-
-
-const TIME_RANGE_OPTIONS: { value: TimeRange; label: string; days: number }[] = [
-  { value: "7d", label: "7 days", days: 7 },
-  { value: "30d", label: "30 days", days: 30 },
-  { value: "60d", label: "60 days", days: 60 },
-  { value: "90d", label: "90 days", days: 90 },
-  { value: "1y", label: "1 year", days: 365 },
-];
 
 function getToolDisplayName(tool: string): string {
   return humanizeToolName(tool);
@@ -58,10 +48,6 @@ function formatDate(dateStr: string, range: TimeRange): string {
     return date.toLocaleDateString("en-US", { month: "short" });
   }
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
-export function getDaysForRange(range: TimeRange): number {
-  return TIME_RANGE_OPTIONS.find((opt) => opt.value === range)?.days ?? 30;
 }
 
 function getRangeLabel(range: TimeRange): string {

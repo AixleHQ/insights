@@ -150,6 +150,7 @@ const TOOL_COLOR_MAP: Record<string, string> = {
   aider: "hsl(142 71% 45%)",
   windsurf: "hsl(199 89% 48%)",
   cody: "hsl(339 90% 51%)",
+  Other: "hsl(220 9% 46%)",
 };
 
 export function getToolColor(toolName: string | undefined | null): string {
