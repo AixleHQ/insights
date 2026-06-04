@@ -11,6 +11,7 @@ import { Login } from "./pages/Login";
 import { AuthCallback } from "./pages/AuthCallback";
 import { AuthIframeCallback } from "./pages/AuthIframeCallback";
 import { AuthPopupCallback } from "./pages/AuthPopupCallback";
+import { AuthSilentCallback } from "./pages/AuthSilentCallback";
 import { Dashboard } from "./pages/Dashboard";
 import { Events } from "./pages/Events";
 import { EventDetailPage } from "./pages/EventDetailPage";
@@ -74,6 +75,7 @@ function App() {
                 {/* Public routes */}
                 <Route path="/login" element={<Login />} />
                 <Route path="/auth/callback" element={<AuthCallback />} />
+                <Route path="/auth/silent-callback" element={<AuthSilentCallback />} />
                 <Route path="/auth/iframe-callback" element={<AuthIframeCallback />} />
                 <Route path="/auth/popup-callback" element={<AuthPopupCallback />} />
 

@@ -18,6 +18,10 @@ const settings: UserManagerSettings = {
   authority: `${keycloakConfig.url}/realms/${keycloakConfig.realm}`,
   client_id: keycloakConfig.clientId,
   redirect_uri: `${window.location.origin}/auth/callback`,
+  // silent_redirect_uri must point to a page that calls signinSilentCallback().
+  // Without this, oidc-client-ts falls back to redirect_uri (/auth/callback)
+  // which cannot handle the silent renew postMessage — causing IFrame timeouts.
+  silent_redirect_uri: `${window.location.origin}/auth/silent-callback`,
   post_logout_redirect_uri: `${window.location.origin}/login`,
   response_type: "code",
   scope: "openid profile email",
@@ -34,6 +38,9 @@ let userManager: UserManager | null = null;
 
 /** Deduplicate concurrent signinRedirectCallback (React Strict Mode dev, rare races). */
 let signinRedirectCallbackInFlight: Promise<User> | null = null;
+
+/** Deduplicate concurrent signinSilent calls (React Strict Mode double-mount, parallel hooks). */
+let signinSilentInFlight: Promise<User | null> | null = null;
 
 export function getUserManager(): UserManager {
   if (!userManager) {
@@ -121,13 +128,17 @@ export async function getAccessToken(): Promise<string | null> {
 }
 
 export async function silentRenew(): Promise<User | null> {
+  if (signinSilentInFlight) {
+    return signinSilentInFlight;
+  }
   const manager = getUserManager();
-  try {
-    return await manager.signinSilent();
-  } catch (error) {
+  signinSilentInFlight = manager.signinSilent().catch((error) => {
     console.error("[Auth] Silent renew failed:", error);
     return null;
-  }
+  }).finally(() => {
+    signinSilentInFlight = null;
+  });
+  return signinSilentInFlight;
 }
 
 export async function isAuthenticated(): Promise<boolean> {

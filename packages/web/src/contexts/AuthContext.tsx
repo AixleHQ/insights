@@ -2,6 +2,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   useCallback,
   type ReactNode,
@@ -13,6 +14,7 @@ import {
   getUser,
   getAccessToken as getAuthAccessToken,
   getUserProfile,
+  silentRenew,
   directLogin as authDirectLogin,
   type User,
   type UserProfile,
@@ -48,11 +50,78 @@ export function AuthProvider({ children }: AuthProviderProps) {
     error: null,
   });
 
-  // Initialize auth state
+  // Track whether initAuth has completed so OIDC events fired during init are ignored.
+  // Using a ref (not state) to avoid re-renders and ensure the flag is visible
+  // synchronously inside event handlers registered in the same effect.
+  const initDoneRef = useRef(false);
+
+  // Single effect: register OIDC event listeners BEFORE running initAuth so no
+  // events are missed, but suppress userUnloaded / accessTokenExpired until init
+  // completes — otherwise a transient OIDC check during storage read can flip
+  // isAuthenticated to false and trigger a redirect to /login mid-initialization.
   useEffect(() => {
+    const manager = getUserManager();
+
+    const handleUserLoaded = (user: User) => {
+      setState({
+        isAuthenticated: true,
+        isLoading: false,
+        user,
+        profile: getUserProfile(user),
+        error: null,
+      });
+    };
+
+    const handleUserUnloaded = () => {
+      console.log("[AuthContext] userUnloaded event, initDone:", initDoneRef.current);
+      if (!initDoneRef.current) return;
+      setState({
+        isAuthenticated: false,
+        isLoading: false,
+        user: null,
+        profile: null,
+        error: null,
+      });
+    };
+
+    const handleAccessTokenExpired = () => {
+      console.log("[AuthContext] accessTokenExpired event, initDone:", initDoneRef.current);
+      if (!initDoneRef.current) return;
+      setState((prev) => ({
+        ...prev,
+        isAuthenticated: false,
+        user: null,
+        profile: null,
+      }));
+    };
+
+    const handleSilentRenewError = (error: Error) => {
+      console.error("[AuthContext] Silent renew error:", error);
+      setState((prev) => ({ ...prev, error }));
+    };
+
+    manager.events.addUserLoaded(handleUserLoaded);
+    manager.events.addUserUnloaded(handleUserUnloaded);
+    manager.events.addAccessTokenExpired(handleAccessTokenExpired);
+    manager.events.addSilentRenewError(handleSilentRenewError);
+
     const initAuth = async () => {
       try {
-        const user = await getUser();
+        let user = await getUser();
+
+        // If no user in storage, or stored token is expired, attempt silent renew.
+        // This is the normal path for a fresh page load when the user already has
+        // a valid Keycloak session — the access token may not be in localStorage
+        // yet but the SSO session cookie is present, so signinSilent() succeeds.
+        if (!user || user.expired) {
+          console.log("[AuthContext] No valid token in storage, attempting silent renew...");
+          // silentRenew() deduplicates concurrent calls (React StrictMode double-mount)
+          user = await silentRenew();
+          if (!user) {
+            console.log("[AuthContext] Silent renew returned no user, treating as unauthenticated");
+          }
+        }
+
         if (user && !user.expired) {
           setState({
             isAuthenticated: true,
@@ -78,57 +147,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
           profile: null,
           error: error instanceof Error ? error : new Error("Auth initialization failed"),
         });
+      } finally {
+        initDoneRef.current = true;
       }
     };
 
     initAuth();
-  }, []);
-
-  // Set up event listeners
-  useEffect(() => {
-    const manager = getUserManager();
-
-    const handleUserLoaded = (user: User) => {
-      setState({
-        isAuthenticated: true,
-        isLoading: false,
-        user,
-        profile: getUserProfile(user),
-        error: null,
-      });
-    };
-
-    const handleUserUnloaded = () => {
-      setState({
-        isAuthenticated: false,
-        isLoading: false,
-        user: null,
-        profile: null,
-        error: null,
-      });
-    };
-
-    const handleAccessTokenExpired = () => {
-      setState((prev) => ({
-        ...prev,
-        isAuthenticated: false,
-        user: null,
-        profile: null,
-      }));
-    };
-
-    const handleSilentRenewError = (error: Error) => {
-      console.error("[AuthContext] Silent renew error:", error);
-      setState((prev) => ({
-        ...prev,
-        error,
-      }));
-    };
-
-    manager.events.addUserLoaded(handleUserLoaded);
-    manager.events.addUserUnloaded(handleUserUnloaded);
-    manager.events.addAccessTokenExpired(handleAccessTokenExpired);
-    manager.events.addSilentRenewError(handleSilentRenewError);
 
     return () => {
       manager.events.removeUserLoaded(handleUserLoaded);
