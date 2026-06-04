@@ -230,6 +230,29 @@ variable "rollbar_client_token" {
   sensitive = true
 }
 
+# --- Mailtrap (staging SMTP sandbox; optional in production) ---
+
+variable "mailtrap_username" {
+  type    = string
+  default = ""
+}
+
+variable "mailtrap_password" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
+variable "mailtrap_port" {
+  type    = number
+  default = 0
+}
+
+variable "mailtrap_address" {
+  type    = string
+  default = ""
+}
+
 variable "alb_oidc_client_id" {
   type        = string
   description = "Keycloak OIDC client ID for ALB authentication (protects Temporal UI)"
