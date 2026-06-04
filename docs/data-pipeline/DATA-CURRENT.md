@@ -348,6 +348,15 @@ Validated against `packages/tools/db90-claude/src/claude-reader.ts` at HEAD of `
 - The **5m vs 1h cache TTL split** (`usage.cache_creation.ephemeral_5m_input_tokens` vs `ephemeral_1h_input_tokens`, per `DATA-CLAUDE.md` §2.4 + §4.1) is **collapsed** by `claude-reader.ts:174` reading only the rollup `cache_creation_input_tokens`. Anthropic bills the two TTL buckets at different multipliers (1.25× vs 2× base), so we systematically undercount cost on 1h-TTL sessions.
 - `requestId` — the per-API-call identifier that cross-correlates JSONL with OTEL `claude_code.api_request` events (`DATA-CLAUDE.md` §6 item 10) — is **read but never persisted**. `parseTranscriptFile` ignores it at `155-211`; the type definition (`ClaudeTranscriptLine` at `30-36`) doesn't even declare it.
 
+### 8c. Ignored at ingest — local-command pseudo-prompts (`@db90/telemetry-mcp`)
+
+Claude Code injects IDE-local command markers into JSONL `user` lines (`<local-command-caveat>`, `<command-name>/exit</command-name>`, `<local-command-stdout>`, and `isMeta: true` system lines per `DATA-CLAUDE.md` §2.1). The MCP per-turn reader (`packages/tools/db90-telemetry-mcp/src/readers/claude.ts`) **does not POST** matching turns when all of the following hold:
+
+- Prompt matches `local-command-caveat`, `local-command-stdout`, or `command-name` XML markers (or the line has `isMeta: true` at parse time).
+- `tokens_in + tokens_out + cache_* = 0`, `model` is null, and `assistant_text` is empty.
+
+Turns with real model usage and non-zero tokens are never filtered, even if the prompt contains angle brackets. Sync logs `sync_noise_skip` in verbose mode. Historical rows already in `tool_events` can be removed with `rails db90:cleanup_claude_noise_events[ORG,dry_run]` (see `packages/api/lib/tasks/db90.rake`).
+
 ---
 
 ## 9. Claude Code — What we ignore today
@@ -356,6 +365,7 @@ The list below cross-references back to `./DATA-CLAUDE.md` (AIX-234). Every row 
 
 | Source field / signal | What it would tell us | claude-reader.ts treatment | DATA-CLAUDE.md anchor |
 |---|---|---|---|
+| JSONL `user` lines: `local-command-caveat`, `command-name` (`/exit`, etc.), `local-command-stdout`, `isMeta: true` | No analytics value — IDE command plumbing, not engineer prompts | Dropped at parse + sync (`isClaudeNoiseTranscriptTurn` in `telemetry-mcp/src/readers/claude.ts`). Backfill: `db90:cleanup_claude_noise_events` | `./DATA-CLAUDE.md#21-chat-turns-user--assistant--system--summary` |
 | `entry.message.content[].type === "tool_use"` (Bash / Edit / Read / Write / MultiEdit / Grep / Glob / Task / Skill / mcp__\*) | Per-tool engineer activity — the single highest-ROI extension cited in TOKENS.md §8 | Skipped — only `usage.*` numbers are aggregated; the `content[]` array is never iterated for assistant turns | `./DATA-CLAUDE.md#22-tool-use-blocks-bash--edit--read--write--grep--glob--task--mcp` |
 | `entry.message.content[].type === "thinking"` | Extended-thinking activation per turn (a cost + latency signal independent of `output_tokens`) | Skipped — only contributes opaquely to `output_tokens` | `./DATA-CLAUDE.md#23-thinking-blocks` |
 | `entry.message.content[].type === "tool_result"` | Tool success / failure outcomes, file paths affected, duration | Skipped (lives on `user`-type entries via `sourceToolUseID`) | `./DATA-CLAUDE.md#22-tool-use-blocks-bash--edit--read--write--grep--glob--task--mcp` |

@@ -162,7 +162,7 @@ When agent transcripts are present, aggregate **daily_composer** rows from daily
 
 SQLite / JSONL checkpoints live under **`~/.db90-mcp`** with namespaced keys preventing collisions across tools:
 
-- **`claude_code:<session>`** — Claude transcript turns (file-size checkpoint).
+- **`claude_code:<session>`** — Claude transcript turns (file-size checkpoint). Local-command noise (`local-command-caveat`, `/exit`, `local-command-stdout`, `isMeta` lines) is not ingested; use `db90:cleanup_claude_noise_events` for historical rows — see [LOCAL-DEV.md](./LOCAL-DEV.md#claude-local-command-noise-backfill).
 - **`cursor:events_watermark`**, **`cursor:daily_stats_watermark`**, **`cursor:recent_commit_watermark`** — high-water marks per ingest slice.
 - **`cursor:transcript_turn:<turnId>`** — Cursor agent transcript turns.
 - **`lastRecentCommitHashes`** — commit-hash dedupe (authoritative when Cursor stores one `recentCommit` row; avoids missing retries after HTTP 202 without DB persist).

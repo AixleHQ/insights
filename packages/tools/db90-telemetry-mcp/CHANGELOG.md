@@ -8,6 +8,8 @@ All notable changes to `@db90/telemetry-mcp` will be documented in this file.
 
 - **Cursor Hooks (opt-in)** [AIX-286]: `db90-mcp init --hooks` installs a forwarder script into `~/.cursor/hooks.json` that captures `sessionEnd` and `postToolUse` events on every turn. The background sync picks up the queue (`~/.db90-mcp/hooks-queue.ndjson`) and POSTs hook-sourced events with accurate model attribution (`model` from the resolved turn, not the global settings default). New commands: `uninstall-hooks` (restores backup), `verify-hooks` (prints feasibility report). Health output gains `hooks_installed` and `hooks_queue_depth` fields.
 - `cursor_hook` ingest path: hook events carry `metadata.cost_model: "cursor_hook"` and `metadata.ingest_source: "cursor_hook"` — excluded from cost dashboards (tokens/cost = 0 on all hook events). Dedup key: `cursor:hook:{conversation_id}:{generation_id}:{hook_event_name}` (also set as `metadata.session_id` for server-side upsert surviving MCP state wipe).
+- **Cursor model from settings** [AIX-265]: reads active model from Cursor `settings.json` once per sync pass and applies it to daily-stats and recent-commit payloads (replacing hardcoded `model: "unknown"` when the file is present).
+- **Claude local-command noise filter** [AIX-309]: `<local-command-caveat>`, `<command-name>`, `<local-command-stdout>`, and `isMeta: true` user lines are dropped at parse time and never POSTed. Turns with real token usage are preserved even when the prompt contains angle brackets. Historical rows can be cleaned up with `rails db90:cleanup_claude_noise_events[ORG_SLUG]`.
 
 ## [0.1.0] - 2026-05-29
 
@@ -22,8 +24,6 @@ First public npm release (`@db90/telemetry-mcp@0.1.0`): stdio MCP server for DB9
 - **Resilience & observability**: Shared **`src/health.ts`** for **`db90-mcp health`** and MCP **`db90_status`**. Operational **`mcp.log`** (~/.db90-mcp, `DB90_MCP_HOME` override), **5 MiB** rotate to **`mcp.log.1`**. Credential-scoped state **`mcp_operator`** diagnostics. **`postEvent`** retries (1s / 4s / 16s) on transient failures; **429** uses backoff helper only.
 - **Scope-directory filtering** (`scopeDir`): MCP server captures `process.cwd()` at startup and filters Claude turns / Cursor payloads to only events whose `cwd` / `workspace_folder` is under that directory. Prevents events from unrelated repos being mis-attributed when multiple projects share one ingest token.
 - **SSH host alias resolution** (`canonicalizeGitRemote` in `@db90/sdk`): resolves SSH config host aliases (e.g. `github-work → github.com`) via `ssh -G` before sending git remotes to the lookup API. Fixes attribution for teams that use per-org SSH aliases in `~/.ssh/config`.
-- **Cursor model from settings**: reads active model from Cursor `settings.json` once per sync pass and applies it to daily-stats and recent-commit payloads (replacing hardcoded `model: "unknown"` when the file is present).
-
 ### Packaging
 
 - **Bundled `@db90/sdk`** via **`prepack` → `packages/tools/scripts/stage-sdk-bundle.mjs`** and **`bundledDependencies`**, so published tarballs remain installable while the SDK stays private on npm.

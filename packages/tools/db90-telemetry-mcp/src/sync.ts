@@ -17,6 +17,7 @@ import {
   findTranscriptFiles,
   parseTranscriptFile,
   mapTranscriptTurn as mapClaudeTranscriptTurn,
+  isClaudeNoiseTranscriptTurn,
   type ClaudeTranscriptTurn,
 } from "./readers/claude.js";
 import { prepareCursorSliceGroups } from "./collect-cursor-payloads.js";
@@ -326,6 +327,21 @@ async function runClaudeSlice(options: SyncOptions): Promise<SyncResult> {
   const projectLookupCache = new Map<string, string | null>();
 
   for (const turn of bestTurns.values()) {
+    // Defense-in-depth: parseTranscriptFile already drops noise turns before returning.
+    // This guard only fires if the parser's filter is weakened in a future change.
+    if (isClaudeNoiseTranscriptTurn(turn)) {
+      totalSkipped++;
+      if (verbose) {
+        console.log(`[verbose] Skipping Claude noise turn ${turn.turnId} — local-command/meta`);
+      }
+      mcpLog.info(
+        "sync_noise_skip",
+        { tool: "claude_code", reason: "local_command_noise" },
+        false
+      );
+      continue;
+    }
+
     // When scopeDir is set, skip turns from other directories.
     if (scopeDir) {
       const cwd = turn.cwd?.trim();
@@ -710,33 +726,31 @@ async function runCursorSlice(params: {
   // Process cursor hooks queue if present (opt-in; no-op when hooks not installed)
   if (!shouldStopForBackoff) {
     const hooksQueuePath = join(appDir, "hooks-queue.ndjson");
-    if (existsSync(hooksQueuePath)) {
-      try {
-        const hooksResult = await processHooksQueue({
-          queuePath: hooksQueuePath,
-          scopeDir,
-          state: stateMut,
-          host,
-          token,
-          on429,
-          resolveProjectId: explicitProject
-            ? undefined
-            : (workspace) =>
-                resolveProjectIdForRepoPathCached(workspace, host, lookupToken, verbose, projectLookupCache),
-          verbose,
-        });
-        totalSent += hooksResult.sent;
-        totalFailed += hooksResult.failed;
-        totalSkipped += hooksResult.skipped;
-        stateMut = hooksResult.state;
-        if (hooksResult.sent > 0 || hooksResult.failed > 0) {
-          writeState(stateMut, appDir, host, token);
-        }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        errors.push(`cursor-hooks queue processing failed: ${msg}`);
-        mcpLog.error("sync_hooks_queue_error", { error: msg }, true);
+    try {
+      const hooksResult = await processHooksQueue({
+        queuePath: hooksQueuePath,
+        scopeDir,
+        state: stateMut,
+        host,
+        token,
+        on429,
+        resolveProjectId: explicitProject
+          ? undefined
+          : (workspace) =>
+              resolveProjectIdForRepoPathCached(workspace, host, lookupToken, verbose, projectLookupCache),
+        verbose,
+      });
+      totalSent += hooksResult.sent;
+      totalFailed += hooksResult.failed;
+      totalSkipped += hooksResult.skipped;
+      stateMut = hooksResult.state;
+      if (hooksResult.sent > 0 || hooksResult.failed > 0) {
+        writeState(stateMut, appDir, host, token);
       }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push(`cursor-hooks queue processing failed: ${msg}`);
+      mcpLog.error("sync_hooks_queue_error", { error: msg }, true);
     }
   }
 

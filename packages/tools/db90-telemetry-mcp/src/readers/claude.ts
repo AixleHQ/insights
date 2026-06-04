@@ -1,8 +1,3 @@
-/**
- * Pragmatic copy of `packages/tools/db90-claude/src/claude-reader.ts` for MCP.
- * Conscious duplication for phase 1 — phase 8 may hoist into `packages/db90-shared/`
- * if reuse earns its keep (avoids publish-order dependency from `@db90/telemetry-mcp` to `@db90/claude`).
- */
 import { createReadStream, statSync } from "node:fs";
 import { finished } from "node:stream/promises";
 import { createInterface } from "node:readline";
@@ -35,7 +30,42 @@ interface ClaudeTranscriptLine {
   promptId?: string;
   timestamp?: string;
   cwd?: string;
+  isMeta?: boolean;
   message?: ClaudeMessage;
+}
+
+/** Prompt substrings emitted for local IDE commands — not real user prompts. */
+const LOCAL_COMMAND_NOISE_PROMPT_PATTERNS = [
+  /<local-command-caveat\b/i,
+  /<local-command-stdout\b/i,
+  /<command-name>/i,
+] as const;
+
+function hasZeroTokenUsage(turn: ClaudeTranscriptTurn): boolean {
+  return (
+    turn.tokensIn === 0 &&
+    turn.tokensOut === 0 &&
+    turn.cacheWriteTokens === 0 &&
+    turn.cacheReadTokens === 0
+  );
+}
+
+/** True when prompt text alone matches known local-command injection markers. */
+export function isClaudeLocalCommandNoisePrompt(promptText: string): boolean {
+  const prompt = promptText.trim();
+  if (!prompt) return false;
+  return LOCAL_COMMAND_NOISE_PROMPT_PATTERNS.some((pattern) => pattern.test(prompt));
+}
+
+/**
+ * Returns true for transcript turns that are Claude Code local-command noise
+ * (caveat, /exit, stdout) with no model usage — safe to omit from ingest.
+ */
+export function isClaudeNoiseTranscriptTurn(turn: ClaudeTranscriptTurn): boolean {
+  if (!hasZeroTokenUsage(turn)) return false;
+  if (turn.model !== null) return false;
+  if (turn.assistantText.trim().length > 0) return false;
+  return isClaudeLocalCommandNoisePrompt(turn.promptText);
 }
 
 export interface ClaudeTranscriptTurn {
@@ -218,7 +248,9 @@ export async function parseTranscriptFile(
     if (!currentTurn) return;
     if (!currentTurn.persisted) {
       enrichTurnRisk(currentTurn);
-      if (currentTurn.promptText.trim() || currentTurn.assistantText.trim()) {
+      const hasContent =
+        currentTurn.promptText.trim().length > 0 || currentTurn.assistantText.trim().length > 0;
+      if (hasContent && !isClaudeNoiseTranscriptTurn(currentTurn)) {
         currentTurn.persisted = true;
         finalizedTurns.push(currentTurn);
       }
@@ -254,6 +286,12 @@ export async function parseTranscriptFile(
         // Claude emits tool_result-only user entries after assistant tool_use.
         // Those are part of the active turn, not a new user prompt.
         if (hasTextContent(entry.message.content)) {
+          if (entry.isMeta === true || isClaudeLocalCommandNoisePrompt(text)) {
+            if (verbose) {
+              console.log("[verbose] Skipping Claude local-command/meta user line");
+            }
+            continue;
+          }
           flushCurrentTurn();
           currentTurnIndex += 1;
           currentTurn = newTurn(sessionId, currentTurnIndex, filePath, fileSize, timestamp, promptId);

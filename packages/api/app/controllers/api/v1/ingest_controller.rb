@@ -13,8 +13,7 @@ module Api
         # Back-compat: detect raw Claude Code hook payloads (no jq transform applied)
         # and map them to structured fields before processing.
         if event_params[:event_type].blank?
-          mapped = extract_claude_code_hook_params
-          event_params.merge!(mapped) if mapped.any?
+          event_params.merge!(extract_claude_code_hook_params)
         end
 
         org = @tool_account.organization

@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   findTranscriptFiles: vi.fn(),
   parseTranscriptFile: vi.fn(),
   mapClaudeTranscriptTurn: vi.fn(),
+  isClaudeNoiseTranscriptTurn: vi.fn(() => false),
   lookupProjectByRemote: vi.fn(),
   enrichCommitProjectAttribution: vi.fn(),
   readCursorEvents: vi.fn(),
@@ -34,6 +35,8 @@ vi.mock("../readers/claude.js", () => ({
   findTranscriptFiles: mocks.findTranscriptFiles,
   parseTranscriptFile: mocks.parseTranscriptFile,
   mapTranscriptTurn: mocks.mapClaudeTranscriptTurn,
+  isClaudeNoiseTranscriptTurn: mocks.isClaudeNoiseTranscriptTurn,
+  isClaudeLocalCommandNoisePrompt: () => false,
 }));
 
 vi.mock("../readers/cursor.js", () => ({
@@ -1078,6 +1081,97 @@ describe("syncTelemetryTools", () => {
       expect.any(Object)
     );
     expect(mockExecFileSync).not.toHaveBeenCalled();
+  });
+
+  it("skips Claude noise turns returned by parseTranscriptFile and does not POST them", async () => {
+    const token = "db90_noise_token";
+    mocks.findTranscriptFiles.mockReturnValue(["/transcripts/noise.jsonl"]);
+    const noiseTurn = {
+      sessionId: "sess-noise",
+      turnId: "sess-noise:1",
+      filePath: "/transcripts/noise.jsonl",
+      fileSize: 50,
+      cwd: "/repos/test",
+      model: null,
+      tokensIn: 0,
+      tokensOut: 0,
+      cacheWriteTokens: 0,
+      cacheReadTokens: 0,
+      occurredAt: "2026-06-01T10:00:00.000Z",
+      promptText: "<local-command-caveat>Caveat text</local-command-caveat>",
+      assistantText: "",
+      riskLevel: "low" as const,
+      riskScore: 0,
+      riskCategories: [] as string[],
+    };
+    const realTurn = {
+      sessionId: "sess-real",
+      turnId: "sess-real:1",
+      filePath: "/transcripts/noise.jsonl",
+      fileSize: 50,
+      cwd: "/repos/test",
+      model: "claude-sonnet-4-6",
+      tokensIn: 20,
+      tokensOut: 8,
+      cacheWriteTokens: 0,
+      cacheReadTokens: 0,
+      occurredAt: "2026-06-01T10:01:00.000Z",
+      promptText: "Real question",
+      assistantText: "Real answer",
+      riskLevel: "low" as const,
+      riskScore: 0,
+      riskCategories: [] as string[],
+    };
+    mocks.parseTranscriptFile.mockResolvedValueOnce([noiseTurn, realTurn]);
+    // Noise predicate: true only for the noise turn (identified by sessionId)
+    mocks.isClaudeNoiseTranscriptTurn.mockImplementation(
+      (turn: { sessionId: string }) => turn.sessionId === "sess-noise"
+    );
+    mocks.mapClaudeTranscriptTurn.mockImplementation((turn) => ({
+      tool_name: "claude_code",
+      event_type: "chat",
+      occurred_at: turn.occurredAt,
+      cost_usd: null,
+      metadata: {
+        session_id: turn.turnId,
+        claude_session_id: turn.sessionId,
+        transcript_source: "claude_jsonl",
+        model: turn.model,
+        base_input_tokens: turn.tokensIn,
+        output_tokens: turn.tokensOut,
+        cache_write_tokens: 0,
+        cache_read_tokens: 0,
+        risk_level: "low",
+        risk_categories: [],
+        risk_score: 0,
+        scannable: true as const,
+      },
+    }));
+    mocks.postEvent.mockResolvedValue(true);
+
+    const result = await syncTelemetryTools({
+      credentials: { host, accounts: { claude_code: token } },
+      dryRun: false,
+      verbose: false,
+      projectId: null,
+      pricing: DEFAULT_PRICING,
+      appDir,
+      tools: ["claude_code"],
+    });
+
+    expect(result.skipped).toBeGreaterThanOrEqual(1);
+    expect(result.sent).toBe(1);
+    // Only the real turn should have been POSTed
+    expect(mocks.postEvent).toHaveBeenCalledTimes(1);
+    expect(mocks.postEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ metadata: expect.objectContaining({ session_id: "sess-real:1" }) }),
+      host,
+      token,
+      expect.any(Object)
+    );
+
+    // Restore mock to default stub
+    mocks.isClaudeNoiseTranscriptTurn.mockImplementation(() => false);
   });
 });
 

@@ -208,6 +208,86 @@ namespace :db90 do
   end
 
   desc <<~DESC
+    Delete historical Claude Code local-command noise rows (zero tokens, no model).
+
+    Targets tool_events where tool_name = 'claude_code', transcript_source = claude_jsonl,
+    prompt_text matches local-command / command-name XML markers, and token totals are zero.
+    Aligns with telemetry-mcp ingest filter (isClaudeNoiseTranscriptTurn).
+
+    Usage (from packages/api):
+      rails 'db90:cleanup_claude_noise_events[my-org-slug]'
+      rails 'db90:cleanup_claude_noise_events[my-org-slug,dry_run]'
+
+    After delete, MCP checkpoints in ~/.db90-mcp/state-*.json may still block re-send of
+    valid turns for the same session; clear claude_code:{sessionId}:{turnIndex} keys only if
+    you need to re-ingest legitimate turns (not required for noise cleanup).
+
+    Allowed environments: development, staging (set ALLOW_PRODUCTION_CLEANUP=1 to override).
+    On large orgs, run during off-peak hours — the DELETE scans all historical partitions.
+  DESC
+  task :cleanup_claude_noise_events, [ :organization_slug, :dry_run ] => :environment do |_t, args|
+    first  = args[:organization_slug].to_s.strip
+    second = args[:dry_run].to_s.strip
+
+    dry_run = second.casecmp("dry_run").zero? || first.casecmp("dry_run").zero?
+
+    unless Rails.env.development? || Rails.env.staging? || ENV["ALLOW_PRODUCTION_CLEANUP"].present?
+      abort "[db90:cleanup_claude_noise_events] Refusing to run in #{Rails.env} " \
+            "(set ALLOW_PRODUCTION_CLEANUP=1 only if you intend this)."
+    end
+
+    org_slug = first.casecmp("dry_run").zero? ? "" : first
+    if org_slug.blank?
+      abort "[db90:cleanup_claude_noise_events] Usage: " \
+            "rails 'db90:cleanup_claude_noise_events[ORG_SLUG]' or " \
+            "rails 'db90:cleanup_claude_noise_events[ORG_SLUG,dry_run]'"
+    end
+
+    org = Organization.find_by(slug: org_slug)
+    unless org
+      abort "[db90:cleanup_claude_noise_events] Organization not found: slug=#{org_slug.inspect}"
+    end
+
+    noise_prompt_sql = <<~SQL.squish.freeze
+      (
+        metadata->>'prompt_text' ILIKE '%<local-command-caveat%'
+        OR metadata->>'prompt_text' ILIKE '%<local-command-stdout%'
+        OR metadata->>'prompt_text' ILIKE '%<command-name>%'
+      )
+    SQL
+
+    scope = ToolEvent.where(organization: org)
+      .where(tool_name: "claude_code")
+      .where("metadata->>'transcript_source' = ?", "claude_jsonl")
+      .where(model: nil)
+      .where(tokens_in: [ nil, 0 ])
+      .where(tokens_out: [ nil, 0 ])
+      .where(noise_prompt_sql)
+
+    count = scope.count
+
+    puts "[db90:cleanup_claude_noise_events] #{dry_run ? '[DRY RUN] ' : ''}org=#{org.slug} (#{org.name})"
+    puts "[db90:cleanup_claude_noise_events] Matching noise events: #{count}"
+
+    if count.zero?
+      puts "[db90:cleanup_claude_noise_events] Nothing to do."
+      next
+    end
+
+    unique_sessions = scope.distinct.count(Arel.sql("metadata->>'session_id'"))
+    puts "[db90:cleanup_claude_noise_events] Matching events span #{unique_sessions} session(s)"
+
+    if dry_run
+      puts "[db90:cleanup_claude_noise_events] DRY RUN — no rows deleted. Run without dry_run to destroy."
+      next
+    end
+
+    deleted = scope.delete_all
+    puts "[db90:cleanup_claude_noise_events] Deleted #{deleted} noise event(s)."
+    puts "[db90:cleanup_claude_noise_events] Done."
+  end
+
+  desc <<~DESC
     Delete synthetic engineer* users seeded by db/seeds.rb for one organization.
 
     Matches users whose email matches '#{SEED_USER_EMAIL_PATTERN}'.

@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { homedir, tmpdir } from "node:os";
+import { homedir } from "node:os";
 import { createHash, randomBytes } from "node:crypto";
 
 export interface SessionRecord {
@@ -193,7 +193,7 @@ export function writeState(state: State, dir?: string, host?: string, token?: st
   mkdirSync(stateDir, { recursive: true });
 
   const finalPath = stateFilePath(stateDir, host, token);
-  const tmpPath = join(tmpdir(), `db90-mcp-state-${randomBytes(6).toString("hex")}.json`);
+  const tmpPath = join(stateDir, `.tmp-${randomBytes(6).toString("hex")}.json`);
 
   writeFileSync(tmpPath, JSON.stringify(state, null, 2), "utf-8");
   renameSync(tmpPath, finalPath);

@@ -280,6 +280,17 @@ node db90-telemetry-mcp/dist/cli.js run --once
 
 UI: http://localhost:5173 → Events
 
+### Claude local-command noise backfill
+
+If Events still show zero-token `claude_code` rows with `local-command-*` or `<command-name>` in `prompt_text`, remove historical noise (API container):
+
+```bash
+docker exec db90-api bundle exec rails 'db90:cleanup_claude_noise_events[dualboot-partners,dry_run]'
+docker exec db90-api bundle exec rails 'db90:cleanup_claude_noise_events[dualboot-partners]'
+```
+
+New ingest via MCP skips these turns automatically; the rake only cleans DB rows written before the filter shipped.
+
 ---
 
 ## 10. After npm publish
