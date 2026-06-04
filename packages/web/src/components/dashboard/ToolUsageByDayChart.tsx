@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import {
   Bar,
   BarChart,
@@ -25,17 +25,17 @@ import type { ChartConfig } from "@/components/ui/chart";
 import { cn, getToolColor, humanizeToolName } from "@/lib/utils";
 import type { DailyToolData } from "@/hooks/useApi";
 
+export type TimeRange = "7d" | "30d" | "60d" | "90d" | "1y";
+
 interface ToolUsageByDayChartProps {
   data: DailyToolData[];
   tools: string[];
   isLoading?: boolean;
   className?: string;
-  onDaysChange?: (days: number) => void;
+  timeRange: TimeRange;
+  onTimeRangeChange: (range: TimeRange) => void;
 }
 
-type TimeRange = "7d" | "30d" | "60d" | "90d" | "1y";
-
-const DEFAULT_TIME_RANGE: TimeRange = "7d";
 
 const TIME_RANGE_OPTIONS: { value: TimeRange; label: string; days: number }[] = [
   { value: "7d", label: "7 days", days: 7 },
@@ -60,29 +60,17 @@ function formatDate(dateStr: string, range: TimeRange): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function getDaysForRange(range: TimeRange): number {
-  return TIME_RANGE_OPTIONS.find((opt) => opt.value === range)?.days || 30;
+export function getDaysForRange(range: TimeRange): number {
+  return TIME_RANGE_OPTIONS.find((opt) => opt.value === range)?.days ?? 30;
 }
 
 function getRangeLabel(range: TimeRange): string {
   return TIME_RANGE_OPTIONS.find((opt) => opt.value === range)?.label || "30 days";
 }
 
-export const TOOL_USAGE_DEFAULT_DAYS = 7;
-
-export function ToolUsageByDayChart({ data, tools, isLoading, className, onDaysChange }: ToolUsageByDayChartProps) {
-  const [timeRange, setTimeRange] = useState<TimeRange>(DEFAULT_TIME_RANGE);
-
-  const handleTimeRangeChange = (value: string) => {
-    const range = value as TimeRange;
-    setTimeRange(range);
-    onDaysChange?.(getDaysForRange(range));
-  };
-
+export function ToolUsageByDayChart({ data, tools, isLoading, className, timeRange, onTimeRangeChange }: ToolUsageByDayChartProps) {
   const filteredData = useMemo(() => {
-    const days = getDaysForRange(timeRange);
-    const sliced = data.slice(-days);
-    return sliced.map((item) => ({
+    return data.map((item) => ({
       ...item,
       dateLabel: formatDate(item.date, timeRange),
     })) as (DailyToolData & { dateLabel: string })[];
@@ -114,7 +102,7 @@ export function ToolUsageByDayChart({ data, tools, isLoading, className, onDaysC
             {totalEvents.toLocaleString()} events in the last {getRangeLabel(timeRange)}
           </CardDescription>
         </div>
-        <Select value={timeRange} onValueChange={handleTimeRangeChange}>
+        <Select value={timeRange} onValueChange={(value) => onTimeRangeChange(value as TimeRange)}>
           <SelectTrigger className="h-8 w-[100px] text-xs">
             <SelectValue />
           </SelectTrigger>

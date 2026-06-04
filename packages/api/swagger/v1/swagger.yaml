@@ -3232,6 +3232,64 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /api/v1/projects/{id}/stats/daily_by_tool:
+    get:
+      summary: Project daily stats by tool
+      description: Returns event counts grouped by the top 3 tools plus an "Other" bucket — shaped for stacked bar charts. Supports day (default) or month granularity. Zero-fills buckets with no activity.
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - name: days
+          in: query
+          description: Rolling window in days (default 30, max 365)
+          schema:
+            type: integer
+            default: 30
+            minimum: 1
+            maximum: 365
+        - name: granularity
+          in: query
+          description: Bucket granularity — day for daily data, month for monthly buckets (days=365 gives 13 buckets: current month + 12 prior)
+          schema:
+            type: string
+            enum: [day, month]
+            default: day
+      responses:
+        '200':
+          description: Daily stats by tool
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    description: One entry per bucket (day or month start); keys are tool names + "Other"
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                      additionalProperties:
+                        type: integer
+                  tools:
+                    type: array
+                    description: Ordered list of tool names present in data (top 3 + "Other")
+                    items:
+                      type: string
+                  granularity:
+                    type: string
+                    enum: [day, month]
+                    description: Granularity used for the response buckets
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   # ============================================
   # PROJECT AUDIT LOG ENDPOINTS
   # ============================================

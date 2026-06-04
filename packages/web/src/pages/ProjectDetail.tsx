@@ -49,7 +49,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { EventsTable, EventDrawer, EventFilters } from "@/components/events";
-import { ToolUsageByDayChart, TOOL_USAGE_DEFAULT_DAYS } from "@/components/dashboard";
+import { ToolUsageByDayChart } from "@/components/dashboard";
+import { getDaysForRange } from "@/components/dashboard/ToolUsageByDayChart";
+import type { TimeRange } from "@/components/dashboard/ToolUsageByDayChart";
 import {
   ProjectReposSection,
   ProjectNotFound,
@@ -106,12 +108,15 @@ export function ProjectDetail() {
   const { currentOrg, currentRole, hasRole } = useOrg();
   const navigate = useNavigate();
   const [connectRepoOpen, setConnectRepoOpen] = useState(false);
+  const [timeRange, setTimeRange] = useState<TimeRange>("7d");
+
+  const selectedDays = getDaysForRange(timeRange);
+  const granularity = timeRange === "1y" ? "month" : "day";
 
   const { data: project, isLoading: isLoadingProject } = useProject(id || "");
   const { data: projectMembers, isLoading: isLoadingMembers } = useProjectMembers(id || "");
   const { data: me } = useCurrentUser();
-  const [dailyByToolDays, setDailyByToolDays] = useState(TOOL_USAGE_DEFAULT_DAYS);
-  const { data: dailyByToolData, isLoading: isLoadingDailyByTool } = useProjectDailyByTool(id || "", dailyByToolDays);
+  const { data: dailyByToolData, isLoading: isLoadingDailyByTool } = useProjectDailyByTool(id || "", selectedDays, granularity);
   const { data: projectRepositories, isLoading: isLoadingRepositories } = useProjectRepositories(id || "");
   const disconnectRepo = useDisconnectRepo(id || "");
   const deleteProject = useDeleteProject();
@@ -261,12 +266,13 @@ export function ProjectDetail() {
 
         {/* ── Overview ── */}
         <TabsContent value="overview" className="space-y-6 mt-4">
-          {dailyByToolData && dailyByToolData.data && dailyByToolData.data.length > 0 && (
+          {dailyByToolData && dailyByToolData.data && (
             <ToolUsageByDayChart
               data={dailyByToolData.data}
               tools={dailyByToolData.tools}
               isLoading={isLoadingDailyByTool}
-              onDaysChange={setDailyByToolDays}
+              timeRange={timeRange}
+              onTimeRangeChange={setTimeRange}
             />
           )}
 

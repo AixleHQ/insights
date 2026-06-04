@@ -255,6 +255,68 @@ describe("ProjectDetail", () => {
     });
   });
 
+  describe("ToolUsageByDayChart integration", () => {
+    it("calls useProjectDailyByTool with default 7-day range and day granularity", () => {
+      render(<ProjectDetail />);
+
+      expect(mockUseProjectDailyByTool).toHaveBeenCalledWith("proj-1", 7, "day");
+    });
+
+    it("renders chart when data is available", () => {
+      mockUseProjectDailyByTool.mockReturnValue({
+        data: {
+          data: [{ date: "2026-06-01", claude_code: 5, Other: 0 }],
+          tools: ["claude_code", "Other"],
+          granularity: "day",
+        },
+        isLoading: false,
+      });
+      render(<ProjectDetail />);
+
+      expect(screen.getByText("Usage by Tool")).toBeInTheDocument();
+    });
+
+    it("calls useProjectDailyByTool with 365 days and month granularity for 1y range", async () => {
+      const user = userEvent.setup();
+      mockUseProjectDailyByTool.mockReturnValue({
+        data: {
+          data: [{ date: "2026-06-01", claude_code: 3, Other: 0 }],
+          tools: ["claude_code", "Other"],
+          granularity: "month",
+        },
+        isLoading: false,
+      });
+      render(<ProjectDetail />);
+
+      const trigger = screen.getByRole("combobox");
+      await user.click(trigger);
+      const option = screen.getByRole("option", { name: "1 year" });
+      await user.click(option);
+
+      expect(mockUseProjectDailyByTool).toHaveBeenCalledWith("proj-1", 365, "month");
+    });
+
+    it("calls useProjectDailyByTool with 90 days and day granularity for 90d range", async () => {
+      const user = userEvent.setup();
+      mockUseProjectDailyByTool.mockReturnValue({
+        data: {
+          data: [{ date: "2026-03-06", claude_code: 1, Other: 0 }],
+          tools: ["claude_code", "Other"],
+          granularity: "day",
+        },
+        isLoading: false,
+      });
+      render(<ProjectDetail />);
+
+      const trigger = screen.getByRole("combobox");
+      await user.click(trigger);
+      const option = screen.getByRole("option", { name: "90 days" });
+      await user.click(option);
+
+      expect(mockUseProjectDailyByTool).toHaveBeenCalledWith("proj-1", 90, "day");
+    });
+  });
+
   describe("Git remote attribution warning", () => {
     it("shows warning and settings link when git remote is missing (camelCase empty)", () => {
       mockUseProject.mockReturnValue({
