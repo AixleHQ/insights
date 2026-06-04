@@ -542,6 +542,10 @@ locals {
     S3_REGION           = var.region
     MINIO_ENDPOINT      = "https://s3.${var.region}.amazonaws.com"
     FRONTEND_URL        = "https://${var.app_domain}"
+    MAILTRAP_USERNAME   = var.mailtrap_username
+    MAILTRAP_PASSWORD   = var.mailtrap_password
+    MAILTRAP_PORT       = var.mailtrap_port > 0 ? tostring(var.mailtrap_port) : ""
+    MAILTRAP_ADDRESS    = var.mailtrap_address
   }
 
   common_secrets = [
