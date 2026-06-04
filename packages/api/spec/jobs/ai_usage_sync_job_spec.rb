@@ -872,7 +872,6 @@ RSpec.describe AiUsageSyncJob, type: :job do
         access_token: "AIza-test123",
         is_active: true)
     end
-
     before { connector }
 
     it "creates no ToolEvents (usage is captured per-request via ProxyService)" do
@@ -907,6 +906,19 @@ RSpec.describe AiUsageSyncJob, type: :job do
       connector.reload
       expect(connector.status).to eq(previous_status)
       expect(connector.last_sync_at).to eq(previous_sync_at)
+    end
+
+    it "logs a warning via GeminiProvider explaining there is no usage API" do
+      expect(Rails.logger).to receive(:warn).with(/no historical usage API/)
+      job.perform(organization.id, "gemini")
+    end
+
+    it "still marks the connector synced when GeminiProvider#fetch_usage returns nil" do
+      job.perform(organization.id, "gemini")
+
+      connector.reload
+      expect(connector.status).to eq("connected")
+      expect(connector.last_sync_at).to be_present
     end
   end
 

@@ -3,8 +3,19 @@
 require 'rails_helper'
 
 RSpec.describe Oauth::GeminiProvider, type: :service do
-  let(:connector) { instance_double('OrganizationConnector', access_token: 'AIza-test123') }
+  let(:connector) { instance_double('OrganizationConnector', access_token: 'AIza-test123', organization_id: 42) }
   let(:provider) { described_class.new(connector) }
+
+  describe '#fetch_usage' do
+    it 'returns nil' do
+      expect(provider.fetch_usage).to be_nil
+    end
+
+    it 'logs a warning explaining that no historical usage API exists' do
+      expect(Rails.logger).to receive(:warn).with(/no historical usage API/)
+      provider.fetch_usage
+    end
+  end
 
   describe '#test_connection' do
     context 'when the API key is valid' do

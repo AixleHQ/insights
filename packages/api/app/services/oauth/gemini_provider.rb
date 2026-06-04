@@ -4,6 +4,15 @@ module Oauth
   class GeminiProvider < BaseProvider
     API_URL = "https://generativelanguage.googleapis.com"
 
+    def fetch_usage
+      Rails.logger.warn(
+        "[GeminiProvider] org=#{connector.organization_id} — " \
+        "Google AI Studio has no historical usage API. " \
+        "Usage is captured per-request via Ai::ProxyService. Skipping fetch."
+      )
+      nil
+    end
+
     def test_connection
       response = Faraday.get("#{API_URL}/v1beta/models") do |req|
         req.params["key"] = connector.access_token
