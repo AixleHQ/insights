@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -36,7 +36,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { EventsTable, type EventRow } from "@/components/events";
+import { EventsTable, EventDrawer, type EventRow } from "@/components/events";
 import { ActivityHeatmap } from "@/components/dashboard";
 import { SortButton, type SortDirection } from "@/components/ui/sort-button";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -154,6 +154,15 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
   // Project commits sorting state
   const [commitSortField, setCommitSortField] = useState<EventSortField>("created_at");
   const [commitSortDirection, setCommitSortDirection] = useState<SortDirection>("desc");
+
+  // Event detail drawer state
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const handleEventClick = useCallback((eventId: string) => {
+    setSelectedEventId(eventId);
+    setDrawerOpen(true);
+  }, []);
 
   const { data: member, isLoading: memberLoading } = useMember(currentOrg?.id || "", memberId);
   const { data: statsData } = useMemberStats(currentOrg?.id || "", memberId);
@@ -758,6 +767,8 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
             sortField={eventSortField}
             sortDirection={eventSortDirection}
             onSort={handleEventSort}
+            onEventClick={handleEventClick}
+            selectedEventId={selectedEventId}
             className="border-0 rounded-none"
           />
         </CardContent>
@@ -781,6 +792,8 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
               sortField={commitSortField}
               sortDirection={commitSortDirection}
               onSort={handleCommitSort}
+              onEventClick={handleEventClick}
+              selectedEventId={selectedEventId}
               className="border-0 rounded-none"
             />
             {projectCommitsResponse?.meta && projectCommitsResponse.meta.total_pages > 1 && (
@@ -809,6 +822,12 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
           </CardContent>
         </Card>
       )}
+
+      <EventDrawer
+        eventId={selectedEventId}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+      />
     </div>
   );
 }

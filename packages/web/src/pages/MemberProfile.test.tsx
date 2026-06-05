@@ -15,6 +15,7 @@ const mockUseMemberStats = vi.fn();
 const mockUseMemberEvents = vi.fn();
 const mockUseProject = vi.fn();
 const mockUseEvents = vi.fn();
+const mockUseEvent = vi.fn();
 
 vi.mock("@/hooks/useApi", () => ({
   useMember: (...args: unknown[]) => mockUseMember(...args),
@@ -22,6 +23,7 @@ vi.mock("@/hooks/useApi", () => ({
   useMemberEvents: (...args: unknown[]) => mockUseMemberEvents(...args),
   useProject: (...args: unknown[]) => mockUseProject(...args),
   useEvents: (...args: unknown[]) => mockUseEvents(...args),
+  useEvent: (...args: unknown[]) => mockUseEvent(...args),
 }));
 
 const mockMember = {
@@ -70,6 +72,7 @@ function setupDefaultMocks() {
   mockUseMemberEvents.mockReturnValue({ data: emptyEventsResponse, isLoading: false });
   mockUseProject.mockReturnValue({ data: mockProject, isLoading: false });
   mockUseEvents.mockReturnValue({ data: emptyEventsResponse, isLoading: false });
+  mockUseEvent.mockReturnValue({ data: null, isLoading: false });
 }
 
 describe("MemberProfileView", () => {
