@@ -28,6 +28,24 @@ RSpec.describe ModelPricingService do
         result = described_class.pricing_for_model("unknown-model-xyz")
         expect(result).to eq(ModelPricingService::MODEL_PRICING["default"])
       end
+
+      {
+        "gemini-2.5-pro"   => { input: 1.25, output: 10.00 },
+        "gemini-2.5-flash" => { input: 0.15, output: 0.60 },
+        "gemini-2.0-flash" => { input: 0.10, output: 0.40 },
+        "gemini-1.5-pro"   => { input: 1.25, output: 5.00 },
+        "gemini-1.5-flash" => { input: 0.075, output: 0.30 },
+        "gemini-1.0-pro"   => { input: 0.50, output: 1.50 }
+      }.each do |model, expected|
+        it "returns correct pricing for #{model}" do
+          expect(described_class.pricing_for_model(model)).to eq(expected)
+        end
+      end
+
+      it 'resolves versioned Gemini model names via substring match' do
+        result = described_class.pricing_for_model("gemini-2.5-pro-exp-03-25")
+        expect(result).to eq({ input: 1.25, output: 10.00 })
+      end
     end
 
     context 'with organization' do
