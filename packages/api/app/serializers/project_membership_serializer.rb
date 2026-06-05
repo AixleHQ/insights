@@ -12,7 +12,7 @@ class ProjectMembershipSerializer < BaseSerializer
   end
 
   attribute :avatar_url do |membership|
-    membership.user.avatar_url
+    membership.user.resolved_avatar_url
   end
 
   attribute :joined_at do |membership|

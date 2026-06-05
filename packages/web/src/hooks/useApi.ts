@@ -7,7 +7,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useCallback, useMemo } from "react";
-import { api, downloadBlob } from "@/lib/api";
+import { api, apiRequest, downloadBlob } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import type {
   CurrentUser,
@@ -210,8 +210,37 @@ export function useUpdateCurrentUser() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: { name?: string; avatar_url?: string }) =>
+    mutationFn: (data: { name?: string; avatar_url?: string | null }) =>
       api.patch<{ data: CurrentUser }>("/users/me", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.current });
+    },
+  });
+}
+
+export function useUploadAvatar() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      return apiRequest<{ data: CurrentUser }>("/users/me/avatar", {
+        method: "POST",
+        body: formData,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.current });
+    },
+  });
+}
+
+export function useDeleteAvatar() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => api.delete<{ data: CurrentUser }>("/users/me/avatar"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.user.current });
     },

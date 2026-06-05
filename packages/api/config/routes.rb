@@ -41,6 +41,8 @@ Rails.application.routes.draw do
       get   "users/me/personal_settings", to: "user_personal_settings#show"
       patch "users/me/personal_settings", to: "user_personal_settings#update"
       post "users/me/stop_impersonation", to: "users#stop_impersonation"
+      post   "users/me/avatar", to: "users#upload_avatar"
+      delete "users/me/avatar", to: "users#destroy_avatar"
 
       # Organization routes
       resources :organizations do

@@ -20,6 +20,7 @@ class User < ApplicationRecord
   has_many :notifications, dependent: :destroy
   has_many :user_project_favorites, dependent: :destroy
   has_many :favorited_projects, through: :user_project_favorites, source: :project
+  has_one_attached :avatar_file
 
   validates :keycloak_sub, presence: true, uniqueness: true
   validates :email, presence: true, uniqueness: true, format: { with: URI::MailTo::EMAIL_REGEXP }
@@ -48,5 +49,11 @@ class User < ApplicationRecord
 
   def global_admin?
     global_admin == true
+  end
+
+  def resolved_avatar_url
+    return avatar_url unless avatar_file.attached?
+
+    avatar_file.url
   end
 end

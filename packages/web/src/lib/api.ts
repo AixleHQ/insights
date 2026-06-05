@@ -103,10 +103,10 @@ export async function apiRequest<T = unknown>(
   const impersonating = isImpersonating();
 
   const buildHeaders = async (): Promise<HeadersInit> => {
-    const requestHeaders: HeadersInit = {
-      "Content-Type": "application/json",
-      ...headers,
-    };
+    const isFormData = fetchOptions.body instanceof FormData;
+    const requestHeaders: HeadersInit = isFormData
+      ? { ...headers }
+      : { "Content-Type": "application/json", ...headers };
 
     if (!skipAuth) {
       const token = await getAuthToken();
