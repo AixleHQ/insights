@@ -11,8 +11,8 @@ RSpec.describe Oauth::GeminiProvider, type: :service do
       expect(provider.fetch_usage).to be_nil
     end
 
-    it 'logs a warning explaining that no historical usage API exists' do
-      expect(Rails.logger).to receive(:warn).with(/no historical usage API/)
+    it 'logs that no historical usage API exists' do
+      expect(Rails.logger).to receive(:info).with(/no historical usage API/)
       provider.fetch_usage
     end
   end

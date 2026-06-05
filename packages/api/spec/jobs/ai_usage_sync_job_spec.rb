@@ -908,9 +908,10 @@ RSpec.describe AiUsageSyncJob, type: :job do
       expect(connector.last_sync_at).to eq(previous_sync_at)
     end
 
-    it "logs a warning via GeminiProvider explaining there is no usage API" do
-      expect(Rails.logger).to receive(:warn).with(/no historical usage API/)
+    it "logs via GeminiProvider that there is no usage API" do
+      allow(Rails.logger).to receive(:info)
       job.perform(organization.id, "gemini")
+      expect(Rails.logger).to have_received(:info).with(/no historical usage API/)
     end
 
     it "still marks the connector synced when GeminiProvider#fetch_usage returns nil" do

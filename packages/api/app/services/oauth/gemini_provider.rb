@@ -5,7 +5,7 @@ module Oauth
     API_URL = "https://generativelanguage.googleapis.com"
 
     def fetch_usage
-      Rails.logger.warn(
+      Rails.logger.info(
         "[GeminiProvider] org=#{connector.organization_id} — " \
         "Google AI Studio has no historical usage API. " \
         "Usage is captured per-request via Ai::ProxyService. Skipping fetch."
