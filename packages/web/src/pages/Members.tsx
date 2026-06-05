@@ -141,7 +141,7 @@ export function Members() {
       email: m.user.email,
       name: m.user.name || undefined,
       role: m.role as MemberRole,
-      joined_at: m.created_at,
+      joined_at: m.createdAt,
       last_active_at: m.last_active_at || undefined,
       total_tokens: m.total_tokens,
       total_events: m.total_events,
