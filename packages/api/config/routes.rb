@@ -69,6 +69,9 @@ Rails.application.routes.draw do
         # Notification routing configuration
         resources :notification_routes, only: %i[index create update destroy]
 
+        # Scheduled report exports
+        resources :scheduled_exports, only: %i[index create update destroy]
+
         # Organization audit logs (export + unified must precede the resource to avoid capture by :index)
         get "audit_logs/unified/export", to: "unified_audit_logs#export"
         get "audit_logs/unified",        to: "unified_audit_logs#index"
