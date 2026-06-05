@@ -41,6 +41,7 @@ import { ActivityHeatmap } from "@/components/dashboard";
 import { SortButton, type SortDirection } from "@/components/ui/sort-button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn, humanizeToolName, toEventRow } from "@/lib/utils";
+import { formatTokens } from "@/lib/formatters";
 
 type MemberRole = "owner" | "member" | "viewer";
 
@@ -62,15 +63,15 @@ function getInitials(name?: string | null, email?: string): string {
   return email?.slice(0, 2).toUpperCase() || "U";
 }
 
-function formatTokens(tokens: number): string {
-  if (tokens >= 1_000_000) {
-    return `${(tokens / 1_000_000).toFixed(2)}M`;
-  }
-  if (tokens >= 1_000) {
-    return `${(tokens / 1_000).toFixed(1)}K`;
-  }
-  return tokens.toLocaleString();
-}
+type EventSortField = "created_at" | "tool_name" | "risk_level" | "cost_usd";
+
+const riskOrder: Record<string, number> = {
+  critical: 4,
+  high: 3,
+  medium: 2,
+  low: 1,
+  none: 0,
+};
 
 function StatCard({
   title,
@@ -146,6 +147,14 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
   const [modelSortField, setModelSortField] = useState<ModelSortField>("tokens");
   const [modelSortDirection, setModelSortDirection] = useState<SortDirection>("desc");
 
+  // Recent Activity sorting state
+  const [eventSortField, setEventSortField] = useState<EventSortField>("created_at");
+  const [eventSortDirection, setEventSortDirection] = useState<SortDirection>("desc");
+
+  // Project commits sorting state
+  const [commitSortField, setCommitSortField] = useState<EventSortField>("created_at");
+  const [commitSortDirection, setCommitSortDirection] = useState<SortDirection>("desc");
+
   const { data: member, isLoading: memberLoading } = useMember(currentOrg?.id || "", memberId);
   const { data: statsData } = useMemberStats(currentOrg?.id || "", memberId);
   const { data: eventsResponse, isLoading: eventsLoading } = useMemberEvents(
@@ -173,6 +182,56 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
     [projectCommitsResponse]
   );
 
+  const sortedEvents: EventRow[] = useMemo(() => {
+    return [...events].sort((a, b) => {
+      let comparison = 0;
+      switch (eventSortField) {
+        case "created_at":
+          comparison =
+            new Date(a.created_at || 0).getTime() -
+            new Date(b.created_at || 0).getTime();
+          break;
+        case "tool_name":
+          comparison = (a.tool_name || "").localeCompare(b.tool_name || "");
+          break;
+        case "risk_level":
+          comparison =
+            (riskOrder[a.risk_level || "none"] ?? 0) -
+            (riskOrder[b.risk_level || "none"] ?? 0);
+          break;
+        case "cost_usd":
+          comparison = (a.cost_usd || 0) - (b.cost_usd || 0);
+          break;
+      }
+      return eventSortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [events, eventSortField, eventSortDirection]);
+
+  const sortedProjectCommits: EventRow[] = useMemo(() => {
+    return [...projectCommits].sort((a, b) => {
+      let comparison = 0;
+      switch (commitSortField) {
+        case "created_at":
+          comparison =
+            new Date(a.created_at || 0).getTime() -
+            new Date(b.created_at || 0).getTime();
+          break;
+        case "tool_name":
+          comparison = (a.tool_name || "").localeCompare(b.tool_name || "");
+          break;
+        case "risk_level":
+          comparison =
+            (riskOrder[a.risk_level || "none"] ?? 0) -
+            (riskOrder[b.risk_level || "none"] ?? 0);
+          break;
+        case "cost_usd":
+          comparison = (a.cost_usd || 0) - (b.cost_usd || 0);
+          break;
+      }
+      return commitSortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [projectCommits, commitSortField, commitSortDirection]);
+
   const handleToolSort = (field: ToolSortField) => {
     if (toolSortField === field) {
       setToolSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
@@ -188,6 +247,24 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
     } else {
       setModelSortField(field);
       setModelSortDirection("desc");
+    }
+  };
+
+  const handleEventSort = (field: EventSortField) => {
+    if (eventSortField === field) {
+      setEventSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setEventSortField(field);
+      setEventSortDirection("desc");
+    }
+  };
+
+  const handleCommitSort = (field: EventSortField) => {
+    if (commitSortField === field) {
+      setCommitSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setCommitSortField(field);
+      setCommitSortDirection("desc");
     }
   };
 
@@ -676,8 +753,11 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
         </CardHeader>
         <CardContent className="px-0 pb-0">
           <EventsTable
-            events={events}
+            events={sortedEvents}
             isLoading={eventsLoading}
+            sortField={eventSortField}
+            sortDirection={eventSortDirection}
+            onSort={handleEventSort}
             className="border-0 rounded-none"
           />
         </CardContent>
@@ -696,8 +776,11 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
           </CardHeader>
           <CardContent className="px-0 pb-0">
             <EventsTable
-              events={projectCommits}
+              events={sortedProjectCommits}
               isLoading={projectCommitsLoading}
+              sortField={commitSortField}
+              sortDirection={commitSortDirection}
+              onSort={handleCommitSort}
               className="border-0 rounded-none"
             />
             {projectCommitsResponse?.meta && projectCommitsResponse.meta.total_pages > 1 && (
