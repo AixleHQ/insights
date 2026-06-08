@@ -1846,11 +1846,14 @@ export function useToolUsers(orgId: string, tool: string, days = 30) {
   });
 }
 
-export function useToolDaily(orgId: string, tool: string, days = 30) {
+export function useToolDaily(orgId: string, tool: string, days = 30, period?: "day" | "week" | "month") {
   return useQuery({
-    queryKey: queryKeys.stats.toolDaily(orgId, tool, days),
-    queryFn: () =>
-      api.get<ToolDailyResponse>(`/organizations/${orgId}/stats/tools/${tool}/daily?days=${days}`),
+    queryKey: [...queryKeys.stats.toolDaily(orgId, tool, days), period],
+    queryFn: () => {
+      const p = new URLSearchParams({ days: String(days) });
+      if (period) p.set("period", period);
+      return api.get<ToolDailyResponse>(`/organizations/${orgId}/stats/tools/${tool}/daily?${p}`);
+    },
     enabled: !!orgId && !!tool,
   });
 }

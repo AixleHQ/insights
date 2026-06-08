@@ -2168,7 +2168,7 @@ paths:
   /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/daily:
     get:
       summary: Tool daily stats
-      description: Returns day-by-day event counts, tokens, and cost for a specific tool. Every day in the range has an entry — days with no events are zero-filled.
+      description: Returns event counts, tokens, and cost bucketed by the requested granularity (day/week/month) for a specific tool. Every bucket in the range has an entry — buckets with no events are zero-filled.
       tags:
         - Stats
       parameters:
@@ -2189,9 +2189,17 @@ paths:
           schema:
             type: integer
             default: 30
+        - name: period
+          in: query
+          required: false
+          description: Bucket granularity. Use week for 60–180 day ranges or month for ~1 year ranges to keep charts readable.
+          schema:
+            type: string
+            enum: [day, week, month]
+            default: day
       responses:
         '200':
-          description: Daily trend data with zero-filled gaps
+          description: Bucketed trend data with zero-filled gaps
           content:
             application/json:
               schema:
@@ -2209,8 +2217,13 @@ paths:
                       end:
                         type: string
                         format: date-time
+                  period:
+                    type: string
+                    enum: [day, week, month]
+                    description: Actual bucket granularity used
                   daily:
                     type: array
+                    description: One entry per bucket (day, week-start, or month-start)
                     items:
                       type: object
                       properties:

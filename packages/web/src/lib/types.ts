@@ -595,6 +595,7 @@ export interface ToolUsersResponse {
 export interface ToolDailyResponse {
   tool: string;
   timeRange: { start: string; end: string };
+  period: "day" | "week" | "month";
   daily: ToolDailyPoint[];
 }
 

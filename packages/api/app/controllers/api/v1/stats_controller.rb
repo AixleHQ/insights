@@ -366,26 +366,32 @@ module Api
       end
 
       # GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/daily
+      # Optional params: days (int), period (day|week|month)
       def tool_daily
         authorize! current_organization, to: :show?
 
         days       = (params[:days] || 30).to_i
+        trunc      = case params[:period]
+        when "month" then "month"
+        when "week"  then "week"
+        else              "day"
+        end
         time_range = parse_time_range(default_days: days)
         events     = @tool_events.where(occurred_at: time_range[:start]..time_range[:end])
 
         rows = events
-          .group("DATE_TRUNC('day', occurred_at)")
+          .group("DATE_TRUNC('#{trunc}', occurred_at)")
           .select(
-            "DATE_TRUNC('day', occurred_at) as day",
+            "DATE_TRUNC('#{trunc}', occurred_at) as bucket",
             "COUNT(*) as event_count",
             "SUM(tokens_in) as tokens_in",
             "SUM(tokens_out) as tokens_out",
             "SUM(cost_usd) as cost_usd"
           )
-          .order(Arel.sql("day"))
+          .order(Arel.sql("bucket"))
           .each_with_object({}) do |row, h|
-            h[row.day.to_date.iso8601] = {
-              date:       row.day.to_date.iso8601,
+            h[row.bucket.to_date.iso8601] = {
+              date:       row.bucket.to_date.iso8601,
               eventCount: row.event_count,
               tokensIn:   row.tokens_in  || 0,
               tokensOut:  row.tokens_out || 0,
@@ -393,13 +399,39 @@ module Api
             }
           end
 
-        daily = (time_range[:start].to_date..time_range[:end].to_date).map do |date|
-          rows[date.iso8601] || { date: date.iso8601, eventCount: 0, tokensIn: 0, tokensOut: 0, costUsd: 0.0 }
+        all_buckets = case trunc
+        when "month"
+          start_month = time_range[:start].beginning_of_month.to_date
+          end_month   = time_range[:end].beginning_of_month.to_date
+          months = []
+          m = start_month
+          while m <= end_month
+            months << m.iso8601
+            m = m.next_month
+          end
+          months
+        when "week"
+          start_week = time_range[:start].to_date.beginning_of_week(:monday)
+          end_week   = time_range[:end].to_date.beginning_of_week(:monday)
+          weeks = []
+          w = start_week
+          while w <= end_week
+            weeks << w.iso8601
+            w += 7
+          end
+          weeks
+        else
+          (time_range[:start].to_date..time_range[:end].to_date).map(&:iso8601)
+        end
+
+        daily = all_buckets.map do |bucket|
+          rows[bucket] || { date: bucket, eventCount: 0, tokensIn: 0, tokensOut: 0, costUsd: 0.0 }
         end
 
         render json: {
           tool:      @tool_name,
           timeRange: { start: time_range[:start].iso8601, end: time_range[:end].iso8601 },
+          period:    trunc,
           daily:     daily
         }
       end
