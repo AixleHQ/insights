@@ -896,7 +896,9 @@ export function useAddProjectMember(projectId: string, orgId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects", projectId, "members"] });
       queryClient.invalidateQueries({ queryKey: ["projects", projectId, "members", "stats"] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.stats.overview(orgId) });
+      queryClient.invalidateQueries({
+        queryKey: ["organizations", orgId, "stats", "overview"],
+      });
     },
   });
 }
@@ -919,7 +921,10 @@ export function useRemoveProjectMember(projectId: string, orgId: string) {
       api.delete(`/projects/${projectId}/members/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects", projectId, "members"] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.stats.overview(orgId) });
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "members", "stats"] });
+      queryClient.invalidateQueries({
+        queryKey: ["organizations", orgId, "stats", "overview"],
+      });
     },
   });
 }
