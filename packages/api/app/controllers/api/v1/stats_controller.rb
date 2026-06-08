@@ -28,6 +28,9 @@ module Api
         prev_end    = 1.month.ago.end_of_month
         prev_events = base_scope.where(occurred_at: prev_start..prev_end)
 
+        # Counts users with at least one event in the last 7 days — intentionally activity-based,
+        # not membership-based. A newly-added member with no events will not appear here until
+        # they start generating activity.
         active_users = base_scope.where("occurred_at > ?", 7.days.ago).distinct.count(:user_id)
 
         # Count distinct tool_events that have at least one non-none audit log in the current month.

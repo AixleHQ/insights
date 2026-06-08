@@ -72,8 +72,8 @@ export function ProjectMembersTab({
   const { data: orgMembers = [] } = useOrganizationMembers(orgId, {
     enabled: canManageMembers,
   });
-  const addMember = useAddProjectMember(projectId);
-  const removeMember = useRemoveProjectMember(projectId);
+  const addMember = useAddProjectMember(projectId, orgId);
+  const removeMember = useRemoveProjectMember(projectId, orgId);
   const updateMember = useUpdateProjectMember(projectId);
 
   const statsById = useMemo(
