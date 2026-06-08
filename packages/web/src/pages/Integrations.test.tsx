@@ -193,7 +193,7 @@ describe("Integrations", () => {
       expect(screen.queryByText("Cursor")).not.toBeInTheDocument();
     });
 
-    it("shows OpenAI as connectable and Gemini as coming soon", () => {
+    it("shows OpenAI and Gemini as connectable", () => {
       renderAt("/integrations/available");
       expect(screen.getByText("OpenAI")).toBeInTheDocument();
       expect(screen.getByText("Gemini")).toBeInTheDocument();
@@ -202,7 +202,7 @@ describe("Integrations", () => {
       expect(within(openaiCard).getByRole("button", { name: "Connect" })).toBeInTheDocument();
 
       const geminiCard = screen.getByTestId("provider-card-gemini");
-      expect(within(geminiCard).getByRole("button", { name: "Coming Soon" })).toBeInTheDocument();
+      expect(within(geminiCard).getByRole("button", { name: "Connect" })).toBeInTheDocument();
     });
 
     it("does not show providers that are already connected", () => {

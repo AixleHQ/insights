@@ -864,6 +864,52 @@ RSpec.describe AiUsageSyncJob, type: :job do
     end
   end
 
+  describe "#perform — Gemini provider" do
+    let(:connector) do
+      create(:organization_connector,
+        organization: organization,
+        connector_type: "gemini",
+        access_token: "AIza-test123",
+        is_active: true)
+    end
+
+    before { connector }
+
+    it "creates no ToolEvents (usage is captured per-request via ProxyService)" do
+      expect {
+        job.perform(organization.id, "gemini")
+      }.not_to change(ToolEvent, :count)
+    end
+
+    it "marks the connector synced after a successful run" do
+      job.perform(organization.id, "gemini")
+
+      connector.reload
+      expect(connector.status).to eq("connected")
+      expect(connector.last_sync_at).to be_present
+    end
+
+    it "does not create any ToolEvents when the Gemini connector is inactive" do
+      connector.update!(is_active: false)
+
+      expect {
+        job.perform(organization.id, "gemini")
+      }.not_to change(ToolEvent, :count)
+    end
+
+    it "does not update connector status when connector is inactive" do
+      connector.update!(is_active: false)
+      previous_status = connector.status
+      previous_sync_at = connector.last_sync_at
+
+      job.perform(organization.id, "gemini")
+
+      connector.reload
+      expect(connector.status).to eq(previous_status)
+      expect(connector.last_sync_at).to eq(previous_sync_at)
+    end
+  end
+
   describe "Oauth::OpenrouterProvider#fetch_activity — rate limit retry" do
     let(:connector) do
       create(:organization_connector,

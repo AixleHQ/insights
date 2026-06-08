@@ -152,7 +152,7 @@ const availableProviders: ProviderInfo[] = [
   {
     id: "gemini",
     name: "Gemini",
-    description: "Track Google Gemini API usage and costs",
+    description: "Track Google Gemini API usage via DB90 AI Gateway — usage is recorded per request, not via API polling",
     category: "ai",
     scope: "org",
     features: [
@@ -161,8 +161,7 @@ const availableProviders: ProviderInfo[] = [
       "Token consumption",
       "Cost breakdown",
     ],
-    available: false,
-    comingSoon: true,
+    available: true,
   },
   {
     id: "github_copilot",

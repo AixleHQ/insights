@@ -5,13 +5,6 @@ module Ai
     BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
     DEFAULT_MODEL = "gemini-1.5-pro"
 
-    # Pricing per million tokens (as of 2024)
-    PRICING = {
-      "gemini-1.5-pro" => { prompt: 1.25, completion: 5.00 },
-      "gemini-1.5-flash" => { prompt: 0.075, completion: 0.30 },
-      "gemini-1.0-pro" => { prompt: 0.50, completion: 1.50 }
-    }.freeze
-
     class << self
       def default_model
         DEFAULT_MODEL
@@ -61,11 +54,12 @@ module Ai
           .select { |m| m["name"].include?("gemini") }
           .map do |model|
             model_id = model["name"].sub("models/", "")
+            p = ModelPricingService.pricing_for_model(model_id)
             {
               id: model_id,
               name: model["displayName"],
               context_length: model["inputTokenLimit"],
-              pricing: PRICING[model_id]
+              pricing: { prompt: p[:input], completion: p[:output] }
             }
           end
       end
@@ -148,12 +142,11 @@ module Ai
       end
 
       def calculate_cost(model, prompt_tokens, completion_tokens)
-        pricing = PRICING[model]
-        return nil unless pricing
-
-        prompt_cost = (prompt_tokens / 1_000_000.0) * pricing[:prompt]
-        completion_cost = (completion_tokens / 1_000_000.0) * pricing[:completion]
-        prompt_cost + completion_cost
+        ModelPricingService.calculate_cost(
+          tokens_in: prompt_tokens,
+          tokens_out: completion_tokens,
+          model: model
+        )[:total_cost]
       end
     end
   end
