@@ -44,15 +44,22 @@ interface ToolInsightsSectionProps {
 
 const DAY_OPTIONS = [7, 30, 90, 365] as const;
 
+const PERIOD_THRESHOLDS = { month: 365, week: 60 } as const;
+
 function periodForDays(days: number): "day" | "week" | "month" {
-  if (days >= 365) return "month";
-  if (days >= 60) return "week";
+  if (days >= PERIOD_THRESHOLDS.month) return "month";
+  if (days >= PERIOD_THRESHOLDS.week) return "week";
   return "day";
 }
 
 function labelForDays(days: number): string {
   if (days === 365) return "1y";
   return `${days}d`;
+}
+
+function humanizeDays(days: number): string {
+  if (days === 365) return "1 year";
+  return `${days} days`;
 }
 
 function chartTitleForPeriod(period: "day" | "week" | "month"): string {
@@ -188,7 +195,7 @@ function OpenRouterTabContent({ orgId, days, period }: { orgId: string; days: nu
   if (!isLoadingDaily && totalEvents === 0) {
     return (
       <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-        No OpenRouter events in the last {days === 365 ? "1 year" : `${days} days`}.
+        No OpenRouter events in the last {humanizeDays(days)}.
       </div>
     );
   }
@@ -271,7 +278,7 @@ function CursorTabContent({ orgId, days, period }: { orgId: string; days: number
   if (!isLoadingDaily && totalEvents === 0) {
     return (
       <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-        No Cursor events in the last {days === 365 ? "1 year" : `${days} days`}.
+        No Cursor events in the last {humanizeDays(days)}.
       </div>
     );
   }
@@ -407,7 +414,7 @@ function AnthropicTabContent({ orgId, days, period }: { orgId: string; days: num
   if (!isLoadingDaily && totalEvents === 0) {
     return (
       <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-        No Anthropic API events in the last {days === 365 ? "1 year" : `${days} days`}.
+        No Anthropic API events in the last {humanizeDays(days)}.
       </div>
     );
   }

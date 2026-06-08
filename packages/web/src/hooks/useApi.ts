@@ -139,8 +139,8 @@ export const queryKeys = {
       ["organizations", orgId, "stats", "tools", tool, "models", days] as const,
     toolUsers: (orgId: string, tool: string, days?: number) =>
       ["organizations", orgId, "stats", "tools", tool, "users", days] as const,
-    toolDaily: (orgId: string, tool: string, days?: number) =>
-      ["organizations", orgId, "stats", "tools", tool, "daily", days] as const,
+    toolDaily: (orgId: string, tool: string, days?: number, period?: string) =>
+      ["organizations", orgId, "stats", "tools", tool, "daily", days, period] as const,
     toolEventTypes: (orgId: string, tool: string, days?: number) =>
       ["organizations", orgId, "stats", "tools", tool, "event_types", days] as const,
   },
@@ -1848,7 +1848,7 @@ export function useToolUsers(orgId: string, tool: string, days = 30) {
 
 export function useToolDaily(orgId: string, tool: string, days = 30, period?: "day" | "week" | "month") {
   return useQuery({
-    queryKey: [...queryKeys.stats.toolDaily(orgId, tool, days), period],
+    queryKey: queryKeys.stats.toolDaily(orgId, tool, days, period),
     queryFn: () => {
       const p = new URLSearchParams({ days: String(days) });
       if (period) p.set("period", period);

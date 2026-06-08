@@ -4,6 +4,7 @@ module Api
   module V1
     class StatsController < BaseController
       TOOL_SCOPED_ACTIONS = %i[tool_overview tool_models tool_users tool_daily tool_event_types].freeze
+      ALLOWED_PERIODS = %w[day week month].freeze
 
       before_action :require_organization!
       before_action :set_tool_scope, only: TOOL_SCOPED_ACTIONS
@@ -370,19 +371,16 @@ module Api
       def tool_daily
         authorize! current_organization, to: :show?
 
-        days       = (params[:days] || 30).to_i
-        trunc      = case params[:period]
-        when "month" then "month"
-        when "week"  then "week"
-        else              "day"
-        end
+        days       = (params[:days] || 30).to_i.clamp(1, 730)
+        trunc      = ALLOWED_PERIODS.include?(params[:period]) ? params[:period] : "day"
         time_range = parse_time_range(default_days: days)
         events     = @tool_events.where(occurred_at: time_range[:start]..time_range[:end])
+        bucket_expr = Arel.sql("DATE_TRUNC('#{trunc}', occurred_at)")
 
         rows = events
-          .group("DATE_TRUNC('#{trunc}', occurred_at)")
+          .group(bucket_expr)
           .select(
-            "DATE_TRUNC('#{trunc}', occurred_at) as bucket",
+            Arel.sql("DATE_TRUNC('#{trunc}', occurred_at) as bucket"),
             "COUNT(*) as event_count",
             "SUM(tokens_in) as tokens_in",
             "SUM(tokens_out) as tokens_out",
