@@ -122,6 +122,7 @@ vi.mock("@/hooks/useApi", () => {
     data: { data: [], meta: { current_page: 1, total_pages: 0, total_count: 0, per_page: 10 } },
     isLoading: false,
   }),
+  useEvent: () => ({ data: null, isLoading: false }),
   useCurrentUser: () => ({ data: { ...mockUser, settings: notificationSettings.value } }),
   useUpdateCurrentUser: () => ({ mutate: vi.fn(), isPending: false }),
   useUserOrganizations: () => ({ data: mockOrgs, isLoading: false }),
