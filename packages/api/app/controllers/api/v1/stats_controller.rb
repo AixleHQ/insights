@@ -154,12 +154,16 @@ module Api
       end
 
       # GET /api/v1/organizations/:organization_id/stats/daily_by_tool
-      # Optional params: period (day|week), month (YYYY-MM), project_id
+      # Optional params: period (day|week|month), month (YYYY-MM), project_id
       def daily_by_tool
         authorize! current_organization, to: :show?
 
         time_range = month_or_days_time_range
-        trunc      = params[:period] == "week" ? "week" : "day"
+        trunc      = case params[:period]
+        when "month" then "month"
+        when "week"  then "week"
+        else              "day"
+        end
         events     = scoped_events(time_range)
 
         top_tools = events
@@ -187,9 +191,26 @@ module Api
           date_map[date][tool_key] = (date_map[date][tool_key] || 0) + row.event_count
         end
 
+        all_buckets = if trunc == "month"
+          start_month = time_range[:start].beginning_of_month.to_date
+          end_month   = time_range[:end].beginning_of_month.to_date
+          months = []
+          m = start_month
+          while m <= end_month
+            months << m.iso8601
+            m = m.next_month
+          end
+          months
+        else
+          (time_range[:start].to_date..time_range[:end].to_date).map(&:iso8601)
+        end
+
+        filled = all_buckets.map { |d| date_map[d] || { date: d } }
+
         render json: {
-          data:  date_map.values.sort_by { |d| d[:date] },
-          tools: top_tools + [ "Other" ]
+          data:   filled,
+          tools:  top_tools + [ "Other" ],
+          period: trunc
         }
       end
 

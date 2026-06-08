@@ -184,6 +184,34 @@ RSpec.describe 'Api::V1::Stats', type: :request do
       expect(json_response[:tools]).to be_an(Array)
     end
 
+    it 'accepts period=month and returns monthly buckets' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/daily_by_tool",
+                        user: user,
+                        organization: organization,
+                        params: { period: 'month', days: 365 }
+
+      expect_success
+      expect(json_response[:data]).to be_an(Array)
+      expect(json_response[:tools]).to be_an(Array)
+      expect(json_response[:period]).to eq('month')
+    end
+
+    it 'zero-fills the full monthly range when period=month' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/daily_by_tool",
+                        user: user,
+                        organization: organization,
+                        params: { period: 'month', days: 365 }
+
+      expect_success
+      dates = json_response[:data].map { |d| d[:date] }
+      # All dates should be the 1st of their respective months
+      dates.each do |d|
+        expect(Date.parse(d).day).to eq(1)
+      end
+      # Should span approximately 12 months (±1 for boundaries)
+      expect(dates.length).to be_between(12, 14)
+    end
+
     it 'scopes by project_id' do
       project = create(:project, organization: organization)
       create(:tool_event, organization: organization, project: project, user: user,

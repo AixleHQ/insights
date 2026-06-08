@@ -1756,11 +1756,12 @@ export interface DailyByToolResponse {
   data: DailyToolData[];
   tools: string[];
   granularity: "day" | "month";
+  period?: "day" | "week" | "month";
 }
 
 export interface DailyByToolOpts {
   days?: number;
-  period?: "day" | "week";
+  period?: "day" | "week" | "month";
   month?: string;
   projectId?: string;
 }

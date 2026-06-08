@@ -1734,7 +1734,7 @@ paths:
   /api/v1/organizations/{organization_id}/stats/daily_by_tool:
     get:
       summary: Daily stats by tool
-      description: Returns event counts grouped by the top 3 tools plus an "Other" bucket — shaped for stacked bar charts. Granularity is day (default) or week. Use month (YYYY-MM) or days to set the window.
+      description: Returns event counts grouped by the top 3 tools plus an "Other" bucket — shaped for stacked bar charts. Granularity is day (default), week, or month. Use month (YYYY-MM) or days to set the window.
       tags:
         - Stats
       parameters:
@@ -1751,7 +1751,7 @@ paths:
           description: Bucket granularity
           schema:
             type: string
-            enum: [day, week]
+            enum: [day, week, month]
             default: day
         - name: month
           in: query
@@ -1776,7 +1776,7 @@ paths:
                 properties:
                   data:
                     type: array
-                    description: One entry per bucket (day or week start); keys are tool names + "Other"
+                    description: One entry per bucket (day, week, or month start); keys are tool names + "Other"
                     items:
                       type: object
                       properties:
@@ -1790,6 +1790,10 @@ paths:
                     description: Ordered list of tool names present in data (top 3 + "Other")
                     items:
                       type: string
+                  period:
+                    type: string
+                    enum: [day, week, month]
+                    description: Actual bucket granularity used
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
