@@ -1004,16 +1004,16 @@ RSpec.describe 'Api::V1::Stats', type: :request do
   end
 
   describe 'not_none risk_level filter on events' do
-    it 'filters tool_events to cost_usd > 0.01' do
+    it 'filters tool_events by classification risk_level' do
       # Use a fresh org to avoid interference from the global before block
       fresh_org  = create(:organization)
       fresh_user = create(:user)
       create(:organization_membership, user: fresh_user, organization: fresh_org, role: 'member')
 
       create(:tool_event, organization: fresh_org, user: fresh_user,
-             tool_name: 'claude_code', cost_usd: 0.50, occurred_at: Time.current)
+             tool_name: 'claude_code', metadata: { "risk_level" => "low" }, occurred_at: Time.current)
       create(:tool_event, organization: fresh_org, user: fresh_user,
-             tool_name: 'cursor', cost_usd: 0.001, occurred_at: Time.current)
+             tool_name: 'cursor', metadata: { "risk_level" => "none" }, occurred_at: Time.current)
 
       authenticated_get "/api/v1/organizations/#{fresh_org.id}/events",
                         user: fresh_user,

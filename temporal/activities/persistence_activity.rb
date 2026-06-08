@@ -18,7 +18,7 @@ module Activities
       api_key = ENV.fetch("INTERNAL_API_KEY", nil)
 
       # Create the tool event via internal API
-      tool_event = create_tool_event(api_url, api_key, event_params, sanitization)
+      tool_event = create_tool_event(api_url, api_key, event_params, sanitization, classification)
 
       # Create the audit log
       audit_log = create_audit_log(
@@ -41,7 +41,7 @@ module Activities
 
     private
 
-    def create_tool_event(api_url, api_key, event_params, sanitization)
+    def create_tool_event(api_url, api_key, event_params, sanitization, classification = {})
       uri = URI("#{api_url}/api/internal/tool_events")
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = uri.scheme == "https"
@@ -64,7 +64,7 @@ module Activities
           cost_usd: event_params["cost_usd"],
           duration_ms: event_params["duration_ms"],
           occurred_at: event_params["occurred_at"],
-          metadata: metadata_from_sanitized(sanitization, event_params)
+          metadata: metadata_from_sanitized(sanitization, event_params, classification)
         }
       }.to_json
 
@@ -77,7 +77,7 @@ module Activities
       JSON.parse(response.body)["data"]
     end
 
-    def metadata_from_sanitized(sanitization, event_params)
+    def metadata_from_sanitized(sanitization, event_params, classification = {})
       base = event_params["metadata"].is_a?(Hash) ? event_params["metadata"].dup : {}
 
       envelope = parse_jsonish(sanitization["sanitized_payload"])
@@ -93,7 +93,9 @@ module Activities
       base.merge(
         "sanitization_applied" => sanitization["change_count"].to_i > 0,
         "original_size" => sanitization["original_size"],
-        "sanitized_size" => sanitization["sanitized_size"]
+        "sanitized_size" => sanitization["sanitized_size"],
+        "risk_level" => (classification || {})["risk_level"] || "none",
+        "risk_score" => (classification || {})["risk_score"].to_i
       )
     end
 

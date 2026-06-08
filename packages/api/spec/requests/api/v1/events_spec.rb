@@ -576,13 +576,13 @@ RSpec.describe 'Api::V1::Events', type: :request do
         expect(response.body).not_to include("cursor")
       end
 
-      it "respects risk_level filter (high = cost_usd > 1.0)" do
-        high_event = create(:tool_event,
-                            organization: organization,
-                            user: user,
-                            tool_name: "windsurf",
-                            cost_usd: 5.0,
-                            occurred_at: 30.minutes.ago)
+      it "respects risk_level filter (high)" do
+        create(:tool_event,
+               organization: organization,
+               user: user,
+               tool_name: "windsurf",
+               metadata: { "risk_level" => "high" },
+               occurred_at: 30.minutes.ago)
 
         authenticated_get export_path, user: user, organization: organization,
                           params: { risk_level: "high" }
@@ -591,12 +591,12 @@ RSpec.describe 'Api::V1::Events', type: :request do
         expect(response.body).not_to include("claude_code")
       end
 
-      it "respects risk_level filter (critical uses the same bucket as high)" do
+      it "respects risk_level filter (critical)" do
         create(:tool_event,
                organization: organization,
                user: user,
                tool_name: "windsurf",
-               cost_usd: 5.0,
+               metadata: { "risk_level" => "critical" },
                occurred_at: 30.minutes.ago)
 
         authenticated_get export_path, user: user, organization: organization,

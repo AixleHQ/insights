@@ -90,13 +90,7 @@ module ToolEventCsvExporter
     end
   end
 
-  # Mirrors ToolEventAttributes#risk_level thresholds exactly.
   def self.risk_level_for(event)
-    cost = event.cost_usd.to_f
-    if    cost > 1.0  then "high"
-    elsif cost > 0.1  then "medium"
-    elsif cost > 0.01 then "low"
-    else "none"
-    end
+    event.metadata&.dig("risk_level") || "none"
   end
 end

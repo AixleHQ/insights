@@ -3719,9 +3719,9 @@ paths:
         - name: risk_level
           in: query
           description: |
-            Filter by cost-based risk tier. `not_none` is a convenience alias for `cost_usd > 0.01`
-            (any non-zero risk). Note: this is cost-based risk; AuditLog risk (content scanning) is a
-            separate signal available via /stats/risk_alerts.
+            Filter by security classification risk level. `not_none` matches any event with a detected
+            risk (low, medium, high, or critical). Levels are set by the content-scanning classification
+            engine, not by cost.
           schema:
             type: string
             enum: [critical, high, medium, low, none, not_none]
@@ -4093,11 +4093,12 @@ paths:
         - name: risk_level
           in: query
           description: |
-            Filter by cost-based risk tier. `not_none` is a convenience alias for `cost_usd > 0.01`.
-            Note: this is cost-based risk; AuditLog risk (content scanning) is a separate signal.
+            Filter by security classification risk level. `not_none` matches any event with a detected
+            risk (low, medium, high, or critical). Levels are set by the content-scanning classification
+            engine, not by cost.
           schema:
             type: string
-            enum: [high, medium, low, none, not_none]
+            enum: [critical, high, medium, low, none, not_none]
         - name: project_id
           in: query
           schema:

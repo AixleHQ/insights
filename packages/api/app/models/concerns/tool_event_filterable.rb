@@ -31,15 +31,16 @@ module ToolEventFilterable
     scope
   end
 
-  # Thresholds match ToolEventAttributes#risk_level. UI may send "critical"; bucket it with high (cost > $1).
   def apply_tool_event_risk_level_filter(scope, risk_level)
+    return scope if risk_level.blank?
+
     case risk_level
-    when "high", "critical" then scope.where("cost_usd > 1.0")
-    when "medium" then scope.where("cost_usd > 0.1 AND cost_usd <= 1.0")
-    when "low"    then scope.where("cost_usd > 0.01 AND cost_usd <= 0.1")
-    when "none"   then scope.where("cost_usd IS NULL OR cost_usd <= 0.01")
-    when "not_none" then scope.where("cost_usd > 0.01")
-    else scope
+    when "not_none"
+      scope.where("metadata->>'risk_level' IS NOT NULL AND metadata->>'risk_level' NOT IN ('none', '')")
+    when "none"
+      scope.where("metadata->>'risk_level' IS NULL OR metadata->>'risk_level' IN ('none', '')")
+    else
+      scope.where("metadata->>'risk_level' = ?", risk_level)
     end
   end
 

@@ -37,36 +37,24 @@ RSpec.describe ToolEventAttributes, type: :serializer do
   end
 
   describe "risk_level" do
-    it 'returns "high" for cost > $1.00' do
-      event = create(:tool_event, organization: organization, user: user, cost_usd: 1.50)
-      data = ToolEventSerializer.new(event).serialize
+    %w[critical high medium low none].each do |level|
+      it "returns #{level.inspect} when metadata risk_level is #{level.inspect}" do
+        event = create(:tool_event, organization: organization, user: user, metadata: { "risk_level" => level })
+        data = ToolEventSerializer.new(event).serialize
 
-      expect(data["riskLevel"]).to eq("high")
+        expect(data["riskLevel"]).to eq(level)
+      end
     end
 
-    it 'returns "medium" for cost > $0.10' do
-      event = create(:tool_event, organization: organization, user: user, cost_usd: 0.50)
-      data = ToolEventSerializer.new(event).serialize
-
-      expect(data["riskLevel"]).to eq("medium")
-    end
-
-    it 'returns "low" for cost > $0.01' do
-      event = create(:tool_event, organization: organization, user: user, cost_usd: 0.05)
-      data = ToolEventSerializer.new(event).serialize
-
-      expect(data["riskLevel"]).to eq("low")
-    end
-
-    it 'returns "none" for cost <= $0.01' do
-      event = create(:tool_event, organization: organization, user: user, cost_usd: 0.005)
+    it 'returns "none" when metadata has no risk_level key' do
+      event = create(:tool_event, organization: organization, user: user, metadata: {})
       data = ToolEventSerializer.new(event).serialize
 
       expect(data["riskLevel"]).to eq("none")
     end
 
-    it 'returns "none" when cost_usd is nil' do
-      event = create(:tool_event, organization: organization, user: user, cost_usd: nil)
+    it 'returns "none" when metadata is nil' do
+      event = create(:tool_event, organization: organization, user: user, metadata: nil)
       data = ToolEventSerializer.new(event).serialize
 
       expect(data["riskLevel"]).to eq("none")
@@ -115,7 +103,7 @@ RSpec.describe ToolEventAttributes, type: :serializer do
   end
 
   describe "concern is shared across serializers" do
-    let(:event) { create(:tool_event, organization: organization, user: user, cost_usd: 0.50) }
+    let(:event) { create(:tool_event, organization: organization, user: user, metadata: { "risk_level" => "medium" }) }
 
     it "produces consistent attribution across list and detail serializers" do
       list_data = ToolEventSerializer.new(event).serialize
