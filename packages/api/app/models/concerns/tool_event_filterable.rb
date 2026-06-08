@@ -9,7 +9,9 @@ module ToolEventFilterable
 
     scope = apply_tool_event_time_filter(scope, fp)
     scope = scope.where(tool_name: fp["tool_name"])   if fp["tool_name"].present?
-    scope = scope.where(event_type: fp["event_type"]) if fp["event_type"].present?
+    if (types = normalize_event_types(fp["event_type"])).any?
+      scope = scope.where(event_type: types)
+    end
     scope = scope.where(user_id: fp["user_id"])       if fp["user_id"].present?
     scope = scope.where(project_id: fp["project_id"]) if fp["project_id"].present?
     scope = scope.where(model: fp["model"])            if fp["model"].present?
@@ -38,6 +40,16 @@ module ToolEventFilterable
     when "none"   then scope.where("cost_usd IS NULL OR cost_usd <= 0.01")
     when "not_none" then scope.where("cost_usd > 0.01")
     else scope
+    end
+  end
+
+  private
+
+  def normalize_event_types(value)
+    case value
+    when Array then value.flatten.compact.reject(&:blank?)
+    when String then value.split(",").map(&:strip).reject(&:empty?)
+    else []
     end
   end
 end

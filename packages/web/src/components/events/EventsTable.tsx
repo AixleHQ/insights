@@ -9,6 +9,7 @@ import {
 import { EventRowSkeleton } from "@/components/ui/skeletons";
 import { SortButton, type SortDirection } from "@/components/ui/sort-button";
 import { RiskBadge } from "@/components/dashboard/ActivityFeed";
+import { labelForEventType } from "@/lib/eventTypes";
 import { formatDistanceToNow, humanizeToolName, cn } from "@/lib/utils";
 import {
   formatCost as formatCostValue,
@@ -146,8 +147,8 @@ export function EventsTable({
                   </span>
                 </TableCell>
                 <TableCell className="hidden sm:table-cell">
-                  <span className="text-xs capitalize text-muted-foreground">
-                    {(event.event_type || "unknown").replace("_", " ")}
+                  <span className="text-xs text-muted-foreground">
+                    {labelForEventType(event.event_type || "unknown")}
                   </span>
                 </TableCell>
                 <TableCell>

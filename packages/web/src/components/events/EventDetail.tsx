@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RiskBadge } from "@/components/dashboard/ActivityFeed";
 import { useOrg } from "@/contexts/OrgContext";
+import { labelForEventType } from "@/lib/eventTypes";
 import { cn, humanizeToolName } from "@/lib/utils";
 import { formatCost, formatTokens } from "@/lib/formatters";
 import { canViewEventPrompt } from "@/lib/eventAccess";
@@ -145,7 +146,7 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
               <RiskBadge level={event.risk_level || "none"} />
             </div>
             <p className="text-sm text-muted-foreground">
-              {(event.event_type || "unknown").replaceAll("_", " ")} · {formattedDate}
+              {labelForEventType(event.event_type || "unknown")} · {formattedDate}
             </p>
           </div>
         </div>

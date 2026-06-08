@@ -28,6 +28,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { RiskBadge } from "@/components/dashboard/ActivityFeed";
 import { useOrg } from "@/contexts/OrgContext";
 import { useEvent } from "@/hooks/useApi";
+import { labelForEventType } from "@/lib/eventTypes";
 import { cn, humanizeToolName } from "@/lib/utils";
 import { formatCost, formatTokens } from "@/lib/formatters";
 import { canViewEventPrompt } from "@/lib/eventAccess";
@@ -156,7 +157,7 @@ export function EventDrawer({
                     <RiskBadge level={event.riskLevel || "none"} />
                   </div>
                   <SheetDescription className="mt-1">
-                    <span className="capitalize">{(event.eventType || "unknown").replaceAll("_", " ")}</span>
+                    <span>{labelForEventType(event.eventType || "unknown")}</span>
                     {" · "}
                     {formattedDate}
                   </SheetDescription>

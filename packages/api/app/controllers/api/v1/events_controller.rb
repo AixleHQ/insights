@@ -228,8 +228,9 @@ module Api
       end
 
       def export_filter_params
-        params.permit(:tool_name, :event_type, :user_id, :project_id,
-                      :model, :start_date, :end_date, :risk_level)
+        params.permit(:tool_name, :user_id, :project_id,
+                      :model, :start_date, :end_date, :risk_level,
+                      :event_type, event_type: [])
       end
     end
   end

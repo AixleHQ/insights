@@ -234,14 +234,20 @@ export interface McpIngestExchangeData {
 // Event types
 export type RiskLevel = "none" | "low" | "medium" | "high" | "critical";
 export type EventType =
-  | "completion"
-  | "prompt"
   | "chat"
+  | "completion"
   | "edit"
-  | "generation"
   | "commit"
   | "review"
-  | "other";
+  | "test"
+  | "debug"
+  | "refactor"
+  | "documentation"
+  | "other"
+  | "issue"
+  | "comment"
+  | "sprint"
+  | "tool_use";
 
 export interface ToolEvent {
   id: string;

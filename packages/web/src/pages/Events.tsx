@@ -14,6 +14,7 @@ import {
   type EventRow,
 } from "@/components/events";
 import type { EventsToolFilterOption } from "@/lib/eventsToolFilters";
+import { dbTypesForCategory } from "@/lib/eventTypes";
 import { humanizeToolName } from "@/lib/utils";
 import { showEventsUserColumn, type SortField, type SortDirection, riskLevelOrder } from "@/lib/eventAccess";
 
@@ -57,7 +58,7 @@ export function Events() {
     per_page: 25,
     tool_name: filters.tool,
     risk_level: filters.riskLevels?.length === 1 ? filters.riskLevels[0] : undefined,
-    event_type: filters.eventType,
+    event_type: filters.eventType ? dbTypesForCategory(filters.eventType) : undefined,
     start_date: filters.dateFrom,
     end_date: filters.dateTo,
     project_id: filters.projectId,
@@ -162,7 +163,7 @@ export function Events() {
       const result = await exportEvents({
         tool_name: filters.tool,
         risk_level: filters.riskLevels?.[0],
-        event_type: filters.eventType,
+        event_type: filters.eventType ? dbTypesForCategory(filters.eventType) : undefined,
         start_date: filters.dateFrom,
         end_date: filters.dateTo,
         project_id: filters.projectId,

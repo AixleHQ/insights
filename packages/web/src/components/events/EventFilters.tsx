@@ -16,6 +16,10 @@ import {
 } from "@/components/ui/popover";
 import { cn, humanizeToolName } from "@/lib/utils";
 import type { EventsToolFilterOption } from "@/lib/eventsToolFilters";
+import {
+  EVENT_CATEGORY_LABEL,
+  type EventCategory,
+} from "@/lib/eventTypes";
 import type { ProjectWithStats } from "@/lib/types";
 
 export interface EventFiltersState {
@@ -23,7 +27,8 @@ export interface EventFiltersState {
   /** Canonical API `tool_name` (e.g. `cursor`, `claude_code`). */
   tool?: string;
   riskLevels?: string[];
-  eventType?: string;
+  /** UI category key (prompt, completion, …), expanded to DB types before API calls. */
+  eventType?: EventCategory;
   dateFrom?: string;
   dateTo?: string;
   /** API `project_id` (organization project UUID). */
@@ -47,12 +52,9 @@ const riskLevels = [
   { value: "none", label: "None", color: "bg-muted-foreground" },
 ];
 
-const eventTypes = [
-  { value: "prompt", label: "Prompt" },
-  { value: "completion", label: "Completion" },
-  { value: "function_call", label: "Function Call" },
-  { value: "file_operation", label: "File Operation" },
-];
+const eventTypeOptions = (
+  Object.entries(EVENT_CATEGORY_LABEL) as [EventCategory, string][]
+).map(([value, label]) => ({ value, label }));
 
 export function FilterChip({
   label,
@@ -200,8 +202,8 @@ export function EventFilters({
   }
   // riskLevels chips are rendered separately below (per-level chips)
   if (filters.eventType) {
-    const type = eventTypes.find(t => t.value === filters.eventType);
-    activeFilters.push({ key: "eventType", label: "Type", value: type?.label || filters.eventType });
+    const label = filters.eventType ? EVENT_CATEGORY_LABEL[filters.eventType] : undefined;
+    activeFilters.push({ key: "eventType", label: "Type", value: label || filters.eventType });
   }
   if (filters.dateFrom) {
     activeFilters.push({
@@ -342,7 +344,7 @@ export function EventFilters({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All types</SelectItem>
-              {eventTypes.map((type) => (
+              {eventTypeOptions.map((type) => (
                 <SelectItem key={type.value} value={type.value}>
                   {type.label}
                 </SelectItem>

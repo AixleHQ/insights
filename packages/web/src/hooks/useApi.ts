@@ -1524,16 +1524,31 @@ export function useMcpIngestExchange() {
 // ============================================================================
 
 export interface EventsParams {
-  [key: string]: string | number | undefined;
+  [key: string]: string | number | string[] | undefined;
   page?: number;
   per_page?: number;
   tool_name?: string;
   risk_level?: string;
-  event_type?: string;
+  event_type?: string | string[];
   start_date?: string;
   end_date?: string;
   user_id?: string;
   project_id?: string;
+}
+
+/** Serializes query values; arrays become comma-separated (API normalize_event_types splits commas). */
+export function appendQueryParam(
+  params: URLSearchParams,
+  key: string,
+  value: string | number | string[] | undefined
+): void {
+  if (value === undefined || value === null || value === "") return;
+  if (Array.isArray(value)) {
+    if (value.length === 0) return;
+    params.append(key, value.join(","));
+    return;
+  }
+  params.append(key, String(value));
 }
 
 export function useEvents(orgId: string, params?: EventsParams, options?: { enabled?: boolean }) {
@@ -1543,9 +1558,7 @@ export function useEvents(orgId: string, params?: EventsParams, options?: { enab
       const searchParams = new URLSearchParams();
       if (params) {
         Object.entries(params).forEach(([key, value]) => {
-          if (value !== undefined && value !== null && value !== "") {
-            searchParams.append(key, String(value));
-          }
+          appendQueryParam(searchParams, key, value);
         });
       }
       const query = searchParams.toString();
@@ -1579,9 +1592,7 @@ export function useExportEvents(orgId: string) {
         const { filename, ...filterParams } = params;
         const searchParams = new URLSearchParams();
         Object.entries(filterParams).forEach(([k, v]) => {
-          if (v !== undefined && v !== null && v !== "") {
-            searchParams.append(k, String(v));
-          }
+          appendQueryParam(searchParams, k, v);
         });
         const query = searchParams.toString();
         const endpoint = `/organizations/${orgId}/events/export${query ? `?${query}` : ""}`;

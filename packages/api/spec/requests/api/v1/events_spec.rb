@@ -54,6 +54,22 @@ RSpec.describe 'Api::V1::Events', type: :request do
       expect(json_data.first[:eventType]).to eq('chat')
     end
 
+    it 'filters by multiple comma-separated event_types' do
+      chat_event = create(:tool_event, organization: organization, user: user, event_type: 'chat')
+      edit_event = create(:tool_event, organization: organization, user: user, event_type: 'edit')
+      commit_event = create(:tool_event, organization: organization, user: user, event_type: 'commit')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                        user: user,
+                        organization: organization,
+                        params: { event_type: 'chat,edit' }
+
+      expect_success
+      ids = json_data.map { |e| e[:id] }
+      expect(ids).to include(chat_event.id, edit_event.id)
+      expect(ids).not_to include(commit_event.id)
+    end
+
     it 'returns 403 for non-members' do
       non_member = create(:user)
 
@@ -588,6 +604,31 @@ RSpec.describe 'Api::V1::Events', type: :request do
 
         expect(response.body).to     include("windsurf")
         expect(response.body).not_to include("claude_code")
+      end
+
+      it "respects event_type filter" do
+        create(:tool_event, organization: organization, user: user, event_type: 'chat',   tool_name: 'claude_code')
+        create(:tool_event, organization: organization, user: user, event_type: 'edit',   tool_name: 'claude_code')
+
+        authenticated_get export_path, user: user, organization: organization,
+                          params: { event_type: 'chat' }
+
+        # CSV columns: occurred_at,tool_name,event_type,... — no id column
+        expect(response.body).to     include(",chat,")
+        expect(response.body).not_to include(",edit,")
+      end
+
+      it "respects multi-value event_type filter" do
+        create(:tool_event, organization: organization, user: user, event_type: 'chat',   tool_name: 'claude_code')
+        create(:tool_event, organization: organization, user: user, event_type: 'commit', tool_name: 'claude_code')
+        create(:tool_event, organization: organization, user: user, event_type: 'edit',   tool_name: 'claude_code')
+
+        authenticated_get export_path, user: user, organization: organization,
+                          params: { event_type: 'chat,commit' }
+
+        expect(response.body).to     include(",chat,")
+        expect(response.body).to     include(",commit,")
+        expect(response.body).not_to include(",edit,")
       end
 
       it "respects date range filter" do

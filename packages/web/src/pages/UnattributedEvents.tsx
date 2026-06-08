@@ -54,6 +54,7 @@ import {
 } from "@/components/ui/dialog";
 import { RiskBadge } from "@/components/dashboard";
 import { formatCost } from "@/lib/formatters";
+import { labelForEventType } from "@/lib/eventTypes";
 import { formatDistanceToNow } from "@/lib/utils";
 
 type UnattributedSortField = "tool_name" | "risk_level" | "cost_usd" | "created_at";
@@ -602,7 +603,7 @@ export function UnattributedEvents() {
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">
                     <Badge variant="secondary" className="text-xs">
-                      {event.eventType || "unknown"}
+                      {labelForEventType(event.eventType || "unknown")}
                     </Badge>
                   </TableCell>
                   <TableCell>

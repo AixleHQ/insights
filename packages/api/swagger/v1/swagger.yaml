@@ -3694,8 +3694,28 @@ paths:
             type: string
         - name: event_type
           in: query
+          style: form
+          explode: false
+          description: Filter by one or more stored event types. Comma-separated (e.g. chat,edit).
           schema:
-            type: string
+            type: array
+            items:
+              type: string
+              enum:
+                - chat
+                - completion
+                - edit
+                - commit
+                - review
+                - test
+                - debug
+                - refactor
+                - documentation
+                - other
+                - issue
+                - comment
+                - sprint
+                - tool_use
         - name: risk_level
           in: query
           description: |
@@ -3843,8 +3863,28 @@ paths:
             type: string
         - name: event_type
           in: query
+          style: form
+          explode: false
+          description: Filter by one or more stored event types. Comma-separated (e.g. chat,edit).
           schema:
-            type: string
+            type: array
+            items:
+              type: string
+              enum:
+                - chat
+                - completion
+                - edit
+                - commit
+                - review
+                - test
+                - debug
+                - refactor
+                - documentation
+                - other
+                - issue
+                - comment
+                - sprint
+                - tool_use
         - name: min_confidence
           in: query
           description: Filter to events where the best-attempt correlation_confidence is at least this value (0.0–1.0). Events never processed by AttributionJob are excluded when this filter is active.
@@ -4028,8 +4068,28 @@ paths:
             type: string
         - name: event_type
           in: query
+          style: form
+          explode: false
+          description: Filter by one or more stored event types. Comma-separated (e.g. chat,edit).
           schema:
-            type: string
+            type: array
+            items:
+              type: string
+              enum:
+                - chat
+                - completion
+                - edit
+                - commit
+                - review
+                - test
+                - debug
+                - refactor
+                - documentation
+                - other
+                - issue
+                - comment
+                - sprint
+                - tool_use
         - name: risk_level
           in: query
           description: |
