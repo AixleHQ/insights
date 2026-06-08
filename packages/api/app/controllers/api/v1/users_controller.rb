@@ -174,8 +174,9 @@ module Api
       def destroy_avatar
         authorize! current_user, to: :update?
 
-        current_user.avatar_file.purge if current_user.avatar_file.attached?
-        current_user.update!(avatar_url: nil)
+        had_file = current_user.avatar_file.attached?
+        current_user.avatar_file.purge if had_file
+        current_user.update!(avatar_url: nil) if had_file
         current_user.user_settings.load
         render_resource(current_user, UserSerializer)
       end

@@ -105,14 +105,27 @@ RSpec.describe 'Api::V1::Users', type: :request do
   end
 
   describe 'DELETE /api/v1/users/me/avatar' do
-    it 'removes avatar and clears avatar_url' do
-      user.update!(avatar_url: 'https://example.com/avatar.png')
+    let(:file) { fixture_file_upload(Rails.root.join('spec/fixtures/files/avatar.png'), 'image/png') }
+
+    it 'purges the attached file when a file was uploaded via API' do
+      authenticated_multipart_post '/api/v1/users/me/avatar', user: user, params: { file: file }
+      expect_success
 
       authenticated_delete '/api/v1/users/me/avatar', user: user
 
       expect_success
       expect(json_data[:avatarUrl]).to be_nil
-      expect(user.reload.avatar_url).to be_nil
+      expect(user.reload.avatar_file.attached?).to be false
+    end
+
+    it 'does not clear avatar_url when only a URL avatar is set (no attached file)' do
+      user.update!(avatar_url: 'https://example.com/avatar.png')
+
+      authenticated_delete '/api/v1/users/me/avatar', user: user
+
+      expect_success
+      expect(json_data[:avatarUrl]).to eq('https://example.com/avatar.png')
+      expect(user.reload.avatar_url).to eq('https://example.com/avatar.png')
     end
 
     it 'returns unauthorized without authentication' do

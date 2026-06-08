@@ -21,6 +21,9 @@ Rails.application.configure do
 
   # Store uploaded files on S3 (avatars bucket). Credentials come from the ECS task IAM role.
   config.active_storage.service = :amazon
+  # Presigned URL TTL must exceed the longest TanStack Query staleTime (5 min).
+  # 1 hour gives comfortable headroom for member lists and profile pages left open.
+  config.active_storage.urls_expire_in = 1.hour
 
   # App sits behind a TLS-terminating ALB/CDN; trust X-Forwarded-Proto.
   config.assume_ssl = true
