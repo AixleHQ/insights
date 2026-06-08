@@ -150,6 +150,7 @@ export function InviteForm({ onSubmit, className }: InviteFormProps) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="owner">Owner</SelectItem>
                     <SelectItem value="member">Member</SelectItem>
                     <SelectItem value="viewer">Viewer</SelectItem>
                   </SelectContent>
@@ -196,8 +197,7 @@ export function InviteForm({ onSubmit, className }: InviteFormProps) {
               <p className="font-medium">Role Permissions</p>
               <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
                 <li>
-                  <strong>Owner:</strong> Full access — manage members, settings, and all projects{" "}
-                  <span className="italic">(assigned post-invite via the Members table)</span>
+                  <strong>Owner:</strong> Full access — manage members, settings, and all projects
                 </li>
                 <li>
                   <strong>Member:</strong> View dashboards and contribute to projects

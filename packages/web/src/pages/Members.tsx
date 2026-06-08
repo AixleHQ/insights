@@ -188,6 +188,7 @@ export function Members() {
   }, [members, search, roleFilter, sortField, sortDirection]);
 
   const activeCount = members.length;
+  const ownerCount = useMemo(() => members.filter((m) => m.role === "owner").length, [members]);
   const pendingInvitations = invitationsData || [];
   const pendingCount = pendingInvitations.length;
 
@@ -352,6 +353,7 @@ export function Members() {
                   member={member}
                   currentUserEmail={profile?.email}
                   currentUserRole={currentMembership?.role}
+                  ownerCount={ownerCount}
                   onRoleChange={handleRoleChange}
                   onRemove={handleRemove}
                   isRemoving={removeMember.isPending}
@@ -398,6 +400,7 @@ interface MemberTableRowProps {
   member: MemberData;
   currentUserEmail?: string;
   currentUserRole?: MemberRole;
+  ownerCount: number;
   onRoleChange: (id: string, role: MemberRole) => void;
   onRemove: (id: string) => void;
   isRemoving: boolean;
@@ -408,15 +411,17 @@ function MemberTableRow({
   member,
   currentUserEmail,
   currentUserRole,
+  ownerCount,
   onRoleChange,
   onRemove,
   isRemoving,
   onRowClick,
 }: MemberTableRowProps) {
   const [removeOpen, setRemoveOpen] = useState(false);
-  const isOwner = currentUserRole === "owner";
+  const isCurrentUserOwner = currentUserRole === "owner";
   const isSelf = !!currentUserEmail && member.email === currentUserEmail;
-  const canManage = isOwner && member.role !== "owner" && !isSelf;
+  const isLastOwner = member.role === "owner" && ownerCount === 1;
+  const canManage = isCurrentUserOwner && !isSelf && !isLastOwner;
 
   return (
     <>
@@ -463,6 +468,16 @@ function MemberTableRow({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                {member.role === "owner" && (
+                  <>
+                    <DropdownMenuItem onClick={() => onRoleChange(member.id, "member")}>
+                      Change to Member
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onRoleChange(member.id, "viewer")}>
+                      Change to Viewer
+                    </DropdownMenuItem>
+                  </>
+                )}
                 {member.role === "member" && (
                   <>
                     <DropdownMenuItem onClick={() => onRoleChange(member.id, "owner")}>
