@@ -140,6 +140,7 @@ export function Members() {
       id: m.id,
       email: m.user.email,
       name: m.user.name || undefined,
+      avatar_url: m.user.avatarUrl ?? undefined,
       role: m.role as MemberRole,
       joined_at: m.createdAt,
       last_active_at: m.last_active_at || undefined,

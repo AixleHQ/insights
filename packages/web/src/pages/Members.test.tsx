@@ -58,7 +58,7 @@ const mockMembers: OrganizationMember[] = [
     role: "owner",
     created_at: "2024-01-01T00:00:00Z",
     updated_at: "2024-01-01T00:00:00Z",
-    user: { id: "user-owner", email: "owner@example.com", name: "Owner User" },
+    user: { id: "user-owner", email: "owner@example.com", name: "Owner User", avatarUrl: null },
     total_events: 120,
     total_cost: 45.5,
     last_active_at: new Date().toISOString(),
@@ -69,7 +69,7 @@ const mockMembers: OrganizationMember[] = [
     role: "member",
     created_at: "2024-02-01T00:00:00Z",
     updated_at: "2024-02-01T00:00:00Z",
-    user: { id: "user-alice", email: "alice@example.com", name: "Alice Member" },
+    user: { id: "user-alice", email: "alice@example.com", name: "Alice Member", avatarUrl: "https://example.com/alice-avatar.png" },
     total_events: 42,
     total_cost: 12.25,
     last_active_at: null,
@@ -165,6 +165,17 @@ describe("Members", () => {
 
       expect(screen.getByText("Viewer User")).toBeInTheDocument();
       expect(screen.queryByText("Alice Member")).not.toBeInTheDocument();
+    });
+
+    it("renders one avatar per member row without crashing when avatarUrl is provided", () => {
+      const { container } = renderMembers();
+
+      // Radix AvatarImage does not produce a visible <img> in JSDOM (images cannot load),
+      // but the Avatar component must render without errors. We verify that the correct
+      // number of avatar slots are rendered — one per member — confirming the avatar_url
+      // mapping from m.user.avatarUrl does not break the component tree.
+      const avatarSlots = container.querySelectorAll('[data-slot="avatar"]');
+      expect(avatarSlots.length).toBe(mockMembers.length);
     });
 
     it("navigates to member profile when a row is clicked", async () => {
