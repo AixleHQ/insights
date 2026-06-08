@@ -273,8 +273,9 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
   const role = roleConfig[(member.role as MemberRole) || "member"];
   const RoleIcon = role.icon;
 
-  const formattedJoinDate = member.created_at
-    ? new Date(member.created_at).toLocaleDateString("en-US", {
+  const joinDateRaw = member.createdAt;
+  const formattedJoinDate = joinDateRaw
+    ? new Date(joinDateRaw).toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
         year: "numeric",

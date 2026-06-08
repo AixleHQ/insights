@@ -53,8 +53,8 @@ export interface OrganizationMember {
   organization_id: string;
   role: "owner" | "member" | "viewer";
   user: User;
-  created_at: string;
-  updated_at: string;
+  createdAt?: string;
+  updatedAt?: string;
   total_tokens?: number;
   total_events?: number;
   total_cost?: number;
