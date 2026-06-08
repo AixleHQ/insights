@@ -122,23 +122,29 @@ export function OrgProvider({ children, apiBaseUrl = "/api/v1" }: OrgProviderPro
         defaultOrgId = (userData.data?.settings?.default_org_id as string) ?? null;
       }
 
-      // Restore previously selected org: localStorage > default_org_id setting > first org
-      const storedOrgId = localStorage.getItem(ORG_STORAGE_KEY);
-      let currentOrg = organizations.find((o) => o.id === storedOrgId) || null;
+      // Select org: default_org_id preference > last used (localStorage) > first org
+      let currentOrg: Organization | null = null;
 
-      // No localStorage entry — try the server-persisted default_org_id
-      if (!currentOrg && defaultOrgId) {
+      if (defaultOrgId) {
         currentOrg = organizations.find((o) => o.id === defaultOrgId) || null;
       }
 
-      // If still no org, use first org
+      const storedOrgId = localStorage.getItem(ORG_STORAGE_KEY);
+
+      if (!currentOrg) {
+        currentOrg = organizations.find((o) => o.id === storedOrgId) || null;
+      }
+
       if (!currentOrg && organizations.length > 0) {
-        currentOrg = organizations[0];
-        // Clear invalid stored org ID (e.g., after DB reseed)
         if (storedOrgId) {
-          console.warn(`[OrgContext] Stored org ${storedOrgId} not found, switching to ${currentOrg.slug}`);
-          localStorage.setItem(ORG_STORAGE_KEY, currentOrg.id);
+          console.warn(`[OrgContext] Stored org ${storedOrgId} not found, switching to first org`);
         }
+        currentOrg = organizations[0];
+      }
+
+      // Keep localStorage in sync so within-session org switches continue to work
+      if (currentOrg && currentOrg.id !== storedOrgId) {
+        localStorage.setItem(ORG_STORAGE_KEY, currentOrg.id);
       }
 
       // Update the global API client state for X-Organization-ID header
