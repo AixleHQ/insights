@@ -203,12 +203,11 @@ class AiUsageSyncJob
     end
   end
 
-  # Gemini (Google AI Studio API key) has no historical usage API.
-  # Usage events are captured per-request via Ai::ProxyService#track_usage.
-  # Return [] so the connector heartbeat still fires and mark_synced! is called.
   def fetch_gemini_usage(connector)
-    Rails.logger.info("[AiUsageSyncJob] Gemini heartbeat for org #{connector.organization_id} — usage captured per-request via ProxyService")
-    []
+    provider = Oauth::GeminiProvider.new(connector)
+    data = provider.fetch_usage
+    return [] if data.nil?
+    data
   end
 
   def fetch_openrouter_usage(connector)

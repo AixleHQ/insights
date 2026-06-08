@@ -183,6 +183,44 @@ RSpec.describe Ai::GeminiAdapter do
       expect(described_class.default_model).to eq('gemini-1.5-pro')
     end
   end
+
+  describe '.list_models' do
+    let(:api_response) do
+      {
+        "models" => [
+          { "name" => "models/gemini-1.5-pro", "displayName" => "Gemini 1.5 Pro", "inputTokenLimit" => 1_048_576 },
+          { "name" => "models/gemini-2.5-flash", "displayName" => "Gemini 2.5 Flash", "inputTokenLimit" => 1_048_576 },
+          { "name" => "models/text-bison-001", "displayName" => "PaLM 2", "inputTokenLimit" => 8192 }
+        ]
+      }
+    end
+
+    before do
+      allow(described_class).to receive(:make_request).and_return(api_response)
+    end
+
+    it 'filters to gemini models only' do
+      models = described_class.list_models(api_key: 'test-key')
+      expect(models.map { |m| m[:id] }).to contain_exactly('gemini-1.5-pro', 'gemini-2.5-flash')
+    end
+
+    it 'delegates pricing to ModelPricingService' do
+      expect(ModelPricingService).to receive(:pricing_for_model).with('gemini-1.5-pro').and_call_original
+      expect(ModelPricingService).to receive(:pricing_for_model).with('gemini-2.5-flash').and_call_original
+      described_class.list_models(api_key: 'test-key')
+    end
+
+    it 'returns prompt/completion pricing keys shaped for API consumers' do
+      models = described_class.list_models(api_key: 'test-key')
+      pro = models.find { |m| m[:id] == 'gemini-1.5-pro' }
+      expect(pro[:pricing]).to eq({ prompt: 1.25, completion: 5.00 })
+    end
+
+    it 'strips the models/ prefix from the id' do
+      models = described_class.list_models(api_key: 'test-key')
+      expect(models.map { |m| m[:id] }).to all(satisfy { |id| !id.start_with?('models/') })
+    end
+  end
 end
 
 RSpec.describe Ai::OpenrouterAdapter do
