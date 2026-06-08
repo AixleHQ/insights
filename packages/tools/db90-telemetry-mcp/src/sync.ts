@@ -250,7 +250,7 @@ async function resolveProjectIdForRepoPathCached(
   return projectId;
 }
 
-function cursorRepoPathFromPayload(payload: CursorDb90Payload): string | undefined {
+export function cursorRepoPathFromPayload(payload: CursorDb90Payload): string | undefined {
   const metadata = payload.metadata as Record<string, unknown> | undefined;
   if (!metadata) return undefined;
 
@@ -258,7 +258,7 @@ function cursorRepoPathFromPayload(payload: CursorDb90Payload): string | undefin
     return metadata.workspace_folder;
   }
 
-  if (typeof metadata.transcript_source === "string" && typeof metadata.workspace === "string" && metadata.workspace.length > 0) {
+  if (typeof metadata.workspace === "string" && metadata.workspace.length > 0) {
     return metadata.workspace;
   }
 
