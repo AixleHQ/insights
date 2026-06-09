@@ -2019,6 +2019,12 @@ CREATE INDEX index_webhook_deliveries_on_organization_connector_id ON public.web
 CREATE INDEX idx_tool_events_external_id ON timeseries.tool_events USING btree (organization_id, ((metadata ->> 'external_id'::text))) WHERE ((metadata ->> 'external_id'::text) IS NOT NULL);
 
 --
+-- Name: idx_tool_events_org_cost_occurred; Type: INDEX; Schema: timeseries; Owner: -
+--
+
+CREATE INDEX idx_tool_events_org_cost_occurred ON timeseries.tool_events USING btree (organization_id, cost_usd DESC, occurred_at DESC, id DESC);
+
+--
 -- Name: idx_tool_events_org_occurred; Type: INDEX; Schema: timeseries; Owner: -
 --
 
@@ -2029,6 +2035,12 @@ CREATE INDEX idx_tool_events_org_occurred ON timeseries.tool_events USING btree 
 --
 
 CREATE INDEX idx_tool_events_org_tool_occurred ON timeseries.tool_events USING btree (organization_id, tool_name, occurred_at DESC);
+
+--
+-- Name: idx_tool_events_org_tokens_in_occurred; Type: INDEX; Schema: timeseries; Owner: -
+--
+
+CREATE INDEX idx_tool_events_org_tokens_in_occurred ON timeseries.tool_events USING btree (organization_id, tokens_in DESC, occurred_at DESC, id DESC);
 
 --
 -- Name: idx_tool_events_project_occurred; Type: INDEX; Schema: timeseries; Owner: -
@@ -2443,6 +2455,7 @@ INSERT INTO "schema_migrations" (version) VALUES
 ('20260617091734'),
 ('20260616120937'),
 ('20260609191045'),
+('20260609170000'),
 ('20260608000001'),
 ('20260605120000'),
 ('20260527113000'),

@@ -341,6 +341,19 @@ RSpec.describe 'Api::V1::Events', type: :request do
         expect(expensive_index).to be < cheap_index
       end
 
+      it 'ignores unknown sort_by values and preserves valid direction (occurred_at asc)' do
+        authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                          user: user,
+                          organization: organization,
+                          params: { sort_by: 'not_a_column', direction: 'asc' }
+
+        expect_success
+        ids = json_data.map { |e| e[:id] }
+        cheap_index = ids.index(cheap_event.id)
+        expensive_index = ids.index(expensive_event.id)
+        expect(cheap_index).to be < expensive_index
+      end
+
       it 'ignores unknown direction values and falls back to desc' do
         authenticated_get "/api/v1/organizations/#{organization.id}/events",
                           user: user,

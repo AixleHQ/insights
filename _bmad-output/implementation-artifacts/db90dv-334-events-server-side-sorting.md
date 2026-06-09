@@ -359,14 +359,18 @@ All columns used for sorting (`occurred_at`, `cost_usd`, `tokens_in`, `tool_name
 ### File List
 
 - `packages/api/app/controllers/api/v1/events_controller.rb` — added `SORTABLE_COLUMNS`, `SORT_DIRECTIONS`, `apply_sort`; updated `#index`
-- `packages/api/spec/requests/api/v1/events_spec.rb` — added `context 'sorting'` with 5 tests
+- `packages/api/app/query_builders/tool_event_sort_scope.rb` — extracted sort scope with whitelist + tie-break
+- `packages/api/db/migrate/20260609170000_add_tool_events_sort_indexes.rb` — indexes for cost_usd/tokens_in sort
+- `packages/api/db/structure.sql` — structure dump updated with new indexes
+- `packages/api/spec/requests/api/v1/events_spec.rb` — added `context 'sorting'` with 9 tests (incl. invalid sort_by + asc)
 - `packages/api/swagger/v1/swagger.yaml` — added `sort_by` and `direction` query params to events index
-- `packages/web/src/hooks/useApi.ts` — added `sort_by?` and `direction?` to `EventsParams`
+- `packages/web/src/hooks/useApi.ts` — added `EventSortBy`/`EventSortDirection` and typed `EventsParams`
 - `packages/web/src/pages/Events.tsx` — added `SORT_FIELD_API_MAP`, updated `apiParams`, removed client-side sort, added `setPage(1)` to `handleSort`, removed unused `riskLevelOrder` import
 
 ### Change Log
 
 - 2026-06-09: Implemented server-side sorting for Events list (AIX-334). Added `apply_sort` to API controller, updated swagger, extended `EventsParams`, removed client-side sort from `Events.tsx`.
+- 2026-06-09: Architecture review follow-up — added sort indexes for `cost_usd`/`tokens_in`, strict TS sort types, invalid `sort_by` + `direction=asc` spec; deferred `risk_level` expression index.
 
 ## Review Findings
 
@@ -377,3 +381,27 @@ All columns used for sorting (`occurred_at`, `cost_usd`, `tokens_in`, `tool_name
 - [x] [Review][Patch] Add request spec coverage for AC1/AC3 global sorting across pagination (>25 rows, page 1 -> page 2 sequence continuity) [packages/api/spec/requests/api/v1/events_spec.rb:116]
 
 - [x] [Review][Patch] Add request specs that assert ordering behavior for `risk_level` and strict fallback semantics for invalid `sort_by`/`direction` [packages/api/spec/requests/api/v1/events_spec.rb:159]
+
+## Architecture Review Follow-up (2026-06-09)
+
+### Performance indexes (HIGH)
+
+- Added migration `20260609170000_add_tool_events_sort_indexes.rb`:
+  - `idx_tool_events_org_cost_occurred` on `(organization_id, cost_usd DESC, occurred_at DESC, id DESC)`
+  - `idx_tool_events_org_tokens_in_occurred` on `(organization_id, tokens_in DESC, occurred_at DESC, id DESC)`
+- Pattern matches existing Timescale hypertable migrations (`AddPerformanceIndexes`) — raw SQL, no CONCURRENTLY.
+
+### risk_level index — deferred
+
+- **Decision:** no expression index in this PR.
+- **Reason:** `risk_level` sort uses a CASE over `metadata->>'risk_level'` (JSONB); an expression index would add write amplification on every ingest and is not justified until sort-by-risk usage is measured in production.
+- **Mitigation:** org-scoped filters still narrow the row set; acceptable for current traffic. Revisit with EXPLAIN ANALYZE if p95 latency on `sort_by=risk_level` exceeds SLO.
+
+### Frontend typing (MEDIUM)
+
+- `EventsParams.sort_by` → `EventSortBy` union; `direction` → `EventSortDirection`.
+- `SORT_FIELD_API_MAP` in `Events.tsx` typed as `Record<SortField, EventSortBy>`.
+
+### Request spec (LOW)
+
+- Added test: invalid `sort_by` + valid `direction=asc` → fallback column `occurred_at` with requested direction preserved.
