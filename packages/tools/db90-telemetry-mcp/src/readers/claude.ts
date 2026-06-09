@@ -68,6 +68,28 @@ export function isClaudeNoiseTranscriptTurn(turn: ClaudeTranscriptTurn): boolean
   return isClaudeLocalCommandNoisePrompt(turn.promptText);
 }
 
+/**
+ * True for turns that look mid-flight: a user prompt is present but the
+ * assistant hasn't responded yet (no text, no model, no output tokens).
+ *
+ * Skipping these is safe: the turn is NOT checkpointed (we never push it to
+ * finalizedTurns), so the next sync cycle re-parses the JSONL and persists
+ * the now-complete turn once the assistant has finished writing.
+ *
+ * Genuinely interrupted turns where the assistant never writes anything are
+ * also dropped by this guard — that's correct. The classic example is the
+ * "[Request interrupted by user for tool use]" placeholder Claude Code
+ * injects after a tool-use interruption; it's a system marker, not real
+ * user activity, so losing it produces cleaner Events table rows.
+ */
+export function isIncompleteTranscriptTurn(turn: ClaudeTranscriptTurn): boolean {
+  return (
+    turn.model === null &&
+    turn.assistantText.trim().length === 0 &&
+    turn.tokensOut === 0
+  );
+}
+
 export interface ClaudeTranscriptTurn {
   sessionId: string;
   turnId: string;
@@ -250,7 +272,11 @@ export async function parseTranscriptFile(
       enrichTurnRisk(currentTurn);
       const hasContent =
         currentTurn.promptText.trim().length > 0 || currentTurn.assistantText.trim().length > 0;
-      if (hasContent && !isClaudeNoiseTranscriptTurn(currentTurn)) {
+      if (
+        hasContent &&
+        !isClaudeNoiseTranscriptTurn(currentTurn) &&
+        !isIncompleteTranscriptTurn(currentTurn)
+      ) {
         currentTurn.persisted = true;
         finalizedTurns.push(currentTurn);
       }
