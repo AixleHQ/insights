@@ -55,6 +55,25 @@ RSpec.describe ToolEvents::ConnectorUpsert do
         described_class.call(unique_key: :sha, unique_value: "abc123", **base_attributes)
       }.not_to change(ConnectorEventDedup, :count)
     end
+
+    context "when project_id appears later on update" do
+      let(:user) { create(:user) }
+      let(:initial_attributes) { base_attributes.merge(user_id: user.id, project_id: nil) }
+
+      before { create(:organization_membership, user: user, organization: organization) }
+
+      it "creates project membership on the update call" do
+        described_class.call(unique_key: :sha, unique_value: "abc123", **initial_attributes)
+
+        expect {
+          described_class.call(
+            unique_key: :sha,
+            unique_value: "abc123",
+            **base_attributes.merge(user_id: user.id, project_id: project.id)
+          )
+        }.to change(ProjectMembership, :count).by(1)
+      end
+    end
   end
 
   describe "concurrent upserts for the same dedupe key", use_transactional_tests: false do

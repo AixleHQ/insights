@@ -634,6 +634,62 @@ RSpec.describe ToolEvents::Upsert do
     end
   end
 
+  describe ".call — auto membership on update path" do
+    let(:organization) { create(:organization) }
+    let(:user) { create(:user) }
+    let(:project) { create(:project, organization: organization) }
+    let(:session_id) { SecureRandom.uuid }
+
+    before { create(:organization_membership, user: user, organization: organization) }
+
+    it "does not duplicate membership when existing event with project is updated" do
+      attrs = {
+        organization_id: organization.id,
+        user_id: user.id,
+        tool_name: "cursor",
+        event_type: "chat",
+        model: "gpt-4o",
+        tokens_in: 10,
+        tokens_out: 20,
+        occurred_at: Time.current,
+        project_id: project.id,
+        metadata: { "session_id" => session_id }
+      }
+
+      described_class.call(attrs)
+
+      expect {
+        described_class.call(attrs.merge(tokens_in: 999))
+      }.not_to change(ProjectMembership, :count)
+      expect(ProjectMembership.count).to eq(1)
+    end
+
+    it "creates project membership when project_id appears on a deduplicated update" do
+      first_attributes = {
+        organization_id: organization.id,
+        user_id: user.id,
+        tool_name: "cursor",
+        event_type: "chat",
+        model: "gpt-4o",
+        tokens_in: 10,
+        tokens_out: 20,
+        occurred_at: Time.current,
+        metadata: { "session_id" => session_id }
+      }
+
+      second_attributes = first_attributes.merge(
+        project_id: project.id,
+        metadata: { "session_id" => session_id, "update" => "with_project" }
+      )
+
+      described_class.call(first_attributes)
+
+      expect {
+        described_class.call(second_attributes)
+      }.to change(ProjectMembership, :count).by(1)
+    end
+  end
+
   # AIX-260 — server-side event_type re-tagging for pre-T-02 CLIs
   describe ".call — event_type normalization (AIX-260)" do
     let(:organization) { create(:organization) }

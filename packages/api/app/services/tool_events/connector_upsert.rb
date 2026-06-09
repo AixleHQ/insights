@@ -80,6 +80,7 @@ module ToolEvents
           # Existing event — update mutable fields.
           event = ToolEvent.find_by(id: existing_event_id)
           event&.update!(mutable_attributes)
+          ToolEvents::AutoMembershipService.call(event) if event
           event
         end
       end
