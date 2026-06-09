@@ -82,6 +82,15 @@ RSpec.describe ToolEvents::AutoMembershipService do
       end
     end
 
+    context "when tool_event has no organization_id" do
+      it "does nothing (treats missing org as mismatch)" do
+        tool_event = build(:tool_event, user: user, project: project, organization: nil)
+        tool_event.organization_id = nil
+
+        expect { described_class.call(tool_event) }.not_to change(ProjectMembership, :count)
+      end
+    end
+
     context "when project organization does not match tool event organization" do
       let(:other_organization) { create(:organization) }
       let(:cross_org_project) { create(:project, organization: other_organization) }

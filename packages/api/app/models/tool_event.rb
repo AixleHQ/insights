@@ -30,6 +30,8 @@ class ToolEvent < ApplicationRecord
 
   before_validation :normalize_model
   before_validation :calculate_tokens_total
+  # Triggered only on INSERT. Update paths (Upsert, ConnectorUpsert) call
+  # AutoMembershipService explicitly — do not add a call here for those paths.
   after_create :auto_add_project_membership
 
   scope :by_tool, ->(tool) { where(tool_name: tool) }

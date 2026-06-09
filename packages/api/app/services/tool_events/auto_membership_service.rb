@@ -50,9 +50,9 @@ module ToolEvents
     end
 
     def org_mismatch?(candidate_project)
-      @tool_event.organization_id.present? &&
-        candidate_project.organization_id.present? &&
-        @tool_event.organization_id != candidate_project.organization_id
+      return true if @tool_event.organization_id.blank? || candidate_project.organization_id.blank?
+
+      @tool_event.organization_id != candidate_project.organization_id
     end
   end
 end
