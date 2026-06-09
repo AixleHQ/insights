@@ -15,7 +15,9 @@ module Api
         authorize! current_organization, to: :show?
         events = authorized_scope(current_organization.tool_events)
         events = apply_filters(events)
-        events = events.includes(:user, :project, :audit_logs).order(occurred_at: :desc)
+        events = scope_events_for_member_visibility(events)
+        events = events.includes(:user, :project, :audit_logs)
+        events = ToolEventSortScope.new(scope: events, params: params).call
 
         render_collection(events, ToolEventSerializer, serializer_params: ->(paginated) {
           { candidate_users: candidate_users_for(paginated) }

@@ -4741,6 +4741,21 @@ paths:
           in: query
           schema:
             type: string
+        - name: sort_by
+          in: query
+          description: |
+            Column to sort by. Defaults to `occurred_at`.
+            `risk_level` is sorted by severity (critical > high > medium > low > none).
+            `tokens_in` sorts by `tokens_in` column only.
+          schema:
+            type: string
+            enum: [occurred_at, cost_usd, tokens_in, tool_name, risk_level]
+        - name: direction
+          in: query
+          description: Sort direction. Defaults to `desc`.
+          schema:
+            type: string
+            enum: [asc, desc]
       responses:
         '200':
           description: Paginated list of events
