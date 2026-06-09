@@ -25,7 +25,7 @@ class User < ApplicationRecord
   validates :keycloak_sub, presence: true, uniqueness: true
   validates :email, presence: true, uniqueness: true, format: { with: URI::MailTo::EMAIL_REGEXP }
   validates :global_admin, inclusion: { in: [ true, false ] }
-  validates :avatar_url, format: { with: /\Ahttps?:\/\//i }, allow_blank: true
+  validates :avatar_url, format: { with: /\Ahttps?:\/\/.+\z/i }, allow_blank: true
 
   scope :global_admins, -> { where(global_admin: true) }
   scope :active_in_organization, ->(org) { joins(:organization_memberships).where(organization_memberships: { organization_id: org.id }) }
