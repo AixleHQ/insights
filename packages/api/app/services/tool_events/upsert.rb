@@ -34,7 +34,6 @@ module ToolEvents
     end
 
     def call
-      promote_model_from_metadata!
       enrich_cost!
 
       if @session_id.present?
@@ -46,16 +45,6 @@ module ToolEvents
     end
 
     private
-
-    def promote_model_from_metadata!
-      return if @attributes[:model].present?
-
-      model_from_metadata = @attributes.dig(:metadata, "model") ||
-                            @attributes.dig(:metadata, :model)
-      return if model_from_metadata.blank?
-
-      @attributes[:model] = model_from_metadata
-    end
 
     def enrich_cost!
       cost  = @attributes[:cost_usd]
