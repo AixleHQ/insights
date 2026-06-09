@@ -93,4 +93,77 @@ RSpec.describe ToolEvents::Upsert do
       end
     end
   end
+
+  describe ".call — model promotion from metadata" do
+    let(:organization) { create(:organization) }
+    let(:user) { create(:user) }
+
+    it "promotes model from metadata['model'] when model column is nil" do
+      attributes = {
+        organization_id: organization.id,
+        user_id: user.id,
+        tool_name: "claude_code",
+        event_type: "chat",
+        model: nil,
+        tokens_in: 500,
+        tokens_out: 200,
+        cost_usd: nil,
+        occurred_at: Time.current,
+        metadata: { "model" => "claude-opus-4-5-20251001", "session_id" => SecureRandom.uuid }
+      }
+      result = described_class.call(attributes)
+      expect(result[:tool_event].model).to eq("claude-opus-4-5-20251001")
+    end
+
+    it "enriches cost_usd after model is promoted" do
+      attributes = {
+        organization_id: organization.id,
+        user_id: user.id,
+        tool_name: "claude_code",
+        event_type: "chat",
+        model: nil,
+        tokens_in: 500,
+        tokens_out: 200,
+        cost_usd: nil,
+        occurred_at: Time.current,
+        metadata: { "model" => "claude-opus-4-5-20251001", "session_id" => SecureRandom.uuid }
+      }
+      result = described_class.call(attributes)
+      expect(result[:tool_event].cost_usd.to_f).to be > 0
+      expect(result[:tool_event].metadata["cost_source"]).to eq("server_estimated")
+    end
+
+    it "does not overwrite an existing model column value with metadata model" do
+      attributes = {
+        organization_id: organization.id,
+        user_id: user.id,
+        tool_name: "claude_code",
+        event_type: "chat",
+        model: "claude-sonnet-4-6",
+        tokens_in: 100,
+        tokens_out: 50,
+        cost_usd: nil,
+        occurred_at: Time.current,
+        metadata: { "model" => "some-other-model", "session_id" => SecureRandom.uuid }
+      }
+      result = described_class.call(attributes)
+      expect(result[:tool_event].model).to eq("claude-sonnet-4-6")
+    end
+
+    it "does not error when metadata has no model key" do
+      attributes = {
+        organization_id: organization.id,
+        user_id: user.id,
+        tool_name: "claude_code",
+        event_type: "chat",
+        model: nil,
+        tokens_in: 0,
+        tokens_out: 0,
+        cost_usd: nil,
+        occurred_at: Time.current,
+        metadata: { "session_id" => SecureRandom.uuid }
+      }
+      expect { described_class.call(attributes) }.not_to raise_error
+    end
+  end
 end
