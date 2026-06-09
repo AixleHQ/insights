@@ -90,6 +90,8 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '422':
           $ref: '#/components/responses/ValidationError'
     delete:
@@ -106,6 +108,8 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /api/v1/users/me/organizations:
     get:
