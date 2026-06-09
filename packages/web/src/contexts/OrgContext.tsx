@@ -139,7 +139,12 @@ export function OrgProvider({ children, apiBaseUrl = "/api/v1" }: OrgProviderPro
 
       if (!currentOrg && organizations.length > 0) {
         if (storedOrgId) {
-          console.warn(`[OrgContext] Stored org ${storedOrgId} not found, switching to first org`);
+          // Avoid leaking org UUIDs in production logs
+          if (import.meta.env.DEV) {
+            console.warn(`[OrgContext] Stored org ${storedOrgId} not found in membership list, switching to first org`);
+          } else {
+            console.warn("[OrgContext] Stored org not found in membership list, switching to first org");
+          }
         }
         currentOrg = organizations[0];
       }

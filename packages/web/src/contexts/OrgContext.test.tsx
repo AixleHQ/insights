@@ -135,6 +135,21 @@ describe("OrgProvider — org selection priority", () => {
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("stale-org-id"));
   });
 
+  it("falls back to first org when stored org ID is invalid and no default_org_id is set", async () => {
+    localStorage.setItem(ORG_STORAGE_KEY, "stale-org-id");
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(makeOrgsResponse([ORG_A, ORG_B]) as never)
+      .mockResolvedValueOnce(makeUserResponse(null) as never);
+
+    const { result } = renderHook(() => useOrg(), { wrapper });
+
+    await waitFor(() => expect(result.current.isInitialized).toBe(true));
+
+    expect(result.current.currentOrg?.id).toBe(ORG_A.id);
+  });
+
   it("syncs localStorage only when the selected org differs from the stored value", async () => {
     localStorage.setItem(ORG_STORAGE_KEY, ORG_A.id);
     const setItemSpy = vi.spyOn(localStorageMock, "setItem");
