@@ -4154,7 +4154,7 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '422':
-          $ref: '#/components/responses/UnprocessableEntity'
+          $ref: '#/components/responses/ValidationError'
 
   /api/v1/organizations/{organization_id}/event_export_jobs/{id}:
     get:
