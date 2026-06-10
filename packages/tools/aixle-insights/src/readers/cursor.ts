@@ -656,6 +656,44 @@ export function findCursorTranscriptFiles(projectDirs?: string[]): string[] {
   return [...new Set(files)];
 }
 
+/**
+ * Decode a Cursor project directory name back to the original workspace path.
+ * Cursor encodes workspace paths as `absolutePath.slice(1).replace(/\//g, '-')`,
+ * which is ambiguous when directories contain literal hyphens. We resolve the
+ * ambiguity by backtracking: at each '-', try treating it as a path separator
+ * first (only if the current prefix exists on disk), then as a literal hyphen.
+ */
+function decodeProjectDirName(encodedName: string): string | null {
+  function bt(pos: number, current: string): string | null {
+    if (pos === encodedName.length) {
+      return existsSync("/" + current) ? "/" + current : null;
+    }
+    const ch = encodedName[pos];
+    if (ch !== "-") return bt(pos + 1, current + ch);
+    if (existsSync("/" + current)) {
+      const res = bt(pos + 1, current + "/");
+      if (res) return res;
+    }
+    return bt(pos + 1, current + "-");
+  }
+  return bt(0, "");
+}
+
+/**
+ * Derive the workspace path from a transcript file path when the composer
+ * header doesn't carry a workspacePath. The transcript lives at:
+ *   ~/.cursor/projects/<encoded-workspace>/agent-transcripts/<session>/<session>.jsonl
+ * Going up three directories yields the encoded project dir, which we decode.
+ * Returns null on Windows (encoding differs) or if the path can't be resolved.
+ */
+function workspaceFromTranscriptFile(filePath: string): string | null {
+  if (process.platform === "win32") return null;
+  const projectDir = dirname(dirname(dirname(filePath)));
+  const projectsDir = cursorProjectsDir();
+  if (!projectDir.startsWith(projectsDir)) return null;
+  return decodeProjectDirName(basename(projectDir));
+}
+
 /** Skip JSONL files larger than this to avoid memory pressure on extremely long sessions. */
 const MAX_TRANSCRIPT_BYTES = 50 * 1024 * 1024; // 50 MB
 
@@ -706,7 +744,7 @@ export async function parseCursorTranscriptFile(
       sessionId,
       filePath,
       fileSize,
-      workspacePath: header?.workspacePath ?? null,
+      workspacePath: header?.workspacePath ?? workspaceFromTranscriptFile(filePath),
       composerName: header?.name ?? null,
       occurredAt,
       promptText,

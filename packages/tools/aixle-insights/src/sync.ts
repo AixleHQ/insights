@@ -371,10 +371,14 @@ async function runClaudeSlice(options: SyncOptions): Promise<SyncResult> {
       continue;
     }
 
-    // When scoped to a directory, use the pre-resolved projectId directly (the project
-    // was already looked up from scopeDir's git remote). Skip per-turn network lookup.
+    // When scoped to a directory, prefer the pre-resolved projectId. If it's null
+    // (e.g. MCP server launched from a non-git cwd, or stuck null in module cache),
+    // fall back to per-turn cwd lookup. The lookup cache dedupes by path so this is
+    // effectively one network call per unique cwd per sync.
     const resolvedProjectId = scopeDir
-      ? (projectId ?? undefined)
+      ? (projectId ??
+         (await resolveProjectIdForRepoPathCached(turn.cwd, host, token, verbose, projectLookupCache)) ??
+         undefined)
       : (explicitProject ??
          (await resolveProjectIdForRepoPathCached(turn.cwd, host, token, verbose, projectLookupCache)) ??
          undefined);
@@ -530,7 +534,12 @@ async function runCursorSlice(params: {
       for (const payload of group.payloads) {
         const ws = cursorRepoPathFromPayload(payload);
         if (ws && (ws === scopeDir || ws.startsWith(scopeDir + "/"))) {
-          if (projectId) payload.project_id = projectId;
+          // Same fallback as Claude: when the pre-resolved projectId is null, do a
+          // per-payload lookup from the payload's workspace. Cache dedupes by path.
+          const resolved =
+            projectId ??
+            (await resolveProjectIdForRepoPathCached(ws, host, lookupToken, verbose, projectLookupCache));
+          if (resolved) payload.project_id = resolved;
           else delete payload.project_id;
           inScope.push(payload);
         } else if (verbose) {

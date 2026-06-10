@@ -1083,6 +1083,176 @@ describe("syncTelemetryTools", () => {
     expect(mockExecFileSync).not.toHaveBeenCalled();
   });
 
+  it("scopeDir + null projectId: falls back to per-turn cwd lookup for Claude turns", async () => {
+    const token = "db90_scoped_token";
+    mockExecFileSync.mockImplementation((cmd: unknown, args?: readonly unknown[]) => {
+      if (
+        cmd === "git" &&
+        Array.isArray(args) &&
+        args[0] === "-C" &&
+        args[1] === "/repos/test-repo" &&
+        args[2] === "remote" &&
+        args[3] === "get-url"
+      ) {
+        return "git@github.com:org/test-repo.git\n";
+      }
+      throw new Error("not a git repo");
+    });
+    mocks.lookupProjectByRemote.mockResolvedValue({
+      project_id: "recovered-from-cwd",
+      name: "Test Repo",
+    });
+    mocks.findTranscriptFiles.mockReturnValue(["/transcripts/a.jsonl"]);
+    mocks.parseTranscriptFile.mockResolvedValueOnce([
+      {
+        sessionId: "sess-a",
+        turnId: "sess-a:1",
+        filePath: "/transcripts/a.jsonl",
+        fileSize: 100,
+        cwd: "/repos/test-repo",
+        model: "claude-sonnet-4",
+        tokensIn: 10,
+        tokensOut: 5,
+        cacheWriteTokens: 0,
+        cacheReadTokens: 0,
+        occurredAt: "2026-05-19T10:00:00.000Z",
+        promptText: "in scope",
+        assistantText: "yes",
+        riskLevel: "low",
+        riskScore: 0,
+        riskCategories: [],
+      },
+    ]);
+    mocks.mapClaudeTranscriptTurn.mockImplementation((_turn, options) => ({
+      tool_name: "claude_code",
+      event_type: "chat",
+      occurred_at: "2026-05-19T10:00:00.000Z",
+      cost_usd: null,
+      project_id: options?.projectId ?? undefined,
+      metadata: {
+        session_id: _turn.turnId,
+        claude_session_id: _turn.sessionId,
+        transcript_source: "claude_jsonl",
+        model: null,
+        base_input_tokens: 0,
+        output_tokens: 0,
+        cache_write_tokens: 0,
+        cache_read_tokens: 0,
+        risk_level: "low",
+        risk_categories: [],
+        risk_score: 0,
+        scannable: true as const,
+      },
+    }));
+
+    await syncTelemetryTools({
+      credentials: { host, accounts: { claude_code: token } },
+      dryRun: false,
+      verbose: false,
+      projectId: null,
+      projectIdSource: "none",
+      pricing: DEFAULT_PRICING,
+      appDir,
+      tools: ["claude_code"],
+      scopeDir: "/repos/test-repo",
+    });
+
+    expect(mocks.postEvent).toHaveBeenCalledTimes(1);
+    expect(mocks.postEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ project_id: "recovered-from-cwd" }),
+      host,
+      token,
+      expect.any(Object)
+    );
+    expect(mockExecFileSync).toHaveBeenCalledWith(
+      "git",
+      ["-C", "/repos/test-repo", "remote", "get-url", "origin"],
+      expect.any(Object)
+    );
+  });
+
+  it("scopeDir + null projectId: falls back to per-payload workspace lookup for Cursor transcripts", async () => {
+    const cursorToken = "db90_cursor_scoped_token";
+    mockExecFileSync.mockImplementation((cmd: unknown, args?: readonly unknown[]) => {
+      if (
+        cmd === "git" &&
+        Array.isArray(args) &&
+        args[0] === "-C" &&
+        args[1] === "/repos/cursor-repo" &&
+        args[2] === "remote" &&
+        args[3] === "get-url"
+      ) {
+        return "git@github.com:org/cursor-repo.git\n";
+      }
+      throw new Error("not a git repo");
+    });
+    mocks.lookupProjectByRemote.mockResolvedValue({
+      project_id: "cursor-recovered-project",
+      name: "Cursor Repo",
+    });
+    mocks.readCursorTranscriptSessions.mockResolvedValue([
+      {
+        sessionId: "cursor-sess-1",
+        turnId: "cursor-sess-1:1",
+        filePath: "/tmp/cursor-sess-1.jsonl",
+        fileSize: 200,
+        workspacePath: "/repos/cursor-repo",
+        composerName: "Test composer",
+        occurredAt: "2026-05-20T09:10:00.000Z",
+        promptText: "in scope",
+        assistantText: "ok",
+        tokensIn: 5,
+        tokensOut: 3,
+        riskLevel: "low",
+        riskScore: 0,
+        riskCategories: [],
+      },
+    ]);
+    mocks.mapCursorTranscriptTurn.mockReturnValue({
+      tool_name: "cursor",
+      event_type: "chat",
+      model: "unknown",
+      tokens_in: 5,
+      tokens_out: 3,
+      cost_usd: 0.05,
+      occurred_at: "2026-05-20T09:10:00.000Z",
+      metadata: {
+        session_id: "cursor-sess-1:1",
+        cursor_session_id: "cursor-sess-1",
+        workspace: "/repos/cursor-repo",
+        cost_model: "estimated_transcript_text",
+        scannable: true,
+        risk_level: "low",
+        transcript_source: "agent_transcript",
+      },
+    });
+
+    await syncTelemetryTools({
+      credentials: { host, accounts: { cursor: cursorToken } },
+      dryRun: false,
+      verbose: false,
+      projectId: null,
+      projectIdSource: "none",
+      pricing: DEFAULT_PRICING,
+      appDir,
+      tools: ["cursor"],
+      scopeDir: "/repos/cursor-repo",
+    });
+
+    expect(mocks.postEvent).toHaveBeenCalledTimes(1);
+    expect(mocks.postEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ project_id: "cursor-recovered-project" }),
+      host,
+      cursorToken,
+      expect.any(Object)
+    );
+    expect(mockExecFileSync).toHaveBeenCalledWith(
+      "git",
+      ["-C", "/repos/cursor-repo", "remote", "get-url", "origin"],
+      expect.any(Object)
+    );
+  });
+
   it("skips Claude noise turns returned by parseTranscriptFile and does not POST them", async () => {
     const token = "db90_noise_token";
     mocks.findTranscriptFiles.mockReturnValue(["/transcripts/noise.jsonl"]);
