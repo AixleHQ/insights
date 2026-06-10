@@ -3,7 +3,7 @@
  * CUR-V02 — collect payloads from the local Cursor install, validate contract, print matrix.
  * Does not POST to db90 (no token required).
  *
- * Usage: npm run verify:cursor-dry-run --workspace=@db90/telemetry-mcp
+ * Usage: npm run verify:cursor-dry-run --workspace=@aixle/insights
  */
 import { homedir } from "node:os";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -46,7 +46,7 @@ function main(): void {
   console.log("Probing global state.vscdb (better-sqlite3)…");
   if (!probeCursorGlobalStateDb(true)) {
     console.error(
-      "\nSQLite probe failed. From repo root try:\n  cd packages/tools && npm rebuild better-sqlite3\nThen re-run: npm run verify:cursor-dry-run --workspace=@db90/telemetry-mcp"
+      "\nSQLite probe failed. From repo root try:\n  cd packages/tools && npm rebuild better-sqlite3\nThen re-run: npm run verify:cursor-dry-run --workspace=@aixle/insights"
     );
     process.exit(1);
   }
@@ -102,7 +102,7 @@ function main(): void {
         JSON.stringify(
           {
             captured_at: new Date().toISOString(),
-            source: "@db90/telemetry-mcp",
+            source: "@aixle/insights",
             payload_count: payloads.length,
             matrix,
             samples_by_path: samplesByPath,

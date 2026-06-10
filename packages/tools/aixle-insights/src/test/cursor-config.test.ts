@@ -46,7 +46,7 @@ describe("parseCursorPricing", () => {
 
 describe("resolveCursorPricing", () => {
   it("merges file config over defaults", () => {
-    const dir = mkdtempSync(join(tmpdir(), "db90-mcp-pricing-"));
+    const dir = mkdtempSync(join(tmpdir(), "aixle-insights-pricing-"));
     mkdirSync(dir, { recursive: true });
     writeFileSync(
       join(dir, "config.json"),
@@ -61,7 +61,7 @@ describe("resolveCursorPricing", () => {
   });
 
   it("lets explicit overrides win over file config", () => {
-    const dir = mkdtempSync(join(tmpdir(), "db90-mcp-pricing-"));
+    const dir = mkdtempSync(join(tmpdir(), "aixle-insights-pricing-"));
     mkdirSync(dir, { recursive: true });
     writeFileSync(
       join(dir, "config.json"),

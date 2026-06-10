@@ -3,5 +3,4 @@ dist/
 *.log
 
 # npm pack smoke-test artifacts (any version)
-db90-telemetry-mcp-*.tgz
 aixle-insights-*.tgz

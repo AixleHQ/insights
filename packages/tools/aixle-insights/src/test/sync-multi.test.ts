@@ -129,7 +129,7 @@ describe("syncTelemetryTools", () => {
   const host = "http://localhost:3000";
 
   beforeEach(() => {
-    appDir = mkdtempSync(join(tmpdir(), "db90-mcp-sync-multi-"));
+    appDir = mkdtempSync(join(tmpdir(), "aixle-insights-sync-multi-"));
     process.env.AIXLE_INSIGHTS_HOME = appDir;
     mkdirSync(appDir, { recursive: true });
     vi.clearAllMocks();
@@ -1240,7 +1240,7 @@ describe("lastRecentCommitHashes partial batch failure guard", () => {
   }
 
   beforeEach(() => {
-    appDir = mkdtempSync(join(tmpdir(), "db90-mcp-partial-"));
+    appDir = mkdtempSync(join(tmpdir(), "aixle-insights-partial-"));
     process.env.AIXLE_INSIGHTS_HOME = appDir;
     mkdirSync(appDir, { recursive: true });
     vi.clearAllMocks();

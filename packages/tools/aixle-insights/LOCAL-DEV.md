@@ -1,6 +1,6 @@
 # Local MCP setup (npm not published yet)
 
-Step-by-step guide for running **`@db90/telemetry-mcp`** against the **db90-rails** Docker stack while the package is **not on npm** (`npx @db90/telemetry-mcp` → 404).
+Step-by-step guide for running **`@aixle/insights`** against the **db90-rails** Docker stack while the package is **not on npm** (`npx @aixle/insights` → 404).
 
 > **TL;DR:** build the CLI from the monorepo, run `init` against local Keycloak, **patch `~/.claude.json`** to point at the local `dist/cli.js` (because `init` writes `npx`), start the **Temporal worker**, and verify in the Events UI.
 
@@ -51,20 +51,20 @@ Always from **`packages/tools`** (workspace lockfile):
 ```bash
 cd packages/tools
 npm ci
-npm run build --workspace=@db90/sdk
-npm run build --workspace=@db90/telemetry-mcp
+# SDK is now inlined; only the package itself needs building
+npm run build --workspace=@aixle/insights
 ```
 
 Quick smoke:
 
 ```bash
-node db90-telemetry-mcp/dist/cli.js --help
+node aixle-insights/dist/cli.js --help
 ```
 
 Typical absolute path on macOS:
 
 ```text
-/Users/<your-user>/db90-rails/packages/tools/db90-telemetry-mcp/dist/cli.js
+/Users/<your-user>/db90-rails/packages/tools/aixle-insights/dist/cli.js
 ```
 
 ---
@@ -78,7 +78,7 @@ cd packages/tools
 
 export DB90_MCP_USE_LOCAL_KEYCLOAK_DEFAULT=true
 
-node db90-telemetry-mcp/dist/cli.js init \
+node aixle-insights/dist/cli.js init \
   --host http://localhost:3000 \
   --keycloak-url http://localhost:8080/realms/db90
 ```
@@ -92,7 +92,7 @@ Flow:
 **Organization:** by default `init` uses your **oldest** membership. If you belong to multiple orgs:
 
 ```bash
-node db90-telemetry-mcp/dist/cli.js init \
+node aixle-insights/dist/cli.js init \
   --host http://localhost:3000 \
   --keycloak-url http://localhost:8080/realms/db90 \
   --organization-id <your-org-uuid>
@@ -100,13 +100,13 @@ node db90-telemetry-mcp/dist/cli.js init \
 
 Credentials are stored in:
 
-- **macOS:** Keychain (via `keytar`) — `~/.db90-mcp/credentials.json` may not exist
-- **Fallback:** `~/.db90-mcp/credentials.json` (mode `0600`)
+- **macOS:** Keychain (via `keytar`) — `~/.aixle-insights/credentials.json` may not exist
+- **Fallback:** `~/.aixle-insights/credentials.json` (mode `0600`)
 
 Verify:
 
 ```bash
-node db90-telemetry-mcp/dist/cli.js health
+node aixle-insights/dist/cli.js health
 ```
 
 Expected: `authenticated: true`, `host: http://localhost:3000`, `ingest_tools: claude_code, cursor`.
@@ -119,7 +119,7 @@ Expected: `authenticated: true`, `host: http://localhost:3000`, `ingest_tools: c
 
 ```json
 "command": "npx",
-"args": ["-y", "@db90/telemetry-mcp", "run"]
+"args": ["-y", "@aixle/insights", "run"]
 ```
 
 That **fails** until npm publish. Replace it with the local build.
@@ -129,10 +129,10 @@ That **fails** until npm publish. Replace it with the local build.
 Set `CLI` to your absolute path:
 
 ```bash
-CLI="/Users/<your-user>/db90-rails/packages/tools/db90-telemetry-mcp/dist/cli.js"
+CLI="/Users/<your-user>/db90-rails/packages/tools/aixle-insights/dist/cli.js"
 
 cp ~/.claude.json ~/.claude.json.bak && \
-jq --arg cli "$CLI" '.mcpServers.db90 = {
+jq --arg cli "$CLI" '.mcpServers["aixle-insights"] = {
   "command": "node",
   "args": [$cli, "run"],
   "env": { "DB90_API_URL": "http://localhost:3000" }
@@ -141,13 +141,13 @@ jq --arg cli "$CLI" '.mcpServers.db90 = {
 
 ### Option B — edit manually
 
-In `~/.claude.json` → `mcpServers.db90`:
+In `~/.claude.json` → `mcpServers["aixle-insights"]`:
 
 ```json
-"db90": {
+"aixle-insights": {
   "command": "node",
   "args": [
-    "/Users/<your-user>/db90-rails/packages/tools/db90-telemetry-mcp/dist/cli.js",
+    "/Users/<your-user>/db90-rails/packages/tools/aixle-insights/dist/cli.js",
     "run"
   ],
   "env": {
@@ -184,11 +184,11 @@ Automatic sync: ~**5 minutes** + one flush on connect.
 
 ```bash
 # Single sync pass (exit 1 if POST fails)
-node db90-telemetry-mcp/dist/cli.js run --once
+node aixle-insights/dist/cli.js run --once
 
 # Diagnostics
-node db90-telemetry-mcp/dist/cli.js health
-tail -20 ~/.db90-mcp/mcp.log
+node aixle-insights/dist/cli.js health
+tail -20 ~/.aixle-insights/mcp.log
 ```
 
 ### API / DB
@@ -234,7 +234,7 @@ If Temporal is down, the API may **fallback to direct insert** (logs: `Temporal 
 
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
-| `/mcp` missing `db90` or **failed** | `npx @db90/telemetry-mcp` in `~/.claude.json` | Section 4 — patch to `node …/dist/cli.js` |
+| `/mcp` missing `db90` or **failed** | `npx @aixle/insights` in `~/.claude.json` | Section 4 — patch to `node …/dist/cli.js` |
 | `health` → `authenticated: false` | No credentials / incomplete init | Re-run `init` (section 3) |
 | `sent: N`, UI empty of **new** events | Worker not running | `make worker` |
 | Keycloak device login blank page | Theme CSS | `docker compose restart keycloak`; pull latest `keycloak/themes/db90/` |
@@ -246,7 +246,7 @@ If Temporal is down, the API may **fallback to direct insert** (logs: `Temporal 
 ### Useful logs
 
 ```bash
-~/.db90-mcp/mcp.log          # sync, skips, MCP errors
+~/.aixle-insights/mcp.log          # sync, skips, MCP errors
 docker logs db90-api           # ingest 202 / fallback
 docker logs db90-worker        # sanitization + persist
 ```
@@ -264,18 +264,18 @@ make worker
 # Terminal 2 — build + init (first time or after large pull)
 cd ~/db90-rails/packages/tools
 npm ci
-npm run build --workspace=@db90/sdk
-npm run build --workspace=@db90/telemetry-mcp
+# SDK is now inlined; only the package itself needs building
+npm run build --workspace=@aixle/insights
 
 export DB90_MCP_USE_LOCAL_KEYCLOAK_DEFAULT=true
-node db90-telemetry-mcp/dist/cli.js init \
+node aixle-insights/dist/cli.js init \
   --host http://localhost:3000 \
   --keycloak-url http://localhost:8080/realms/db90
 
 # Patch ~/.claude.json (section 4) → restart Claude Code → /mcp
 
-node db90-telemetry-mcp/dist/cli.js health
-node db90-telemetry-mcp/dist/cli.js run --once
+node aixle-insights/dist/cli.js health
+node aixle-insights/dist/cli.js run --once
 ```
 
 UI: http://localhost:5173 → Events
@@ -298,7 +298,7 @@ New ingest via MCP skips these turns automatically; the rake only cleans DB rows
 You can switch back to:
 
 ```bash
-npx -y @db90/telemetry-mcp init --host http://localhost:3000
+npx -y @aixle/insights init --host http://localhost:3000
 ```
 
 and let `init` write the `npx` stanza in `~/.claude.json` without manual patching. Until then, this guide is the supported path for local monorepo development.
@@ -311,9 +311,9 @@ Installs the per-turn hook forwarder so each Agent turn records the resolved mod
 
 ```bash
 cd packages/tools
-npm run build --workspace=@db90/telemetry-mcp   # ensures dist/hooks/hook-forwarder.mjs is current
+npm run build --workspace=@aixle/insights   # ensures dist/hooks/hook-forwarder.mjs is current
 
-node db90-telemetry-mcp/dist/cli.js init --hooks
+node aixle-insights/dist/cli.js init --hooks
 # Output: backup path + "Restart Cursor to activate"
 ```
 
@@ -322,13 +322,13 @@ node db90-telemetry-mcp/dist/cli.js init --hooks
 3. Run a sync cycle:
 
 ```bash
-node db90-telemetry-mcp/dist/cli.js run --once
+node aixle-insights/dist/cli.js run --once
 ```
 
 4. Check health to confirm hooks fired:
 
 ```bash
-node db90-telemetry-mcp/dist/cli.js health
+node aixle-insights/dist/cli.js health
 # hooks_installed: true
 # hooks_queue_depth: 0  (queue was drained)
 ```
@@ -338,5 +338,5 @@ node db90-telemetry-mcp/dist/cli.js health
 To uninstall:
 
 ```bash
-node db90-telemetry-mcp/dist/cli.js uninstall-hooks
+node aixle-insights/dist/cli.js uninstall-hooks
 ```

@@ -1,40 +1,29 @@
 # Changelog
 
-All notable changes to `@db90/telemetry-mcp` will be documented in this file.
+All notable changes to `@aixle/insights` will be documented in this file.
 
-## [Unreleased]
+## 0.1.0
 
-### Added
+Initial release of `@aixle/insights` — stdio MCP server for AI coding-assistant telemetry (Claude transcripts + Cursor SQLite ingest).
 
-- **Cursor Hooks (opt-in)** [AIX-286]: `db90-mcp init --hooks` installs a forwarder script into `~/.cursor/hooks.json` that captures `sessionEnd` and `postToolUse` events on every turn. The background sync picks up the queue (`~/.db90-mcp/hooks-queue.ndjson`) and POSTs hook-sourced events with accurate model attribution (`model` from the resolved turn, not the global settings default). New commands: `uninstall-hooks` (restores backup), `verify-hooks` (prints feasibility report). Health output gains `hooks_installed` and `hooks_queue_depth` fields.
-- `cursor_hook` ingest path: hook events carry `metadata.cost_model: "cursor_hook"` and `metadata.ingest_source: "cursor_hook"` — excluded from cost dashboards (tokens/cost = 0 on all hook events). Dedup key: `cursor:hook:{conversation_id}:{generation_id}:{hook_event_name}` (also set as `metadata.session_id` for server-side upsert surviving MCP state wipe).
-- **Cursor model from settings** [AIX-265]: reads active model from Cursor `settings.json` once per sync pass and applies it to daily-stats and recent-commit payloads (replacing hardcoded `model: "unknown"` when the file is present).
-- **Claude local-command noise filter** [AIX-309]: `<local-command-caveat>`, `<command-name>`, `<local-command-stdout>`, and `isMeta: true` user lines are dropped at parse time and never POSTed. Turns with real token usage are preserved even when the prompt contains angle brackets. Historical rows can be cleaned up with `rails db90:cleanup_claude_noise_events[ORG_SLUG]`.
+### Features
 
-## [0.1.0] - 2026-05-29
+- **Claude Code ingest**: parses `~/.claude/projects/**/*.jsonl` transcript turns, sends one POST per turn with `tool_name=claude_code`, model, tokens, prompt + assistant text, project attribution, and risk-scan metadata.
+- **Cursor ingest**: reads Cursor's SQLite store + optional hook-forwarder queue; sends one POST per chat turn / hook event with workspace + model attribution.
+- **OIDC device login**: `aixle-insights init` runs Keycloak device authorization, exchanges OIDC for per-tool ingest tokens, stores them in the OS keychain (keytar) or a `~/.aixle-insights/credentials.json` fallback (mode 0600).
+- **MCP tools**: `db90_status`, `db90_sync_now`, `db90_authenticate` exposed over the stdio MCP transport.
+- **Background sync**: 5-minute cycle; advisory `state.lock` prevents concurrent runs; per-credential checkpoints prevent re-syncing the same turn.
+- **Cursor hook forwarder (opt-in)**: `aixle-insights init --hooks` writes a Node forwarder into `~/.cursor/hooks.json` for per-turn model attribution.
+- **Health diagnostics**: `aixle-insights health` (CLI) and `db90_status` (MCP) return credentials, last sync, log path, and state file structure.
+- **Rate-limit + retry**: postEvent retries 3× with exponential backoff (1s/4s/16s); 429 honors `Retry-After`; rate-limit windows persist across process restarts.
 
-First public npm release (`@db90/telemetry-mcp@0.1.0`): stdio MCP server for DB90 with Claude Code + Cursor ingestion, Keycloak/OIDC device login, bundled private `@db90/sdk`.
+### Requirements
 
-### Highlights
+- Node.js ≥ 20.
+- macOS / Linux / Windows.
 
-- **Init & auth**: Keycloak RFC 8628 device login (`src/auth/keycloak.ts`), exchange to `POST /api/v1/integrations/mcp/exchange`, `src/auth/credentials.ts` with optional OS keychain (`keytar`) and `credentials.json` fallback (`0600` on POSIX). CLI `init --host/--keycloak-url/--tool-name/--force`; MCP tool **`db90_authenticate`** for device-code JSON.
-- **Multi-org init**: optional **`--organization-id <uuid>`** and env **`DB90_ORGANIZATION_ID`** (CLI wins when both set) — sent as **`X-Organization-ID`** on **`POST /api/v1/integrations/mcp/exchange`** so multi-org users can mint ingest tokens for a chosen membership instead of the API default (oldest).
-- **Claude Code wiring**: `init` merges the **`db90`** MCP server into **user** config **`~/.claude.json`** → `mcpServers` (`src/install/`). Omit **`--tool-name`** so provisioning can attach both **`claude_code`** and **`cursor`** when eligible. **`--tool-name cursor`** skips Claude MCP install. **`--force`** replaces a conflicting existing `db90` entry. Windows uses `cmd /c npx …` per Claude expectations.
-- **Sync & ingest**: Claude JSONL transcript sync in-process (`syncOnce`, state keys `claude_code:<sessionId>`), Cursor SQLite readers, advisory lock **`state.lock`**, posts via **`@db90/sdk`** to **`POST /api/v1/ingest/events`**. MCP tools **`db90_status`**, **`db90_sync_now`**, **5‑minute** background timer plus startup sync when credentials exist. CLI **`db90-mcp run --once`** for single sync / non-zero exit on failures.
-- **Resilience & observability**: Shared **`src/health.ts`** for **`db90-mcp health`** and MCP **`db90_status`**. Operational **`mcp.log`** (~/.db90-mcp, `DB90_MCP_HOME` override), **5 MiB** rotate to **`mcp.log.1`**. Credential-scoped state **`mcp_operator`** diagnostics. **`postEvent`** retries (1s / 4s / 16s) on transient failures; **429** uses backoff helper only.
-- **Scope-directory filtering** (`scopeDir`): MCP server captures `process.cwd()` at startup and filters Claude turns / Cursor payloads to only events whose `cwd` / `workspace_folder` is under that directory. Prevents events from unrelated repos being mis-attributed when multiple projects share one ingest token.
-- **SSH host alias resolution** (`canonicalizeGitRemote` in `@db90/sdk`): resolves SSH config host aliases (e.g. `github-work → github.com`) via `ssh -G` before sending git remotes to the lookup API. Fixes attribution for teams that use per-org SSH aliases in `~/.ssh/config`.
-### Packaging
+### Compatibility notes
 
-- **Bundled `@db90/sdk`** via **`prepack` → `packages/tools/scripts/stage-sdk-bundle.mjs`** and **`bundledDependencies`**, so published tarballs remain installable while the SDK stays private on npm.
-
-## API stability policy (applies from 0.1.0 forward)
-
-- The MCP tool/resource surface is part of this package's public API.
-- A breaking change to a tool's input/output shape requires a minor-version bump.
-- The `~/.db90-mcp/state.json` shape is internal — do not depend on it from outside this package.
-
-## Dependencies
-
-- `@db90/sdk` provides the shared ingest HTTP primitive (bundled in the published tarball).
-- Claude reader/sync code is intentionally duplicated inside `@db90/telemetry-mcp` for publish isolation.
+- Local state directory is `~/.aixle-insights/` (override: `AIXLE_INSIGHTS_HOME`).
+- Keytar service identifier: `aixle-insights`.
+- MCP server entry written to `~/.claude.json` is under `mcpServers.aixle-insights`.
