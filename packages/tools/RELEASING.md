@@ -4,10 +4,12 @@ Runbook for cutting a public npm release of **`@aixle/insights`**. The package l
 
 ## Prerequisites (once per maintainer)
 
-- Member of the `@aixle` npm org with hardware 2FA enabled.
+- Member of the `@aixle` npm org with hardware 2FA enabled (FIDO2/WebAuthn — passkey or YubiKey).
 - Commit access to this repo.
-- Repo secret `NPM_TOKEN` exists, has not expired, and has publish rights on `@aixle/insights`.
+- **No long-lived npm token required.** Publishing uses OIDC Trusted Publishing (GitHub Actions OIDC). The `npm-publish` GitHub Environment must be configured with the intended reviewer(s).
 - `gh` CLI authenticated (`gh auth status` succeeds) for tag pushes via the terminal (optional if you use the GitHub UI).
+
+**Break-glass only** (if OIDC ever fails at npm Inc.'s side): create a short-lived Granular Access Token (90-day max) scoped to `@aixle/insights`, set as `NPM_TOKEN` in GitHub Secrets, then delete it immediately after the publish completes. Never store permanently.
 
 ## Tag → release mapping
 
@@ -49,16 +51,25 @@ For a release of `@aixle/insights@X.Y.Z`:
    git push origin cli-mcp-vX.Y.Z
    ```
 6. **Watch the workflow** (`.github/workflows/release-cli.yml` — "Release CLI to npm"). It:
+   - Pauses on the `npm-publish` GitHub Environment gate — a configured reviewer must approve before publish runs.
    - Matches tag version against `package.json` (and the `version` workflow_dispatch input).
    - Rejects placeholder + legacy scope literals (`@<scope>`, `@db90/telemetry-mcp`, `db90-telemetry-mcp`, `db90-mcp`) anywhere in the package source — straggler trap.
    - Rejects `file:` / `link:` dependency specs that cannot ship to the registry.
-   - Runs `npm ci`, builds, tests.
+   - Rejects any lifecycle script in `package.json` other than `prepublishOnly`.
+   - Asserts `publishConfig.provenance` is `true`.
+   - Runs `npm ci --ignore-scripts` (defends against compromised-dep postinstall payloads).
+   - Runs `npm audit signatures` over the installed dep tree (verifies registry-signed integrity).
+   - Builds, tests.
    - `npm pack --dry-run --json` against an allowlist: `dist/**`, `README.md`, `LICENSE`, `package.json`.
-   - `npm publish` with `NODE_AUTH_TOKEN` from `NPM_TOKEN`.
+   - `npm publish` via OIDC Trusted Publishing — short-lived token minted by GitHub OIDC; no secret read. Provenance attestation is automatic.
 7. **Smoke-test the published artifact** from an empty directory (outside the monorepo):
    ```bash
    npm view @aixle/insights version            # confirms registry has the new version
    npx -y @aixle/insights@X.Y.Z --help
+
+   # Verify cryptographic provenance:
+   npm audit signatures @aixle/insights@X.Y.Z
+   # Expected: Signed artifact, provenance verified
    ```
    **Clean-profile init smoke** (a disposable user account or a machine with no prior install):
    1. `npx -y @aixle/insights@X.Y.Z init --host … --keycloak-url … --organization-id <uuid>`
@@ -91,8 +102,16 @@ Record the Actions run URL, outcome, `npm view` output, smoke-test result, elaps
 
 - **"Verify version matches package.json"** — tag (`cli-mcp-v…`) or `version` input mismatch; bump in a new commit and re-tag.
 - **Obsolete-scope guard** — a legacy `@db90/telemetry-mcp` / `db90-mcp` / `db90-telemetry-mcp` / `@<scope>` literal slipped into the package. Find and replace, then re-tag.
+- **Unauthorized lifecycle script guard** — only `prepublishOnly` is allowed. If a new lifecycle script is genuinely required, update the guard *and* `plans/npm-org-setup-aixle/tasks/03-package-and-workflow-hardening.md` together.
+- **`publishConfig.provenance` guard** — `package.json` must keep `"publishConfig": { "access": "public", "provenance": true }`. Do not remove the `provenance` flag.
+- **`npm audit signatures` failure** — a dep was unpublished + republished with a different signing identity, or registry signature drift. Investigate the failing dep on `npmjs.com` before disabling the check.
 - **Pack allowlist leaks** — fix `files` field / `.npmignore`; ensure stray artifacts are not staged.
-- **403 from npm** — regenerate `NPM_TOKEN` per `CLAUDE.md` ("Release secrets").
+- **403 from npm (OIDC failure)** — check, in order:
+  1. Trusted Publisher config on `npmjs.com/package/@aixle/insights` matches: GitHub org `dualboot-partners`, repo `db90-rails`, workflow `release-cli.yml`, environment `npm-publish` (all case-sensitive).
+  2. The workflow has `permissions: id-token: write` at the top level — already set in `.github/workflows/release-cli.yml`.
+  3. The publish job runs inside the `npm-publish` GitHub Environment (check workflow logs for the "Environment: npm-publish" line).
+  4. npm CLI is ≥ 11.5.1 (the workflow upgrades npm with `npm install -g npm@latest` before publish; confirm that step ran green).
+  5. **Last resort only:** see "Break-glass only" under Prerequisites — create a short-lived Granular Access Token, set as `NPM_TOKEN`, delete after the run. Not a permanent fix.
 
 ## Evidence checklist
 

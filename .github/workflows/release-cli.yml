@@ -67,14 +67,17 @@ jobs:
     runs-on: ubuntu-latest
     environment: npm-publish
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: packages/tools/package-lock.json
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Upgrade npm to OIDC-capable version (>= 11.5.1 required for Trusted Publishing)
+        run: npm install -g npm@latest
 
       - name: Verify version matches package.json
         env:
@@ -141,8 +144,56 @@ jobs:
           }
           EOF
 
-      - name: Install workspace
-        run: npm ci
+      - name: "Reject unauthorized lifecycle scripts (only prepublishOnly allowed)"
+        env:
+          WORKING_DIRECTORY: ${{ needs.resolve.outputs.working_directory }}
+        run: |
+          set -euo pipefail
+          node <<'EOF'
+          const pkg = require(`${process.env.WORKING_DIRECTORY}/package.json`);
+          const scripts = pkg.scripts || {};
+          const allowedLifecycle = new Set(['prepublishOnly']);
+          const lifecycleHooks = [
+            'preinstall', 'install', 'postinstall',
+            'preuninstall', 'uninstall', 'postuninstall',
+            'preversion', 'version', 'postversion',
+            'prepublish', 'prepare', 'prepack',
+            'postpack', 'publish', 'postpublish',
+          ];
+          const offenders = [];
+          for (const hook of lifecycleHooks) {
+            if (hook in scripts && !allowedLifecycle.has(hook)) {
+              offenders.push(`${hook} = ${scripts[hook]}`);
+            }
+          }
+          if (offenders.length > 0) {
+            console.error('Unauthorized lifecycle script(s) in package.json:');
+            for (const o of offenders) console.error('  ' + o);
+            console.error('Allowed: ' + [...allowedLifecycle].join(', '));
+            console.error('If a new lifecycle script is genuinely required, update plans/npm-org-setup-aixle/tasks/03-package-and-workflow-hardening.md and this guard together.');
+            process.exit(1);
+          }
+          EOF
+
+      - name: "Verify publishConfig.provenance is set"
+        env:
+          WORKING_DIRECTORY: ${{ needs.resolve.outputs.working_directory }}
+        run: |
+          set -euo pipefail
+          node <<'EOF'
+          const pkg = require(`${process.env.WORKING_DIRECTORY}/package.json`);
+          if (pkg.publishConfig?.provenance !== true) {
+            console.error('publishConfig.provenance must be true; got ' + JSON.stringify(pkg.publishConfig));
+            process.exit(1);
+          }
+          EOF
+
+      - name: Install workspace (block dep lifecycle scripts — defense vs. Shai-Hulud-class postinstall payloads)
+        run: npm ci --ignore-scripts
+        working-directory: packages/tools
+
+      - name: Verify signatures of installed dependencies
+        run: npm audit signatures
         working-directory: packages/tools
 
       - name: Build
@@ -178,8 +229,6 @@ jobs:
           // is obsolete — there is no separate SDK package to stage.
           EOF
 
-      - name: Publish to npm
+      - name: Publish to npm (OIDC Trusted Publishing — no stored token)
         working-directory: ${{ needs.resolve.outputs.working_directory }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish

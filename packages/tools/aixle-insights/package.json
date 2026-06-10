@@ -4,7 +4,7 @@
   "description": "stdio MCP server for AI coding-assistant telemetry — Claude transcript sync + Cursor SQLite ingest.",
   "type": "module",
   "bin": {
-    "aixle-insights": "./dist/cli.js"
+    "aixle-insights": "dist/cli.js"
   },
   "exports": {
     ".": "./dist/cli.js"
@@ -15,7 +15,8 @@
     "LICENSE"
   ],
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "engines": {
     "node": ">=20"
@@ -23,7 +24,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/dualboot-partners/db90-rails.git",
+    "url": "git+https://github.com/dualboot-partners/db90-rails.git",
     "directory": "packages/tools/aixle-insights"
   },
   "homepage": "https://github.com/dualboot-partners/db90-rails/tree/develop/packages/tools/aixle-insights#readme",

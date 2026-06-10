@@ -77,9 +77,11 @@ Decision hierarchy: standard Rails patterns first → existing codebase patterns
 
 ## Release secrets
 
-- `NPM_TOKEN` — GitHub Actions repository secret (Settings → Secrets → Actions). Automation token scoped to `@db90/*`, read + write. Rotate every 11 months. Owners: Ada Lovelace + Grace Hopper. Set a calendar reminder on creation.
-- npm org `@db90` — both owners must have hardware 2FA enforced at org level.
-- To publish: push a tag matching `cli-claude-v*`, `cli-cursor-v*`, or **`cli-mcp-v*`** (@db90/telemetry-mcp). See `packages/tools/RELEASING.md` for the full runbook.
+- npm org `@aixle` — owned by `aixle-bot` (service account, email `aixle@example.com`). All maintainers must have hardware 2FA (FIDO2/WebAuthn — passkey or YubiKey) enforced.
+- **No `NPM_TOKEN`** — publishing uses **OIDC Trusted Publishing** (GitHub Actions OIDC). No long-lived token is stored in GitHub Secrets. Provenance attestation is automatic.
+- To publish: push a tag matching **`cli-mcp-v*`** → approve the `npm-publish` GitHub Environment gate. See `packages/tools/RELEASING.md` for the full runbook.
+- **Break-glass only:** if OIDC fails at npm Inc.'s side, create a Granular Access Token (90-day max) scoped to `@aixle/insights`. Delete it immediately after the publish. Never store permanently.
+- Plan and threat-model for this setup: `plans/npm-org-setup-aixle/` (orientation, tasks 01–05).
 
 ## Codebase Exploration
 
