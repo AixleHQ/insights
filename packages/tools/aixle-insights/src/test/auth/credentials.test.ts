@@ -10,13 +10,13 @@ describe("auth/credentials", () => {
   beforeEach(() => {
     home = join(tmpdir(), `db90-mcp-cred-${Date.now()}-${Math.random().toString(16).slice(2)}`);
     mkdirSync(home, { recursive: true });
-    process.env.DB90_MCP_HOME = home;
+    process.env.AIXLE_INSIGHTS_HOME = home;
     process.env.DB90_MCP_DISABLE_KEYTAR = "true";
   });
 
   afterEach(async () => {
     await clearCredentials(home);
-    delete process.env.DB90_MCP_HOME;
+    delete process.env.AIXLE_INSIGHTS_HOME;
     delete process.env.DB90_MCP_DISABLE_KEYTAR;
   });
 

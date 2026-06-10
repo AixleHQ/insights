@@ -130,7 +130,7 @@ describe("syncTelemetryTools", () => {
 
   beforeEach(() => {
     appDir = mkdtempSync(join(tmpdir(), "db90-mcp-sync-multi-"));
-    process.env.DB90_MCP_HOME = appDir;
+    process.env.AIXLE_INSIGHTS_HOME = appDir;
     mkdirSync(appDir, { recursive: true });
     vi.clearAllMocks();
     mockExecFileSync.mockImplementation(() => {
@@ -155,7 +155,7 @@ describe("syncTelemetryTools", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    delete process.env.DB90_MCP_HOME;
+    delete process.env.AIXLE_INSIGHTS_HOME;
     resetBackoffStateForTests();
   });
 
@@ -1241,7 +1241,7 @@ describe("lastRecentCommitHashes partial batch failure guard", () => {
 
   beforeEach(() => {
     appDir = mkdtempSync(join(tmpdir(), "db90-mcp-partial-"));
-    process.env.DB90_MCP_HOME = appDir;
+    process.env.AIXLE_INSIGHTS_HOME = appDir;
     mkdirSync(appDir, { recursive: true });
     vi.clearAllMocks();
     mockExecFileSync.mockImplementation(() => { throw new Error("not a git repo"); });
@@ -1263,7 +1263,7 @@ describe("lastRecentCommitHashes partial batch failure guard", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    delete process.env.DB90_MCP_HOME;
+    delete process.env.AIXLE_INSIGHTS_HOME;
     resetBackoffStateForTests();
   });
 

@@ -46,8 +46,8 @@ const EXPECTED_SPAWN_NPM_NAME = "@aixle/insights"; // flipped in commit 6 (insta
 const EXPECTED_BIN = "aixle-insights";
 const EXPECTED_MCP_KEY = "db90";
 const EXPECTED_OBSOLETE_KEY: string | null = null;
-const EXPECTED_STATE_DIR = ".db90-mcp";
-const EXPECTED_KEYTAR = "db90-mcp";
+const EXPECTED_STATE_DIR = ".aixle-insights";
+const EXPECTED_KEYTAR = "aixle-insights";
 const EXPECTED_SERVER_NAME = "aixle-insights-mcp";
 
 // =====================================================================
@@ -162,17 +162,14 @@ describe("Refactor parity — install/claude.ts integration", () => {
 
 describe("Refactor parity — state directory", () => {
   it("getAppDir returns ~/<EXPECTED_STATE_DIR>", () => {
-    // getAppDir respects DB90_MCP_HOME / AIXLE_INSIGHTS_HOME env override, so
+    // getAppDir respects AIXLE_INSIGHTS_HOME / AIXLE_INSIGHTS_HOME env override, so
     // unset both to assert the default-derivation path.
-    const savedDb90Home = process.env.DB90_MCP_HOME;
     const savedAixleHome = process.env.AIXLE_INSIGHTS_HOME;
-    delete process.env.DB90_MCP_HOME;
     delete process.env.AIXLE_INSIGHTS_HOME;
 
     try {
       expect(getAppDir()).toBe(join(homedir(), EXPECTED_STATE_DIR));
     } finally {
-      if (savedDb90Home !== undefined) process.env.DB90_MCP_HOME = savedDb90Home;
       if (savedAixleHome !== undefined) process.env.AIXLE_INSIGHTS_HOME = savedAixleHome;
     }
   });

@@ -9,14 +9,14 @@ describe("mcp file log", () => {
 
   beforeEach(() => {
     home = mkdtempSync(join(tmpdir(), "db90-mcp-log-"));
-    process.env.DB90_MCP_HOME = home;
+    process.env.AIXLE_INSIGHTS_HOME = home;
   });
 
   afterEach(() => {
-    delete process.env.DB90_MCP_HOME;
+    delete process.env.AIXLE_INSIGHTS_HOME;
   });
 
-  it("creates mcp.log under DB90_MCP_HOME", () => {
+  it("creates mcp.log under AIXLE_INSIGHTS_HOME", () => {
     appendMcpLogLine(JSON.stringify({ x: 1 }), home);
     const p = getMcpLogPath(home);
     const text = readFileSync(p, "utf-8").trim();

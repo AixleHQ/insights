@@ -97,7 +97,7 @@ export interface MultiSyncOptions {
   /** Token for GET /projects/lookup (defaults to cursor ingest token in cursor slice). */
   projectLookupToken?: string | null;
   pricing: PricingTable;
-  /** Cursor line-cost rates (defaults + optional ~/.db90-mcp/config.json overrides). */
+  /** Cursor line-cost rates (defaults + optional ~/.aixle-insights/config.json overrides). */
   cursorPricing?: PricingConfig;
   appDir?: string;
   transcriptBaseDirs?: string[];

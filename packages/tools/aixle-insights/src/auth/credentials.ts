@@ -12,8 +12,8 @@ export interface StoredCredentials {
   accounts: Partial<Record<TelemetryToolId, string>>;
 }
 
-export const KEYTAR_SERVICE = "db90-mcp";
-const KEYTAR_ACCOUNT = "db90-ingest-credential";
+export const KEYTAR_SERVICE = "aixle-insights";
+const KEYTAR_ACCOUNT = "aixle-insights-ingest-credential";
 
 function credentialsPath(appDir: string): string {
   return join(appDir, "credentials.json");

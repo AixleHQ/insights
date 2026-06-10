@@ -14,7 +14,7 @@ describe("syncOnce", () => {
 
   beforeEach(() => {
     appDir = mkdtempSync(join(tmpdir(), "db90-mcp-sync-"));
-    process.env.DB90_MCP_HOME = appDir;
+    process.env.AIXLE_INSIGHTS_HOME = appDir;
     transcriptsRoot = join(appDir, "claude-projects");
     mkdirSync(join(transcriptsRoot, "proj"), { recursive: true });
     setIngestRetryWaitOverrideForTests(async () => {});
@@ -49,7 +49,7 @@ describe("syncOnce", () => {
 
   afterEach(() => {
     fetchSpy.mockRestore();
-    delete process.env.DB90_MCP_HOME;
+    delete process.env.AIXLE_INSIGHTS_HOME;
     resetBackoffStateForTests();
     setIngestRetryWaitOverrideForTests(undefined);
   });

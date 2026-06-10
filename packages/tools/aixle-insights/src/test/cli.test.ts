@@ -163,7 +163,7 @@ describe("runOnce", () => {
 
   it("returns non-zero when credentials are missing", async () => {
     const home = mkdtempSync(join(tmpdir(), "db90-cli-missing-creds-"));
-    process.env.DB90_MCP_HOME = home;
+    process.env.AIXLE_INSIGHTS_HOME = home;
     try {
       const code = await runOnce({
         loadCredentials: async () => null,
@@ -173,7 +173,7 @@ describe("runOnce", () => {
       expect(code).toBe(1);
       expect(readFileSync(join(home, "mcp.log"), "utf-8")).toContain("credential_validation_failed");
     } finally {
-      delete process.env.DB90_MCP_HOME;
+      delete process.env.AIXLE_INSIGHTS_HOME;
     }
   });
 
@@ -626,7 +626,7 @@ describe("health CLI formatting", () => {
   it("includes log_path and app_dir from buildHealthSnapshot", async () => {
     const home = mkdtempSync(join(tmpdir(), "db90-health-cli-"));
     mkdirSync(home, { recursive: true });
-    process.env.DB90_MCP_HOME = home;
+    process.env.AIXLE_INSIGHTS_HOME = home;
     process.env.DB90_MCP_DISABLE_KEYTAR = "true";
     try {
       const { formatHealthForCli, buildHealthSnapshot } = await import("../health.js");
@@ -635,7 +635,7 @@ describe("health CLI formatting", () => {
       expect(text).toContain(join(home, "mcp.log"));
       expect(text).toContain(`app_dir: ${home}`);
     } finally {
-      delete process.env.DB90_MCP_HOME;
+      delete process.env.AIXLE_INSIGHTS_HOME;
       delete process.env.DB90_MCP_DISABLE_KEYTAR;
     }
   });

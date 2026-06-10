@@ -30,14 +30,14 @@ describe("MCP server (in-process)", () => {
   }
 
   beforeEach(() => {
-    home = mkdtempSync(join(tmpdir(), "db90-mcp-home-"));
+    home = mkdtempSync(join(tmpdir(), "aixle-insights-home-"));
     mkdirSync(home, { recursive: true });
-    process.env.DB90_MCP_HOME = home;
+    process.env.AIXLE_INSIGHTS_HOME = home;
     process.env.DB90_MCP_DISABLE_KEYTAR = "true";
   });
 
   afterEach(() => {
-    delete process.env.DB90_MCP_HOME;
+    delete process.env.AIXLE_INSIGHTS_HOME;
     delete process.env.DB90_MCP_DISABLE_KEYTAR;
     vi.restoreAllMocks();
   });

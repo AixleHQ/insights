@@ -48,7 +48,7 @@ function rotateIfNeeded(logPath: string, incomingByteLength: number): void {
 }
 
 /**
- * Append one UTF-8 line to `mcp.log` under the app dir (`DB90_MCP_HOME` or `~/.db90-mcp`).
+ * Append one UTF-8 line to `mcp.log` under the app dir (`AIXLE_INSIGHTS_HOME` or `~/.aixle-insights`).
  * Rotates when the file would exceed {@link MCP_LOG_MAX_BYTES}.
  */
 export function appendMcpLogLine(line: string, appDir?: string): void {

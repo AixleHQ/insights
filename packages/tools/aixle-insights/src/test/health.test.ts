@@ -25,7 +25,7 @@ describe("buildHealthSnapshot", () => {
 
   beforeEach(() => {
     home = mkdtempSync(join(tmpdir(), "db90-mcp-health-"));
-    process.env.DB90_MCP_HOME = home;
+    process.env.AIXLE_INSIGHTS_HOME = home;
     process.env.DB90_MCP_DISABLE_KEYTAR = "true";
     mkdirSync(home, { recursive: true });
     // Redirect homedir() to the sandbox so verifyHooksConfig() reads an
@@ -38,7 +38,7 @@ describe("buildHealthSnapshot", () => {
   });
 
   afterEach(() => {
-    delete process.env.DB90_MCP_HOME;
+    delete process.env.AIXLE_INSIGHTS_HOME;
     delete process.env.DB90_MCP_DISABLE_KEYTAR;
     vi.doUnmock("node:os");
     vi.resetModules();

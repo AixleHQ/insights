@@ -235,7 +235,7 @@ Multi-org:
 
 Credentials:
   Stored in the OS keychain via keytar when available; otherwise
-  ~/.db90-mcp/credentials.json (mode 0600 on POSIX).
+  ~/.aixle-insights/credentials.json (mode 0600 on POSIX).
 
 Note: Omitting --tool-name provisions separate ingest tokens for Claude Code + Cursor behind a single Keycloak login.
 `);

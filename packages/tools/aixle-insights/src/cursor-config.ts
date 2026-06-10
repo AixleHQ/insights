@@ -29,7 +29,7 @@ export function parseCursorPricing(
   return Object.keys(pricing).length > 0 ? pricing : undefined;
 }
 
-/** Load optional Cursor line-cost overrides from `~/.db90-mcp/config.json`. */
+/** Load optional Cursor line-cost overrides from `~/.aixle-insights/config.json`. */
 export function loadCursorConfig(appDir?: string): Partial<PricingConfig> {
   return loadBaseConfig<Partial<PricingConfig>>(appDir ?? getAppDir(), parseCursorPricing)
     .pricing ?? {};

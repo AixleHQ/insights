@@ -55,9 +55,9 @@ export interface State {
 }
 
 export function getAppDir(): string {
-  const override = process.env["DB90_MCP_HOME"]?.trim();
+  const override = process.env["AIXLE_INSIGHTS_HOME"]?.trim();
   if (override && override.length > 0) return override;
-  return join(homedir(), ".db90-mcp");
+  return join(homedir(), ".aixle-insights");
 }
 
 /**
