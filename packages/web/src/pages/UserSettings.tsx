@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { Routes, Route, Link, Navigate, useLocation } from "react-router-dom";
-import { User, Settings2, Bell, Shield, Wrench, Loader2 } from "lucide-react";
+import { User, Settings2, Bell, Shield, Wrench, Loader2, Download } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useOrg } from "@/contexts/OrgContext";
@@ -16,11 +16,12 @@ import {
   usePersonalSettings,
   useUpdatePersonalSettings,
   useRetentionPolicy,
+  useDownloadPersonalExport,
 } from "@/hooks/useApi";
 import { formatCost, formatTokens } from "@/lib/formatters";
 import { getApiErrorMessage } from "@/lib/api";
 import { formatRetentionLabel, retentionOrder } from "@/lib/retention-utils";
-import type { UserPersonalSettings } from "@/lib/types";
+import type { UserPersonalSettings, PersonalReportType, PersonalExportFormat } from "@/lib/types";
 import { MemberProfileView } from "./MemberProfile";
 import { cn } from "@/lib/utils";
 import { AppRoutes } from "@/lib/routes";
@@ -78,6 +79,110 @@ function UserSettingsNav() {
         );
       })}
     </nav>
+  );
+}
+
+const PERSONAL_REPORT_OPTIONS: { value: PersonalReportType; label: string }[] = [
+  { value: "my_events", label: "My Events (raw)" },
+  { value: "my_cost_by_tool", label: "My Cost by Tool" },
+  { value: "my_token_by_tool", label: "My Tokens by Tool" },
+  { value: "my_cost_by_project", label: "My Cost by Project" },
+];
+
+function ExportMyDataSection() {
+  const [reportType, setReportType] = useState<PersonalReportType>("my_events");
+  const [format, setFormat] = useState<PersonalExportFormat>("csv");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+
+  const { download, isDownloading, error } = useDownloadPersonalExport();
+
+  function handleDownload() {
+    download({
+      reportType,
+      format,
+      from: from || undefined,
+      to: to || undefined,
+    });
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Export My Data</CardTitle>
+        <CardDescription>
+          Download your personal usage data. Reports are scoped to your account only.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="personal-report-type">Report type</Label>
+            <Select value={reportType} onValueChange={(v) => setReportType(v as PersonalReportType)}>
+              <SelectTrigger id="personal-report-type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PERSONAL_REPORT_OPTIONS.map(({ value, label }) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="personal-format">Format</Label>
+            <Select value={format} onValueChange={(v) => setFormat(v as PersonalExportFormat)}>
+              <SelectTrigger id="personal-format">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="csv">CSV</SelectItem>
+                <SelectItem value="json">JSON</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="personal-from">From (optional)</Label>
+            <Input
+              id="personal-from"
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="personal-to">To (optional)</Label>
+            <Input
+              id="personal-to"
+              type="date"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {error && <p className="text-sm text-destructive">{error}</p>}
+
+        <Button onClick={handleDownload} disabled={isDownloading} size="sm">
+          {isDownloading ? (
+            <Loader2 className="mr-2 size-4 animate-spin" />
+          ) : (
+            <Download className="mr-2 size-4" />
+          )}
+          {isDownloading ? "Downloading…" : "Download"}
+        </Button>
+
+        <p className="text-xs text-muted-foreground">
+          If no date range is set, the last 30 days are exported. No data from other users is
+          included.
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -297,6 +402,8 @@ function ProfileSection() {
           )}
         </CardContent>
       </Card>
+      <ExportMyDataSection />
+
       {membersLoading ? (
         <Skeleton className="h-[400px]" />
       ) : myMemberId ? (

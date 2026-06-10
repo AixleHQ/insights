@@ -344,6 +344,66 @@ paths:
   # ============================================
   # ORGANIZATION ENDPOINTS
   # ============================================
+  /api/v1/users/me/exports:
+    get:
+      summary: Export personal usage data
+      description: >
+        Returns a personal usage report scoped strictly to the requesting user's own tool events.
+        Four report types are supported: my_cost_by_tool, my_token_by_tool, my_cost_by_project,
+        and my_events (raw event list). Any authenticated user may export their own data —
+        no org role requirement. If from/to are omitted the endpoint defaults to the last 30 days.
+      tags:
+        - Users
+      security:
+        - bearer_auth: []
+      parameters:
+        - name: report_type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [my_cost_by_tool, my_token_by_tool, my_cost_by_project, my_events]
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [csv, json]
+            default: json
+        - name: from
+          in: query
+          description: Start of date range (ISO 8601). Defaults to 30 days ago.
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: End of date range (ISO 8601). Defaults to now.
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Personal report data as CSV download or JSON array
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
   /api/v1/organizations:
     get:
       summary: List organizations

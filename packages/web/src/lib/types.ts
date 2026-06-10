@@ -747,3 +747,15 @@ export interface ScheduledExport {
   createdAt: string;
   updatedAt: string;
 }
+
+// ============================================
+// PERSONAL EXPORT TYPES
+// ============================================
+
+export type PersonalReportType =
+  | "my_cost_by_tool"
+  | "my_token_by_tool"
+  | "my_cost_by_project"
+  | "my_events";
+
+export type PersonalExportFormat = "csv" | "json";
