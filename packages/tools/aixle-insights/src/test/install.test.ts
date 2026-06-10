@@ -4,12 +4,12 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   installClaudeUserMcp,
-  desiredDb90McpEntry,
-  db90EntryMatchesDesired,
+  desiredAixleInsightsEntry,
+  aixleInsightsEntryMatchesDesired,
 } from "../install/claude.js";
 
 function tempDir(): string {
-  return mkdtempSync(join(tmpdir(), "db90-install-"));
+  return mkdtempSync(join(tmpdir(), "aixle-insights-install-"));
 }
 
 describe("installClaudeUserMcp", () => {
@@ -25,13 +25,13 @@ describe("installClaudeUserMcp", () => {
     // temp dirs left behind; OS cleans periodically
   });
 
-  it("creates a new config with db90 when the file does not exist", () => {
+  it("creates a new config with the aixle-insights entry when the file does not exist", () => {
     const r = installClaudeUserMcp({ claudeConfigPath: configPath, force: false });
     expect(r).toEqual({ kind: "installed" });
     const json = JSON.parse(readFileSync(configPath, "utf-8")) as {
-      mcpServers: { db90: { command: string; args: string[] } };
+      mcpServers: Record<string, { command: string; args: string[] }>;
     };
-    expect(json.mcpServers.db90).toEqual(desiredDb90McpEntry());
+    expect(json.mcpServers["aixle-insights"]).toEqual(desiredAixleInsightsEntry());
   });
 
   it("merges without removing unrelated top-level keys or other MCP servers", () => {
@@ -53,14 +53,14 @@ describe("installClaudeUserMcp", () => {
     expect(data.projects).toEqual({ "/x": { note: 1 } });
     const servers = data.mcpServers as Record<string, unknown>;
     expect(servers.other).toEqual({ command: "echo", args: ["hi"] });
-    expect(servers.db90).toEqual(desiredDb90McpEntry());
+    expect(servers["aixle-insights"]).toEqual(desiredAixleInsightsEntry());
   });
 
-  it("is a no-op when db90 already matches desired", () => {
-    const desired = desiredDb90McpEntry();
+  it("is a no-op when aixle-insights already matches desired", () => {
+    const desired = desiredAixleInsightsEntry();
     writeFileSync(
       configPath,
-      JSON.stringify({ mcpServers: { db90: desired }, meta: 1 }),
+      JSON.stringify({ mcpServers: { "aixle-insights": desired }, meta: 1 }),
       "utf-8"
     );
     const before = readFileSync(configPath, "utf-8");
@@ -69,12 +69,12 @@ describe("installClaudeUserMcp", () => {
     expect(readFileSync(configPath, "utf-8")).toBe(before);
   });
 
-  it("refuses to overwrite a mismatched db90 entry without force", () => {
+  it("refuses to overwrite a mismatched aixle-insights entry without force", () => {
     writeFileSync(
       configPath,
       JSON.stringify({
         mcpServers: {
-          db90: { command: "node", args: ["./local.js"] },
+          "aixle-insights": { command: "node", args: ["./local.js"] },
         },
       }),
       "utf-8"
@@ -85,17 +85,17 @@ describe("installClaudeUserMcp", () => {
       expect(r.detail).toContain("--force");
     }
     const data = JSON.parse(readFileSync(configPath, "utf-8")) as {
-      mcpServers: { db90: { command: string } };
+      mcpServers: Record<string, { command: string }>;
     };
-    expect(data.mcpServers.db90.command).toBe("node");
+    expect(data.mcpServers["aixle-insights"].command).toBe("node");
   });
 
-  it("overwrites only db90 with --force and preserves neighbors", () => {
+  it("overwrites only aixle-insights with --force and preserves neighbors", () => {
     writeFileSync(
       configPath,
       JSON.stringify({
         mcpServers: {
-          db90: { command: "node", args: ["./local.js"] },
+          "aixle-insights": { command: "node", args: ["./local.js"] },
           keep: { command: "true", args: [] },
         },
       }),
@@ -106,8 +106,51 @@ describe("installClaudeUserMcp", () => {
     const data = JSON.parse(readFileSync(configPath, "utf-8")) as {
       mcpServers: Record<string, { command: string; args: string[] }>;
     };
-    expect(data.mcpServers.db90).toEqual(desiredDb90McpEntry());
+    expect(data.mcpServers["aixle-insights"]).toEqual(desiredAixleInsightsEntry());
     expect(data.mcpServers.keep).toEqual({ command: "true", args: [] });
+  });
+
+  it("delete-old-key shim: removes a pre-existing mcpServers.db90 and writes the new aixle-insights entry", () => {
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        mcpServers: {
+          db90: { command: "npx", args: ["-y", "@db90/telemetry-mcp", "run"] },
+          keep: { command: "true", args: [] },
+        },
+      }),
+      "utf-8"
+    );
+    const r = installClaudeUserMcp({ claudeConfigPath: configPath, force: false });
+    expect(r).toEqual({ kind: "installed" });
+    const data = JSON.parse(readFileSync(configPath, "utf-8")) as {
+      mcpServers: Record<string, { command: string; args: string[] }>;
+    };
+    expect(data.mcpServers["aixle-insights"]).toEqual(desiredAixleInsightsEntry());
+    expect(data.mcpServers.db90).toBeUndefined();
+    // Neighbors preserved.
+    expect(data.mcpServers.keep).toEqual({ command: "true", args: [] });
+  });
+
+  it("delete-old-key shim runs even when the new entry already matches (cleans up partial-state from manual installs)", () => {
+    const desired = desiredAixleInsightsEntry();
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        mcpServers: {
+          "aixle-insights": desired,
+          db90: { command: "npx", args: ["-y", "@db90/telemetry-mcp", "run"] },
+        },
+      }),
+      "utf-8"
+    );
+    const r = installClaudeUserMcp({ claudeConfigPath: configPath, force: false });
+    expect(r).toEqual({ kind: "installed" });
+    const data = JSON.parse(readFileSync(configPath, "utf-8")) as {
+      mcpServers: Record<string, unknown>;
+    };
+    expect(data.mcpServers["aixle-insights"]).toEqual(desired);
+    expect(data.mcpServers.db90).toBeUndefined();
   });
 
   it("returns error when file is invalid JSON", () => {
@@ -123,27 +166,27 @@ describe("installClaudeUserMcp", () => {
   });
 });
 
-describe("desiredDb90McpEntry", () => {
+describe("desiredAixleInsightsEntry", () => {
   it("uses cmd /c npx on Windows", () => {
-    expect(desiredDb90McpEntry("win32")).toEqual({
+    expect(desiredAixleInsightsEntry("win32")).toEqual({
       command: "cmd",
       args: ["/c", "npx", "-y", "@aixle/insights", "run"],
     });
   });
 
   it("uses plain npx on POSIX", () => {
-    expect(desiredDb90McpEntry("darwin")).toEqual({
+    expect(desiredAixleInsightsEntry("darwin")).toEqual({
       command: "npx",
       args: ["-y", "@aixle/insights", "run"],
     });
   });
 });
 
-describe("db90EntryMatchesDesired", () => {
+describe("aixleInsightsEntryMatchesDesired", () => {
   it("matches when extra keys exist but command/args match", () => {
-    const d = desiredDb90McpEntry("linux");
+    const d = desiredAixleInsightsEntry("linux");
     expect(
-      db90EntryMatchesDesired(
+      aixleInsightsEntryMatchesDesired(
         { command: d.command, args: d.args, env: { FOO: "bar" } },
         d
       )

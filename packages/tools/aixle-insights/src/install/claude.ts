@@ -26,7 +26,7 @@ export function defaultClaudeUserConfigPath(): string {
 }
 
 /** Exposed for tests; `platform` defaults to `process.platform`. */
-export function desiredDb90McpEntry(platform: NodeJS.Platform = process.platform): {
+export function desiredAixleInsightsEntry(platform: NodeJS.Platform = process.platform): {
   command: string;
   args: string[];
 } {
@@ -73,7 +73,7 @@ function normalizeCommandEntry(e: unknown): { command: string; args: string[] } 
   return { command: o.command, args: [...o.args] };
 }
 
-export function db90EntryMatchesDesired(existing: unknown, desired: { command: string; args: string[] }): boolean {
+export function aixleInsightsEntryMatchesDesired(existing: unknown, desired: { command: string; args: string[] }): boolean {
   const norm = normalizeCommandEntry(existing);
   if (!norm) return false;
   if (norm.command !== desired.command || norm.args.length !== desired.args.length) return false;
@@ -85,7 +85,7 @@ function atomicWriteJson(path: string, data: Record<string, unknown>): InstallRe
     const dir = dirname(path);
     mkdirSync(dir, { recursive: true });
     const serialized = `${JSON.stringify(data, null, 2)}\n`;
-    const tmpPath = join(dir, `.db90-claude-json-${randomBytes(8).toString("hex")}.tmp`);
+    const tmpPath = join(dir, `.aixle-insights-claude-json-${randomBytes(8).toString("hex")}.tmp`);
     writeFileSync(tmpPath, serialized, "utf-8");
     renameSync(tmpPath, path);
     return { kind: "installed" };
@@ -95,14 +95,19 @@ function atomicWriteJson(path: string, data: Record<string, unknown>): InstallRe
   }
 }
 
+const LEGACY_MCP_KEY = "db90";
+const AIXLE_INSIGHTS_MCP_KEY = "aixle-insights";
+
 /**
- * Merges top-level `mcpServers.db90` into ~/.claude.json (or overridden path).
- * Preserves all other keys and MCP server entries.
+ * Merges top-level `mcpServers.aixle-insights` into ~/.claude.json (or overridden path).
+ * Preserves all other keys and MCP server entries. If a legacy `mcpServers.db90`
+ * entry from a prior install is present, removes it so Claude Code does not
+ * spawn both old and new MCP servers (delete-old-key shim).
  */
 export function installClaudeUserMcp(options: InstallClaudeUserMcpOptions = {}): InstallResult {
   const path = options.claudeConfigPath ?? defaultClaudeUserConfigPath();
   const force = options.force === true;
-  const desired = desiredDb90McpEntry();
+  const desired = desiredAixleInsightsEntry();
 
   const rootRead = readRootObject(path);
   if ("kind" in rootRead && typeof rootRead.kind === "string" && rootRead.kind === "error") {
@@ -130,21 +135,36 @@ export function installClaudeUserMcp(options: InstallClaudeUserMcpOptions = {}):
     };
   }
 
-  const existingDb90 = mcpServers["db90"];
-  if (existingDb90 !== undefined) {
-    if (db90EntryMatchesDesired(existingDb90, desired)) {
+  const existing = mcpServers[AIXLE_INSIGHTS_MCP_KEY];
+  if (existing !== undefined) {
+    if (aixleInsightsEntryMatchesDesired(existing, desired)) {
+      // Even if the new entry matches, clean up the legacy "db90" key if it
+      // somehow still exists (defensive — handles users who manually copied
+      // both keys, or partial-state from earlier installs).
+      if (mcpServers[LEGACY_MCP_KEY] !== undefined) {
+        delete mcpServers[LEGACY_MCP_KEY];
+        root["mcpServers"] = mcpServers;
+        return atomicWriteJson(path, root);
+      }
       return { kind: "already-configured" };
     }
     if (!force) {
       return {
         kind: "requires-force",
         detail:
-          'A different "db90" MCP server entry already exists in the Claude Code user config (~/.claude.json). Re-run with `init --force` to replace only that entry.',
+          'A different "aixle-insights" MCP server entry already exists in the Claude Code user config (~/.claude.json). Re-run with `init --force` to replace only that entry.',
       };
     }
   }
 
-  mcpServers["db90"] = { command: desired.command, args: desired.args };
+  // Delete-old-key shim: an existing "db90" entry from a prior install must
+  // go before we write the new "aixle-insights" entry. Otherwise Claude Code
+  // would spawn BOTH MCP servers and we would get duplicate ingestion.
+  if (mcpServers[LEGACY_MCP_KEY] !== undefined) {
+    delete mcpServers[LEGACY_MCP_KEY];
+  }
+
+  mcpServers[AIXLE_INSIGHTS_MCP_KEY] = { command: desired.command, args: desired.args };
   root["mcpServers"] = mcpServers;
 
   return atomicWriteJson(path, root);

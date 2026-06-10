@@ -226,7 +226,7 @@ init options:
   --keycloak-url <issuer>  Keycloak realm issuer (default: env KEYCLOAK_ISSUER / DB90_KEYCLOAK_ISSUER)
   --tool-name <name>       Optional: mint only \`claude_code\`, only \`cursor\`, or omit to mint BOTH.
   --organization-id <uuid> Optional: scope MCP token exchange to this org (overrides env DB90_ORGANIZATION_ID).
-  --force                  Replace an existing user "db90" MCP entry in ~/.claude.json if it differs.
+  --force                  Replace an existing user "aixle-insights" MCP entry in ~/.claude.json if it differs.
   --hooks                  (opt-in) Install Cursor hook forwarder for per-turn model attribution.
                            Requires Cursor restart. Run 'aixle-insights uninstall-hooks' to remove.
 
@@ -349,10 +349,10 @@ export async function runInit(cliArgs: Args, deps?: Partial<InitDeps>): Promise<
     const installResult = runtime.installClaudeUserMcp({ force: cliArgs.force === true });
     switch (installResult.kind) {
       case "already-configured":
-        runtime.log("Claude Code MCP: db90 server is already configured for your user.");
+        runtime.log("Claude Code MCP: aixle-insights server is already configured for your user.");
         break;
       case "installed":
-        runtime.log("Claude Code MCP: added db90 server to your user config (~/.claude.json).");
+        runtime.log("Claude Code MCP: added aixle-insights server to your user config (~/.claude.json).");
         break;
       case "requires-force":
         runtime.error(installResult.detail);

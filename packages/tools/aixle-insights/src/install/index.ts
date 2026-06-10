@@ -24,6 +24,6 @@ export function installEditorMcp(
 export {
   installClaudeUserMcp,
   defaultClaudeUserConfigPath,
-  desiredDb90McpEntry,
-  db90EntryMatchesDesired,
+  desiredAixleInsightsEntry,
+  aixleInsightsEntryMatchesDesired,
 } from "./claude.js";
