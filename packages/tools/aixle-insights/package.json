@@ -1,7 +1,7 @@
 {
-  "name": "@db90/telemetry-mcp",
-  "version": "0.0.1",
-  "description": "stdio MCP server for DB90 — Claude transcript sync, db90_status, db90_sync_now",
+  "name": "@aixle/insights",
+  "version": "0.1.0",
+  "description": "stdio MCP server for AI coding-assistant telemetry — Claude transcript sync + Cursor SQLite ingest.",
   "type": "module",
   "bin": {
     "db90-mcp": "./dist/cli.js"
@@ -35,7 +35,9 @@
     "model-context-protocol",
     "claude-code",
     "cursor",
-    "db90"
+    "aixle",
+    "insights",
+    "telemetry"
   ],
   "scripts": {
     "build": "tsc && node -e \"const{mkdirSync,copyFileSync}=require('fs');mkdirSync('dist/hooks',{recursive:true});copyFileSync('src/hooks/hook-forwarder.mjs','dist/hooks/hook-forwarder.mjs');\"",

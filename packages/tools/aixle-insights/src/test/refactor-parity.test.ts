@@ -41,7 +41,8 @@ import { mapTranscriptTurn, type ClaudeTranscriptTurn } from "../readers/claude.
 // Constants — flip these in the relevant rename commit
 // =====================================================================
 
-const EXPECTED_NPM_NAME = "@db90/telemetry-mcp";
+const EXPECTED_PKG_NAME = "@aixle/insights"; // flipped in commit 4
+const EXPECTED_SPAWN_NPM_NAME = "@db90/telemetry-mcp"; // flips in commit 6 (install/claude.ts spawn args)
 const EXPECTED_BIN = "db90-mcp";
 const EXPECTED_MCP_KEY = "db90";
 const EXPECTED_OBSOLETE_KEY: string | null = null;
@@ -89,7 +90,7 @@ function makeTurn(overrides: Partial<ClaudeTranscriptTurn> = {}): ClaudeTranscri
 describe("Refactor parity — package.json metadata", () => {
   it("npm package `name` matches expected (locks the rename in package.json)", () => {
     const pkg = readPackageJson();
-    expect(pkg.name).toBe(EXPECTED_NPM_NAME);
+    expect(pkg.name).toBe(EXPECTED_PKG_NAME);
   });
 
   it("package.json `bin` has exactly one entry with the expected key", () => {
@@ -117,7 +118,7 @@ describe("Refactor parity — install/claude.ts integration", () => {
 
       expect(entry).toBeDefined();
       expect(entry!.command).toMatch(/^(npx|cmd)$/);
-      expect(entry!.args).toEqual(expect.arrayContaining([EXPECTED_NPM_NAME, "run"]));
+      expect(entry!.args).toEqual(expect.arrayContaining([EXPECTED_SPAWN_NPM_NAME, "run"]));
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
