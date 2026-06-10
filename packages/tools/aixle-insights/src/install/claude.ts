@@ -33,12 +33,12 @@ export function desiredDb90McpEntry(platform: NodeJS.Platform = process.platform
   if (platform === "win32") {
     return {
       command: "cmd",
-      args: ["/c", "npx", "-y", "@db90/telemetry-mcp", "run"],
+      args: ["/c", "npx", "-y", "@aixle/insights", "run"],
     };
   }
   return {
     command: "npx",
-    args: ["-y", "@db90/telemetry-mcp", "run"],
+    args: ["-y", "@aixle/insights", "run"],
   };
 }
 

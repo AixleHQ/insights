@@ -127,14 +127,14 @@ describe("desiredDb90McpEntry", () => {
   it("uses cmd /c npx on Windows", () => {
     expect(desiredDb90McpEntry("win32")).toEqual({
       command: "cmd",
-      args: ["/c", "npx", "-y", "@db90/telemetry-mcp", "run"],
+      args: ["/c", "npx", "-y", "@aixle/insights", "run"],
     });
   });
 
   it("uses plain npx on POSIX", () => {
     expect(desiredDb90McpEntry("darwin")).toEqual({
       command: "npx",
-      args: ["-y", "@db90/telemetry-mcp", "run"],
+      args: ["-y", "@aixle/insights", "run"],
     });
   });
 });

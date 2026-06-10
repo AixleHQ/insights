@@ -1,6 +1,5 @@
 /**
- * Install / uninstall / verify Cursor hooks config for the db90 hook-forwarder.
- * Ported and adapted from @db90/cursor CUR-V13 hooks-feasibility.ts.
+ * Install / uninstall / verify Cursor hooks config for the aixle-insights hook-forwarder.
  */
 import {
   copyFileSync,

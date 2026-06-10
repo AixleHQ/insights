@@ -1,6 +1,6 @@
 /**
- * Consolidated SQLite reader + ingest mapper copied from `@db90/cursor`'s internal
- * `cursor-reader.ts` and `mapper.ts`. Not imported from the package — public export is `./sync`.
+ * Consolidated SQLite reader + ingest mapper for Cursor telemetry.
+ * Not imported from the package — public export is `./sync`.
  */
 import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
 import { finished } from "node:stream/promises";

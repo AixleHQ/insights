@@ -1,11 +1,8 @@
 /**
- * Model pricing table and cost calculation for @db90/telemetry-mcp (duplicated from db90-claude).
+ * Model pricing table and cost calculation for @aixle/insights.
  *
  * Default rates source: https://platform.claude.com/docs/en/about-claude/pricing
  * Rates last verified: 2026-05-04
- *
- * Duplication is intentional for this phase — see `readers/claude.ts`. Phase 8 may
- * hoist shared tables into `packages/db90-shared/` if reuse earns its keep.
  */
 
 export interface ModelPricing {

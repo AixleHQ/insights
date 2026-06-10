@@ -41,7 +41,7 @@ export interface State {
   sessions: Record<string, SessionRecord>;
   /**
    * All `metadata.commit_hash` values successfully POSTed for Cursor Path B (recent commit).
-   * Parity with `@db90/cursor` — hash dedupe is authoritative; timestamp watermarks alone
+   * Hash dedupe is authoritative; timestamp watermarks alone
    * can block retries after ingest accepted 202 but failed to persist.
    */
   lastRecentCommitHashes?: string[];
