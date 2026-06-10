@@ -11,7 +11,7 @@ import { resolveCursorPricing } from "./cursor-config.js";
 import { buildHealthSnapshot, healthSnapshotToStatusPayload } from "./health.js";
 import { mcpLog } from "./log.js";
 
-const SERVER_NAME = "db90-mcp";
+export const SERVER_NAME = "db90-mcp";
 const SERVER_VERSION = "0.1.0";
 
 const SYNC_INTERVAL_MS = 5 * 60 * 1000;

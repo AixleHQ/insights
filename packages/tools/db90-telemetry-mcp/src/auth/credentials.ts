@@ -12,7 +12,7 @@ export interface StoredCredentials {
   accounts: Partial<Record<TelemetryToolId, string>>;
 }
 
-const KEYTAR_SERVICE = "db90-mcp";
+export const KEYTAR_SERVICE = "db90-mcp";
 const KEYTAR_ACCOUNT = "db90-ingest-credential";
 
 function credentialsPath(appDir: string): string {
