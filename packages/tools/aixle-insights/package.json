@@ -24,9 +24,9 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/dualboot-partners/db90-rails.git",
-    "directory": "packages/tools/db90-telemetry-mcp"
+    "directory": "packages/tools/aixle-insights"
   },
-  "homepage": "https://github.com/dualboot-partners/db90-rails/tree/develop/packages/tools/db90-telemetry-mcp#readme",
+  "homepage": "https://github.com/dualboot-partners/db90-rails/tree/develop/packages/tools/aixle-insights#readme",
   "bugs": {
     "url": "https://github.com/dualboot-partners/db90-rails/issues"
   },

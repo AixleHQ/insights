@@ -39,7 +39,7 @@ jobs:
           set -euo pipefail
           if [[ "$REF" == refs/tags/cli-mcp-v* ]]; then
             echo "package=mcp" >> "$GITHUB_OUTPUT"
-            echo "working_directory=packages/tools/db90-telemetry-mcp" >> "$GITHUB_OUTPUT"
+            echo "working_directory=packages/tools/aixle-insights" >> "$GITHUB_OUTPUT"
             echo "tag_version=${REF#refs/tags/cli-mcp-v}" >> "$GITHUB_OUTPUT"
           elif [[ -n "$INPUT_PACKAGE" ]]; then
             # workflow_dispatch: require an explicit version input so the
@@ -54,7 +54,7 @@ jobs:
               exit 1
             fi
             echo "package=mcp" >> "$GITHUB_OUTPUT"
-            echo "working_directory=packages/tools/db90-telemetry-mcp" >> "$GITHUB_OUTPUT"
+            echo "working_directory=packages/tools/aixle-insights" >> "$GITHUB_OUTPUT"
             echo "tag_version=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
           else
             echo "Could not resolve target package from ref=$REF / input=$INPUT_PACKAGE" >&2

@@ -15,19 +15,19 @@ Runbook for cutting a public npm release of **`@db90/claude`**, **`@db90/cursor`
 |-------------|-------------------|-------------------|
 | `cli-claude-vX.Y.Z` | `@db90/claude` | `packages/tools/db90-claude` |
 | `cli-cursor-vX.Y.Z` | `@db90/cursor` | `packages/tools/db90-cursor` |
-| `cli-mcp-vX.Y.Z` | `@db90/telemetry-mcp` | `packages/tools/db90-telemetry-mcp` |
+| `cli-mcp-vX.Y.Z` | `@db90/telemetry-mcp` | `packages/tools/aixle-insights` |
 
-**Exception:** MCP lives under `db90-telemetry-mcp/` (not `db90-mcp/`) — the workflow maps `package=mcp` to that folder.
+**Exception:** MCP lives under `aixle-insights/` (not `db90-mcp/`) — the workflow maps `package=mcp` to that folder.
 
 ## Release flow (happy path)
 
 For a release of `<pkg>` in `{ claude | cursor | mcp }` at version `X.Y.Z`:
 
-1. **Branch and bump.** On a branch from `develop`, edit `packages/tools/db90-<canonical>/package.json` (for **`mcp`**, the directory is **`db90-telemetry-mcp`**, not **`db90-mcp`**):
+1. **Branch and bump.** On a branch from `develop`, edit `packages/tools/db90-<canonical>/package.json` (for **`mcp`**, the directory is **`aixle-insights`**, not **`db90-mcp`**):
    ```bash
    # examples:
    vim packages/tools/db90-claude/package.json
-   vim packages/tools/db90-telemetry-mcp/package.json
+   vim packages/tools/aixle-insights/package.json
    # set "version": "X.Y.Z"
    ```
 2. **Update the changelog** in that same package directory (`CHANGELOG.md`):
@@ -48,7 +48,7 @@ For a release of `<pkg>` in `{ claude | cursor | mcp }` at version `X.Y.Z`:
    ```
    **Pack sanity (all three packages):**
    ```bash
-   cd packages/tools/db90-<canonical>   # or db90-telemetry-mcp for mcp
+   cd packages/tools/db90-<canonical>   # or aixle-insights for mcp
    npm pack --dry-run
    # Expect: dist/**, node_modules/@db90/sdk/** (bundled SDK), README.md, LICENSE, package.json
    ```

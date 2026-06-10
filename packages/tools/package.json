@@ -1,6 +1,6 @@
 {
   "private": true,
   "workspaces": [
-    "db90-telemetry-mcp"
+    "aixle-insights"
   ]
 }
