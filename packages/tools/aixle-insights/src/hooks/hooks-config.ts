@@ -220,7 +220,7 @@ export function uninstallHooksConfig(appDir: string, queuePath?: string): {
   if (existsSync(resolvedQueue)) {
     const lines = readHooksQueue(resolvedQueue);
     if (lines.length > 0) {
-      queueWarning = `hooks-queue.ndjson has ${lines.length} unprocessed event(s) — run db90-mcp run --once before uninstalling to flush them`;
+      queueWarning = `hooks-queue.ndjson has ${lines.length} unprocessed event(s) — run aixle-insights run --once before uninstalling to flush them`;
     }
   }
 
@@ -299,10 +299,10 @@ export function verifyHooksConfig(appDir: string): HookFeasibilityReport {
 
   const next_steps: string[] = [];
   if (!hooks_json_installed) {
-    next_steps.push("Run: db90-mcp init --hooks");
+    next_steps.push("Run: aixle-insights init --hooks");
   } else if (events.length === 0) {
     next_steps.push("Restart Cursor, then run an Agent session to emit hook events.");
-    next_steps.push("Re-run: db90-mcp verify-hooks");
+    next_steps.push("Re-run: aixle-insights verify-hooks");
   }
 
   return {

@@ -289,7 +289,7 @@ async function runClaudeSlice(options: SyncOptions): Promise<SyncResult> {
     if (verbose) {
       console.log(`[verbose] Rate limited — skipping until ${until}`);
     } else {
-      console.warn(`[db90-mcp] Rate limited — skipping until ${until}`);
+      console.warn(`[aixle-insights] Rate limited — skipping until ${until}`);
     }
     return {
       sent: 0,
@@ -418,7 +418,7 @@ async function runClaudeSlice(options: SyncOptions): Promise<SyncResult> {
           },
           true
         );
-        console.warn(`[db90-mcp] ${reason}. Pausing until ${nextBackoff.toISOString()}.`);
+        console.warn(`[aixle-insights] ${reason}. Pausing until ${nextBackoff.toISOString()}.`);
         // Persist backoff to state so it survives process restarts
         state = { ...state, rate_limited_until: nextBackoff.toISOString() };
         writeState(state, appDir, host, token);
@@ -497,7 +497,7 @@ async function runCursorSlice(params: {
     if (verbose) {
       console.log(`[verbose][cursor] Rate limited — skipping until ${until}`);
     } else {
-      console.warn(`[db90-mcp][cursor] Rate limited — skipping until ${until}`);
+      console.warn(`[aixle-insights][cursor] Rate limited — skipping until ${until}`);
     }
     return {
       sent: 0,
@@ -623,7 +623,7 @@ async function runCursorSlice(params: {
       },
       true
     );
-    console.warn(`[db90-mcp][cursor] ${reason}. Pausing until ${nextBackoff.toISOString()}.`);
+    console.warn(`[aixle-insights][cursor] ${reason}. Pausing until ${nextBackoff.toISOString()}.`);
     // Persist backoff to state so it survives process restarts
     stateMut = { ...stateMut, rate_limited_until: nextBackoff.toISOString() };
     writeState(stateMut, appDir, host, token);
@@ -694,7 +694,7 @@ async function runCursorSlice(params: {
           true
         );
         console.warn(
-          `[db90-mcp][cursor] Partial batch failure in ${group.label}: ` +
+          `[aixle-insights][cursor] Partial batch failure in ${group.label}: ` +
           `${batchResult.sent} sent, ${batchResult.failed} dropped (watermark advances past sent events).`
         );
       }

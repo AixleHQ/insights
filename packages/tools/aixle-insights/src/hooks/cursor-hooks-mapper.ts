@@ -57,7 +57,7 @@ export function warnOnCursorVersion(event: HookLogEvent, verbose: boolean): void
     );
     if (verbose) {
       console.warn(
-        `[db90-mcp][cursor-hooks] cursor_version ${v} is older than ${MIN_CURSOR_VERSION_MAJOR}.${MIN_CURSOR_VERSION_MINOR} — hook payload shape may differ`
+        `[aixle-insights][cursor-hooks] cursor_version ${v} is older than ${MIN_CURSOR_VERSION_MAJOR}.${MIN_CURSOR_VERSION_MINOR} — hook payload shape may differ`
       );
     }
   }

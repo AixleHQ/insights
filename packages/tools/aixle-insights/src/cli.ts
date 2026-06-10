@@ -204,10 +204,10 @@ export function parseArgs(argv: string[]): Args {
 
 function printHelp(): void {
   console.log(`
-db90-mcp — DB90 MCP telemetry (Claude transcripts + Cursor SQLite ingest)
+aixle-insights — AI coding-assistant telemetry (Claude transcripts + Cursor SQLite ingest)
 
 Usage:
-  db90-mcp [command] [options]
+  aixle-insights [command] [options]
 
 Commands:
   run              Start the MCP stdio server (default — used by Claude Code).
@@ -228,7 +228,7 @@ init options:
   --organization-id <uuid> Optional: scope MCP token exchange to this org (overrides env DB90_ORGANIZATION_ID).
   --force                  Replace an existing user "db90" MCP entry in ~/.claude.json if it differs.
   --hooks                  (opt-in) Install Cursor hook forwarder for per-turn model attribution.
-                           Requires Cursor restart. Run 'db90-mcp uninstall-hooks' to remove.
+                           Requires Cursor restart. Run 'aixle-insights uninstall-hooks' to remove.
 
 Multi-org:
   Set \`DB90_ORGANIZATION_ID\` to a UUID, or pass \`--organization-id\` on \`init\`, so ingest tokens are minted for that membership instead of the default (oldest) org.
@@ -307,7 +307,7 @@ export async function runInit(cliArgs: Args, deps?: Partial<InitDeps>): Promise<
           ? "cursor"
           : "claude_code"
         : undefined,
-    deviceLabel: "db90-mcp CLI init",
+    deviceLabel: "aixle-insights CLI init",
     appDir: runtime.getAppDir(),
     exchangeOrganizationId: exchangeOrganizationId || undefined,
     onVisitInstructions: (uri, code) => {
@@ -338,7 +338,7 @@ export async function runInit(cliArgs: Args, deps?: Partial<InitDeps>): Promise<
         `Warning: --hooks install failed: ${err instanceof Error ? err.message : String(err)}`
       );
       runtime.error(
-        `Run 'db90-mcp init --hooks' again after verifying ${srcForwarder} exists.`
+        `Run 'aixle-insights init --hooks' again after verifying ${srcForwarder} exists.`
       );
     }
   }
@@ -389,7 +389,7 @@ export async function runOnce(
   if (!creds || !credentialsHaveAnyToken(creds)) {
     mcpLog.warn("credential_validation_failed", { source: "cli_once", reason: "missing_credentials" }, false);
     runtime.error(
-      "Error: no DB90 credentials. Run `db90-mcp init` first (dual-tool auth is the default)."
+      "Error: no Aixle Insights credentials. Run `aixle-insights init` first (dual-tool auth is the default)."
     );
     return 1;
   }

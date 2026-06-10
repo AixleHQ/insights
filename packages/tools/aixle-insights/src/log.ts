@@ -76,11 +76,11 @@ function emit(
   } catch (err) {
     /* best-effort — never break sync for logging */
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[db90-mcp] failed to append mcp.log: ${msg}`);
+    console.error(`[aixle-insights] failed to append mcp.log: ${msg}`);
   }
   if (mirrorToConsole) {
     const suffix = fields ? ` ${JSON.stringify(fields)}` : "";
-    const prefix = `[db90-mcp][${level}] ${event}`;
+    const prefix = `[aixle-insights][${level}] ${event}`;
     if (level === "info") console.log(prefix + suffix);
     else if (level === "warn") console.warn(prefix + suffix);
     else console.error(prefix + suffix);

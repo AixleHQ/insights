@@ -203,7 +203,7 @@ export function healthSnapshotToStatusPayload(snapshot: HealthSnapshot): Record<
 }
 
 export function formatHealthForCli(snapshot: HealthSnapshot): string {
-  const lines: string[] = ["db90-mcp health diagnostic", ""];
+  const lines: string[] = ["aixle-insights health diagnostic", ""];
   lines.push(`app_dir: ${snapshot.app_dir}`);
   lines.push(`log_path: ${snapshot.log_path}`);
   lines.push(`authenticated: ${snapshot.authenticated}`);

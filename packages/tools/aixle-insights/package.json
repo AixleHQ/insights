@@ -4,7 +4,7 @@
   "description": "stdio MCP server for AI coding-assistant telemetry — Claude transcript sync + Cursor SQLite ingest.",
   "type": "module",
   "bin": {
-    "db90-mcp": "./dist/cli.js"
+    "aixle-insights": "./dist/cli.js"
   },
   "exports": {
     ".": "./dist/cli.js"

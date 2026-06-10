@@ -43,12 +43,12 @@ import { mapTranscriptTurn, type ClaudeTranscriptTurn } from "../readers/claude.
 
 const EXPECTED_PKG_NAME = "@aixle/insights"; // flipped in commit 4
 const EXPECTED_SPAWN_NPM_NAME = "@db90/telemetry-mcp"; // flips in commit 6 (install/claude.ts spawn args)
-const EXPECTED_BIN = "db90-mcp";
+const EXPECTED_BIN = "aixle-insights";
 const EXPECTED_MCP_KEY = "db90";
 const EXPECTED_OBSOLETE_KEY: string | null = null;
 const EXPECTED_STATE_DIR = ".db90-mcp";
 const EXPECTED_KEYTAR = "db90-mcp";
-const EXPECTED_SERVER_NAME = "db90-mcp";
+const EXPECTED_SERVER_NAME = "aixle-insights-mcp";
 
 // =====================================================================
 // Helpers

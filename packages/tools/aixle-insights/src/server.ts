@@ -11,7 +11,7 @@ import { resolveCursorPricing } from "./cursor-config.js";
 import { buildHealthSnapshot, healthSnapshotToStatusPayload } from "./health.js";
 import { mcpLog } from "./log.js";
 
-export const SERVER_NAME = "db90-mcp";
+export const SERVER_NAME = "aixle-insights-mcp";
 const SERVER_VERSION = "0.1.0";
 
 const SYNC_INTERVAL_MS = 5 * 60 * 1000;
@@ -139,7 +139,7 @@ export function createDb90McpServer(): McpServer {
     "db90_status",
     {
       description:
-        "Returns DB90 MCP connectivity and last sync metadata from disk (credentials + state). No arguments.",
+        "Returns Aixle Insights MCP connectivity and last sync metadata from disk (credentials + state). No arguments.",
     },
     async () => jsonContent(await buildDb90StatusPayload())
   );
@@ -176,7 +176,7 @@ export function createDb90McpServer(): McpServer {
     "db90_authenticate",
     {
       description:
-        "Starts Keycloak device login and returns the visit URL/code for the user. Use db90-mcp init for the full terminal flow that saves credentials.",
+        "Starts Keycloak device login and returns the visit URL/code for the user. Use aixle-insights init for the full terminal flow that saves credentials.",
       inputSchema: z.object({
         keycloakUrl: z.string().optional(),
         clientId: z.string().optional(),
