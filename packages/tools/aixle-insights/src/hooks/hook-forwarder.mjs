@@ -1,19 +1,19 @@
 #!/usr/bin/env node
 /**
- * AIX-286 — append redacted Cursor hook stdin to the db90-mcp hooks queue.
+ * Append redacted Cursor hook stdin to the aixle-insights hooks queue.
  * Cursor invokes this via ~/.cursor/hooks.json on sessionEnd / postToolUse.
- * No credentials here — telemetry-mcp reads the queue and POSTs on the next sync cycle.
+ * No credentials here — aixle-insights reads the queue and POSTs on the next sync cycle.
  */
 import { appendFileSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
-const DEFAULT_APP_DIR = join(homedir(), ".db90-mcp");
+const DEFAULT_APP_DIR = join(homedir(), ".aixle-insights");
 
 /**
  * Resolve the app dir. Cursor's hooks.json has no `env` support, so the
  * installer passes `--app-dir <path>` in the command string. Precedence:
- * CLI arg → DB90_MCP_HOME env → default (~/.db90-mcp).
+ * CLI arg → AIXLE_INSIGHTS_HOME env → default (~/.aixle-insights).
  */
 function getAppDir() {
   const argv = process.argv.slice(2);
@@ -21,7 +21,7 @@ function getAppDir() {
   if (flagIdx !== -1 && typeof argv[flagIdx + 1] === "string" && argv[flagIdx + 1].trim()) {
     return argv[flagIdx + 1].trim();
   }
-  return process.env.DB90_MCP_HOME?.trim() || DEFAULT_APP_DIR;
+  return process.env.AIXLE_INSIGHTS_HOME?.trim() || DEFAULT_APP_DIR;
 }
 
 function getQueuePath() {

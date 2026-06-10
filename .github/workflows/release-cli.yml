@@ -95,11 +95,12 @@ jobs:
           WORKING_DIRECTORY: ${{ needs.resolve.outputs.working_directory }}
         run: |
           set -euo pipefail
-          # Reject both the original `@<scope>` placeholder (forward-looking trap
+          # Reject the original `@<scope>` placeholder (forward-looking trap
           # for new packages that copy the convention without filling in the
-          # scope) and the historical `@aixle/` scope (reverted to `@db90/` on
-          # 2026-04-29). Catches stragglers that escaped the mass-rename.
-          for needle in '@<scope>' '@aixle/'; do
+          # scope) and any leftover legacy `@db90/telemetry-mcp` / `db90-mcp` /
+          # `db90-telemetry-mcp` strings (catches stragglers from the
+          # 2026-06 @db90 → @aixle/insights migration).
+          for needle in '@<scope>' '@db90/telemetry-mcp' 'db90-telemetry-mcp' 'db90-mcp'; do
             # Use -F (fixed-string) so needles are matched literally and never
             # interpreted as regex — future-proofs against needles that happen
             # to contain regex metacharacters.
