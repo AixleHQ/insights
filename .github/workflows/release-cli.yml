@@ -3,8 +3,6 @@ name: Release CLI to npm
 on:
   push:
     tags:
-      - 'cli-claude-v*'
-      - 'cli-cursor-v*'
       - 'cli-mcp-v*'
   workflow_dispatch:
     inputs:
@@ -13,8 +11,6 @@ on:
         required: true
         type: choice
         options:
-          - claude
-          - cursor
           - mcp
       version:
         description: 'Version to publish (must equal package.json version; no leading v). Required.'
@@ -41,15 +37,7 @@ jobs:
           INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
           set -euo pipefail
-          if [[ "$REF" == refs/tags/cli-claude-v* ]]; then
-            echo "package=claude" >> "$GITHUB_OUTPUT"
-            echo "working_directory=packages/tools/db90-claude" >> "$GITHUB_OUTPUT"
-            echo "tag_version=${REF#refs/tags/cli-claude-v}" >> "$GITHUB_OUTPUT"
-          elif [[ "$REF" == refs/tags/cli-cursor-v* ]]; then
-            echo "package=cursor" >> "$GITHUB_OUTPUT"
-            echo "working_directory=packages/tools/db90-cursor" >> "$GITHUB_OUTPUT"
-            echo "tag_version=${REF#refs/tags/cli-cursor-v}" >> "$GITHUB_OUTPUT"
-          elif [[ "$REF" == refs/tags/cli-mcp-v* ]]; then
+          if [[ "$REF" == refs/tags/cli-mcp-v* ]]; then
             echo "package=mcp" >> "$GITHUB_OUTPUT"
             echo "working_directory=packages/tools/db90-telemetry-mcp" >> "$GITHUB_OUTPUT"
             echo "tag_version=${REF#refs/tags/cli-mcp-v}" >> "$GITHUB_OUTPUT"
@@ -61,12 +49,12 @@ jobs:
               echo "workflow_dispatch requires a 'version' input." >&2
               exit 1
             fi
-            echo "package=$INPUT_PACKAGE" >> "$GITHUB_OUTPUT"
-            if [[ "$INPUT_PACKAGE" == "mcp" ]]; then
-              echo "working_directory=packages/tools/db90-telemetry-mcp" >> "$GITHUB_OUTPUT"
-            else
-              echo "working_directory=packages/tools/db90-$INPUT_PACKAGE" >> "$GITHUB_OUTPUT"
+            if [[ "$INPUT_PACKAGE" != "mcp" ]]; then
+              echo "Only 'mcp' is a valid workflow_dispatch package (got $INPUT_PACKAGE)." >&2
+              exit 1
             fi
+            echo "package=mcp" >> "$GITHUB_OUTPUT"
+            echo "working_directory=packages/tools/db90-telemetry-mcp" >> "$GITHUB_OUTPUT"
             echo "tag_version=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
           else
             echo "Could not resolve target package from ref=$REF / input=$INPUT_PACKAGE" >&2
@@ -183,11 +171,13 @@ jobs:
             console.error("Fix the 'files' field in package.json.");
             process.exit(1);
           }
-          // Fail-closed: claude/cursor/mcp declare @db90/sdk in bundledDependencies
-          // and the SDK is private (not on npm). If the staged SDK is missing
-          // from the tarball, end-users would hit "no matching version" on install.
+          // Fail-closed: mcp declares @db90/sdk in bundledDependencies and
+          // the SDK is private (not on npm). If the staged SDK is missing
+          // from the tarball, end-users would hit "no matching version" on
+          // install. (claude + cursor packages deleted; only mcp remains
+          // until task 13 folds the SDK in and removes bundling entirely.)
           const pkg = process.env.PACKAGE;
-          if (pkg === 'claude' || pkg === 'cursor' || pkg === 'mcp') {
+          if (pkg === 'mcp') {
             const hasSdkDist = paths.some((p) => p.startsWith('node_modules/@db90/sdk/dist/'));
             if (!hasSdkDist) {
               console.error("BLOCKER: tarball is missing node_modules/@db90/sdk/dist/** — the prepack staging step did not run or failed silently.");

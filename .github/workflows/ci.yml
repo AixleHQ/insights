@@ -98,56 +98,6 @@ jobs:
       container_name: web
       docker_compose_file: docker-compose.ci-web.yml
 
-  # --- db90-cursor package checks ---
-
-  cursor_check:
-    name: db90-cursor (build + test)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: packages/tools/package-lock.json
-      - name: Install workspace
-        run: npm ci
-        working-directory: packages/tools
-      - name: Build SDK
-        run: npm run build --workspace=@db90/sdk
-        working-directory: packages/tools
-      - name: Build
-        run: npm run build --workspace=@db90/cursor
-        working-directory: packages/tools
-      - name: Test
-        run: npm test --workspace=@db90/cursor
-        working-directory: packages/tools
-
-  # --- db90-claude package checks ---
-
-  claude_check:
-    name: db90-claude (build + test)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: packages/tools/package-lock.json
-      - name: Install workspace
-        run: npm ci
-        working-directory: packages/tools
-      - name: Build SDK
-        run: npm run build --workspace=@db90/sdk
-        working-directory: packages/tools
-      - name: Build
-        run: npm run build --workspace=@db90/claude
-        working-directory: packages/tools
-      - name: Test
-        run: npm test --workspace=@db90/claude
-        working-directory: packages/tools
-
   # --- Plan task budget check ---
   # Verifies every plans/<feature>/tasks/*.md fits Sonnet 4.6's 200K context
   # without compaction. Runs only when plan files changed (or on develop/main
