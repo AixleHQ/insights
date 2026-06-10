@@ -1,0 +1,23 @@
+{
+  "turn": {
+    "sessionId": "baseline-session-normal",
+    "turnId": "baseline-session-normal:1",
+    "filePath": "/tmp/baseline-normal.jsonl",
+    "fileSize": 4096,
+    "model": "claude-sonnet-4-6",
+    "tokensIn": 1500,
+    "tokensOut": 800,
+    "cacheWriteTokens": 0,
+    "cacheReadTokens": 0,
+    "occurredAt": "2026-06-09T18:00:00.000Z",
+    "promptText": "baseline normal prompt",
+    "assistantText": "baseline normal response",
+    "riskLevel": "low",
+    "riskScore": 0,
+    "riskCategories": []
+  },
+  "options": {
+    "projectId": "00000000-0000-0000-0000-baseline00normal",
+    "usePricingTable": true
+  }
+}

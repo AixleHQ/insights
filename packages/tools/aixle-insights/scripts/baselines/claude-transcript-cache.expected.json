@@ -1,0 +1,27 @@
+{
+  "tool_name": "claude_code",
+  "event_type": "chat",
+  "cost_usd": 0.04275,
+  "occurred_at": "2026-06-09T18:05:00.000Z",
+  "metadata": {
+    "session_id": "baseline-session-cache:1",
+    "claude_session_id": "baseline-session-cache",
+    "transcript_source": "claude_jsonl",
+    "model": "claude-opus-4-7",
+    "base_input_tokens": 1000,
+    "output_tokens": 1200,
+    "cache_write_tokens": 1000,
+    "cache_read_tokens": 3000,
+    "risk_level": "low",
+    "risk_categories": [],
+    "risk_score": 0,
+    "prompt_text": "baseline cache-heavy prompt with reads + writes",
+    "assistant_text": "baseline cache response",
+    "scannable": true
+  },
+  "model": "claude-opus-4-7",
+  "tokens_in": 5000,
+  "tokens_out": 1200,
+  "tokens_total": 6200,
+  "project_id": "00000000-0000-0000-0000-baseline000cache"
+}
