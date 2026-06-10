@@ -324,7 +324,12 @@ export async function runInit(cliArgs: Args, deps?: Partial<InitDeps>): Promise<
   if (cliArgs.hooks) {
     const appDir = runtime.getAppDir();
     const thisFile = nodeFileURLToPath(import.meta.url);
-    const pkgRoot = join(thisFile, "..", "..", "..");
+    // From dist/cli.js: one `..` → dist/, two `..` → package root.
+    // (Pre-existing off-by-one bug — used three `..`s, which lands on the
+    // npm scope dir `@aixle/` instead of `@aixle/insights/`. Surfaced by
+    // the rename-parity verification when the published-tarball install
+    // path exercised this code for the first time via npx.)
+    const pkgRoot = join(thisFile, "..", "..");
     const srcForwarder = join(pkgRoot, "dist", "hooks", FORWARDER_FILENAME);
     try {
       const { forwarderInstalled, backupPath } = installHooksConfig(srcForwarder, appDir);
