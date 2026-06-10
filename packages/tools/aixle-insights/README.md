@@ -94,6 +94,39 @@ aixle-insights verify-hooks  # JSON: hooks installed + queue depth
 
 `mcp.log` (rotates at 5 MiB to `mcp.log.1`) under the app home directory captures operational events. Inside Claude Code, the **`db90_status`** MCP tool returns the same diagnostic structure as `aixle-insights health`.
 
+## Local development — `/aixle-reset` skill
+
+> Audience: contributors editing this package. If you installed `@aixle/insights` from npm and aren't modifying the source, you can skip this section.
+
+When you iterate on `src/` against a real Claude Code or Cursor session, the running MCP routinely drifts out of sync with the code you just wrote. Common causes:
+
+- Rebuilt `dist/` but never restarted the long-lived MCP process — your changes aren't in memory.
+- `~/.claude.json` accumulated both `mcpServers.insights` and `mcpServers.aixle-insights` (or a legacy `mcpServers.db90`), and Claude Code spawned the wrong one.
+- The MCP launched from a non-git-rooted `cwd` (e.g. `~/`), so pre-resolution returned `project_id: null` and every turn in that session inherited it.
+
+The repo ships a Claude Code skill, **`/aixle-reset`** (lives at `.claude/skills/aixle-reset/SKILL.md`), that restores known-good local state in one shot.
+
+It runs `scripts/reset-local-env.mjs`, which:
+
+1. Stops any running `aixle-insights/dist/cli.js run` process.
+2. Rebuilds `dist/` if anything in `src/` is newer.
+3. Repairs `~/.claude.json` and `~/.cursor/mcp.json` so the entries point at `node <abs path>/dist/cli.js run`, stripping duplicate `insights` and legacy `db90` keys. Backs up each file it modifies.
+4. Warns non-blockingly about leftover direct-curl ingest hooks in `~/.claude/settings.json` and stale `@db90/*` npm globals.
+5. Restarts the MCP from the repo root so pre-resolution finds the project from `git remote`.
+6. Waits up to 30 s for the first `project_attribution_resolved` log line and asserts `project_id` is non-null.
+
+Invoke manually:
+
+```bash
+node packages/tools/aixle-insights/scripts/reset-local-env.mjs
+```
+
+Or, inside Claude Code, run the **`/aixle-reset`** skill.
+
+A `PostToolUse` hook (`.claude/hooks/on-aixle-insights-edit.ts`) **suggests** running the skill whenever you edit a file under `packages/tools/aixle-insights/**` (excluding `dist/`, `*.md`, and any test path). The hook is advisory only — it never auto-executes, so you can iterate freely and reset when you're ready to test end-to-end.
+
+After the script reports success: **quit and reopen Claude Code / Cursor** so each IDE re-spawns its own MCP from the now-canonical config. The MCP the script started manually keeps running standalone and will still sweep transcripts correctly until you replace it.
+
 ## Requirements
 
 - Node.js ≥ 20.
