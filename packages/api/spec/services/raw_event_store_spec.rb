@@ -298,26 +298,49 @@ RSpec.describe RawEventStore do
   end
 
   describe 'configuration' do
-    it 'uses environment variables for configuration' do
+    it 'uses MinIO settings when MINIO_ENDPOINT is set' do
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with('MINIO_ENDPOINT').and_return('http://minio:9000')
       allow(ENV).to receive(:fetch).and_call_original
-      allow(ENV).to receive(:fetch).with('MINIO_ENDPOINT', anything).and_return('http://minio:9000')
+      allow(ENV).to receive(:fetch).with('S3_REGION', anything).and_return('us-west-2')
       allow(ENV).to receive(:fetch).with('MINIO_REGION', anything).and_return('us-west-2')
       allow(ENV).to receive(:fetch).with('MINIO_ACCESS_KEY', anything).and_return('mykey')
       allow(ENV).to receive(:fetch).with('MINIO_SECRET_KEY', anything).and_return('mysecret')
       allow(ENV).to receive(:fetch).with('RAW_EVENTS_BUCKET', anything).and_return('custom-bucket')
+      allow(ENV).to receive(:fetch).with('S3_BUCKET', anything).and_return('custom-bucket')
       allow(ENV).to receive(:fetch).with('RAW_EVENT_ENCRYPTION_KEY', anything).and_return('custom_encryption_key_32_chars_')
 
-      # Clear memoized values
       described_class.instance_variable_set(:@client, nil)
       described_class.instance_variable_set(:@encryption_key, nil)
 
-      expect(Aws::S3::Client).to receive(:new).with(
-        endpoint: 'http://minio:9000',
+      expect(Aws::S3::Client).to receive(:new).with(hash_including(
         region: 'us-west-2',
+        endpoint: 'http://minio:9000',
+        force_path_style: true,
         access_key_id: 'mykey',
-        secret_access_key: 'mysecret',
-        force_path_style: true
-      ).and_return(s3_client)
+        secret_access_key: 'mysecret'
+      )).and_return(s3_client)
+
+      allow(s3_client).to receive(:put_object)
+
+      described_class.store(payload, organization_id: organization_id)
+    end
+
+    it 'uses native AWS S3 when MINIO_ENDPOINT is unset outside local env' do
+      allow(Rails.env).to receive(:local?).and_return(false)
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with('MINIO_ENDPOINT').and_return(nil)
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with('S3_REGION', anything).and_return('us-east-1')
+      allow(ENV).to receive(:fetch).with('MINIO_REGION', anything).and_return('us-east-1')
+      allow(ENV).to receive(:fetch).with('RAW_EVENTS_BUCKET', anything).and_return('db90-prod-raw-events')
+      allow(ENV).to receive(:fetch).with('S3_BUCKET', anything).and_return('db90-prod-raw-events')
+      allow(ENV).to receive(:fetch).with('RAW_EVENT_ENCRYPTION_KEY', anything).and_return('custom_encryption_key_32_chars_')
+
+      described_class.instance_variable_set(:@client, nil)
+      described_class.instance_variable_set(:@encryption_key, nil)
+
+      expect(Aws::S3::Client).to receive(:new).with(hash_including(region: 'us-east-1')).and_return(s3_client)
 
       allow(s3_client).to receive(:put_object)
 

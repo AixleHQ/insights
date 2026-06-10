@@ -12,7 +12,7 @@ module Activities
     def execute(params)
       Temporalio::Activity::Context.current.heartbeat("Fetching raw event from storage")
 
-      bucket = params["bucket"] || ENV.fetch("RAW_EVENTS_BUCKET", ENV.fetch("MINIO_BUCKET", "raw-events"))
+      bucket = params["bucket"] || ENV.fetch("RAW_EVENTS_BUCKET", ENV.fetch("S3_BUCKET", ENV.fetch("MINIO_BUCKET", "raw-events")))
       key = params["key"]
       @current_key = key
 
@@ -54,13 +54,22 @@ module Activities
     end
 
     def s3_client
-      @s3_client ||= Aws::S3::Client.new(
-        endpoint: ENV.fetch("MINIO_ENDPOINT", "http://localhost:9000"),
-        access_key_id: ENV.fetch("MINIO_ACCESS_KEY", "minioadmin"),
-        secret_access_key: ENV.fetch("MINIO_SECRET_KEY", "minioadmin"),
-        region: ENV.fetch("MINIO_REGION", "us-east-1"),
-        force_path_style: true
-      )
+      @s3_client ||= Aws::S3::Client.new(s3_client_options)
+    end
+
+    def s3_client_options
+      endpoint = ENV["MINIO_ENDPOINT"].presence
+      region = ENV.fetch("S3_REGION", ENV.fetch("MINIO_REGION", "us-east-1"))
+      options = { region: region }
+
+      if endpoint.present?
+        options[:endpoint] = endpoint
+        options[:force_path_style] = true
+        options[:access_key_id] = ENV.fetch("MINIO_ACCESS_KEY", "minioadmin")
+        options[:secret_access_key] = ENV.fetch("MINIO_SECRET_KEY", "minioadmin")
+      end
+
+      options
     end
 
     def encryption_key
