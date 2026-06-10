@@ -1,5 +1,5 @@
-import type { ProjectResolution } from "@db90/sdk";
-import { enrichCommitProjectAttribution } from "@db90/sdk";
+import type { ProjectResolution } from "./lib/index.js";
+import { enrichCommitProjectAttribution } from "./lib/index.js";
 import type { State } from "./state.js";
 import {
   CURSOR_DAILY_STATS_WATERMARK_KEY,

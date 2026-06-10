@@ -95,7 +95,7 @@ vi.mock("../client.js", () => ({
   },
 }));
 
-vi.mock("@db90/sdk", () => ({
+vi.mock("../lib/index.js", () => ({
   enrichCommitProjectAttribution: mocks.enrichCommitProjectAttribution,
   lookupProjectByRemote: mocks.lookupProjectByRemote,
   canonicalizeGitRemote: (remote: string) => remote,

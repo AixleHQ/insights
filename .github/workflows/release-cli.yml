@@ -136,10 +136,6 @@ jobs:
         run: npm ci
         working-directory: packages/tools
 
-      - name: Build SDK
-        run: npm run build --workspace=@db90/sdk
-        working-directory: packages/tools
-
       - name: Build
         run: npm run build
         working-directory: ${{ needs.resolve.outputs.working_directory }}
@@ -148,7 +144,7 @@ jobs:
         run: npm test
         working-directory: ${{ needs.resolve.outputs.working_directory }}
 
-      - name: Verify pack contents (dist + staged SDK + README + LICENSE)
+      - name: Verify pack contents (dist + README + LICENSE)
         working-directory: ${{ needs.resolve.outputs.working_directory }}
         env:
           PACKAGE: ${{ needs.resolve.outputs.package }}
@@ -159,32 +155,18 @@ jobs:
           const out = require('/tmp/pack.json');
           const allow = new Set(['README.md', 'LICENSE', 'package.json']);
           const paths = out[0].files.map((f) => f.path);
-          const isStagedSdkFile = (p) =>
-            p === 'node_modules/@db90/sdk/package.json' ||
-            p.startsWith('node_modules/@db90/sdk/dist/');
           const leaks = paths.filter(
-            (p) => !allow.has(p) && !p.startsWith('dist/') && !isStagedSdkFile(p),
+            (p) => !allow.has(p) && !p.startsWith('dist/'),
           );
           if (leaks.length > 0) {
-            console.error("Tarball contains files outside the allowlist (dist/**, node_modules/@db90/sdk/dist/**, node_modules/@db90/sdk/package.json, README.md, LICENSE, package.json):");
+            console.error("Tarball contains files outside the allowlist (dist/**, README.md, LICENSE, package.json):");
             for (const p of leaks) console.error('  ' + p);
             console.error("Fix the 'files' field in package.json.");
             process.exit(1);
           }
-          // Fail-closed: mcp declares @db90/sdk in bundledDependencies and
-          // the SDK is private (not on npm). If the staged SDK is missing
-          // from the tarball, end-users would hit "no matching version" on
-          // install. (claude + cursor packages deleted; only mcp remains
-          // until task 13 folds the SDK in and removes bundling entirely.)
-          const pkg = process.env.PACKAGE;
-          if (pkg === 'mcp') {
-            const hasSdkDist = paths.some((p) => p.startsWith('node_modules/@db90/sdk/dist/'));
-            if (!hasSdkDist) {
-              console.error("BLOCKER: tarball is missing node_modules/@db90/sdk/dist/** — the prepack staging step did not run or failed silently.");
-              console.error("Without bundled SDK, end-user install resolves @db90/sdk@* against npm registry and fails (SDK is private).");
-              process.exit(1);
-            }
-          }
+          // SDK is now inlined as src/lib/ (no longer a bundledDependency).
+          // The previous fail-closed check for node_modules/@db90/sdk/dist/**
+          // is obsolete — there is no separate SDK package to stage.
           EOF
 
       - name: Publish to npm

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { fileURLToPath } from "node:url";
 import { realpathSync } from "node:fs";
-import { resolveProjectId } from "@db90/sdk";
+import { resolveProjectId } from "./lib/index.js";
 import { loadCredentials, credentialsHaveAnyToken, pickProjectLookupToken } from "./credentials.js";
 import type { TelemetryToolId } from "./credentials.js";
 import { loginAndPersistCredentials } from "./auth/flow.js";

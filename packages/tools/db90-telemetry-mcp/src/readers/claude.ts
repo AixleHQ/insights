@@ -4,7 +4,7 @@ import { createInterface } from "node:readline";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { glob } from "glob";
-import type { IngestPayload } from "@db90/sdk";
+import type { IngestPayload } from "../lib/index.js";
 import { type PricingTable, calculateCost } from "../pricing.js";
 import { type RiskLevel, scanText } from "../risk-scanner.js";
 

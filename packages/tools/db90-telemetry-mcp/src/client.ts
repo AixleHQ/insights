@@ -2,7 +2,7 @@ import {
   postEvent as sdkPostEvent,
   type IngestPayload,
   type PostEventOptions,
-} from "@db90/sdk";
+} from "./lib/index.js";
 import { mcpLog } from "./log.js";
 
 export interface PostResult {

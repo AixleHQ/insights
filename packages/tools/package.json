@@ -1,7 +1,6 @@
 {
   "private": true,
   "workspaces": [
-    "db90-telemetry-mcp",
-    "db90-sdk"
+    "db90-telemetry-mcp"
   ]
 }

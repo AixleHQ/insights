@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { postEvent, type IngestPayload } from "../client.js";
+import { postEvent, type IngestPayload } from "../../lib/client.js";
 
 const payload: IngestPayload = {
   tool_name: "test",

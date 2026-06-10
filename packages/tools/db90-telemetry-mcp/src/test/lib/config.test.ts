@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadBaseConfig } from "../config.js";
+import { loadBaseConfig } from "../../lib/config.js";
 
 let testDir: string;
 

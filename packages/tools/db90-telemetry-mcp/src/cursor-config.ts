@@ -1,4 +1,4 @@
-import { loadBaseConfig } from "@db90/sdk";
+import { loadBaseConfig } from "./lib/index.js";
 import { getAppDir } from "./state.js";
 import {
   DEFAULT_CURSOR_PRICING,

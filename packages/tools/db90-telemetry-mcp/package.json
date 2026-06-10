@@ -38,21 +38,14 @@
     "db90"
   ],
   "scripts": {
-    "prebuild": "npm run build --prefix ../db90-sdk",
     "build": "tsc && node -e \"const{mkdirSync,copyFileSync}=require('fs');mkdirSync('dist/hooks',{recursive:true});copyFileSync('src/hooks/hook-forwarder.mjs','dist/hooks/hook-forwarder.mjs');\"",
     "test": "vitest run",
     "verify:cursor-dry-run": "tsx scripts/verify-cursor-dry-run.ts",
     "audit:local-stores": "tsx scripts/audit-local-stores.ts",
-    "verify:cli-mcp-parity": "tsx scripts/verify-cli-mcp-parity.ts",
     "dev": "tsx src/cli.ts",
-    "prepublishOnly": "npm run build",
-    "prepack": "node ../scripts/stage-sdk-bundle.mjs"
+    "prepublishOnly": "npm run build"
   },
-  "bundledDependencies": [
-    "@db90/sdk"
-  ],
   "dependencies": {
-    "@db90/sdk": "*",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "better-sqlite3": "^12.9.0",
     "glob": "^10.5.0",

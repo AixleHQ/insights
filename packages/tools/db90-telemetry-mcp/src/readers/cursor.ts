@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 import { glob } from "glob";
 import Database from "better-sqlite3";
-import type { IngestPayload } from "@db90/sdk";
+import type { IngestPayload } from "../lib/index.js";
 import { type RiskLevel, scanText } from "../risk-scanner.js";
 
 // ─── Reader: paths & SQLite ──────────────────────────────────────────────────

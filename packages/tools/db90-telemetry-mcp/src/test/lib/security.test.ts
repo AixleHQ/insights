@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { lookupProjectByRemote, resolveProjectId } from "../project-resolver.js";
+import { lookupProjectByRemote, resolveProjectId } from "../../lib/project-resolver.js";
 
 vi.mock("node:child_process", () => ({
   execFileSync: vi.fn(),

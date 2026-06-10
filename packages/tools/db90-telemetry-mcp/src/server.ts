@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { getGitRemote, resolveProjectId } from "@db90/sdk";
+import { getGitRemote, resolveProjectId } from "./lib/index.js";
 import { loadCredentials, type TelemetryToolId, type StoredCredentials, credentialsHaveAnyToken, pickProjectLookupToken } from "./credentials.js";
 import { defaultKeycloakClientId, defaultKeycloakIssuer, startDeviceAuthorization } from "./auth/keycloak.js";
 import { migrateLegacyState, getAppDir } from "./state.js";

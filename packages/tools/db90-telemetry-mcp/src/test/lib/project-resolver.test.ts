@@ -9,7 +9,7 @@ import {
   lookupProjectByRepoName,
   repoNameToGitRemoteCandidates,
   enrichCommitProjectAttribution,
-} from "../project-resolver.js";
+} from "../../lib/project-resolver.js";
 
 vi.mock("node:child_process", () => ({
   execFileSync: vi.fn(),

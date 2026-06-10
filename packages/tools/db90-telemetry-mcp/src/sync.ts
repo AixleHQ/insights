@@ -36,7 +36,7 @@ import {
   getGitRemoteForPath,
   lookupProjectByRemote,
   type ProjectResolution,
-} from "@db90/sdk";
+} from "./lib/index.js";
 import type { CursorDb90Payload } from "./readers/cursor.js";
 import { mcpLog } from "./log.js";
 

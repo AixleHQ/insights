@@ -240,8 +240,8 @@ describe("MCP server (in-process)", () => {
       );
 
       vi.resetModules();
-      vi.doMock("@db90/sdk", async () => {
-        const actual = await vi.importActual<typeof import("@db90/sdk")>("@db90/sdk");
+      vi.doMock("../lib/index.js", async () => {
+        const actual = await vi.importActual<typeof import("../lib/index.js")>("../lib/index.js");
         return { ...actual, resolveProjectId: resolveMock };
       });
       vi.doMock("../sync.js", async () => {
