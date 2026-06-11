@@ -138,7 +138,7 @@ class RawEventStore
     end
 
     def bucket_name
-      ENV.fetch("RAW_EVENTS_BUCKET", ENV.fetch("S3_BUCKET", BUCKET_NAME))
+      ENV.fetch("RAW_EVENTS_BUCKET", BUCKET_NAME)
     end
 
     def encryption_key

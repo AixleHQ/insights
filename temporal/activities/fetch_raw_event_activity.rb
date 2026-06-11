@@ -12,7 +12,7 @@ module Activities
     def execute(params)
       Temporalio::Activity::Context.current.heartbeat("Fetching raw event from storage")
 
-      bucket = params["bucket"] || ENV.fetch("RAW_EVENTS_BUCKET", ENV.fetch("S3_BUCKET", ENV.fetch("MINIO_BUCKET", "raw-events")))
+      bucket = params["bucket"] || ENV.fetch("RAW_EVENTS_BUCKET", ENV.fetch("MINIO_BUCKET", "raw-events"))
       key = params["key"]
       @current_key = key
 

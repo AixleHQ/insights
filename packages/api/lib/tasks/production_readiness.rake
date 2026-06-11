@@ -21,7 +21,6 @@ namespace :production_readiness do
         KEYCLOAK_ISSUER
         KEYCLOAK_JWKS_URI
         S3_REGION
-        S3_BUCKET
         RAW_EVENTS_BUCKET
         AVATARS_S3_BUCKET
         RAW_EVENT_ENCRYPTION_KEY
@@ -63,7 +62,6 @@ namespace :production_readiness do
         KEYCLOAK_ISSUER
         KEYCLOAK_JWKS_URI
         S3_REGION
-        S3_BUCKET
         RAW_EVENTS_BUCKET
         AVATARS_S3_BUCKET
         RAW_EVENT_ENCRYPTION_KEY
@@ -119,15 +117,10 @@ namespace :production_readiness do
     email = args[:email].presence || ENV.fetch("TEST_EMAIL_RECIPIENT", nil)
     abort "Provide recipient: rake production_readiness:send_test_email[user@example.com]" if email.blank?
 
-    organization = Organization.first || Organization.create!(
-      name: "Production Readiness Test Org",
-      slug: "prod-readiness-test"
-    )
-    inviter = User.first || User.create!(
-      email: "readiness-test@#{organization.id}.local",
-      name: "Readiness Test",
-      keycloak_sub: SecureRandom.uuid
-    )
+    organization = Organization.first ||
+      abort("No organization found. Run db:seed or create one manually before running this task.")
+    inviter = User.first ||
+      abort("No user found. Run db:seed or create one manually before running this task.")
 
     invitation = Invitation.create!(
       organization: organization,
@@ -140,8 +133,9 @@ namespace :production_readiness do
     puts "Accept URL: #{invitation.accept_url}"
 
     InvitationMailer.invite(invitation).deliver_now
+    invitation.destroy
 
-    puts "Email delivered successfully."
+    puts "Email delivered successfully. Test invitation record cleaned up."
   rescue StandardError => e
     abort "Email delivery failed: #{e.class}: #{e.message}"
   end

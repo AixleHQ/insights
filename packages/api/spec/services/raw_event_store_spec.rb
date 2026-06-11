@@ -307,7 +307,6 @@ RSpec.describe RawEventStore do
       allow(ENV).to receive(:fetch).with('MINIO_ACCESS_KEY', anything).and_return('mykey')
       allow(ENV).to receive(:fetch).with('MINIO_SECRET_KEY', anything).and_return('mysecret')
       allow(ENV).to receive(:fetch).with('RAW_EVENTS_BUCKET', anything).and_return('custom-bucket')
-      allow(ENV).to receive(:fetch).with('S3_BUCKET', anything).and_return('custom-bucket')
       allow(ENV).to receive(:fetch).with('RAW_EVENT_ENCRYPTION_KEY', anything).and_return('custom_encryption_key_32_chars_')
 
       described_class.instance_variable_set(:@client, nil)
@@ -334,7 +333,6 @@ RSpec.describe RawEventStore do
       allow(ENV).to receive(:fetch).with('S3_REGION', anything).and_return('us-east-1')
       allow(ENV).to receive(:fetch).with('MINIO_REGION', anything).and_return('us-east-1')
       allow(ENV).to receive(:fetch).with('RAW_EVENTS_BUCKET', anything).and_return('db90-prod-raw-events')
-      allow(ENV).to receive(:fetch).with('S3_BUCKET', anything).and_return('db90-prod-raw-events')
       allow(ENV).to receive(:fetch).with('RAW_EVENT_ENCRYPTION_KEY', anything).and_return('custom_encryption_key_32_chars_')
 
       described_class.instance_variable_set(:@client, nil)
