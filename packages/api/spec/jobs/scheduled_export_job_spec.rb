@@ -10,7 +10,7 @@ RSpec.describe ScheduledExportJob, type: :job do
     create(:organization_membership, user: owner, organization: organization, role: "owner")
   end
 
-  let(:mailer_double) { instance_double(ActionMailer::MessageDelivery, deliver_now: true) }
+  let(:mailer_double) { instance_double(ActionMailer::MessageDelivery, deliver_later: true) }
 
   before do
     allow(ScheduledExportMailer).to receive(:deliver).and_return(mailer_double)

@@ -33,11 +33,13 @@ module NextRunCalculator
     candidate = candidate.next_month if candidate <= after
     candidate.beginning_of_day
   rescue Date::Error
-    # Clamp to last day of month when target_day exceeds month length
-    last_day = Date.new(after.year, after.month, -1).day
-    candidate = after.change(day: [ target_day, last_day ].min)
-    candidate = candidate.next_month if candidate <= after
-    candidate.beginning_of_day
+    # target_day exceeds this month's length — advance to next month first, then
+    # clamp to that month's last day. This prevents the drift that occurs when
+    # clamping in the current month and calling next_month on the clamped date
+    # (e.g. day 29 in Feb → Feb 28 → next_month → Mar 28 instead of Mar 29).
+    next_month_date = after.next_month
+    last_day = Date.new(next_month_date.year, next_month_date.month, -1).day
+    next_month_date.change(day: [ target_day, last_day ].min).beginning_of_day
   end
 
   private_class_method :next_daily, :next_weekday, :next_month_day

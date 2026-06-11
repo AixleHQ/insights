@@ -36,9 +36,10 @@ class ScheduledExport < ApplicationRecord
   end
 
   def advance_next_run_at!
+    scheduled_time = next_run_at
     update!(
       last_run_at: Time.current,
-      next_run_at: NextRunCalculator.call(frequency, day_of_week, day_of_month, after: Time.current)
+      next_run_at: NextRunCalculator.call(frequency, day_of_week, day_of_month, after: scheduled_time)
     )
   end
 end
