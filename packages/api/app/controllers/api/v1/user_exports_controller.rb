@@ -11,7 +11,13 @@ module Api
         return render_invalid_param("format", PersonalReportQueryBuilder::VALID_FORMATS) if params[:format].present? && !valid_format?
 
         builder = PersonalReportQueryBuilder.new(user: current_user, params: export_params)
-        report  = builder.call
+
+        begin
+          report = builder.call
+        rescue PersonalReportQueryBuilder::DateRangeTooLargeError => e
+          return render json: { error: "Unprocessable Entity", message: e.message },
+                        status: :unprocessable_content
+        end
 
         if csv_format?
           send_data builder.to_csv(report),

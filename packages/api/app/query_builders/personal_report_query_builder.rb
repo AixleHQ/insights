@@ -12,8 +12,11 @@ require "csv"
 class PersonalReportQueryBuilder
   Result = Data.define(:rows, :columns)
 
-  VALID_REPORT_TYPES = %w[my_cost_by_tool my_token_by_tool my_cost_by_project my_events].freeze
-  VALID_FORMATS      = %w[csv json].freeze
+  DateRangeTooLargeError = Class.new(StandardError)
+
+  VALID_REPORT_TYPES  = %w[my_cost_by_tool my_token_by_tool my_cost_by_project my_events].freeze
+  VALID_FORMATS       = %w[csv json].freeze
+  MAX_DATE_RANGE_DAYS = 366
 
   COLUMNS = {
     "my_cost_by_tool"    => %w[tool_name total_cost_usd total_tokens event_count],
@@ -30,6 +33,7 @@ class PersonalReportQueryBuilder
   end
 
   def call
+    validate_date_range!
     rows    = send(@report_type).map { |r| serialize_row(r) }
     columns = COLUMNS[@report_type]
     Result.new(rows: rows, columns: columns)
@@ -38,11 +42,26 @@ class PersonalReportQueryBuilder
   def to_csv(result)
     CSV.generate(headers: true) do |csv|
       csv << result.columns
-      result.rows.each { |row| csv << result.columns.map { |col| row[col] } }
+      result.rows.each { |row| csv << result.columns.map { |col| sanitize_csv_cell(row[col]) } }
     end
   end
 
   private
+
+  def validate_date_range!
+    range_days = (@to - @from) / 1.day
+    if range_days > MAX_DATE_RANGE_DAYS
+      raise DateRangeTooLargeError,
+        "Date range exceeds #{MAX_DATE_RANGE_DAYS} days. Please narrow your query."
+    end
+  end
+
+  def sanitize_csv_cell(value)
+    return value unless value.is_a?(String)
+    return value unless value.start_with?("=", "+", "-", "@", "\t", "\r")
+
+    "'#{value}"
+  end
 
   def base_scope
     @user.tool_events.where(occurred_at: @from..@to)
