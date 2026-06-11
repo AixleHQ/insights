@@ -3,8 +3,6 @@ name: Release CLI to npm
 on:
   push:
     tags:
-      - 'cli-claude-v*'
-      - 'cli-cursor-v*'
       - 'cli-mcp-v*'
   workflow_dispatch:
     inputs:
@@ -13,8 +11,6 @@ on:
         required: true
         type: choice
         options:
-          - claude
-          - cursor
           - mcp
       version:
         description: 'Version to publish (must equal package.json version; no leading v). Required.'
@@ -41,17 +37,9 @@ jobs:
           INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
           set -euo pipefail
-          if [[ "$REF" == refs/tags/cli-claude-v* ]]; then
-            echo "package=claude" >> "$GITHUB_OUTPUT"
-            echo "working_directory=packages/tools/db90-claude" >> "$GITHUB_OUTPUT"
-            echo "tag_version=${REF#refs/tags/cli-claude-v}" >> "$GITHUB_OUTPUT"
-          elif [[ "$REF" == refs/tags/cli-cursor-v* ]]; then
-            echo "package=cursor" >> "$GITHUB_OUTPUT"
-            echo "working_directory=packages/tools/db90-cursor" >> "$GITHUB_OUTPUT"
-            echo "tag_version=${REF#refs/tags/cli-cursor-v}" >> "$GITHUB_OUTPUT"
-          elif [[ "$REF" == refs/tags/cli-mcp-v* ]]; then
+          if [[ "$REF" == refs/tags/cli-mcp-v* ]]; then
             echo "package=mcp" >> "$GITHUB_OUTPUT"
-            echo "working_directory=packages/tools/db90-telemetry-mcp" >> "$GITHUB_OUTPUT"
+            echo "working_directory=packages/tools/aixle-insights" >> "$GITHUB_OUTPUT"
             echo "tag_version=${REF#refs/tags/cli-mcp-v}" >> "$GITHUB_OUTPUT"
           elif [[ -n "$INPUT_PACKAGE" ]]; then
             # workflow_dispatch: require an explicit version input so the
@@ -61,12 +49,12 @@ jobs:
               echo "workflow_dispatch requires a 'version' input." >&2
               exit 1
             fi
-            echo "package=$INPUT_PACKAGE" >> "$GITHUB_OUTPUT"
-            if [[ "$INPUT_PACKAGE" == "mcp" ]]; then
-              echo "working_directory=packages/tools/db90-telemetry-mcp" >> "$GITHUB_OUTPUT"
-            else
-              echo "working_directory=packages/tools/db90-$INPUT_PACKAGE" >> "$GITHUB_OUTPUT"
+            if [[ "$INPUT_PACKAGE" != "mcp" ]]; then
+              echo "Only 'mcp' is a valid workflow_dispatch package (got $INPUT_PACKAGE)." >&2
+              exit 1
             fi
+            echo "package=mcp" >> "$GITHUB_OUTPUT"
+            echo "working_directory=packages/tools/aixle-insights" >> "$GITHUB_OUTPUT"
             echo "tag_version=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
           else
             echo "Could not resolve target package from ref=$REF / input=$INPUT_PACKAGE" >&2
@@ -79,14 +67,17 @@ jobs:
     runs-on: ubuntu-latest
     environment: npm-publish
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: packages/tools/package-lock.json
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Upgrade npm to OIDC-capable version (>= 11.5.1 required for Trusted Publishing)
+        run: npm install -g npm@latest
 
       - name: Verify version matches package.json
         env:
@@ -107,18 +98,27 @@ jobs:
           WORKING_DIRECTORY: ${{ needs.resolve.outputs.working_directory }}
         run: |
           set -euo pipefail
-          # Reject both the original `@<scope>` placeholder (forward-looking trap
+          # Reject the original `@<scope>` placeholder (forward-looking trap
           # for new packages that copy the convention without filling in the
-          # scope) and the historical `@aixle/` scope (reverted to `@db90/` on
-          # 2026-04-29). Catches stragglers that escaped the mass-rename.
-          for needle in '@<scope>' '@aixle/'; do
+          # scope) and any leftover legacy `@db90/telemetry-mcp` / `db90-mcp` /
+          # `db90-telemetry-mcp` strings (catches stragglers from the
+          # 2026-06 @db90 → @aixle/insights migration).
+          #
+          # Scope: scan only files that ship in the npm tarball. Tests +
+          # scripts + dev configs are excluded — they intentionally retain
+          # legacy strings for shim-behavior assertions and tmp-dir fixtures.
+          SCAN_TARGETS=("dist" "README.md" "LICENSE" "package.json" "CHANGELOG.md")
+          for needle in '@<scope>' '@db90/telemetry-mcp' 'db90-telemetry-mcp' 'db90-mcp'; do
             # Use -F (fixed-string) so needles are matched literally and never
             # interpreted as regex — future-proofs against needles that happen
             # to contain regex metacharacters.
-            if grep -Frn --binary-files=without-match "$needle" "$WORKING_DIRECTORY"; then
-              echo "Found obsolete-scope reference: $needle — block publish." >&2
-              exit 1
-            fi
+            for target in "${SCAN_TARGETS[@]}"; do
+              full="${WORKING_DIRECTORY}/${target}"
+              if [[ -e "$full" ]] && grep -Frn --binary-files=without-match "$needle" "$full"; then
+                echo "Found obsolete-scope reference: $needle in $target — block publish." >&2
+                exit 1
+              fi
+            done
           done
 
       - name: "Reject file:/link: dependencies in package.json"
@@ -144,12 +144,56 @@ jobs:
           }
           EOF
 
-      - name: Install workspace
-        run: npm ci
+      - name: "Reject unauthorized lifecycle scripts (only prepublishOnly allowed)"
+        env:
+          WORKING_DIRECTORY: ${{ needs.resolve.outputs.working_directory }}
+        run: |
+          set -euo pipefail
+          node <<'EOF'
+          const pkg = require(`${process.env.WORKING_DIRECTORY}/package.json`);
+          const scripts = pkg.scripts || {};
+          const allowedLifecycle = new Set(['prepublishOnly']);
+          const lifecycleHooks = [
+            'preinstall', 'install', 'postinstall',
+            'preuninstall', 'uninstall', 'postuninstall',
+            'preversion', 'version', 'postversion',
+            'prepublish', 'prepare', 'prepack',
+            'postpack', 'publish', 'postpublish',
+          ];
+          const offenders = [];
+          for (const hook of lifecycleHooks) {
+            if (hook in scripts && !allowedLifecycle.has(hook)) {
+              offenders.push(`${hook} = ${scripts[hook]}`);
+            }
+          }
+          if (offenders.length > 0) {
+            console.error('Unauthorized lifecycle script(s) in package.json:');
+            for (const o of offenders) console.error('  ' + o);
+            console.error('Allowed: ' + [...allowedLifecycle].join(', '));
+            console.error('If a new lifecycle script is genuinely required, update plans/npm-org-setup-aixle/tasks/03-package-and-workflow-hardening.md and this guard together.');
+            process.exit(1);
+          }
+          EOF
+
+      - name: "Verify publishConfig.provenance is set"
+        env:
+          WORKING_DIRECTORY: ${{ needs.resolve.outputs.working_directory }}
+        run: |
+          set -euo pipefail
+          node <<'EOF'
+          const pkg = require(`${process.env.WORKING_DIRECTORY}/package.json`);
+          if (pkg.publishConfig?.provenance !== true) {
+            console.error('publishConfig.provenance must be true; got ' + JSON.stringify(pkg.publishConfig));
+            process.exit(1);
+          }
+          EOF
+
+      - name: Install workspace (block dep lifecycle scripts — defense vs. Shai-Hulud-class postinstall payloads)
+        run: npm ci --ignore-scripts
         working-directory: packages/tools
 
-      - name: Build SDK
-        run: npm run build --workspace=@db90/sdk
+      - name: Verify signatures of installed dependencies
+        run: npm audit signatures
         working-directory: packages/tools
 
       - name: Build
@@ -160,7 +204,7 @@ jobs:
         run: npm test
         working-directory: ${{ needs.resolve.outputs.working_directory }}
 
-      - name: Verify pack contents (dist + staged SDK + README + LICENSE)
+      - name: Verify pack contents (dist + README + LICENSE)
         working-directory: ${{ needs.resolve.outputs.working_directory }}
         env:
           PACKAGE: ${{ needs.resolve.outputs.package }}
@@ -171,34 +215,20 @@ jobs:
           const out = require('/tmp/pack.json');
           const allow = new Set(['README.md', 'LICENSE', 'package.json']);
           const paths = out[0].files.map((f) => f.path);
-          const isStagedSdkFile = (p) =>
-            p === 'node_modules/@db90/sdk/package.json' ||
-            p.startsWith('node_modules/@db90/sdk/dist/');
           const leaks = paths.filter(
-            (p) => !allow.has(p) && !p.startsWith('dist/') && !isStagedSdkFile(p),
+            (p) => !allow.has(p) && !p.startsWith('dist/'),
           );
           if (leaks.length > 0) {
-            console.error("Tarball contains files outside the allowlist (dist/**, node_modules/@db90/sdk/dist/**, node_modules/@db90/sdk/package.json, README.md, LICENSE, package.json):");
+            console.error("Tarball contains files outside the allowlist (dist/**, README.md, LICENSE, package.json):");
             for (const p of leaks) console.error('  ' + p);
             console.error("Fix the 'files' field in package.json.");
             process.exit(1);
           }
-          // Fail-closed: claude/cursor/mcp declare @db90/sdk in bundledDependencies
-          // and the SDK is private (not on npm). If the staged SDK is missing
-          // from the tarball, end-users would hit "no matching version" on install.
-          const pkg = process.env.PACKAGE;
-          if (pkg === 'claude' || pkg === 'cursor' || pkg === 'mcp') {
-            const hasSdkDist = paths.some((p) => p.startsWith('node_modules/@db90/sdk/dist/'));
-            if (!hasSdkDist) {
-              console.error("BLOCKER: tarball is missing node_modules/@db90/sdk/dist/** — the prepack staging step did not run or failed silently.");
-              console.error("Without bundled SDK, end-user install resolves @db90/sdk@* against npm registry and fails (SDK is private).");
-              process.exit(1);
-            }
-          }
+          // SDK is now inlined as src/lib/ (no longer a bundledDependency).
+          // The previous fail-closed check for node_modules/@db90/sdk/dist/**
+          // is obsolete — there is no separate SDK package to stage.
           EOF
 
-      - name: Publish to npm
+      - name: Publish to npm (OIDC Trusted Publishing — no stored token)
         working-directory: ${{ needs.resolve.outputs.working_directory }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish
