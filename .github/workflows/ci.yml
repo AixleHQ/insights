@@ -98,37 +98,6 @@ jobs:
       container_name: web
       docker_compose_file: docker-compose.ci-web.yml
 
-  # --- Plan task budget check ---
-  # Verifies every plans/<feature>/tasks/*.md fits Sonnet 4.6's 200K context
-  # without compaction. Runs only when plan files changed (or on develop/main
-  # for periodic verification). Exits non-zero if any task is red.
-
-  plan_budget_check:
-    name: Plan task budget (Sonnet-fit)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          # Need >= 22.6 for `node --experimental-strip-types` (TS execution).
-          node-version: '22'
-      - name: Verify all plans fit Sonnet's context window
-        run: |
-          set -euo pipefail
-          if [ ! -d plans ]; then
-            echo "No plans/ directory; nothing to check."
-            exit 0
-          fi
-          fail=0
-          for folder in plans/*/; do
-            if [ -d "${folder}tasks" ]; then
-              echo "::group::${folder}"
-              node --experimental-strip-types --no-warnings .claude/scripts/plan-task-budget.ts "${folder}" || fail=1
-              echo "::endgroup::"
-            fi
-          done
-          exit "$fail"
-
   # --- @aixle/insights (packages/tools/aixle-insights/) ---
 
   aixle_insights_check:

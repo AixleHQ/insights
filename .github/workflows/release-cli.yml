@@ -199,6 +199,20 @@ jobs:
         run: npm audit signatures
         working-directory: packages/tools
 
+      # Explicitly allow ONLY better-sqlite3's install script after the
+      # blanket --ignore-scripts above. better-sqlite3 ships a postinstall
+      # that runs prebuild-install to download a native .node binding for
+      # the current Node version + platform. Without it, vitest tests that
+      # touch SQLite crash with "Could not locate the bindings file".
+      #
+      # `npm rebuild <pkg>` runs the install lifecycle for ONLY that
+      # package — every other dep's postinstall stays blocked. Audit
+      # signatures already ran above, so the better-sqlite3 tarball was
+      # validated before we let any of its code execute.
+      - name: Compile better-sqlite3 native binding (surgical allowlist)
+        run: npm rebuild better-sqlite3
+        working-directory: packages/tools
+
       - name: Build
         run: npm run build
         working-directory: ${{ needs.resolve.outputs.working_directory }}
