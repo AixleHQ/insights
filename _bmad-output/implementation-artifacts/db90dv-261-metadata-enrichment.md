@@ -1,6 +1,6 @@
 # Story: Metadata enrichment — jira_ticket, pr_number, pr_url, branch on every event (AIX-261)
 
-Status: review
+Status: done
 
 Completion note: Ultimate context engine analysis completed - comprehensive developer guide created. Design revised vs the Jira sketch following the AIX-260 precedent: pure extraction lives in `ToolEvents::Upsert`, I/O-bound PR correlation lives in a Sidekiq job — no Temporal activity.
 
@@ -95,6 +95,27 @@ Out of scope (same boundary as AIX-260): `ToolEvents::ConnectorUpsert` (webhook 
 - [x] Verify. (AC: 12)
   - [x] Via `docker compose exec -T api bundle exec rspec` (host Ruby is 2.6, as in AIX-260): full run of `spec/requests/api/v1/ spec/services/ spec/jobs/ spec/serializers/` — 1611 examples, 0 failures.
   - [x] RuboCop on all 14 changed files — no offenses.
+
+### Review Findings
+
+Adversarial code review 2026-06-12 (Blind Hunter + Edge Case Hunter + Acceptance Auditor, diff `feature/AIX-260-event-type-normalizer..HEAD`):
+
+- [x] [Review][Decision] Default ticket pattern over-permissive — RESOLVED 2026-06-12: keep as-is per AC 1 letter (false positives accepted; `JIRA_TICKET_PATTERN` ENV is the tuning knob; revisit under open question #2 if real traffic shows noise).
+- [x] [Review][Patch] Repo-resolution chain must filter by GitHub connector during resolution (decision D2: per AC 4 letter) — prefer a GitHub-connected repo across `event.repository` → `project.repositories` → git-remote match instead of stamping `no_repo_link` when the first resolved repo is non-GitHub [packages/api/app/jobs/pr_correlation_job.rb:30-37]
+- [x] [Review][Patch] Cap retries on permanent GitHub failures (decision D3: deviate from AC 4 "defaults are fine") — `retry_on Oauth::GithubApiError, attempts: 5` + `discard_on Oauth::TokenRefreshError` [packages/api/app/jobs/pr_correlation_job.rb:10]
+- [x] [Review][Patch] Validate client-supplied `jira_ticket` against the ticket pattern (decision D4) — non-matching client value is ignored (extractor then runs as usual); matching value still wins and is uppercased [packages/api/app/services/tool_events/upsert.rb:137-141]
+- [x] [Review][Patch] Nil-metadata guard in PrCorrelationJob — `event.metadata["commit_hash"]` and `merge_metadata!` crash with NoMethodError on `metadata: nil` (legal state, exercised by serializer specs) [packages/api/app/jobs/pr_correlation_job.rb:15,54]
+- [x] [Review][Patch] Enqueue races the open transaction — `enqueue_pr_correlation` runs inside `upsert_with_lock`'s transaction; job executing pre-commit hits `RecordNotFound` → `discard_on` permanently drops enrichment. Set `self.enqueue_after_transaction_commit = true` or bounded `retry_on ActiveRecord::RecordNotFound` before discard [packages/api/app/services/tool_events/upsert.rb:197, packages/api/app/jobs/pr_correlation_job.rb:10]
+- [x] [Review][Patch] Validate sha format before URL interpolation — client-supplied `commit_hash` goes raw into `/repos/{owner}/{repo}/commits/#{sha}/pulls` (path injection with the org's authenticated token) and into the cache key; guard `/\A\h{7,40}\z/` [packages/api/app/services/oauth/github_provider.rb:86-90]
+- [x] [Review][Patch] Enqueue gate blank-vs-truthy mismatch — bare `||` chain means `commit_hash: ""` short-circuits the `sha` fallback and skips enqueue; job uses `.presence ||`. Align on `.presence` [packages/api/app/services/tool_events/upsert.rb:163-165]
+- [x] [Review][Patch] Malformed GitHub 200 body unguarded — empty/HTML body → `JSON::ParserError`, non-array JSON (object/null) → NoMethodError on `pulls.empty?`/`first["number"]`; coerce to Array and wrap parse errors in `GithubApiError` [packages/api/app/services/oauth/github_provider.rb:91, packages/api/app/services/metadata_enrichers/pr_correlator.rb:18-22]
+- [x] [Review][Patch] Job read-merge-write race — `merge_metadata!` does unlocked read→merge→`update!`; concurrent writer between read and write loses one side. Wrap in `event.with_lock` (the dedupe wholesale-replace itself stays deferred) [packages/api/app/jobs/pr_correlation_job.rb:53-55]
+- [x] [Review][Patch] AC 9 end-to-end proven only transitively — ingest spec asserts persisted metadata, events spec asserts serialization of a factory event; add one chained POST `/ingest/events` → GET `/organizations/:org_id/events/:id` spec [packages/api/spec/requests/api/v1/events_spec.rb]
+- [x] [Review][Patch] Zeitwerk-hostile constant placement — `Oauth::GithubApiError` defined at module level in `github_provider.rb`; lazy-load reference before the provider autoloads → NameError. Project precedent exists: `oauth/linear_api_error.rb`. Move to `oauth/github_api_error.rb` [packages/api/app/services/oauth/github_provider.rb:4]
+- [x] [Review][Patch] ReDoS guard on ENV pattern — operator-supplied `JIRA_TICKET_PATTERN` with catastrophic backtracking runs against client strings on the ingest hot path; add `timeout:` to `Regexp.new` (fall back to default on `Regexp::TimeoutError` at match time) [packages/api/app/services/metadata_enrichers/jira_ticket_extractor.rb:38]
+- [x] [Review][Defer] Dedupe re-send wholesale-replaces metadata, now also wiping stamped `jira_ticket`/`pr_*` [packages/api/app/services/tool_events/upsert.rb:126] — deferred, pre-existing (`MUTABLE_FIELDS` semantics, already in deferred-work.md from AIX-260; commit events carry no session_id so blast radius is nil today)
+
+Dismissed as noise (8): `pr_state` stored-not-serialized (AC 7 letter), `pulls.first` ordering/pagination (AC 3 letter), `branch` serializer "unsanitized" (metadata already fully exposed), cache-key sha case, symbol-key sha in job (JSONB stringifies), per-call regex compile (spec mandate), `stub_const("ENV", ...)` idiom (AIX-260 precedent), empty-string `branch` fallback (AC 7 letter).
 
 ## Dev Notes
 
@@ -247,6 +268,7 @@ Implemented in story-task order, red-green per task, all runs via `docker compos
 
 - 2026-06-12 — Story created from Jira AIX-261 with full codebase analysis (standalone artifact; no sprint-status.yaml in repo). Design revised vs the Jira sketch per AIX-260 precedent: no Temporal activity (anchors don't exist), jira extraction in `Upsert`, PR correlation as Sidekiq job over `Oauth::GithubProvider` (no `GithubClient` exists), 6h `Rails.cache` with negative caching.
 - 2026-06-12 — Implementation complete on `feature/AIX-261-metadata-enrichment` (stacked on AIX-260). All tasks done, 1611-example regression green, RuboCop clean. Status → review.
+- 2026-06-12 — Adversarial code review (Blind Hunter + Edge Case Hunter + Acceptance Auditor): 4 decisions resolved (D1 keep default pattern; D2 GitHub-filter in repo resolution; D3 bounded retries; D4 validate client jira_ticket), 12 patches applied (nil-metadata guard, post-commit enqueue, sha validation, presence gate, body guards, with_lock merge, AC 9 chained spec, Zeitwerk error file, ReDoS timeout), 1 defer re-recorded in deferred-work.md, 8 findings dismissed. Regression 1629 examples green, RuboCop clean. Status → done.
 
 ## Open questions (saved for the end)
 

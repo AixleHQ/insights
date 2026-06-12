@@ -2,21 +2,34 @@
 
 # Enriches a freshly created commit event with the pull request it belongs
 # to, looked up via the repository's GitHub connector (AIX-261). Enqueued
-# from ToolEvents::Upsert after create; idempotent — the correlator caches
-# lookups and the metadata merge is a no-op on re-run.
+# from ToolEvents::Upsert after create; safe to re-run — lookups are cached
+# and metadata merges are additive.
 class PrCorrelationJob < ApplicationJob
   queue_as :default
 
+  # Enqueued inside the upsert transaction — wait for commit so a fast
+  # worker can't hit RecordNotFound on a not-yet-visible row.
+  self.enqueue_after_transaction_commit = true
+
   discard_on ActiveRecord::RecordNotFound
+  # A connector whose token can't be refreshed won't heal on the default
+  # retry schedule; transient GitHub failures get a bounded retry instead
+  # of weeks of hammering (review decision D3). TokenRefreshError is declared
+  # by string: it lives in oauth/base_provider.rb, not in a file of its own,
+  # so a direct constant reference here would crash autoloading.
+  discard_on "Oauth::TokenRefreshError"
+  retry_on Oauth::GithubApiError, wait: :polynomially_longer, attempts: 5
 
   def perform(tool_event_id)
     event = ToolEvent.find(tool_event_id)
+    metadata = event.metadata || {}
 
-    commit_hash = event.metadata["commit_hash"].presence || event.metadata["sha"].presence
+    commit_hash = metadata["commit_hash"].presence || metadata["sha"].presence
     return if commit_hash.blank?
+    return unless commit_hash.to_s.match?(Oauth::GithubProvider::COMMIT_SHA_PATTERN)
 
     repository = resolve_repository(event)
-    unless repository&.organization_connector&.connector_type == "github"
+    if repository.nil?
       merge_metadata!(event, "pr_lookup_status" => "no_repo_link")
       return
     end
@@ -27,13 +40,23 @@ class PrCorrelationJob < ApplicationJob
 
   private
 
+  # First GitHub-connected repository along the resolution chain — a
+  # non-GitHub repo earlier in the chain must not mask a GitHub one
+  # (review decision D2).
   def resolve_repository(event)
-    return event.repository if event.repository_id.present?
+    candidates(event).find { |repo| repo&.organization_connector&.connector_type == "github" }
+  end
+
+  def candidates(event)
+    list = []
+    list << event.repository if event.repository_id.present?
 
     project = event.project
-    return nil if project.nil?
+    return list if project.nil?
 
-    project.repositories.first || repository_by_git_remote(project)
+    list.concat(project.repositories.order(:id).to_a)
+    list << repository_by_git_remote(project)
+    list
   end
 
   # Projects without synced Repository rows may still name the same repo via
@@ -51,6 +74,8 @@ class PrCorrelationJob < ApplicationJob
   end
 
   def merge_metadata!(event, new_keys)
-    event.update!(metadata: event.metadata.merge(new_keys))
+    event.with_lock do
+      event.update!(metadata: (event.metadata || {}).merge(new_keys))
+    end
   end
 end

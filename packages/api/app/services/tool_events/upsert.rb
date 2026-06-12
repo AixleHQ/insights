@@ -132,11 +132,23 @@ module ToolEvents
 
     # Stamps the Jira ticket key derived from metadata hints (AIX-261).
     # Create branches only — session re-sends must not stamp (same contract
-    # as normalize_event_type!). A non-blank client-supplied value wins.
+    # as normalize_event_type!). A client-supplied value wins only when it
+    # fully matches the ticket pattern; anything else is dropped before it
+    # can reach the serializer (review decision D4).
     def extract_jira_ticket!
       metadata = @attributes[:metadata]
-      client_value = metadata.is_a?(Hash) && (metadata["jira_ticket"] || metadata[:jira_ticket])
-      return if client_value.present?
+      client_value = metadata.is_a?(Hash) ? (metadata["jira_ticket"] || metadata[:jira_ticket]) : nil
+
+      if client_value.present?
+        normalized = MetadataEnrichers::JiraTicketExtractor.normalize(client_value)
+        if normalized
+          @attributes[:metadata] = metadata.except(:jira_ticket).merge("jira_ticket" => normalized)
+          return
+        end
+
+        metadata = metadata.except("jira_ticket", :jira_ticket)
+        @attributes[:metadata] = metadata
+      end
 
       ticket = MetadataEnrichers::JiraTicketExtractor.extract(metadata)
       return if ticket.nil?
@@ -162,8 +174,8 @@ module ToolEvents
       metadata = @attributes[:metadata]
       return unless metadata.is_a?(Hash)
 
-      commit_hash = metadata["commit_hash"] || metadata[:commit_hash] ||
-                    metadata["sha"] || metadata[:sha]
+      commit_hash = metadata["commit_hash"].presence || metadata[:commit_hash].presence ||
+                    metadata["sha"].presence || metadata[:sha].presence
       return if commit_hash.blank?
 
       PrCorrelationJob.perform_later(event.id)

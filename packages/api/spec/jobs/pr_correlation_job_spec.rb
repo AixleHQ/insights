@@ -125,11 +125,75 @@ RSpec.describe PrCorrelationJob, type: :job do
       end
     end
 
+    context "when a non-github repository precedes a github one (review decision D2)" do
+      it "resolves the github repository instead of stamping no_repo_link" do
+        gitlab_connector = create(:organization_connector, :gitlab, organization: organization)
+        gitlab_repo = create(:repository, organization_connector: gitlab_connector, project: project)
+        github_repo = create(:repository, organization_connector: connector, project: project)
+        event = create_commit_event(repository: gitlab_repo, project: project)
+        allow(MetadataEnrichers::PrCorrelator).to receive(:call)
+          .with(commit_hash: "abc123", repository: github_repo)
+          .and_return(correlation_result)
+
+        described_class.new.perform(event.id)
+
+        expect(event.reload.metadata["pr_number"]).to eq(42)
+      end
+    end
+
+    context "when the event's metadata is nil" do
+      it "returns without raising or stamping" do
+        event = create_commit_event(project: project)
+        event.update_column(:metadata, nil)
+        allow(MetadataEnrichers::PrCorrelator).to receive(:call)
+
+        expect { described_class.new.perform(event.id) }.not_to raise_error
+        expect(MetadataEnrichers::PrCorrelator).not_to have_received(:call)
+      end
+    end
+
+    context "when the commit hash is not plain hex" do
+      it "returns without calling the correlator" do
+        repository = create(:repository, organization_connector: connector, project: project)
+        event = create_commit_event(repository: repository, metadata: { "commit_hash" => "abc/../evil" })
+        allow(MetadataEnrichers::PrCorrelator).to receive(:call)
+
+        described_class.new.perform(event.id)
+
+        expect(MetadataEnrichers::PrCorrelator).not_to have_received(:call)
+        expect(event.reload.metadata).not_to have_key("pr_lookup_status")
+      end
+    end
+
     context "when the event no longer exists" do
       it "discards instead of raising" do
         expect {
           described_class.perform_now(-1)
         }.not_to raise_error
+      end
+    end
+
+    context "when the correlator raises (review decision D3)" do
+      let(:repository) { create(:repository, organization_connector: connector, project: project) }
+
+      it "retries on Oauth::GithubApiError" do
+        event = create_commit_event(repository: repository)
+        allow(MetadataEnrichers::PrCorrelator).to receive(:call)
+          .and_raise(Oauth::GithubApiError, "502")
+
+        expect {
+          described_class.perform_now(event.id)
+        }.to have_enqueued_job(described_class).with(event.id)
+      end
+
+      it "discards on Oauth::TokenRefreshError without retrying" do
+        event = create_commit_event(repository: repository)
+        allow(MetadataEnrichers::PrCorrelator).to receive(:call)
+          .and_raise(Oauth::TokenRefreshError, "revoked")
+
+        expect {
+          described_class.perform_now(event.id)
+        }.not_to have_enqueued_job(described_class)
       end
     end
 

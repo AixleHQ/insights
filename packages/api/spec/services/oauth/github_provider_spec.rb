@@ -223,6 +223,36 @@ RSpec.describe Oauth::GithubProvider, type: :service do
         }.to raise_error(ArgumentError)
       end
     end
+
+    context 'with a malformed commit sha' do
+      it 'raises ArgumentError without an HTTP call' do
+        expect {
+          provider.fetch_pull_requests_for_commit('octocat/hello-world', 'abc/../evil')
+        }.to raise_error(ArgumentError)
+      end
+    end
+
+    context 'when the API returns a non-array 200 body' do
+      it 'raises Oauth::GithubApiError' do
+        stub_request(:get, "https://api.github.com/repos/octocat/hello-world/commits/#{sha}/pulls")
+          .to_return(status: 200, body: '{"message":"ok"}', headers: { 'Content-Type' => 'application/json' })
+
+        expect {
+          provider.fetch_pull_requests_for_commit('octocat/hello-world', sha)
+        }.to raise_error(Oauth::GithubApiError, /non-array/)
+      end
+    end
+
+    context 'when the API returns an unparseable 200 body' do
+      it 'raises Oauth::GithubApiError' do
+        stub_request(:get, "https://api.github.com/repos/octocat/hello-world/commits/#{sha}/pulls")
+          .to_return(status: 200, body: '<html>oops</html>', headers: { 'Content-Type' => 'text/html' })
+
+        expect {
+          provider.fetch_pull_requests_for_commit('octocat/hello-world', sha)
+        }.to raise_error(Oauth::GithubApiError, /unparseable/)
+      end
+    end
   end
 
   describe '.authorization_url' do

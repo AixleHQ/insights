@@ -504,6 +504,28 @@ RSpec.describe ToolEvents::Upsert do
       expect(event.metadata["jira_ticket"]).to eq("AIX-1")
     end
 
+    it "drops an invalid client-supplied jira_ticket and falls back to extraction (review decision D4)" do
+      attrs = base_attributes.merge(
+        metadata: { "jira_ticket" => "<img src=x onerror=alert(1)>", "branch_name" => "feature/AIX-1-x" }
+      )
+      event = described_class.call(attrs)[:tool_event]
+      expect(event.metadata["jira_ticket"]).to eq("AIX-1")
+    end
+
+    it "drops an invalid client-supplied jira_ticket entirely when nothing matches" do
+      attrs = base_attributes.merge(
+        metadata: { "jira_ticket" => "not a ticket!", "branch_name" => "main" }
+      )
+      event = described_class.call(attrs)[:tool_event]
+      expect(event.metadata).not_to have_key("jira_ticket")
+    end
+
+    it "uppercases a lowercase client-supplied jira_ticket" do
+      attrs = base_attributes.merge(metadata: { "jira_ticket" => "client-99" })
+      event = described_class.call(attrs)[:tool_event]
+      expect(event.metadata["jira_ticket"]).to eq("CLIENT-99")
+    end
+
     it "respects a symbol-keyed client-supplied jira_ticket" do
       attrs = base_attributes.merge(
         metadata: { jira_ticket: "CLIENT-7", branch_name: "feature/AIX-1-x" }
@@ -575,6 +597,11 @@ RSpec.describe ToolEvents::Upsert do
 
     it "enqueues when the hash arrives under the sha key" do
       attrs = base_attributes.merge(metadata: { "sha" => "fff999" })
+      expect { described_class.call(attrs) }.to have_enqueued_job(PrCorrelationJob)
+    end
+
+    it "falls back to sha when commit_hash is present but blank" do
+      attrs = base_attributes.merge(metadata: { "commit_hash" => "", "sha" => "fff999" })
       expect { described_class.call(attrs) }.to have_enqueued_job(PrCorrelationJob)
     end
 

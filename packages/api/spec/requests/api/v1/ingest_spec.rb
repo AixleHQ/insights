@@ -438,6 +438,19 @@ RSpec.describe 'Api::V1::Ingest', type: :request do
         }.to have_enqueued_job(PrCorrelationJob)
       end
 
+      it 'exposes the extracted jiraTicket and branch via the events detail endpoint (AC 9 end-to-end)' do
+        ingest_post(payload: commit_payload)
+        event = ToolEvent.last
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/events/#{event.id}",
+                          user: user,
+                          organization: organization
+
+        expect(response).to have_http_status(:ok)
+        expect(json_data[:jiraTicket]).to eq('AIX-157')
+        expect(json_data[:branch]).to eq('feature/AIX-157-foo')
+      end
+
       it 'strips forged pr_* metadata keys' do
         forged = commit_payload.deep_merge(
           metadata: { pr_number: 666, pr_url: 'https://evil.example' }

@@ -91,4 +91,27 @@ RSpec.describe MetadataEnrichers::JiraTicketExtractor do
       end
     end
   end
+
+  describe ".normalize" do
+    it "uppercases a fully matching client value" do
+      expect(described_class.normalize("aix-12")).to eq("AIX-12")
+    end
+
+    it "tolerates surrounding whitespace" do
+      expect(described_class.normalize("  AIX-7 ")).to eq("AIX-7")
+    end
+
+    it "rejects values with extra content around the key" do
+      expect(described_class.normalize("see AIX-12 for details")).to be_nil
+    end
+
+    it "rejects non-matching strings" do
+      expect(described_class.normalize("<img src=x onerror=alert(1)>")).to be_nil
+    end
+
+    it "rejects non-string values" do
+      expect(described_class.normalize(42)).to be_nil
+      expect(described_class.normalize(nil)).to be_nil
+    end
+  end
 end
