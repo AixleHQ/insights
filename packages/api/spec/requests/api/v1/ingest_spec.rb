@@ -399,6 +399,56 @@ RSpec.describe 'Api::V1::Ingest', type: :request do
       end
     end
 
+    # AIX-261 — server-side jira_ticket extraction. Same fallback_direct_insert
+    # path as the AIX-260 block above.
+    context 'with a commit event carrying a ticket-bearing branch_name (AIX-261)' do
+      let(:commit_payload) do
+        {
+          event_type: 'commit',
+          model: 'unknown',
+          tokens_in: 10,
+          tokens_out: 5,
+          cost_usd: 0.001,
+          metadata: {
+            source: 'recent_commit',
+            commit_hash: '1080c8e38aa694380e5e5d14c950123e6e1a2942',
+            branch_name: 'feature/AIX-157-foo'
+          }
+        }
+      end
+
+      before do
+        allow(Temporal::Client).to receive(:start_workflow).and_raise(StandardError, 'skip workflow')
+      end
+
+      it 'persists the event with a server-extracted jira_ticket' do
+        expect {
+          ingest_post(payload: commit_payload)
+        }.to change(ToolEvent, :count).by(1)
+
+        expect(response).to have_http_status(:accepted)
+        event = ToolEvent.last
+        expect(event.metadata['jira_ticket']).to eq('AIX-157')
+        expect(event.metadata['branch_name']).to eq('feature/AIX-157-foo')
+      end
+
+      it 'enqueues PrCorrelationJob for the commit' do
+        expect {
+          ingest_post(payload: commit_payload)
+        }.to have_enqueued_job(PrCorrelationJob)
+      end
+
+      it 'strips forged pr_* metadata keys' do
+        forged = commit_payload.deep_merge(
+          metadata: { pr_number: 666, pr_url: 'https://evil.example' }
+        )
+        ingest_post(payload: forged)
+
+        event = ToolEvent.last
+        expect(event.metadata.keys).not_to include('pr_number', 'pr_url')
+      end
+    end
+
     context 'with rate limiting' do
       it 'returns 202 when under the per-minute limit' do
         OrganizationSetting.set(organization, 'ingest_rate_limit_per_minute', '3')

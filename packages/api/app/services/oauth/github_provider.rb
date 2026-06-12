@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 module Oauth
+  GithubApiError = Class.new(StandardError)
+
   class GithubProvider < BaseProvider
     API_URL = "https://api.github.com"
 
@@ -72,6 +74,23 @@ module Oauth
       end
 
       all
+    end
+
+    # Pull requests associated with a commit (PR correlation, AIX-261).
+    # Raises Oauth::GithubApiError on non-success so Sidekiq can retry —
+    # callers must not cache failures.
+    def fetch_pull_requests_for_commit(full_name, sha)
+      ensure_fresh_token!
+
+      owner, repo = full_name.to_s.split("/", 2)
+      raise ArgumentError, "malformed repository full_name: #{full_name.inspect}" if owner.blank? || repo.blank?
+
+      response = http_client.get("#{API_URL}/repos/#{owner}/#{repo}/commits/#{sha}/pulls")
+      unless response.success?
+        raise Oauth::GithubApiError, "GitHub commit-pulls lookup failed (#{response.status}) for #{full_name}@#{sha}"
+      end
+
+      JSON.parse(response.body)
     end
 
     class << self
