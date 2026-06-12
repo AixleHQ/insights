@@ -140,3 +140,20 @@ export function humanizeToolName(toolName: string | undefined | null): string {
     .replace(/[_-]/g, " ")
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
+
+const TOOL_COLOR_MAP: Record<string, string> = {
+  claude_code: "hsl(32 95% 55%)",
+  "claude-code": "hsl(32 95% 55%)",
+  github_copilot: "hsl(211 100% 50%)",
+  "github-copilot": "hsl(211 100% 50%)",
+  cursor: "hsl(271 91% 65%)",
+  aider: "hsl(142 71% 45%)",
+  windsurf: "hsl(199 89% 48%)",
+  cody: "hsl(339 90% 51%)",
+};
+
+export function getToolColor(toolName: string | undefined | null): string {
+  if (!toolName) return "hsl(220 9% 46%)";
+  const normalized = toolName.toLowerCase().trim();
+  return TOOL_COLOR_MAP[normalized] ?? "hsl(220 9% 46%)";
+}

@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/chart";
 import type { ChartConfig } from "@/components/ui/chart";
 import { ChartSkeleton } from "@/components/ui/skeletons";
-import { cn, humanizeToolName } from "@/lib/utils";
+import { cn, getToolColor, humanizeToolName } from "@/lib/utils";
 import { useDailyByTool, useDailyByModel } from "@/hooks/useApi";
 
 interface WeeklyToolUsageChartProps {
@@ -32,16 +32,6 @@ interface WeeklyToolUsageChartProps {
   projectId?: string;
   className?: string;
 }
-
-const TOOL_COLORS: Record<string, string> = {
-  claude_code: "hsl(32 95% 55%)",
-  github_copilot: "hsl(211 100% 50%)",
-  cursor: "hsl(271 91% 65%)",
-  aider: "hsl(142 71% 45%)",
-  windsurf: "hsl(199 89% 48%)",
-  cody: "hsl(339 90% 51%)",
-  Other: "hsl(220 9% 46%)",
-};
 
 const MODEL_PALETTE = [
   "hsl(221 83% 53%)",
@@ -53,10 +43,6 @@ const MODEL_PALETTE = [
   "hsl(0 72% 51%)",
   "hsl(60 100% 38%)",
 ];
-
-function getToolColor(tool: string): string {
-  return TOOL_COLORS[tool] ?? TOOL_COLORS["Other"];
-}
 
 function getModelColor(index: number): string {
   return MODEL_PALETTE[index % MODEL_PALETTE.length];

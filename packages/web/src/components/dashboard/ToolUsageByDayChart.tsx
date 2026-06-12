@@ -22,7 +22,7 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import type { ChartConfig } from "@/components/ui/chart";
-import { cn, humanizeToolName } from "@/lib/utils";
+import { cn, getToolColor, humanizeToolName } from "@/lib/utils";
 import type { DailyToolData } from "@/hooks/useApi";
 
 interface ToolUsageByDayChartProps {
@@ -41,21 +41,6 @@ const TIME_RANGE_OPTIONS: { value: TimeRange; label: string; days: number }[] = 
   { value: "90d", label: "90 days", days: 90 },
   { value: "1y", label: "1 year", days: 365 },
 ];
-
-// Chart colors for tools (keys match API snake_case names)
-const TOOL_COLORS: Record<string, string> = {
-  claude_code: "hsl(32 95% 55%)",       // amber
-  github_copilot: "hsl(211 100% 50%)",  // blue
-  cursor: "hsl(271 91% 65%)",           // purple
-  aider: "hsl(142 71% 45%)",            // green
-  windsurf: "hsl(199 89% 48%)",         // cyan
-  cody: "hsl(339 90% 51%)",             // pink
-  Other: "hsl(220 9% 46%)",             // gray
-};
-
-function getToolColor(tool: string): string {
-  return TOOL_COLORS[tool] || TOOL_COLORS["Other"];
-}
 
 function getToolDisplayName(tool: string): string {
   return humanizeToolName(tool);

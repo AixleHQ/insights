@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Activity, DollarSign, Coins } from "lucide-react";
+import { Activity, DollarSign, Coins, Wrench } from "lucide-react";
 import { useOrg } from "@/contexts/OrgContext";
 import { useCurrentUser, useMemberDashboardStats, useMemberHeatmap } from "@/hooks/useApi";
 import {
@@ -10,9 +10,10 @@ import {
   PromptInsightsSection,
   type ToolUsageData,
 } from "@/components/dashboard";
-import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatCardSkeleton } from "@/components/ui/skeletons";
+import { humanizeToolName } from "@/lib/utils";
 import { formatTokens, formatPercent, formatCount } from "@/lib/formatters";
 
 const PERIODS = ["7d", "30d", "90d"] as const;
@@ -46,22 +47,22 @@ export function MemberDashboard({ hideHeader = false }: { hideHeader?: boolean }
     total_cost: t.cost_usd,
   })) ?? [];
 
+  const topTool = toolUsage.length > 0
+    ? toolUsage.reduce((a, b) => (b.event_count > a.event_count ? b : a))
+    : null;
+
   const totalTokens = (stats?.total_tokens_in ?? 0) + (stats?.total_tokens_out ?? 0);
-  const totalHeatmapEvents = heatmapData?.reduce((sum, d) => sum + d.count, 0) ?? 0;
 
   const periodButtons = (
-    <div className="flex gap-2">
-      {PERIODS.map((p) => (
-        <Button
-          key={p}
-          size="sm"
-          variant={period === p ? "default" : "outline"}
-          onClick={() => setPeriod(p)}
-        >
-          {PERIOD_LABELS[p]}
-        </Button>
-      ))}
-    </div>
+    <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
+      <TabsList>
+        {PERIODS.map((p) => (
+          <TabsTrigger key={p} value={p}>
+            {PERIOD_LABELS[p]}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+    </Tabs>
   );
 
   return (
@@ -80,7 +81,7 @@ export function MemberDashboard({ hideHeader = false }: { hideHeader?: boolean }
         <div className="flex justify-end">{periodButtons}</div>
       )}
 
-      <MetricGrid>
+      <MetricGrid className="lg:grid-cols-4 xl:grid-cols-4">
         {isLoadingStats ? (
           <>
             <StatCardSkeleton showDescription />
@@ -90,84 +91,87 @@ export function MemberDashboard({ hideHeader = false }: { hideHeader?: boolean }
           </>
         ) : (
           <>
-        <MetricCard
-          title="Total Events"
-          value={stats?.total_events ?? 0}
-          format="number"
-          icon={<Activity className="size-5" />}
-          trend={
-            stats?.events_change_percent
-              ? stats.events_change_percent > 0
-                ? "up"
-                : "down"
-              : "neutral"
-          }
-          trendValue={
-            stats?.events_change_percent
-              ? formatPercent(Math.abs(stats.events_change_percent))
-              : undefined
-          }
-          description={`Last ${PERIOD_LABELS[period]}`}
-        />
-        <MetricCard
-          title="Total Cost"
-          value={stats?.total_cost_usd ?? 0}
-          format="currency"
-          icon={<DollarSign className="size-5" />}
-          trend={
-            stats?.cost_change_percent
-              ? stats.cost_change_percent > 0
-                ? "up"
-                : "down"
-              : "neutral"
-          }
-          trendValue={
-            stats?.cost_change_percent
-              ? formatPercent(Math.abs(stats.cost_change_percent))
-              : undefined
-          }
-          description={`Last ${PERIOD_LABELS[period]}`}
-        />
-        <MetricCard
-          title="Total Tokens"
-          value={totalTokens}
-          format="compact"
-          icon={<Coins className="size-5" />}
-          trend={
-            stats?.tokens_change_percent
-              ? stats.tokens_change_percent > 0
-                ? "up"
-                : "down"
-              : "neutral"
-          }
-          trendValue={
-            stats?.tokens_change_percent
-              ? formatPercent(Math.abs(stats.tokens_change_percent))
-              : undefined
-          }
-          description={`${formatTokens(stats?.total_tokens_in ?? 0)} in / ${formatTokens(stats?.total_tokens_out ?? 0)} out`}
-        />
+            <MetricCard
+              title="Total Events"
+              value={stats?.total_events ?? 0}
+              format="number"
+              icon={<Activity className="size-5" />}
+              trend={
+                stats?.events_change_percent
+                  ? stats.events_change_percent > 0
+                    ? "up"
+                    : "down"
+                  : "neutral"
+              }
+              trendValue={
+                stats?.events_change_percent
+                  ? formatPercent(Math.abs(stats.events_change_percent))
+                  : undefined
+              }
+              description={`Last ${PERIOD_LABELS[period]}`}
+            />
+            <MetricCard
+              title="Total Cost"
+              value={stats?.total_cost_usd ?? 0}
+              format="currency"
+              icon={<DollarSign className="size-5" />}
+              trend={
+                stats?.cost_change_percent
+                  ? stats.cost_change_percent > 0
+                    ? "up"
+                    : "down"
+                  : "neutral"
+              }
+              trendValue={
+                stats?.cost_change_percent
+                  ? formatPercent(Math.abs(stats.cost_change_percent))
+                  : undefined
+              }
+              description={`Last ${PERIOD_LABELS[period]}`}
+            />
+            <MetricCard
+              title="Total Tokens"
+              value={totalTokens}
+              format="compact"
+              icon={<Coins className="size-5" />}
+              trend={
+                stats?.tokens_change_percent
+                  ? stats.tokens_change_percent > 0
+                    ? "up"
+                    : "down"
+                  : "neutral"
+              }
+              trendValue={
+                stats?.tokens_change_percent
+                  ? formatPercent(Math.abs(stats.tokens_change_percent))
+                  : undefined
+              }
+              description={`${formatTokens(stats?.total_tokens_in ?? 0)} in / ${formatTokens(stats?.total_tokens_out ?? 0)} out`}
+            />
+            <MetricCard
+              title="Top Tool"
+              value={topTool ? humanizeToolName(topTool.tool_name) : "—"}
+              icon={<Wrench className="size-5" />}
+              description={
+                topTool
+                  ? `${formatCount(topTool.event_count)} events · ${formatPercent((topTool.event_count / (stats?.total_events ?? 1)) * 100)} of total`
+                  : "No data yet"
+              }
+            />
           </>
         )}
       </MetricGrid>
 
-      <PromptInsightsSection orgId={orgId} userId={userId} period={period} />
-
-      <div>
-        <p className="text-sm text-muted-foreground mb-2">
-          {formatCount(totalHeatmapEvents)} events in the last year
-        </p>
-        {heatmapData ? (
-          <ActivityHeatmap data={heatmapData} className="col-span-full" />
-        ) : (
-          <Skeleton className="h-32 w-full" />
-        )}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <PromptInsightsSection orgId={orgId} userId={userId} period={period} />
+        <TopToolsChart data={toolUsage} isLoading={isLoadingStats} />
       </div>
 
-      <section>
-        <h2 className="text-base font-semibold mb-3">Usage by Tool</h2>
-        <TopToolsChart data={toolUsage} isLoading={isLoadingStats} />
-      </section>
+      {heatmapData ? (
+        <ActivityHeatmap data={heatmapData} />
+      ) : (
+        <Skeleton className="h-32 w-full" />
+      )}
     </div>
   );
 }

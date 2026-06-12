@@ -1,4 +1,4 @@
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, Cell, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ChartContainer,
@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/chart";
 import type { ChartConfig } from "@/components/ui/chart";
 import { ChartSkeleton } from "@/components/ui/skeletons";
-import { cn, humanizeToolName } from "@/lib/utils";
+import { getToolColor, humanizeToolName } from "@/lib/utils";
 
 export interface ToolUsageData {
   tool_name: string;
@@ -36,10 +36,14 @@ export function TopToolsChart({ data, isLoading, className }: TopToolsChartProps
   const sortedData = [...data]
     .sort((a, b) => b.event_count - a.event_count)
     .slice(0, 5)
-    .map((d) => ({ ...d, tool_name: humanizeToolName(d.tool_name) }));
+    .map((d) => ({
+      ...d,
+      display_name: humanizeToolName(d.tool_name),
+      color: getToolColor(d.tool_name),
+    }));
 
   return (
-    <Card className={cn("", className)}>
+    <Card className={className}>
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-medium">Top Tools</CardTitle>
         <CardDescription className="text-xs">
@@ -63,7 +67,7 @@ export function TopToolsChart({ data, isLoading, className }: TopToolsChartProps
               >
                 <XAxis type="number" hide />
                 <YAxis
-                  dataKey="tool_name"
+                  dataKey="display_name"
                   type="category"
                   tickLine={false}
                   axisLine={false}
@@ -87,10 +91,13 @@ export function TopToolsChart({ data, isLoading, className }: TopToolsChartProps
                 />
                 <Bar
                   dataKey="event_count"
-                  fill="var(--chart-1)"
                   radius={[0, 4, 4, 0]}
                   maxBarSize={24}
-                />
+                >
+                  {sortedData.map((entry, index) => (
+                    <Cell key={index} fill={entry.color} />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </ChartContainer>
