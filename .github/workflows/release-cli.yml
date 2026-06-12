@@ -130,7 +130,7 @@ jobs:
         run: |
           set -euo pipefail
           node <<'EOF'
-          const pkg = require(`${process.env.WORKING_DIRECTORY}/package.json`);
+          const pkg = require(`./${process.env.WORKING_DIRECTORY}/package.json`);
           const sections = ['dependencies', 'peerDependencies', 'optionalDependencies'];
           const offenders = [];
           for (const section of sections) {
@@ -153,7 +153,7 @@ jobs:
         run: |
           set -euo pipefail
           node <<'EOF'
-          const pkg = require(`${process.env.WORKING_DIRECTORY}/package.json`);
+          const pkg = require(`./${process.env.WORKING_DIRECTORY}/package.json`);
           const scripts = pkg.scripts || {};
           const allowedLifecycle = new Set(['prepublishOnly']);
           const lifecycleHooks = [
@@ -184,7 +184,7 @@ jobs:
         run: |
           set -euo pipefail
           node <<'EOF'
-          const pkg = require(`${process.env.WORKING_DIRECTORY}/package.json`);
+          const pkg = require(`./${process.env.WORKING_DIRECTORY}/package.json`);
           if (pkg.publishConfig?.provenance !== true) {
             console.error('publishConfig.provenance must be true; got ' + JSON.stringify(pkg.publishConfig));
             process.exit(1);
