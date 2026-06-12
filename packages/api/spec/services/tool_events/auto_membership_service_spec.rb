@@ -103,4 +103,24 @@ RSpec.describe ToolEvents::AutoMembershipService do
       end
     end
   end
+
+  describe ".call_with" do
+    it "creates a membership from raw attributes (no ToolEvent instance)" do
+      expect {
+        described_class.call_with(user_id: user.id, project_id: project.id, organization_id: organization.id)
+      }.to change(ProjectMembership, :count).by(1)
+      expect(ProjectMembership.last.role).to eq("viewer")
+    end
+
+    it "reports unexpected errors to Rollbar and returns nil instead of raising" do
+      allow(ProjectMembership).to receive(:find_or_create_by!).and_raise(RuntimeError, "boom")
+      expect(Rollbar).to receive(:error)
+
+      result = nil
+      expect {
+        result = described_class.call_with(user_id: user.id, project_id: project.id, organization_id: organization.id)
+      }.not_to raise_error
+      expect(result).to be_nil
+    end
+  end
 end
