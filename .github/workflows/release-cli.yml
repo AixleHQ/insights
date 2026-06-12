@@ -178,15 +178,26 @@ jobs:
           }
           EOF
 
-      - name: "Verify publishConfig.provenance is set"
+      - name: "Verify publishConfig.provenance is explicitly false (deferred until repo is public)"
         env:
           WORKING_DIRECTORY: ${{ needs.resolve.outputs.working_directory }}
         run: |
           set -euo pipefail
+          # npm rejects provenance attestations from private source repos with
+          # HTTP 422 ("Unsupported GitHub Actions source repository visibility:
+          # private"). Until dualboot-partners/db90-rails is public, provenance
+          # MUST be explicitly false — not missing, not true. The explicit-false
+          # form fails fast with this clear message if anyone flips it back to
+          # true without first making the repo public.
+          #
+          # Re-enabling: when the repo goes public, flip this guard to assert
+          # === true and set publishConfig.provenance: true in package.json,
+          # in the same PR.
           node <<'EOF'
           const pkg = require(`./${process.env.WORKING_DIRECTORY}/package.json`);
-          if (pkg.publishConfig?.provenance !== true) {
-            console.error('publishConfig.provenance must be true; got ' + JSON.stringify(pkg.publishConfig));
+          if (pkg.publishConfig?.provenance !== false) {
+            console.error('publishConfig.provenance must be explicitly false while the repo is private; got ' + JSON.stringify(pkg.publishConfig));
+            console.error('npm rejects provenance attestations from private source repos. See https://docs.npmjs.com/generating-provenance-statements');
             process.exit(1);
           }
           EOF

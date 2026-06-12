@@ -2,13 +2,13 @@
 
 All notable changes to `@aixle/insights` will be documented in this file.
 
-## 0.1.1 — 2026-06-11
+## 0.1.1 — 2026-06-12
 
 ### Internal
 
-- Publish pipeline migrated to OIDC Trusted Publishing — no stored npm token; provenance attestation automatic on every release.
-- CI: Node 20 → 24; SHA-pinned GitHub Actions; `npm ci --ignore-scripts`; `npm audit signatures`; lifecycle-script guard; provenance assertion guard.
-- `publishConfig.provenance: true` added to `package.json`.
+- Publish pipeline migrated to OIDC Trusted Publishing — no stored npm token.
+- CI: Node 20 → 24; SHA-pinned GitHub Actions (`actions/checkout@v6.0.3`, `actions/setup-node@v6.4.0`); `npm ci --ignore-scripts`; `npm audit signatures`; lifecycle-script guard; surgical `npm rebuild better-sqlite3` after install to compile the native binding without re-enabling all postinstall scripts.
+- `publishConfig.provenance: false` — provenance attestation is deferred until the source repo is public. npm rejects provenance bundles from private GitHub repos (HTTP 422). All other supply-chain defenses (OIDC, hardware 2FA, `npm audit signatures`, `--ignore-scripts` with a surgical allowlist) remain active.
 
 No functional changes to the package itself.
 
