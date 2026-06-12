@@ -1655,6 +1655,7 @@ export function useEvents(orgId: string, params?: EventsParams, options?: { enab
       );
     },
     enabled: options?.enabled !== false && !!orgId,
+    staleTime: 30_000,
   });
 }
 

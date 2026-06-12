@@ -4746,7 +4746,8 @@ paths:
           description: |
             Column to sort by. Defaults to `occurred_at`.
             `risk_level` is sorted by severity (critical > high > medium > low > none).
-            `tokens_in` sorts by `tokens_in` column only.
+            `tokens_in` sorts by `tokens_in` with `occurred_at, id` as tiebreaks
+            (a stable `occurred_at, id` tiebreak is appended for every column).
           schema:
             type: string
             enum: [occurred_at, cost_usd, tokens_in, tool_name, risk_level]
@@ -5065,7 +5066,7 @@ paths:
     get:
       summary: Export events as CSV
       description: >
-        Exports filtered events as a CSV file. When any export query parameters
+        Exports filtered events as a CSV file. When any filter query parameters
         are present, the file begins with an "Applied filters" title row, then one
         row per active filter, then a blank row, before the column headers. Columns vary by role:
         members receive base columns only; org admins add user_email;
@@ -5131,6 +5132,21 @@ paths:
           in: query
           schema:
             type: string
+        - name: sort_by
+          in: query
+          description: |
+            Column to order CSV rows by. Defaults to `occurred_at`. Same
+            semantics as the events list endpoint, including the stable
+            `occurred_at, id` tiebreak.
+          schema:
+            type: string
+            enum: [occurred_at, cost_usd, tokens_in, tool_name, risk_level]
+        - name: direction
+          in: query
+          description: Sort direction. Defaults to `desc`.
+          schema:
+            type: string
+            enum: [asc, desc]
       responses:
         '200':
           description: CSV file download

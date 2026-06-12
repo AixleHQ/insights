@@ -8,6 +8,11 @@ class AddToolEventsSortIndexes < ActiveRecord::Migration[8.1]
     # Scoped by organization_id to match authorized_scope queries.
     # Tie-break columns (occurred_at, id) align with ToolEventSortScope ORDER BY.
     #
+    # Plain DESC (= NULLS FIRST) is deliberate: a forward scan serves
+    # DESC NULLS FIRST and a backward scan serves ASC NULLS LAST, so one
+    # index covers both sort directions emitted by ToolEventSortScope.
+    # Do not add NULLS LAST here without changing the scope's SQL fragments.
+    #
     # TimescaleDB hypertables do NOT support CONCURRENTLY — see AddPerformanceIndexes.
     execute <<-SQL
       CREATE INDEX IF NOT EXISTS idx_tool_events_org_cost_occurred

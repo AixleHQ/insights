@@ -26,9 +26,9 @@ class ToolEventExportJob
     # AIX-381: all org members export every org event (rows); `role` still drives
     # column redaction inside ToolEventCsvExporter, not row-level filtering.
     events = org.tool_events
-    events = apply_tool_event_filters(events, fp)
-             .includes(:user, :project, :audit_logs)
-             .order(occurred_at: :desc)
+    events = events.where(user_id: user.id) unless role.in?(%i[org_admin global_admin])
+    events = apply_tool_event_filters(events, fp).includes(:user, :project, :audit_logs)
+    events = ToolEventSortScope.new(scope: events, params: fp.symbolize_keys).call
 
     summary_lines = ToolEventCsvExporter.filter_summary_lines_for_export(fp, organization: org)
     csv = ToolEventCsvExporter.generate(events, role, filter_summary_lines: summary_lines)

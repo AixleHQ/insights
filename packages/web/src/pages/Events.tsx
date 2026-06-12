@@ -27,7 +27,6 @@ import { showEventsUserColumn, type SortField, type SortDirection } from "@/lib/
 import { UnattributedEvents } from "./UnattributedEvents";
 import type { EventSortBy } from "@/hooks/useApi";
 
-
 // tokens_in is intentionally absent: the table shows a combined in+out token
 // count, so sorting by tokens_in alone would not match what the user sees.
 const SORT_FIELD_API_MAP: Record<SortField, EventSortBy> = {
