@@ -19,6 +19,7 @@ RSpec.describe GithubCopilotSyncJob, type: :job do
   before do
     allow(Oauth::GithubCopilotProvider).to receive(:new).with(connector).and_return(provider_double)
     allow(provider_double).to receive(:fetch_seats).and_return(seats_fixture)
+    allow(provider_double).to receive(:fetch_billing_usage).and_return({})
   end
 
   describe "#perform — usage sync" do
@@ -112,6 +113,7 @@ RSpec.describe GithubCopilotSyncJob, type: :job do
   describe "#perform — seat sync" do
     before do
       allow(provider_double).to receive(:fetch_usage).and_return([])
+      allow(provider_double).to receive(:fetch_billing_usage).and_return({})
     end
 
     it "updates connector config with seat_count and active_users" do
@@ -120,6 +122,61 @@ RSpec.describe GithubCopilotSyncJob, type: :job do
       connector.reload
       expect(connector.config["seat_count"]).to eq(2)
       expect(connector.config["active_users"]).to eq(1) # only first seat has last_activity_at
+    end
+  end
+
+  describe "#perform — billing sync" do
+    let(:billing_result) do
+      {
+        "metered_units_used"   => 4500,
+        "included_units"       => 3000,
+        "overage_units"        => 1500,
+        "overage_cost_usd"     => 15.0,
+        "billing_model"        => "ai_credits",
+        "billing_period_start" => "2026-06-01",
+        "billing_period_end"   => "2026-06-30"
+      }
+    end
+
+    before do
+      allow(provider_double).to receive(:fetch_usage).and_return([])
+      allow(provider_double).to receive(:fetch_billing_usage).and_return(billing_result)
+    end
+
+    it "stores billing data in connector config" do
+      described_class.new.perform(connector.id)
+
+      connector.reload
+      expect(connector.config["overage_cost_usd"]).to eq(15.0)
+      expect(connector.config["overage_units"]).to eq(1500)
+      expect(connector.config["billing_model"]).to eq("ai_credits")
+      expect(connector.config["billing_period_start"]).to eq("2026-06-01")
+    end
+
+    it "preserves existing seat_count when billing is stored" do
+      connector.update!(config: { "seat_count" => 10 })
+
+      described_class.new.perform(connector.id)
+
+      connector.reload
+      expect(connector.config["seat_count"]).to be_present
+    end
+
+    it "does not raise or mark_error! when billing returns {}" do
+      allow(provider_double).to receive(:fetch_billing_usage).and_return({})
+
+      expect { described_class.new.perform(connector.id) }.not_to raise_error
+
+      connector.reload
+      expect(connector.status).not_to eq("error")
+    end
+
+    it "passes seat assignee logins from seats fixture to fetch_billing_usage" do
+      expect(provider_double).to receive(:fetch_billing_usage)
+        .with(seat_assignees: array_including("octocat", "monalisa"))
+        .and_return(billing_result)
+
+      described_class.new.perform(connector.id)
     end
   end
 

@@ -48,6 +48,34 @@ class OrganizationConnectorSerializer < BaseSerializer
     connector.config&.dig("active_users") if connector.copilot?
   end
 
+  attribute :metered_units_used do |connector|
+    connector.config&.dig("metered_units_used") if connector.copilot?
+  end
+
+  attribute :included_units do |connector|
+    connector.config&.dig("included_units") if connector.copilot?
+  end
+
+  attribute :overage_units do |connector|
+    connector.config&.dig("overage_units") if connector.copilot?
+  end
+
+  attribute :overage_cost_usd do |connector|
+    connector.config&.dig("overage_cost_usd") if connector.copilot?
+  end
+
+  attribute :billing_model do |connector|
+    connector.config&.dig("billing_model") if connector.copilot?
+  end
+
+  attribute :billing_period_start do |connector|
+    connector.config&.dig("billing_period_start") if connector.copilot?
+  end
+
+  attribute :billing_period_end do |connector|
+    connector.config&.dig("billing_period_end") if connector.copilot?
+  end
+
   attribute :copilot_connector do |connector|
     connector.copilot?
   end

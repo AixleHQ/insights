@@ -15,7 +15,9 @@ class GithubCopilotSyncJob < ApplicationJob
     provider   = Oauth::GithubCopilotProvider.new(@connector)
 
     sync_usage(provider)
+    # sync_seats must run before sync_billing_usage — it populates @seat_assignee_logins
     sync_seats(provider)
+    sync_billing_usage(provider)
     @connector.mark_synced!(sync_started_at: @sync_started_at)
 
     Rails.logger.info("[GithubCopilotSyncJob] Completed for connector #{connector_id}")
@@ -115,13 +117,21 @@ class GithubCopilotSyncJob < ApplicationJob
     data = provider.fetch_seats
     return if data.blank?
 
-    active_count = Array(data["seats"]).count { |s| s["last_activity_at"].present? }
+    seats = Array(data["seats"])
+    @seat_assignee_logins = seats.filter_map { |s| s.dig("assignee", "login") }
+    @seats_config = {
+      "seat_count"   => data["total_seats"],
+      "active_users" => seats.count { |s| s["last_activity_at"].present? }
+    }
+  end
+
+  def sync_billing_usage(provider)
+    billing = provider.fetch_billing_usage(seat_assignees: Array(@seat_assignee_logins))
+    config_patch = (@seats_config || {}).merge(billing || {})
+    return if config_patch.blank?
 
     @connector.update!(
-      config: (@connector.config || {}).merge(
-        "seat_count"   => data["total_seats"],
-        "active_users" => active_count
-      )
+      config: (@connector.config || {}).merge(config_patch)
     )
   end
 end

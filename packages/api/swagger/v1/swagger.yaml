@@ -5721,6 +5721,36 @@ components:
           nullable: true
         activeUsersCount:
           type: integer
+        meteredUnitsUsed:
+          type: integer
+          nullable: true
+          description: Total units consumed in the current billing period (Copilot only)
+        includedUnits:
+          type: integer
+          nullable: true
+          description: Units included in plan without overage charge (Copilot only)
+        overageUnits:
+          type: integer
+          nullable: true
+          description: Units consumed above the included allowance (Copilot only)
+        overageCostUsd:
+          type: number
+          format: float
+          nullable: true
+          description: Overage cost in USD for the current billing period (Copilot only)
+        billingModel:
+          type: string
+          nullable: true
+          enum: [ai_credits, premium_requests]
+          description: Which GitHub billing model is active for this org (Copilot only)
+        billingPeriodStart:
+          type: string
+          nullable: true
+          description: ISO 8601 date for start of current billing period (Copilot only)
+        billingPeriodEnd:
+          type: string
+          nullable: true
+          description: ISO 8601 date for end of current billing period (Copilot only)
         repositoryCount:
           type: integer
         syncedEventCount:

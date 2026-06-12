@@ -1,0 +1,22 @@
+{
+  "timePeriod": { "year": 2026, "month": 6 },
+  "organization": "acme",
+  "usageItems": [
+    {
+      "grossQuantity": 3000,
+      "discountQuantity": 2000,
+      "netQuantity": 1000,
+      "grossAmount": 30.00,
+      "discountAmount": 20.00,
+      "netAmount": 10.00
+    },
+    {
+      "grossQuantity": 1500,
+      "discountQuantity": 1000,
+      "netQuantity": 500,
+      "grossAmount": 15.00,
+      "discountAmount": 10.00,
+      "netAmount": 5.00
+    }
+  ]
+}
