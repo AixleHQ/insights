@@ -57,7 +57,7 @@ Decision hierarchy: standard Rails patterns first → existing codebase patterns
 
 ## Git & Worktree Integrity
 
-**Branch naming:** always branch from `develop` (never `staging` or `main`). Format: `feature/AIX-XX-short-description` (e.g. `feature/AIX-61-user-auth`).
+**Branch naming:** always branch from `develop` (never `staging` or `main`). Format: `<prefix>/AIX-XX-short-description`. Prefixes: `feature/` for new functionality, `bugfix/` for bug fixes (e.g. `feature/AIX-61-user-auth`, `bugfix/AIX-319-google-sign-in`).
 
 **Commit messages:** `[AIX-XX] Short imperative description` — imperative mood, subject under 72 chars (e.g. `[AIX-58] Add connector health display`).
 

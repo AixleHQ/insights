@@ -78,7 +78,10 @@ export function getUserManager(): UserManager {
 // Auth helper functions
 export async function login(): Promise<void> {
   const manager = getUserManager();
-  await manager.signinRedirect();
+  // kc_idp_hint must match the IDP alias in Keycloak Admin → Identity Providers
+  await manager.signinRedirect({
+    extraQueryParams: { kc_idp_hint: "google-dbp" },
+  });
 }
 
 export async function loginCallback(): Promise<User> {
