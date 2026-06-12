@@ -17,13 +17,18 @@ class EventTypeNormalizer
   # @return [String, nil] the derived event_type, or nil when no rule matches
   def self.derive(event_type:, metadata:)
     return nil unless event_type.to_s == "chat"
-    return nil if metadata.blank?
+    return nil unless metadata.is_a?(Hash)
+    return nil if metadata.empty?
 
     return "commit" if fetch(metadata, "source") == "recent_commit"
 
-    bash_command = fetch(metadata, "bash_command").to_s
-    return "commit" if bash_command.match?(GIT_COMMIT_PATTERN)
-    return "test"   if bash_command.match?(TEST_RUNNER_PATTERN)
+    # Only match real command strings — a non-String bash_command (e.g. a
+    # nested hash) must not be regex-matched via its inspect form.
+    bash_command = fetch(metadata, "bash_command")
+    if bash_command.is_a?(String)
+      return "commit" if bash_command.match?(GIT_COMMIT_PATTERN)
+      return "test"   if bash_command.match?(TEST_RUNNER_PATTERN)
+    end
 
     return "edit" if EDIT_TOOLS.include?(fetch(metadata, "tool_name"))
 

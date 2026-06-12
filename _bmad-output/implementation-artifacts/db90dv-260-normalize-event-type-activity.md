@@ -1,6 +1,6 @@
 # Story: Server-side event_type re-tagger — defensive net for pre-T-02 CLIs (AIX-260)
 
-Status: review
+Status: done
 
 Completion note: Ultimate context engine analysis completed - comprehensive developer guide created. Design revised per team decision: normalization lives in `ToolEvents::Upsert`, not a Temporal activity.
 
@@ -74,6 +74,17 @@ Out of scope: `ToolEvents::ConnectorUpsert` (webhook connector dedupe path) — 
 - [x] Verify. (AC: 9, 10)
   - [x] From `packages/api/`: `bundle exec rspec spec/services/event_type_normalizer_spec.rb spec/services/tool_events/ spec/requests/api/v1/ingest_spec.rb`.
   - [x] `make lint-api`.
+
+### Review Findings (2026-06-12, adversarial code review)
+
+- [x] [Review][Decision] Regex rules over/under-match vs real-world bash commands — **resolved 2026-06-12 (Kirill): keep as-is per AC 1**; false positives accepted, the rules are a defensive net and match the spec exactly.
+- [x] [Review][Patch] Strip client-supplied `renormalized_*` keys from incoming metadata [packages/api/app/services/tool_events/upsert.rb] — **applied 2026-06-12**: `RESERVED_METADATA_KEYS` + `strip_reserved_metadata!` first in the `#call` pipeline, unconditional (flag off included), strips string and symbol key variants; 4 new specs incl. re-stamp-after-strip.
+- [x] [Review][Patch] Dedupe-update path stamps `renormalized_*` onto a row that was never re-tagged [packages/api/app/services/tool_events/upsert.rb] — **applied 2026-06-12**: `normalize_event_type!` moved out of `#call` into the two create branches only; regression spec extended to assert no `renormalized_*` keys on the existing row after a hinted re-send.
+- [x] [Review][Patch] Non-Hash metadata / non-String bash_command not type-guarded [packages/api/app/services/event_type_normalizer.rb] — **applied 2026-06-12**: `metadata.is_a?(Hash)` guard; regex rules run only when `bash_command.is_a?(String)`; 3 new malformed-type specs.
+- [x] [Review][Patch] Feature flag accepts only the exact lowercase string `"true"` [packages/api/app/services/tool_events/upsert.rb] — **applied 2026-06-12**: `ActiveModel::Type::Boolean` cast (`TRUE`/`1`/`yes` → on, `FALSE`/`0`/`off` → off, defaults unchanged); 3 new flag-spelling specs.
+
+Review verification 2026-06-12: full API suite 2535 examples / 0 failures; `make lint-api` clean (independently re-run, closing the auditor's AC 10 note).
+- [x] [Review][Defer] Same-session re-send wholesale-replaces `metadata`, wiping `renormalized_*`/`source` provenance from a previously re-tagged row [packages/api/app/services/tool_events/upsert.rb:126,135-137] — deferred, pre-existing: `MUTABLE_FIELDS` metadata-replace semantics predate this story (also affects `cost_source`); fixing means merge-not-replace on the update path, a separate change.
 
 ## Dev Notes
 
@@ -188,6 +199,7 @@ Claude Fable 5 (`claude-fable-5`) via Claude Code, bmad-dev-story workflow.
 - 2026-06-12 — **Design revised per team decision (Kirill):** Temporal activity rejected as overkill for a pure transformation; normalization moved to `ToolEvents::Upsert` + `EventTypeNormalizer` service. Covers fallback and telemetry paths the activity design missed; makes the ticket's `config.x` flag and request-spec AC literally implementable.
 - 2026-06-12 — **Implementation complete** on branch `feature/AIX-260-event-type-normalizer`: normalizer service + `Upsert` wiring + ENV-driven flag; 34 new unit examples, 8 new upsert examples, 2 new request examples. Full suite 2524/0, RuboCop clean. Status → review.
 - 2026-06-12 — **Flag placement revised (Kirill):** removed the `config.x.ingest.event_type_renormalization` block from `application.rb`; `Upsert#renormalization_enabled?` now reads `DB90_EVENT_TYPE_RENORMALIZATION` directly. Full suite re-run 2524/0, RuboCop clean.
+- 2026-06-12 — **Adversarial code review** (Blind Hunter / Edge Case Hunter / Acceptance Auditor): 2 decisions resolved (regexes stay per AC 1; forged provenance keys stripped), 4 patches applied (create-only normalization, reserved-key strip, type guards, boolean flag cast), 1 deferred (pre-existing wholesale metadata replacement on dedupe-update → deferred-work.md). Full suite 2535/0, RuboCop clean. Status → done.
 
 ## Open questions (saved for the end)
 

@@ -111,6 +111,20 @@ RSpec.describe EventTypeNormalizer do
       end
     end
 
+    context "with malformed metadata types" do
+      it "returns nil for a String metadata payload" do
+        expect(derive(metadata: "source=recent_commit")).to be_nil
+      end
+
+      it "returns nil for an Array metadata payload" do
+        expect(derive(metadata: [ { "source" => "recent_commit" } ])).to be_nil
+      end
+
+      it "does not regex-match a non-String bash_command via its inspect form" do
+        expect(derive(metadata: { "bash_command" => { "cmd" => "bundle exec rspec" } })).to be_nil
+      end
+    end
+
     it "does not mutate the metadata input" do
       metadata = { "source" => "recent_commit" }.freeze
       expect { derive(metadata: metadata) }.not_to raise_error

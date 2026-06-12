@@ -368,6 +368,83 @@ RSpec.describe ToolEvents::Upsert do
         expect(result[:tool_event].id).to eq(existing.id)
         expect(result[:tool_event].event_type).to eq("chat")
       end
+
+      it "never stamps renormalized_* metadata onto the existing row" do
+        session_id = SecureRandom.uuid
+        first = base_attributes.merge(
+          metadata: { "session_id" => session_id }
+        )
+        existing = described_class.call(first)[:tool_event]
+
+        resend = base_attributes.merge(
+          metadata: { "session_id" => session_id, "source" => "recent_commit" }
+        )
+        result = described_class.call(resend)
+        expect(result[:tool_event].id).to eq(existing.id)
+        expect(result[:tool_event].metadata).not_to have_key("renormalized_from")
+        expect(result[:tool_event].metadata).not_to have_key("renormalized_by")
+      end
+    end
+
+    context "when a client sends forged renormalized_* metadata" do
+      it "strips reserved keys from a non-re-tagged event" do
+        attrs = base_attributes.merge(
+          event_type: "commit",
+          metadata: { "renormalized_from" => "chat", "renormalized_by" => "server_v1" }
+        )
+        event = described_class.call(attrs)[:tool_event]
+        expect(event.metadata).not_to have_key("renormalized_from")
+        expect(event.metadata).not_to have_key("renormalized_by")
+      end
+
+      it "strips symbol-keyed reserved keys" do
+        attrs = base_attributes.merge(
+          event_type: "commit",
+          metadata: { renormalized_from: "chat", renormalized_by: "server_v1" }
+        )
+        event = described_class.call(attrs)[:tool_event]
+        expect(event.metadata).not_to have_key("renormalized_from")
+        expect(event.metadata).not_to have_key("renormalized_by")
+      end
+
+      it "strips reserved keys even when the feature flag is off" do
+        stub_const("ENV", ENV.to_h.merge("DB90_EVENT_TYPE_RENORMALIZATION" => "false"))
+        attrs = base_attributes.merge(
+          event_type: "commit",
+          metadata: { "renormalized_by" => "server_v1" }
+        )
+        event = described_class.call(attrs)[:tool_event]
+        expect(event.metadata).not_to have_key("renormalized_by")
+      end
+
+      it "re-stamps genuine provenance after stripping a forged value" do
+        attrs = base_attributes.merge(
+          metadata: { "source" => "recent_commit", "renormalized_from" => "completion" }
+        )
+        event = described_class.call(attrs)[:tool_event]
+        expect(event.event_type).to eq("commit")
+        expect(event.metadata["renormalized_from"]).to eq("chat")
+      end
+    end
+
+    context "with non-canonical feature-flag spellings" do
+      it "treats '0' as off" do
+        stub_const("ENV", ENV.to_h.merge("DB90_EVENT_TYPE_RENORMALIZATION" => "0"))
+        attrs = base_attributes.merge(metadata: { "source" => "recent_commit" })
+        expect(described_class.call(attrs)[:tool_event].event_type).to eq("chat")
+      end
+
+      it "treats 'FALSE' as off" do
+        stub_const("ENV", ENV.to_h.merge("DB90_EVENT_TYPE_RENORMALIZATION" => "FALSE"))
+        attrs = base_attributes.merge(metadata: { "source" => "recent_commit" })
+        expect(described_class.call(attrs)[:tool_event].event_type).to eq("chat")
+      end
+
+      it "treats 'TRUE' as on" do
+        stub_const("ENV", ENV.to_h.merge("DB90_EVENT_TYPE_RENORMALIZATION" => "TRUE"))
+        attrs = base_attributes.merge(metadata: { "source" => "recent_commit" })
+        expect(described_class.call(attrs)[:tool_event].event_type).to eq("commit")
+      end
     end
   end
 end
