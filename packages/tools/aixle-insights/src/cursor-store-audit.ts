@@ -14,7 +14,7 @@ import {
   isGlobalStateDbPath,
   probeCursorGlobalStateDb,
 } from "./readers/cursor.js";
-import { openCursorSqliteReadonly } from "./readers/cursor-sqlite.js";
+import { openCursorSqliteReadonly, resolveCursorSqlitePath } from "./readers/cursor-sqlite.js";
 
 export type { DailyStatsVersionDiscovery } from "./daily-stats-versions.js";
 
@@ -110,11 +110,16 @@ export function auditStateVscdbFile(dbPath: string, rootDir?: string): StateVscd
 export function auditLegacyCursorDbFile(dbPath: string, rootDir?: string): LegacyDbAuditEntry {
   const entry: LegacyDbAuditEntry = {
     db_path_redacted: redactCursorPath(dbPath),
-    file_bytes: existsSync(dbPath) ? statSync(dbPath).size : 0,
+    file_bytes: 0,
     has_feedback_table: false,
     feedback_row_count: 0,
   };
   if (!existsSync(dbPath)) return entry;
+
+  const resolved = resolveCursorSqlitePath(dbPath, { rootDir });
+  if (!resolved.ok) return entry;
+
+  entry.file_bytes = statSync(resolved.path).size;
 
   let db: Database.Database | null = null;
   try {

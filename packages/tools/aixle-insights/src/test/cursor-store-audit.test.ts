@@ -93,6 +93,7 @@ describe("auditLegacyCursorDbFile", () => {
     symlinkSync(targetDb, symlinkPath);
 
     expect(auditLegacyCursorDbFile(symlinkPath, root)).toMatchObject({
+      file_bytes: 0,
       has_feedback_table: false,
       feedback_row_count: 0,
     });

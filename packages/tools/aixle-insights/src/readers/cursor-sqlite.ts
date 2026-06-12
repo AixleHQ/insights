@@ -12,6 +12,10 @@ export type CursorSqliteOpenResult =
   | { ok: true; db: Database.Database }
   | { ok: false; reason: CursorSqliteOpenFailureReason; message: string };
 
+export type CursorSqlitePathResult =
+  | { ok: true; path: string }
+  | { ok: false; reason: CursorSqliteOpenFailureReason; message: string };
+
 export interface CursorSqliteOpenOptions {
   rootDir?: string;
 }
@@ -36,6 +40,26 @@ export function openCursorSqliteReadonly(
   dbPath: string,
   options: CursorSqliteOpenOptions = {}
 ): CursorSqliteOpenResult {
+  const resolved = resolveCursorSqlitePath(dbPath, options);
+  if (!resolved.ok) return resolved;
+
+  try {
+    const db = new Database(resolved.path, { readonly: true, fileMustExist: true });
+    return { ok: true, db };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      ok: false,
+      reason: isNativeBindingError(message) ? "native_binding" : "unknown",
+      message,
+    };
+  }
+}
+
+export function resolveCursorSqlitePath(
+  dbPath: string,
+  options: CursorSqliteOpenOptions = {}
+): CursorSqlitePathResult {
   const normalizedPath = resolve(dbPath);
   if (!existsSync(normalizedPath)) {
     return {
@@ -69,15 +93,5 @@ export function openCursorSqliteReadonly(
     }
   }
 
-  try {
-    const db = new Database(pathToOpen, { readonly: true, fileMustExist: true });
-    return { ok: true, db };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return {
-      ok: false,
-      reason: isNativeBindingError(message) ? "native_binding" : "unknown",
-      message,
-    };
-  }
+  return { ok: true, path: pathToOpen };
 }
