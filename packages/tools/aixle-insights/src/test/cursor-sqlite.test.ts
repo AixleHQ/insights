@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, mkdirSync, rmSync, symlinkSync } from "node:fs";
+import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Database from "better-sqlite3";
@@ -84,6 +84,9 @@ describe("openCursorSqliteReadonly", () => {
 
     const result = openCursorSqliteReadonly(symlinkPath, { rootDir: tempDir });
     expect(result.ok).toBe(true);
-    if (result.ok) result.db.close();
+    if (!result.ok) return;
+
+    expect(result.db.name).toBe(realpathSync(targetDb));
+    result.db.close();
   });
 });

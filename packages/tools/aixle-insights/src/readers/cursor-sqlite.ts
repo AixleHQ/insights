@@ -16,12 +16,12 @@ export interface CursorSqliteOpenOptions {
   rootDir?: string;
 }
 
-function isWithinRoot(path: string, rootDir: string): boolean {
+function validatedRealPathWithinRoot(path: string, rootDir: string): string | null {
   const realPath = realpathSync(path);
   const realRoot = realpathSync(rootDir);
-  if (realPath === realRoot) return true;
+  if (realPath === realRoot) return realPath;
   const rootWithSep = realRoot.endsWith(sep) ? realRoot : `${realRoot}${sep}`;
-  return realPath.startsWith(rootWithSep);
+  return realPath.startsWith(rootWithSep) ? realPath : null;
 }
 
 function isNativeBindingError(message: string): boolean {
@@ -46,16 +46,19 @@ export function openCursorSqliteReadonly(
   }
 
   const { rootDir } = options;
+  let pathToOpen = normalizedPath;
   if (rootDir) {
     const normalizedRoot = resolve(rootDir);
     try {
-      if (!isWithinRoot(normalizedPath, normalizedRoot)) {
+      const realPath = validatedRealPathWithinRoot(normalizedPath, normalizedRoot);
+      if (realPath === null) {
         return {
           ok: false,
           reason: "outside_root",
           message: `Database path escapes root: ${normalizedPath}`,
         };
       }
+      pathToOpen = realPath;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return {
@@ -67,7 +70,7 @@ export function openCursorSqliteReadonly(
   }
 
   try {
-    const db = new Database(normalizedPath, { readonly: true, fileMustExist: true });
+    const db = new Database(pathToOpen, { readonly: true, fileMustExist: true });
     return { ok: true, db };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
