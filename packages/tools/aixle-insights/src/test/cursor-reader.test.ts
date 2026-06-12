@@ -11,6 +11,7 @@ import {
   findStateVscDbs,
   probeCursorGlobalStateDb,
   parseCursorTranscriptFile,
+  dedupeDailyStatsEntries,
   readLegacyEvents,
   readCursorTranscriptSessions,
   readDailyStats,
@@ -70,6 +71,12 @@ const malformedNotSqliteFixture = join(
   "fixtures",
   "malformed",
   "not-sqlite.db"
+);
+const malformedTruncatedFixture = join(
+  __dirname,
+  "fixtures",
+  "malformed",
+  "sqlite-truncated.db"
 );
 
 // ─── findCursorDbs ────────────────────────────────────────────────────────────
@@ -397,6 +404,47 @@ describe("readDailyStats", () => {
   });
 });
 
+describe("dedupeDailyStatsEntries", () => {
+  it("prefers globalStorage when multiple entries share the same date", () => {
+    const entries = [
+      {
+        date: "2026-06-12",
+        dbPath: "/tmp/User/workspaceStorage/ws1/state.vscdb",
+        value: { tabSuggestedLines: 100, tabAcceptedLines: 100 },
+      },
+      {
+        date: "2026-06-12",
+        dbPath: "/tmp/User/globalStorage/state.vscdb",
+        value: { tabSuggestedLines: 1, tabAcceptedLines: 1 },
+      },
+    ];
+
+    expect(dedupeDailyStatsEntries(entries)).toEqual([entries[1]]);
+  });
+
+  it("dedupes identical workspace values and otherwise keeps highest-activity workspace value", () => {
+    const lowActivity = {
+      date: "2026-06-12",
+      dbPath: "/tmp/User/workspaceStorage/ws1/state.vscdb",
+      value: { tabSuggestedLines: 1, tabAcceptedLines: 1 },
+    };
+    const highActivity = {
+      date: "2026-06-12",
+      dbPath: "/tmp/User/workspaceStorage/ws2/state.vscdb",
+      value: { tabSuggestedLines: 5, tabAcceptedLines: 5 },
+    };
+    const duplicateHighActivity = {
+      date: "2026-06-12",
+      dbPath: "/tmp/User/workspaceStorage/ws3/state.vscdb",
+      value: { tabSuggestedLines: 5, tabAcceptedLines: 5 },
+    };
+
+    expect(
+      dedupeDailyStatsEntries([lowActivity, highActivity, duplicateHighActivity])
+    ).toEqual([highActivity]);
+  });
+});
+
 // ─── readRecentCommitSnapshots ────────────────────────────────────────────────
 
 describe("readRecentCommitSnapshots", () => {
@@ -627,10 +675,13 @@ describe("readDailyStats — security", () => {
     expect(result).toEqual([]);
   });
 
-  it("returns empty when global state.vscdb is malformed", () => {
+  it.each([
+    ["plain text", malformedNotSqliteFixture],
+    ["truncated sqlite", malformedTruncatedFixture],
+  ])("returns empty when global state.vscdb is malformed: %s", (_label, fixturePath) => {
     const globalDir = join(tempDir, "globalStorage");
     mkdirSync(globalDir, { recursive: true });
-    writeFileSync(join(globalDir, "state.vscdb"), readFileSync(malformedNotSqliteFixture));
+    writeFileSync(join(globalDir, "state.vscdb"), readFileSync(fixturePath));
 
     expect(readDailyStats(null, tempDir)).toEqual([]);
   });
