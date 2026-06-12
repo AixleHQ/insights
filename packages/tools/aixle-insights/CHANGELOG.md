@@ -2,6 +2,16 @@
 
 All notable changes to `@aixle/insights` will be documented in this file.
 
+## 0.1.1 — 2026-06-11
+
+### Internal
+
+- Publish pipeline migrated to OIDC Trusted Publishing — no stored npm token; provenance attestation automatic on every release.
+- CI: Node 20 → 24; SHA-pinned GitHub Actions; `npm ci --ignore-scripts`; `npm audit signatures`; lifecycle-script guard; provenance assertion guard.
+- `publishConfig.provenance: true` added to `package.json`.
+
+No functional changes to the package itself.
+
 ## 0.1.0
 
 Initial release of `@aixle/insights` — stdio MCP server for AI coding-assistant telemetry (Claude transcripts + Cursor SQLite ingest).
