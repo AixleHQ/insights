@@ -78,7 +78,8 @@ Decision hierarchy: standard Rails patterns first → existing codebase patterns
 ## Release secrets
 
 - npm org `@aixle` — owned by `aixle-bot` (service account, email `aixle@example.com`). All maintainers must have hardware 2FA (FIDO2/WebAuthn — passkey or YubiKey) enforced.
-- **No `NPM_TOKEN`** — publishing uses **OIDC Trusted Publishing** (GitHub Actions OIDC). No long-lived token is stored in GitHub Secrets. Provenance attestation is automatic.
+- **No `NPM_TOKEN`** — publishing uses **OIDC Trusted Publishing** (GitHub Actions OIDC). No long-lived token is stored in GitHub Secrets.
+- **Provenance attestation is deferred** — npm rejects provenance bundles from private source repos (HTTP 422 "Unsupported GitHub Actions source repository visibility: private"). `publishConfig.provenance` is explicitly `false` until this repo is made public; flip to `true` in the same PR that flips visibility. Registry-level signatures (`npm audit signatures`) remain in place; the rest of the supply-chain hardening (OIDC, hardware 2FA, `--ignore-scripts`) is unaffected.
 - To publish: push a tag matching **`cli-mcp-v*`** → approve the `npm-publish` GitHub Environment gate. See `packages/tools/RELEASING.md` for the full runbook.
 - **Break-glass only:** if OIDC fails at npm Inc.'s side, create a Granular Access Token (90-day max) scoped to `@aixle/insights`. Delete it immediately after the publish. Never store permanently.
 - Plan and threat-model for this setup: `plans/npm-org-setup-aixle/` (orientation, tasks 01–05).

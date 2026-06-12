@@ -56,7 +56,7 @@ For a release of `@aixle/insights@X.Y.Z`:
    - Rejects placeholder + legacy scope literals (`@<scope>`, `@db90/telemetry-mcp`, `db90-telemetry-mcp`, `db90-mcp`) anywhere in the package source — straggler trap.
    - Rejects `file:` / `link:` dependency specs that cannot ship to the registry.
    - Rejects any lifecycle script in `package.json` other than `prepublishOnly`.
-   - Asserts `publishConfig.provenance` is `true`.
+   - Asserts `publishConfig.provenance` is explicitly `false` (deferred — npm rejects provenance from private repos; flip to `true` in the same PR that makes the source repo public).
    - Runs `npm ci --ignore-scripts` (defends against compromised-dep postinstall payloads).
    - Runs `npm audit signatures` over the installed dep tree (verifies registry-signed integrity).
    - Builds, tests.
@@ -67,9 +67,9 @@ For a release of `@aixle/insights@X.Y.Z`:
    npm view @aixle/insights version            # confirms registry has the new version
    npx -y @aixle/insights@X.Y.Z --help
 
-   # Verify cryptographic provenance:
+   # Verify registry signature (provenance is deferred until repo is public):
    npm audit signatures @aixle/insights@X.Y.Z
-   # Expected: Signed artifact, provenance verified
+   # Expected: "Signed artifact" — provenance line absent until repo is public
    ```
    **Clean-profile init smoke** (a disposable user account or a machine with no prior install):
    1. `npx -y @aixle/insights@X.Y.Z init --host … --keycloak-url … --organization-id <uuid>`
@@ -103,7 +103,7 @@ Record the Actions run URL, outcome, `npm view` output, smoke-test result, elaps
 - **"Verify version matches package.json"** — tag (`cli-mcp-v…`) or `version` input mismatch; bump in a new commit and re-tag.
 - **Obsolete-scope guard** — a legacy `@db90/telemetry-mcp` / `db90-mcp` / `db90-telemetry-mcp` / `@<scope>` literal slipped into the package. Find and replace, then re-tag.
 - **Unauthorized lifecycle script guard** — only `prepublishOnly` is allowed. If a new lifecycle script is genuinely required, update the guard *and* `plans/npm-org-setup-aixle/tasks/03-package-and-workflow-hardening.md` together.
-- **`publishConfig.provenance` guard** — `package.json` must keep `"publishConfig": { "access": "public", "provenance": true }`. Do not remove the `provenance` flag.
+- **`publishConfig.provenance` guard** — `package.json` must keep `"publishConfig": { "access": "public", "provenance": false }` while the source repo is private. Flipping to `true` requires the source repo to be public first; npm returns HTTP 422 ("Unsupported GitHub Actions source repository visibility: private") otherwise.
 - **`npm audit signatures` failure** — a dep was unpublished + republished with a different signing identity, or registry signature drift. Investigate the failing dep on `npmjs.com` before disabling the check.
 - **Pack allowlist leaks** — fix `files` field / `.npmignore`; ensure stray artifacts are not staged.
 - **403 from npm (OIDC failure)** — check, in order:
