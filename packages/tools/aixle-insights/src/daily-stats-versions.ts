@@ -2,7 +2,8 @@
  * CUR-V11 — discover `aiCodeTracking.dailyStats` version prefixes on disk.
  * Keys look like: aiCodeTracking.dailyStats.v1.5.2026-05-20
  */
-import Database from "better-sqlite3";
+import type Database from "better-sqlite3";
+import { openCursorSqliteReadonly } from "./readers/cursor-sqlite.js";
 
 const STATE_TABLE = "ItemTable";
 const DAILY_STATS_LIKE = "aiCodeTracking.dailyStats%";
@@ -109,7 +110,9 @@ export function discoverDailyStatsVersionsInDb(dbPath: string): DailyStatsVersio
 
   let db: Database.Database | null = null;
   try {
-    db = new Database(dbPath, { readonly: true });
+    const opened = openCursorSqliteReadonly(dbPath);
+    if (!opened.ok) return emptyDiscovery();
+    db = opened.db;
     const table = db
       .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?")
       .get(STATE_TABLE) as { name: string } | undefined;
