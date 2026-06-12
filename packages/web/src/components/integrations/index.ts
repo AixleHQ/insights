@@ -8,3 +8,4 @@ export {
 export { IntegrationSkeleton } from "./IntegrationSkeleton";
 export { IngestTokenConnectSheet } from "./IngestTokenConnectSheet";
 export { OpenrouterWebhookSheet } from "./OpenrouterWebhookSheet";
+export { ProviderManageCard } from "./ProviderManageCard";

@@ -6,7 +6,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { api, downloadBlob } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import type {
@@ -56,6 +56,7 @@ import type {
   MyToolAccountMetadata,
   McpIngestExchangeData,
 } from "@/lib/types";
+import type { IntegrationProvider } from "@/lib/providers";
 
 // Query keys factory
 export const queryKeys = {
@@ -2271,6 +2272,76 @@ export function useDeleteModelPricingOverride(orgId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["organizations", orgId, "model_pricing_overrides"],
+      });
+    },
+  });
+}
+
+// ─── Organization Provider Settings (AIX-121) ──────────────────────────────
+
+export interface OrgProviderSetting {
+  id: string;
+  provider: IntegrationProvider;
+  enabled: boolean;
+}
+
+interface OrgProviderSettingsResponse {
+  data: OrgProviderSetting[];
+  meta: { currentPage: number; totalPages: number; totalCount: number; perPage: number };
+}
+
+export function useOrgProviderSettings(orgId: string) {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["organizations", orgId, "organization_provider_settings"],
+    queryFn: () =>
+      api.get<OrgProviderSettingsResponse>(
+        `/organizations/${orgId}/organization_provider_settings`
+      ),
+    enabled: !!orgId,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const enabledMap: Partial<Record<IntegrationProvider, boolean>> = useMemo(() => {
+    if (!data?.data) return {};
+    return Object.fromEntries(data.data.map((s) => [s.provider, s.enabled]));
+  }, [data]);
+
+  return { data: data?.data, enabledMap, isLoading, isError };
+}
+
+export function useUpdateOrgProviderSetting(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ provider, enabled }: { provider: IntegrationProvider; enabled: boolean }) =>
+      api.patch<{ data: OrgProviderSetting }>(
+        `/organizations/${orgId}/organization_provider_settings/${provider}`,
+        { organization_provider_setting: { enabled } }
+      ),
+    onMutate: async ({ provider, enabled }) => {
+      const queryKey = ["organizations", orgId, "organization_provider_settings"];
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<OrgProviderSettingsResponse>(queryKey);
+      if (previous) {
+        queryClient.setQueryData<OrgProviderSettingsResponse>(queryKey, {
+          ...previous,
+          data: previous.data.some((s) => s.provider === provider)
+            ? previous.data.map((s) => (s.provider === provider ? { ...s, enabled } : s))
+            : [...previous.data, { id: `optimistic-${provider}`, provider, enabled }],
+        });
+      }
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(
+          ["organizations", orgId, "organization_provider_settings"],
+          context.previous
+        );
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["organizations", orgId, "organization_provider_settings"],
       });
     },
   });

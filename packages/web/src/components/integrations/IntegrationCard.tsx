@@ -29,26 +29,9 @@ import { cn, formatDistanceToNow } from "@/lib/utils";
 import { ProviderLogo } from "@/components/icons";
 import type { ConnectorStatus, ConnectorHealthStats } from "@/lib/types";
 import { formatPercentage } from "@/lib/formatters";
+import type { IntegrationScope, IntegrationProvider, ProviderInfo } from "@/lib/providers";
 
-export type IntegrationScope = "org" | "project" | "persona";
-
-export type IntegrationProvider =
-  | "github"
-  | "gitlab"
-  | "bitbucket"
-  | "jira"
-  | "linear"
-  | "slack"
-  | "figma"
-  | "claude"
-  | "claude-code"
-  | "anthropic"
-  | "openai"
-  | "openrouter"
-  | "gemini"
-  | "cursor"
-  | "github_copilot"
-  | "google";
+export type { IntegrationScope, IntegrationProvider, ProviderInfo };
 
 export interface IntegrationData {
   id: string;
@@ -72,20 +55,6 @@ export interface IntegrationData {
   webhookToken?: string;
   webhookSecretSet?: boolean;
   scope?: IntegrationScope;
-}
-
-export interface ProviderInfo {
-  id: IntegrationProvider;
-  name: string;
-  description: string;
-  category: "code" | "project" | "ai" | "design" | "communication";
-  features: string[];
-  available: boolean;
-  comingSoon?: boolean;
-  inputLabel?: string;
-  inputPlaceholder?: string;
-  connectSheet?: "webhook";
-  scope: IntegrationScope;
 }
 
 interface IntegrationCardProps {

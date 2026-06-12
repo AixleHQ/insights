@@ -20,6 +20,7 @@ import { NewProject } from "./pages/NewProject";
 import { ProjectDetail } from "./pages/ProjectDetail";
 import { ProjectSettings } from "./pages/ProjectSettings";
 import { Integrations } from "./pages/Integrations";
+import { IntegrationsManage } from "./pages/IntegrationsManage";
 import { IntegrationSetup } from "./pages/IntegrationSetup";
 import { IntegrationOAuthCallback } from "./pages/IntegrationOAuthCallback";
 import { Members } from "./pages/Members";
@@ -121,6 +122,14 @@ function App() {
                   <Route path="/projects/:id/edit" element={<EditProjectRedirect />} />
                   <Route path="/integrations" element={<Navigate to="/integrations/connected" replace />} />
                   <Route path="/integrations/new/:provider" element={<IntegrationSetup />} />
+                  <Route
+                    path="/integrations/manage"
+                    element={
+                      <ProtectedRoute requireRoles={["owner"]}>
+                        <IntegrationsManage />
+                      </ProtectedRoute>
+                    }
+                  />
                   <Route path="/integrations/:status" element={<Integrations />} />
                   {/* /members — top-level members routes */}
                   <Route path="/members" element={<Members />} />

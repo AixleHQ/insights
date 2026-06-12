@@ -5,6 +5,7 @@ import {
   useProjectConnectWithApiKey,
   useProjectDeleteConnector,
   useProjectTestConnector,
+  useOrgProviderSettings,
 } from "@/hooks/useApi";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -107,10 +108,12 @@ const PROVIDERS: ProviderInfo[] = [
 
 interface ProjectConnectorsTabProps {
   projectId: string;
+  orgId?: string;
 }
 
-export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
+export function ProjectConnectorsTab({ projectId, orgId = "" }: ProjectConnectorsTabProps) {
   const { data: connectorsData, isLoading } = useProjectConnectors(projectId);
+  const { enabledMap } = useOrgProviderSettings(orgId);
   const connectWithApiKey = useProjectConnectWithApiKey();
   const deleteConnector = useProjectDeleteConnector();
   const testConnector = useProjectTestConnector();
@@ -159,7 +162,7 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
 
   const connectedProviderIds = new Set(integrations.map((c) => c.provider));
   const availableProviders = PROVIDERS.filter(
-    (p) => !connectedProviderIds.has(p.id),
+    (p) => !connectedProviderIds.has(p.id) && enabledMap[p.id] !== false,
   );
 
   const handleConnect = (providerId: string) => {

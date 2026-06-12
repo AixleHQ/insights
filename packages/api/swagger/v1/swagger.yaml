@@ -4956,6 +4956,81 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /api/v1/organizations/{organization_id}/organization_provider_settings:
+    get:
+      summary: List org provider settings
+      description: Returns persisted enable/disable settings for providers. Missing providers default to enabled. Accessible by all org members.
+      tags:
+        - Organization Provider Settings
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      responses:
+        '200':
+          description: Provider settings list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OrganizationProviderSetting'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/organization_provider_settings/{provider}:
+    patch:
+      summary: Enable or disable a provider for the org
+      description: Upserts the enable/disable setting for a single provider. Requires owner role.
+      tags:
+        - Organization Provider Settings
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: provider
+          in: path
+          required: true
+          description: Provider key (e.g. github, anthropic, slack)
+          schema:
+            type: string
+            enum: [github, gitlab, bitbucket, jira, linear, openrouter, anthropic, openai, gemini, slack, github_copilot, claude, figma, cursor, google]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [organization_provider_setting]
+              properties:
+                organization_provider_setting:
+                  type: object
+                  required: [enabled]
+                  properties:
+                    enabled:
+                      type: boolean
+      responses:
+        '200':
+          description: Updated provider setting
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OrganizationProviderSetting'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
 # ============================================
 # COMPONENTS
 # ============================================
@@ -5077,6 +5152,18 @@ components:
             $ref: '#/components/schemas/ValidationError'
 
   schemas:
+    OrganizationProviderSetting:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        provider:
+          type: string
+          enum: [github, gitlab, bitbucket, jira, linear, openrouter, anthropic, openai, gemini, slack, github_copilot, claude, figma, cursor, google]
+        enabled:
+          type: boolean
+
     PricingEntry:
       type: object
       properties:

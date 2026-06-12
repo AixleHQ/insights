@@ -531,7 +531,7 @@ export function ProjectDetail() {
         {/* ── Integrations (lead-only) ── */}
         {isProjectOwner && (
           <TabsContent value="integrations" className="mt-4">
-            <ProjectConnectorsTab projectId={id || ""} />
+            <ProjectConnectorsTab projectId={id || ""} orgId={currentOrg?.id || ""} />
           </TabsContent>
         )}
 

@@ -4573,6 +4573,19 @@ CREATE TABLE public.organization_memberships (
 
 
 --
+-- Name: organization_provider_settings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_provider_settings (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    provider character varying NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+--
 -- Name: organization_retention_policies; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -8171,6 +8184,13 @@ ALTER TABLE ONLY public.organization_connectors
 ALTER TABLE ONLY public.organization_memberships
     ADD CONSTRAINT organization_memberships_pkey PRIMARY KEY (id);
 
+
+--
+-- Name: organization_provider_settings organization_provider_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_provider_settings
+    ADD CONSTRAINT organization_provider_settings_pkey PRIMARY KEY (id);
 
 --
 -- Name: organization_retention_policies organization_retention_policies_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -12204,6 +12224,12 @@ CREATE INDEX index_notifications_on_user_id_and_read_at ON public.notifications 
 
 
 --
+-- Name: index_org_provider_settings_on_org_and_provider; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_org_provider_settings_on_org_and_provider ON public.organization_provider_settings USING btree (organization_id, provider);
+
+--
 -- Name: index_organization_audit_logs_on_action; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -12286,6 +12312,12 @@ CREATE INDEX index_organization_memberships_on_user_id ON public.organization_me
 
 CREATE UNIQUE INDEX index_organization_memberships_on_user_id_and_organization_id ON public.organization_memberships USING btree (user_id, organization_id);
 
+
+--
+-- Name: index_organization_provider_settings_on_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_organization_provider_settings_on_organization_id ON public.organization_provider_settings USING btree (organization_id);
 
 --
 -- Name: index_organization_retention_policies_on_organization_id; Type: INDEX; Schema: public; Owner: -
@@ -14447,6 +14479,13 @@ ALTER TABLE ONLY public.audit_logs
 
 
 --
+-- Name: organization_provider_settings fk_rails_167d6eba5a; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_provider_settings
+    ADD CONSTRAINT fk_rails_167d6eba5a FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+
+--
 -- Name: project_memberships fk_rails_18b611e244; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -14805,6 +14844,7 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260609191045'),
 ('20260608000001'),
 ('20260527100000'),
 ('20260525234350'),

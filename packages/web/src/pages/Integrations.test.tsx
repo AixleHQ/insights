@@ -6,11 +6,13 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { Integrations } from "./Integrations";
 import { useConnectors, useToolAccounts } from "../hooks/useApi";
 
+const mockHasRole = vi.fn(() => true);
+
 vi.mock("@/contexts/OrgContext", () => ({
   useOrg: () => ({
     currentOrg: { id: "test-org-id", name: "Test Org", slug: "test-org" },
     isLoading: false,
-    hasRole: () => true,
+    hasRole: mockHasRole,
   }),
 }));
 
@@ -68,6 +70,7 @@ function renderAt(path: string) {
 describe("Integrations", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockHasRole.mockReturnValue(true);
     vi.mocked(useConnectors).mockReturnValue({ data: [], isLoading: false } as ReturnType<typeof useConnectors>);
     vi.mocked(useToolAccounts).mockReturnValue({ data: [], isLoading: false } as ReturnType<typeof useToolAccounts>);
   });
@@ -213,6 +216,20 @@ describe("Integrations", () => {
 
       renderAt("/integrations/available");
       expect(screen.queryByText("GitLab")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Manage Catalog button", () => {
+    it("is visible for org owners", () => {
+      mockHasRole.mockReturnValue(true);
+      renderAt("/integrations/connected");
+      expect(screen.getByRole("button", { name: /manage catalog/i })).toBeInTheDocument();
+    });
+
+    it("is not rendered for non-owners (org members)", () => {
+      mockHasRole.mockReturnValue(false);
+      renderAt("/integrations/connected");
+      expect(screen.queryByRole("button", { name: /manage catalog/i })).not.toBeInTheDocument();
     });
   });
 });

@@ -100,6 +100,9 @@ Rails.application.routes.draw do
           end
         end
 
+        # Org-level provider enable/disable settings (Admin manage catalog)
+        resources :organization_provider_settings, only: [ :index, :update ], param: :provider
+
         # User tool accounts (scoped to current user's membership)
         resources :tool_accounts, controller: "user_tool_accounts" do
           member do

@@ -13,6 +13,7 @@ const mockConnectWithSlack = vi.fn();
 const mockConnectWithWebhook = vi.fn();
 const mockDeleteConnector = vi.fn();
 const mockTestConnector = vi.fn();
+const mockOrgProviderSettings = vi.fn();
 
 vi.mock("@/contexts/OrgContext", () => ({
   useOrg: () => ({
@@ -28,6 +29,7 @@ vi.mock("@/hooks/useApi", () => ({
   useProjectDeleteConnector: () => ({ mutateAsync: mockDeleteConnector }),
   useProjectTestConnector: () => ({ mutateAsync: mockTestConnector }),
   useConnectWithApiKey: () => ({ mutateAsync: vi.fn() }),
+  useOrgProviderSettings: () => mockOrgProviderSettings(),
 }));
 
 const PROJECT_ID = "test-project-id";
@@ -61,6 +63,7 @@ describe("ProjectConnectorsTab", () => {
     mockConnectWithSlack.mockResolvedValue({});
     mockDeleteConnector.mockResolvedValue({});
     mockTestConnector.mockResolvedValue({ data: { success: true } });
+    mockOrgProviderSettings.mockReturnValue({ enabledMap: {}, isLoading: false, isError: false });
   });
 
   describe("Loading state", () => {
@@ -149,6 +152,37 @@ describe("ProjectConnectorsTab", () => {
       expect(screen.getByText("OpenRouter")).toBeInTheDocument();
       expect(screen.getByText("Gemini")).toBeInTheDocument();
       expect(screen.getByText("Slack")).toBeInTheDocument();
+    });
+
+    it("hides a provider that is disabled in the org catalog", async () => {
+      mockOrgProviderSettings.mockReturnValue({
+        enabledMap: { anthropic: false },
+        isLoading: false,
+        isError: false,
+      });
+      mockProjectConnectors.mockReturnValue({ data: [], isLoading: false });
+      const user = userEvent.setup();
+      renderComponent();
+
+      await user.click(screen.getByRole("tab", { name: /available/i }));
+
+      expect(screen.queryByText("Anthropic API")).not.toBeInTheDocument();
+      expect(screen.getByText("OpenAI")).toBeInTheDocument();
+    });
+
+    it("shows all providers when catalog settings are loading (fail-open)", async () => {
+      mockOrgProviderSettings.mockReturnValue({
+        enabledMap: {},
+        isLoading: true,
+        isError: false,
+      });
+      mockProjectConnectors.mockReturnValue({ data: [], isLoading: false });
+      const user = userEvent.setup();
+      renderComponent();
+
+      await user.click(screen.getByRole("tab", { name: /available \(5\)/i }));
+
+      expect(screen.getByText("Anthropic API")).toBeInTheDocument();
     });
 
     it("shows empty state when all providers are connected", async () => {

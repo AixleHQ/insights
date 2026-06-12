@@ -369,7 +369,8 @@ RSpec.describe 'Api::V1::Ingest', type: :request do
       end
 
       it 'falls back to ENV default when no org setting exists' do
-        stub_const('ENV', ENV.to_h.merge('INGEST_RATE_LIMIT_DEFAULT' => '2'))
+        allow(ENV).to receive(:fetch).and_call_original
+        allow(ENV).to receive(:fetch).with("INGEST_RATE_LIMIT_DEFAULT", "1000").and_return("2")
         2.times { ingest_post }
         ingest_post
         expect(response).to have_http_status(:too_many_requests)
