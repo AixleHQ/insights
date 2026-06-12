@@ -175,7 +175,7 @@ function pathCIngestNote(verdict: PathCLegacyVerdict, legacyCount: number, total
  * Does not read disk outside Cursor's User directory unless `baseDir` is passed (tests).
  */
 export function auditCursorLocalStores(baseDir?: string): CursorStoreAuditReport {
-  const sqlite_probe_ok = probeCursorGlobalStateDb(false);
+  const sqlite_probe_ok = probeCursorGlobalStateDb(false, baseDir);
   const statePaths = findStateVscDbs(baseDir);
   const globalPath =
     statePaths.find((p) => isGlobalStateDbPath(p)) ??

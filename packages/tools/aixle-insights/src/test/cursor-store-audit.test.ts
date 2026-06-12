@@ -99,4 +99,22 @@ describe("auditCursorLocalStores", () => {
     expect(report.state_vscdb.global.daily_stats_key_count).toBe(1);
     expect(report.daily_stats_versions.buckets.some((b) => b.version === "v1.5")).toBe(true);
   });
+
+  it("uses provided baseDir for sqlite probe", () => {
+    const root = mkdtempSync(join(tmpdir(), "db90-audit-probe-"));
+    const dbPath = join(root, "globalStorage", "state.vscdb");
+    createItemTableDb(dbPath, [
+      {
+        key: "aiCodeTracking.dailyStats.v1.5.2026-06-12",
+        value: JSON.stringify({ tabSuggestedLines: 1, tabAcceptedLines: 0 }),
+      },
+    ]);
+
+    const ok = auditCursorLocalStores(root);
+    expect(ok.sqlite_probe_ok).toBe(true);
+
+    const emptyRoot = mkdtempSync(join(tmpdir(), "db90-audit-probe-empty-"));
+    const missing = auditCursorLocalStores(emptyRoot);
+    expect(missing.sqlite_probe_ok).toBe(false);
+  });
 });

@@ -8,6 +8,7 @@ import {
   findCursorDbs,
   findCursorTranscriptFiles,
   findStateVscDbs,
+  probeCursorGlobalStateDb,
   parseCursorTranscriptFile,
   readLegacyEvents,
   readCursorTranscriptSessions,
@@ -132,6 +133,39 @@ describe("findStateVscDbs", () => {
     }
     // +1 for the always-included globalStorage path
     expect(findStateVscDbs(tempDir).length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("probeCursorGlobalStateDb", () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = makeTempDir();
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  it("returns true for a readable global state.vscdb with ItemTable", () => {
+    const globalDir = join(tempDir, "globalStorage");
+    mkdirSync(globalDir, { recursive: true });
+    createItemTableDb(join(globalDir, "state.vscdb"), [
+      {
+        key: "aiCodeTracking.dailyStats.v1.5.2026-06-12",
+        value: JSON.stringify({ tabSuggestedLines: 1, tabAcceptedLines: 1 }),
+      },
+    ]);
+
+    expect(probeCursorGlobalStateDb(false, tempDir)).toBe(true);
+  });
+
+  it("returns false when global state.vscdb is missing under baseDir", () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(probeCursorGlobalStateDb(false, tempDir)).toBe(false);
+    expect(errorSpy).toHaveBeenCalled();
   });
 });
 

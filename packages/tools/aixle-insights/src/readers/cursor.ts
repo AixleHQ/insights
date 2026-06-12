@@ -58,8 +58,8 @@ function logDbTables(db: Database.Database, dbPath: string, label: string): void
 }
 
 /** Smoke-test better-sqlite3 against the global Cursor state DB (CUR-V02 / verify scripts). */
-export function probeCursorGlobalStateDb(verbose = false): boolean {
-  const dbPath = join(cursorUserDir(), "globalStorage", "state.vscdb");
+export function probeCursorGlobalStateDb(verbose = false, baseDir?: string): boolean {
+  const dbPath = join(baseDir ?? cursorUserDir(), "globalStorage", "state.vscdb");
   try {
     const db = new Database(dbPath, { readonly: true });
     const row = db
