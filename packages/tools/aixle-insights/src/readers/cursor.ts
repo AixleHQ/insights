@@ -10,9 +10,10 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 import { glob } from "glob";
-import Database from "better-sqlite3";
+import type Database from "better-sqlite3";
 import type { IngestPayload } from "../lib/index.js";
 import { type RiskLevel, scanText } from "../risk-scanner.js";
+import { openCursorSqliteReadonly } from "./cursor-sqlite.js";
 
 // ─── Reader: paths & SQLite ──────────────────────────────────────────────────
 
@@ -59,15 +60,21 @@ function logDbTables(db: Database.Database, dbPath: string, label: string): void
 
 /** Smoke-test better-sqlite3 against the global Cursor state DB (CUR-V02 / verify scripts). */
 export function probeCursorGlobalStateDb(verbose = false, baseDir?: string): boolean {
-  const dbPath = join(baseDir ?? cursorUserDir(), "globalStorage", "state.vscdb");
+  const userDir = baseDir ?? cursorUserDir();
+  const dbPath = join(userDir, "globalStorage", "state.vscdb");
+  const opened = openCursorSqliteReadonly(dbPath, { rootDir: userDir });
+  if (!opened.ok) {
+    console.error(`  [probe] failed to read ${dbPath}: ${opened.message}`);
+    return false;
+  }
+
+  const db = opened.db;
   try {
-    const db = new Database(dbPath, { readonly: true });
     const row = db
       .prepare(
         `SELECT count(*) AS c FROM ${STATE_TABLE} WHERE key LIKE 'aiCodeTracking.dailyStats%'`
       )
       .get() as { c: number };
-    db.close();
     if (verbose) {
       console.log(`  [probe] global state.vscdb OK — ${row.c} dailyStats key(s)`);
     }
@@ -76,6 +83,8 @@ export function probeCursorGlobalStateDb(verbose = false, baseDir?: string): boo
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`  [probe] failed to read ${dbPath}: ${msg}`);
     return false;
+  } finally {
+    db.close();
   }
 }
 
@@ -105,11 +114,14 @@ function readLegacyFromDb(
   dbPath: string,
   since: Date | null,
   workspacePath: string,
+  rootDir: string,
   verbose: boolean
 ): CursorRow[] {
   let db: Database.Database | null = null;
   try {
-    db = new Database(dbPath, { readonly: true });
+    const opened = openCursorSqliteReadonly(dbPath, { rootDir });
+    if (!opened.ok) return [];
+    db = opened.db;
 
     if (verbose) logDbTables(db, dbPath, "cursor.db");
 
@@ -145,6 +157,7 @@ export function readLegacyEvents(
   baseDir?: string,
   verbose = false
 ): Array<{ row: CursorRow; workspacePath: string }> {
+  const rootDir = baseDir ?? cursorUserDir();
   const dbPaths = findCursorDbs(baseDir);
 
   if (verbose) console.log(`Found ${dbPaths.length} legacy cursor.db file(s)`);
@@ -152,7 +165,7 @@ export function readLegacyEvents(
   const results: Array<{ row: CursorRow; workspacePath: string }> = [];
   for (const dbPath of dbPaths) {
     const workspacePath = dbPath.replace(/[\\/]cursor\.db$/, "");
-    for (const row of readLegacyFromDb(dbPath, since, workspacePath, verbose)) {
+    for (const row of readLegacyFromDb(dbPath, since, workspacePath, rootDir, verbose)) {
       results.push({ row, workspacePath });
     }
   }
@@ -313,11 +326,14 @@ export function findStateVscDbs(baseDir?: string): string[] {
 function readDailyStatsFromDb(
   dbPath: string,
   since: Date | null,
+  rootDir: string,
   verbose: boolean
 ): DailyStatsEntry[] {
   let db: Database.Database | null = null;
   try {
-    db = new Database(dbPath, { readonly: true });
+    const opened = openCursorSqliteReadonly(dbPath, { rootDir });
+    if (!opened.ok) return [];
+    db = opened.db;
 
     if (verbose) logDbTables(db, dbPath, "state.vscdb");
 
@@ -366,6 +382,7 @@ function readDailyStatsRaw(
   baseDir: string | undefined,
   verbose: boolean
 ): DailyStatsEntry[] {
+  const rootDir = baseDir ?? cursorUserDir();
   const dbPaths = findStateVscDbs(baseDir);
 
   if (verbose) {
@@ -375,7 +392,7 @@ function readDailyStatsRaw(
 
   const raw: DailyStatsEntry[] = [];
   for (const dbPath of dbPaths) {
-    raw.push(...readDailyStatsFromDb(dbPath, since, verbose));
+    raw.push(...readDailyStatsFromDb(dbPath, since, rootDir, verbose));
   }
   return raw;
 }
@@ -449,11 +466,14 @@ function dedupeRecentCommitSnapshots(entries: RecentCommitSnapshot[]): RecentCom
 function readRecentCommitFromDb(
   dbPath: string,
   since: Date | null,
+  rootDir: string,
   verbose: boolean
 ): RecentCommitSnapshot[] {
   let db: Database.Database | null = null;
   try {
-    db = new Database(dbPath, { readonly: true });
+    const opened = openCursorSqliteReadonly(dbPath, { rootDir });
+    if (!opened.ok) return [];
+    db = opened.db;
     if (!tableExists(db, STATE_TABLE)) return [];
 
     const row = db
@@ -496,6 +516,7 @@ export function readRecentCommitSnapshots(
   baseDir?: string,
   verbose = false
 ): RecentCommitSnapshot[] {
+  const rootDir = baseDir ?? cursorUserDir();
   const dbPaths = findStateVscDbs(baseDir);
   if (verbose) {
     console.log(`Searching recentCommit: ${baseDir ?? cursorUserDir()}`);
@@ -503,7 +524,7 @@ export function readRecentCommitSnapshots(
 
   const found: RecentCommitSnapshot[] = [];
   for (const dbPath of dbPaths) {
-    found.push(...readRecentCommitFromDb(dbPath, since, verbose));
+    found.push(...readRecentCommitFromDb(dbPath, since, rootDir, verbose));
   }
   return dedupeRecentCommitSnapshots(found);
 }
@@ -586,7 +607,9 @@ function readComposerHeaders(baseDir?: string): Map<string, CursorComposerHeader
   let db: Database.Database | null = null;
 
   try {
-    db = new Database(dbPath, { readonly: true });
+    const opened = openCursorSqliteReadonly(dbPath, { rootDir: userDir });
+    if (!opened.ok) return new Map();
+    db = opened.db;
     if (!tableExists(db, STATE_TABLE)) return new Map();
 
     const row = db

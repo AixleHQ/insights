@@ -1,0 +1,12 @@
+{
+  "fixtures": [
+    {
+      "file": "not-sqlite.db",
+      "purpose": "plain text, invalid sqlite payload"
+    },
+    {
+      "file": "sqlite-truncated.db",
+      "purpose": "truncated sqlite-like content"
+    }
+  ]
+}

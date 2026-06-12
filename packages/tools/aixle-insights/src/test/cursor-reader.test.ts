@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
 import {
   findCursorDbs,
@@ -62,6 +63,14 @@ function createEmptyDb(dbPath: string): void {
   const db = new Database(dbPath);
   db.close();
 }
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const malformedNotSqliteFixture = join(
+  __dirname,
+  "fixtures",
+  "malformed",
+  "not-sqlite.db"
+);
 
 // ─── findCursorDbs ────────────────────────────────────────────────────────────
 
@@ -256,6 +265,41 @@ describe("readLegacyEvents", () => {
     expect(results[0].workspacePath).not.toContain("cursor.db");
     expect(results[0].workspacePath).toContain("ws1");
   });
+
+  it("returns empty when a discovered cursor.db is malformed", () => {
+    const wsDir = join(tempDir, "workspaceStorage", "ws1");
+    mkdirSync(wsDir, { recursive: true });
+    writeFileSync(join(wsDir, "cursor.db"), readFileSync(malformedNotSqliteFixture));
+
+    expect(readLegacyEvents(null, tempDir)).toEqual([]);
+  });
+
+  it("ignores symlinked cursor.db files that resolve outside baseDir", () => {
+    const outsideRoot = makeTempDir();
+    try {
+      const targetDb = join(outsideRoot, "outside", "cursor.db");
+      mkdirSync(join(targetDb, ".."), { recursive: true });
+      createLegacyDb(targetDb, [
+        {
+          requestId: "r1",
+          timestamp: 1700000000000,
+          model: "gpt-4",
+          promptTokens: 10,
+          generatedTokens: 5,
+          type: 0,
+          sessionId: null,
+        },
+      ]);
+
+      const symlinkPath = join(tempDir, "workspaceStorage", "ws1", "cursor.db");
+      mkdirSync(join(symlinkPath, ".."), { recursive: true });
+      symlinkSync(targetDb, symlinkPath);
+
+      expect(readLegacyEvents(null, tempDir)).toEqual([]);
+    } finally {
+      rmSync(outsideRoot, { recursive: true, force: true });
+    }
+  });
 });
 
 // ─── readDailyStats ───────────────────────────────────────────────────────────
@@ -405,6 +449,14 @@ describe("readRecentCommitSnapshots", () => {
   it("returns empty when key is absent", () => {
     makeGlobalDb([{ key: "other.key", value: "{}" }]);
     expect(readRecentCommitSnapshots(null, tempDir)).toHaveLength(0);
+  });
+
+  it("returns empty when global state.vscdb is malformed", () => {
+    const globalDir = join(tempDir, "globalStorage");
+    mkdirSync(globalDir, { recursive: true });
+    writeFileSync(join(globalDir, "state.vscdb"), readFileSync(malformedNotSqliteFixture));
+
+    expect(readRecentCommitSnapshots(null, tempDir)).toEqual([]);
   });
 });
 
@@ -573,5 +625,35 @@ describe("readDailyStats — security", () => {
     // ../../../etc is resolved by glob but no .vscdb files exist there
     const result = readDailyStats(null, join(tmpdir(), "..", "..", "etc"), false);
     expect(result).toEqual([]);
+  });
+
+  it("returns empty when global state.vscdb is malformed", () => {
+    const globalDir = join(tempDir, "globalStorage");
+    mkdirSync(globalDir, { recursive: true });
+    writeFileSync(join(globalDir, "state.vscdb"), readFileSync(malformedNotSqliteFixture));
+
+    expect(readDailyStats(null, tempDir)).toEqual([]);
+  });
+
+  it("ignores symlinked state.vscdb files that resolve outside baseDir", () => {
+    const outsideRoot = makeTempDir();
+    try {
+      const targetDb = join(outsideRoot, "outside", "state.vscdb");
+      mkdirSync(join(targetDb, ".."), { recursive: true });
+      createItemTableDb(targetDb, [
+        {
+          key: "aiCodeTracking.dailyStats.v1.5.2026-06-12",
+          value: JSON.stringify({ tabSuggestedLines: 3, tabAcceptedLines: 1 }),
+        },
+      ]);
+
+      const symlinkPath = join(tempDir, "workspaceStorage", "ws1", "state.vscdb");
+      mkdirSync(join(symlinkPath, ".."), { recursive: true });
+      symlinkSync(targetDb, symlinkPath);
+
+      expect(readDailyStats(null, tempDir)).toEqual([]);
+    } finally {
+      rmSync(outsideRoot, { recursive: true, force: true });
+    }
   });
 });

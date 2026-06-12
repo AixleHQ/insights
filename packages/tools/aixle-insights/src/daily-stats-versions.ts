@@ -101,7 +101,10 @@ function mergeBuckets(
 /**
  * Read all `aiCodeTracking.dailyStats%` keys from one `state.vscdb` file.
  */
-export function discoverDailyStatsVersionsInDb(dbPath: string): DailyStatsVersionDiscovery {
+export function discoverDailyStatsVersionsInDb(
+  dbPath: string,
+  options: { rootDir?: string } = {}
+): DailyStatsVersionDiscovery {
   const byVersion = new Map<
     string,
     { count: number; dateMin: string | null; dateMax: string | null; samples: string[] }
@@ -110,7 +113,7 @@ export function discoverDailyStatsVersionsInDb(dbPath: string): DailyStatsVersio
 
   let db: Database.Database | null = null;
   try {
-    const opened = openCursorSqliteReadonly(dbPath);
+    const opened = openCursorSqliteReadonly(dbPath, { rootDir: options.rootDir });
     if (!opened.ok) return emptyDiscovery();
     db = opened.db;
     const table = db
