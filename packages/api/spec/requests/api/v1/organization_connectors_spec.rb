@@ -180,6 +180,46 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
         end
       end
     end
+
+    context 'with a Cursor connector' do
+      it 'creates a cursor connector when API key is valid' do
+        allow_any_instance_of(Oauth::CursorProvider)
+          .to receive(:test_connection).and_return({ success: true })
+
+        authenticated_post "/api/v1/organizations/#{organization.id}/connectors",
+                           user: admin,
+                           organization: organization,
+                           params: { connector_type: 'cursor', access_token: 'valid-cursor-key' }
+
+        expect_created
+        expect(json_data[:connectorType]).to eq('cursor')
+      end
+
+      it 'returns 422 when Cursor API key is invalid' do
+        allow_any_instance_of(Oauth::CursorProvider)
+          .to receive(:test_connection).and_return({ success: false, error: 'Invalid or unauthorised Cursor API key.' })
+
+        authenticated_post "/api/v1/organizations/#{organization.id}/connectors",
+                           user: admin,
+                           organization: organization,
+                           params: { connector_type: 'cursor', access_token: 'bad-key' }
+
+        expect_unprocessable
+        expect(json_response[:errors][:access_token]).to include('Invalid or unauthorised Cursor API key.')
+      end
+
+      it 'does not create a cursor connector when API key is invalid' do
+        allow_any_instance_of(Oauth::CursorProvider)
+          .to receive(:test_connection).and_return({ success: false, error: 'Invalid or unauthorised Cursor API key.' })
+
+        expect {
+          authenticated_post "/api/v1/organizations/#{organization.id}/connectors",
+                             user: admin,
+                             organization: organization,
+                             params: { connector_type: 'cursor', access_token: 'bad-key' }
+        }.not_to change(OrganizationConnector, :count)
+      end
+    end
   end
 
   describe 'PATCH /api/v1/organizations/:organization_id/connectors/:id' do
@@ -333,6 +373,18 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
       expect_success
       expect(connector.reload.status).to eq('testing')
       expect(GithubSyncJob).to have_received(:perform_later).with(connector.id)
+    end
+
+    it 'enqueues CursorSyncJob for a cursor connector' do
+      cursor_connector = create(:organization_connector, :cursor, organization: organization)
+      allow(CursorSyncJob).to receive(:perform_later)
+
+      authenticated_post "/api/v1/organizations/#{organization.id}/connectors/#{cursor_connector.id}/sync",
+                         user: admin,
+                         organization: organization
+
+      expect_success
+      expect(CursorSyncJob).to have_received(:perform_later).with(cursor_connector.id)
     end
   end
 
@@ -786,6 +838,54 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
       expect_success
       expect(json_data.first).to have_key(:scope)
       expect(json_data.first[:scope]).to eq('project')
+    end
+  end
+
+  describe 'Cursor connector serializer read path' do
+    let!(:cursor_connector) do
+      create(:organization_connector, :cursor, organization: organization,
+             status: 'connected',
+             config: {
+               "seat_count"            => 12,
+               "overage_spend_cents"   => 875.5,
+               "overall_spend_cents"   => 3200.0,
+               "fast_premium_requests" => 410,
+               "billing_cycle_start"   => "2026-06-01T00:00:00Z"
+             })
+    end
+
+    it 'exposes billing fields on GET /connectors/:id' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{cursor_connector.id}",
+                        user: member,
+                        organization: organization
+
+      expect_success
+      expect(json_data[:seatCount]).to eq(12)
+      expect(json_data[:overageSpendCents]).to eq(875.5)
+      expect(json_data[:overallSpendCents]).to eq(3200.0)
+      expect(json_data[:fastPremiumRequests]).to eq(410)
+      expect(json_data[:billingCycleStart]).to eq("2026-06-01T00:00:00Z")
+    end
+
+    it 'returns nil billing fields for non-cursor connectors' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{connector.id}",
+                        user: member,
+                        organization: organization
+
+      expect_success
+      expect(json_data[:overageSpendCents]).to be_nil
+      expect(json_data[:overallSpendCents]).to be_nil
+      expect(json_data[:fastPremiumRequests]).to be_nil
+      expect(json_data[:billingCycleStart]).to be_nil
+    end
+
+    it 'returns scope=org for cursor connectors' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{cursor_connector.id}",
+                        user: member,
+                        organization: organization
+
+      expect_success
+      expect(json_data[:scope]).to eq('org')
     end
   end
 

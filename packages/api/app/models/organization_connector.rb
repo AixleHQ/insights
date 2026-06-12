@@ -1,5 +1,5 @@
 class OrganizationConnector < ApplicationRecord
-  CONNECTOR_TYPES = %w[github gitlab bitbucket jira linear openrouter anthropic openai gemini slack github_copilot].freeze
+  CONNECTOR_TYPES = %w[github gitlab bitbucket jira linear openrouter anthropic openai gemini slack github_copilot cursor].freeze
   STATUSES = %w[connected testing error disconnected].freeze
   SCOPES = %w[org project persona].freeze
 
@@ -8,7 +8,7 @@ class OrganizationConnector < ApplicationRecord
     "github" => "project", "gitlab" => "project", "bitbucket" => "project",
     "jira" => "org", "linear" => "org", "slack" => "org",
     "anthropic" => "org", "openai" => "org", "openrouter" => "org",
-    "gemini" => "org", "github_copilot" => "org"
+    "gemini" => "org", "github_copilot" => "org", "cursor" => "org"
   }.freeze
 
   belongs_to :organization
@@ -54,6 +54,10 @@ class OrganizationConnector < ApplicationRecord
 
   def copilot?
     connector_type == "github_copilot"
+  end
+
+  def cursor?
+    connector_type == "cursor"
   end
 
   def openrouter?

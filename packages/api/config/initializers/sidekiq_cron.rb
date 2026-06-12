@@ -15,6 +15,12 @@ Sidekiq.configure_server do |config|
         "queue" => "connectors",
         "description" => "Fan out daily GitHub Copilot usage sync for all active connectors"
       },
+      "cursor_daily" => {
+        "class" => "CursorDailyJob",
+        "cron" => "0 6 * * *",
+        "queue" => "connectors",
+        "description" => "Fan out daily Cursor Teams billing sync (seat count + overage) for all active connectors"
+      },
       "update_timescale_retention" => {
         "class" => "UpdateTimescaleRetentionJob",
         "cron" => "0 1 * * *",

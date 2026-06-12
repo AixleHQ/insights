@@ -41,7 +41,7 @@ class OrganizationConnectorSerializer < BaseSerializer
   end
 
   attribute :seat_count do |connector|
-    connector.config&.dig("seat_count") if connector.copilot?
+    connector.config&.dig("seat_count") if connector.copilot? || connector.cursor?
   end
 
   attribute :active_users_count do |connector|
@@ -78,6 +78,22 @@ class OrganizationConnectorSerializer < BaseSerializer
 
   attribute :copilot_connector do |connector|
     connector.copilot?
+  end
+
+  attribute :overage_spend_cents do |connector|
+    connector.config&.dig("overage_spend_cents") if connector.cursor?
+  end
+
+  attribute :overall_spend_cents do |connector|
+    connector.config&.dig("overall_spend_cents") if connector.cursor?
+  end
+
+  attribute :fast_premium_requests do |connector|
+    connector.config&.dig("fast_premium_requests") if connector.cursor?
+  end
+
+  attribute :billing_cycle_start do |connector|
+    connector.config&.dig("billing_cycle_start") if connector.cursor?
   end
 
   attribute :repository_count do |connector|

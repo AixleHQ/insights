@@ -1072,7 +1072,7 @@ paths:
               properties:
                 connector_type:
                   type: string
-                  enum: [github, gitlab, bitbucket, jira, linear, openrouter, anthropic, openai, gemini, slack, github_copilot]
+                  enum: [github, gitlab, bitbucket, jira, linear, openrouter, anthropic, openai, gemini, slack, github_copilot, cursor]
                 access_token:
                   type: string
                   description: OAuth access token (sensitive)
@@ -5686,7 +5686,7 @@ components:
           format: uuid
         connectorType:
           type: string
-          enum: [github, gitlab, bitbucket, jira, linear, openrouter, anthropic, openai, gemini, slack, github_copilot]
+          enum: [github, gitlab, bitbucket, jira, linear, openrouter, anthropic, openai, gemini, slack, github_copilot, cursor]
         isActive:
           type: boolean
         externalAccountId:
@@ -5719,6 +5719,25 @@ components:
         seatCount:
           type: integer
           nullable: true
+        overageSpendCents:
+          type: number
+          format: float
+          nullable: true
+          description: Cursor on-demand spend excluding included allowance (overage), in cents. Null for non-Cursor connectors.
+        overallSpendCents:
+          type: number
+          format: float
+          nullable: true
+          description: Cursor total spend including included allowance, in cents. Null for non-Cursor connectors.
+        fastPremiumRequests:
+          type: integer
+          nullable: true
+          description: Cursor fast/premium request count for the current billing cycle. Null for non-Cursor connectors.
+        billingCycleStart:
+          type: string
+          format: date-time
+          nullable: true
+          description: ISO8601 start of the current Cursor billing cycle. Null for non-Cursor connectors.
         activeUsersCount:
           type: integer
         meteredUnitsUsed:

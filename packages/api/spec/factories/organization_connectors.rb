@@ -48,6 +48,12 @@ FactoryBot.define do
       access_token { SecureRandom.hex(32) }
     end
 
+    trait :cursor do
+      connector_type { "cursor" }
+      access_token { "cursor_test_api_key_#{SecureRandom.hex(8)}" }
+      status { "connected" }
+    end
+
     trait :with_tokens do
       access_token { SecureRandom.hex(32) }
       refresh_token { SecureRandom.hex(32) }
