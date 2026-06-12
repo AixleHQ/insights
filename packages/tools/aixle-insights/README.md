@@ -2,6 +2,10 @@
 
 stdio **MCP server** for AI coding-assistant telemetry. Ingests Claude Code JSONL transcripts and Cursor IDE SQLite telemetry into your organization's ingest API, exposes operator tools on the MCP bridge, and pairs with `aixle-insights init` so teammates can onboard without juggling cron jobs or brittle shell hooks.
 
+## Architecture reference
+
+For implementation architecture, design decisions, and package direction, see [`ARD.md`](./ARD.md).
+
 ## Install
 
 ```bash
@@ -171,6 +175,12 @@ After the script reports success: **quit and reopen Claude Code / Cursor** so ea
 
 - Node.js ≥ 20.
 - macOS / Linux / Windows. On Windows, the package writes a `cmd /c npx …` wrapper in `~/.claude.json` so Claude Code can spawn the MCP server reliably.
+- `better-sqlite3` is a native module. After a Node upgrade, if SQLite reads start failing, rebuild it from the tools workspace:
+
+```bash
+cd packages/tools
+npm rebuild better-sqlite3
+```
 
 ## License
 
