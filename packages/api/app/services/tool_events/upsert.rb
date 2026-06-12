@@ -36,6 +36,7 @@ module ToolEvents
     def call
       promote_model_from_metadata!
       enrich_cost!
+      normalize_event_type!
 
       if @session_id.present?
         upsert_with_lock
@@ -80,6 +81,33 @@ module ToolEvents
 
     def set_cost_source(source)
       @attributes[:metadata] = (@attributes[:metadata] || {}).merge("cost_source" => source)
+    end
+
+    # Re-tags generic "chat" events into finer types (commit/test/edit) from
+    # metadata hints — defensive net for pre-T-02 CLIs (AIX-260). Note:
+    # event_type is intentionally NOT in MUTABLE_FIELDS, so session re-sends
+    # never flip an existing row's type — normalization applies at create only.
+    def normalize_event_type!
+      return unless renormalization_enabled?
+
+      derived = EventTypeNormalizer.derive(
+        event_type: @attributes[:event_type],
+        metadata:   @attributes[:metadata]
+      )
+      return if derived.nil? || derived == @attributes[:event_type]
+
+      original = @attributes[:event_type]
+      @attributes[:event_type] = derived
+      @attributes[:metadata] = (@attributes[:metadata] || {}).merge(
+        "renormalized_from" => original,
+        "renormalized_by"   => "server_v1"
+      )
+    end
+
+    # Default ON outside production; production opts in by setting
+    # DB90_EVENT_TYPE_RENORMALIZATION=true on the Rails API deployment.
+    def renormalization_enabled?
+      ENV.fetch("DB90_EVENT_TYPE_RENORMALIZATION", Rails.env.production? ? "false" : "true") == "true"
     end
 
     def upsert_with_lock
