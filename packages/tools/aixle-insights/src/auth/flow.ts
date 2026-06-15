@@ -3,6 +3,7 @@ import { defaultKeycloakClientId, defaultKeycloakIssuer, obtainKeycloakAccessTok
 import { loadCredentials, saveStoredCredentials } from "./credentials.js";
 import type { TelemetryToolId, StoredCredentials } from "./credentials.js";
 import { getAppDir } from "../state.js";
+import { evaluateTransportSecurity } from "../lib/transport-security.js";
 
 export interface LoginAndPersistOptions {
   db90Host: string;
@@ -15,6 +16,8 @@ export interface LoginAndPersistOptions {
   exchangeOrganizationId?: string;
   clientId?: string;
   appDir?: string;
+  allowInsecureHttp?: boolean;
+  onSecurityWarning?: (message: string) => void;
   onVisitInstructions?: (verification_uri: string, user_code: string) => void;
   fetchImpl?: typeof fetch;
 }
@@ -66,6 +69,17 @@ export async function loginAndPersistCredentials(opts: LoginAndPersistOptions): 
         exchangeOrganizationId: opts.exchangeOrganizationId,
         fetchImpl: opts.fetchImpl,
       });
+    }
+
+    const ingestHostSecurity = evaluateTransportSecurity(exchanged.ingestHost, {
+      allowInsecureHttp: opts.allowInsecureHttp === true,
+      label: "DB90 ingest host",
+    });
+    if (!ingestHostSecurity.ok) {
+      return { ok: false, error: ingestHostSecurity.error };
+    }
+    if (ingestHostSecurity.warning) {
+      opts.onSecurityWarning?.(ingestHostSecurity.warning);
     }
 
     const existing = await loadCredentials(appDir);

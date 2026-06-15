@@ -44,6 +44,8 @@ You can also set `DB90_ORGANIZATION_ID=<uuid>` in your shell environment, or pin
 | `aixle-insights run --once` | Perform one multi-tool sync, exit. Useful for cron / manual flushes. |
 | `aixle-insights run --once --full` | Backfill: ignore Cursor watermarks and commit-hash dedupe. |
 | `aixle-insights init` | Keycloak device login + persist credentials + merge `~/.claude.json` entry. |
+| `aixle-insights init --host <url>` | Use a DB90 API origin for token exchange. Remote hosts must use HTTPS; `http://localhost` and loopback addresses are allowed for local development. |
+| `aixle-insights init --insecure --host http://...` | Allow a remote plaintext HTTP host for a trusted non-production test endpoint. Prints a warning because tokens and telemetry can be exposed. |
 | `aixle-insights init --hooks --tool-name cursor` | Also install the Cursor-side hook forwarder (opt-in; requires Cursor restart). |
 | `aixle-insights uninstall-hooks` | Remove the hook forwarder + restore `~/.cursor/hooks.json` backup. |
 | `aixle-insights verify-hooks` | Print hooks install status + queue depth as JSON. |
@@ -58,6 +60,8 @@ You can also set `DB90_ORGANIZATION_ID=<uuid>` in your shell environment, or pin
 | `DB90_KEYCLOAK_CLIENT_ID` | Defaults to `db90-web`; must allow device authorization in Keycloak. |
 | `DB90_ORGANIZATION_ID` | Optional UUID scoping `init` to that org membership (header `X-Organization-ID`). |
 | `AIXLE_INSIGHTS_HOME` | Override the local state directory (defaults to `~/.aixle-insights/`). |
+
+Remote API and ingest hosts must use `https://`. Plaintext `http://` is local-dev-only for `localhost`, `127.0.0.0/8`, and `[::1]`; those loopback URLs work without warnings. A remote `http://` host is rejected during `init` unless you pass `--insecure`, which should only be used for trusted non-production test endpoints and will print a warning because ingest tokens and telemetry can cross the network unencrypted.
 
 Note: the `DB90_*` variables above are retained as compatibility names for the deployment-side Keycloak realm/client identifiers. Future versions may rename them with a deprecation window.
 
