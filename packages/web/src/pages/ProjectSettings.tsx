@@ -10,12 +10,18 @@ import {
   Loader2,
   Save,
   Trash2,
+  Users,
+  Plug,
 } from "lucide-react";
 import {
   useProject,
   useUpdateProject,
   useDeleteProject,
+  useCurrentUser,
+  useProjectMembers,
+  type ProjectMember,
 } from "@/hooks/useApi";
+import { useOrg } from "@/contexts/OrgContext";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,20 +36,38 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ProjectSecurityTab, ProjectSettingsSection, ProjectNotFound, ProjectRetentionPolicySection, ProjectAlertsSection } from "@/components/project";
+import {
+  ProjectSecurityTab,
+  ProjectSettingsSection,
+  ProjectNotFound,
+  ProjectRetentionPolicySection,
+  ProjectAlertsSection,
+  ProjectMembersTab,
+  ProjectConnectorsTab,
+} from "@/components/project";
 import { cn } from "@/lib/utils";
 import { isGitRemoteMissing } from "@/lib/project-git-remote";
 
-const getNavItems = (id: string) => [
-  { title: "General", href: `/projects/${id}/settings`, icon: Building2 },
-  { title: "Security & Audit", href: `/projects/${id}/settings/security`, icon: FileSearch },
-  { title: "Policies", href: `/projects/${id}/settings/policies`, icon: Shield },
-  { title: "Alerts", href: `/projects/${id}/settings/alerts`, icon: Bell },
+const getNavItems = (id: string, isMemberOfProject: boolean, isProjectOwner: boolean) => [
+  { title: "General",          href: `/projects/${id}/settings`,              icon: Building2  },
+  ...(isMemberOfProject ? [{ title: "Members",      href: `/projects/${id}/settings/members`,      icon: Users      }] : []),
+  ...(isProjectOwner    ? [{ title: "Integrations", href: `/projects/${id}/settings/integrations`, icon: Plug       }] : []),
+  { title: "Security & Audit", href: `/projects/${id}/settings/security`,     icon: FileSearch },
+  { title: "Policies",         href: `/projects/${id}/settings/policies`,     icon: Shield     },
+  { title: "Alerts",           href: `/projects/${id}/settings/alerts`,       icon: Bell       },
 ];
 
-function ProjectSettingsNav({ projectId }: { projectId: string }) {
+function ProjectSettingsNav({
+  projectId,
+  isMemberOfProject,
+  isProjectOwner,
+}: {
+  projectId: string;
+  isMemberOfProject: boolean;
+  isProjectOwner: boolean;
+}) {
   const location = useLocation();
-  const navItems = getNavItems(projectId);
+  const navItems = getNavItems(projectId, isMemberOfProject, isProjectOwner);
 
   return (
     <nav className="flex flex-col gap-1">
@@ -302,8 +326,18 @@ function ProjectGeneralSettings({
 export function ProjectSettings() {
   const { id } = useParams<{ id: string }>();
   const { data: project, isLoading: isLoadingProject } = useProject(id || "");
+  const { hasRole } = useOrg();
+  const { data: me } = useCurrentUser();
+  const { data: projectMembers = [] } = useProjectMembers(id ?? "");
+
+  const myMembership = projectMembers.find((m: ProjectMember) => m.userId === me?.id);
+  const isProjectOwner = hasRole(["owner"]) || myMembership?.role === "owner";
+  const canManageMembers = hasRole(["owner"]);
+  const isMemberOfProject = isProjectOwner || !!myMembership;
 
   if (!id) return null;
+
+  const orgId = project?.organization_id ?? "";
 
   return (
     <div className="space-y-6">
@@ -329,13 +363,52 @@ export function ProjectSettings() {
 
       <div className="flex flex-col gap-8 md:flex-row">
         <aside className="w-full md:w-48 shrink-0">
-          <ProjectSettingsNav projectId={id} />
+          <ProjectSettingsNav
+            projectId={id}
+            isMemberOfProject={isMemberOfProject}
+            isProjectOwner={isProjectOwner}
+          />
         </aside>
         <div className="flex-1 min-w-0">
           <Routes>
             <Route index element={<ProjectGeneralSettings projectId={id} project={project} isLoading={isLoadingProject} />} />
-            <Route path="members" element={<Navigate to={`/projects/${id}?tab=members`} replace />} />
-            <Route path="integrations" element={<Navigate to={`/projects/${id}?tab=integrations`} replace />} />
+            <Route
+              path="members"
+              element={
+                isMemberOfProject ? (
+                  <div className="space-y-6">
+                    <div>
+                      <h2 className="text-lg font-medium">Members</h2>
+                      <p className="text-sm text-muted-foreground">Manage project member access and roles</p>
+                    </div>
+                    <ProjectMembersTab
+                      projectId={id}
+                      orgId={orgId}
+                      isProjectOwner={isProjectOwner}
+                      canManageMembers={canManageMembers}
+                    />
+                  </div>
+                ) : (
+                  <Navigate to={`/projects/${id}/settings`} replace />
+                )
+              }
+            />
+            <Route
+              path="integrations"
+              element={
+                isProjectOwner ? (
+                  <div className="space-y-6">
+                    <div>
+                      <h2 className="text-lg font-medium">Integrations</h2>
+                      <p className="text-sm text-muted-foreground">Connect AI providers and notification services to this project</p>
+                    </div>
+                    <ProjectConnectorsTab projectId={id} orgId={orgId} />
+                  </div>
+                ) : (
+                  <Navigate to={`/projects/${id}/settings`} replace />
+                )
+              }
+            />
             <Route path="security" element={<ProjectSecurityTab projectId={id} />} />
             <Route path="policies" element={<ProjectRetentionPolicySection projectId={id} />} />
             <Route
@@ -343,7 +416,7 @@ export function ProjectSettings() {
               element={
                 <ProjectAlertsSection
                   projectId={id}
-                  orgId={project?.organization_id ?? ""}
+                  orgId={orgId}
                 />
               }
             />

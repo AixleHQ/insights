@@ -21,6 +21,8 @@ const mockUseUpdateProject = vi.fn();
 const mockUseDeleteProject = vi.fn();
 const mockUseProjectRetentionPolicy = vi.fn();
 const mockUseUpdateProjectRetentionPolicy = vi.fn();
+const mockUseProjectMembers = vi.fn();
+const mockHasRole = vi.fn();
 
 vi.mock("@/hooks/useApi", () => ({
   useProject: (...args: unknown[]) => mockUseProject(...args),
@@ -29,6 +31,7 @@ vi.mock("@/hooks/useApi", () => ({
   useProjectRetentionPolicy: (...args: unknown[]) => mockUseProjectRetentionPolicy(...args),
   useUpdateProjectRetentionPolicy: () => mockUseUpdateProjectRetentionPolicy(),
   useCurrentUser: () => ({ data: { id: "user-1", email: "test@example.com" }, isLoading: false }),
+  useProjectMembers: (...args: unknown[]) => mockUseProjectMembers(...args),
 }));
 
 vi.mock("@/contexts/OrgContext", () => ({
@@ -36,6 +39,7 @@ vi.mock("@/contexts/OrgContext", () => ({
     currentOrg: { id: "test-org-id", name: "Test Org", slug: "test-org" },
     currentMembership: { role: "member" },
     isLoading: false,
+    hasRole: mockHasRole,
   }),
 }));
 
@@ -44,6 +48,8 @@ vi.mock("@/components/project", () => ({
   ProjectSettingsSection: () => <div>Email Domain Section</div>,
   ProjectRetentionPolicySection: () => <div>Retention Policy Section</div>,
   ProjectAlertsSection: () => <div>Alerts Section</div>,
+  ProjectMembersTab: () => <div>Members Tab</div>,
+  ProjectConnectorsTab: () => <div>Connectors Tab</div>,
   ProjectNotFound: () => (
     <div>
       <p>Project not found</p>
@@ -76,12 +82,17 @@ function renderAtPath(path: string) {
   );
 }
 
+const mockProjectMember = { id: "pm-1", userId: "user-1", role: "owner" as const };
+
 function setupDefaultMocks() {
   mockUseProject.mockReturnValue({ data: mockProject, isLoading: false });
   mockUseUpdateProject.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
   mockUseDeleteProject.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
   mockUseProjectRetentionPolicy.mockReturnValue({ data: undefined, isLoading: false });
   mockUseUpdateProjectRetentionPolicy.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+  // Default: current user is a project member with owner role; org role is non-owner
+  mockUseProjectMembers.mockReturnValue({ data: [mockProjectMember] });
+  mockHasRole.mockReturnValue(false);
 }
 
 describe("ProjectSettings", () => {
@@ -113,15 +124,34 @@ describe("ProjectSettings", () => {
   });
 
   describe("Sidebar navigation", () => {
-    it("renders settings nav links without Members or Integrations", () => {
+    it("shows all 6 nav links for a project owner", () => {
+      mockHasRole.mockReturnValue(true);
       renderAtPath("/projects/proj-1/settings");
 
       expect(screen.getByRole("link", { name: /general/i })).toBeInTheDocument();
-      expect(screen.queryByRole("link", { name: /^members$/i })).not.toBeInTheDocument();
-      expect(screen.queryByRole("link", { name: /^integrations$/i })).not.toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /^members$/i })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /^integrations$/i })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: /security & audit/i })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: /policies/i })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: /alerts/i })).toBeInTheDocument();
+    });
+
+    it("shows Members but not Integrations for a project member who is not org owner", () => {
+      mockHasRole.mockReturnValue(false);
+      mockUseProjectMembers.mockReturnValue({ data: [{ id: "pm-1", userId: "user-1", role: "member" }] });
+      renderAtPath("/projects/proj-1/settings");
+
+      expect(screen.getByRole("link", { name: /^members$/i })).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /^integrations$/i })).not.toBeInTheDocument();
+    });
+
+    it("shows neither Members nor Integrations for a non-member", () => {
+      mockHasRole.mockReturnValue(false);
+      mockUseProjectMembers.mockReturnValue({ data: [] });
+      renderAtPath("/projects/proj-1/settings");
+
+      expect(screen.queryByRole("link", { name: /^members$/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /^integrations$/i })).not.toBeInTheDocument();
     });
 
     it("marks General as active on the index route", () => {
@@ -282,13 +312,33 @@ describe("ProjectSettings", () => {
   });
 
   describe("Sub-routes", () => {
-    it("redirects /settings/members to project detail Members tab", () => {
+    it("renders Members tab at /settings/members for a project member", () => {
+      mockUseProjectMembers.mockReturnValue({ data: [{ id: "pm-1", userId: "user-1", role: "member" }] });
       renderAtPath("/projects/proj-1/settings/members");
 
-      expect(screen.queryByText("Team Section")).not.toBeInTheDocument();
+      expect(screen.getByText("Members Tab")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: /members/i })).toBeInTheDocument();
     });
 
-    it("redirects /settings/integrations to project detail Integrations tab", () => {
+    it("redirects /settings/members to General for a non-member", () => {
+      mockHasRole.mockReturnValue(false);
+      mockUseProjectMembers.mockReturnValue({ data: [] });
+      renderAtPath("/projects/proj-1/settings/members");
+
+      expect(screen.queryByText("Members Tab")).not.toBeInTheDocument();
+    });
+
+    it("renders Integrations tab at /settings/integrations for a project owner", () => {
+      mockHasRole.mockReturnValue(true);
+      renderAtPath("/projects/proj-1/settings/integrations");
+
+      expect(screen.getByText("Connectors Tab")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: /integrations/i })).toBeInTheDocument();
+    });
+
+    it("redirects /settings/integrations to General for a non-owner", () => {
+      mockHasRole.mockReturnValue(false);
+      mockUseProjectMembers.mockReturnValue({ data: [{ id: "pm-1", userId: "user-1", role: "member" }] });
       renderAtPath("/projects/proj-1/settings/integrations");
 
       expect(screen.queryByText("Connectors Tab")).not.toBeInTheDocument();
