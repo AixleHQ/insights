@@ -1004,6 +1004,144 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  # ============================================
+  # ORGANIZATION INVITATIONS ENDPOINTS
+  # ============================================
+  /api/v1/organizations/{organization_id}/invitations:
+    get:
+      summary: List organization invitations
+      description: Requires owner role.
+      tags:
+        - Organization Invitations
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, accepted, revoked, expired]
+      responses:
+        '200':
+          description: Invitations list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Invitation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      summary: Create organization invitation
+      description: Requires owner role. Sends an invitation email to the recipient.
+      tags:
+        - Organization Invitations
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                role:
+                  type: string
+                  enum: [owner, member, viewer]
+              required:
+                - email
+                - role
+      responses:
+        '201':
+          description: Invitation created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Invitation'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/invitations/{id}:
+    get:
+      summary: Get organization invitation
+      description: Requires owner role.
+      tags:
+        - Organization Invitations
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Invitation details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Invitation'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      summary: Revoke organization invitation
+      description: Requires owner role.
+      tags:
+        - Organization Invitations
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204':
+          description: Invitation revoked
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/invitations/{id}/resend:
+    post:
+      summary: Resend organization invitation email
+      description: Requires owner role. Only pending invitations can be resent.
+      tags:
+        - Organization Invitations
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Invitation resent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Invitation'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
   /api/v1/organizations/{organization_id}/members/{id}/dashboard_stats:
     get:
       summary: Personal dashboard stats for a member
@@ -6433,6 +6571,78 @@ components:
         - organizationId
         - role
         - user
+        - createdAt
+        - updatedAt
+
+    Invitation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        token:
+          type: string
+          description: Public token used in invitation accept URLs
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [owner, member, viewer]
+        status:
+          type: string
+          enum: [pending, accepted, revoked, expired]
+        organization:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            slug:
+              type: string
+          required:
+            - id
+            - name
+            - slug
+        invitedBy:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            email:
+              type: string
+              format: email
+          required:
+            - id
+            - name
+            - email
+        expiresAt:
+          type: string
+          format: date-time
+        acceptedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - token
+        - email
+        - role
+        - status
+        - organization
+        - invitedBy
+        - expiresAt
         - createdAt
         - updatedAt
 

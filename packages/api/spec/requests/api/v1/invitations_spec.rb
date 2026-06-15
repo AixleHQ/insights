@@ -24,6 +24,15 @@ RSpec.describe 'Api::V1::Invitations', type: :request do
       expect(json_data.length).to eq(2)
     end
 
+    it 'includes token in invitation responses' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/invitations",
+                        user: owner,
+                        organization: organization
+
+      expect_success
+      expect(json_data.first[:token]).to be_present
+    end
+
     it 'filters by status' do
       authenticated_get "/api/v1/organizations/#{organization.id}/invitations",
                         user: owner,

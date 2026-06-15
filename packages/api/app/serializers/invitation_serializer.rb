@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class InvitationSerializer < BaseSerializer
-  attributes :id, :email, :role, :status
+  attributes :id, :email, :role, :status, :token
 
   attribute :organization do |invitation|
     {

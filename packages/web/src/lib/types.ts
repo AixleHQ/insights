@@ -482,6 +482,7 @@ export type MemberRole = "owner" | "member" | "viewer";
 
 export interface Invitation {
   id: string;
+  token: string;
   email: string;
   role: MemberRole;
   status: InvitationStatus;
