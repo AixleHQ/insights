@@ -135,7 +135,7 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
     <div className={cn("space-y-6", className)}>
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-4">
-          <Button asChild variant="ghost" size="icon">
+          <Button asChild variant="ghost" size="icon" aria-label="Back to events">
             <Link to="/events">
               <ArrowLeft className="size-4" />
             </Link>
