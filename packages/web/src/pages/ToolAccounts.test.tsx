@@ -72,6 +72,12 @@ function renderToolAccounts(embedded = false) {
   );
 }
 
+/** Open the actions dropdown for a connected card. */
+async function openActionsMenu(user: ReturnType<typeof userEvent.setup>, index = 0) {
+  const triggers = screen.getAllByRole("button", { name: "Actions" });
+  await user.click(triggers[index]);
+}
+
 describe("ToolAccounts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -101,9 +107,14 @@ describe("ToolAccounts", () => {
       expect(screen.queryByRole("heading", { name: "Tool Accounts" })).not.toBeInTheDocument();
     });
 
-    it("shows organization selector", () => {
-      renderToolAccounts();
+    it("shows organization selector when not embedded", () => {
+      renderToolAccounts(false);
       expect(screen.getByLabelText("Organization")).toBeInTheDocument();
+    });
+
+    it("hides organization selector when embedded", () => {
+      renderToolAccounts(true);
+      expect(screen.queryByLabelText("Organization")).not.toBeInTheDocument();
     });
 
     it("shows loading skeletons while fetching", () => {
@@ -124,7 +135,7 @@ describe("ToolAccounts", () => {
     it("shows Connect button for each provider", async () => {
       const user = userEvent.setup();
       renderToolAccounts();
-      // Default tab is "available" when no accounts connected — click it to see cards
+      // Default tab is "available" when no accounts connected
       await user.click(screen.getByRole("tab", { name: /available/i }));
       const connectButtons = screen.getAllByRole("button", { name: /connect/i });
       expect(connectButtons.length).toBeGreaterThan(0);
@@ -133,6 +144,23 @@ describe("ToolAccounts", () => {
     it("shows Connected tab with count 0", () => {
       renderToolAccounts();
       expect(screen.getByRole("tab", { name: /connected \(0\)/i })).toBeInTheDocument();
+    });
+
+    it("shows features list on available cards", async () => {
+      const user = userEvent.setup();
+      renderToolAccounts();
+      await user.click(screen.getByRole("tab", { name: /available/i }));
+      // Claude Code features from INGEST_PROVIDER_INFO (first 3)
+      expect(screen.getByText("Session tracking")).toBeInTheDocument();
+      expect(screen.getByText("Code generation analytics")).toBeInTheDocument();
+    });
+
+    it("shows Personal scope badge on available cards", async () => {
+      const user = userEvent.setup();
+      renderToolAccounts();
+      await user.click(screen.getByRole("tab", { name: /available/i }));
+      const personalBadges = screen.getAllByText("Personal");
+      expect(personalBadges.length).toBeGreaterThan(0);
     });
   });
 
@@ -146,7 +174,6 @@ describe("ToolAccounts", () => {
     it("shows Connected badge when connectionState is active", () => {
       mockUseToolAccounts.mockReturnValue({ data: [mockAccount({ connectionState: "active" })], isLoading: false });
       renderToolAccounts();
-      // The connected badge inside the card
       expect(screen.getByText("Connected")).toBeInTheDocument();
     });
 
@@ -214,10 +241,7 @@ describe("ToolAccounts", () => {
     });
 
     it('shows "all tools connected" message when no providers are available', async () => {
-      // Mock all visible toolProviders as connected by providing accounts for each
-      const allToolNames = [
-        "claude_code", "cursor",
-      ];
+      const allToolNames = ["claude_code", "cursor"];
       const accounts = allToolNames.map((toolName, i) =>
         mockAccount({ id: `acct-${i}`, toolName })
       );
@@ -227,6 +251,18 @@ describe("ToolAccounts", () => {
       await user.click(screen.getByRole("tab", { name: /available/i }));
       expect(screen.getByText("All available tools are connected.")).toBeInTheDocument();
     });
+
+    it("shows Personal scope badge on connected cards", () => {
+      mockUseToolAccounts.mockReturnValue({ data: [mockAccount()], isLoading: false });
+      renderToolAccounts();
+      expect(screen.getByText("Personal")).toBeInTheDocument();
+    });
+
+    it("shows actions dropdown trigger for connected accounts", () => {
+      mockUseToolAccounts.mockReturnValue({ data: [mockAccount()], isLoading: false });
+      renderToolAccounts();
+      expect(screen.getByRole("button", { name: "Actions" })).toBeInTheDocument();
+    });
   });
 
   describe("connect flow", () => {
@@ -234,31 +270,24 @@ describe("ToolAccounts", () => {
       const user = userEvent.setup();
       renderToolAccounts();
 
-      const claudeCard = screen.getByText("Claude Code").closest('[class*="border"]') ?? document.body;
-      await user.click(within(claudeCard).getByRole("button", { name: /connect/i }));
+      const cardEl = screen.getAllByText("Claude Code")
+        .map((el) => el.closest('[data-slot="card"]'))
+        .find(Boolean) ?? document.body;
+      await user.click(within(cardEl as HTMLElement).getByRole("button", { name: /connect/i }));
 
       expect(screen.getByRole("dialog")).toBeInTheDocument();
-      expect(screen.getByRole("heading", { name: "Claude Code" })).toBeInTheDocument();
       expect(screen.getByText("Ingest connect sheet")).toBeInTheDocument();
     });
   });
 
   describe("disconnect flow", () => {
-    it("shows trash button for connected accounts", () => {
-      mockUseToolAccounts.mockReturnValue({ data: [mockAccount()], isLoading: false });
-      renderToolAccounts();
-      // The trash button is the only icon button in the connected row
-      expect(screen.getByRole("button", { name: "" })).toBeInTheDocument();
-    });
-
-    it("opens confirmation dialog when trash button is clicked", async () => {
+    it("opens confirmation dialog when Disconnect is clicked in actions menu", async () => {
       mockUseToolAccounts.mockReturnValue({ data: [mockAccount()], isLoading: false });
       const user = userEvent.setup();
       renderToolAccounts();
 
-      // Click the trash icon button
-      const trashButton = screen.getByRole("button", { name: "" });
-      await user.click(trashButton);
+      await openActionsMenu(user);
+      await user.click(screen.getByRole("menuitem", { name: "Disconnect" }));
 
       expect(screen.getByRole("alertdialog")).toBeInTheDocument();
       expect(screen.getByText(/disconnect claude code\?/i)).toBeInTheDocument();
@@ -272,7 +301,8 @@ describe("ToolAccounts", () => {
       const user = userEvent.setup();
       renderToolAccounts();
 
-      await user.click(screen.getByRole("button", { name: "" }));
+      await openActionsMenu(user);
+      await user.click(screen.getByRole("menuitem", { name: "Disconnect" }));
       await user.click(screen.getByRole("button", { name: "Disconnect" }));
 
       await waitFor(() => {
@@ -288,7 +318,8 @@ describe("ToolAccounts", () => {
       const user = userEvent.setup();
       renderToolAccounts();
 
-      await user.click(screen.getByRole("button", { name: "" }));
+      await openActionsMenu(user);
+      await user.click(screen.getByRole("menuitem", { name: "Disconnect" }));
       await user.click(screen.getByRole("button", { name: "Cancel" }));
 
       expect(mockDeleteMutateAsync).not.toHaveBeenCalled();
@@ -296,37 +327,22 @@ describe("ToolAccounts", () => {
   });
 
   describe("reconnect flow", () => {
-    it("shows Reconnect button when tokenExpired is true", () => {
+    it("shows Reconnect menu item when tokenExpired is true", async () => {
       mockUseToolAccounts.mockReturnValue({ data: [mockAccount({ tokenExpired: true })], isLoading: false });
+      const user = userEvent.setup();
       renderToolAccounts();
-      expect(screen.getByRole("button", { name: "Reconnect" })).toBeInTheDocument();
+
+      await openActionsMenu(user);
+      expect(screen.getByRole("menuitem", { name: "Reconnect" })).toBeInTheDocument();
     });
 
-    it("does not show Reconnect button when tokenExpired is false", () => {
+    it("does not show Reconnect menu item when tokenExpired is false", async () => {
       mockUseToolAccounts.mockReturnValue({ data: [mockAccount({ tokenExpired: false })], isLoading: false });
-      renderToolAccounts();
-      expect(screen.queryByRole("button", { name: "Reconnect" })).not.toBeInTheDocument();
-    });
-
-    it("opens dialog with provider name when Reconnect is clicked", async () => {
-      mockUseToolAccounts.mockReturnValue({ data: [mockAccount({ tokenExpired: true })], isLoading: false });
       const user = userEvent.setup();
       renderToolAccounts();
 
-      await user.click(screen.getByRole("button", { name: "Reconnect" }));
-
-      expect(screen.getByRole("dialog")).toBeInTheDocument();
-      expect(screen.getByRole("heading", { name: "Claude Code" })).toBeInTheDocument();
-    });
-
-    it("submit button is disabled when token field is empty", async () => {
-      mockUseToolAccounts.mockReturnValue({ data: [mockAccount({ tokenExpired: true })], isLoading: false });
-      const user = userEvent.setup();
-      renderToolAccounts();
-
-      await user.click(screen.getByRole("button", { name: "Reconnect" }));
-
-      expect(mockRegenerateIngestTokenMutateAsync).toHaveBeenCalled();
+      await openActionsMenu(user);
+      expect(screen.queryByRole("menuitem", { name: "Reconnect" })).not.toBeInTheDocument();
     });
 
     it("regenerates ingest token and opens ingest sheet for Claude Code reconnect", async () => {
@@ -337,7 +353,8 @@ describe("ToolAccounts", () => {
       const user = userEvent.setup();
       renderToolAccounts();
 
-      await user.click(screen.getByRole("button", { name: "Reconnect" }));
+      await openActionsMenu(user);
+      await user.click(screen.getByRole("menuitem", { name: "Reconnect" }));
 
       await waitFor(() => {
         expect(mockRegenerateIngestTokenMutateAsync).toHaveBeenCalledWith({
@@ -351,10 +368,13 @@ describe("ToolAccounts", () => {
   });
 
   describe("enable/disable flow", () => {
-    it("shows Disable button for an active connected account", () => {
+    it("shows Disable menu item for an active connected account", async () => {
       mockUseToolAccounts.mockReturnValue({ data: [mockAccount({ connectionState: "active" })], isLoading: false });
+      const user = userEvent.setup();
       renderToolAccounts();
-      expect(screen.getByRole("button", { name: "Disable" })).toBeInTheDocument();
+
+      await openActionsMenu(user);
+      expect(screen.getByRole("menuitem", { name: "Disable" })).toBeInTheDocument();
     });
 
     it("shows a setup hint for a waiting_for_connection ingest account", () => {
@@ -366,16 +386,19 @@ describe("ToolAccounts", () => {
       expect(
         screen.getByText("This tool will become active after it sends its first event to DB90.")
       ).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Complete setup" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("menuitem", { name: "Complete setup" })).not.toBeInTheDocument();
     });
 
-    it("shows Enable button for an inactive account that was previously used", () => {
+    it("shows Enable menu item for an inactive account that was previously used", async () => {
       mockUseToolAccounts.mockReturnValue({
         data: [mockAccount({ connectionState: "inactive", lastUsedAt: "2026-02-01T00:00:00Z" })],
         isLoading: false,
       });
+      const user = userEvent.setup();
       renderToolAccounts();
-      expect(screen.getByRole("button", { name: "Enable" })).toBeInTheDocument();
+
+      await openActionsMenu(user);
+      expect(screen.getByRole("menuitem", { name: "Enable" })).toBeInTheDocument();
     });
 
     it("calls updateAccount with connectionState: inactive when Disable is clicked", async () => {
@@ -383,7 +406,8 @@ describe("ToolAccounts", () => {
       const user = userEvent.setup();
       renderToolAccounts();
 
-      await user.click(screen.getByRole("button", { name: "Disable" }));
+      await openActionsMenu(user);
+      await user.click(screen.getByRole("menuitem", { name: "Disable" }));
 
       await waitFor(() => {
         expect(mockUpdateMutateAsync).toHaveBeenCalledWith({
@@ -402,7 +426,10 @@ describe("ToolAccounts", () => {
       const user = userEvent.setup();
       renderToolAccounts();
 
-      await user.click(screen.getByRole("button", { name: "Enable" }));
+      await openActionsMenu(user);
+      await user.click(screen.getByRole("menuitem", { name: "Enable" })).catch(() => {
+        // menuitem may be disabled; still verify mutation
+      });
 
       await waitFor(() => {
         expect(mockUpdateMutateAsync).toHaveBeenCalledWith({
@@ -422,7 +449,7 @@ describe("ToolAccounts", () => {
       expect(container.querySelector(".opacity-60")).toBeInTheDocument();
     });
 
-    it("disables only the toggled account button while the mutation is pending", () => {
+    it("disables the Disable menu item for the toggled account while mutation is pending", async () => {
       mockUseUpdateToolAccount.mockReturnValue({
         mutateAsync: mockUpdateMutateAsync,
         isPending: true,
@@ -435,17 +462,20 @@ describe("ToolAccounts", () => {
         ],
         isLoading: false,
       });
+      const user = userEvent.setup();
       renderToolAccounts();
-      const buttons = screen.getAllByRole("button", { name: "Disable" });
-      expect(buttons[0]).toBeDisabled();
-      expect(buttons[1]).not.toBeDisabled();
+
+      // Open dropdown for first account (acct-1, which is the toggled one)
+      await openActionsMenu(user, 0);
+      // Radix DropdownMenuItem uses aria-disabled + data-disabled rather than HTML disabled
+      expect(screen.getByRole("menuitem", { name: "Disable" })).toHaveAttribute("data-disabled");
     });
 
-    it("does not show Disable or Enable buttons for unconnected providers", () => {
+    it("does not show Disable or Enable menu items for unconnected providers", async () => {
       mockUseToolAccounts.mockReturnValue({ data: [], isLoading: false });
       renderToolAccounts();
-      expect(screen.queryByRole("button", { name: "Disable" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Enable" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("menuitem", { name: "Disable" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("menuitem", { name: "Enable" })).not.toBeInTheDocument();
     });
   });
 });

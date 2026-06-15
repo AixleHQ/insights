@@ -2287,7 +2287,6 @@ export interface OrgProviderSetting {
 
 interface OrgProviderSettingsResponse {
   data: OrgProviderSetting[];
-  meta: { currentPage: number; totalPages: number; totalCount: number; perPage: number };
 }
 
 export function useOrgProviderSettings(orgId: string) {

@@ -111,6 +111,7 @@ interface ProjectConnectorsTabProps {
   orgId?: string;
 }
 
+// orgId defaults to "" so useOrgProviderSettings is disabled and all providers show (fail-open)
 export function ProjectConnectorsTab({ projectId, orgId = "" }: ProjectConnectorsTabProps) {
   const { data: connectorsData, isLoading } = useProjectConnectors(projectId);
   const { enabledMap } = useOrgProviderSettings(orgId);

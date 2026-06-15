@@ -7,10 +7,19 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { availableProviders, categoryLabels } from "@/lib/providers";
 import type { IntegrationProvider, ProviderInfo } from "@/lib/providers";
-import { useState, useMemo, useCallback } from "react";
+import { useCallback } from "react";
 
 type Category = ProviderInfo["category"];
 const CATEGORIES: Category[] = ["code", "project", "ai", "design", "communication"];
+
+const providersByCategory: Record<"all" | Category, ProviderInfo[]> = {
+  all: availableProviders,
+  code: availableProviders.filter((p) => p.category === "code"),
+  project: availableProviders.filter((p) => p.category === "project"),
+  ai: availableProviders.filter((p) => p.category === "ai"),
+  design: availableProviders.filter((p) => p.category === "design"),
+  communication: availableProviders.filter((p) => p.category === "communication"),
+};
 
 export function IntegrationsManage() {
   const { currentOrg } = useOrg();
@@ -18,13 +27,6 @@ export function IntegrationsManage() {
 
   const { enabledMap, isLoading, isError } = useOrgProviderSettings(orgId);
   const updateSetting = useUpdateOrgProviderSetting(orgId);
-
-  const [activeCategory, setActiveCategory] = useState<"all" | Category>("all");
-
-  const visibleProviders = useMemo(() => {
-    if (activeCategory === "all") return availableProviders;
-    return availableProviders.filter((p) => p.category === activeCategory);
-  }, [activeCategory]);
 
   const handleToggle = useCallback(
     (provider: IntegrationProvider, enabled: boolean) => {
@@ -49,7 +51,7 @@ export function IntegrationsManage() {
         </Alert>
       )}
 
-      <Tabs value={activeCategory} onValueChange={(v) => setActiveCategory(v as "all" | Category)}>
+      <Tabs defaultValue="all">
         <TabsList>
           <TabsTrigger value="all">All</TabsTrigger>
           {CATEGORIES.map((cat) => (
@@ -59,27 +61,29 @@ export function IntegrationsManage() {
           ))}
         </TabsList>
 
-        <TabsContent value={activeCategory} className="mt-4">
-          {isLoading ? (
-            <div className="grid gap-4 md:grid-cols-2">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <IntegrationSkeleton key={i} />
-              ))}
-            </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              {visibleProviders.map((provider) => (
-                <ProviderManageCard
-                  key={provider.id}
-                  provider={provider}
-                  enabled={enabledMap[provider.id] !== false}
-                  onToggle={handleToggle}
-                  isPending={updateSetting.isPending && updateSetting.variables?.provider === provider.id}
-                />
-              ))}
-            </div>
-          )}
-        </TabsContent>
+        {(["all", ...CATEGORIES] as const).map((cat) => (
+          <TabsContent key={cat} value={cat} className="mt-4">
+            {isLoading ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <IntegrationSkeleton key={i} />
+                ))}
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                {providersByCategory[cat].map((provider) => (
+                  <ProviderManageCard
+                    key={provider.id}
+                    provider={provider}
+                    enabled={enabledMap[provider.id] !== false}
+                    onToggle={handleToggle}
+                    isPending={updateSetting.isPending && updateSetting.variables?.provider === provider.id}
+                  />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        ))}
       </Tabs>
     </div>
   );

@@ -130,6 +130,12 @@ jobs:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: packages/tools/package-lock.json
+      # Upgrade npm so its bundled node-gyp (12.x+) recognises VS 2025/2026
+      # (version "18" in the install path). The default npm on windows-latest
+      # ships node-gyp 10.x which reports VS 18.x as "unknown version undefined"
+      # and cannot find any VS installation to compile better-sqlite3.
+      - name: Upgrade npm (ships node-gyp 12+ with VS 2025/2026 support)
+        run: npm install -g npm@latest
       - name: Install workspace
         run: npm ci
         working-directory: packages/tools

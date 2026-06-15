@@ -612,7 +612,7 @@ function SecuritySection() {
             )}
           </div>
 
-          <div className="rounded-md border p-4">
+          <div className="rounded-md border bg-muted/30 p-4">
             <p className="text-sm text-muted-foreground">
               Password and authentication settings are managed through your identity provider.
               Contact your administrator to change your password or update multi-factor

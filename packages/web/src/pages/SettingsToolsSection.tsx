@@ -280,13 +280,8 @@ export function SettingsToolsSection() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Linked tool accounts</CardTitle>
-          <CardDescription>
-            Connect or disconnect additional providers for this organization.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
+          <p className="mb-4 text-sm font-medium">Linked tool accounts</p>
           <ToolAccounts embedded />
         </CardContent>
       </Card>
