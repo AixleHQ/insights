@@ -299,7 +299,7 @@ export function UnifiedAuditTimelineTab({ orgId }: UnifiedAuditTimelineTabProps)
                           variant={log.outcome === "failure" ? "destructive" : "outline"}
                           className={cn(
                             "text-xs",
-                            log.outcome === "success" && "text-green-600 dark:text-green-400"
+                            log.outcome === "success" && "text-success"
                           )}
                         >
                           {log.outcome}

@@ -357,7 +357,7 @@ function OverridesSection({ orgId }: { orgId: string }) {
                     <form onSubmit={handleEditSubmit} className="flex gap-1 justify-end">
                       <Button type="submit" size="icon" variant="ghost" className="h-8 w-8"
                         disabled={updateMutation.isPending}>
-                        <Check className="size-4 text-green-600" />
+                        <Check className="size-4 text-success" />
                       </Button>
                       <Button type="button" size="icon" variant="ghost" className="h-8 w-8"
                         onClick={() => setEditingId(null)}>

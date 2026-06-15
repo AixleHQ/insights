@@ -26,5 +26,6 @@ dev-dist/
 
 # Playwright
 /e2e/.auth/
+/e2e/screenshots/
 /playwright-report/
 /test-results/

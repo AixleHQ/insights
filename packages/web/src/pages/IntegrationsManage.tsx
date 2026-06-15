@@ -26,13 +26,13 @@ export function IntegrationsManage() {
   const orgId = currentOrg?.id ?? "";
 
   const { enabledMap, isLoading, isError } = useOrgProviderSettings(orgId);
-  const updateSetting = useUpdateOrgProviderSetting(orgId);
+  const { mutate: updateProviderSetting, isPending, variables } = useUpdateOrgProviderSetting(orgId);
 
   const handleToggle = useCallback(
     (provider: IntegrationProvider, enabled: boolean) => {
-      updateSetting.mutate({ provider, enabled });
+      updateProviderSetting({ provider, enabled });
     },
-    [updateSetting]
+    [updateProviderSetting]
   );
 
   return (
@@ -77,7 +77,7 @@ export function IntegrationsManage() {
                     provider={provider}
                     enabled={enabledMap[provider.id] !== false}
                     onToggle={handleToggle}
-                    isPending={updateSetting.isPending && updateSetting.variables?.provider === provider.id}
+                    isPending={isPending && variables?.provider === provider.id}
                   />
                 ))}
               </div>
