@@ -27,6 +27,7 @@ class OrganizationConnector < ApplicationRecord
   validates :status, inclusion: { in: STATUSES }
   validates :connector_scope, inclusion: { in: SCOPES }
 
+  before_validation :normalize_external_org_id
   before_validation :assign_scope, on: :create
 
   encrypts :access_token
@@ -141,6 +142,10 @@ class OrganizationConnector < ApplicationRecord
 
   def assign_scope
     self.connector_scope = SCOPE_BY_TYPE.fetch(connector_type.to_s, "org")
+  end
+
+  def normalize_external_org_id
+    self.external_org_id = external_org_id.to_s.strip.presence
   end
 
   def assign_webhook_token

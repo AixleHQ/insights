@@ -1038,4 +1038,56 @@ RSpec.describe AiUsageSyncJob, type: :job do
       expect(connector_b.reload.status).to eq("connected")
     end
   end
+
+  describe "#perform — multiple openai connectors per org" do
+    let(:connector_a) do
+      create(:organization_connector, organization: organization, connector_type: "openai", is_active: true)
+    end
+    let(:connector_b) do
+      create(:organization_connector, organization: organization, connector_type: "openai", is_active: true)
+    end
+    let(:usage_a) do
+      [ { external_id: "oa-a-1", model: "gpt-4o", tokens_in: 100, tokens_out: 50, occurred_at: 1.day.ago } ]
+    end
+    let(:usage_b) do
+      [ { external_id: "oa-b-1", model: "gpt-4.1-mini", tokens_in: 200, tokens_out: 100, occurred_at: 1.day.ago } ]
+    end
+
+    before do
+      connector_a
+      connector_b
+    end
+
+    it "reconciles both connectors (fetch_usage is called for each)" do
+      provider_a = instance_double(Oauth::OpenaiProvider, fetch_usage: usage_a, fetch_costs: {})
+      provider_b = instance_double(Oauth::OpenaiProvider, fetch_usage: usage_b, fetch_costs: {})
+      call_count = 0
+
+      allow(Oauth::OpenaiProvider).to receive(:new) do
+        call_count += 1
+        call_count == 1 ? provider_a : provider_b
+      end
+
+      job.perform(organization.id, "openai")
+
+      expect(provider_a).to have_received(:fetch_usage)
+      expect(provider_b).to have_received(:fetch_usage)
+    end
+
+    it "marks both connectors synced after reconciliation" do
+      provider_a = instance_double(Oauth::OpenaiProvider, fetch_usage: usage_a, fetch_costs: {})
+      provider_b = instance_double(Oauth::OpenaiProvider, fetch_usage: usage_b, fetch_costs: {})
+      call_count = 0
+
+      allow(Oauth::OpenaiProvider).to receive(:new) do
+        call_count += 1
+        call_count == 1 ? provider_a : provider_b
+      end
+
+      job.perform(organization.id, "openai")
+
+      expect(connector_a.reload.status).to eq("connected")
+      expect(connector_b.reload.status).to eq("connected")
+    end
+  end
 end

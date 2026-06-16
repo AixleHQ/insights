@@ -42,7 +42,6 @@ export function ApiKeyConnectSheet({
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isOpenRouter = provider?.id === "openrouter";
-  const isMultiInstance = provider?.multiInstance ?? false;
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
@@ -116,22 +115,20 @@ export function ApiKeyConnectSheet({
               onChange={(e) => setApiKey(e.target.value)}
               autoComplete="off"
             />
-            {isMultiInstance && (
-              <div className="space-y-1 pt-1">
-                <Label htmlFor="connector-label">Label <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                <Input
-                  id="connector-label"
-                  type="text"
-                  placeholder="e.g. Production key, Team A"
-                  value={label}
-                  onChange={(e) => setLabel(e.target.value)}
-                  autoComplete="off"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Helps you tell multiple connections of this provider apart.
-                </p>
-              </div>
-            )}
+            <div className="space-y-1 pt-1">
+              <Label htmlFor="connector-label">Label <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Input
+                id="connector-label"
+                type="text"
+                placeholder="e.g. Production key, Team A"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                autoComplete="off"
+              />
+              <p className="text-xs text-muted-foreground">
+                Optional display name for this connection.
+              </p>
+            </div>
             {isOpenRouter && (
               <p className="text-sm text-muted-foreground">
                 Use an OpenRouter management key for usage sync. Standard API keys can proxy model

@@ -273,7 +273,14 @@ module Api
 
         external_org_id = token_data[:account_id]
         multi_instance = OrganizationConnector::MULTI_INSTANCE_CONNECTOR_TYPES.include?(connector_type)
-        connector = if multi_instance && external_org_id.present?
+        if multi_instance && external_org_id.blank?
+          return render json: {
+            error: "Unprocessable Entity",
+            errors: { external_org_id: [ "is required for this connector type" ] }
+          }, status: :unprocessable_content
+        end
+
+        connector = if multi_instance
           current_organization.organization_connectors
                               .find_or_initialize_by(connector_type: connector_type, external_org_id: external_org_id)
         else

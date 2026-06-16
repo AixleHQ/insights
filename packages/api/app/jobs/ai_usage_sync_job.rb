@@ -82,9 +82,9 @@ class AiUsageSyncJob
     end
 
     reconciled = if provider == "openrouter"
-      batch_upsert_openrouter_usage(org, usage_data)
+      batch_upsert_openrouter_usage(org, connector, usage_data)
     else
-      upsert_usage_one_by_one(org, provider, usage_data)
+      upsert_usage_one_by_one(org, connector, provider, usage_data)
     end
 
     connector.mark_synced!(sync_started_at: sync_started_at)
@@ -105,12 +105,12 @@ class AiUsageSyncJob
   # the N×1 loop used for other providers. A lazy backfill step seeds
   # connector_event_dedup from pre-existing tool_events so that events created before
   # this path was introduced are not duplicated on the first batch run.
-  def batch_upsert_openrouter_usage(org, usage_data)
-    backfill_openrouter_dedup(org, usage_data)
+  def batch_upsert_openrouter_usage(org, connector, usage_data)
+    backfill_openrouter_dedup(org, connector, usage_data)
 
     records = usage_data.map do |usage|
-      tool_event_attributes_for_usage(usage).merge(
-        unique_value: usage[:external_id],
+      tool_event_attributes_for_usage(usage, connector).merge(
+        unique_value: dedup_unique_value(usage[:external_id], connector),
         organization_id: org.id,
         tool_name: "openrouter_api"
       )
@@ -123,9 +123,10 @@ class AiUsageSyncJob
   # Seeds connector_event_dedup for any openrouter_api tool_events that were created
   # by the old per-row path and are not yet tracked in the dedup table.
   # Runs once per batch; subsequent runs are cheap because all rows already exist.
-  def backfill_openrouter_dedup(org, usage_data)
+  def backfill_openrouter_dedup(org, connector, usage_data)
     external_ids = usage_data.map { |u| u[:external_id].to_s }
     return if external_ids.empty?
+    dedup_values = external_ids.map { |external_id| dedup_unique_value(external_id, connector) }
 
     already_tracked = ConnectorEventDedup
       .where(
@@ -133,16 +134,19 @@ class AiUsageSyncJob
         tool_name: "openrouter_api",
         event_type: "completion",
         unique_key: "external_id",
-        unique_value: external_ids
+        unique_value: dedup_values
       )
       .pluck(:unique_value)
       .to_set
 
-    untracked_ids = external_ids.reject { |id| already_tracked.include?(id) }
+    untracked_ids = external_ids.reject do |external_id|
+      already_tracked.include?(dedup_unique_value(external_id, connector))
+    end
     return if untracked_ids.empty?
 
     existing_events = org.tool_events
       .where(tool_name: "openrouter_api")
+      .where("metadata->>'connector_id' = ?", connector.id.to_s)
       .where("metadata->>'external_id' IN (?)", untracked_ids)
       .pluck(Arel.sql("metadata->>'external_id'"), :id)
 
@@ -155,7 +159,7 @@ class AiUsageSyncJob
         tool_name: "openrouter_api",
         event_type: "completion",
         unique_key: "external_id",
-        unique_value: external_id,
+        unique_value: dedup_unique_value(external_id, connector),
         tool_event_id: event_id,
         updated_at: now
       }
@@ -164,13 +168,13 @@ class AiUsageSyncJob
     upsert_dedup_rows(dedup_rows)
   end
 
-  def upsert_usage_one_by_one(org, provider, usage_data)
+  def upsert_usage_one_by_one(org, connector, provider, usage_data)
     reconciled = 0
     usage_data.each do |usage|
-      event = find_matching_event(org, provider, usage)
+      event = find_matching_event(org, connector, provider, usage)
 
       if event
-        attributes = tool_event_attributes_for_usage(usage)
+        attributes = tool_event_attributes_for_usage(usage, connector)
         metadata = event.metadata.is_a?(Hash) ? event.metadata.deep_stringify_keys : {}
         next_metadata = metadata.merge(attributes.delete(:metadata))
 
@@ -179,7 +183,7 @@ class AiUsageSyncJob
           reconciled += 1
         end
       else
-        create_event_from_usage(org, provider, usage)
+        create_event_from_usage(org, connector, provider, usage)
         reconciled += 1
       end
     end
@@ -276,32 +280,51 @@ def fetch_anthropic_usage(connector, organization)
     end
   end
 
-  def find_matching_event(org, provider, usage)
+  def find_matching_event(org, connector, provider, usage)
     scope = org.tool_events.where(tool_name: "#{provider}_api")
 
-    match = scope.where("metadata->>'external_id' = ?", usage[:external_id]).first
+    match = scope
+      .where("metadata->>'connector_id' = ?", connector.id.to_s)
+      .where("metadata->>'external_id' = ?", usage[:external_id])
+      .first
     return match if match
 
     Array(usage[:legacy_external_ids]).each do |legacy_id|
-      legacy_match = scope.where("metadata->>'external_id' = ?", legacy_id).first
+      legacy_match = scope
+        .where("metadata->>'connector_id' = ?", connector.id.to_s)
+        .where("metadata->>'external_id' = ?", legacy_id)
+        .first
       return legacy_match if legacy_match
+    end
+
+    # Legacy fallback: events created before connector-scoped dedup did not include connector_id.
+    if org.organization_connectors.where(connector_type: provider, is_active: true).count == 1
+      legacy_scope = scope.where("metadata->>'connector_id' IS NULL")
+      legacy_match = legacy_scope.where("metadata->>'external_id' = ?", usage[:external_id]).first
+      return legacy_match if legacy_match
+
+      Array(usage[:legacy_external_ids]).each do |legacy_id|
+        legacy_id_match = legacy_scope.where("metadata->>'external_id' = ?", legacy_id).first
+        return legacy_id_match if legacy_id_match
+      end
     end
 
     nil
   end
 
-  def create_event_from_usage(org, provider, usage)
+  def create_event_from_usage(org, connector, provider, usage)
     ToolEvent.create!(
-      tool_event_attributes_for_usage(usage).merge(
+      tool_event_attributes_for_usage(usage, connector).merge(
         organization_id: org.id,
         tool_name: "#{provider}_api"
       )
     )
   end
 
-  def tool_event_attributes_for_usage(usage)
+  def tool_event_attributes_for_usage(usage, connector)
     metadata = {
       external_id: usage[:external_id],
+      connector_id: connector.id,
       reconciled: true
     }.merge(usage[:metadata] || {})
 
@@ -358,5 +381,9 @@ def fetch_anthropic_usage(connector, organization)
 
     sql_template = "INSERT INTO %s (%s) VALUES %s ON CONFLICT (%s) DO UPDATE SET tool_event_id = EXCLUDED.tool_event_id, updated_at = EXCLUDED.updated_at"
     conn.execute(format(sql_template, table, col_names, values_sql, conflict_cols))
+  end
+
+  def dedup_unique_value(external_id, connector)
+    "#{connector.id}:#{external_id}"
   end
 end

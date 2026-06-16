@@ -186,6 +186,24 @@ describe("Integrations", () => {
       );
     });
 
+    it("shows rename error and keeps dialog open when update fails", async () => {
+      const user = userEvent.setup();
+      mockMutateAsync.mockRejectedValueOnce(new Error("Update failed"));
+      vi.mocked(useConnectors).mockReturnValue({
+        data: [mockConnector],
+        isLoading: false,
+      } as ReturnType<typeof useConnectors>);
+
+      renderAt("/integrations/connected");
+
+      await user.click(screen.getByRole("button", { name: /actions/i }));
+      await user.click(screen.getByRole("menuitem", { name: /rename/i }));
+      await user.click(screen.getByRole("button", { name: /save/i }));
+
+      expect(await screen.findByText("Update failed")).toBeInTheDocument();
+      expect(screen.getByRole("dialog", { name: /rename/i })).toBeInTheDocument();
+    });
+
     it("does not render personal tool accounts in Connected tab", () => {
       vi.mocked(useToolAccounts).mockReturnValue({
         data: [

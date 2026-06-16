@@ -1,6 +1,6 @@
 # Story AIX-347: Support multiple integrations of the same provider per organization
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -76,6 +76,20 @@ These were decided with the product owner on 2026-06-16. Treat them as requireme
   - [x] Test: in `IntegrationCard.test.tsx` assert the Rename item appears in the menu and calls the update; in `Integrations.test.tsx` assert the wired handler calls `useUpdateConnector`.
 - [x] **Tests** (AC: all) — see Testing requirements below.
 - [x] **Verification:** `make lint-api`, `make lint-web`; RSpec for model/request/job; Vitest for Integrations + IntegrationCard; full API suite green in Docker.
+
+### Review Findings
+
+- [x] [Review][Patch] Make AI usage dedup connector-scoped for multi-instance providers [packages/api/app/jobs/ai_usage_sync_job.rb:84]
+- [x] [Review][Patch] Add fail-fast rollback guard when duplicate multi-instance rows exist [packages/api/db/migrate/20260616120937_allow_multiple_connectors_per_provider.rb:31]
+- [x] [Review][Patch] OAuth callback should not fallback to type-only dedup when `external_org_id` is missing [packages/api/app/controllers/api/v1/organization_connectors_controller.rb:273]
+- [x] [Review][Patch] Normalize blank `external_org_id` before validation/index checks to avoid model/DB mismatch [packages/api/app/models/organization_connector.rb:22]
+- [x] [Review][Patch] Add request-spec coverage for 422 when OAuth callback omits `external_org_id` for multi-instance providers [packages/api/spec/requests/api/v1/organization_connectors_spec.rb]
+- [x] [Review][Patch] Strengthen OAuth callback test to assert real `external_org_id A -> B` create path (not `nil -> B`) [packages/api/spec/requests/api/v1/organization_connectors_spec.rb]
+- [x] [Review][Patch] Add `openai` multi-connector reconciliation coverage alongside existing `openrouter` job spec [packages/api/spec/jobs/ai_usage_sync_job_spec.rb]
+- [x] [Review][Patch] Make label input available for single-instance providers at connect time (decision: apply to all providers) [packages/web/src/pages/IntegrationSetup.tsx]
+- [x] [Review][Patch] Prevent silent rename failures by keeping dialog open and showing user-visible error when update fails [packages/web/src/components/integrations/IntegrationCard.tsx]
+- [x] [Review][Patch] Normalize label display so whitespace-only labels fallback to account name instead of rendering an empty badge [packages/web/src/components/integrations/IntegrationCard.tsx]
+- [x] [Review][Patch] Add frontend tests for rename failure path and whitespace/trimmed label behavior [packages/web/src/components/integrations/IntegrationCard.test.tsx]
 
 ## Dev Notes
 

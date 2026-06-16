@@ -75,7 +75,7 @@ interface IntegrationCardProps {
   onSync?: (id: string) => void;
   onTest?: (id: string) => void;
   onDisconnect?: (id: string) => void;
-  onRename?: (id: string, newLabel: string) => void;
+  onRename?: (id: string, newLabel: string) => Promise<void> | void;
   onRegenerateToken?: (id: string) => void;
   onConnect?: (providerId: string) => void;
   onSetupWebhook?: (id: string) => void;
@@ -168,6 +168,8 @@ export function IntegrationCard({
 }: IntegrationCardProps) {
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameValue, setRenameValue] = useState("");
+  const [renameError, setRenameError] = useState<string | null>(null);
+  const [isRenaming, setIsRenaming] = useState(false);
   // Display as available provider to connect
   if (provider && !integration) {
     return (
@@ -221,6 +223,23 @@ export function IntegrationCard({
   const StatusIcon = status.icon;
   const isSyncing = integration.status === "testing" && !isTesting;
   const statusLabel = isSyncing ? "Syncing…" : status.label;
+  const normalizedLabel = integration.label?.trim();
+  const displayAccountLabel = normalizedLabel || integration.metadata?.account_name;
+
+  const submitRename = async () => {
+    if (!onRename) return;
+
+    setRenameError(null);
+    setIsRenaming(true);
+    try {
+      await onRename(integration.id, renameValue.trim());
+      setRenameOpen(false);
+    } catch (error) {
+      setRenameError(error instanceof Error ? error.message : "Failed to rename connector.");
+    } finally {
+      setIsRenaming(false);
+    }
+  };
 
   return (
     <Card className={cn("group relative transition-all hover:shadow-md", className)}>
@@ -232,9 +251,7 @@ export function IntegrationCard({
               <CardTitle className="text-base">{integration.name}</CardTitle>
               <CardDescription className="text-xs capitalize">
                 {integration.provider.replace("-", " ")}
-                {integration.label && ` · ${integration.label}`}
-                {!integration.label && integration.metadata?.account_name &&
-                  ` · ${integration.metadata.account_name}`}
+                {displayAccountLabel && ` · ${displayAccountLabel}`}
               </CardDescription>
               {integration.scope && (
                 <div className="mt-1">
@@ -285,7 +302,8 @@ export function IntegrationCard({
               {onRename && (
                 <DropdownMenuItem
                   onClick={() => {
-                    setRenameValue(integration.label ?? "");
+                    setRenameValue(normalizedLabel ?? "");
+                    setRenameError(null);
                     setRenameOpen(true);
                   }}
                 >
@@ -318,24 +336,28 @@ export function IntegrationCard({
                   placeholder="e.g. Work account, Team A"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
-                      onRename?.(integration.id, renameValue.trim());
-                      setRenameOpen(false);
+                      void submitRename();
                     }
                   }}
                   autoFocus
                 />
+                {renameError && (
+                  <p className="text-xs text-destructive">{renameError}</p>
+                )}
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setRenameOpen(false)}>
+                <Button
+                  variant="outline"
+                  onClick={() => setRenameOpen(false)}
+                  disabled={isRenaming}
+                >
                   Cancel
                 </Button>
                 <Button
-                  onClick={() => {
-                    onRename?.(integration.id, renameValue.trim());
-                    setRenameOpen(false);
-                  }}
+                  onClick={() => void submitRename()}
+                  disabled={isRenaming}
                 >
-                  Save
+                  {isRenaming ? "Saving…" : "Save"}
                 </Button>
               </DialogFooter>
             </DialogContent>

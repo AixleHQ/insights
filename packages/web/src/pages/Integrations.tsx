@@ -147,15 +147,11 @@ export function Integrations() {
 
   const handleRename = async (id: string, newLabel: string) => {
     if (!currentOrg) return;
-    try {
-      await updateConnector.mutateAsync({
-        orgId: currentOrg.id,
-        connectorId: id,
-        data: { label: newLabel },
-      });
-    } catch (error) {
-      console.error("Failed to rename connector:", error);
-    }
+    await updateConnector.mutateAsync({
+      orgId: currentOrg.id,
+      connectorId: id,
+      data: { label: newLabel },
+    });
   };
 
   const handleTest = async (id: string) => {

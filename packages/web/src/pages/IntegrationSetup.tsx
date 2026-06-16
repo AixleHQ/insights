@@ -470,22 +470,20 @@ export function IntegrationSetup() {
                   </p>
                 </div>
 
-                {provider.multiInstance && (
-                  <div className="space-y-1">
-                    <Label htmlFor="oauth-label">Label <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                    <Input
-                      id="oauth-label"
-                      type="text"
-                      placeholder="e.g. Work org, Personal account"
-                      value={config.label}
-                      onChange={(e) => setConfig({ ...config, label: e.target.value })}
-                      autoComplete="off"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Helps you tell multiple connections of this provider apart.
-                    </p>
-                  </div>
-                )}
+                <div className="space-y-1">
+                  <Label htmlFor="oauth-label">Label <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <Input
+                    id="oauth-label"
+                    type="text"
+                    placeholder="e.g. Work org, Personal account"
+                    value={config.label}
+                    onChange={(e) => setConfig({ ...config, label: e.target.value })}
+                    autoComplete="off"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Optional display name for this connection.
+                  </p>
+                </div>
 
                 <div className="flex items-center justify-between rounded-lg bg-muted/50 p-4">
                   <div className="flex items-center gap-2">

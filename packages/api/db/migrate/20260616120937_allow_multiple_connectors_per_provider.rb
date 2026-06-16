@@ -29,6 +29,11 @@ class AllowMultipleConnectorsPerProvider < ActiveRecord::Migration[8.1]
   end
 
   def down
+    if multi_instance_duplicates_exist?
+      raise ActiveRecord::IrreversibleMigration,
+            "Cannot rollback: multiple connectors exist for at least one multi-instance provider."
+    end
+
     remove_column :organization_connectors, :label
 
     execute "DROP INDEX IF EXISTS idx_org_connectors_oauth_dedup"
@@ -37,5 +42,20 @@ class AllowMultipleConnectorsPerProvider < ActiveRecord::Migration[8.1]
     # Restore original blanket unique index.
     add_index :organization_connectors, %i[organization_id connector_type],
               unique: true, name: "idx_on_organization_id_connector_type_ebd5fb8c77"
+  end
+
+  private
+
+  def multi_instance_duplicates_exist?
+    values = MULTI_INSTANCE_TYPES.map { |type| connection.quote(type) }.join(", ")
+    sql = <<~SQL.squish
+      SELECT 1
+      FROM organization_connectors
+      WHERE connector_type IN (#{values})
+      GROUP BY organization_id, connector_type
+      HAVING COUNT(*) > 1
+      LIMIT 1
+    SQL
+    connection.select_value(sql).present?
   end
 end

@@ -233,6 +233,19 @@ describe("IntegrationCard — connected integration", () => {
       expect(onRename).toHaveBeenCalledWith("conn-1", "New name");
     });
 
+    it("keeps dialog open and shows error when rename fails", async () => {
+      const user = userEvent.setup();
+      const onRename = vi.fn().mockRejectedValueOnce(new Error("Rename failed"));
+      render(<IntegrationCard integration={baseIntegration} onRename={onRename} />);
+
+      await user.click(screen.getByRole("button", { name: /actions/i }));
+      await user.click(screen.getByRole("menuitem", { name: /rename/i }));
+      await user.click(screen.getByRole("button", { name: /save/i }));
+
+      expect(await screen.findByText("Rename failed")).toBeInTheDocument();
+      expect(screen.getByRole("dialog", { name: /rename/i })).toBeInTheDocument();
+    });
+
     it("closes dialog on Cancel without calling onRename", async () => {
       const user = userEvent.setup();
       const onRename = vi.fn();
@@ -322,5 +335,17 @@ describe("IntegrationCard — label display", () => {
     render(<IntegrationCard integration={integration} />);
     expect(screen.getByText(/Primary org/)).toBeInTheDocument();
     expect(screen.queryByText(/secondary-name/)).not.toBeInTheDocument();
+  });
+
+  it("falls back to account_name when label is whitespace-only", () => {
+    const integration: IntegrationData = {
+      ...baseIntegration,
+      provider: "github",
+      name: "GitHub",
+      label: "   ",
+      metadata: { account_name: "fallback-org" },
+    };
+    render(<IntegrationCard integration={integration} />);
+    expect(screen.getByText(/fallback-org/)).toBeInTheDocument();
   });
 });

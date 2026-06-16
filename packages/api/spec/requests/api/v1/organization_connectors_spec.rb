@@ -742,8 +742,9 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
     end
 
     context 'when connecting a different external account (new external_org_id)' do
+      before { connector.update!(external_org_id: 'gh-old') }
+
       it 'creates a new connector (count +1)' do
-        # connector has no external_org_id; fake provider returns 'gh-42' → new row
         expect {
           authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
                              user: admin,
@@ -752,6 +753,8 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
         }.to change(OrganizationConnector, :count).by(1)
 
         expect_success
+        external_org_ids = organization.organization_connectors.where(connector_type: 'github').pluck(:external_org_id)
+        expect(external_org_ids).to include('gh-old', 'gh-42')
       end
     end
 
@@ -765,6 +768,37 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
 
       expect_success
       expect(json_data[:label]).to eq('Work account')
+    end
+
+    context 'when OAuth provider does not return account_id for multi-instance type' do
+      let(:missing_account_provider) do
+        Class.new do
+          def self.exchange_code(_code, redirect_uri:)
+            {
+              access_token: 'gho_token123',
+              refresh_token: nil,
+              expires_at: nil,
+              account_id: nil,
+              account_name: 'octocat'
+            }
+          end
+        end
+      end
+
+      before do
+        connector.destroy!
+        allow(Oauth::BaseProvider).to receive(:provider_class).with('github').and_return(missing_account_provider)
+      end
+
+      it 'returns 422 with external_org_id error' do
+        authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
+                           user: admin,
+                           organization: organization,
+                           params: { connector_type: 'github', code: 'oauth_code_abc' }
+
+        expect_unprocessable
+        expect(json_response.dig(:errors, :external_org_id)).to include('is required for this connector type')
+      end
     end
 
     it 'returns 403 for org members' do
