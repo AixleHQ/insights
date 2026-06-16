@@ -1,6 +1,6 @@
 {
   "name": "@aixle/insights",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "stdio MCP server for AI coding-assistant telemetry — Claude transcript sync + Cursor SQLite ingest.",
   "type": "module",
   "bin": {

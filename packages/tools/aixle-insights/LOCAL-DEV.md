@@ -340,3 +340,9 @@ To uninstall:
 ```bash
 node aixle-insights/dist/cli.js uninstall-hooks
 ```
+
+## 12. TLS / `--insecure` (AIX-339)
+
+`@aixle/insights` now enforces HTTPS for non-localhost hosts. Local development against `http://localhost:3000` continues to work without any flag — loopback (`localhost`, `127.0.0.0/8`, `[::1]`) is always allowed. A remote `http://` host is rejected during `init` unless you pass `--insecure`.
+
+See [README.md](./README.md) → **Security** for the two-gate model (CLI `--host` + post-exchange `ingestHost`) and [README.md](./README.md) → **Troubleshooting** for common failure modes (401 ingest after token rotation, `fetch failed` from a bad Keycloak URL, `--help` missing `--insecure` because you're on an older published version).

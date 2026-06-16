@@ -77,6 +77,29 @@ Optional `~/.aixle-insights/config.json` accepts Cursor line-cost overrides (per
 }
 ```
 
+## Security
+
+`@aixle/insights` enforces HTTPS for any remote host. Plaintext `http://` is allowed only for loopback (`localhost`, `127.0.0.0/8`, `[::1]`) so that local-dev flows against `make up` continue to work without friction.
+
+### Two gates
+
+| Gate | Where it fires | What it checks |
+|---|---|---|
+| CLI `--host` gate | `runInit()` at the top of `aixle-insights init`, before any network call to Keycloak | The `--host` value the user typed |
+| Post-exchange `ingestHost` gate | `auth/flow.ts`, immediately after the OIDC-for-ingest-token exchange returns, before persisting credentials to the keychain | The `ingestHost` returned by the server, in case it differs from `--host` |
+
+Both gates use the same pure utility, `evaluateTransportSecurity()` in `src/lib/transport-security.ts`. Either gate rejecting aborts `init` with exit code 1 and a single-line error naming the offending host.
+
+### `--insecure` (init-only)
+
+`aixle-insights init --insecure --host http://<remote>` downgrades both gates from "reject" to "warn + continue." It is intended only for trusted non-production test endpoints (e.g. a self-hosted staging on a private network without a TLS cert).
+
+`--insecure` is rejected on the `run` subcommand by design — the long-running MCP server should never run insecurely. `run --insecure` routes to the help screen, the same as any unknown flag.
+
+### What is NOT gated
+
+The Keycloak issuer URL (`--keycloak-url` / `KEYCLOAK_ISSUER`) is **not** TLS-gated by this package. Same threat model, different ticket — tracked separately. For now, use HTTPS for any remote Keycloak issuer; the OIDC device-flow library will fail the request if the cert is invalid, but it will not refuse to attempt plaintext.
+
 ## Cursor hook forwarder (opt-in)
 
 `aixle-insights init --hooks --tool-name cursor` installs a Node script as a Cursor hook (`~/.cursor/hooks.json`). The script appends redacted hook payloads to `~/.aixle-insights/hooks-queue.ndjson`; the background sync drains the queue on its next cycle and POSTs the events with accurate per-turn model attribution. Requires a Cursor restart after install. To remove, run `aixle-insights uninstall-hooks` and restart Cursor again.
@@ -97,6 +120,19 @@ aixle-insights verify-hooks  # JSON: hooks installed + queue depth
 ```
 
 `mcp.log` (rotates at 5 MiB to `mcp.log.1`) under the app home directory captures operational events. Inside Claude Code, the **`db90_status`** MCP tool returns the same diagnostic structure as `aixle-insights health`.
+
+## Troubleshooting
+
+| Symptom | Most likely cause | Fix |
+|---|---|---|
+| `Error: DB90 API host <name> uses remote plaintext HTTP.` | You passed `--host http://<remote>` without `--insecure`. | Use `https://...`, or add `--insecure` if you know the endpoint is trusted and non-production. |
+| `Auth failed: fetch failed` during `init` | The `--keycloak-url` host doesn't resolve (NXDOMAIN), is behind a VPN, or the TLS cert is bad. | Verify with `curl -sS https://<host>/realms/<realm>/.well-known/openid-configuration`. For DB90 staging, the canonical Keycloak URL is embedded in the SPA — `curl https://<APP_HOST> \| grep keycloakUrl` extracts the current value. |
+| `Failed to post event: HTTP 401 Unauthorized` repeated for every turn | Your saved ingest token has been rotated, revoked, or invalidated by a server redeploy. The ingest token is distinct from the Keycloak access token that `health` reports as `authenticated: true`. | Reset the keychain entry and re-run `init`: `security delete-generic-password -s "aixle-insights" -a "aixle-insights-ingest-credential"` then `rm -f ~/.aixle-insights/credentials.json` then `aixle-insights init --host ... --keycloak-url ...`. State files are **not** deleted, so already-sent sessions stay deduped. |
+| `health` shows `authenticated: true` but `last_result` is `sent: 0, failed: N` cycle after cycle | Same as the 401 row above. `authenticated` only proves the OIDC token was acquired, not that the ingest token still validates server-side. | Re-init as above. |
+| `last_result` reports `sent: N` but the Events UI shows nothing | The Temporal worker is not running. The ingest endpoint returns HTTP 202 (queued) regardless of worker state. | `make worker` (or check `docker ps` for `db90-worker`). See [LOCAL-DEV.md](./LOCAL-DEV.md) §1. |
+| `sync_lock_skip {reason: "advisory_lock_held"}` in the log | Another sync cycle is still holding `~/.aixle-insights/state.lock`. | Wait for it to finish; only delete the lock file (`rm -f ~/.aixle-insights/state.lock`) after confirming no `aixle-insights run` process is alive (`pgrep -fa aixle-insights`). |
+| `aixle-insights --help` doesn't list `--insecure` | You're running an older published version of the package, not the local source. | `which aixle-insights` shows the path. To run local source: `cd packages/tools/aixle-insights && npm run build && npm link`. To return to the published version: `npm unlink -g @aixle/insights && npm install -g @aixle/insights@latest`. |
+| Not sure whether `aixle-insights` is a `npm link` or a real install | Real installs are regular files; `npm link` is a symlink chain into the repo. | `readlink "$(which aixle-insights)"` shows the link target if any. A linked install will trace back to a path under your monorepo checkout. |
 
 ## Local development — `/aixle-reset` skill
 
