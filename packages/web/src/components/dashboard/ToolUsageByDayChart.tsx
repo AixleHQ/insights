@@ -30,6 +30,7 @@ interface ToolUsageByDayChartProps {
   tools: string[];
   isLoading?: boolean;
   className?: string;
+  onDaysChange?: (days: number) => void;
 }
 
 type TimeRange = "7d" | "30d" | "60d" | "90d" | "1y";
@@ -65,8 +66,14 @@ function getRangeLabel(range: TimeRange): string {
   return TIME_RANGE_OPTIONS.find((opt) => opt.value === range)?.label || "30 days";
 }
 
-export function ToolUsageByDayChart({ data, tools, isLoading, className }: ToolUsageByDayChartProps) {
+export function ToolUsageByDayChart({ data, tools, isLoading, className, onDaysChange }: ToolUsageByDayChartProps) {
   const [timeRange, setTimeRange] = useState<TimeRange>("7d");
+
+  const handleTimeRangeChange = (value: string) => {
+    const range = value as TimeRange;
+    setTimeRange(range);
+    onDaysChange?.(getDaysForRange(range));
+  };
 
   const filteredData = useMemo(() => {
     const days = getDaysForRange(timeRange);
@@ -103,7 +110,7 @@ export function ToolUsageByDayChart({ data, tools, isLoading, className }: ToolU
             {totalEvents.toLocaleString()} events in the last {getRangeLabel(timeRange)}
           </CardDescription>
         </div>
-        <Select value={timeRange} onValueChange={(value) => setTimeRange(value as TimeRange)}>
+        <Select value={timeRange} onValueChange={handleTimeRangeChange}>
           <SelectTrigger className="h-8 w-[100px] text-xs">
             <SelectValue />
           </SelectTrigger>
