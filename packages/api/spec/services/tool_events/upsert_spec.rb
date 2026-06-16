@@ -92,6 +92,59 @@ RSpec.describe ToolEvents::Upsert do
         expect(result[:tool_event].metadata["cost_source"]).to eq("server_estimated")
       end
     end
+
+    context "when cost_model is 'estimated_line_count' (Cursor daily-stats line counts)" do
+      let(:line_attrs) do
+        base_attributes.merge(
+          cost_usd: 0,
+          tokens_in: 100,
+          tokens_out: 10,
+          metadata: { "cost_model" => "estimated_line_count" }
+        )
+      end
+
+      it "does not re-estimate cost from line counts as tokens" do
+        result = described_class.call(line_attrs)
+        expect(result[:tool_event].cost_usd.to_f).to eq(0)
+      end
+
+      it "sets cost_source to 'client'" do
+        result = described_class.call(line_attrs)
+        expect(result[:tool_event].metadata["cost_source"]).to eq("client")
+      end
+
+      it "nils out tokens_in and tokens_out so line counts do not inflate token aggregations" do
+        result = described_class.call(line_attrs)
+        expect(result[:tool_event].tokens_in).to be_nil
+        expect(result[:tool_event].tokens_out).to be_nil
+      end
+
+      it "sets tokens_total to zero" do
+        result = described_class.call(line_attrs)
+        expect(result[:tool_event].tokens_total).to eq(0)
+      end
+
+      it "preserves line counts in metadata as lines_suggested and lines_accepted" do
+        result = described_class.call(line_attrs)
+        expect(result[:tool_event].metadata["lines_suggested"]).to eq(100)
+        expect(result[:tool_event].metadata["lines_accepted"]).to eq(10)
+      end
+
+      it "does not re-estimate when cost_usd is nil" do
+        result = described_class.call(line_attrs.merge(cost_usd: nil))
+        expect(result[:tool_event].metadata["cost_source"]).to eq("client")
+        expect(result[:tool_event].tokens_in).to be_nil
+        expect(result[:tool_event].tokens_out).to be_nil
+      end
+
+      it "preserves a positive client cost untouched" do
+        result = described_class.call(line_attrs.merge(cost_usd: 0.00012))
+        expect(result[:tool_event].cost_usd.to_f).to eq(0.00012)
+        expect(result[:tool_event].metadata["cost_source"]).to eq("client")
+        expect(result[:tool_event].tokens_in).to be_nil
+        expect(result[:tool_event].tokens_out).to be_nil
+      end
+    end
   end
 
   describe ".call — model promotion from metadata" do

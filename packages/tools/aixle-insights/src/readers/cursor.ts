@@ -1043,7 +1043,7 @@ export function mapDailyStats(
         eventType: "completion",
         tokensIn: tabSuggested,
         tokensOut: tabAccepted,
-        costUsd: computeLineCost("completion", tabSuggested, pricing),
+        costUsd: computeLineCost("completion", tabAccepted, pricing),
         occurredAt,
         dbPath,
         date,
