@@ -35,6 +35,8 @@ interface ToolUsageByDayChartProps {
 
 type TimeRange = "7d" | "30d" | "60d" | "90d" | "1y";
 
+const DEFAULT_TIME_RANGE: TimeRange = "7d";
+
 const TIME_RANGE_OPTIONS: { value: TimeRange; label: string; days: number }[] = [
   { value: "7d", label: "7 days", days: 7 },
   { value: "30d", label: "30 days", days: 30 },
@@ -66,8 +68,10 @@ function getRangeLabel(range: TimeRange): string {
   return TIME_RANGE_OPTIONS.find((opt) => opt.value === range)?.label || "30 days";
 }
 
+export const TOOL_USAGE_DEFAULT_DAYS = 7;
+
 export function ToolUsageByDayChart({ data, tools, isLoading, className, onDaysChange }: ToolUsageByDayChartProps) {
-  const [timeRange, setTimeRange] = useState<TimeRange>("7d");
+  const [timeRange, setTimeRange] = useState<TimeRange>(DEFAULT_TIME_RANGE);
 
   const handleTimeRangeChange = (value: string) => {
     const range = value as TimeRange;
