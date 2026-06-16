@@ -24,6 +24,7 @@ vi.mock("@/hooks/useApi", () => ({
   useSyncConnector: () => ({ mutateAsync: mockMutateAsync }),
   useDeleteConnector: () => ({ mutateAsync: mockMutateAsync }),
   useTestConnector: () => ({ mutateAsync: mockMutateAsync }),
+  useUpdateConnector: () => ({ mutateAsync: mockMutateAsync }),
   useConnectWithApiKey: () => ({ mutateAsync: mockMutateAsync }),
   useConnectSlack: () => ({ mutateAsync: mockMutateAsync }),
   useToolAccounts: vi.fn(() => ({ data: [], isLoading: false })),
@@ -165,6 +166,26 @@ describe("Integrations", () => {
       expect(screen.getByText(/12 synced events/i)).toBeInTheDocument();
     });
 
+    it("calls useUpdateConnector when rename is confirmed", async () => {
+      const user = userEvent.setup();
+      vi.mocked(useConnectors).mockReturnValue({
+        data: [mockConnector],
+        isLoading: false,
+      } as ReturnType<typeof useConnectors>);
+
+      renderAt("/integrations/connected");
+
+      await user.click(screen.getByRole("button", { name: /actions/i }));
+      await user.click(screen.getByRole("menuitem", { name: /rename/i }));
+      await user.clear(screen.getByLabelText(/label/i));
+      await user.type(screen.getByLabelText(/label/i), "Renamed");
+      await user.click(screen.getByRole("button", { name: /save/i }));
+
+      expect(mockMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { label: "Renamed" } }),
+      );
+    });
+
     it("does not render personal tool accounts in Connected tab", () => {
       vi.mocked(useToolAccounts).mockReturnValue({
         data: [
@@ -208,14 +229,29 @@ describe("Integrations", () => {
       expect(within(geminiCard).getByRole("button", { name: "Connect" })).toBeInTheDocument();
     });
 
-    it("does not show providers that are already connected", () => {
+    it("still shows multi-instance providers (GitLab) even when already connected", () => {
       vi.mocked(useConnectors).mockReturnValue({
         data: [mockConnector],
         isLoading: false,
       } as ReturnType<typeof useConnectors>);
 
       renderAt("/integrations/available");
-      expect(screen.queryByText("GitLab")).not.toBeInTheDocument();
+      expect(screen.getByText("GitLab")).toBeInTheDocument();
+    });
+
+    it("hides single-instance providers (Slack) once connected", () => {
+      const slackConnector = {
+        ...mockConnector,
+        id: "conn-slack",
+        connector_type: "slack",
+      };
+      vi.mocked(useConnectors).mockReturnValue({
+        data: [slackConnector],
+        isLoading: false,
+      } as ReturnType<typeof useConnectors>);
+
+      renderAt("/integrations/available");
+      expect(screen.queryByText("Slack")).not.toBeInTheDocument();
     });
   });
 

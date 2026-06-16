@@ -55,11 +55,10 @@ class AiUsageSyncJob
     providers = provider_filter ? [ provider_filter ] : SUPPORTED_PROVIDERS
 
     providers.each do |provider|
-      connector = org.organization_connectors.find_by(connector_type: provider, is_active: true)
-      next unless connector
-
-      reconciled = reconcile_provider(org, connector, provider)
-      total_reconciled += reconciled
+      org.organization_connectors.where(connector_type: provider, is_active: true).find_each do |connector|
+        reconciled = reconcile_provider(org, connector, provider)
+        total_reconciled += reconciled
+      end
     end
 
     total_reconciled

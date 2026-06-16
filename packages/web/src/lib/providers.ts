@@ -30,6 +30,8 @@ export interface ProviderInfo {
   inputPlaceholder?: string;
   connectSheet?: "webhook";
   scope: IntegrationScope;
+  /** When true, multiple connectors of this provider are allowed per org. */
+  multiInstance?: boolean;
 }
 
 export const availableProviders: ProviderInfo[] = [
@@ -47,6 +49,7 @@ export const availableProviders: ProviderInfo[] = [
       "Copilot usage analytics",
     ],
     available: true,
+    multiInstance: true,
   },
   {
     id: "gitlab",
@@ -61,6 +64,7 @@ export const availableProviders: ProviderInfo[] = [
       "CI/CD analytics",
     ],
     available: true,
+    multiInstance: true,
   },
   {
     id: "bitbucket",
@@ -76,6 +80,7 @@ export const availableProviders: ProviderInfo[] = [
       "Pipeline monitoring",
     ],
     available: true,
+    multiInstance: true,
   },
 
   // Project Management
@@ -87,6 +92,7 @@ export const availableProviders: ProviderInfo[] = [
     scope: "org",
     features: ["Issue tracking", "Project context", "Sprint monitoring"],
     available: true,
+    multiInstance: true,
   },
   {
     id: "linear",
@@ -96,6 +102,7 @@ export const availableProviders: ProviderInfo[] = [
     scope: "org",
     features: ["Team sync", "Project context", "Issue throughput", "Cycle monitoring"],
     available: true,
+    multiInstance: true,
   },
 
   // AI / LLM Providers
@@ -142,6 +149,7 @@ export const availableProviders: ProviderInfo[] = [
     ],
     available: true,
     inputPlaceholder: "sk-admin-...",
+    multiInstance: true,
   },
   {
     id: "openrouter",
@@ -156,6 +164,7 @@ export const availableProviders: ProviderInfo[] = [
       "Usage patterns",
     ],
     available: true,
+    multiInstance: true,
   },
   {
     id: "gemini",

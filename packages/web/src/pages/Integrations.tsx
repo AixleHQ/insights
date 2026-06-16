@@ -7,6 +7,7 @@ import {
   useSyncConnector,
   useDeleteConnector,
   useTestConnector,
+  useUpdateConnector,
 } from "@/hooks/useApi";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,7 @@ export function Integrations() {
   const syncConnector = useSyncConnector();
   const deleteConnector = useDeleteConnector();
   const testConnector = useTestConnector();
+  const updateConnector = useUpdateConnector();
 
   const activeTab = status === "available" ? "available" : "connected";
   const [scopeFilter, setScopeFilter] = useState<IntegrationScope | "all">("all");
@@ -86,6 +88,7 @@ export function Integrations() {
         provider: connectorType as IntegrationProvider,
         name: externalAccountName || providerInfo?.name || connectorType,
         status: c.status as ConnectorStatus,
+        label: c.label,
         last_sync_at: lastSyncAt || undefined,
         last_event_at: lastEventAt || undefined,
         sync_error: lastError || undefined,
@@ -142,6 +145,19 @@ export function Integrations() {
     }
   };
 
+  const handleRename = async (id: string, newLabel: string) => {
+    if (!currentOrg) return;
+    try {
+      await updateConnector.mutateAsync({
+        orgId: currentOrg.id,
+        connectorId: id,
+        data: { label: newLabel },
+      });
+    } catch (error) {
+      console.error("Failed to rename connector:", error);
+    }
+  };
+
   const handleTest = async (id: string) => {
     if (!currentOrg) return;
     setTestingConnectorId(id);
@@ -184,9 +200,10 @@ export function Integrations() {
   // Get providers that are already connected
   const connectedProviders = new Set(integrations.map((c) => c.provider));
 
-  // Filter available providers to show only those not connected
+  // Multi-instance providers (github, gitlab, etc.) always appear in Available.
+  // Single-instance providers are hidden once connected.
   const unconnectedProviders = availableProviders.filter(
-    (p) => !connectedProviders.has(p.id),
+    (p) => p.multiInstance || !connectedProviders.has(p.id),
   );
 
   // Group unconnected providers by category
@@ -313,6 +330,7 @@ export function Integrations() {
                   onSync={integration.provider === "slack" ? undefined : handleSync}
                   onTest={handleTest}
                   onDisconnect={handleDisconnect}
+                  onRename={handleRename}
                   onSetupWebhook={integration.provider === "openrouter" ? handleSetupWebhook : undefined}
                   isTesting={testingConnectorId === integration.id}
                 />

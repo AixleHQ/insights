@@ -232,6 +232,61 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
       expect_success
       expect(json_data[:isActive]).to be false
     end
+
+    it 'updates label via PATCH' do
+      authenticated_patch "/api/v1/organizations/#{organization.id}/connectors/#{connector.id}",
+                          user: admin,
+                          organization: organization,
+                          params: { label: 'My GitHub account' }
+
+      expect_success
+      expect(json_data[:label]).to eq('My GitHub account')
+      expect(connector.reload.label).to eq('My GitHub account')
+    end
+  end
+
+  describe 'POST /api/v1/organizations/:organization_id/connectors (multi-instance)' do
+    let(:openrouter_provider_double) { instance_double(Oauth::OpenrouterProvider, test_connection: { success: true }) }
+
+    before do
+      allow(Oauth::BaseProvider).to receive(:for).and_call_original
+      allow(Oauth::OpenrouterProvider).to receive(:new).and_return(openrouter_provider_double)
+      allow(Oauth::BaseProvider).to receive(:for).with(anything) do |c|
+        openrouter_provider_double if c.connector_type == 'openrouter'
+      end
+    end
+
+    it 'allows creating two openrouter connectors in one org' do
+      allow_any_instance_of(Oauth::OpenrouterProvider).to receive(:test_connection).and_return({ success: true })
+
+      authenticated_post "/api/v1/organizations/#{organization.id}/connectors",
+                         user: admin,
+                         organization: organization,
+                         params: { connector_type: 'openrouter', access_token: 'key-1' }
+      expect_created
+
+      expect {
+        authenticated_post "/api/v1/organizations/#{organization.id}/connectors",
+                           user: admin,
+                           organization: organization,
+                           params: { connector_type: 'openrouter', access_token: 'key-2', label: 'Secondary' }
+      }.to change(OrganizationConnector, :count).by(1)
+
+      expect_created
+      expect(json_data[:label]).to eq('Secondary')
+    end
+
+    it 'persists label on connector create' do
+      allow_any_instance_of(Oauth::OpenrouterProvider).to receive(:test_connection).and_return({ success: true })
+
+      authenticated_post "/api/v1/organizations/#{organization.id}/connectors",
+                         user: admin,
+                         organization: organization,
+                         params: { connector_type: 'openrouter', access_token: 'key-1', label: 'Primary key' }
+
+      expect_created
+      expect(json_data[:label]).to eq('Primary key')
+    end
   end
 
   describe 'DELETE /api/v1/organizations/:organization_id/connectors/:id' do
@@ -657,29 +712,59 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
       expect(log.tracked_changes).to include('connector_type' => 'github', 'via' => 'oauth_callback')
     end
 
-    it 'updates an existing connector when one already exists' do
-      expect {
-        authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
-                           user: admin,
-                           organization: organization,
-                           params: { connector_type: 'github', code: 'oauth_code_abc' }
-      }.not_to change(OrganizationConnector, :count)
+    context 'when re-authing the same external account (same external_org_id)' do
+      before { connector.update!(external_org_id: 'gh-42') }
 
-      expect_success
-      expect(connector.reload.status).to eq('connected')
+      it 'updates the existing connector (count unchanged)' do
+        expect {
+          authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
+                             user: admin,
+                             organization: organization,
+                             params: { connector_type: 'github', code: 'oauth_code_abc' }
+        }.not_to change(OrganizationConnector, :count)
+
+        expect_success
+        expect(connector.reload.status).to eq('connected')
+      end
+
+      it 'creates a connector.update audit log' do
+        expect {
+          authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
+                             user: admin,
+                             organization: organization,
+                             params: { connector_type: 'github', code: 'oauth_code_abc' }
+        }.to change(OrganizationAuditLog, :count).by(1)
+
+        log = OrganizationAuditLog.order(:created_at).last
+        expect(log.action).to eq('connector.update')
+        expect(log.tracked_changes).to include('connector_type' => 'github', 'via' => 'oauth_callback')
+      end
     end
 
-    it 'creates a connector.update audit log when reconnecting via OAuth callback' do
-      expect {
-        authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
-                           user: admin,
-                           organization: organization,
-                           params: { connector_type: 'github', code: 'oauth_code_abc' }
-      }.to change(OrganizationAuditLog, :count).by(1)
+    context 'when connecting a different external account (new external_org_id)' do
+      it 'creates a new connector (count +1)' do
+        # connector has no external_org_id; fake provider returns 'gh-42' → new row
+        expect {
+          authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
+                             user: admin,
+                             organization: organization,
+                             params: { connector_type: 'github', code: 'oauth_code_abc' }
+        }.to change(OrganizationConnector, :count).by(1)
 
-      log = OrganizationAuditLog.order(:created_at).last
-      expect(log.action).to eq('connector.update')
-      expect(log.tracked_changes).to include('connector_type' => 'github', 'via' => 'oauth_callback')
+        expect_success
+      end
+    end
+
+    it 'persists a label when provided' do
+      connector.destroy!
+
+      authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
+                         user: admin,
+                         organization: organization,
+                         params: { connector_type: 'github', code: 'oauth_code_abc', label: 'Work account' }
+
+      expect_success
+      expect(json_data[:label]).to eq('Work account')
     end
 
     it 'returns 403 for org members' do

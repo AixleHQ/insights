@@ -133,6 +133,7 @@ export interface Connector {
   is_active?: boolean;
   status: ConnectorStatus;
   scope: ConnectorScope;
+  label?: string | null;
   externalAccountId?: string | null;
   external_account_id?: string | null;
   externalAccountName?: string | null;

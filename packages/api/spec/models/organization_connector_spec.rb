@@ -9,6 +9,10 @@ RSpec.describe OrganizationConnector, type: :model do
     it 'defines valid statuses' do
       expect(OrganizationConnector::STATUSES).to eq(%w[connected testing error disconnected])
     end
+
+    it 'defines multi-instance connector types' do
+      expect(OrganizationConnector::MULTI_INSTANCE_CONNECTOR_TYPES).to eq(%w[github gitlab bitbucket jira linear openrouter openai])
+    end
   end
 
   describe 'associations' do
@@ -28,11 +32,23 @@ RSpec.describe OrganizationConnector, type: :model do
       expect(connector).to be_valid
     end
 
-    it 'validates uniqueness of connector type per organization' do
-      connector = create(:organization_connector, connector_type: 'github')
-      duplicate = build(:organization_connector, organization: connector.organization, connector_type: 'github')
+    it 'allows multiple connectors of the same multi-instance type per organization' do
+      connector = create(:organization_connector, connector_type: 'github', external_org_id: 'org-a')
+      second = build(:organization_connector, organization: connector.organization, connector_type: 'github', external_org_id: 'org-b')
+      expect(second).to be_valid
+    end
+
+    it 'rejects a second connector of a single-instance type' do
+      connector = create(:organization_connector, :slack)
+      duplicate = build(:organization_connector, :slack, organization: connector.organization)
       expect(duplicate).not_to be_valid
       expect(duplicate.errors[:connector_type]).to include('already exists for this organization')
+    end
+
+    it 'rejects a second multi-instance OAuth connector with the same external_org_id' do
+      connector = create(:organization_connector, connector_type: 'github', external_org_id: 'org-a')
+      duplicate = build(:organization_connector, organization: connector.organization, connector_type: 'github', external_org_id: 'org-a')
+      expect(duplicate).not_to be_valid
     end
 
     it { should allow_value(true).for(:is_active) }
@@ -124,6 +140,28 @@ RSpec.describe OrganizationConnector, type: :model do
 
     it 'returns false for github' do
       expect(build(:organization_connector, connector_type: 'github').ai_provider?).to be false
+    end
+  end
+
+  describe '#multi_instance?' do
+    it 'returns true for github' do
+      expect(build(:organization_connector, connector_type: 'github').multi_instance?).to be true
+    end
+
+    it 'returns true for openrouter' do
+      expect(build(:organization_connector, connector_type: 'openrouter').multi_instance?).to be true
+    end
+
+    it 'returns true for openai' do
+      expect(build(:organization_connector, connector_type: 'openai').multi_instance?).to be true
+    end
+
+    it 'returns false for slack' do
+      expect(build(:organization_connector, :slack).multi_instance?).to be false
+    end
+
+    it 'returns false for anthropic' do
+      expect(build(:organization_connector, connector_type: 'anthropic').multi_instance?).to be false
     end
   end
 

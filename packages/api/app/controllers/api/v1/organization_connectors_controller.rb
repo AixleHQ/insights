@@ -271,19 +271,27 @@ module Api
         provider_class = Oauth::BaseProvider.provider_class(connector_type)
         token_data = provider_class.exchange_code(code, redirect_uri: oauth_callback_url)
 
-        connector = current_organization.organization_connectors
-                                        .find_or_initialize_by(connector_type: connector_type)
+        external_org_id = token_data[:account_id]
+        multi_instance = OrganizationConnector::MULTI_INSTANCE_CONNECTOR_TYPES.include?(connector_type)
+        connector = if multi_instance && external_org_id.present?
+          current_organization.organization_connectors
+                              .find_or_initialize_by(connector_type: connector_type, external_org_id: external_org_id)
+        else
+          current_organization.organization_connectors
+                              .find_or_initialize_by(connector_type: connector_type)
+        end
         creating = connector.new_record?
         connector.assign_attributes(
           access_token: token_data[:access_token],
           refresh_token: token_data[:refresh_token],
           token_expires_at: token_data[:expires_at],
-          external_org_id: token_data[:account_id],
+          external_org_id: external_org_id,
           external_org_name: token_data[:account_name],
           is_active: true,
           status: "connected",
           last_error: nil
         )
+        connector.label = params[:label] if params[:label].present?
 
         if connector.save
           OrganizationAuditLog.log(
@@ -313,12 +321,12 @@ module Api
 
       def connector_params
         params.permit(:connector_type, :access_token, :refresh_token, :token_expires_at,
-                      :external_account_id, :external_account_name, :webhook_secret, :is_active)
+                      :external_account_id, :external_account_name, :webhook_secret, :is_active, :label)
       end
 
       def connector_update_params
         params.permit(:access_token, :refresh_token, :token_expires_at,
-                      :external_account_id, :external_account_name, :webhook_secret, :is_active)
+                      :external_account_id, :external_account_name, :webhook_secret, :is_active, :label)
       end
 
       def oauth_callback_url

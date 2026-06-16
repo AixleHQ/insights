@@ -10,6 +10,7 @@ import {
   ChevronDown,
   KeyRound,
   Zap,
+  Pencil,
   Building2,
   FolderKanban,
   User,
@@ -25,6 +26,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { cn, formatDistanceToNow } from "@/lib/utils";
 import { ProviderLogo } from "@/components/icons";
 import type { ConnectorStatus, ConnectorHealthStats } from "@/lib/types";
@@ -41,6 +51,7 @@ export interface IntegrationData {
   last_sync_at?: string;
   last_event_at?: string;
   sync_error?: string;
+  label?: string | null;
   metadata?: {
     account_name?: string;
     resources_count?: number;
@@ -64,6 +75,7 @@ interface IntegrationCardProps {
   onSync?: (id: string) => void;
   onTest?: (id: string) => void;
   onDisconnect?: (id: string) => void;
+  onRename?: (id: string, newLabel: string) => void;
   onRegenerateToken?: (id: string) => void;
   onConnect?: (providerId: string) => void;
   onSetupWebhook?: (id: string) => void;
@@ -147,12 +159,15 @@ export function IntegrationCard({
   onSync,
   onTest,
   onDisconnect,
+  onRename,
   onRegenerateToken,
   onConnect,
   onSetupWebhook,
   isTesting = false,
   className,
 }: IntegrationCardProps) {
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
   // Display as available provider to connect
   if (provider && !integration) {
     return (
@@ -217,7 +232,8 @@ export function IntegrationCard({
               <CardTitle className="text-base">{integration.name}</CardTitle>
               <CardDescription className="text-xs capitalize">
                 {integration.provider.replace("-", " ")}
-                {integration.metadata?.account_name &&
+                {integration.label && ` · ${integration.label}`}
+                {!integration.label && integration.metadata?.account_name &&
                   ` · ${integration.metadata.account_name}`}
               </CardDescription>
               {integration.scope && (
@@ -266,7 +282,18 @@ export function IntegrationCard({
                   Setup webhook
                 </DropdownMenuItem>
               )}
-              {(onSync || onTest || onRegenerateToken || onSetupWebhook) && <DropdownMenuSeparator />}
+              {onRename && (
+                <DropdownMenuItem
+                  onClick={() => {
+                    setRenameValue(integration.label ?? "");
+                    setRenameOpen(true);
+                  }}
+                >
+                  <Pencil className="mr-2 size-4" />
+                  Rename
+                </DropdownMenuItem>
+              )}
+              {(onSync || onTest || onRegenerateToken || onSetupWebhook || onRename) && <DropdownMenuSeparator />}
               <DropdownMenuItem
                 className="text-destructive"
                 onClick={() => onDisconnect?.(integration.id)}
@@ -276,6 +303,43 @@ export function IntegrationCard({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+            <DialogContent aria-describedby={undefined}>
+              <DialogHeader>
+                <DialogTitle>Rename connector</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-2 py-2">
+                <Label htmlFor="rename-label">Label</Label>
+                <Input
+                  id="rename-label"
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  placeholder="e.g. Work account, Team A"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      onRename?.(integration.id, renameValue.trim());
+                      setRenameOpen(false);
+                    }
+                  }}
+                  autoFocus
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setRenameOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    onRename?.(integration.id, renameValue.trim());
+                    setRenameOpen(false);
+                  }}
+                >
+                  Save
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
