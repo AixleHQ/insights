@@ -102,7 +102,7 @@ class ModelPricingService
     end
 
     def calculate_cost(tokens_in:, tokens_out:, model: nil, tool: nil, organization: nil)
-      pricing = if model.present?
+      pricing = if model.present? && model != "unknown"
                   pricing_for_model(model, organization: organization)
       elsif tool.present?
                   pricing_for_tool(tool)

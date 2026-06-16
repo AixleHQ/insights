@@ -282,5 +282,29 @@ RSpec.describe ModelPricingService do
         expect(result[:output_cost]).to eq(3.00)
       end
     end
+
+    context "when model is 'unknown' (unresolved client sentinel)" do
+      it 'falls back to tool pricing when tool is present' do
+        result = described_class.calculate_cost(
+          tokens_in: 1_000_000,
+          tokens_out: 1_000_000,
+          model: "unknown",
+          tool: "cursor"
+        )
+        # Cursor tool pricing: $2.00/$8.00 — not generic default $1.00/$3.00
+        expect(result[:input_cost]).to eq(2.00)
+        expect(result[:output_cost]).to eq(8.00)
+      end
+
+      it 'falls back to default pricing when tool is also absent' do
+        result = described_class.calculate_cost(
+          tokens_in: 1_000_000,
+          tokens_out: 1_000_000,
+          model: "unknown"
+        )
+        expect(result[:input_cost]).to eq(1.00)
+        expect(result[:output_cost]).to eq(3.00)
+      end
+    end
   end
 end

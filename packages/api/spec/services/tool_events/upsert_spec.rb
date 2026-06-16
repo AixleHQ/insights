@@ -164,6 +164,142 @@ RSpec.describe ToolEvents::Upsert do
         expect(result[:tool_event].tokens_out).to be_nil
       end
     end
+
+    context "when cost_model is 'estimated_transcript_text' (Cursor char/4 token estimates)" do
+      let(:transcript_attrs) do
+        base_attributes.merge(
+          cost_usd: 0.0021,
+          tokens_in: 250,
+          tokens_out: 180,
+          metadata: { "cost_model" => "estimated_transcript_text" }
+        )
+      end
+
+      it "nils out the fabricated cost_usd so char/4-derived cost does not inflate cost aggregations" do
+        result = described_class.call(transcript_attrs)
+        expect(result[:tool_event].cost_usd).to be_nil
+      end
+
+      it "sets cost_source to 'client'" do
+        result = described_class.call(transcript_attrs)
+        expect(result[:tool_event].metadata["cost_source"]).to eq("client")
+      end
+
+      it "nils out tokens_in and tokens_out so char/4 estimates do not inflate token aggregations" do
+        result = described_class.call(transcript_attrs)
+        expect(result[:tool_event].tokens_in).to be_nil
+        expect(result[:tool_event].tokens_out).to be_nil
+      end
+
+      it "sets tokens_total to zero" do
+        result = described_class.call(transcript_attrs)
+        expect(result[:tool_event].tokens_total).to eq(0)
+      end
+
+      it "preserves char/4 estimates in metadata as tokens_estimated_in and tokens_estimated_out" do
+        result = described_class.call(transcript_attrs)
+        expect(result[:tool_event].metadata["tokens_estimated_in"]).to eq(250)
+        expect(result[:tool_event].metadata["tokens_estimated_out"]).to eq(180)
+      end
+
+      it "does not re-estimate when cost_usd is zero" do
+        result = described_class.call(transcript_attrs.merge(cost_usd: 0))
+        expect(result[:tool_event].metadata["cost_source"]).to eq("client")
+        expect(result[:tool_event].tokens_in).to be_nil
+      end
+    end
+
+    context "estimated-metric relocation on the dedupe-update path (session re-send)" do
+      it "nils token columns on the existing row for estimated_line_count re-sends" do
+        session_id = SecureRandom.uuid
+        described_class.call(
+          base_attributes.merge(
+            cost_usd: 0.5, tokens_in: 999, tokens_out: 999,
+            metadata: { "session_id" => session_id }
+          )
+        )
+
+        result = described_class.call(
+          base_attributes.merge(
+            cost_usd: 0.00012, tokens_in: 100, tokens_out: 10,
+            metadata: { "session_id" => session_id, "cost_model" => "estimated_line_count" }
+          )
+        )
+
+        expect(result[:created]).to be(false)
+        expect(result[:tool_event].tokens_in).to be_nil
+        expect(result[:tool_event].tokens_out).to be_nil
+        expect(result[:tool_event].tokens_total).to eq(0)
+        expect(result[:tool_event].metadata["lines_suggested"]).to eq(100)
+        expect(result[:tool_event].metadata["lines_accepted"]).to eq(10)
+        # Line-count cost is a legitimate estimate — preserved on update.
+        expect(result[:tool_event].cost_usd.to_f).to eq(0.00012)
+      end
+
+      it "nils token columns and fabricated cost on the existing row for transcript re-sends" do
+        session_id = SecureRandom.uuid
+        described_class.call(
+          base_attributes.merge(
+            cost_usd: 0.5, tokens_in: 999, tokens_out: 999,
+            metadata: { "session_id" => session_id }
+          )
+        )
+
+        result = described_class.call(
+          base_attributes.merge(
+            cost_usd: 0.0021, tokens_in: 250, tokens_out: 180,
+            metadata: { "session_id" => session_id, "cost_model" => "estimated_transcript_text" }
+          )
+        )
+
+        expect(result[:created]).to be(false)
+        expect(result[:tool_event].tokens_in).to be_nil
+        expect(result[:tool_event].tokens_out).to be_nil
+        expect(result[:tool_event].tokens_total).to eq(0)
+        expect(result[:tool_event].metadata["tokens_estimated_in"]).to eq(250)
+        expect(result[:tool_event].metadata["tokens_estimated_out"]).to eq(180)
+        # char/4-derived cost is fabricated — nilled on update too.
+        expect(result[:tool_event].cost_usd).to be_nil
+      end
+    end
+
+    context "when model is 'unknown' (unresolved Cursor model)" do
+      let(:unknown_model_attrs) do
+        base_attributes.merge(
+          tool_name: "cursor",
+          model: "unknown",
+          cost_usd: nil,
+          tokens_in: 1_000,
+          tokens_out: 500
+        )
+      end
+
+      it "uses Cursor TOOL_PRICING ($2/$8) not the generic default ($1/$3)" do
+        expected = ModelPricingService.calculate_cost(
+          tokens_in: 1_000,
+          tokens_out: 500,
+          tool: "cursor"
+        )[:total_cost]
+
+        result = described_class.call(unknown_model_attrs)
+        expect(result[:tool_event].cost_usd.to_f).to eq(expected)
+      end
+
+      it "sets cost_source to 'server_estimated'" do
+        result = described_class.call(unknown_model_attrs)
+        expect(result[:tool_event].metadata["cost_source"]).to eq("server_estimated")
+      end
+
+      it "does not use generic default pricing ($1/$3) for Cursor unknown-model events" do
+        generic_default_cost = ModelPricingService.calculate_cost(
+          tokens_in: 1_000,
+          tokens_out: 500
+        )[:total_cost]
+
+        result = described_class.call(unknown_model_attrs)
+        expect(result[:tool_event].cost_usd.to_f).not_to eq(generic_default_cost)
+      end
+    end
   end
 
   describe ".call — model promotion from metadata" do
