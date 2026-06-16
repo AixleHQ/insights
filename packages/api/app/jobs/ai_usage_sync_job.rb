@@ -150,6 +150,17 @@ class AiUsageSyncJob
       .where("metadata->>'external_id' IN (?)", untracked_ids)
       .pluck(Arel.sql("metadata->>'external_id'"), :id)
 
+    # Legacy fallback: events created before connector-scoped metadata did not store
+    # connector_id. Only safe when one active openrouter connector exists in the org.
+    if existing_events.empty? &&
+        org.organization_connectors.where(connector_type: "openrouter", is_active: true).count == 1
+      existing_events = org.tool_events
+        .where(tool_name: "openrouter_api")
+        .where("metadata->>'connector_id' IS NULL")
+        .where("metadata->>'external_id' IN (?)", untracked_ids)
+        .pluck(Arel.sql("metadata->>'external_id'"), :id)
+    end
+
     return if existing_events.empty?
 
     now = Time.current
@@ -383,7 +394,7 @@ def fetch_anthropic_usage(connector, organization)
     conn.execute(format(sql_template, table, col_names, values_sql, conflict_cols))
   end
 
-  def dedup_unique_value(external_id, connector)
-    "#{connector.id}:#{external_id}"
+  def dedup_unique_value(external_id, _connector)
+    external_id.to_s
   end
 end

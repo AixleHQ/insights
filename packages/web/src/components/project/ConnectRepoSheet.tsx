@@ -117,7 +117,7 @@ export function ConnectRepoSheet({ projectId, open, onOpenChange, onSuccess }: C
                 <SelectContent>
                   {sourceControlConnectors.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
-                      {c.externalAccountName || c.connectorType}
+                      {c.label || c.externalAccountName || c.connectorType}
                     </SelectItem>
                   ))}
                 </SelectContent>

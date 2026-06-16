@@ -5,6 +5,8 @@ module Api
     class BaseController < ApplicationController
       include ActionPolicy::Controller
 
+      wrap_parameters false
+
       authorize :user, through: :current_user
       authorize :organization, through: :current_organization
 
