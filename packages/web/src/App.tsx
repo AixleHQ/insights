@@ -116,7 +116,14 @@ function App() {
                   <Route path="/events" element={<Events />} />
                   <Route path="/events/:id" element={<EventDetailPage />} />
                   <Route path="/projects" element={<Projects />} />
-                  <Route path="/projects/new" element={<NewProject />} />
+                  <Route
+                    path="/projects/new"
+                    element={
+                      <ProtectedRoute requireRoles={["owner"]}>
+                        <NewProject />
+                      </ProtectedRoute>
+                    }
+                  />
                   <Route path="/projects/:id" element={<ProjectDetail />} />
                   <Route path="/projects/:id/settings/*" element={<ProjectSettings />} />
                   <Route path="/projects/:id/edit" element={<EditProjectRedirect />} />

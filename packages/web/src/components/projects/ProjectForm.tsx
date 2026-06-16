@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { ApiError } from "@/lib/api";
 
 export interface ProjectFormData {
   name: string;
@@ -41,6 +42,7 @@ export function ProjectForm({
     }
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [generalError, setGeneralError] = useState<string | null>(null);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -74,11 +76,24 @@ export function ProjectForm({
     if (!validateForm()) return;
 
     setIsSubmitting(true);
+    setGeneralError(null);
     try {
       await onSubmit(formData);
-      navigate("/projects");
     } catch (error) {
-      console.error("Failed to save project:", error);
+      if (error instanceof ApiError && error.status === 422) {
+        const data = error.data as { errors?: Record<string, string[]> } | null;
+        if (data?.errors) {
+          const fieldErrors: Record<string, string> = {};
+          for (const [field, messages] of Object.entries(data.errors)) {
+            fieldErrors[field] = messages[0];
+          }
+          setErrors(fieldErrors);
+        } else {
+          setGeneralError("The server rejected the request. Please check your inputs.");
+        }
+      } else {
+        setGeneralError("Something went wrong. Please try again.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -97,7 +112,7 @@ export function ProjectForm({
   return (
     <div className={cn("space-y-6", className)}>
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/projects")}>
+        <Button variant="ghost" size="icon" onClick={() => navigate("/projects")} aria-label="Back to projects">
           <ArrowLeft className="size-4" />
         </Button>
         <div>
@@ -192,6 +207,10 @@ export function ProjectForm({
             </div>
           </CardContent>
         </Card>
+
+        {generalError && (
+          <p className="mt-4 text-sm text-destructive" role="alert">{generalError}</p>
+        )}
 
         <div className="mt-6 flex items-center justify-end gap-2">
           <Button
