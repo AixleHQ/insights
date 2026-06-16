@@ -42,7 +42,31 @@ interface ToolInsightsSectionProps {
   onDaysChange: (days: number) => void;
 }
 
-const DAY_OPTIONS = [7, 30, 90] as const;
+const DAY_OPTIONS = [7, 30, 90, 365] as const;
+
+const PERIOD_THRESHOLDS = { month: 365, week: 60 } as const;
+
+function periodForDays(days: number): "day" | "week" | "month" {
+  if (days >= PERIOD_THRESHOLDS.month) return "month";
+  if (days >= PERIOD_THRESHOLDS.week) return "week";
+  return "day";
+}
+
+function labelForDays(days: number): string {
+  if (days === 365) return "1y";
+  return `${days}d`;
+}
+
+function humanizeDays(days: number): string {
+  if (days === 365) return "1 year";
+  return `${days} days`;
+}
+
+function chartTitleForPeriod(period: "day" | "week" | "month"): string {
+  if (period === "month") return "Monthly Cost Trend";
+  if (period === "week") return "Weekly Cost Trend";
+  return "Daily Cost Trend";
+}
 
 const trendChartConfig = {
   costUsd: {
@@ -151,9 +175,9 @@ function SyncStatusSubsection({ orgId, connectorId }: { orgId: string; connector
   );
 }
 
-function OpenRouterTabContent({ orgId, days }: { orgId: string; days: number }) {
+function OpenRouterTabContent({ orgId, days, period }: { orgId: string; days: number; period: "day" | "week" | "month" }) {
   const { data: connectorsResp } = useConnectors(orgId);
-  const { data: dailyResp, isLoading: isLoadingDaily } = useToolDaily(orgId, "openrouter_api", days);
+  const { data: dailyResp, isLoading: isLoadingDaily } = useToolDaily(orgId, "openrouter_api", days, period);
   const { data: modelsResp, isLoading: isLoadingModels } = useToolModels(orgId, "openrouter_api", days);
   const { data: usersResp, isLoading: isLoadingUsers } = useToolUsers(orgId, "openrouter_api", days);
 
@@ -171,7 +195,7 @@ function OpenRouterTabContent({ orgId, days }: { orgId: string; days: number }) 
   if (!isLoadingDaily && totalEvents === 0) {
     return (
       <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-        No OpenRouter events in the last {days} days.
+        No OpenRouter events in the last {humanizeDays(days)}.
       </div>
     );
   }
@@ -229,8 +253,8 @@ function OpenRouterTabContent({ orgId, days }: { orgId: string; days: number }) 
   );
 }
 
-function CursorTabContent({ orgId, days }: { orgId: string; days: number }) {
-  const { data: dailyResp, isLoading: isLoadingDaily } = useToolDaily(orgId, "cursor", days);
+function CursorTabContent({ orgId, days, period }: { orgId: string; days: number; period: "day" | "week" | "month" }) {
+  const { data: dailyResp, isLoading: isLoadingDaily } = useToolDaily(orgId, "cursor", days, period);
   const { data: modelsResp, isLoading: isLoadingModels } = useToolModels(orgId, "cursor", days);
   const { data: usersResp, isLoading: isLoadingUsers } = useToolUsers(orgId, "cursor", days);
   const { data: eventTypesResp, isLoading: isLoadingEventTypes } = useToolEventTypes(orgId, "cursor", days);
@@ -254,7 +278,7 @@ function CursorTabContent({ orgId, days }: { orgId: string; days: number }) {
   if (!isLoadingDaily && totalEvents === 0) {
     return (
       <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-        No Cursor events in the last {days} days.
+        No Cursor events in the last {humanizeDays(days)}.
       </div>
     );
   }
@@ -298,7 +322,7 @@ function CursorTabContent({ orgId, days }: { orgId: string; days: number }) {
       {/* Trend chart */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base font-medium">Daily Cost Trend</CardTitle>
+          <CardTitle className="text-base font-medium">{chartTitleForPeriod(period)}</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoadingDaily ? (
@@ -373,8 +397,8 @@ function CursorTabContent({ orgId, days }: { orgId: string; days: number }) {
   );
 }
 
-function AnthropicTabContent({ orgId, days }: { orgId: string; days: number }) {
-  const { data: dailyResp, isLoading: isLoadingDaily } = useToolDaily(orgId, "anthropic_api", days);
+function AnthropicTabContent({ orgId, days, period }: { orgId: string; days: number; period: "day" | "week" | "month" }) {
+  const { data: dailyResp, isLoading: isLoadingDaily } = useToolDaily(orgId, "anthropic_api", days, period);
   const { data: modelsResp, isLoading: isLoadingModels } = useToolModels(orgId, "anthropic_api", days);
   const { data: usersResp, isLoading: isLoadingUsers } = useToolUsers(orgId, "anthropic_api", days);
 
@@ -390,7 +414,7 @@ function AnthropicTabContent({ orgId, days }: { orgId: string; days: number }) {
   if (!isLoadingDaily && totalEvents === 0) {
     return (
       <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-        No Anthropic API events in the last {days} days.
+        No Anthropic API events in the last {humanizeDays(days)}.
       </div>
     );
   }
@@ -499,7 +523,7 @@ export function ToolInsightsSection({ orgId, days, onDaysChange }: ToolInsightsS
                 className="h-7 text-xs"
                 onClick={() => onDaysChange(d)}
               >
-                {d}d
+                {labelForDays(d)}
               </Button>
             ))}
           </div>
@@ -519,19 +543,19 @@ export function ToolInsightsSection({ orgId, days, onDaysChange }: ToolInsightsS
 
           {cursorHasData && (
             <TabsContent value="cursor">
-              <CursorTabContent orgId={orgId} days={days} />
+              <CursorTabContent orgId={orgId} days={days} period={periodForDays(days)} />
             </TabsContent>
           )}
 
           {openrouterHasData && (
             <TabsContent value="openrouter_api">
-              <OpenRouterTabContent orgId={orgId} days={days} />
+              <OpenRouterTabContent orgId={orgId} days={days} period={periodForDays(days)} />
             </TabsContent>
           )}
 
           {anthropicHasData && (
             <TabsContent value="anthropic_api">
-              <AnthropicTabContent orgId={orgId} days={days} />
+              <AnthropicTabContent orgId={orgId} days={days} period={periodForDays(days)} />
             </TabsContent>
           )}
         </Tabs>
