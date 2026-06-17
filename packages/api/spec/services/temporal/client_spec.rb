@@ -150,7 +150,7 @@ RSpec.describe Temporal::Client do
 
     it 'returns true when pollers are active' do
       poller = double("poller")
-      response = double("response", pollers: [poller])
+      response = double("response", pollers: [ poller ])
       allow(mock_workflow_service).to receive(:describe_task_queue).and_return(response)
 
       expect(described_class.workers_polling?).to eq(true)
@@ -171,7 +171,7 @@ RSpec.describe Temporal::Client do
 
     it 'caches true result for 5 seconds' do
       poller = double("poller")
-      response = double("response", pollers: [poller])
+      response = double("response", pollers: [ poller ])
       allow(mock_workflow_service).to receive(:describe_task_queue).and_return(response)
 
       result1 = described_class.workers_polling?
