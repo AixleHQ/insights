@@ -37,7 +37,7 @@ export function AuthCallback() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen">
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
-          <h1 className="text-xl font-semibold text-red-800 mb-2">
+          <h1 className="type-h3 text-red-800 mb-2">
             Authentication Failed
           </h1>
           <p className="text-red-600 mb-4">{error}</p>

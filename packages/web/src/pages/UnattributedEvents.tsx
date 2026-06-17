@@ -327,7 +327,7 @@ export function UnattributedEvents() {
               <ArrowLeft className="size-4" />
             </Link>
           </Button>
-          <h1 className="text-xl font-semibold">Unattributed Events</h1>
+          <h1 className="type-h3">Unattributed Events</h1>
         </div>
         <div className="rounded-md border overflow-x-auto">
           <Table>
@@ -356,7 +356,7 @@ export function UnattributedEvents() {
             </Link>
           </Button>
           <div className="flex-1">
-            <h1 className="text-xl font-semibold">Unattributed Events</h1>
+            <h1 className="type-h3">Unattributed Events</h1>
             <p className="text-sm text-muted-foreground">
               Events that couldn't be automatically attributed to a user
             </p>
@@ -567,7 +567,7 @@ export function UnattributedEvents() {
                     <div>
                       <p className="font-medium">{event.toolName || "Unknown"}</p>
                       {event.model && (
-                        <p className="text-xs text-muted-foreground">{event.model}</p>
+                        <p className="type-caption text-muted-foreground">{event.model}</p>
                       )}
                     </div>
                   </TableCell>
@@ -590,13 +590,13 @@ export function UnattributedEvents() {
                             event.correlationMethod}
                         </Badge>
                         {event.correlationConfidence != null && (
-                          <span className="text-xs text-muted-foreground">
+                          <span className="type-caption text-muted-foreground">
                             {Math.round(Number(event.correlationConfidence) * 100)}% confidence
                           </span>
                         )}
                       </div>
                     ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
+                      <span className="type-caption text-muted-foreground">—</span>
                     )}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">

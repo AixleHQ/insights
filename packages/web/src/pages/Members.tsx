@@ -237,7 +237,7 @@ export function Members() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Members</h1>
+          <h1 className="type-h2">Members</h1>
           <p className="text-sm text-muted-foreground">
             {activeCount} active member{activeCount !== 1 && "s"}
             {pendingCount > 0 && `, ${pendingCount} pending`}
@@ -282,7 +282,7 @@ export function Members() {
         <div className="rounded-lg border border-dashed border-warning/50 bg-warning/5 p-4">
           <div className="flex items-center gap-2 mb-3">
             <Mail className="size-4 text-warning" />
-            <h3 className="font-medium text-sm">
+            <h3 className="type-label">
               Pending Invitations ({pendingCount})
             </h3>
           </div>
@@ -438,8 +438,8 @@ function MemberTableRow({
               </AvatarFallback>
             </Avatar>
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium">{member.name || member.email.split("@")[0]}</p>
-              <p className="truncate text-xs text-muted-foreground">{member.email}</p>
+              <p className="truncate type-label">{member.name || member.email.split("@")[0]}</p>
+              <p className="truncate type-caption text-muted-foreground">{member.email}</p>
             </div>
           </div>
         </TableCell>
@@ -559,8 +559,8 @@ function PendingInvitationRow({ invitation, onRevoke, isRevoking }: PendingInvit
           <Mail className="size-4 text-muted-foreground" />
         </div>
         <div className="min-w-0">
-          <p className="truncate font-medium text-sm">{invitation.email}</p>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <p className="truncate type-label">{invitation.email}</p>
+          <div className="flex items-center gap-2 type-caption text-muted-foreground">
             <span className="capitalize">{invitation.role}</span>
             <span>•</span>
             <span className="flex items-center gap-1">
@@ -750,7 +750,7 @@ function NotificationRoutesPanel({
         ))}
 
         <div className="border-t pt-4 space-y-3">
-          <p className="text-sm font-medium">Add route</p>
+          <p className="type-label">Add route</p>
           <div className="flex gap-2 flex-wrap items-end">
             <div>
               <Label className="text-xs">Alert type</Label>

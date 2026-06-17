@@ -86,25 +86,25 @@ export function MetricCard({
       <CardContent className="p-6">
         <div className="flex items-start justify-between">
           <div className="space-y-2">
-            <p className="text-sm font-medium text-muted-foreground">{title}</p>
+            <p className="type-label text-muted-foreground">{title}</p>
             <div className="flex items-baseline gap-2">
               <p
                 className={cn(
-                  "font-mono-display text-3xl font-bold tracking-tight",
+                  "font-mono-display type-h1",
                   isAnimating && "animate-metric-update"
                 )}
               >
                 {formatValue(value, format)}
               </p>
               {trendValue && (
-                <span className={cn("flex items-center gap-0.5 text-xs font-medium", trendColor)}>
+                <span className={cn("flex items-center gap-0.5 text-caption font-medium", trendColor)}>
                   <TrendIcon className="size-3" />
                   {trendValue}
                 </span>
               )}
             </div>
             {description && (
-              <p className="text-xs text-muted-foreground">{description}</p>
+              <p className="type-caption text-muted-foreground">{description}</p>
             )}
           </div>
           {icon && (

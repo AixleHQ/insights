@@ -167,7 +167,7 @@ function InvitationRow({
       <TableCell>
         <div className="flex flex-col gap-0.5">
           <span className="font-medium">{invitation.email}</span>
-          <span className="text-xs text-muted-foreground">
+          <span className="type-caption text-muted-foreground">
             Invited {formatDate(invitation.createdAt)}
           </span>
         </div>
@@ -376,7 +376,7 @@ function InviteDialog({
                 <SelectItem value="member">
                   <div className="flex flex-col items-start">
                     <span>Member</span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="type-caption text-muted-foreground">
                       View dashboards and contribute to projects
                     </span>
                   </div>
@@ -384,7 +384,7 @@ function InviteDialog({
                 <SelectItem value="viewer">
                   <div className="flex flex-col items-start">
                     <span>Viewer</span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="type-caption text-muted-foreground">
                       Read-only access to organization data
                     </span>
                   </div>
@@ -504,7 +504,7 @@ export function InvitationsManagement() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight">Team Invitations</h1>
+          <h1 className="type-h2">Team Invitations</h1>
           <p className="text-muted-foreground">
             Invite team members and manage pending invitations.
           </p>

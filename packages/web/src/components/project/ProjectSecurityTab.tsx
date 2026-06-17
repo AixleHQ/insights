@@ -82,7 +82,7 @@ export function ProjectSecurityTab({ projectId }: { projectId: string }) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-medium">Security & Audit Log</h2>
+        <h2 className="type-h4">Security & Audit Log</h2>
         <p className="text-sm text-muted-foreground">
           Track all security-relevant actions taken within this project
         </p>
@@ -90,7 +90,7 @@ export function ProjectSecurityTab({ projectId }: { projectId: string }) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Filters</CardTitle>
+          <CardTitle className="type-body-lg">Filters</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-3">
@@ -109,7 +109,7 @@ export function ProjectSecurityTab({ projectId }: { projectId: string }) {
               </Select>
             </div>
             <div className="flex items-center gap-2">
-              <Label htmlFor="project-audit-from-date" className="text-xs text-muted-foreground">From</Label>
+              <Label htmlFor="project-audit-from-date" className="type-caption text-muted-foreground">From</Label>
               <Input
                 id="project-audit-from-date"
                 type="date"
@@ -119,7 +119,7 @@ export function ProjectSecurityTab({ projectId }: { projectId: string }) {
               />
             </div>
             <div className="flex items-center gap-2">
-              <Label htmlFor="project-audit-to-date" className="text-xs text-muted-foreground">To</Label>
+              <Label htmlFor="project-audit-to-date" className="type-caption text-muted-foreground">To</Label>
               <Input
                 id="project-audit-to-date"
                 type="date"
@@ -169,19 +169,19 @@ export function ProjectSecurityTab({ projectId }: { projectId: string }) {
               <TableBody>
                 {logs.map((log) => (
                   <TableRow key={log.id}>
-                    <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                    <TableCell className="whitespace-nowrap type-caption text-muted-foreground">
                       {new Date(log.createdAt).toLocaleString()}
                     </TableCell>
                     <TableCell>
                       {log.actor ? (
                         <div>
-                          <p className="text-sm font-medium">{log.actor.name || log.actor.email}</p>
+                          <p className="type-label">{log.actor.name || log.actor.email}</p>
                           {log.actor.name && (
-                            <p className="text-xs text-muted-foreground">{log.actor.email}</p>
+                            <p className="type-caption text-muted-foreground">{log.actor.email}</p>
                           )}
                         </div>
                       ) : (
-                        <span className="text-xs text-muted-foreground">System</span>
+                        <span className="type-caption text-muted-foreground">System</span>
                       )}
                     </TableCell>
                     <TableCell>
@@ -194,7 +194,7 @@ export function ProjectSecurityTab({ projectId }: { projectId: string }) {
                         {AUDIT_ACTION_LABELS[log.action] ?? log.action}
                       </Badge>
                       {log.action.startsWith("impersonation") && typeof log.metadata?.impersonator_email === "string" && (
-                        <p className="mt-0.5 text-xs text-muted-foreground">
+                        <p className="mt-0.5 type-caption text-muted-foreground">
                           by {log.metadata.impersonator_email}
                         </p>
                       )}
@@ -213,7 +213,7 @@ export function ProjectSecurityTab({ projectId }: { projectId: string }) {
                         <span className="text-muted-foreground/50">&mdash;</span>
                       )}
                     </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
+                    <TableCell className="font-mono type-caption text-muted-foreground">
                       {log.ipAddress ?? "—"}
                     </TableCell>
                   </TableRow>

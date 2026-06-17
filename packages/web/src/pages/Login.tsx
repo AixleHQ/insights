@@ -59,20 +59,22 @@ export function Login() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-svh items-center justify-center bg-zinc-950">
-        <Loader2 className="size-8 animate-spin text-zinc-400" />
+      // Force dark tokens — login is always dark per Figma design
+      <div className="dark flex min-h-svh items-center justify-center bg-background">
+        <Loader2 className="size-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="relative flex min-h-svh items-center justify-center overflow-hidden bg-zinc-950">
+    // Force dark tokens — login is always dark per Figma design
+    <div className="dark relative flex min-h-svh items-center justify-center overflow-hidden bg-background">
       {/* Particle background */}
       <div className="pointer-events-none fixed inset-0" aria-hidden="true">
         {DOTS.map((dot) => (
           <span
             key={dot.id}
-            className="absolute rounded-full bg-zinc-400"
+            className="absolute rounded-full bg-muted-foreground/30"
             style={{
               top: dot.top,
               left: dot.left,
@@ -89,12 +91,12 @@ export function Login() {
       <div className="relative z-10 w-full max-w-sm px-4">
         {/* Logo */}
         <div className="mb-8 flex flex-col items-center gap-4 text-center">
-          <div className="flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-zinc-100 to-zinc-300 shadow-lg">
-            <span className="font-mono-display text-2xl font-bold text-zinc-900">90</span>
+          <div className="flex size-14 items-center justify-center rounded-2xl bg-primary shadow-lg">
+            <span className="font-mono-display type-h2 text-primary-foreground">90</span>
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-zinc-50">Aixle Insights</h1>
-            <p className="mt-1 text-sm leading-snug text-zinc-400">
+            <h1 className="type-h2 text-foreground">Aixle Insights</h1>
+            <p className="mt-1 type-body leading-snug text-muted-foreground">
               Every AI Token your team ever spent.<br />Right Here.
             </p>
           </div>
@@ -112,7 +114,7 @@ export function Login() {
           <Button
             type="button"
             size="lg"
-            className="w-full bg-zinc-50 text-zinc-900 hover:bg-zinc-200"
+            className="w-full bg-primary text-primary-foreground hover:bg-primary/80"
             onClick={login}
           >
             <GoogleLogo className="mr-2 size-5" />
@@ -125,37 +127,37 @@ export function Login() {
               type="button"
               variant="outline"
               size="lg"
-              className="w-full border-zinc-700 bg-transparent text-zinc-200 hover:bg-zinc-800 hover:text-zinc-50"
+              className="w-full border-border bg-transparent text-foreground/80 hover:bg-accent hover:text-accent-foreground"
               onClick={() => setShowEmailForm(true)}
             >
               <Mail className="mr-2 size-4" />
               Continue with Email
             </Button>
           ) : (
-            <form onSubmit={handleDirectLogin} className="space-y-3 rounded-lg border border-zinc-700 bg-zinc-900/60 p-4">
+            <form onSubmit={handleDirectLogin} className="space-y-3 rounded-lg border border-border bg-card/60 p-4">
               <div className="space-y-1.5">
-                <Label htmlFor="email" className="text-zinc-300">Email</Label>
+                <Label htmlFor="email" className="text-foreground/70">Email</Label>
                 <Input
                   id="email"
                   type="email"
                   placeholder="you@company.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="border-zinc-700 bg-zinc-800 text-zinc-50 placeholder:text-zinc-500"
+                  className="border-border bg-input text-foreground placeholder:text-muted-foreground"
                   required
                   autoComplete="email"
                   autoFocus
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="password" className="text-zinc-300">Password</Label>
+                <Label htmlFor="password" className="text-foreground/70">Password</Label>
                 <Input
                   id="password"
                   type="password"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="border-zinc-700 bg-zinc-800 text-zinc-50 placeholder:text-zinc-500"
+                  className="border-border bg-input text-foreground placeholder:text-muted-foreground"
                   required
                   autoComplete="current-password"
                 />
@@ -165,7 +167,7 @@ export function Login() {
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="text-zinc-400 hover:text-zinc-200"
+                  className="text-muted-foreground hover:text-foreground"
                   onClick={() => { setShowEmailForm(false); setFormError(null); }}
                 >
                   Cancel
@@ -193,7 +195,7 @@ export function Login() {
             size="lg"
             disabled
             aria-disabled={true}
-            className="w-full cursor-not-allowed border-zinc-800 bg-transparent text-zinc-500"
+            className="w-full cursor-not-allowed border-border bg-transparent text-muted-foreground"
           >
             <Fingerprint className="mr-2 size-4" />
             Continue with Passkey
@@ -202,11 +204,11 @@ export function Login() {
         </div>
 
         {/* Sign up */}
-        <p className="mt-6 text-center text-sm text-zinc-500">
+        <p className="mt-6 text-center type-body text-muted-foreground">
           Don&apos;t have an account?{" "}
           <button
             type="button"
-            className="text-zinc-300 underline-offset-4 hover:text-zinc-50 hover:underline"
+            className="text-foreground/70 underline-offset-4 hover:text-foreground hover:underline"
           >
             Sign Up
           </button>

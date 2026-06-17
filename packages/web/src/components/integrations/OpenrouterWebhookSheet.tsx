@@ -103,10 +103,10 @@ export function OpenrouterWebhookSheet({
               </div>
             </div>
           ) : (
-            <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm">
-              <Zap className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <div className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm">
+              <Zap className="mt-0.5 size-4 shrink-0 text-warning dark:text-warning" />
               <div>
-                <p className="font-medium text-amber-700 dark:text-amber-400">
+                <p className="font-medium text-warning dark:text-warning">
                   Webhook not configured
                 </p>
                 <p className="mt-0.5 text-muted-foreground">

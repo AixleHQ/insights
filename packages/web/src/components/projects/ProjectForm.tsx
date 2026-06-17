@@ -116,7 +116,7 @@ export function ProjectForm({
           <ArrowLeft className="size-4" />
         </Button>
         <div>
-          <h1 className="text-xl font-semibold">
+          <h1 className="type-h3">
             {isEditing ? "Edit Project" : "New Project"}
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -130,7 +130,7 @@ export function ProjectForm({
       <form onSubmit={handleSubmit}>
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Project Details</CardTitle>
+            <CardTitle className="type-body-lg">Project Details</CardTitle>
             <CardDescription>
               Basic information about your project
             </CardDescription>
@@ -184,7 +184,7 @@ export function ProjectForm({
                 value={formData.git_remote_url || ""}
                 onChange={(e) => updateField("git_remote_url", e.target.value)}
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="type-caption text-muted-foreground">
                 Paste the output of <code className="font-mono">git remote get-url origin</code> from the repository where
                 developers run the CLI. When the CLI runs inside that repo, events are auto-attributed to this project.
               </p>
@@ -195,7 +195,7 @@ export function ProjectForm({
                 <Label htmlFor="is_active" className="cursor-pointer">
                   Active
                 </Label>
-                <p className="text-xs text-muted-foreground">
+                <p className="type-caption text-muted-foreground">
                   Enable event tracking for this project
                 </p>
               </div>

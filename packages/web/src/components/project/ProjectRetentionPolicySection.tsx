@@ -75,7 +75,7 @@ export function ProjectRetentionPolicySection({ projectId }: Props) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-medium">Data Retention</h2>
+        <h2 className="type-h4">Data Retention</h2>
         <p className="text-sm text-muted-foreground">
           Configure how long data is retained for this project
         </p>
@@ -83,7 +83,7 @@ export function ProjectRetentionPolicySection({ projectId }: Props) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Retention Periods</CardTitle>
+          <CardTitle className="type-body-lg">Retention Periods</CardTitle>
           <CardDescription>
             Configure how long each type of data is kept
           </CardDescription>

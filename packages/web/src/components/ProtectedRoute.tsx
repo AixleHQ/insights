@@ -56,7 +56,7 @@ export function ProtectedRoute({
     if (!hasRole(requireRoles)) {
       return (
         <div className="flex flex-col items-center justify-center min-h-screen">
-          <h1 className="text-2xl font-bold text-foreground mb-2">Access Denied</h1>
+          <h1 className="type-h2 text-foreground mb-2">Access Denied</h1>
           <p className="text-muted-foreground">
             You don't have permission to access this page.
           </p>

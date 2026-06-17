@@ -208,7 +208,7 @@ export function Integrations() {
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Integrations</h1>
+          <h1 className="type-h2">Integrations</h1>
           <p className="text-sm text-muted-foreground">
             Connect external services to sync repositories, track AI usage, and
             more
@@ -265,7 +265,7 @@ export function Integrations() {
                     key={s}
                     type="button"
                     onClick={() => setScopeFilter(s)}
-                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-caption font-medium transition-colors ${
                       scopeFilter === s
                         ? "border-primary bg-primary text-primary-foreground"
                         : "border-border bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground"
@@ -326,7 +326,7 @@ export function Integrations() {
             if (providers.length === 0) return null;
             return (
               <div key={category} className="space-y-4">
-                <h2 className="text-lg font-medium">
+                <h2 className="type-h4">
                   {categoryLabels[category as ProviderInfo["category"]]}
                 </h2>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

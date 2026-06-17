@@ -77,7 +77,7 @@ function InvitationCard({
           <p className="text-sm text-muted-foreground">
             Invited by {invitation.invitedByName}
           </p>
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1 type-caption text-muted-foreground">
             <Clock className="size-3" />
             <span>
               {isExpired ? "Expired" : `Expires ${formatDate(invitation.expiresAt)}`}
@@ -243,7 +243,7 @@ export function Onboarding() {
                 90
               </span>
             </div>
-            <span className="text-lg font-semibold tracking-tight">Aixle Insights</span>
+            <span className="type-h4">Aixle Insights</span>
           </div>
           {profile && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -261,7 +261,7 @@ export function Onboarding() {
             <div className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-primary/10">
               <Sparkles className="size-8 text-primary" />
             </div>
-            <h1 className="text-3xl font-bold tracking-tight">
+            <h1 className="type-h1">
               Welcome to Aixle Insights
             </h1>
             <p className="mx-auto max-w-md text-muted-foreground">
@@ -427,7 +427,7 @@ export function Onboarding() {
       {/* Footer */}
       <footer className="relative z-10 border-t bg-background/80 backdrop-blur-sm">
         <div className="mx-auto flex h-14 max-w-4xl items-center justify-center px-6">
-          <p className="text-xs text-muted-foreground">
+          <p className="type-caption text-muted-foreground">
             &copy; {new Date().getFullYear()} Acme Corp. All rights reserved.
           </p>
         </div>

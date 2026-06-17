@@ -4,6 +4,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* Radius */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -11,6 +12,8 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
+
+  /* Color tokens */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -48,95 +51,132 @@
   --color-risk-low: var(--risk-low);
   --color-risk-none: var(--risk-none);
   --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
+
+  /* Typography — semantic font-size tokens.
+     Generates text-h1…text-h4, text-body-lg, text-label, text-caption utilities.
+     Use .type-* composite classes (defined in @layer utilities) to get the full
+     semantic treatment (size + weight + tracking) in a single class. */
+  --font-size-h1: 1.875rem;     /* 30px */
+  --font-size-h2: 1.5rem;       /* 24px */
+  --font-size-h3: 1.25rem;      /* 20px */
+  --font-size-h4: 1.125rem;     /* 18px */
+  --font-size-body-lg: 1rem;    /* 16px — prominent body / detail pages */
+  --font-size-label: 0.875rem;  /* 14px — same as sm, semantic alias */
+  --font-size-caption: 0.75rem; /* 12px — same as xs, semantic alias */
+
+  /* Spacing — semantic aliases over Tailwind's 4px base scale.
+     Tailwind's numeric scale already covers 4/8/12/16/24/32/48 as tw-1/2/3/4/6/8/12.
+     These named aliases express intent for layout-level decisions. */
+  --spacing-page: 1.5rem;     /* 24px — outer page padding */
+  --spacing-section: 2rem;    /* 32px — between page sections */
+  --spacing-card: 1.5rem;     /* 24px — card content padding */
+  --spacing-item: 1rem;       /* 16px — list / row gap */
+  --spacing-tight: 0.5rem;    /* 8px — compact gap */
+  --spacing-micro: 0.25rem;   /* 4px — inline gap */
 }
 
 :root {
   --radius: 0.625rem;
+
+  /* B&W chrome — light mode (dark text on near-white) */
   --background: oklch(0.985 0 0);
-  --foreground: oklch(0.145 0 0);
+  --foreground: oklch(0.12 0 0);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  /* Elevated card: use bg-card with border + shadow-sm — no separate token needed */
+  --card-foreground: oklch(0.12 0 0);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.55 0.25 260);
+  --popover-foreground: oklch(0.12 0 0);
+  --primary: oklch(0.12 0 0);          /* black CTA in light mode */
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
+  --secondary-foreground: oklch(0.12 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0.01 260);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.55 0.25 260);
+  --muted-foreground: oklch(0.55 0 0); /* disabled text: text-muted-foreground opacity-50 */
+  --accent: oklch(0.94 0 0);
+  --accent-foreground: oklch(0.12 0 0);
+  --destructive: oklch(0.577 0.245 27.325); /* error = destructive, no separate token */
+  --border: oklch(0.9 0 0);
+  --input: oklch(0.9 0 0);
+  --ring: oklch(0.4 0 0);
+
+  /* Chart tokens — keep color for data readability */
   --chart-1: oklch(0.55 0.25 260);
   --chart-2: oklch(0.65 0.2 180);
   --chart-3: oklch(0.7 0.18 145);
   --chart-4: oklch(0.75 0.15 85);
   --chart-5: oklch(0.6 0.22 320);
-  --sidebar: oklch(0.18 0.02 260);
-  --sidebar-foreground: oklch(0.92 0 0);
-  --sidebar-primary: oklch(0.55 0.25 260);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.25 0.03 260);
-  --sidebar-accent-foreground: oklch(0.95 0 0);
-  --sidebar-border: oklch(0.3 0.02 260);
-  --sidebar-ring: oklch(0.55 0.25 260);
 
-  /* DB90 Custom Colors */
+  /* Sidebar — achromatic dark surface regardless of app theme */
+  --sidebar: oklch(0.18 0 0);
+  --sidebar-foreground: oklch(0.92 0 0);
+  --sidebar-primary: oklch(0.12 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.25 0 0);
+  --sidebar-accent-foreground: oklch(0.95 0 0);
+  --sidebar-border: oklch(0.3 0 0);
+  --sidebar-ring: oklch(0.55 0 0);
+
+  /* DB90 semantic data colors — risk tokens unchanged */
   --risk-critical: oklch(0.6 0.25 25);
   --risk-high: oklch(0.7 0.2 45);
   --risk-medium: oklch(0.75 0.15 85);
   --risk-low: oklch(0.7 0.15 145);
   --risk-none: oklch(0.65 0.12 160);
   --success: oklch(0.65 0.2 145);
+  --success-foreground: oklch(0.12 0 0);
   --warning: oklch(0.75 0.15 85);
   --warning-foreground: oklch(0.2 0.05 85);
 }
 
 .dark {
-  --background: oklch(0.12 0.01 260);
+  /* B&W chrome — dark mode (light text on near-black) */
+  --background: oklch(0.08 0 0);
   --foreground: oklch(0.95 0 0);
-  --card: oklch(0.16 0.015 260);
+  --card: oklch(0.12 0 0);
   --card-foreground: oklch(0.95 0 0);
-  --popover: oklch(0.16 0.015 260);
+  --popover: oklch(0.12 0 0);
   --popover-foreground: oklch(0.95 0 0);
-  --primary: oklch(0.65 0.25 260);
-  --primary-foreground: oklch(0.12 0 0);
-  --secondary: oklch(0.22 0.02 260);
+  --primary: oklch(0.98 0 0);          /* white CTA in dark mode */
+  --primary-foreground: oklch(0.08 0 0);
+  --secondary: oklch(0.18 0 0);
   --secondary-foreground: oklch(0.95 0 0);
-  --muted: oklch(0.22 0.02 260);
-  --muted-foreground: oklch(0.65 0 0);
-  --accent: oklch(0.25 0.03 260);
+  --muted: oklch(0.18 0 0);
+  --muted-foreground: oklch(0.6 0 0);
+  --accent: oklch(0.22 0 0);
   --accent-foreground: oklch(0.95 0 0);
   --destructive: oklch(0.65 0.22 25);
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.65 0.25 260);
+  --ring: oklch(0.7 0 0);
+
+  /* Chart tokens — keep color for data readability */
   --chart-1: oklch(0.65 0.25 260);
   --chart-2: oklch(0.7 0.2 180);
   --chart-3: oklch(0.75 0.18 145);
   --chart-4: oklch(0.8 0.15 85);
   --chart-5: oklch(0.65 0.22 320);
-  --sidebar: oklch(0.14 0.015 260);
+
+  /* Sidebar — achromatic, slightly darker than card */
+  --sidebar: oklch(0.1 0 0);
   --sidebar-foreground: oklch(0.92 0 0);
-  --sidebar-primary: oklch(0.65 0.25 260);
-  --sidebar-primary-foreground: oklch(0.12 0 0);
-  --sidebar-accent: oklch(0.22 0.025 260);
+  --sidebar-primary: oklch(0.98 0 0);
+  --sidebar-primary-foreground: oklch(0.08 0 0);
+  --sidebar-accent: oklch(0.18 0 0);
   --sidebar-accent-foreground: oklch(0.95 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.65 0.25 260);
+  --sidebar-ring: oklch(0.7 0 0);
 
-  /* DB90 Custom Colors - Dark */
+  /* DB90 semantic data colors — risk tokens unchanged */
   --risk-critical: oklch(0.65 0.25 25);
   --risk-high: oklch(0.75 0.2 45);
   --risk-medium: oklch(0.8 0.15 85);
   --risk-low: oklch(0.75 0.15 145);
   --risk-none: oklch(0.7 0.12 160);
   --success: oklch(0.7 0.2 145);
+  --success-foreground: oklch(0.12 0 0);
   --warning: oklch(0.8 0.15 85);
   --warning-foreground: oklch(0.15 0.04 85);
 }
@@ -149,6 +189,24 @@
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
+}
+
+/* Semantic typography composite classes — size + weight + tracking only.
+   Color is NOT encoded here; callers set it explicitly (text-muted-foreground,
+   text-foreground, etc.) so the classes compose in any color context.
+   Pair .type-caption with text-muted-foreground at the callsite for the common case.
+   NOTE: Raw CSS values are intentional. Tailwind v4 cannot @apply @theme
+   inline-generated utilities (text-h1 etc.) within the same CSS file at build
+   time. If you change --font-size-h1 in @theme inline, update the value here too. */
+@layer utilities {
+  .type-h1      { font-size: 1.875rem; font-weight: 700; letter-spacing: -0.025em; line-height: 1.25; }
+  .type-h2      { font-size: 1.5rem;   font-weight: 600; letter-spacing: -0.025em; }
+  .type-h3      { font-size: 1.25rem;  font-weight: 600; }
+  .type-h4      { font-size: 1.125rem; font-weight: 500; }
+  .type-body-lg { font-size: 1rem; }
+  .type-body    { font-size: 0.875rem; }
+  .type-label   { font-size: 0.875rem; font-weight: 500; }
+  .type-caption { font-size: 0.75rem; }
 }
 
 /* Monospace accent for metrics/code */

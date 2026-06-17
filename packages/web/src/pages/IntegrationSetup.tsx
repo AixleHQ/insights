@@ -326,7 +326,7 @@ export function IntegrationSetup() {
         <div className="flex items-center gap-3">
           <ProviderLogo provider={provider.id} size="lg" showBackground />
           <div>
-            <h1 className="text-xl font-semibold">Connect {provider.displayName}</h1>
+            <h1 className="type-h3">Connect {provider.displayName}</h1>
             <p className="text-sm text-muted-foreground">Step-by-step setup wizard</p>
           </div>
         </div>
@@ -337,7 +337,7 @@ export function IntegrationSetup() {
         {(["overview", "authorize", "configure", "complete"] as SetupStep[]).map((s, i) => (
           <div key={s} className="flex items-center">
             <div
-              className={`flex size-8 items-center justify-center rounded-full text-xs font-medium transition-colors ${
+              className={`flex size-8 items-center justify-center rounded-full text-caption font-medium transition-colors ${
                 step === s
                   ? "bg-primary text-primary-foreground"
                   : ["overview", "authorize", "configure", "complete"].indexOf(step) > i
@@ -380,7 +380,7 @@ export function IntegrationSetup() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div>
-              <h3 className="mb-3 text-sm font-medium">Features</h3>
+              <h3 className="mb-3 type-label">Features</h3>
               <div className="grid gap-2">
                 {provider.features.map((feature) => (
                   <div key={feature} className="flex items-center gap-2 text-sm">
@@ -395,7 +395,7 @@ export function IntegrationSetup() {
               <>
                 <Separator />
                 <div>
-                  <h3 className="mb-3 flex items-center gap-2 text-sm font-medium">
+                  <h3 className="mb-3 flex items-center gap-2 type-label">
                     <Shield className="size-4" />
                     Required Permissions
                   </h3>
@@ -521,7 +521,7 @@ export function IntegrationSetup() {
                 value={config.name}
                 onChange={(e) => setConfig({ ...config, name: e.target.value })}
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="type-caption text-muted-foreground">
                 A friendly name to identify this connection
               </p>
             </div>
@@ -529,12 +529,12 @@ export function IntegrationSetup() {
             <Separator />
 
             <div className="space-y-4">
-              <h3 className="text-sm font-medium">Sync Options</h3>
+              <h3 className="type-label">Sync Options</h3>
 
               <div className="flex items-center justify-between">
                 <div>
                   <Label>Sync Repositories</Label>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="type-caption text-muted-foreground">
                     Import repository metadata and activity
                   </p>
                 </div>
@@ -549,7 +549,7 @@ export function IntegrationSetup() {
               <div className="flex items-center justify-between">
                 <div>
                   <Label>Sync Pull Requests / MRs</Label>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="type-caption text-muted-foreground">
                     Track AI-assisted code changes
                   </p>
                 </div>
@@ -565,7 +565,7 @@ export function IntegrationSetup() {
                 <div className="flex items-center justify-between">
                   <div>
                     <Label>Enable Webhooks</Label>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="type-caption text-muted-foreground">
                       Receive real-time updates (recommended)
                     </p>
                   </div>
@@ -598,7 +598,7 @@ export function IntegrationSetup() {
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
+              <p className="type-caption text-muted-foreground">
                 Optionally link this integration to a specific project
               </p>
             </div>
@@ -632,7 +632,7 @@ export function IntegrationSetup() {
             <div className="mx-auto mb-6 flex size-16 items-center justify-center rounded-full bg-primary/10">
               <Check className="size-8 text-primary" />
             </div>
-            <h2 className="text-xl font-semibold">Connection Successful!</h2>
+            <h2 className="type-h3">Connection Successful!</h2>
             <p className="mt-2 text-muted-foreground">
               Your {provider.displayName} account is now connected to Aixle Insights.
             </p>

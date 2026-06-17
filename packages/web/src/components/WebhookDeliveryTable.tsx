@@ -38,7 +38,7 @@ function statusBadgeVariant(status: WebhookDeliveryStatus): {
       return {
         variant: "outline",
         className:
-          "border-emerald-600/40 bg-emerald-600/10 text-emerald-800 dark:text-emerald-200",
+          "border-success/40 bg-success/10 text-success-foreground dark:text-success/70",
       };
     case "failed":
       return { variant: "destructive" };

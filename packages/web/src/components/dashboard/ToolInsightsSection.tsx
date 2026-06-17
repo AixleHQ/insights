@@ -107,17 +107,17 @@ function StatCard({
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        <CardTitle className="type-label text-muted-foreground">{title}</CardTitle>
         <Icon className="size-4 text-muted-foreground" />
       </CardHeader>
       <CardContent>
         {isLoading ? (
           <Skeleton className="h-7 w-24" />
         ) : (
-          <div className="text-2xl font-bold font-mono tracking-tight">{value}</div>
+          <div className="type-h2 font-mono">{value}</div>
         )}
         {sub && !isLoading && (
-          <p className="mt-1 text-xs text-muted-foreground">{sub}</p>
+          <p className="mt-1 type-caption text-muted-foreground">{sub}</p>
         )}
       </CardContent>
     </Card>
@@ -149,11 +149,11 @@ function SyncStatusSubsection({ orgId, connectorId }: { orgId: string; connector
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/40 px-4 py-3">
       <div className="space-y-0.5">
-        <p className="text-sm font-medium">Data Sync</p>
+        <p className="type-label">Data Sync</p>
         {isSyncError ? (
           <p className="text-xs text-destructive">Unable to fetch sync status.</p>
         ) : (
-          <p className="text-xs text-muted-foreground">
+          <p className="type-caption text-muted-foreground">
             Last synced: {formatSyncTime(syncStatus?.last_sync_at ?? null)}
             {syncStatus?.status === "error" && syncStatus.last_error && (
               <span className="ml-2 text-destructive">— {syncStatus.last_error}</span>
@@ -240,13 +240,13 @@ function OpenRouterTabContent({ orgId, days, period }: { orgId: string; days: nu
 
       {/* Full model table */}
       <div className="space-y-2">
-        <h4 className="text-sm font-medium text-muted-foreground">Model Breakdown</h4>
+        <h4 className="type-label text-muted-foreground">Model Breakdown</h4>
         <ToolModelTable models={models} isLoading={isLoadingModels} />
       </div>
 
       {/* Users table */}
       <div className="space-y-2">
-        <h4 className="text-sm font-medium text-muted-foreground">Top Users</h4>
+        <h4 className="type-label text-muted-foreground">Top Users</h4>
         <ToolUsersTable users={users} isLoading={isLoadingUsers} />
       </div>
     </div>
@@ -322,7 +322,7 @@ function CursorTabContent({ orgId, days, period }: { orgId: string; days: number
       {/* Trend chart */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base font-medium">{chartTitleForPeriod(period)}</CardTitle>
+          <CardTitle className="type-body-lg font-medium">{chartTitleForPeriod(period)}</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoadingDaily ? (
@@ -379,18 +379,18 @@ function CursorTabContent({ orgId, days, period }: { orgId: string; days: number
       {/* Model and event type tables */}
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         <div className="space-y-2">
-          <h4 className="text-sm font-medium text-muted-foreground">Model Breakdown</h4>
+          <h4 className="type-label text-muted-foreground">Model Breakdown</h4>
           <ToolModelTable models={models} isLoading={isLoadingModels} />
         </div>
         <div className="space-y-2">
-          <h4 className="text-sm font-medium text-muted-foreground">Event Types</h4>
+          <h4 className="type-label text-muted-foreground">Event Types</h4>
           <ToolEventTypesTable eventTypes={eventTypes} isLoading={isLoadingEventTypes} />
         </div>
       </div>
 
       {/* Users table */}
       <div className="space-y-2">
-        <h4 className="text-sm font-medium text-muted-foreground">Top Users</h4>
+        <h4 className="type-label text-muted-foreground">Top Users</h4>
         <ToolUsersTable users={users} isLoading={isLoadingUsers} />
       </div>
     </div>
@@ -429,12 +429,12 @@ function AnthropicTabContent({ orgId, days, period }: { orgId: string; days: num
       </div>
 
       <div className="space-y-2">
-        <h4 className="text-sm font-medium text-muted-foreground">Model Breakdown</h4>
+        <h4 className="type-label text-muted-foreground">Model Breakdown</h4>
         <ToolModelTable models={models} isLoading={isLoadingModels} />
       </div>
 
       <div className="space-y-2">
-        <h4 className="text-sm font-medium text-muted-foreground">Top Users</h4>
+        <h4 className="type-label text-muted-foreground">Top Users</h4>
         <ToolUsersTable users={users} isLoading={isLoadingUsers} />
       </div>
     </div>
@@ -502,7 +502,7 @@ export function ToolInsightsSection({ orgId, days, onDaysChange }: ToolInsightsS
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-lg font-semibold">Tool Insights</CardTitle>
+        <CardTitle className="type-h4">Tool Insights</CardTitle>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"

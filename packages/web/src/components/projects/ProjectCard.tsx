@@ -64,7 +64,7 @@ export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFa
                 onClick={() => onToggleFavorite({ id: project.id, name: project.name })}
               >
                 <Star
-                  className={cn("size-4", isFavorited && "fill-current text-amber-500")}
+                  className={cn("size-4", isFavorited && "fill-current text-warning")}
                 />
               </Button>
             )}
@@ -76,10 +76,10 @@ export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFa
                 <TooltipTrigger asChild>
                   <Badge
                     variant="outline"
-                    className="cursor-default gap-1 border-amber-500/40 bg-amber-500/10 text-xs text-amber-900 dark:text-amber-100"
+                    className="cursor-default gap-1 border-warning/40 bg-warning/10 text-xs text-warning-foreground dark:text-warning/80"
                     aria-label="No git remote configured"
                   >
-                    <AlertCircle className="size-3 text-amber-600 dark:text-amber-400" />
+                    <AlertCircle className="size-3 text-warning dark:text-warning" />
                     Unlinked
                   </Badge>
                 </TooltipTrigger>

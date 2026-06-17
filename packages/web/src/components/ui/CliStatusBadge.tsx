@@ -14,7 +14,7 @@ export function CliStatusBadge({ connected, className }: CliStatusBadgeProps) {
   if (connected) {
     return (
       <Badge variant="outline" className={cn("gap-1 text-xs", className)}>
-        <CheckCircle2 className="size-3 text-emerald-500" />
+        <CheckCircle2 className="size-3 text-success" />
         Connected
       </Badge>
     );
@@ -24,7 +24,7 @@ export function CliStatusBadge({ connected, className }: CliStatusBadgeProps) {
     <Tooltip>
       <TooltipTrigger asChild>
         <Badge variant="outline" className={cn("gap-1 text-xs cursor-default", className)}>
-          <AlertCircle className="size-3 text-amber-500" />
+          <AlertCircle className="size-3 text-warning" />
           Not set up
         </Badge>
       </TooltipTrigger>

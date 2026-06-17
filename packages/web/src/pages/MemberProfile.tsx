@@ -89,14 +89,14 @@ function StatCard({
   return (
     <Card className={cn("relative overflow-hidden", className)}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        <CardTitle className="type-label text-muted-foreground">{title}</CardTitle>
         <div className="flex size-8 items-center justify-center rounded-md bg-muted">
           <Icon className="size-4 text-muted-foreground" />
         </div>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold tracking-tight">{value}</div>
-        {subtitle && <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>}
+        <div className="type-h1">{value}</div>
+        {subtitle && <p className="mt-1 type-caption text-muted-foreground">{subtitle}</p>}
       </CardContent>
     </Card>
   );
@@ -452,36 +452,36 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Tokens In</CardTitle>
+            <CardTitle className="type-label text-muted-foreground">Tokens In</CardTitle>
             <ArrowDownToLine className="size-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold tracking-tight font-mono">
+            <div className="type-h1 font-mono">
               {formatTokens(stats.tokens?.total_in || 0)}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">Input tokens (prompts)</p>
+            <p className="mt-1 type-caption text-muted-foreground">Input tokens (prompts)</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Tokens Out</CardTitle>
-            <ArrowUpFromLine className="size-4 text-emerald-500" />
+            <CardTitle className="type-label text-muted-foreground">Tokens Out</CardTitle>
+            <ArrowUpFromLine className="size-4 text-success" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold tracking-tight font-mono">
+            <div className="type-h1 font-mono">
               {formatTokens(stats.tokens?.total_out || 0)}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">Output tokens (completions)</p>
+            <p className="mt-1 type-caption text-muted-foreground">Output tokens (completions)</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Today's Activity</CardTitle>
+            <CardTitle className="type-label text-muted-foreground">Today's Activity</CardTitle>
             <TrendingUp className="size-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold tracking-tight">{stats.events_today}</div>
-            <p className="mt-1 text-xs text-muted-foreground">Events today</p>
+            <div className="type-h1">{stats.events_today}</div>
+            <p className="mt-1 type-caption text-muted-foreground">Events today</p>
           </CardContent>
         </Card>
       </div>
@@ -491,7 +491,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
         {/* Tool Usage with Token Breakdown */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
+            <CardTitle className="flex items-center gap-2 type-body-lg">
               <Layers className="size-4" />
               Tool Usage
             </CardTitle>
@@ -553,7 +553,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm">
                         <div>{formatTokens(tool.tokens_total)}</div>
-                        <div className="text-xs text-muted-foreground">
+                        <div className="type-caption text-muted-foreground">
                           {formatTokens(tool.tokens_in)} / {formatTokens(tool.tokens_out)}
                         </div>
                       </TableCell>
@@ -573,7 +573,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
         {/* Model Usage with Pricing */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
+            <CardTitle className="flex items-center gap-2 type-body-lg">
               <Code2 className="size-4" />
               Model Usage
             </CardTitle>
@@ -624,7 +624,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
                       <TableCell className="text-right font-mono text-sm">
                         {formatTokens(model.tokens_total)}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                      <TableCell className="text-right font-mono type-caption text-muted-foreground">
                         <div>${model.price_per_million_input} in</div>
                         <div>${model.price_per_million_output} out</div>
                       </TableCell>
@@ -647,7 +647,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
         {/* Projects */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
+            <CardTitle className="flex items-center gap-2 type-body-lg">
               <Folder className="size-4" />
               Projects
             </CardTitle>
@@ -678,7 +678,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
         {/* Organizations */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
+            <CardTitle className="flex items-center gap-2 type-body-lg">
               <Building2 className="size-4" />
               Organizations
             </CardTitle>
@@ -709,7 +709,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
         {/* Connected Tools */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
+            <CardTitle className="flex items-center gap-2 type-body-lg">
               <Plug className="size-4" />
               Connected Tools
             </CardTitle>
@@ -726,7 +726,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
                     <div>
                       <div className="font-medium text-sm">{humanizeToolName(account.tool_name)}</div>
                       {account.external_username && (
-                        <div className="text-xs text-muted-foreground">@{account.external_username}</div>
+                        <div className="type-caption text-muted-foreground">@{account.external_username}</div>
                       )}
                     </div>
                     <Badge
@@ -753,7 +753,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div>
-            <CardTitle className="text-base">Recent Activity</CardTitle>
+            <CardTitle className="type-body-lg">Recent Activity</CardTitle>
             <CardDescription>Latest events from this team member</CardDescription>
           </div>
           <Button asChild variant="outline" size="sm">
@@ -777,7 +777,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
       {projectId && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
+            <CardTitle className="flex items-center gap-2 type-body-lg">
               <GitCommitHorizontal className="size-4" />
               Commits in {projectData?.name ?? "Project"}
             </CardTitle>

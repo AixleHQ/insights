@@ -212,7 +212,7 @@ export function UnifiedAuditTimelineTab({ orgId }: UnifiedAuditTimelineTabProps)
 
       {/* Truncation warning */}
       {meta?.truncated && (
-        <p className="text-xs text-amber-600 dark:text-amber-400">
+        <p className="text-xs text-warning dark:text-warning">
           Results capped at 1,000 entries per source. Apply date or scope filters to narrow results.
         </p>
       )}

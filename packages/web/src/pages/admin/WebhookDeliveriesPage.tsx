@@ -108,10 +108,10 @@ export function WebhookDeliveriesPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Webhook deliveries</h1>
+          <h1 className="type-h2">Webhook deliveries</h1>
           <p className="text-sm text-muted-foreground">
             {organization?.name ?? "Organization"}{" "}
-            <span className="font-mono text-xs">({organizationId})</span>
+            <span className="font-mono type-caption text-muted-foreground">({organizationId})</span>
           </p>
         </div>
       </div>

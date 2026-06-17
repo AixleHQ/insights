@@ -151,7 +151,7 @@ function ProjectGeneralSettingsForm({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-medium">General</h2>
+        <h2 className="type-h4">General</h2>
         <p className="text-sm text-muted-foreground">
           Manage your project's basic information
         </p>
@@ -159,21 +159,21 @@ function ProjectGeneralSettingsForm({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Project Details</CardTitle>
+          <CardTitle className="type-body-lg">Project Details</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {serverGitRemoteMissing && (
             <Alert
-              className="border-amber-500/30 bg-amber-500/10 text-amber-950 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-50 [&>svg]:text-amber-600 dark:[&>svg]:text-amber-400"
+              className="border-warning/30 bg-warning/10 text-warning-foreground dark:border-warning/25 dark:bg-warning/10 dark:text-warning-foreground [&>svg]:text-warning dark:[&>svg]:text-warning"
             >
               <AlertCircle className="size-4 shrink-0" />
-              <AlertDescription className="text-amber-900 dark:text-amber-100">
-                <p className="font-medium text-amber-800 dark:text-amber-200">
+              <AlertDescription className="text-warning-foreground dark:text-warning/80">
+                <p className="font-medium text-warning-foreground dark:text-warning/70">
                   CLI events cannot be auto-attributed yet
                 </p>
-                <p className="mt-1 text-sm text-amber-900/90 dark:text-amber-100/90">
+                <p className="mt-1 text-sm text-warning-foreground/90 dark:text-warning/80">
                   Add the Git remote URL below (paste the output of{" "}
-                  <code className="rounded bg-amber-500/15 px-1 py-0.5 font-mono text-xs">git remote get-url origin</code>
+                  <code className="rounded bg-warning/15 px-1 py-0.5 font-mono text-xs">git remote get-url origin</code>
                   ) so the Aixle Insights CLI can match events to this project.
                 </p>
               </AlertDescription>
@@ -213,7 +213,7 @@ function ProjectGeneralSettingsForm({
               onChange={(e) => handleChange("git_remote_url", e.target.value)}
               placeholder="git@github.com:org/repo.git"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="type-caption text-muted-foreground">
               Paste the output of <code className="font-mono">git remote get-url origin</code> from the repository where
               developers run the CLI. When the CLI runs inside that repo, events are auto-attributed to this project.
             </p>
@@ -249,7 +249,7 @@ function ProjectGeneralSettingsForm({
       <Separator />
 
       <div>
-        <h2 className="text-lg font-medium text-destructive">Danger Zone</h2>
+        <h2 className="type-h4 text-destructive">Danger Zone</h2>
         <p className="text-sm text-muted-foreground">
           Irreversible and destructive actions
         </p>
@@ -257,7 +257,7 @@ function ProjectGeneralSettingsForm({
 
       <Card className="border-destructive/50">
         <CardHeader>
-          <CardTitle className="text-base">Delete Project</CardTitle>
+          <CardTitle className="type-body-lg">Delete Project</CardTitle>
           <CardDescription>
             Once you delete a project, there is no going back. All data associated with this
             project will be permanently deleted.
@@ -351,7 +351,7 @@ export function ProjectSettings() {
           {isLoadingProject ? (
             <Skeleton className="h-7 w-48" />
           ) : (
-            <h1 className="text-2xl font-semibold tracking-tight">
+            <h1 className="type-h2">
               {project ? `${project.name} — Settings` : "Settings"}
             </h1>
           )}
@@ -378,7 +378,7 @@ export function ProjectSettings() {
                 isMemberOfProject ? (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-lg font-medium">Members</h2>
+                      <h2 className="type-h4">Members</h2>
                       <p className="text-sm text-muted-foreground">Manage project member access and roles</p>
                     </div>
                     <ProjectMembersTab
@@ -399,7 +399,7 @@ export function ProjectSettings() {
                 isProjectOwner ? (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-lg font-medium">Integrations</h2>
+                      <h2 className="type-h4">Integrations</h2>
                       <p className="text-sm text-muted-foreground">Connect AI providers and notification services to this project</p>
                     </div>
                     <ProjectConnectorsTab projectId={id} orgId={orgId} />

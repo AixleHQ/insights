@@ -148,7 +148,7 @@ export function AdminOrganizations() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Organizations</h1>
+          <h1 className="type-h2">Organizations</h1>
           <p className="text-sm text-muted-foreground">
             Manage all organizations on the platform
           </p>
@@ -277,7 +277,7 @@ export function AdminOrganizations() {
                       </div>
                       <div>
                         <p className="font-medium">{org.name}</p>
-                        <p className="text-xs text-muted-foreground">/{org.slug}</p>
+                        <p className="type-caption text-muted-foreground">/{org.slug}</p>
                       </div>
                     </div>
                   </TableCell>

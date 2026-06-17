@@ -303,7 +303,7 @@ export function IntegrationCard({
               ) : (
                 <Badge
                   variant="outline"
-                  className="cursor-pointer gap-1 bg-muted transition-colors hover:bg-amber-500/10"
+                  className="cursor-pointer gap-1 bg-muted transition-colors hover:bg-warning/10"
                   onClick={() => onSetupWebhook?.(integration.id)}
                   title="Click to set up webhook for per-request tracking"
                 >
@@ -351,7 +351,7 @@ export function IntegrationCard({
                 className={cn(
                   "font-medium",
                   healthStats.success_rate_7d >= 0.9 ? "text-success" :
-                  healthStats.success_rate_7d >= 0.7 ? "text-amber-500" :
+                  healthStats.success_rate_7d >= 0.7 ? "text-warning" :
                   "text-destructive"
                 )}
               >

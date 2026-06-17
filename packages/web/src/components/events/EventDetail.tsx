@@ -70,8 +70,8 @@ function DetailRow({
         <Icon className="size-4 text-muted-foreground" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <div className="mt-0.5 text-sm font-medium">{value}</div>
+        <p className="type-caption text-muted-foreground">{label}</p>
+        <div className="mt-0.5 type-label">{value}</div>
       </div>
     </div>
   );
@@ -80,7 +80,7 @@ function DetailRow({
 function ContentPanel({ title, content }: { title: string; content?: string }) {
   return (
     <div className="space-y-2">
-      <h4 className="text-sm font-medium">{title}</h4>
+      <h4 className="type-label">{title}</h4>
       <pre className="max-h-96 overflow-auto rounded-md bg-muted p-4 text-xs">
         <code>{content || "No content available"}</code>
       </pre>
@@ -142,7 +142,7 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-semibold">{humanizeToolName(event.tool_name)}</h1>
+              <h1 className="type-h3">{humanizeToolName(event.tool_name)}</h1>
               <RiskBadge level={event.risk_level || "none"} />
             </div>
             <p className="text-sm text-muted-foreground">
@@ -155,7 +155,7 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
       <div className="grid gap-6 md:grid-cols-3">
         <Card className="md:col-span-1">
           <CardHeader>
-            <CardTitle className="text-base">Details</CardTitle>
+            <CardTitle className="type-body-lg">Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <DetailRow
@@ -240,7 +240,7 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
 
         <Card className="md:col-span-2">
           <CardHeader>
-            <CardTitle className="text-base">Content</CardTitle>
+            <CardTitle className="type-body-lg">Content</CardTitle>
             <CardDescription>
               Raw and sanitized content from this event
             </CardDescription>
@@ -285,7 +285,7 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
       {isOwner && event.findings && event.findings.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Security Findings</CardTitle>
+            <CardTitle className="type-body-lg">Security Findings</CardTitle>
             <CardDescription>
               Issues detected during content analysis
             </CardDescription>
@@ -329,7 +329,7 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
                   </div>
                   <p className="mt-2 text-sm">{finding.description}</p>
                   {finding.location && (
-                    <p className="mt-1 font-mono-display text-xs text-muted-foreground">
+                    <p className="mt-1 font-mono-display type-caption text-muted-foreground">
                       Location: {finding.location}
                     </p>
                   )}

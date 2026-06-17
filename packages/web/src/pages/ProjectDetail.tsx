@@ -85,13 +85,13 @@ function StatCard({
           <Icon className="size-5 text-muted-foreground" />
         </div>
         <div>
-          <p className="text-xs text-muted-foreground">{label}</p>
+          <p className="type-caption text-muted-foreground">{label}</p>
           {subtitle && <p className="text-[10px] text-muted-foreground">{subtitle}</p>}
           {isLoading ? (
             <Skeleton className="h-6 w-20 mt-1" />
           ) : (
             <>
-              <p className="font-mono-display text-lg font-semibold">{value}</p>
+              <p className="font-mono-display type-h4">{value}</p>
               {delta && <p className="text-xs text-muted-foreground mt-0.5">{delta}</p>}
             </>
           )}
@@ -193,7 +193,7 @@ export function ProjectDetail() {
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-semibold">{project.name}</h1>
+              <h1 className="type-h3">{project.name}</h1>
               <Badge variant={(project.is_active ?? project.isActive) ? "default" : "secondary"}>
                 {(project.is_active ?? project.isActive) ? "Active" : "Inactive"}
               </Badge>
@@ -227,20 +227,20 @@ export function ProjectDetail() {
 
       {isGitRemoteMissing(project) && (
         <Alert
-          className="border-amber-500/30 bg-amber-500/10 text-amber-950 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-50 [&>svg]:text-amber-600 dark:[&>svg]:text-amber-400"
+          className="border-warning/30 bg-warning/10 text-warning-foreground dark:border-warning/25 dark:bg-warning/10 dark:text-warning-foreground [&>svg]:text-warning dark:[&>svg]:text-warning"
         >
           <AlertCircle className="size-4 shrink-0" />
-          <AlertDescription className="text-amber-900 dark:text-amber-100">
-            <p className="font-medium text-amber-800 dark:text-amber-200">
+          <AlertDescription className="text-warning-foreground dark:text-warning/80">
+            <p className="font-medium text-warning-foreground dark:text-warning/70">
               No git remote configured for CLI attribution
             </p>
-            <p className="mt-1 text-sm text-amber-900/90 dark:text-amber-100/90">
+            <p className="mt-1 text-sm text-warning-foreground/90 dark:text-warning/80">
               Events from the Aixle Insights CLI will not be automatically matched to this project until you set the
               repository&apos;s{" "}
-              <code className="rounded bg-amber-500/15 px-1 py-0.5 font-mono text-xs">git remote get-url origin</code>{" "}
+              <code className="rounded bg-warning/15 px-1 py-0.5 font-mono text-xs">git remote get-url origin</code>{" "}
               value in project settings.
             </p>
-            <Button asChild variant="link" className="mt-2 h-auto p-0 text-amber-800 underline dark:text-amber-200">
+            <Button asChild variant="link" className="mt-2 h-auto p-0 text-warning-foreground underline dark:text-warning/70">
               <Link to={`/projects/${id}/settings`}>Open project settings</Link>
             </Button>
           </AlertDescription>
@@ -314,7 +314,7 @@ export function ProjectDetail() {
           {(project.sourceControlSummary?.length ?? 0) > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Source Control Activity</CardTitle>
+                <CardTitle className="type-body-lg">Source Control Activity</CardTitle>
                 <CardDescription>
                   Recent synced repository activity across linked providers
                 </CardDescription>
@@ -326,7 +326,7 @@ export function ProjectDetail() {
                       <ProviderLogo provider={summary.provider} size="sm" showBackground />
                       <div>
                         <p className="text-sm font-medium capitalize">{summary.provider}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="type-caption text-muted-foreground">
                           {summary.repositoryCount} linked repos
                         </p>
                       </div>
@@ -361,7 +361,7 @@ export function ProjectDetail() {
           {(project.issueThroughputSummary?.length ?? 0) > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Issue Throughput</CardTitle>
+                <CardTitle className="type-body-lg">Issue Throughput</CardTitle>
                 <CardDescription>
                   Recent synced issue lifecycle activity for project members
                 </CardDescription>
@@ -373,7 +373,7 @@ export function ProjectDetail() {
                       <ProviderLogo provider={summary.provider} size="sm" showBackground />
                       <div>
                         <p className="text-sm font-medium capitalize">{summary.provider}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="type-caption text-muted-foreground">
                           Synced issue throughput
                         </p>
                       </div>

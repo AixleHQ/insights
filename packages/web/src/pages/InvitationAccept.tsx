@@ -171,7 +171,7 @@ export function InvitationAccept() {
                 90
               </span>
             </div>
-            <span className="text-lg font-semibold tracking-tight">Aixle Insights</span>
+            <span className="type-h4">Aixle Insights</span>
           </Link>
           {profile && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -339,7 +339,7 @@ export function InvitationAccept() {
                   </CardDescription>
                 </div>
                 <div className="rounded-lg border bg-muted/40 p-4 text-left space-y-3">
-                  <p className="text-sm font-medium text-foreground">Link your AI tools</p>
+                  <p className="type-label text-foreground">Link your AI tools</p>
                   <p className="text-sm text-muted-foreground">
                     After you create an ingest token in Settings → Tools (or Integrations), replace{" "}
                     <code className="rounded bg-background px-1 py-0.5 text-xs">
@@ -349,7 +349,7 @@ export function InvitationAccept() {
                   </p>
                   <div className="space-y-3">
                     <div className="space-y-1.5">
-                      <p className="text-xs font-medium text-muted-foreground">Claude Code</p>
+                      <p className="text-caption font-medium text-muted-foreground">Claude Code</p>
                       <pre className="overflow-x-auto rounded-md bg-background border p-3 text-xs font-mono whitespace-pre-wrap break-all">
                         {claudeExampleCommand}
                       </pre>
@@ -373,7 +373,7 @@ export function InvitationAccept() {
                       </Button>
                     </div>
                     <div className="space-y-1.5">
-                      <p className="text-xs font-medium text-muted-foreground">Cursor</p>
+                      <p className="text-caption font-medium text-muted-foreground">Cursor</p>
                       <pre className="overflow-x-auto rounded-md bg-background border p-3 text-xs font-mono whitespace-pre-wrap break-all">
                         {cursorExampleCommand}
                       </pre>
@@ -441,7 +441,7 @@ export function InvitationAccept() {
                         <Building2 className="size-6 text-muted-foreground" />
                       </div>
                       <div className="flex-1 space-y-1">
-                        <h3 className="font-semibold text-lg">
+                        <h3 className="type-h4">
                           {invitation.organization.name}
                         </h3>
                         <p className="text-sm text-muted-foreground">
@@ -528,7 +528,7 @@ export function InvitationAccept() {
       {/* Footer */}
       <footer className="relative z-10 border-t bg-background/80 backdrop-blur-sm">
         <div className="mx-auto flex h-14 max-w-4xl items-center justify-center px-6">
-          <p className="text-xs text-muted-foreground">
+          <p className="type-caption text-muted-foreground">
             &copy; {new Date().getFullYear()} Acme Corp. All rights
             reserved.
           </p>

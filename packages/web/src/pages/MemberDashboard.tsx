@@ -70,7 +70,7 @@ export function MemberDashboard({ hideHeader = false }: { hideHeader?: boolean }
       {!hideHeader ? (
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">My Dashboard</h1>
+            <h1 className="type-h2">My Dashboard</h1>
             <p className="text-sm text-muted-foreground">
               Your personal AI tool usage for {currentOrg?.name || "your organization"}
             </p>

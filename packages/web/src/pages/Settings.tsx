@@ -200,7 +200,7 @@ function GeneralSettings() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-medium">General Settings</h2>
+        <h2 className="type-h4">General Settings</h2>
         <p className="text-sm text-muted-foreground">
           Manage your organization's basic information
         </p>
@@ -208,7 +208,7 @@ function GeneralSettings() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Organization Details</CardTitle>
+          <CardTitle className="type-body-lg">Organization Details</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -226,7 +226,7 @@ function GeneralSettings() {
               value={formData.slug || org?.slug || ""}
               onChange={(e) => handleChange("slug", e.target.value)}
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="type-caption text-muted-foreground">
               This is used in URLs and cannot be easily changed
             </p>
           </div>
@@ -252,7 +252,7 @@ function GeneralSettings() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Email Domain Auto-Join</CardTitle>
+          <CardTitle className="type-body-lg">Email Domain Auto-Join</CardTitle>
           <CardDescription>
             Users who register with this email domain will automatically join your organization
           </CardDescription>
@@ -280,7 +280,7 @@ function GeneralSettings() {
                 Save
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="type-caption text-muted-foreground">
               Leave empty to disable auto-join. Only one domain is supported per organization.
             </p>
           </div>
@@ -398,7 +398,7 @@ function PolicySettings() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-medium">Sanitization Policies</h2>
+        <h2 className="type-h4">Sanitization Policies</h2>
         <p className="text-sm text-muted-foreground">
           Configure how sensitive content is handled
         </p>
@@ -406,7 +406,7 @@ function PolicySettings() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Content Sanitization</CardTitle>
+          <CardTitle className="type-body-lg">Content Sanitization</CardTitle>
           <CardDescription>
             Automatically detect and redact sensitive information
           </CardDescription>
@@ -415,7 +415,7 @@ function PolicySettings() {
           <div className="flex items-center justify-between rounded-lg border p-3">
             <div>
               <Label>API Keys</Label>
-              <p className="text-xs text-muted-foreground">
+              <p className="type-caption text-muted-foreground">
                 Detect and redact API keys and tokens
               </p>
             </div>
@@ -427,7 +427,7 @@ function PolicySettings() {
           <div className="flex items-center justify-between rounded-lg border p-3">
             <div>
               <Label>Secrets & Credentials</Label>
-              <p className="text-xs text-muted-foreground">
+              <p className="type-caption text-muted-foreground">
                 Detect passwords, SSH keys, and certificates
               </p>
             </div>
@@ -439,7 +439,7 @@ function PolicySettings() {
           <div className="flex items-center justify-between rounded-lg border p-3">
             <div>
               <Label>Email Addresses</Label>
-              <p className="text-xs text-muted-foreground">
+              <p className="type-caption text-muted-foreground">
                 Redact email addresses in content
               </p>
             </div>
@@ -451,7 +451,7 @@ function PolicySettings() {
           <div className="flex items-center justify-between rounded-lg border p-3">
             <div>
               <Label>IP Addresses</Label>
-              <p className="text-xs text-muted-foreground">
+              <p className="type-caption text-muted-foreground">
                 Redact IP addresses and network info
               </p>
             </div>
@@ -465,7 +465,7 @@ function PolicySettings() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Data Retention</CardTitle>
+          <CardTitle className="type-body-lg">Data Retention</CardTitle>
           <CardDescription>
             Configure how long data is retained
           </CardDescription>
@@ -585,7 +585,7 @@ function PolicySettings() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Risk Management</CardTitle>
+          <CardTitle className="type-body-lg">Risk Management</CardTitle>
           <CardDescription>
             Configure how high-risk content is handled
           </CardDescription>
@@ -594,7 +594,7 @@ function PolicySettings() {
           <div className="flex items-center justify-between rounded-lg border p-3">
             <div>
               <Label>Block High-Risk Events</Label>
-              <p className="text-xs text-muted-foreground">
+              <p className="type-caption text-muted-foreground">
                 Prevent high-risk content from being processed
               </p>
             </div>
@@ -606,7 +606,7 @@ function PolicySettings() {
           <div className="flex items-center justify-between rounded-lg border p-3">
             <div>
               <Label>Require Manual Review</Label>
-              <p className="text-xs text-muted-foreground">
+              <p className="type-caption text-muted-foreground">
                 Hold medium+ risk events for admin review
               </p>
             </div>
@@ -620,7 +620,7 @@ function PolicySettings() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Event Attribution</CardTitle>
+          <CardTitle className="type-body-lg">Event Attribution</CardTitle>
           <CardDescription>
             Configure the automatic attribution confidence threshold for this organisation
           </CardDescription>
@@ -630,7 +630,7 @@ function PolicySettings() {
             <Label htmlFor="min-attribution-confidence">
               Minimum attribution confidence
             </Label>
-            <p className="text-xs text-muted-foreground">
+            <p className="type-caption text-muted-foreground">
               Events where the best correlation candidate scores below this threshold
               are left unattributed for manual review. Default: 0.7. Range: 0.0 – 1.0.
             </p>
@@ -689,13 +689,13 @@ function DataRetentionSettings() {
     return (
       <div className="space-y-6">
         <div>
-          <h2 className="text-lg font-medium">Data & Retention</h2>
+          <h2 className="type-h4">Data & Retention</h2>
         </div>
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <Shield className="mb-3 size-10 text-muted-foreground/40" />
-            <p className="text-sm font-medium">Access restricted</p>
-            <p className="text-xs text-muted-foreground">
+            <p className="type-label">Access restricted</p>
+            <p className="type-caption text-muted-foreground">
               Only organization owners can view retention history and purge previews.
             </p>
           </CardContent>
@@ -719,7 +719,7 @@ function DataRetentionSettings() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-medium">Data & Retention</h2>
+        <h2 className="type-h4">Data & Retention</h2>
         <p className="text-sm text-muted-foreground">
           Active retention policy, upcoming purge preview, and history of past purge runs
         </p>
@@ -728,7 +728,7 @@ function DataRetentionSettings() {
       {/* Panel 1 — Active Policy Summary */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Active Policy</CardTitle>
+          <CardTitle className="type-body-lg">Active Policy</CardTitle>
           <CardDescription>Current data retention configuration for your organization</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -753,7 +753,7 @@ function DataRetentionSettings() {
       {/* Panel 2 — Next Purge Preview */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Next Purge Preview</CardTitle>
+          <CardTitle className="type-body-lg">Next Purge Preview</CardTitle>
           <CardDescription>
             Estimated impact of the next scheduled purge run
           </CardDescription>
@@ -798,7 +798,7 @@ function DataRetentionSettings() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <History className="size-4 text-muted-foreground" />
-            <CardTitle className="text-base">Purge History</CardTitle>
+            <CardTitle className="type-body-lg">Purge History</CardTitle>
           </div>
           <CardDescription>Log of all past data purge runs for your organization</CardDescription>
         </CardHeader>
@@ -812,8 +812,8 @@ function DataRetentionSettings() {
           ) : logs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <History className="mb-3 size-10 text-muted-foreground/40" />
-              <p className="text-sm font-medium">No purge history yet</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="type-label">No purge history yet</p>
+              <p className="type-caption text-muted-foreground">
                 Past purge runs will appear here once the retention job has executed.
               </p>
             </div>
@@ -961,7 +961,7 @@ export function AlertSettings() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-medium">Alert Settings</h2>
+        <h2 className="type-h4">Alert Settings</h2>
         <p className="text-sm text-muted-foreground">
           Configure when and how you receive alerts
         </p>
@@ -969,7 +969,7 @@ export function AlertSettings() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Cost &amp; Token Thresholds</CardTitle>
+          <CardTitle className="type-body-lg">Cost &amp; Token Thresholds</CardTitle>
           <CardDescription>
             Get notified when usage exceeds these limits.
             {retentionPolicy?.costThresholdCents != null && (
@@ -1017,7 +1017,7 @@ export function AlertSettings() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Risk Alerts</CardTitle>
+          <CardTitle className="type-body-lg">Risk Alerts</CardTitle>
           <CardDescription>
             Notifications for security-related events
           </CardDescription>
@@ -1026,7 +1026,7 @@ export function AlertSettings() {
           <div className="flex items-center justify-between rounded-lg border p-3">
             <div>
               <Label>Critical Risk Events</Label>
-              <p className="text-xs text-muted-foreground">
+              <p className="type-caption text-muted-foreground">
                 Immediate alert for critical findings
               </p>
             </div>
@@ -1041,7 +1041,7 @@ export function AlertSettings() {
           <div className="flex items-center justify-between rounded-lg border p-3">
             <div>
               <Label>High Risk Events</Label>
-              <p className="text-xs text-muted-foreground">
+              <p className="type-caption text-muted-foreground">
                 Alert for high-risk content detected
               </p>
             </div>
@@ -1056,7 +1056,7 @@ export function AlertSettings() {
           <div className="flex items-center justify-between rounded-lg border p-3">
             <div>
               <Label>Usage Spikes</Label>
-              <p className="text-xs text-muted-foreground">
+              <p className="type-caption text-muted-foreground">
                 Unusual increases in tool usage
               </p>
             </div>
@@ -1126,7 +1126,7 @@ export function SecuritySettings() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-medium">Security & Audit Log</h2>
+        <h2 className="type-h4">Security & Audit Log</h2>
         <p className="text-sm text-muted-foreground">
           Track all security-relevant actions taken within your organization
         </p>
@@ -1143,7 +1143,7 @@ export function SecuritySettings() {
         <TabsContent value="org" className="mt-4 space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Filters</CardTitle>
+              <CardTitle className="type-body-lg">Filters</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-3">
@@ -1162,7 +1162,7 @@ export function SecuritySettings() {
                   </Select>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Label htmlFor="org-audit-from-date" className="text-xs text-muted-foreground">From</Label>
+                  <Label htmlFor="org-audit-from-date" className="type-caption text-muted-foreground">From</Label>
                   <Input
                     id="org-audit-from-date"
                     type="date"
@@ -1172,7 +1172,7 @@ export function SecuritySettings() {
                   />
                 </div>
                 <div className="flex items-center gap-2">
-                  <Label htmlFor="org-audit-to-date" className="text-xs text-muted-foreground">To</Label>
+                  <Label htmlFor="org-audit-to-date" className="type-caption text-muted-foreground">To</Label>
                   <Input
                     id="org-audit-to-date"
                     type="date"
@@ -1228,13 +1228,13 @@ export function SecuritySettings() {
                         <TableCell>
                           {log.actor ? (
                             <div>
-                              <p className="text-sm font-medium">{log.actor.name || log.actor.email}</p>
+                              <p className="type-label">{log.actor.name || log.actor.email}</p>
                               {log.actor.name && (
-                                <p className="text-xs text-muted-foreground">{log.actor.email}</p>
+                                <p className="type-caption text-muted-foreground">{log.actor.email}</p>
                               )}
                             </div>
                           ) : (
-                            <span className="text-xs text-muted-foreground">System</span>
+                            <span className="type-caption text-muted-foreground">System</span>
                           )}
                         </TableCell>
                         <TableCell>
@@ -1320,7 +1320,7 @@ export function Settings() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+        <h1 className="type-h2">Settings</h1>
         <p className="text-sm text-muted-foreground">
           Manage your organization settings and preferences
         </p>

@@ -238,7 +238,7 @@ function ConnectDialog({ provider, open, onOpenChange, onSubmit, isSubmitting }:
                 placeholder={`Your ${provider?.name} username or ID`}
                 required
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="type-caption text-muted-foreground">
                 This should match the identifier used in your API requests.
               </p>
             </div>
@@ -260,7 +260,7 @@ function ConnectDialog({ provider, open, onOpenChange, onSubmit, isSubmitting }:
                 onChange={(e) => setToken(e.target.value)}
                 placeholder={`Paste your ${provider?.tokenLabel?.toLowerCase()}`}
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="type-caption text-muted-foreground">
                 Stored encrypted. Used for event attribution.
               </p>
             </div>
@@ -415,7 +415,7 @@ function ToolCard({
             <div className="flex items-center gap-3">
               <ProviderLogo provider={provider.id} showBackground size="md" className="shrink-0" />
               <div>
-                <CardTitle className="text-base">{provider.name}</CardTitle>
+                <CardTitle className="type-body-lg">{provider.name}</CardTitle>
                 <CardDescription className="text-xs">{provider.description}</CardDescription>
                 {isLinked && (
                   <div className="mt-1">
@@ -485,7 +485,7 @@ function ToolCard({
             </p>
           )}
           {isLinked && requiresSetup && (
-            <p className="text-xs text-muted-foreground">
+            <p className="type-caption text-muted-foreground">
               This tool will become active after it sends its first event to Aixle Insights.
             </p>
           )}
@@ -645,7 +645,7 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
             </Link>
           </Button>
           <div>
-            <h1 className="text-xl font-semibold">Tool Accounts</h1>
+            <h1 className="type-h3">Tool Accounts</h1>
             <p className="text-sm text-muted-foreground">
               Link your AI tool accounts for automatic event attribution
             </p>
@@ -655,7 +655,7 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
 
       {!embedded && (
         <div className="flex items-center gap-3">
-          <Label htmlFor="org-select" className="shrink-0 text-sm font-medium">
+          <Label htmlFor="org-select" className="shrink-0 type-label">
             Organization
           </Label>
           <Select value={selectedOrgId} onValueChange={setUserSelectedOrgId} disabled={orgsLoading}>
@@ -727,7 +727,7 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
                 if (providers.length === 0) return null;
                 return (
                   <div key={category} className="space-y-4">
-                    <h2 className="text-base font-medium">{categoryLabels[category]}</h2>
+                    <h2 className="type-body-lg font-medium">{categoryLabels[category]}</h2>
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                       {providers.map((provider) => (
                         <ToolCard

@@ -8,7 +8,7 @@ export const roleIcons: Record<MemberRole, LucideIcon> = {
 };
 
 export const roleColors: Record<MemberRole, string> = {
-  owner: "text-amber-500",
-  member: "text-emerald-500",
+  owner: "text-warning",
+  member: "text-success",
   viewer: "text-muted-foreground",
 };

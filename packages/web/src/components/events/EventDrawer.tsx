@@ -61,8 +61,8 @@ function DetailRow({
         <Icon className="size-4 text-muted-foreground" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <div className="mt-0.5 text-sm font-medium">{value}</div>
+        <p className="type-caption text-muted-foreground">{label}</p>
+        <div className="mt-0.5 type-label">{value}</div>
       </div>
     </div>
   );
@@ -71,7 +71,7 @@ function DetailRow({
 function ContentPanel({ title, content }: { title: string; content?: string }) {
   return (
     <div className="space-y-2">
-      <h4 className="text-sm font-medium">{title}</h4>
+      <h4 className="type-label">{title}</h4>
       <pre className="max-h-64 overflow-auto rounded-md bg-muted p-4 text-xs">
         <code className="whitespace-pre-wrap break-all">{content || "No content available"}</code>
       </pre>
@@ -370,7 +370,7 @@ export function EventDrawer({
                             </div>
                             <p className="mt-2 text-sm">{finding.description}</p>
                             {finding.location && (
-                              <p className="mt-1 font-mono-display text-xs text-muted-foreground">
+                              <p className="mt-1 font-mono-display type-caption text-muted-foreground">
                                 Location: {finding.location.start}-{finding.location.end}
                               </p>
                             )}

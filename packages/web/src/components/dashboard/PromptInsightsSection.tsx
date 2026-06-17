@@ -28,8 +28,8 @@ export function PromptInsightsSection({ orgId, userId, period }: Props) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base font-medium">Prompt Insights</CardTitle>
-        <CardDescription className="text-xs">AI prompt quality score</CardDescription>
+        <CardTitle className="type-body-lg font-medium">Prompt Insights</CardTitle>
+        <CardDescription className="type-caption text-muted-foreground">AI prompt quality score</CardDescription>
       </CardHeader>
       <CardContent className="p-6 pt-0">
         {isLoading ? (

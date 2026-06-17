@@ -81,7 +81,7 @@ export function ProjectAlertsSection({ projectId, orgId }: Props) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-medium">Alert Settings</h2>
+        <h2 className="type-h4">Alert Settings</h2>
         <p className="text-sm text-muted-foreground">
           Override org-level alert thresholds for this project. Leave a field empty to inherit
           the organisation default.
@@ -90,7 +90,7 @@ export function ProjectAlertsSection({ projectId, orgId }: Props) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Cost &amp; Token Thresholds</CardTitle>
+          <CardTitle className="type-body-lg">Cost &amp; Token Thresholds</CardTitle>
           <CardDescription>
             Get notified when this project&apos;s usage exceeds limits.
           </CardDescription>
@@ -100,7 +100,7 @@ export function ProjectAlertsSection({ projectId, orgId }: Props) {
             <div className="flex-1 space-y-1">
               <Label htmlFor="proj-cost-threshold">Cost Threshold (USD)</Label>
               {orgCostCeiling != null && (
-                <p className="text-xs text-muted-foreground">
+                <p className="type-caption text-muted-foreground">
                   Org ceiling: {formatCost(orgCostCeiling / 100)}
                 </p>
               )}
@@ -127,7 +127,7 @@ export function ProjectAlertsSection({ projectId, orgId }: Props) {
             <div className="flex-1 space-y-1">
               <Label htmlFor="proj-token-threshold">Token Threshold</Label>
               {orgTokenCeiling != null && (
-                <p className="text-xs text-muted-foreground">
+                <p className="type-caption text-muted-foreground">
                   Org ceiling: {formatTokens(orgTokenCeiling)}
                 </p>
               )}

@@ -205,7 +205,7 @@ function OrgSwitcher() {
                 {getOrgInitials(currentOrg.name)}
               </span>
               {/* Active indicator dot */}
-              <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-emerald-500 ring-2 ring-sidebar" />
+              <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-success ring-2 ring-sidebar" />
             </div>
 
             {/* Org Details - hidden when collapsed */}

@@ -177,7 +177,7 @@ export function AdminUsers() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Users</h1>
+          <h1 className="type-h2">Users</h1>
           <p className="text-sm text-muted-foreground">
             Manage all users across the platform
           </p>
@@ -305,7 +305,7 @@ export function AdminUsers() {
                         <p className="font-medium">
                           {user.name || user.email.split("@")[0]}
                         </p>
-                        <p className="text-xs text-muted-foreground">{user.email}</p>
+                        <p className="type-caption text-muted-foreground">{user.email}</p>
                       </div>
                     </div>
                   </TableCell>

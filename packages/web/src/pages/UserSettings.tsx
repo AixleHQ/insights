@@ -172,7 +172,7 @@ function ProfileSection() {
                 />
               </div>
               <div className="space-y-1">
-                <p className="text-sm font-medium">Email</p>
+                <p className="type-label">Email</p>
                 <p className="text-sm text-muted-foreground">{currentUser?.email || profile?.email || "—"}</p>
               </div>
               {error && <p className="text-sm text-destructive">{error}</p>}
@@ -195,11 +195,11 @@ function ProfileSection() {
                 </Avatar>
               </div>
               <div className="space-y-1">
-                <p className="text-sm font-medium">Name</p>
+                <p className="type-label">Name</p>
                 <p className="text-sm text-muted-foreground">{displayName}</p>
               </div>
               <div className="space-y-1">
-                <p className="text-sm font-medium">Email</p>
+                <p className="type-label">Email</p>
                 <p className="text-sm text-muted-foreground">{currentUser?.email || profile?.email || "—"}</p>
               </div>
             </>
@@ -251,7 +251,7 @@ function PreferencesSection() {
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">
+            <p className="type-caption text-muted-foreground">
               Changes apply immediately and are saved to your account.
             </p>
           </div>
@@ -279,7 +279,7 @@ function PreferencesSection() {
                 </SelectContent>
               </Select>
             )}
-            <p className="text-xs text-muted-foreground">
+            <p className="type-caption text-muted-foreground">
               Used when you log in on a new device or browser.
             </p>
           </div>
@@ -400,7 +400,7 @@ function PersonalAlertThresholdsForm({ settings }: { settings: UserPersonalSetti
           <div className="space-y-2">
             <Label htmlFor="personal-cost-threshold">Cost threshold (USD)</Label>
             {orgCostCeiling != null && (
-              <p className="text-xs text-muted-foreground">
+              <p className="type-caption text-muted-foreground">
                 Org max: {formatCost(orgCostCeiling / 100)}
               </p>
             )}
@@ -423,12 +423,12 @@ function PersonalAlertThresholdsForm({ settings }: { settings: UserPersonalSetti
                 Cannot exceed org ceiling of {formatCost(orgCostCeiling! / 100)}.
               </p>
             )}
-            <p className="text-xs text-muted-foreground">Alert when your personal cost exceeds this amount.</p>
+            <p className="type-caption text-muted-foreground">Alert when your personal cost exceeds this amount.</p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="personal-token-threshold">Token threshold</Label>
             {orgTokenCeiling != null && (
-              <p className="text-xs text-muted-foreground">
+              <p className="type-caption text-muted-foreground">
                 Org max: {formatTokens(orgTokenCeiling)}
               </p>
             )}
@@ -451,7 +451,7 @@ function PersonalAlertThresholdsForm({ settings }: { settings: UserPersonalSetti
                 Cannot exceed org ceiling of {formatTokens(orgTokenCeiling!)}.
               </p>
             )}
-            <p className="text-xs text-muted-foreground">Alert when your personal token usage exceeds this count.</p>
+            <p className="type-caption text-muted-foreground">Alert when your personal token usage exceeds this count.</p>
           </div>
         </div>
         <Button
@@ -463,11 +463,11 @@ function PersonalAlertThresholdsForm({ settings }: { settings: UserPersonalSetti
           Save thresholds
         </Button>
         <div className="space-y-4 border-t pt-4">
-          <p className="text-sm font-medium">Alert delivery</p>
+          <p className="type-label">Alert delivery</p>
           <div className="flex items-center justify-between gap-4">
             <div className="space-y-0.5">
               <Label htmlFor="alert-email">Email alerts</Label>
-              <p className="text-xs text-muted-foreground">Receive alert notifications by email.</p>
+              <p className="type-caption text-muted-foreground">Receive alert notifications by email.</p>
             </div>
             <Switch
               id="alert-email"
@@ -479,7 +479,7 @@ function PersonalAlertThresholdsForm({ settings }: { settings: UserPersonalSetti
           <div className="flex items-center justify-between gap-4">
             <div className="space-y-0.5">
               <Label htmlFor="alert-slack">Slack alerts</Label>
-              <p className="text-xs text-muted-foreground">Receive alert notifications via Slack.</p>
+              <p className="type-caption text-muted-foreground">Receive alert notifications via Slack.</p>
             </div>
             <Switch
               id="alert-slack"
@@ -560,7 +560,7 @@ function NotificationsSection() {
                 <div key={key} className="flex items-center justify-between gap-4">
                   <div className="space-y-0.5">
                     <Label htmlFor={key}>{label}</Label>
-                    <p className="text-xs text-muted-foreground">{description}</p>
+                    <p className="type-caption text-muted-foreground">{description}</p>
                   </div>
                   <Switch
                     id={key}
@@ -629,7 +629,7 @@ export function UserSettings() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">User Settings</h1>
+        <h1 className="type-h2">User Settings</h1>
         <p className="text-sm text-muted-foreground">Manage your profile and preferences.</p>
       </div>
       <div className="flex flex-col gap-8 md:flex-row">

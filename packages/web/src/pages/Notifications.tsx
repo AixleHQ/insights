@@ -43,7 +43,7 @@ function NotificationItem({
         <div className="flex items-start justify-between gap-2">
           <p
             className={cn(
-              "text-sm font-medium",
+              "type-label",
               notification.read ? "text-muted-foreground" : "text-foreground"
             )}
           >
@@ -75,7 +75,7 @@ export function Notifications() {
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Notifications</h1>
+          <h1 className="type-h2">Notifications</h1>
           <p className="text-sm text-muted-foreground">
             {unreadCount > 0
               ? `${unreadCount} unread notification${unreadCount > 1 ? "s" : ""}`
@@ -113,7 +113,7 @@ export function Notifications() {
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Recent Activity</CardTitle>
+            <CardTitle className="type-body-lg">Recent Activity</CardTitle>
             <CardDescription>
               Notifications from your organization's activity
             </CardDescription>
