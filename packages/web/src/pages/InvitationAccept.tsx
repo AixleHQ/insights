@@ -229,10 +229,10 @@ export function InvitationAccept() {
 
           {/* Expired State */}
           {!isLoading && !isNotFound && isExpired && (
-            <Card className="border-2 border-amber-500/20">
+            <Card className="border-2 border-warning/20">
               <CardHeader className="items-center pb-2">
-                <div className="flex size-16 items-center justify-center rounded-2xl bg-amber-500/10">
-                  <Clock className="size-8 text-amber-500" />
+                <div className="flex size-16 items-center justify-center rounded-2xl bg-warning/10">
+                  <Clock className="size-8 text-warning" />
                 </div>
               </CardHeader>
               <CardContent className="space-y-6 text-center">
@@ -292,10 +292,10 @@ export function InvitationAccept() {
 
           {/* Already Accepted State */}
           {!isLoading && !isNotFound && isAlreadyAccepted && !acceptSuccess && (
-            <Card className="border-2 border-green-500/20">
+            <Card className="border-2 border-success/20">
               <CardHeader className="items-center pb-2">
-                <div className="flex size-16 items-center justify-center rounded-2xl bg-green-500/10">
-                  <CheckCircle2 className="size-8 text-green-500" />
+                <div className="flex size-16 items-center justify-center rounded-2xl bg-success/10">
+                  <CheckCircle2 className="size-8 text-success" />
                 </div>
               </CardHeader>
               <CardContent className="space-y-6 text-center">
@@ -321,10 +321,10 @@ export function InvitationAccept() {
 
           {/* Success State */}
           {!isLoading && acceptSuccess && (
-            <Card className="border-2 border-green-500/30">
+            <Card className="border-2 border-success/30">
               <CardHeader className="items-center pb-2">
-                <div className="flex size-16 items-center justify-center rounded-2xl bg-green-500/10">
-                  <CheckCircle2 className="size-8 text-green-500 animate-in zoom-in-50 duration-300" />
+                <div className="flex size-16 items-center justify-center rounded-2xl bg-success/10">
+                  <CheckCircle2 className="size-8 text-success animate-in zoom-in-50 duration-300" />
                 </div>
               </CardHeader>
               <CardContent className="space-y-6 text-center">
