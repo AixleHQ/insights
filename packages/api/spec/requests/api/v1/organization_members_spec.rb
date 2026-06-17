@@ -249,7 +249,10 @@ RSpec.describe 'Api::V1::OrganizationMembers', type: :request do
       expect(json_data[:role]).to eq('member')
     end
 
-    it 'returns 422 when attempting to downgrade the last owner' do
+    it 'returns 403 when an owner attempts to downgrade the last owner' do
+      # After admin_membership is removed, owner_membership is the sole owner.
+      # Policy blocks the attempt because actor == subject (owner tries to change own role).
+      # The model-level guard for this invariant is covered in organization_membership_spec.rb.
       admin_membership.destroy
 
       authenticated_patch "/api/v1/organizations/#{organization.id}/members/#{owner_membership.id}",
@@ -257,7 +260,7 @@ RSpec.describe 'Api::V1::OrganizationMembers', type: :request do
                           organization: organization,
                           params: { role: 'member' }
 
-      expect_unprocessable
+      expect_forbidden
     end
   end
 
@@ -279,14 +282,17 @@ RSpec.describe 'Api::V1::OrganizationMembers', type: :request do
       expect_forbidden
     end
 
-    it 'returns 422 when attempting to remove the last owner' do
+    it 'returns 403 when an owner attempts to remove themselves as the last owner' do
+      # After admin_membership is removed, owner is the sole owner.
+      # Policy blocks self-removal with 403 (actor == subject).
+      # The model-level guard for this invariant is covered in organization_membership_spec.rb.
       admin_membership.destroy
 
       authenticated_delete "/api/v1/organizations/#{organization.id}/members/#{owner_membership.id}",
                            user: owner,
                            organization: organization
 
-      expect_unprocessable
+      expect_forbidden
       expect(OrganizationMembership.exists?(owner_membership.id)).to be true
     end
   end

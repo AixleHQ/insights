@@ -37,30 +37,24 @@ class OrganizationMembershipPolicy < ApplicationPolicy
     org_owner?(record.organization) || global_admin?
   end
 
-  # Owners can update memberships, but can't demote owners unless they're also an owner (post-AIX-201)
+  # Owners can update memberships, but cannot change their own role.
+  # The last-owner downgrade guard is enforced at the model layer.
   def update?
     return true if global_admin?
     return false unless org_owner?(record.organization)
+    return false if record.user_id == user.id
 
-    # Can't demote an owner unless you're also an owner
-    if record.owner?
-      org_owner?(record.organization)
-    else
-      true
-    end
+    true
   end
 
-  # Only owners can remove members, but can't remove owners unless they're also an owner (post-AIX-201)
+  # Only owners can remove members. Owners cannot remove themselves.
+  # The last-owner removal guard is enforced at the model layer.
   def destroy?
     return true if global_admin?
     return false unless org_owner?(record.organization)
+    return false if record.user_id == user.id
 
-    # Can't remove an owner unless you're also an owner
-    if record.owner?
-      org_owner?(record.organization)
-    else
-      true
-    end
+    true
   end
 
   relation_scope do |scope|
