@@ -171,7 +171,7 @@ export function InvitationAccept() {
                 90
               </span>
             </div>
-            <span className="text-lg font-semibold tracking-tight">DB90</span>
+            <span className="text-lg font-semibold tracking-tight">Aixle Insights</span>
           </Link>
           {profile && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -335,7 +335,7 @@ export function InvitationAccept() {
                     <span className="font-medium text-foreground">
                       {invitation?.organization.name}
                     </span>
-                    . Link your AI tools next so DB90 can receive telemetry.
+                    . Link your AI tools next so Aixle Insights can receive telemetry.
                   </CardDescription>
                 </div>
                 <div className="rounded-lg border bg-muted/40 p-4 text-left space-y-3">

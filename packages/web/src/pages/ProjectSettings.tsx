@@ -174,7 +174,7 @@ function ProjectGeneralSettingsForm({
                 <p className="mt-1 text-sm text-amber-900/90 dark:text-amber-100/90">
                   Add the Git remote URL below (paste the output of{" "}
                   <code className="rounded bg-amber-500/15 px-1 py-0.5 font-mono text-xs">git remote get-url origin</code>
-                  ) so the db90 CLI can match events to this project.
+                  ) so the Aixle Insights CLI can match events to this project.
                 </p>
               </AlertDescription>
             </Alert>

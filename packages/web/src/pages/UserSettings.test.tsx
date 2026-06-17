@@ -228,7 +228,7 @@ describe("UserSettings", () => {
     it("renders Preferences section at /profile/settings", () => {
       renderAtPath("/profile/settings");
 
-      expect(screen.getByText("Customize your experience in DB90.")).toBeInTheDocument();
+      expect(screen.getByText("Customize your experience in Aixle Insights.")).toBeInTheDocument();
       expect(screen.getByLabelText("Theme")).toBeInTheDocument();
       expect(screen.getByLabelText("Default Organization")).toBeInTheDocument();
     });

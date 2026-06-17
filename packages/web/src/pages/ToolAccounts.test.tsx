@@ -231,13 +231,13 @@ describe("ToolAccounts", () => {
       expect(screen.getByText("Linked as user-123")).toBeInTheDocument();
     });
 
-    it("falls back to DB90 when no external linked identity is available", () => {
+    it("falls back to Aixle Insights when no external linked identity is available", () => {
       mockUseToolAccounts.mockReturnValue({
         data: [mockAccount({ externalUsername: null, externalUserId: null })],
         isLoading: false,
       });
       renderToolAccounts();
-      expect(screen.getByText("Linked as DB90")).toBeInTheDocument();
+      expect(screen.getByText("Linked as Aixle Insights")).toBeInTheDocument();
     });
 
     it('shows "all tools connected" message when no providers are available', async () => {
@@ -384,7 +384,7 @@ describe("ToolAccounts", () => {
       });
       renderToolAccounts();
       expect(
-        screen.getByText("This tool will become active after it sends its first event to DB90.")
+        screen.getByText("This tool will become active after it sends its first event to Aixle Insights.")
       ).toBeInTheDocument();
       expect(screen.queryByRole("menuitem", { name: "Complete setup" })).not.toBeInTheDocument();
     });

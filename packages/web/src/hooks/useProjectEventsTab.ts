@@ -194,7 +194,7 @@ export function useProjectEventsTab({
         start_date: filters.dateFrom,
         end_date: filters.dateTo,
         project_id: projectId,
-        filename: `db90-events-${startStr}-${endStr}.csv`,
+        filename: `aixle-insights-events-${startStr}-${endStr}.csv`,
       });
       if (result?.queued) setExportQueued(true);
     } catch {

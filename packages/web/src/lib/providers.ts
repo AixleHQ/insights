@@ -160,7 +160,7 @@ export const availableProviders: ProviderInfo[] = [
   {
     id: "gemini",
     name: "Gemini",
-    description: "Track Google Gemini API usage via DB90 AI Gateway — usage is recorded per request, not via API polling",
+    description: "Track Google Gemini API usage via Aixle Insights AI Gateway — usage is recorded per request, not via API polling",
     category: "ai",
     scope: "org",
     features: [

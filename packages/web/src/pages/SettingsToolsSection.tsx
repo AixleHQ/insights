@@ -110,7 +110,7 @@ export function SettingsToolsSection() {
         <CardHeader>
           <CardTitle>Ingest tokens</CardTitle>
           <CardDescription>
-            Copy or rotate DB90 ingest credentials for Claude Code and Cursor. Tokens are only shown
+            Copy or rotate Aixle Insights ingest credentials for Claude Code and Cursor. Tokens are only shown
             immediately after rotation — use the CLI or MCP flow for first-time setup.
           </CardDescription>
         </CardHeader>

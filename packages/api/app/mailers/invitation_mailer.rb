@@ -1,4 +1,5 @@
 class InvitationMailer < ApplicationMailer
+  # TODO: update fallback domain when infrastructure migrates from db90.dev (tracked: AIX-348)
   default from: ENV.fetch("MAILER_FROM", "noreply@db90.dev")
 
   def invite(invitation)
@@ -10,7 +11,7 @@ class InvitationMailer < ApplicationMailer
 
     mail(
       to: invitation.email,
-      subject: "You've been invited to join #{@organization.name} on DB90"
+      subject: "You've been invited to join #{@organization.name} on Aixle Insights"
     )
   end
 end

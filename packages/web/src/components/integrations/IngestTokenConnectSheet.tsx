@@ -175,7 +175,7 @@ function ClaudeCodeSetupInstructions({ token }: { token: string }) {
         </TabsContent>
 
         <TabsContent value="standalone-cli" className="space-y-2 pt-2">
-          <p className="text-sm font-medium">Run the db90 Claude reporter</p>
+          <p className="text-sm font-medium">Run the Aixle Insights Claude reporter</p>
           <div className="flex items-start gap-2">
             <pre className="text-xs bg-muted rounded p-3 overflow-x-auto flex-1 whitespace-pre-wrap break-all">
               {npxCommand}
@@ -303,7 +303,7 @@ function CursorSetupInstructions({ token }: { token: string }) {
         </TabsContent>
 
         <TabsContent value="standalone-cli" className="space-y-2 pt-2">
-          <p className="text-sm font-medium">Run the db90 Cursor reporter</p>
+          <p className="text-sm font-medium">Run the Aixle Insights Cursor reporter</p>
           <div className="flex items-start gap-2">
             <pre className="text-xs bg-muted rounded p-3 overflow-x-auto flex-1 whitespace-pre-wrap break-all">
               {npxCommand}

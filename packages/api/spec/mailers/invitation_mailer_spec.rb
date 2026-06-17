@@ -18,7 +18,7 @@ RSpec.describe InvitationMailer, type: :mailer do
     let(:mail) { described_class.invite(invitation) }
 
     it 'renders the headers' do
-      expect(mail.subject).to eq("You've been invited to join Test Organization on DB90")
+      expect(mail.subject).to eq("You've been invited to join Test Organization on Aixle Insights")
       expect(mail.to).to eq([ 'invitee@example.com' ])
     end
 
@@ -63,7 +63,7 @@ RSpec.describe InvitationMailer, type: :mailer do
       end
 
       it 'includes organization logo area' do
-        expect(mail.html_part.body.decoded).to include('DB90')
+        expect(mail.html_part.body.decoded).to include('Aixle Insights')
       end
     end
 

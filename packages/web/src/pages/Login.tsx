@@ -93,7 +93,7 @@ export function Login() {
             <span className="font-mono-display text-2xl font-bold text-zinc-900">90</span>
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-zinc-50">DB90</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-zinc-50">Aixle Insights</h1>
             <p className="mt-1 text-sm leading-snug text-zinc-400">
               Every AI Token your team ever spent.<br />Right Here.
             </p>

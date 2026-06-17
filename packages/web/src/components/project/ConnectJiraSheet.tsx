@@ -89,7 +89,7 @@ export function ConnectJiraSheet({ projectId, open, onOpenChange, onSuccess }: C
             <SheetTitle>Connect Jira Project</SheetTitle>
           </div>
           <SheetDescription>
-            Select a Jira account and choose a project to link to this DB90 project.
+            Select a Jira account and choose a project to link to this Aixle Insights project.
           </SheetDescription>
         </SheetHeader>
 

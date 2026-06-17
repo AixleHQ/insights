@@ -430,7 +430,7 @@ export function AppSidebar() {
                 </div>
                 <div className="grid flex-1 text-left leading-tight">
                   <span className="truncate font-semibold tracking-tight">
-                    DB90
+                    Aixle Insights
                   </span>
                   <span className="truncate text-xs text-sidebar-foreground/60">
                     AI Tool Analytics

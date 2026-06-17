@@ -234,7 +234,7 @@ function PreferencesSection() {
       <Card>
         <CardHeader>
           <CardTitle>Preferences</CardTitle>
-          <CardDescription>Customize your experience in DB90.</CardDescription>
+          <CardDescription>Customize your experience in Aixle Insights.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">

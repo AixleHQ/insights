@@ -157,7 +157,7 @@ export function Events() {
     setExportError(false);
     const startStr = filters.dateFrom ?? "all";
     const endStr = filters.dateTo ?? new Date().toISOString().split("T")[0];
-    const filename = `db90-events-${startStr}-${endStr}.csv`;
+    const filename = `aixle-insights-events-${startStr}-${endStr}.csv`;
 
     try {
       const result = await exportEvents({

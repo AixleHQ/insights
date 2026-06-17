@@ -235,7 +235,7 @@ export function ProjectDetail() {
               No git remote configured for CLI attribution
             </p>
             <p className="mt-1 text-sm text-amber-900/90 dark:text-amber-100/90">
-              Events from the db90 CLI will not be automatically matched to this project until you set the
+              Events from the Aixle Insights CLI will not be automatically matched to this project until you set the
               repository&apos;s{" "}
               <code className="rounded bg-amber-500/15 px-1 py-0.5 font-mono text-xs">git remote get-url origin</code>{" "}
               value in project settings.

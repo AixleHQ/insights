@@ -481,12 +481,12 @@ function ToolCard({
           )}
           {isLinked && (
             <p className="text-sm text-muted-foreground">
-              Linked as {linkedAccount.externalUsername || linkedAccount.externalUserId || "DB90"}
+              Linked as {linkedAccount.externalUsername || linkedAccount.externalUserId || "Aixle Insights"}
             </p>
           )}
           {isLinked && requiresSetup && (
             <p className="text-xs text-muted-foreground">
-              This tool will become active after it sends its first event to DB90.
+              This tool will become active after it sends its first event to Aixle Insights.
             </p>
           )}
           {!isLinked && (
@@ -752,7 +752,7 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
           <div className="space-y-1 text-sm">
             <p className="font-medium">Privacy Note</p>
             <p className="text-muted-foreground">
-              DB90 only stores your account identifier and, if provided, your API token —
+              Aixle Insights only stores your account identifier and, if provided, your API token —
               encrypted at rest. We use these only for event attribution and do not access
               your tool data directly.
             </p>

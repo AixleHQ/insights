@@ -413,7 +413,7 @@ export function UnattributedEvents() {
             </p>
             <p className="text-muted-foreground">
               Events become unattributed when they can't be matched to a user account.
-              This usually happens when the user hasn't linked their tool account in DB90.
+              This usually happens when the user hasn't linked their tool account in Aixle Insights.
               Ask team members to link their accounts in Settings → Tool Accounts.
             </p>
           </div>

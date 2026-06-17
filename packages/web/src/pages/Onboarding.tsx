@@ -243,7 +243,7 @@ export function Onboarding() {
                 90
               </span>
             </div>
-            <span className="text-lg font-semibold tracking-tight">DB90</span>
+            <span className="text-lg font-semibold tracking-tight">Aixle Insights</span>
           </div>
           {profile && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -262,7 +262,7 @@ export function Onboarding() {
               <Sparkles className="size-8 text-primary" />
             </div>
             <h1 className="text-3xl font-bold tracking-tight">
-              Welcome to DB90
+              Welcome to Aixle Insights
             </h1>
             <p className="mx-auto max-w-md text-muted-foreground">
               You're not part of any organization yet. Create your own organization or
@@ -413,6 +413,7 @@ export function Onboarding() {
           {/* Help text */}
           <p className="text-center text-sm text-muted-foreground">
             Need help getting started?{" "}
+            {/* TODO: update to Aixle Insights support email when db90.dev domain migrates — track in a follow-up infra ticket */}
             <a
               href="mailto:support@db90.dev"
               className="text-primary underline-offset-4 hover:underline"

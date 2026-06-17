@@ -97,7 +97,7 @@ export function OpenrouterWebhookSheet({
               <div>
                 <p className="font-medium text-success">Webhook is active</p>
                 <p className="mt-0.5 text-muted-foreground">
-                  DB90 is receiving per-request telemetry from OpenRouter. Each
+                  Aixle Insights is receiving per-request telemetry from OpenRouter. Each
                   API call is tracked individually.
                 </p>
               </div>
@@ -195,7 +195,7 @@ export function OpenrouterWebhookSheet({
                   <code className="rounded bg-muted px-1 py-0.5 font-mono">
                     {"{"}"X-Webhook-Secret": "your-secret"{"}"}
                   </code>
-                  . DB90 will reject requests where this header is missing or wrong.
+                  . Aixle Insights will reject requests where this header is missing or wrong.
                 </p>
                 {isSecretSet && !secretSaved && (
                   <div className="mt-2 flex items-center gap-1.5 text-xs text-success">
