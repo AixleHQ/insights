@@ -80,7 +80,7 @@ function StatCard({
 }) {
   return (
     <Card>
-      <CardContent className="flex items-center gap-4 p-4">
+      <CardContent className="flex items-center gap-4 px-4 py-0">
         <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
           <Icon className="size-5 text-muted-foreground" />
         </div>
@@ -296,20 +296,22 @@ export function ProjectDetail() {
             />
           </div>
 
-          <ProjectReposSection
-            repositories={projectRepositories}
-            isLoading={isLoadingRepositories}
-            onConnectRepo={() => setConnectRepoOpen(true)}
-            onDisconnect={(repoId) => disconnectRepo.mutateAsync(repoId)}
-          />
+          <div className="grid gap-4 md:grid-cols-2">
+            <ProjectReposSection
+              repositories={projectRepositories}
+              isLoading={isLoadingRepositories}
+              onConnectRepo={() => setConnectRepoOpen(true)}
+              onDisconnect={(repoId) => disconnectRepo.mutateAsync(repoId)}
+            />
 
-          <ProjectTeamSection
-            members={projectMembers}
-            isLoading={isLoadingMembers}
-            projectId={id}
-            orgId={currentOrg?.id}
-            canManage={canManageMembers}
-          />
+            <ProjectTeamSection
+              members={projectMembers}
+              isLoading={isLoadingMembers}
+              projectId={id}
+              orgId={currentOrg?.id}
+              canManage={canManageMembers}
+            />
+          </div>
 
           {(project.sourceControlSummary?.length ?? 0) > 0 && (
             <Card>

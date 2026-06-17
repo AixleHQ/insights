@@ -94,7 +94,7 @@ export function MetricCard({
         className
       )}
     >
-      <CardContent className="p-6">
+      <CardContent className="px-6 py-0">
         <div className="flex items-start justify-between">
           <div className="space-y-2">
             <p className="type-label text-muted-foreground">{resolvedLabel}</p>

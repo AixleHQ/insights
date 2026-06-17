@@ -183,10 +183,10 @@ describe("ProjectDetail", () => {
     expect(screen.getByText("8")).toBeInTheDocument();
   });
 
-  it("renders Team section on the overview", () => {
+  it("renders Leaderboard section on the overview", () => {
     render(<ProjectDetail />);
 
-    expect(screen.getByText("Team")).toBeInTheDocument();
+    expect(screen.getByText("Leaderboard")).toBeInTheDocument();
   });
 
   it("navigates to settings when Settings menu item is clicked", async () => {

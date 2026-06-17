@@ -7,6 +7,7 @@ import {
   useProjectMemberStats,
   useAddProjectMember,
   useRemoveProjectMember,
+  useUpdateProjectMember,
   useOrganizationMembers,
 } from "@/hooks/useApi";
 
@@ -15,6 +16,7 @@ vi.mock("@/hooks/useApi", () => ({
   useProjectMemberStats: vi.fn(),
   useAddProjectMember: vi.fn(),
   useRemoveProjectMember: vi.fn(),
+  useUpdateProjectMember: vi.fn(),
   useOrganizationMembers: vi.fn(),
 }));
 
@@ -48,6 +50,7 @@ function setupDefaultMocks() {
   vi.mocked(useProjectMemberStats).mockReturnValue({ data: undefined } as ReturnType<typeof useProjectMemberStats>);
   vi.mocked(useAddProjectMember).mockReturnValue({ mutate: mockAddMutate, isPending: false } as unknown as ReturnType<typeof useAddProjectMember>);
   vi.mocked(useRemoveProjectMember).mockReturnValue({ mutate: mockRemoveMutate } as unknown as ReturnType<typeof useRemoveProjectMember>);
+  vi.mocked(useUpdateProjectMember).mockReturnValue({ mutate: vi.fn(), isPending: false } as unknown as ReturnType<typeof useUpdateProjectMember>);
   vi.mocked(useOrganizationMembers).mockReturnValue({ data: [] } as ReturnType<typeof useOrganizationMembers>);
 }
 

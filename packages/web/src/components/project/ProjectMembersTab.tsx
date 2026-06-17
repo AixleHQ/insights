@@ -26,11 +26,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   useProjectMembers,
   useProjectMemberStats,
   useAddProjectMember,
   useRemoveProjectMember,
+  useUpdateProjectMember,
   useOrganizationMembers,
 } from "@/hooks/useApi";
 import { formatCount, formatCost, formatTokens } from "@/lib/formatters";
@@ -72,6 +74,7 @@ export function ProjectMembersTab({
   });
   const addMember = useAddProjectMember(projectId);
   const removeMember = useRemoveProjectMember(projectId);
+  const updateMember = useUpdateProjectMember(projectId);
 
   const statsById = useMemo(
     () => new Map(stats?.map((s) => [s.userId, s]) ?? []),
@@ -100,6 +103,13 @@ export function ProjectMembersTab({
         m.name?.toLowerCase().includes(q) || m.email.toLowerCase().includes(q)
     );
   }, [members, search]);
+
+  const aggregates = useMemo(() => ({
+    count: members.length,
+    cliConnected: members.filter((m) => m.cliConnected === true).length,
+    totalEvents: members.reduce((s, m) => s + (m.totalEvents ?? 0), 0),
+    totalCost: members.reduce((s, m) => s + (m.totalCost ?? 0), 0),
+  }), [members]);
 
   const handleAddMember = () => {
     if (!addUserId) return;
@@ -189,6 +199,36 @@ export function ProjectMembersTab({
 
   return (
     <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <Card>
+          <CardContent className="px-4 py-0">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Members</p>
+            <p className="mt-1 font-mono text-2xl font-bold">{aggregates.count}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="px-4 py-0">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total events</p>
+            <p className="mt-1 font-mono text-2xl font-bold">{formatCount(aggregates.totalEvents)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="px-4 py-0">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total cost</p>
+            <p className="mt-1 font-mono text-2xl font-bold">{formatCost(aggregates.totalCost)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="px-4 py-0">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">CLI connected</p>
+            <p className="mt-1 font-mono text-2xl font-bold">
+              {aggregates.cliConnected}
+              <span className="ml-1 text-sm font-normal text-muted-foreground">/ {aggregates.count}</span>
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="flex items-center gap-2">
         <Input
           placeholder="Search members…"
@@ -316,8 +356,24 @@ export function ProjectMembersTab({
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <RoleBadge role={m.role as "owner" | "member" | "viewer"} />
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    {canManageMembers ? (
+                      <Select
+                        value={m.role}
+                        onValueChange={(role) => updateMember.mutate({ id: m.id, role })}
+                      >
+                        <SelectTrigger className="h-7 w-24 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ROLES.map((r) => (
+                            <SelectItem key={r} value={r} className="text-xs">{r}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <RoleBadge role={m.role as "owner" | "member" | "viewer"} />
+                    )}
                   </TableCell>
                   <TableCell>
                     <CliStatusBadge connected={m.cliConnected} />
