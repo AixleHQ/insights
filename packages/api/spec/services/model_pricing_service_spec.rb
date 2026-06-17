@@ -31,7 +31,7 @@ RSpec.describe ModelPricingService do
 
       {
         "gemini-2.5-pro"   => { input: 1.25, output: 10.00 },
-        "gemini-2.5-flash" => { input: 0.15, output: 0.60 },
+        "gemini-2.5-flash" => { input: 0.30, output: 2.50 },
         "gemini-2.0-flash" => { input: 0.10, output: 0.40 },
         "gemini-1.5-pro"   => { input: 1.25, output: 5.00 },
         "gemini-1.5-flash" => { input: 0.075, output: 0.30 },
@@ -45,6 +45,33 @@ RSpec.describe ModelPricingService do
       it 'resolves versioned Gemini model names via substring match' do
         result = described_class.pricing_for_model("gemini-2.5-pro-exp-03-25")
         expect(result).to eq({ input: 1.25, output: 10.00 })
+      end
+
+      context 'dated Claude model IDs (AIX-349)' do
+        it 'matches claude-opus-4-7-20260101 at $5/$25 (not $15/$75)' do
+          result = described_class.pricing_for_model("claude-opus-4-7-20260101")
+          expect(result).to eq({ input: 5.00, output: 25.00 })
+        end
+
+        it 'matches claude-opus-4-6-20260315 at $5/$25' do
+          result = described_class.pricing_for_model("claude-opus-4-6-20260315")
+          expect(result).to eq({ input: 5.00, output: 25.00 })
+        end
+
+        it 'matches claude-opus-4-5-20250901 at $5/$25' do
+          result = described_class.pricing_for_model("claude-opus-4-5-20250901")
+          expect(result).to eq({ input: 5.00, output: 25.00 })
+        end
+
+        it 'matches claude-opus-4-1-20250601 at $15/$75' do
+          result = described_class.pricing_for_model("claude-opus-4-1-20250601")
+          expect(result).to eq({ input: 15.00, output: 75.00 })
+        end
+
+        it 'matches claude-sonnet-4-6-20260201 at $3/$15' do
+          result = described_class.pricing_for_model("claude-sonnet-4-6-20260201")
+          expect(result).to eq({ input: 3.00, output: 15.00 })
+        end
       end
     end
 
