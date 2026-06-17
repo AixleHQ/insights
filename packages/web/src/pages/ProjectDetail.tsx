@@ -49,7 +49,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { EventsTable, EventDrawer, EventFilters } from "@/components/events";
-import { ToolUsageByDayChart } from "@/components/dashboard";
+import { ToolUsageByDayChart, TOOL_USAGE_DEFAULT_DAYS } from "@/components/dashboard";
 import {
   ProjectReposSection,
   ProjectNotFound,
@@ -110,7 +110,8 @@ export function ProjectDetail() {
   const { data: project, isLoading: isLoadingProject } = useProject(id || "");
   const { data: projectMembers, isLoading: isLoadingMembers } = useProjectMembers(id || "");
   const { data: me } = useCurrentUser();
-  const { data: dailyByToolData, isLoading: isLoadingDailyByTool } = useProjectDailyByTool(id || "");
+  const [dailyByToolDays, setDailyByToolDays] = useState(TOOL_USAGE_DEFAULT_DAYS);
+  const { data: dailyByToolData, isLoading: isLoadingDailyByTool } = useProjectDailyByTool(id || "", dailyByToolDays);
   const { data: projectRepositories, isLoading: isLoadingRepositories } = useProjectRepositories(id || "");
   const disconnectRepo = useDisconnectRepo(id || "");
   const deleteProject = useDeleteProject();
@@ -265,6 +266,7 @@ export function ProjectDetail() {
               data={dailyByToolData.data}
               tools={dailyByToolData.tools}
               isLoading={isLoadingDailyByTool}
+              onDaysChange={setDailyByToolDays}
             />
           )}
 

@@ -4,7 +4,7 @@ export { ActivityFeed, RiskBadge, type ActivityEvent } from "./ActivityFeed";
 export { TopToolsChart, type ToolUsageData } from "./TopToolsChart";
 export { AlertsPanel, type Alert } from "./AlertsPanel";
 export { ActivityHeatmap } from "./ActivityHeatmap";
-export { ToolUsageByDayChart } from "./ToolUsageByDayChart";
+export { ToolUsageByDayChart, TOOL_USAGE_DEFAULT_DAYS } from "./ToolUsageByDayChart";
 export { ToolInsightsSection } from "./ToolInsightsSection";
 export { ToolModelCostChart } from "./ToolModelCostChart";
 export { ToolModelTable } from "./ToolModelTable";
