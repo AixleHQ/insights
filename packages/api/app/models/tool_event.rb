@@ -21,6 +21,8 @@ class ToolEvent < ApplicationRecord
   validates :tool_name, presence: true, inclusion: { in: TOOL_NAMES }
   validates :event_type, presence: true, inclusion: { in: EVENT_TYPES }
   validates :occurred_at, presence: true
+  validates :model, format: { with: ModelStringNormalizer::MODEL_FORMAT,
+                               message: "contains invalid characters" }, allow_nil: true, allow_blank: true
   validates :tokens_in, numericality: { only_integer: true, greater_than_or_equal_to: 0 }, allow_nil: true
   validates :tokens_out, numericality: { only_integer: true, greater_than_or_equal_to: 0 }, allow_nil: true
   validates :tokens_total, numericality: { only_integer: true, greater_than_or_equal_to: 0 }, allow_nil: true

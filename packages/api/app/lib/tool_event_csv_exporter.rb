@@ -83,7 +83,7 @@ module ToolEventCsvExporter
           event.cost_usd
         ]
         row << event.user&.email                  if role.in?(%i[org_admin global_admin])
-        row << event.model                         if role == :global_admin
+        row << csv_safe(event.model)               if role == :global_admin
         row << event.metadata&.dig("session_id")  if role == :global_admin
         csv << row
       end
@@ -92,5 +92,16 @@ module ToolEventCsvExporter
 
   def self.risk_level_for(event)
     event.metadata&.dig("risk_level") || "none"
+  end
+
+  # Neutralises CSV formula-injection for values that may contain arbitrary
+  # strings (e.g. model column) from legacy/pre-normalisation rows.
+  # Prefixes cells starting with = + - @ with a single quote so spreadsheet
+  # applications treat them as literals rather than formulas.
+  def self.csv_safe(value)
+    return value if value.nil?
+
+    str = value.to_s
+    str.start_with?("=", "+", "-", "@") ? "'#{str}" : str
   end
 end

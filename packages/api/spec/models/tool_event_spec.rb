@@ -64,6 +64,44 @@ RSpec.describe ToolEvent, type: :model do
       event = build(:tool_event, tokens_out: -1)
       expect(event).not_to be_valid
     end
+
+    describe 'model format' do
+      it 'accepts nil model' do
+        event = build(:tool_event, model: nil)
+        expect(event).to be_valid
+      end
+
+      it 'accepts a blank model' do
+        event = build(:tool_event, model: "")
+        expect(event).to be_valid
+      end
+
+      it 'accepts a valid model string' do
+        event = build(:tool_event, model: "claude-sonnet-4-6")
+        expect(event).to be_valid
+      end
+
+      it 'accepts a namespaced model string' do
+        event = build(:tool_event, model: "anthropic/claude-opus-4")
+        expect(event).to be_valid
+      end
+
+      it 'rejects a model string containing HTML tags' do
+        event = build(:tool_event, model: "<script>alert(1)</script>")
+        expect(event).not_to be_valid
+        expect(event.errors[:model]).to be_present
+      end
+
+      it 'rejects a model string with spaces' do
+        event = build(:tool_event, model: "my model name")
+        expect(event).not_to be_valid
+      end
+
+      it 'rejects a model string starting with =' do
+        event = build(:tool_event, model: "=HYPERLINK()")
+        expect(event).not_to be_valid
+      end
+    end
   end
 
   describe 'callbacks' do
