@@ -52,6 +52,9 @@ class Invitation < ApplicationRecord
         role: role
       )
 
+      # AIX-381: enroll the accepted member into the org's existing projects.
+      ProjectEnrollmentService.enroll_user_in_org_projects(membership)
+
       update!(
         status: "accepted",
         accepted_at: Time.current

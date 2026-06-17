@@ -1,12 +1,14 @@
 # frozen_string_literal: true
 
 class ProjectPolicy < ApplicationPolicy
-  # Organization members can view org projects
-  # Users can view their personal projects
+  # Project visibility is gated by explicit project membership (AIX-381).
+  # Org members are auto-enrolled into org projects (see ProjectEnrollmentService),
+  # so this stays consistent with #relation_scope. Org owners are implicit
+  # project owners and pass via #project_owner?.
   def show?
     return true if global_admin?
     return own_personal_project? if record.personal?
-    return org_member?(record.organization) if record.organization_project?
+    return project_member?(record) || project_owner?(record) if record.organization_project?
     false
   end
 

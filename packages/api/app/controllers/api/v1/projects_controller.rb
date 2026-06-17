@@ -65,6 +65,9 @@ module Api
           # Add creator as project owner (for org projects)
           if @project.organization_project?
             @project.project_memberships.create!(user: current_user, role: "owner")
+            # AIX-381: enroll existing org members so the new project is not
+            # invisible to them (the creator's explicit owner role is preserved).
+            ProjectEnrollmentService.enroll_org_members_in_project(@project)
           end
           log_project_created!
         end

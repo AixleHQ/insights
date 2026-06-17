@@ -77,6 +77,8 @@ module Api
         authorize! @membership
 
         if @membership.save
+          # AIX-381: a new member must see the org's existing projects.
+          ProjectEnrollmentService.enroll_user_in_org_projects(@membership)
           OrganizationAuditLog.log(
             organization: current_organization,
             actor: current_user,

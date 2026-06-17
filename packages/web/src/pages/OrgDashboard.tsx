@@ -61,13 +61,12 @@ function ProjectFilterDropdown({
 }
 
 export function OrgDashboard() {
-  const { currentOrg, hasRole } = useOrg();
+  const { currentOrg } = useOrg();
   const [searchParams, setSearchParams] = useSearchParams();
-  const isOwnerOrViewer = hasRole(["owner", "viewer"]);
 
-  const activeTab = isOwnerOrViewer
-    ? ((searchParams.get("tab") as "team" | "personal") ?? "team")
-    : "team";
+  // AIX-381: every org role (including plain members) gets the Team/Personal
+  // tabs; the Team tab reads org-scoped stats, which the API allows any member.
+  const activeTab = (searchParams.get("tab") as "team" | "personal") ?? "team";
 
   const [selectedProjectId, setSelectedProjectId] = useState<string | undefined>();
 
@@ -141,26 +140,24 @@ export function OrgDashboard() {
             AI tool usage and cost overview for {currentOrg?.name || "your organization"}
           </p>
         </div>
-        {isOwnerOrViewer && (
-          <div className="flex items-center gap-3">
-            {activeTab === "team" && (
-              <ProjectFilterDropdown
-                orgId={orgId}
-                value={selectedProjectId}
-                onChange={setSelectedProjectId}
-              />
-            )}
-            <Tabs
-              value={activeTab}
-              onValueChange={(v) => setSearchParams({ tab: v })}
-            >
-              <TabsList>
-                <TabsTrigger value="team">Team</TabsTrigger>
-                <TabsTrigger value="personal">Personal</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {activeTab === "team" && (
+            <ProjectFilterDropdown
+              orgId={orgId}
+              value={selectedProjectId}
+              onChange={setSelectedProjectId}
+            />
+          )}
+          <Tabs
+            value={activeTab}
+            onValueChange={(v) => setSearchParams({ tab: v })}
+          >
+            <TabsList>
+              <TabsTrigger value="team">Team</TabsTrigger>
+              <TabsTrigger value="personal">Personal</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
       </div>
 
       {activeTab === "personal" ? (

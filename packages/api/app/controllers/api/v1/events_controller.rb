@@ -14,7 +14,6 @@ module Api
       def index
         events = authorized_scope(current_organization.tool_events)
         events = apply_filters(events)
-        events = scope_events_for_member_visibility(events)
         events = events.includes(:user, :project).order(occurred_at: :desc)
 
         render_collection(events, ToolEventSerializer)
@@ -149,7 +148,6 @@ module Api
 
         events = authorized_scope(current_organization.tool_events)
         events = apply_filters(events)
-        events = scope_events_for_member_visibility(events)
         events = events.includes(:user, :project).order(occurred_at: :desc)
         total_count = events.count
 
@@ -184,22 +182,12 @@ module Api
 
       private
 
+      # All organization members can view every event in the org (AIX-381).
+      # Per-event authorization is still enforced via ToolEventPolicy in each action.
       def set_event
-        events = current_organization.tool_events
-        events = scope_events_for_member_visibility(events) unless owner_only_event_lookup?
-        @event = events.includes(:user, :project, :audit_logs).find(params[:id])
-      end
-
-      # Members see only their own events; org owners and global admins see all org events.
-      def scope_events_for_member_visibility(events)
-        return events if current_user.global_admin? || current_user.admin_of?(current_organization)
-
-        events.where(user_id: current_user.id)
-      end
-
-      # Attribute uses org-wide lookup; ActionPolicy returns 403 for unauthorized members.
-      def owner_only_event_lookup?
-        action_name == "attribute"
+        @event = current_organization.tool_events
+                                     .includes(:user, :project, :audit_logs)
+                                     .find(params[:id])
       end
 
       # Delegates to ToolEventFilterable using request params hash

@@ -19,13 +19,13 @@ class ToolEventExportJob
   def perform(filter_params, user_id, org_id, role_str)
     set_status(user_id, org_id, "pending")
 
-    user = User.find(user_id)
     org  = Organization.find(org_id)
     role = role_str.to_sym
     fp   = filter_params.transform_keys(&:to_s)
 
+    # AIX-381: all org members export every org event (rows); `role` still drives
+    # column redaction inside ToolEventCsvExporter, not row-level filtering.
     events = org.tool_events
-    events = events.where(user_id: user.id) unless role.in?(%i[org_admin global_admin])
     events = apply_tool_event_filters(events, fp)
              .includes(:user, :project)
              .order(occurred_at: :desc)
