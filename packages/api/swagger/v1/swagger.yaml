@@ -4902,6 +4902,12 @@ paths:
                 Standard event payload. Also accepts raw Claude Code hook payloads
                 (`session_id` + `tool_input`/`tool_response` for PostToolUse, or
                 `session_id` + `stop_hook_active` for Stop hooks).
+
+                For Stop hooks, `usage.cache_read_input_tokens` and
+                `usage.cache_creation_input_tokens` are subtracted from
+                `usage.input_tokens` so `tokens_in` reflects only non-cached base
+                input; the cache counts are preserved in `metadata` as
+                `cache_read_tokens` / `cache_write_tokens` and priced separately.
               properties:
                 event_type:
                   type: string

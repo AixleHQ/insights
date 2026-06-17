@@ -306,5 +306,71 @@ RSpec.describe ModelPricingService do
         expect(result[:output_cost]).to eq(3.00)
       end
     end
+
+    context 'with cache token breakdown (AIX-350)' do
+      it 'applies cache_read rate instead of full input rate' do
+        # claude-sonnet-4: input $3/M, cache_read $0.30/M, cache_write $3.75/M
+        result = described_class.calculate_cost(
+          tokens_in: 100_000,
+          tokens_out: 200_000,
+          cache_read_tokens: 900_000,
+          cache_write_tokens: 0,
+          model: "claude-sonnet-4"
+        )
+        # input: 0.1M * $3.00 = $0.30
+        # output: 0.2M * $15.00 = $3.00
+        # cache_read: 0.9M * $0.30 = $0.27
+        expect(result[:total_cost]).to eq(3.57)
+      end
+
+      it 'applies cache_write rate separately' do
+        result = described_class.calculate_cost(
+          tokens_in: 500_000,
+          tokens_out: 0,
+          cache_read_tokens: 0,
+          cache_write_tokens: 200_000,
+          model: "claude-sonnet-4"
+        )
+        # input: 0.5M * $3.00 = $1.50
+        # cache_write: 0.2M * $3.75 = $0.75
+        expect(result[:total_cost]).to eq(2.25)
+      end
+
+      it 'falls back to full input rate when cache tokens are zero' do
+        result_with_cache = described_class.calculate_cost(
+          tokens_in: 1_000_000,
+          tokens_out: 500_000,
+          cache_read_tokens: 0,
+          cache_write_tokens: 0,
+          model: "claude-sonnet-4"
+        )
+        result_without_cache = described_class.calculate_cost(
+          tokens_in: 1_000_000,
+          tokens_out: 500_000,
+          model: "claude-sonnet-4"
+        )
+        expect(result_with_cache[:total_cost]).to eq(result_without_cache[:total_cost])
+      end
+
+      it 'demonstrates cost overestimate when cache tokens priced at input rate' do
+        # Without cache breakdown: all 1M tokens at $3/M input = $3.00
+        naive = described_class.calculate_cost(
+          tokens_in: 1_000_000,
+          tokens_out: 0,
+          model: "claude-sonnet-4"
+        )
+        # With cache breakdown: 100K base at $3/M + 900K cache_read at $0.30/M
+        accurate = described_class.calculate_cost(
+          tokens_in: 100_000,
+          tokens_out: 0,
+          cache_read_tokens: 900_000,
+          cache_write_tokens: 0,
+          model: "claude-sonnet-4"
+        )
+        # Naive overestimates by ~5.3x on the input portion
+        expect(naive[:total_cost]).to eq(3.0)
+        expect(accurate[:total_cost]).to eq(0.57)
+      end
+    end
   end
 end

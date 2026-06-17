@@ -27,15 +27,15 @@ class ModelPricingService
     "claude-opus-4-6" => { input: 5.00, output: 25.00 },
     "claude-opus-4-5" => { input: 5.00, output: 25.00 },
     "claude-opus-4-1" => { input: 15.00, output: 75.00 },
-    "claude-opus-4" => { input: 15.00, output: 75.00 },
+    "claude-opus-4" => { input: 15.00, output: 75.00, cache_write: 18.75, cache_read: 1.50 },
     "claude-sonnet-4-6" => { input: 3.00, output: 15.00 },
-    "claude-sonnet-4" => { input: 3.00, output: 15.00 },
+    "claude-sonnet-4" => { input: 3.00, output: 15.00, cache_write: 3.75, cache_read: 0.30 },
     "claude-haiku-4-5" => { input: 1.00, output: 5.00 },
-    "claude-3-5-sonnet" => { input: 3.00, output: 15.00 },
-    "claude-3-5-haiku" => { input: 0.80, output: 4.00 },
-    "claude-3-opus" => { input: 15.00, output: 75.00 },
-    "claude-3-sonnet" => { input: 3.00, output: 15.00 },
-    "claude-3-haiku" => { input: 0.25, output: 1.25 },
+    "claude-3-5-sonnet" => { input: 3.00, output: 15.00, cache_write: 3.75, cache_read: 0.30 },
+    "claude-3-5-haiku" => { input: 0.80, output: 4.00, cache_write: 1.00, cache_read: 0.08 },
+    "claude-3-opus" => { input: 15.00, output: 75.00, cache_write: 18.75, cache_read: 1.50 },
+    "claude-3-sonnet" => { input: 3.00, output: 15.00, cache_write: 3.75, cache_read: 0.30 },
+    "claude-3-haiku" => { input: 0.25, output: 1.25, cache_write: 0.3125, cache_read: 0.025 },
 
     # Google models
     "gemini-2.5-pro"   => { input: 1.25, output: 10.00 },
@@ -101,7 +101,8 @@ class ModelPricingService
       TOOL_PRICING[tool_name.to_s] || TOOL_PRICING["custom"]
     end
 
-    def calculate_cost(tokens_in:, tokens_out:, model: nil, tool: nil, organization: nil)
+    def calculate_cost(tokens_in:, tokens_out:, model: nil, tool: nil, organization: nil,
+                       cache_read_tokens: 0, cache_write_tokens: 0)
       pricing = if model.present? && model != "unknown"
                   pricing_for_model(model, organization: organization)
       elsif tool.present?
@@ -113,10 +114,26 @@ class ModelPricingService
       input_cost = (tokens_in.to_f / 1_000_000) * pricing[:input]
       output_cost = (tokens_out.to_f / 1_000_000) * pricing[:output]
 
+      cache_read_cost = if cache_read_tokens.to_i > 0 && pricing[:cache_read]
+        (cache_read_tokens.to_f / 1_000_000) * pricing[:cache_read]
+      else
+        0.0
+      end
+
+      cache_write_cost = if cache_write_tokens.to_i > 0 && pricing[:cache_write]
+        (cache_write_tokens.to_f / 1_000_000) * pricing[:cache_write]
+      else
+        0.0
+      end
+
+      total = input_cost + output_cost + cache_read_cost + cache_write_cost
+
       {
         input_cost: input_cost.round(6),
         output_cost: output_cost.round(6),
-        total_cost: (input_cost + output_cost).round(6),
+        cache_read_cost: cache_read_cost.round(6),
+        cache_write_cost: cache_write_cost.round(6),
+        total_cost: total.round(6),
         pricing: pricing
       }
     end

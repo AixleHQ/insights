@@ -183,6 +183,49 @@ RSpec.describe 'Api::V1::Ingest', type: :request do
           end
         end
       end
+
+      context 'when usage includes cache tokens (AIX-350)' do
+        let(:cached_stop_payload) do
+          {
+            session_id: 'session-cached',
+            stop_hook_active: false,
+            model: 'claude-sonnet-4-6',
+            usage: {
+              input_tokens: 1500,
+              output_tokens: 300,
+              cache_read_input_tokens: 1000,
+              cache_creation_input_tokens: 200
+            },
+            total_cost_usd: 0.025
+          }
+        end
+
+        it 'excludes cache tokens from tokens_in (reports base input only)' do
+          ingest_post(payload: cached_stop_payload)
+          expect(Temporal::Client).to have_received(:start_workflow) do |_workflow, **kwargs|
+            event = kwargs[:args][:event]
+            # base_input = 1500 - 1000 - 200 = 300
+            expect(event[:tokens_in]).to eq(300)
+            expect(event[:tokens_out]).to eq(300)
+          end
+        end
+
+        it 'passes cache breakdown in metadata for accurate cost enrichment' do
+          ingest_post(payload: cached_stop_payload)
+          expect(Temporal::Client).to have_received(:start_workflow) do |_workflow, **kwargs|
+            metadata = kwargs[:args][:event][:metadata]
+            expect(metadata['cache_read_tokens']).to eq(1000)
+            expect(metadata['cache_write_tokens']).to eq(200)
+          end
+        end
+
+        it 'extracts model from params' do
+          ingest_post(payload: cached_stop_payload)
+          expect(Temporal::Client).to have_received(:start_workflow) do |_workflow, **kwargs|
+            expect(kwargs[:args][:event][:model]).to eq('claude-sonnet-4-6')
+          end
+        end
+      end
     end
 
     context 'with authentication failures' do

@@ -92,12 +92,18 @@ module ToolEvents
       t_out = @attributes[:tokens_out]
 
       if (cost.nil? || cost.to_f.zero?) && (t_in.present? || t_out.present?)
+        metadata = @attributes[:metadata] || {}
+        cache_read = metadata["cache_read_tokens"] || metadata[:cache_read_tokens]
+        cache_write = metadata["cache_write_tokens"] || metadata[:cache_write_tokens]
+
         result = ModelPricingService.calculate_cost(
-          tokens_in:    t_in.to_i,
-          tokens_out:   t_out.to_i,
-          model:        @attributes[:model],
-          tool:         @attributes[:tool_name],
-          organization: organization
+          tokens_in:          t_in.to_i,
+          tokens_out:         t_out.to_i,
+          cache_read_tokens:  cache_read.to_i,
+          cache_write_tokens: cache_write.to_i,
+          model:              @attributes[:model],
+          tool:               @attributes[:tool_name],
+          organization:       organization
         )
         @attributes[:cost_usd] = result[:total_cost]
 

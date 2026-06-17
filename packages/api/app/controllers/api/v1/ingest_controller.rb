@@ -215,14 +215,21 @@ module Api
             metadata: { "session_id" => params[:session_id], "hook_tool" => params[:tool_name] }.compact
           }
         elsif params.key?(:stop_hook_active)
-          # Stop: record a chat event and extract usage if Claude Code exposes it
           usage = params[:usage]&.to_unsafe_h || {}
+          metadata = { "session_id" => params[:session_id] }
+          cache_read = usage["cache_read_input_tokens"].to_i
+          cache_write = usage["cache_creation_input_tokens"].to_i
+          metadata["cache_read_tokens"] = cache_read if cache_read > 0
+          metadata["cache_write_tokens"] = cache_write if cache_write > 0
+          raw_input = usage["input_tokens"].to_i
+          base_input = raw_input > 0 ? [ raw_input - cache_read - cache_write, 0 ].max : nil
           {
             event_type: "chat",
-            tokens_in: usage["input_tokens"],
+            model: params[:model],
+            tokens_in: base_input,
             tokens_out: usage["output_tokens"],
             cost_usd: params[:total_cost_usd] || params[:total_cost],
-            metadata: { "session_id" => params[:session_id] }.compact
+            metadata: metadata.compact
           }.compact
         else
           {}
