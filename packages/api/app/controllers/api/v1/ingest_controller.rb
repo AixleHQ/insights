@@ -100,6 +100,11 @@ module Api
           return fallback_direct_insert(event_params, org)
         end
 
+        unless Temporal::Client.workers_polling?
+          log_fallback!(reason: "no_workers_polling", organization_id: org.id)
+          return fallback_direct_insert(event_params, org)
+        end
+
         workflow_id = "ingest-#{org.id}-#{SecureRandom.uuid}"
 
         Temporal::Client.start_workflow(
@@ -112,7 +117,8 @@ module Api
               organization_id: org.id,
               occurred_at: event_params[:occurred_at] || Time.current.iso8601
             )
-          }
+          },
+          execution_timeout: 300
         )
 
         { workflow_id: workflow_id }

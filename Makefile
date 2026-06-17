@@ -14,7 +14,7 @@ help:
 	@echo ""
 	@echo "Development:"
 	@echo "  make console        - Rails console inside api container"
-	@echo "  make worker         - Start Temporal worker"
+	@echo "  make worker         - View Temporal worker logs"
 	@echo "  make sidekiq        - View Sidekiq status"
 	@echo ""
 	@echo "Database:"
@@ -111,9 +111,12 @@ up:
 	@echo "  Temporal:    localhost:7233 (UI: localhost:8088)"
 	@echo "  Sidekiq UI:  http://localhost:3000/admin/sidekiq"
 	@echo "  Keycloak:    localhost:8080"
+	@echo ""
+	@echo "Verifying critical services..."
+	@docker compose ps --format '{{.Name}} {{.State}}' | grep -q "db90-worker.*running" && echo "  ✓ Temporal worker running" || echo "  ✗ WARNING: Temporal worker not running — ingest events will queue but not process!"
 
 down:
-	docker compose --profile worker down
+	docker compose down
 
 logs:
 	docker compose logs -f
@@ -135,7 +138,7 @@ console:
 	docker compose exec api bundle exec rails runner -
 
 worker:
-	docker compose --profile worker up -d worker
+	docker compose logs --tail=20 -f worker
 
 sidekiq:
 	docker compose logs --tail=20 sidekiq
