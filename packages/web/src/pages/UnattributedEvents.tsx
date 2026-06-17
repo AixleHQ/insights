@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import {
   ArrowLeft,
   Search,
@@ -9,7 +9,6 @@ import {
   HelpCircle,
   CheckSquare,
   SlidersHorizontal,
-  ShieldX,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useOrg } from "@/contexts/OrgContext";
@@ -344,36 +343,7 @@ export function UnattributedEvents() {
   }
 
   if (accessDenied) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button asChild variant="ghost" size="icon">
-            <Link to="/events">
-              <ArrowLeft className="size-4" />
-            </Link>
-          </Button>
-          <div>
-            <h1 className="text-xl font-semibold">Unattributed Events</h1>
-            <p className="text-sm text-muted-foreground">Restricted to organization admins</p>
-          </div>
-        </div>
-        <Card className="border-destructive/30 bg-destructive/5">
-          <CardContent className="flex items-start gap-4 p-6">
-            <ShieldX className="size-10 shrink-0 text-destructive" />
-            <div className="space-y-2">
-              <p className="font-medium">You don&apos;t have access to this page</p>
-              <p className="text-sm text-muted-foreground">
-                Manual attribution and the unattributed queue are limited to organization owners and
-                admins (and platform administrators).
-              </p>
-              <Button asChild variant="outline" size="sm" className="mt-2">
-                <Link to="/events">Back to Events</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <Navigate to="/events" replace />;
   }
 
   return (
@@ -404,11 +374,11 @@ export function UnattributedEvents() {
         </Button>
       </div>
 
-      <Card className="border-amber-500/20 bg-amber-500/5">
+      <Card className="border-warning/20 bg-warning/5">
         <CardContent className="flex items-start gap-4 p-4">
-          <HelpCircle className="size-5 mt-0.5 text-amber-500 shrink-0" />
+          <HelpCircle className="size-5 mt-0.5 text-warning shrink-0" />
           <div className="space-y-1 text-sm">
-            <p className="font-medium text-amber-700 dark:text-amber-400">
+            <p className="font-medium text-warning">
               Why are events unattributed?
             </p>
             <p className="text-muted-foreground">
