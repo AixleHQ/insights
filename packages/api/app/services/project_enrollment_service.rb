@@ -1,12 +1,10 @@
 # frozen_string_literal: true
 
-# Keeps org members' project access in sync (AIX-381).
+# Keeps project memberships in sync when new org projects are created (AIX-381).
 #
 # Project visibility is gated by an explicit ProjectMembership row (see
-# ProjectPolicy#relation_scope / #show?). To honour "members see the org's
-# existing projects" while keeping that gate, every org member is auto-enrolled
-# into every org project. Org owners are intentionally skipped — they are
-# implicit project owners and need no membership row
+# ProjectPolicy#relation_scope / #show?). Org owners are intentionally skipped —
+# they are implicit project owners and need no membership row
 # (see ApplicationPolicy#project_owner?).
 class ProjectEnrollmentService
   # Maps an organization role to the project role granted on auto-enrollment.
@@ -15,16 +13,6 @@ class ProjectEnrollmentService
     "member" => "member",
     "viewer" => "viewer"
   }.freeze
-
-  # Enroll a single org member into every project of their organization.
-  def self.enroll_user_in_org_projects(membership)
-    role = PROJECT_ROLE_FOR_ORG_ROLE[membership.role]
-    return if role.nil?
-
-    membership.organization.projects.find_each do |project|
-      upsert_membership(project, membership.user_id, role)
-    end
-  end
 
   # Enroll every existing org member into a single (typically newly created) project.
   def self.enroll_org_members_in_project(project)

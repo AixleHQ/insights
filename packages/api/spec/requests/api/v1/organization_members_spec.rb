@@ -205,18 +205,6 @@ RSpec.describe 'Api::V1::OrganizationMembers', type: :request do
 
       expect_forbidden
     end
-
-    it 'enrolls the new member into the org\'s existing projects (AIX-381)' do
-      project = create(:project, organization: organization, owner: nil)
-
-      authenticated_post "/api/v1/organizations/#{organization.id}/members",
-                         user: owner,
-                         organization: organization,
-                         params: { user_id: new_user.id, role: 'member' }
-
-      expect_created
-      expect(project.project_memberships.find_by(user: new_user)&.role).to eq('member')
-    end
   end
 
   describe 'PATCH /api/v1/organizations/:organization_id/members/:id' do

@@ -107,11 +107,9 @@ class UserSyncService
         organization = Organization.find_by(slug: org_slug)
         if organization
           begin
-            membership = OrganizationMembership.find_or_create_by!(user: user, organization: organization) do |m|
+            OrganizationMembership.find_or_create_by!(user: user, organization: organization) do |m|
               m.role = "member"
             end
-            # AIX-381: enroll into the org's existing projects.
-            ProjectEnrollmentService.enroll_user_in_org_projects(membership)
           rescue ActiveRecord::RecordNotUnique
             # Concurrent sync won the race; membership already exists
           end
@@ -125,11 +123,9 @@ class UserSyncService
         .includes(:organization)
         .each do |setting|
           begin
-            membership = OrganizationMembership.find_or_create_by!(user: user, organization: setting.organization) do |m|
+            OrganizationMembership.find_or_create_by!(user: user, organization: setting.organization) do |m|
               m.role = "member"
             end
-            # AIX-381: enroll into the org's existing projects.
-            ProjectEnrollmentService.enroll_user_in_org_projects(membership)
           rescue ActiveRecord::RecordNotUnique
             # Concurrent sync won the race; membership already exists
           end
