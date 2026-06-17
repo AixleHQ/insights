@@ -38,7 +38,12 @@ class InvitationDashboard < Administrate::BaseDashboard
     created_at
   ].freeze
 
-  FORM_ATTRIBUTES = [].freeze
+  FORM_ATTRIBUTES = %i[
+    email
+    organization
+    role
+    expires_at
+  ].freeze
 
   COLLECTION_FILTERS = {
     pending:  ->(resources) { resources.where(status: "pending") },
