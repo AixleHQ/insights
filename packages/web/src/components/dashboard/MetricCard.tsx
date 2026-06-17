@@ -3,17 +3,21 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
-interface MetricCardProps {
-  title: string;
+type MetricCardBaseProps = {
   value: string | number;
   previousValue?: number;
   format?: "number" | "currency" | "percentage" | "compact";
   icon?: ReactNode;
   trend?: "up" | "down" | "neutral";
+  delta?: string;
+  subtitle?: string;
   trendValue?: string;
   description?: string;
   className?: string;
-}
+};
+
+type MetricCardProps = MetricCardBaseProps &
+  ({ label: string; title?: string } | { label?: string; title: string });
 
 function formatValue(value: string | number, format?: string): string {
   if (typeof value === "string") return value;
@@ -45,15 +49,22 @@ function formatValue(value: string | number, format?: string): string {
 }
 
 export function MetricCard({
+  label,
+  delta,
+  subtitle,
   title,
+  trendValue,
+  description,
   value,
   format = "number",
   icon,
   trend,
-  trendValue,
-  description,
   className,
 }: MetricCardProps) {
+  const resolvedLabel = label ?? title!;
+  const resolvedDelta = delta ?? trendValue;
+  const resolvedSubtitle = subtitle ?? description;
+
   const [isAnimating, setIsAnimating] = useState(false);
   const prevValueRef = useRef(value);
 
@@ -86,7 +97,7 @@ export function MetricCard({
       <CardContent className="p-6">
         <div className="flex items-start justify-between">
           <div className="space-y-2">
-            <p className="type-label text-muted-foreground">{title}</p>
+            <p className="type-label text-muted-foreground">{resolvedLabel}</p>
             <div className="flex items-baseline gap-2">
               <p
                 className={cn(
@@ -96,15 +107,15 @@ export function MetricCard({
               >
                 {formatValue(value, format)}
               </p>
-              {trendValue && (
+              {resolvedDelta && (
                 <span className={cn("flex items-center gap-0.5 text-caption font-medium", trendColor)}>
                   <TrendIcon className="size-3" />
-                  {trendValue}
+                  {resolvedDelta}
                 </span>
               )}
             </div>
-            {description && (
-              <p className="type-caption text-muted-foreground">{description}</p>
+            {resolvedSubtitle && (
+              <p className="type-caption text-muted-foreground">{resolvedSubtitle}</p>
             )}
           </div>
           {icon && (
