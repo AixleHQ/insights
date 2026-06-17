@@ -56,7 +56,7 @@ function getRoleBadgeVariant(role: string): "default" | "secondary" | "outline" 
 function getRoleDescription(role: string): string {
   switch (role) {
     case "owner":
-      return "Full control over organization settings, billing, and member management";
+      return "Full control over organization settings and member management";
     case "member":
       return "View dashboards and contribute to projects";
     case "viewer":

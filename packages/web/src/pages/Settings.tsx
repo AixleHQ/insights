@@ -5,7 +5,6 @@ import {
   Building2,
   Shield,
   Bell,
-  CreditCard,
   Loader2,
   Save,
   ChevronLeft,
@@ -29,8 +28,6 @@ import {
   useOrganizationSettings,
   useUpdateOrganizationSetting,
   useDeleteOrganizationSetting,
-  useOverviewStats,
-  useDailyStats,
   useOrganizationAuditLogs,
   useCurrentUser,
   type AuditLogFilters,
@@ -41,7 +38,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Card,
@@ -58,7 +54,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -86,7 +81,6 @@ const navItems = [
   { title: "Policies", href: "/settings/policies", icon: Shield },
   { title: "Data & Retention", href: "/settings/retention", icon: Database },
   { title: "Alerts", href: "/settings/alerts", icon: Bell },
-  { title: "Billing", href: "/settings/billing", icon: CreditCard },
   { title: "Model Pricing", href: "/settings/pricing", icon: DollarSign },
   { title: "Security & Audit", href: "/settings/security", icon: FileSearch },
 ];
@@ -1080,114 +1074,6 @@ export function AlertSettings() {
   );
 }
 
-function BillingSettings() {
-  const { currentOrg } = useOrg();
-  const { data: stats, isLoading: isLoadingStats } = useOverviewStats(currentOrg?.id || "");
-  const { data: dailyStats, isLoading: isLoadingDaily } = useDailyStats(currentOrg?.id || "", 30);
-
-  // Calculate month-to-date usage from daily stats
-  const monthlyEvents = dailyStats?.data?.reduce((sum, d) => sum + d.event_count, 0) ?? 0;
-  const monthlyTokens = dailyStats?.data?.reduce(
-    (sum, d) => sum + (d.input_tokens || 0) + (d.output_tokens || 0),
-    0
-  ) ?? 0;
-
-  // Estimate storage in GB (rough estimate based on tokens)
-  const estimatedStorageGb = (monthlyTokens / 1000000) * 0.004; // ~4KB per 1M tokens
-
-  // Defaults for plan limits (in practice, these would come from a billing API)
-  const limits = {
-    cost: 2000,
-    events: 100000,
-    storage: 10,
-  };
-
-  const isLoading = isLoadingStats || isLoadingDaily;
-
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-[200px]" />
-        <Skeleton className="h-[250px]" />
-      </div>
-    );
-  }
-
-  // Get current month name
-  const currentMonth = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-medium">Billing & Usage</h2>
-        <p className="text-sm text-muted-foreground">
-          Monitor your usage and manage your subscription
-        </p>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Current Plan</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-2xl font-bold">Pro Plan</p>
-              <p className="text-sm text-muted-foreground">$199/month</p>
-            </div>
-            <Badge variant="outline" className="text-success">
-              Active
-            </Badge>
-          </div>
-          <Separator />
-          <div className="text-sm text-muted-foreground">
-            <p>Current billing period: {currentMonth}</p>
-          </div>
-          <Button variant="outline">Manage Subscription</Button>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Current Period Usage</CardTitle>
-          <CardDescription>{currentMonth}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span>API Costs</span>
-              <span className="font-mono-display">
-                ${(stats?.total_cost_usd ?? 0).toFixed(2)} / ${limits.cost}
-              </span>
-            </div>
-            <Progress value={((stats?.total_cost_usd ?? 0) / limits.cost) * 100} />
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span>Events</span>
-              <span className="font-mono-display">
-                {monthlyEvents.toLocaleString()} / {limits.events.toLocaleString()}
-              </span>
-            </div>
-            <Progress value={(monthlyEvents / limits.events) * 100} />
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span>Storage (estimated)</span>
-              <span className="font-mono-display">
-                {estimatedStorageGb.toFixed(2)} GB / {limits.storage} GB
-              </span>
-            </div>
-            <Progress value={(estimatedStorageGb / limits.storage) * 100} />
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
 
 export function SecuritySettings() {
   const { currentOrg, hasRole } = useOrg();
@@ -1450,7 +1336,6 @@ export function Settings() {
             <Route path="policies" element={<PolicySettings />} />
             <Route path="retention" element={<DataRetentionSettings />} />
             <Route path="alerts" element={<AlertSettings />} />
-            <Route path="billing" element={<BillingSettings />} />
             <Route path="pricing" element={<ModelPricingSettings />} />
             <Route path="security" element={<SecuritySettings />} />
             <Route path="*" element={<Navigate to="/settings" replace />} />

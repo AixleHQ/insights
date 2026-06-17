@@ -26,7 +26,6 @@ const routeLabels: Record<string, string> = {
   invite: "Invite",
   policies: "Policies",
   alerts: "Alerts",
-  billing: "Billing",
 };
 
 function useBreadcrumbs(): BreadcrumbConfig[] {

@@ -18,13 +18,6 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SortButton, type SortDirection } from "@/components/ui/sort-button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Table,
   TableBody,
   TableCell,
@@ -36,7 +29,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { formatDistanceToNow, formatCurrency } from "@/lib/utils";
@@ -48,8 +40,6 @@ interface AdminOrganization {
   name: string;
   slug: string;
   logo_url: string | null;
-  plan: string;
-  status: "active" | "suspended" | "trial";
   members_count: number;
   projects_count: number;
   events_count: number;
@@ -70,61 +60,18 @@ function OrgSkeleton() {
           </div>
         </div>
       </TableCell>
-      <TableCell>
-        <Skeleton className="h-5 w-16" />
-      </TableCell>
-      <TableCell>
-        <Skeleton className="h-5 w-16" />
-      </TableCell>
-      <TableCell>
-        <Skeleton className="h-4 w-12" />
-      </TableCell>
-      <TableCell>
-        <Skeleton className="h-4 w-16" />
-      </TableCell>
-      <TableCell>
-        <Skeleton className="h-4 w-20" />
-      </TableCell>
-      <TableCell>
-        <Skeleton className="h-4 w-20" />
-      </TableCell>
-      <TableCell>
-        <Skeleton className="size-8" />
-      </TableCell>
+      <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+      <TableCell><Skeleton className="size-8" /></TableCell>
     </TableRow>
   );
 }
 
-function StatusBadge({ status }: { status: AdminOrganization["status"] }) {
-  switch (status) {
-    case "active":
-      return <Badge variant="default">Active</Badge>;
-    case "suspended":
-      return <Badge variant="destructive">Suspended</Badge>;
-    case "trial":
-      return <Badge variant="secondary">Trial</Badge>;
-    default:
-      return null;
-  }
-}
-
-function PlanBadge({ plan }: { plan: string }) {
-  const variants: Record<string, "default" | "secondary" | "outline"> = {
-    enterprise: "default",
-    team: "secondary",
-    free: "outline",
-  };
-  return (
-    <Badge variant={variants[plan] || "outline"} className="capitalize">
-      {plan}
-    </Badge>
-  );
-}
 
 export function AdminOrganizations() {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [planFilter, setPlanFilter] = useState<string>("all");
   const [sortField, setSortField] = useState<OrgSortField>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
@@ -144,11 +91,9 @@ export function AdminOrganizations() {
 
   const clearFilters = () => {
     setSearch("");
-    setStatusFilter("all");
-    setPlanFilter("all");
   };
 
-  const hasActiveFilters = search || statusFilter !== "all" || planFilter !== "all";
+  const hasActiveFilters = search;
 
   const filteredOrgs = useMemo(() => {
     if (!organizations) return [];
@@ -163,16 +108,6 @@ export function AdminOrganizations() {
           org.name.toLowerCase().includes(searchLower) ||
           org.slug.toLowerCase().includes(searchLower)
       );
-    }
-
-    // Apply status filter
-    if (statusFilter !== "all") {
-      result = result.filter((org) => org.status === statusFilter);
-    }
-
-    // Apply plan filter
-    if (planFilter !== "all") {
-      result = result.filter((org) => org.plan === planFilter);
     }
 
     // Apply sorting
@@ -199,7 +134,7 @@ export function AdminOrganizations() {
     });
 
     return result;
-  }, [organizations, search, statusFilter, planFilter, sortField, sortDirection]);
+  }, [organizations, search, sortField, sortDirection]);
 
   const totalCost = useMemo(() => {
     return organizations?.reduce((sum, org) => sum + org.total_cost_usd, 0) || 0;
@@ -245,30 +180,6 @@ export function AdminOrganizations() {
           />
         </div>
 
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[130px]">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="trial">Trial</SelectItem>
-            <SelectItem value="suspended">Suspended</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={planFilter} onValueChange={setPlanFilter}>
-          <SelectTrigger className="w-[130px]">
-            <SelectValue placeholder="Plan" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Plans</SelectItem>
-            <SelectItem value="enterprise">Enterprise</SelectItem>
-            <SelectItem value="team">Team</SelectItem>
-            <SelectItem value="free">Free</SelectItem>
-          </SelectContent>
-        </Select>
-
         {hasActiveFilters && (
           <Button variant="ghost" size="sm" onClick={clearFilters}>
             <X className="mr-2 size-4" />
@@ -291,8 +202,6 @@ export function AdminOrganizations() {
                   Organization
                 </SortButton>
               </TableHead>
-              <TableHead className="w-[100px]">Status</TableHead>
-              <TableHead className="w-[90px]">Plan</TableHead>
               <TableHead className="w-[80px]">
                 <SortButton
                   field="members_count"
@@ -341,7 +250,7 @@ export function AdminOrganizations() {
               Array.from({ length: 10 }).map((_, i) => <OrgSkeleton key={i} />)
             ) : filteredOrgs.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-24 text-center">
+                <TableCell colSpan={6} className="h-24 text-center">
                   <div className="flex flex-col items-center gap-2">
                     <Building2 className="size-8 text-muted-foreground" />
                     <p className="text-muted-foreground">
@@ -371,12 +280,6 @@ export function AdminOrganizations() {
                         <p className="text-xs text-muted-foreground">/{org.slug}</p>
                       </div>
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge status={org.status} />
-                  </TableCell>
-                  <TableCell>
-                    <PlanBadge plan={org.plan} />
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1 font-mono text-sm">
@@ -415,17 +318,7 @@ export function AdminOrganizations() {
                           <ExternalLink className="mr-2 size-4" />
                           View as Org
                         </DropdownMenuItem>
-                        <DropdownMenuSeparator />
                         <DropdownMenuItem>Edit Settings</DropdownMenuItem>
-                        <DropdownMenuItem>Change Plan</DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        {org.status === "active" ? (
-                          <DropdownMenuItem className="text-destructive">
-                            Suspend Organization
-                          </DropdownMenuItem>
-                        ) : (
-                          <DropdownMenuItem>Activate Organization</DropdownMenuItem>
-                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
