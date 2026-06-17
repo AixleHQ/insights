@@ -24,6 +24,7 @@ RSpec.describe 'Api::V1::Ingest', type: :request do
     allow(RawEventStore).to receive(:ensure_bucket_exists!).and_return(nil)
     allow(RawEventStore).to receive(:store).and_return('events/test-key.json')
     allow(Temporal::Client).to receive(:start_workflow).and_return({ workflow_id: 'test-workflow-id' })
+    allow(Temporal::Client).to receive(:workers_polling?).and_return(true)
 
     # Use a real in-memory cache so Rails.cache.increment works in specs.
     # The default test environment uses :null_store which returns nil from #increment.
