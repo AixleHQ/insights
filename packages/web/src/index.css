@@ -49,6 +49,7 @@
   --color-risk-none: var(--risk-none);
   --color-success: var(--success);
   --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
 }
 
 :root {
@@ -93,6 +94,7 @@
   --risk-none: oklch(0.65 0.12 160);
   --success: oklch(0.65 0.2 145);
   --warning: oklch(0.75 0.15 85);
+  --warning-foreground: oklch(0.2 0.05 85);
 }
 
 .dark {
@@ -136,6 +138,7 @@
   --risk-none: oklch(0.7 0.12 160);
   --success: oklch(0.7 0.2 145);
   --warning: oklch(0.8 0.15 85);
+  --warning-foreground: oklch(0.15 0.04 85);
 }
 
 @layer base {
