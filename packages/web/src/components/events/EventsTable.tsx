@@ -7,6 +7,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { EventRowSkeleton } from "@/components/ui/skeletons";
+import { ErrorState } from "@/components/ui/error-state";
 import { SortButton, type SortDirection } from "@/components/ui/sort-button";
 import { RiskBadge } from "@/components/dashboard/ActivityFeed";
 import { labelForEventType } from "@/lib/eventTypes";
@@ -35,6 +36,8 @@ type SortField = "created_at" | "tool_name" | "risk_level" | "cost_usd";
 interface EventsTableProps {
   events: EventRow[];
   isLoading?: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
   sortField?: SortField;
   sortDirection?: SortDirection;
   onSort?: (field: SortField) => void;
@@ -59,6 +62,8 @@ function formatTokenCount(tokens: number | undefined): string {
 export function EventsTable({
   events,
   isLoading,
+  isError,
+  onRetry,
   sortField,
   sortDirection,
   onSort,
@@ -121,7 +126,18 @@ export function EventsTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {isLoading ? (
+          {isError ? (
+            <TableRow>
+              <TableCell colSpan={columnCount} className="h-40 text-center">
+                <ErrorState
+                  compact
+                  title="Could not load events"
+                  description="Something went wrong fetching the table."
+                  onRetry={onRetry}
+                />
+              </TableCell>
+            </TableRow>
+          ) : isLoading ? (
             Array.from({ length: 10 }).map((_, i) => (
               <EventRowSkeleton key={i} showUserColumn={showUserColumn} />
             ))

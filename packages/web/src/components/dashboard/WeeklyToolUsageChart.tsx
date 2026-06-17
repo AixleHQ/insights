@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/chart";
 import type { ChartConfig } from "@/components/ui/chart";
 import { ChartSkeleton } from "@/components/ui/skeletons";
+import { ErrorState } from "@/components/ui/error-state";
 import { cn, getToolColor, humanizeToolName } from "@/lib/utils";
 import { useDailyByTool, useDailyByModel } from "@/hooks/useApi";
 
@@ -77,10 +78,12 @@ export function WeeklyToolUsageChart({ orgId, projectId, className }: WeeklyTool
   const months = useMemo(() => getLast12Months(), []);
   const opts = { period: "week" as const, month: selectedMonth, projectId };
 
-  const { data: toolData, isLoading: isLoadingTool } = useDailyByTool(orgId, opts);
-  const { data: modelData, isLoading: isLoadingModel } = useDailyByModel(orgId, opts);
+  const { data: toolData, isLoading: isLoadingTool, isError: isErrorTool, refetch: refetchTool } = useDailyByTool(orgId, opts);
+  const { data: modelData, isLoading: isLoadingModel, isError: isErrorModel, refetch: refetchModel } = useDailyByModel(orgId, opts);
 
   const isLoading = groupBy === "tool" ? isLoadingTool : isLoadingModel;
+  const isError = groupBy === "tool" ? isErrorTool : isErrorModel;
+  const refetch = groupBy === "tool" ? refetchTool : refetchModel;
 
   const { keys, chartData, chartConfig } = useMemo(() => {
     if (groupBy === "tool") {
@@ -149,7 +152,16 @@ export function WeeklyToolUsageChart({ orgId, projectId, className }: WeeklyTool
         </div>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {isError ? (
+          <div className="flex h-[280px] items-center justify-center">
+            <ErrorState
+              compact
+              title="Could not load chart"
+              description="Something went wrong fetching the data."
+              onRetry={() => refetch()}
+            />
+          </div>
+        ) : isLoading ? (
           <ChartSkeleton height={280} />
         ) : chartData.length === 0 ? (
           <div className="flex h-[280px] items-center justify-center text-sm text-muted-foreground">

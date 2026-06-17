@@ -41,6 +41,7 @@ import {
   WebhookDeliveriesPage,
 } from "./pages/admin";
 import { ComingSoon } from "./components/ui/ComingSoon";
+import { NotFound } from "./pages/NotFound";
 
 function TeamIdRedirect() {
   const { id } = useParams<{ id: string }>();
@@ -170,6 +171,7 @@ function App() {
                       element={<WebhookDeliveriesPage />}
                     />
                   </Route>
+                  <Route path="*" element={<NotFound />} />
                 </Route>
               </Routes>
             </NotificationsProvider>

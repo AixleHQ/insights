@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/chart";
 import type { ChartConfig } from "@/components/ui/chart";
 import { ChartSkeleton } from "@/components/ui/skeletons";
+import { ErrorState } from "@/components/ui/error-state";
 import { cn } from "@/lib/utils";
 
 export interface DailyCostData {
@@ -27,6 +28,8 @@ export interface DailyCostData {
 interface CostTrendChartProps {
   data: DailyCostData[];
   isLoading?: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
   className?: string;
 }
 
@@ -60,7 +63,7 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
-export function CostTrendChart({ data, isLoading, className }: CostTrendChartProps) {
+export function CostTrendChart({ data, isLoading, isError, onRetry, className }: CostTrendChartProps) {
   const [timeRange, setTimeRange] = useState<TimeRange>("7d");
 
   const filteredData = timeRange === "7d" ? data.slice(-7) : data.slice(-30);
@@ -101,7 +104,16 @@ export function CostTrendChart({ data, isLoading, className }: CostTrendChartPro
         </div>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {isError ? (
+          <div className="flex h-[200px] items-center justify-center">
+            <ErrorState
+              compact
+              title="Could not load chart"
+              description="Something went wrong fetching the data."
+              onRetry={onRetry}
+            />
+          </div>
+        ) : isLoading ? (
           <ChartSkeleton height={200} />
         ) : (
           <ChartContainer config={chartConfig} className="h-[200px] w-full">

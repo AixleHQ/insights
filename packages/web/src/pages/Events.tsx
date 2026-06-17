@@ -64,7 +64,7 @@ export function Events() {
     project_id: filters.projectId,
   }), [page, filters]);
 
-  const { data: eventsResponse, isLoading, isFetching } = useEvents(
+  const { data: eventsResponse, isLoading, isFetching, isError, refetch } = useEvents(
     currentOrg?.id || "",
     apiParams
   );
@@ -252,6 +252,8 @@ export function Events() {
       <EventsTable
         events={filteredAndSortedEvents}
         isLoading={isLoading}
+        isError={isError}
+        onRetry={() => refetch()}
         sortField={sortField}
         sortDirection={sortDirection}
         onSort={handleSort}

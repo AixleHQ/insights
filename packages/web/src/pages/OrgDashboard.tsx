@@ -18,6 +18,8 @@ import {
 } from "@/components/dashboard";
 import { EventDrawer } from "@/components/events";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent } from "@/components/ui/card";
+import { ErrorState } from "@/components/ui/error-state";
 import {
   Select,
   SelectContent,
@@ -73,9 +75,9 @@ export function OrgDashboard() {
 
   const orgId = currentOrg?.id || "";
 
-  const { data: stats, isLoading: isLoadingStats } = useOverviewStats(orgId, selectedProjectId);
-  const { data: dailyData, isLoading: isLoadingDaily } = useDailyStats(orgId, 30);
-  const { data: eventsResponse, isLoading: isLoadingEvents } = useEvents(orgId, { per_page: 10 });
+  const { data: stats, isLoading: isLoadingStats, isError: isErrorStats, refetch: refetchStats } = useOverviewStats(orgId, selectedProjectId);
+  const { data: dailyData, isLoading: isLoadingDaily, isError: isErrorDaily, refetch: refetchDaily } = useDailyStats(orgId, 30);
+  const { data: eventsResponse, isLoading: isLoadingEvents, isError: isErrorEvents, refetch: refetchEvents } = useEvents(orgId, { per_page: 10 });
 
   const chartData: DailyCostData[] = dailyData?.data?.map((d) => ({
     date: d.date,
@@ -169,6 +171,17 @@ export function OrgDashboard() {
         <>
           <WeeklyToolUsageChart orgId={orgId} projectId={selectedProjectId} />
 
+          {isErrorStats ? (
+            <Card>
+              <CardContent className="py-6">
+                <ErrorState
+                  title="Could not load stats"
+                  description="Something went wrong fetching the dashboard metrics."
+                  onRetry={() => refetchStats()}
+                />
+              </CardContent>
+            </Card>
+          ) : (
           <MetricGrid>
             {isLoadingStats ? (
               <>
@@ -234,19 +247,22 @@ export function OrgDashboard() {
               </>
             )}
           </MetricGrid>
+          )}
 
           <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
-            <CostTrendChart data={chartData} isLoading={isLoadingDaily} />
+            <CostTrendChart data={chartData} isLoading={isLoadingDaily} isError={isErrorDaily} onRetry={() => refetchDaily()} />
             <ActivityFeed
               events={events}
               isLoading={isLoadingEvents}
+              isError={isErrorEvents}
+              onRetry={() => refetchEvents()}
               onEventClick={handleEventClick}
               selectedEventId={selectedEventId}
             />
           </div>
 
           <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-            <TopToolsChart data={toolUsage} isLoading={isLoadingDaily} />
+            <TopToolsChart data={toolUsage} isLoading={isLoadingDaily} isError={isErrorDaily} onRetry={() => refetchDaily()} />
             <RiskAlertsTable orgId={orgId} projectId={selectedProjectId} />
           </div>
 

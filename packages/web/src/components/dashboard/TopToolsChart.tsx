@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/chart";
 import type { ChartConfig } from "@/components/ui/chart";
 import { ChartSkeleton } from "@/components/ui/skeletons";
+import { ErrorState } from "@/components/ui/error-state";
 import { getToolColor, humanizeToolName } from "@/lib/utils";
 
 export interface ToolUsageData {
@@ -18,6 +19,8 @@ export interface ToolUsageData {
 interface TopToolsChartProps {
   data: ToolUsageData[];
   isLoading?: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
   className?: string;
 }
 
@@ -32,7 +35,7 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-export function TopToolsChart({ data, isLoading, className }: TopToolsChartProps) {
+export function TopToolsChart({ data, isLoading, isError, onRetry, className }: TopToolsChartProps) {
   const sortedData = [...data]
     .sort((a, b) => b.event_count - a.event_count)
     .slice(0, 5)
@@ -51,7 +54,16 @@ export function TopToolsChart({ data, isLoading, className }: TopToolsChartProps
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {isError ? (
+          <div className="flex h-[200px] items-center justify-center">
+            <ErrorState
+              compact
+              title="Could not load chart"
+              description="Something went wrong fetching the data."
+              onRetry={onRetry}
+            />
+          </div>
+        ) : isLoading ? (
           <ChartSkeleton variant="bars" barCount={5} />
         ) : sortedData.length === 0 ? (
           <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">

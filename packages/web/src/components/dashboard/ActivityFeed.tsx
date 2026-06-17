@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/ui/error-state";
 import { cn } from "@/lib/utils";
 import { formatCost, getEventActorLabel } from "@/lib/formatters";
 import { ProviderLogo } from "@/components/icons/ProviderLogo";
@@ -28,6 +29,8 @@ export interface ActivityEvent {
 interface ActivityFeedProps {
   events: ActivityEvent[];
   isLoading?: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
   className?: string;
   onEventClick?: (eventId: string) => void;
   selectedEventId?: string | null;
@@ -166,6 +169,8 @@ function ActivitySkeleton() {
 export function ActivityFeed({
   events,
   isLoading,
+  isError,
+  onRetry,
   className,
   onEventClick,
   selectedEventId,
@@ -188,7 +193,16 @@ export function ActivityFeed({
       </CardHeader>
       <CardContent className="px-2">
         <ScrollArea className="h-[320px] pr-4">
-          {isLoading ? (
+          {isError ? (
+            <div className="flex h-[200px] items-center justify-center">
+              <ErrorState
+                compact
+                title="Could not load activity"
+                description="Something went wrong fetching events."
+                onRetry={onRetry}
+              />
+            </div>
+          ) : isLoading ? (
             <div className="space-y-1">
               {Array.from({ length: 5 }).map((_, i) => (
                 <ActivitySkeleton key={i} />

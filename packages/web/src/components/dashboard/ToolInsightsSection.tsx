@@ -178,7 +178,7 @@ function SyncStatusSubsection({ orgId, connectorId }: { orgId: string; connector
 function OpenRouterTabContent({ orgId, days, period }: { orgId: string; days: number; period: "day" | "week" | "month" }) {
   const { data: connectorsResp } = useConnectors(orgId);
   const { data: dailyResp, isLoading: isLoadingDaily } = useToolDaily(orgId, "openrouter_api", days, period);
-  const { data: modelsResp, isLoading: isLoadingModels } = useToolModels(orgId, "openrouter_api", days);
+  const { data: modelsResp, isLoading: isLoadingModels, isError: isModelsError, refetch: refetchModels } = useToolModels(orgId, "openrouter_api", days);
   const { data: usersResp, isLoading: isLoadingUsers } = useToolUsers(orgId, "openrouter_api", days);
 
   const activeOpenRouterConnector = connectorsResp?.find(isActiveOpenRouterConnector);
@@ -236,7 +236,7 @@ function OpenRouterTabContent({ orgId, days, period }: { orgId: string; days: nu
       </div>
 
       {/* Cost by model chart */}
-      <ToolModelCostChart models={models} isLoading={isLoadingModels} />
+      <ToolModelCostChart models={models} isLoading={isLoadingModels} isError={isModelsError} onRetry={refetchModels} />
 
       {/* Full model table */}
       <div className="space-y-2">

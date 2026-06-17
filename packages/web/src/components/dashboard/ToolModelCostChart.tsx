@@ -7,12 +7,15 @@ import {
 } from "@/components/ui/chart";
 import type { ChartConfig } from "@/components/ui/chart";
 import { ChartSkeleton } from "@/components/ui/skeletons";
+import { ErrorState } from "@/components/ui/error-state";
 import type { ToolModelStat } from "@/lib/types";
 import { formatCost, truncateModelName } from "@/lib/formatters";
 
 interface ToolModelCostChartProps {
   models: ToolModelStat[];
   isLoading: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
 }
 
 const chartConfig = {
@@ -26,7 +29,7 @@ function modelLabel(model: ToolModelStat): string {
   return model.displayName || model.name;
 }
 
-export function ToolModelCostChart({ models, isLoading }: ToolModelCostChartProps) {
+export function ToolModelCostChart({ models, isLoading, isError, onRetry }: ToolModelCostChartProps) {
   const chartData = [...models]
     .sort((a, b) => b.costUsd - a.costUsd)
     .slice(0, 10)
@@ -45,7 +48,16 @@ export function ToolModelCostChart({ models, isLoading }: ToolModelCostChartProp
         <CardTitle className="text-base font-medium">Cost by Model</CardTitle>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {isError ? (
+          <div className="flex h-[120px] items-center justify-center">
+            <ErrorState
+              compact
+              title="Could not load chart"
+              description="Something went wrong fetching the data."
+              onRetry={onRetry}
+            />
+          </div>
+        ) : isLoading ? (
           <ChartSkeleton variant="bars" barCount={4} />
         ) : chartData.length === 0 ? (
           <div className="flex h-[120px] items-center justify-center text-sm text-muted-foreground">
