@@ -340,6 +340,13 @@ RSpec.describe 'Api::V1::PublicInvitations', type: :request do
       expect(json_data.first[:organization][:name]).to eq(organization.name)
     end
 
+    it 'exposes the token so the recipient can accept the invitation' do
+      authenticated_get '/api/v1/invitations/check', user: user
+
+      expect_success
+      expect(json_data.first[:token]).to eq(pending_invitation.token)
+    end
+
     it 'does not include expired invitations' do
       pending_invitation.update!(expires_at: 1.day.ago)
 

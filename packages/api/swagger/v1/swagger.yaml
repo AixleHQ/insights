@@ -6763,6 +6763,9 @@ components:
         id:
           type: string
           format: uuid
+        token:
+          type: string
+          description: Public token used to accept the invitation
         role:
           type: string
           enum: [owner, member, viewer]
@@ -6792,6 +6795,7 @@ components:
           format: date-time
       required:
         - id
+        - token
         - role
         - status
         - organization

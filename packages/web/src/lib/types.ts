@@ -504,6 +504,7 @@ export interface Invitation {
 
 export interface InvitationPublic {
   id: string;
+  token: string;
   role: MemberRole;
   status: InvitationStatus;
   organization: {

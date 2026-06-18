@@ -1,7 +1,11 @@
 # frozen_string_literal: true
 
 class InvitationPublicSerializer < BaseSerializer
-  attributes :id, :role, :status
+  # token is required so the recipient can call the accept endpoint
+  # (POST /invitations/:token/accept). The caller already holds the token for
+  # the public show endpoint, and the authenticated check endpoint only returns
+  # invitations addressed to the current user's own email (AIX-289).
+  attributes :id, :token, :role, :status
 
   attribute :organization do |invitation|
     {
