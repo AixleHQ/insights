@@ -180,7 +180,7 @@ export function AuditLogDrawer({
               </div>
             </SheetHeader>
 
-            <ScrollArea className="flex-1">
+            <ScrollArea className="flex-1 min-h-0">
               <div className="space-y-6 p-6">
                 <div className="space-y-4">
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
