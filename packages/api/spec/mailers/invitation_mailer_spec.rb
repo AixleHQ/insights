@@ -65,6 +65,14 @@ RSpec.describe InvitationMailer, type: :mailer do
       it 'includes organization logo area' do
         expect(mail.html_part.body.decoded).to include('Aixle Insights')
       end
+
+      it 'is a single well-formed HTML document (no nested layout)' do
+        html = mail.html_part.body.decoded
+
+        expect(html.scan(/<!DOCTYPE/i).size).to eq(1)
+        expect(html.scan(/<html/i).size).to eq(1)
+        expect(html.scan(/<body/i).size).to eq(1)
+      end
     end
 
     describe 'text email' do
