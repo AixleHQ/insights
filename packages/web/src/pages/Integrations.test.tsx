@@ -47,14 +47,14 @@ vi.mock("@/components/integrations/ApiKeyConnectSheet", () => ({
 
 const mockConnector = {
   id: "conn-1",
-  connector_type: "gitlab",
+  connectorType: "gitlab",
   status: "connected" as const,
-  external_account_name: "my-org",
-  last_sync_at: null,
-  last_error: null,
-  repository_count: 4,
-  synced_event_count: 12,
-  last_event_at: "2026-04-28T10:00:00Z",
+  externalAccountName: "my-org",
+  lastSyncAt: null,
+  lastError: null,
+  repositoryCount: 4,
+  syncedEventCount: 12,
+  lastEventAt: "2026-04-28T10:00:00Z",
 };
 
 function renderAt(path: string) {
@@ -261,7 +261,7 @@ describe("Integrations", () => {
       const slackConnector = {
         ...mockConnector,
         id: "conn-slack",
-        connector_type: "slack",
+        connectorType: "slack",
       };
       vi.mocked(useConnectors).mockReturnValue({
         data: [slackConnector],
