@@ -97,15 +97,15 @@ class OrganizationConnectorSerializer < BaseSerializer
   end
 
   attribute :repository_count do |connector, params|
-    connector.repositories.count unless params[:collection]
+    connector.repositories.count unless params&.[](:collection)
   end
 
   attribute :synced_event_count do |connector, params|
-    connector.synced_event_count unless params[:collection]
+    connector.synced_event_count unless params&.[](:collection)
   end
 
   attribute :last_event_at do |connector, params|
-    connector.synced_event_last_occurred_at&.iso8601 unless params[:collection]
+    connector.synced_event_last_occurred_at&.iso8601 unless params&.[](:collection)
   end
 
   attribute :webhook_active do |connector|

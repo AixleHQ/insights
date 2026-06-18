@@ -295,7 +295,7 @@ class AiUsageSyncJob
 
     match = scope
       .where("metadata->>'connector_id' = ?", connector.id.to_s)
-      .where("metadata->>'external_id' = ANY(?)", all_ids)
+      .where("metadata->>'external_id' IN (?)", all_ids)
       .first
     return match if match
 
@@ -303,7 +303,7 @@ class AiUsageSyncJob
     if org.organization_connectors.where(connector_type: provider, is_active: true).count == 1
       legacy_match = scope
         .where("metadata->>'connector_id' IS NULL")
-        .where("metadata->>'external_id' = ANY(?)", all_ids)
+        .where("metadata->>'external_id' IN (?)", all_ids)
         .first
       return legacy_match if legacy_match
     end
