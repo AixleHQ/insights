@@ -67,15 +67,12 @@ class AiUsageSyncJob
   def reconcile_provider(org, connector, provider)
     sync_started_at = Time.current
 
-    # Get usage from provider API
+    # nil means the provider is not yet implemented — skip without touching the connector
+    # so its status doesn't falsely read as "connected / synced".
     usage_data = fetch_provider_usage(connector, provider, org)
     return 0 unless usage_data
 
-    # nil means the provider is not yet implemented — skip without touching the connector
-    # so its status doesn't falsely read as "connected / synced".
-    return 0 if usage_data.nil?
-
-    # nil already handled above; empty array means no new data — still mark synced.
+    # empty array means no new data — still mark synced.
     if usage_data.empty?
       connector.mark_synced!(sync_started_at: sync_started_at)
       return 0
@@ -238,7 +235,7 @@ class AiUsageSyncJob
     provider.fetch_activity(start_date: days_back.days.ago.to_date, end_date: Date.yesterday)
   end
 
-def fetch_anthropic_usage(connector, organization)
+  def fetch_anthropic_usage(connector, organization)
     # Requires an Admin API key (sk-ant-admin...) stored in connector.access_token
     days_back = connector.last_sync_at ? ANTHROPIC_RECURRING_SYNC_DAYS : ANTHROPIC_INITIAL_SYNC_DAYS
     provider = Oauth::AnthropicProvider.new(connector)
@@ -294,30 +291,21 @@ def fetch_anthropic_usage(connector, organization)
   def find_matching_event(org, connector, provider, usage)
     scope = org.tool_events.where(tool_name: "#{provider}_api")
 
+    all_ids = ([ usage[:external_id] ] + Array(usage[:legacy_external_ids])).map(&:to_s)
+
     match = scope
       .where("metadata->>'connector_id' = ?", connector.id.to_s)
-      .where("metadata->>'external_id' = ?", usage[:external_id])
+      .where("metadata->>'external_id' = ANY(?)", all_ids)
       .first
     return match if match
 
-    Array(usage[:legacy_external_ids]).each do |legacy_id|
-      legacy_match = scope
-        .where("metadata->>'connector_id' = ?", connector.id.to_s)
-        .where("metadata->>'external_id' = ?", legacy_id)
-        .first
-      return legacy_match if legacy_match
-    end
-
     # Legacy fallback: events created before connector-scoped dedup did not include connector_id.
     if org.organization_connectors.where(connector_type: provider, is_active: true).count == 1
-      legacy_scope = scope.where("metadata->>'connector_id' IS NULL")
-      legacy_match = legacy_scope.where("metadata->>'external_id' = ?", usage[:external_id]).first
+      legacy_match = scope
+        .where("metadata->>'connector_id' IS NULL")
+        .where("metadata->>'external_id' = ANY(?)", all_ids)
+        .first
       return legacy_match if legacy_match
-
-      Array(usage[:legacy_external_ids]).each do |legacy_id|
-        legacy_id_match = legacy_scope.where("metadata->>'external_id' = ?", legacy_id).first
-        return legacy_id_match if legacy_id_match
-      end
     end
 
     nil

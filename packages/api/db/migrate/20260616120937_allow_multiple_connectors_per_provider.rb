@@ -13,7 +13,7 @@ class AllowMultipleConnectorsPerProvider < ActiveRecord::Migration[8.1]
     execute <<~SQL
       CREATE UNIQUE INDEX idx_org_connectors_single_instance
         ON organization_connectors (organization_id, connector_type)
-        WHERE connector_type NOT IN (#{MULTI_INSTANCE_TYPES.map { |t| "'#{t}'" }.join(", ")})
+        WHERE connector_type NOT IN (#{MULTI_INSTANCE_TYPES.map { |t| connection.quote(t) }.join(", ")})
     SQL
 
     # 3. Partial unique index: OAuth dedup — same account cannot be connected twice.
