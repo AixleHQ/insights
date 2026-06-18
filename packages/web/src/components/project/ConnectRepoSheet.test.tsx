@@ -21,6 +21,7 @@ vi.mock("@/contexts/OrgContext", () => ({
 const mockMutateAsync = vi.fn();
 const mockConnectors = [
   { id: "connector-1", connectorType: "github", externalAccountName: "my-github", isActive: true, status: "connected" },
+  { id: "connector-2", connectorType: "gitlab", externalAccountName: "my-gitlab", isActive: true, status: "connected" },
 ];
 const mockAvailableRepos = [
   { externalId: "r1", name: "repo-a", fullName: "org/repo-a", htmlUrl: "https://github.com/org/repo-a", defaultBranch: "main", isPrivate: false, alreadyLinked: false },
@@ -66,12 +67,21 @@ describe("ConnectRepoSheet", () => {
     expect(screen.getByRole("combobox")).toBeInTheDocument();
   });
 
+  it("shows provider name and account in each dropdown option", async () => {
+    const user = userEvent.setup();
+    renderSheet();
+
+    await user.click(screen.getByRole("combobox"));
+    expect(screen.getByText("GitHub · my-github")).toBeInTheDocument();
+    expect(screen.getByText("GitLab · my-gitlab")).toBeInTheDocument();
+  });
+
   it("shows the repo list after selecting a connector", async () => {
     const user = userEvent.setup();
     renderSheet();
 
     await user.click(screen.getByRole("combobox"));
-    await user.click(screen.getByText("my-github"));
+    await user.click(screen.getByText("GitHub · my-github"));
 
     await waitFor(() => {
       expect(screen.getByText("org/repo-a")).toBeInTheDocument();
@@ -84,7 +94,7 @@ describe("ConnectRepoSheet", () => {
     renderSheet();
 
     await user.click(screen.getByRole("combobox"));
-    await user.click(screen.getByText("my-github"));
+    await user.click(screen.getByText("GitHub · my-github"));
 
     await waitFor(() => {
       expect(screen.getByText("Linked")).toBeInTheDocument();
@@ -101,7 +111,7 @@ describe("ConnectRepoSheet", () => {
     renderSheet();
 
     await user.click(screen.getByRole("combobox"));
-    await user.click(screen.getByText("my-github"));
+    await user.click(screen.getByText("GitHub · my-github"));
 
     await waitFor(() => {
       expect(screen.getByText("org/repo-a")).toBeInTheDocument();

@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Check, GitBranch, Lock, Search } from "lucide-react";
 import { useOrg } from "@/contexts/OrgContext";
 import { useConnectors, useAvailableRepos, useConnectRepo } from "@/hooks/useApi";
+import { ProviderLogo } from "@/components/icons";
+import { availableProviders } from "@/lib/providers";
 import {
   Sheet,
   SheetContent,
@@ -115,11 +117,18 @@ export function ConnectRepoSheet({ projectId, open, onOpenChange, onSuccess }: C
                   <SelectValue placeholder="Select account…" />
                 </SelectTrigger>
                 <SelectContent>
-                  {sourceControlConnectors.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.label || c.externalAccountName || c.connectorType}
-                    </SelectItem>
-                  ))}
+                  {sourceControlConnectors.map((c) => {
+                    const providerName = availableProviders.find((p) => p.id === c.connectorType)?.name ?? c.connectorType;
+                    const accountLabel = c.label || c.externalAccountName || c.connectorType;
+                    return (
+                      <SelectItem key={c.id} value={c.id}>
+                        <span className="flex items-center gap-2">
+                          <ProviderLogo provider={c.connectorType} size="sm" />
+                          <span>{providerName} · {accountLabel}</span>
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             )}
