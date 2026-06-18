@@ -190,6 +190,8 @@ class BitbucketSyncJob < ApplicationJob
   end
 
   def process_pull_request_event(payload, event_type)
+    return unless @connector.sync_pull_requests?
+
     repository = find_repository(payload.dig("repository", "uuid"))
     return unless repository
 

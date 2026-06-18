@@ -338,6 +338,19 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
         expect(connector.reload.config).not_to have_key('linked_project_id')
       end
 
+      it 'clears linked_project_id when sent as blank string' do
+        project = create(:project, organization: organization)
+        connector.update!(config: { 'linked_project_id' => project.id })
+
+        authenticated_patch "/api/v1/organizations/#{organization.id}/connectors/#{connector.id}",
+                            user: admin,
+                            organization: organization,
+                            params: { config: { linked_project_id: '' } }
+
+        expect_success
+        expect(connector.reload.config).not_to have_key('linked_project_id')
+      end
+
       it 'does not touch config for non-source-control connectors' do
         ai_connector = create(:organization_connector,
                               organization: organization,
@@ -352,6 +365,7 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
         expect_success
         reloaded = ai_connector.reload
         expect(reloaded.config['seat_count']).to eq(10)
+        expect(reloaded.config).not_to have_key('sync_repositories')
       end
 
       it 'enforces authorize! (non-owner gets 403)' do

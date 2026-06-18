@@ -181,6 +181,33 @@ RSpec.describe BitbucketSyncJob, type: :job do
     end
   end
 
+  describe "#perform — webhook pull request gating" do
+    let(:pr_payload) do
+      {
+        "repository" => { "uuid" => "{repo-uuid}" },
+        "pullrequest" => {
+          "id" => 13,
+          "title" => "PR title",
+          "state" => "OPEN",
+          "updated_on" => Time.current.iso8601,
+          "author" => { "display_name" => "Dev User" },
+          "links" => { "html" => { "href" => "https://bitbucket.org/workspace/repo/pull-requests/13" } }
+        }
+      }
+    end
+
+    it "skips pull request events when sync_pull_requests is false" do
+      connector.update!(config: { "sync_pull_requests" => false })
+
+      expect {
+        described_class.new.perform(connector.id, "webhook", {
+          "event_type" => "pullrequest:updated",
+          "payload" => pr_payload
+        })
+      }.not_to change(ToolEvent, :count)
+    end
+  end
+
   describe "#perform — health snapshot error handling" do
     before do
       allow(Oauth::BaseProvider).to receive(:for).with(connector).and_raise(RuntimeError, "API down")

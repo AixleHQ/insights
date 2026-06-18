@@ -134,7 +134,7 @@ describe("IntegrationSetup — configure step (step 3)", () => {
           sync_repositories: true,
           sync_pull_requests: true,
           webhook_enabled: false,
-          // selectedProject is "" so linked_project_id is omitted
+          linked_project_id: null,
         },
       },
     });
@@ -174,6 +174,17 @@ describe("IntegrationSetup — configure step (step 3)", () => {
 
     const call = mockUpdateConnector.mock.calls[0][0];
     expect(call.data.config.linked_project_id).toBe("proj-1");
+  });
+
+  it("shows an error and stays on configure when source-control connector id is missing", async () => {
+    renderSetup("github");
+    await advanceToConfigureStep("");
+
+    await userEvent.click(screen.getByRole("button", { name: /connect/i }));
+
+    expect(screen.getByText(/missing connector identifier/i)).toBeInTheDocument();
+    expect(mockUpdateConnector).not.toHaveBeenCalled();
+    expect(screen.queryByText("Connection Successful!")).not.toBeInTheDocument();
   });
 
   it("does NOT call updateConnector for non-source-control providers", async () => {

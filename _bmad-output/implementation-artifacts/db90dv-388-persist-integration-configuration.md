@@ -1,6 +1,6 @@
 # Story AIX-388: Configure Integration step persists and applies its settings
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -87,6 +87,14 @@ Net effect (matches the Jira report): no POST/PUT/PATCH carries the form data, a
 - [x] **Vitest** — `IntegrationSetup` test: assert that clicking **Connect** on step 3 calls `useUpdateConnector` with the mapped payload, advances to "complete" only on success, and shows an error on failure.
 
 - [x] **Verification:** `make lint-api`, `make lint-web`; RSpec request + job specs; Vitest for `IntegrationSetup`; full API suite green in Docker.
+
+### Review Findings
+
+- [x] [Review][Patch] Configure step can finish without PATCH when source-control connector id is missing [packages/web/src/pages/IntegrationSetup.tsx:328]
+- [x] [Review][Patch] Configure step cannot clear linked project selection to remove stored `linked_project_id` [packages/web/src/pages/IntegrationSetup.tsx:625]
+- [x] [Review][Patch] Connector config merge applies source-control sync keys to non-source-control connectors [packages/api/app/controllers/api/v1/organization_connectors_controller.rb:68]
+- [x] [Review][Patch] GitLab and Bitbucket webhook review events ignore `sync_pull_requests` toggle [packages/api/app/jobs/gitlab_sync_job.rb:182]
+- [x] [Review][Patch] Update API accepts blank string `linked_project_id` and persists invalid value in config [packages/api/app/controllers/api/v1/organization_connectors_controller.rb:69]
 
 ## Dev Notes
 

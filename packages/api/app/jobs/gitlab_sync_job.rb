@@ -180,6 +180,8 @@ class GitlabSyncJob < ApplicationJob
   end
 
   def process_merge_request_event(payload)
+    return unless @connector.sync_pull_requests?
+
     repository = find_repository(payload.dig("project", "id"))
     return unless repository
 
