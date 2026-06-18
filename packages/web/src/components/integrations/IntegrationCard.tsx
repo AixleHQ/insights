@@ -197,8 +197,8 @@ export function IntegrationCard({
         </CardHeader>
         <CardContent className="space-y-4">
           <ul className="space-y-1 text-xs text-muted-foreground">
-            {provider.features.slice(0, 3).map((feature, i) => (
-              <li key={i} className="flex items-center gap-2">
+            {provider.features.slice(0, 3).map((feature) => (
+              <li key={feature} className="flex items-center gap-2">
                 <div className="size-1 rounded-full bg-muted-foreground" />
                 {feature}
               </li>

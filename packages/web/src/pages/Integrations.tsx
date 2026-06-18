@@ -12,6 +12,16 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   IntegrationCard,
   IntegrationSkeleton,
   type IntegrationProvider,
@@ -60,6 +70,7 @@ export function Integrations() {
     useState<ProviderInfo | null>(null);
   const [slackSheetOpen, setSlackSheetOpen] = useState(false);
   const [testingConnectorId, setTestingConnectorId] = useState<string | null>(null);
+  const [disconnectingConnectorId, setDisconnectingConnectorId] = useState<string | null>(null);
   const [webhookSheetOpen, setWebhookSheetOpen] = useState(false);
   const [webhookSheetData, setWebhookSheetData] = useState<{
     connectorId: string;
@@ -73,29 +84,22 @@ export function Integrations() {
   // Transform API response to component format
   const integrations = useMemo(() => {
     return (connectorsData ?? []).map((c) => {
-      const connectorType = c.connectorType || c.connector_type || "github";
-      const lastError = c.lastError || c.last_error;
-      const externalAccountName =
-        c.externalAccountName || c.external_account_name;
-      const lastSyncAt = c.lastSyncAt || c.last_sync_at;
-      const lastEventAt = c.lastEventAt || c.last_event_at;
-      const repositoryCount = c.repositoryCount || c.repository_count || 0;
-      const syncedEventCount = c.syncedEventCount || c.synced_event_count || 0;
+      const connectorType = c.connectorType ?? "github";
       const providerInfo = availableProviders.find((p) => p.id === connectorType);
 
       return {
         id: c.id,
         provider: connectorType as IntegrationProvider,
-        name: externalAccountName || providerInfo?.name || connectorType,
+        name: c.externalAccountName || providerInfo?.name || connectorType,
         status: c.status as ConnectorStatus,
         label: c.label,
-        last_sync_at: lastSyncAt || undefined,
-        last_event_at: lastEventAt || undefined,
-        sync_error: lastError || undefined,
+        last_sync_at: c.lastSyncAt ?? undefined,
+        last_event_at: c.lastEventAt ?? undefined,
+        sync_error: c.lastError ?? undefined,
         metadata: {
-          account_name: externalAccountName || "",
-          resources_count: repositoryCount,
-          event_count: syncedEventCount,
+          account_name: c.externalAccountName || "",
+          resources_count: c.repositoryCount ?? 0,
+          event_count: c.syncedEventCount ?? 0,
         },
         copilotConnector: c.copilotConnector,
         seatCount: c.seatCount,
@@ -132,16 +136,18 @@ export function Integrations() {
     }
   };
 
-  const handleDisconnect = async (id: string) => {
-    if (!currentOrg) return;
-    if (
-      window.confirm("Are you sure you want to disconnect this integration?")
-    ) {
-      try {
-        await deleteConnector.mutateAsync({ orgId: currentOrg.id, connectorId: id });
-      } catch (error) {
-        console.error("Failed to disconnect integration:", error);
-      }
+  const handleDisconnect = (id: string) => {
+    setDisconnectingConnectorId(id);
+  };
+
+  const handleDisconnectConfirm = async () => {
+    if (!currentOrg || !disconnectingConnectorId) return;
+    try {
+      await deleteConnector.mutateAsync({ orgId: currentOrg.id, connectorId: disconnectingConnectorId });
+    } catch (error) {
+      console.error("Failed to disconnect integration:", error);
+    } finally {
+      setDisconnectingConnectorId(null);
     }
   };
 
@@ -381,6 +387,26 @@ export function Integrations() {
           webhookSecretSet={webhookSheetData.webhookSecretSet}
         />
       )}
+
+      <AlertDialog
+        open={disconnectingConnectorId !== null}
+        onOpenChange={(open) => { if (!open) setDisconnectingConnectorId(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disconnect integration?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the integration from your organization. You can reconnect it at any time.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDisconnectConfirm}>
+              Disconnect
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
