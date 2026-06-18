@@ -54,6 +54,8 @@ class GitlabSyncJob < ApplicationJob
   # In fan-out mode, one GitlabRepositoryActivitySyncJob is enqueued per repo;
   # mark_synced! is deferred to the last child via a counter on the connector.
   def sync_projects
+    return unless @connector.sync_repositories?
+
     provider = Oauth::BaseProvider.for(@connector)
     projects = provider.fetch_repositories(all_pages: true)
 
@@ -263,7 +265,7 @@ class GitlabSyncJob < ApplicationJob
   end
 
   def persist_merge_requests(repository, merge_requests)
-    return if merge_requests.empty?
+    return if merge_requests.empty? || !@connector.sync_pull_requests?
 
     records = merge_requests.map do |mr|
       {

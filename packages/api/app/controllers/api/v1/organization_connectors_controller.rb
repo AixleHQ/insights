@@ -64,7 +64,26 @@ module Api
 
         changes_before = @connector.slice(:is_active, :status, :external_account_name)
 
-        if @connector.update(connector_update_params)
+        attrs = connector_update_params.to_h.stringify_keys
+
+        if (incoming_config = attrs.delete("config")).present?
+          if (linked_id = incoming_config["linked_project_id"]).present?
+            unless current_organization.projects.exists?(id: linked_id)
+              return render json: {
+                error: "Unprocessable Entity",
+                errors: { linked_project_id: [ "must belong to the current organization" ] }
+              }, status: :unprocessable_content
+            end
+          end
+
+          attrs["config"] = merge_connector_config(incoming_config)
+
+          if @connector.source_control? && incoming_config.key?("webhook_enabled")
+            attrs["webhook_active"] = incoming_config["webhook_enabled"] == true
+          end
+        end
+
+        if @connector.update(attrs)
           OrganizationAuditLog.log(
             organization: current_organization,
             actor: current_user,
@@ -341,7 +360,15 @@ module Api
 
       def connector_update_params
         params.permit(:access_token, :refresh_token, :token_expires_at,
-                      :external_account_id, :external_account_name, :webhook_secret, :is_active, :label)
+                      :external_account_id, :external_account_name, :webhook_secret, :is_active, :label,
+                      config: [ :sync_repositories, :sync_pull_requests, :webhook_enabled, :linked_project_id ])
+      end
+
+      def merge_connector_config(incoming_config)
+        existing = (@connector.config || {}).stringify_keys
+        to_set = incoming_config.reject { |_, v| v.nil? }
+        to_delete = incoming_config.select { |_, v| v.nil? }.keys
+        existing.merge(to_set).except(*to_delete)
       end
 
       def oauth_callback_url
