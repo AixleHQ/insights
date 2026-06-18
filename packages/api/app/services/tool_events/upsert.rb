@@ -22,6 +22,10 @@ module ToolEvents
       model duration_ms project_id metadata
     ].freeze
 
+    # Server-stamped renormalization provenance (AIX-260) — stripped from
+    # incoming metadata so clients cannot forge it.
+    RESERVED_METADATA_KEYS = %w[renormalized_from renormalized_by].freeze
+
     # @return [Hash] { tool_event: ToolEvent, created: Boolean }
     def self.call(attributes)
       new(attributes).call
@@ -34,12 +38,14 @@ module ToolEvents
     end
 
     def call
+      strip_reserved_metadata!
       promote_model_from_metadata!
       enrich_cost!
 
       if @session_id.present?
         upsert_with_lock
       else
+        normalize_event_type!
         event = ToolEvent.create!(@attributes)
         { tool_event: event, created: true }
       end
@@ -82,6 +88,47 @@ module ToolEvents
       @attributes[:metadata] = (@attributes[:metadata] || {}).merge("cost_source" => source)
     end
 
+    # Clients must not be able to forge server renormalization provenance —
+    # reserved keys are stripped on every path, even with the feature flag off.
+    def strip_reserved_metadata!
+      metadata = @attributes[:metadata]
+      return unless metadata.is_a?(Hash)
+
+      @attributes[:metadata] = metadata.except(
+        *RESERVED_METADATA_KEYS,
+        *RESERVED_METADATA_KEYS.map(&:to_sym)
+      )
+    end
+
+    # Re-tags generic "chat" events into finer types (commit/test/edit) from
+    # metadata hints — defensive net for pre-T-02 CLIs (AIX-260). Called
+    # only on the create branches: session re-sends must never flip an existing
+    # row's type nor stamp renormalized_* metadata onto it (event_type is
+    # intentionally NOT in MUTABLE_FIELDS, but metadata is).
+    def normalize_event_type!
+      return unless renormalization_enabled?
+
+      derived = EventTypeNormalizer.derive(
+        event_type: @attributes[:event_type],
+        metadata:   @attributes[:metadata]
+      )
+      return if derived.nil? || derived == @attributes[:event_type]
+
+      original = @attributes[:event_type]
+      @attributes[:event_type] = derived
+      @attributes[:metadata] = (@attributes[:metadata] || {}).merge(
+        "renormalized_from" => original,
+        "renormalized_by"   => "server_v1"
+      )
+    end
+
+    # Default ON outside production; production opts in by setting
+    # DB90_EVENT_TYPE_RENORMALIZATION=true on the Rails API deployment.
+    def renormalization_enabled?
+      default = Rails.env.production? ? "false" : "true"
+      ActiveModel::Type::Boolean.new.cast(ENV.fetch("DB90_EVENT_TYPE_RENORMALIZATION", default)) || false
+    end
+
     def upsert_with_lock
       ToolEvent.transaction do
         # Advisory lock auto-released at transaction end — serialises concurrent
@@ -98,6 +145,7 @@ module ToolEvents
           existing.update!(mutable_attributes)
           { tool_event: existing, created: false }
         else
+          normalize_event_type!
           event = ToolEvent.create!(@attributes)
           { tool_event: event, created: true }
         end

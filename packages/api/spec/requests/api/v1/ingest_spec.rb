@@ -345,6 +345,60 @@ RSpec.describe 'Api::V1::Ingest', type: :request do
       end
     end
 
+    # AIX-260 — server-side event_type re-tagging for pre-T-02 CLIs.
+    # Temporal is stubbed to fail so the request takes fallback_direct_insert →
+    # ToolEvents::Upsert — a covered production path, persisting synchronously.
+    context 'with a pre-T-02 chat event carrying recent_commit metadata (AIX-260)' do
+      let(:legacy_chat_payload) do
+        {
+          event_type: 'chat',
+          model: 'unknown',
+          tokens_in: 507,
+          tokens_out: 36,
+          cost_usd: 0.171,
+          metadata: {
+            source: 'recent_commit',
+            commit_hash: '1080c8e38aa694380e5e5d14c950123e6e1a2942',
+            repo_name: 'acme/demo'
+          }
+        }
+      end
+
+      before do
+        allow(Temporal::Client).to receive(:start_workflow).and_raise(StandardError, 'skip workflow')
+      end
+
+      it 'persists the event re-tagged as commit with renormalization metadata' do
+        expect {
+          ingest_post(payload: legacy_chat_payload)
+        }.to change(ToolEvent, :count).by(1)
+
+        expect(response).to have_http_status(:accepted)
+        event = ToolEvent.last
+        expect(event.event_type).to eq('commit')
+        expect(event.metadata['renormalized_from']).to eq('chat')
+        expect(event.metadata['renormalized_by']).to eq('server_v1')
+        expect(event.metadata['source']).to eq('recent_commit')
+      end
+
+      context 'when the renormalization flag is off' do
+        before do
+          stub_const('ENV', ENV.to_h.merge('DB90_EVENT_TYPE_RENORMALIZATION' => 'false'))
+        end
+
+        it 'persists the event as chat with no renormalized_* keys' do
+          expect {
+            ingest_post(payload: legacy_chat_payload)
+          }.to change(ToolEvent, :count).by(1)
+
+          event = ToolEvent.last
+          expect(event.event_type).to eq('chat')
+          expect(event.metadata).not_to have_key('renormalized_from')
+          expect(event.metadata).not_to have_key('renormalized_by')
+        end
+      end
+    end
+
     context 'with rate limiting' do
       it 'returns 202 when under the per-minute limit' do
         OrganizationSetting.set(organization, 'ingest_rate_limit_per_minute', '3')
