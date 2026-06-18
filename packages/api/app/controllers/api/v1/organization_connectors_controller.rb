@@ -9,12 +9,13 @@ module Api
       # GET /api/v1/organizations/:organization_id/connectors
       def index
         connectors = current_organization.organization_connectors.order(:connector_type)
+        authorize! connectors.new
 
         # Allow filtering by type
         connectors = connectors.by_type(params[:type]) if params[:type].present?
         connectors = connectors.active if params[:active] == "true"
 
-        render_collection(connectors, OrganizationConnectorSerializer)
+        render_collection(connectors, OrganizationConnectorSerializer, serializer_params: { collection: true })
       end
 
       # GET /api/v1/organizations/:organization_id/connectors/:id

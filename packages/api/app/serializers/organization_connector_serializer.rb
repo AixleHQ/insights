@@ -96,16 +96,16 @@ class OrganizationConnectorSerializer < BaseSerializer
     connector.config&.dig("billing_cycle_start") if connector.cursor?
   end
 
-  attribute :repository_count do |connector|
-    connector.repositories.count
+  attribute :repository_count do |connector, params|
+    connector.repositories.count unless params[:collection]
   end
 
-  attribute :synced_event_count do |connector|
-    connector.synced_event_count
+  attribute :synced_event_count do |connector, params|
+    connector.synced_event_count unless params[:collection]
   end
 
-  attribute :last_event_at do |connector|
-    connector.synced_event_last_occurred_at&.iso8601
+  attribute :last_event_at do |connector, params|
+    connector.synced_event_last_occurred_at&.iso8601 unless params[:collection]
   end
 
   attribute :webhook_active do |connector|
