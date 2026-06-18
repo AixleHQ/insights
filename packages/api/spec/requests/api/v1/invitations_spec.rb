@@ -314,14 +314,16 @@ RSpec.describe 'Api::V1::PublicInvitations', type: :request do
       expect(json_response[:message]).to include('expired')
     end
 
-    it 'returns error if user is already a member' do
+    it 'accepts idempotently when the user is already a member' do
       create(:organization_membership, user: accepting_user, organization: organization)
 
       authenticated_post "/api/v1/invitations/#{invitation.token}/accept",
                          user: accepting_user
 
-      expect_unprocessable
-      expect(json_response[:message]).to include('already a member')
+      expect_success
+      expect(json_response[:message]).to include('accepted')
+      expect(invitation.reload.status).to eq('accepted')
+      expect(organization.organization_memberships.where(user: accepting_user).count).to eq(1)
     end
   end
 

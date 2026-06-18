@@ -1142,6 +1142,116 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationError'
 
+  /api/v1/invitations/{token}:
+    get:
+      summary: View an invitation by token
+      description: Public endpoint. Does not require authentication.
+      tags:
+        - Public Invitations
+      security: []
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Public invitation token
+      responses:
+        '200':
+          description: Invitation details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicInvitation'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/invitations/{token}/accept:
+    post:
+      summary: Accept an invitation
+      description: >
+        Requires authentication — the logged-in user accepts the invitation
+        identified by the token. Idempotent: if the user is already a member of
+        the organization (for example, auto-assigned by domain mapping on login),
+        the invitation is still marked accepted and the existing membership is
+        returned.
+      tags:
+        - Public Invitations
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Public invitation token
+      responses:
+        '200':
+          description: Invitation accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      organization:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+                          name:
+                            type: string
+                          slug:
+                            type: string
+                      role:
+                        type: string
+                        enum: [owner, member, viewer]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Invitation is no longer active (revoked or expired) or could not be accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+
+  /api/v1/invitations/check:
+    get:
+      summary: List pending invitations for the current user
+      description: >
+        Requires authentication. Returns the pending, non-expired invitations
+        addressed to the authenticated user's email.
+      tags:
+        - Public Invitations
+      responses:
+        '200':
+          description: Pending invitations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PublicInvitation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /api/v1/organizations/{organization_id}/members/{id}/dashboard_stats:
     get:
       summary: Personal dashboard stats for a member
@@ -6645,6 +6755,49 @@ components:
         - expiresAt
         - createdAt
         - updatedAt
+
+    PublicInvitation:
+      type: object
+      description: Invitation details exposed via the public token endpoints.
+      properties:
+        id:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [owner, member, viewer]
+        status:
+          type: string
+          enum: [pending, accepted, revoked, expired]
+        organization:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            slug:
+              type: string
+          required:
+            - id
+            - name
+            - slug
+        invitedByName:
+          type: string
+        expired:
+          type: boolean
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - role
+        - status
+        - organization
+        - invitedByName
+        - expired
+        - expiresAt
 
     OrganizationMemberListItem:
       allOf:
