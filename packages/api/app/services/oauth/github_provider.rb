@@ -5,6 +5,7 @@ module Oauth
     API_URL = "https://api.github.com"
 
     def test_connection
+      ensure_fresh_token!
       response = http_client.get("#{API_URL}/user")
 
       if response.success?
