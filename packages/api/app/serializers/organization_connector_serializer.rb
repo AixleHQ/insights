@@ -120,14 +120,6 @@ class OrganizationConnectorSerializer < BaseSerializer
     connector.sync_pull_requests? if connector.source_control?
   end
 
-  attribute :webhook_enabled do |connector|
-    connector.config&.fetch("webhook_enabled", false) if connector.source_control?
-  end
-
-  attribute :linked_project_id do |connector|
-    connector.config&.dig("linked_project_id") if connector.source_control?
-  end
-
   attribute :webhook_token do |connector|
     connector.webhook_token if connector.openrouter?
   end

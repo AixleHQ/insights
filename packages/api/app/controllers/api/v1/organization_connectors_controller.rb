@@ -67,24 +67,7 @@ module Api
         attrs = connector_update_params.to_h.stringify_keys
 
         if (incoming_config = attrs.delete("config")).present?
-          if incoming_config["linked_project_id"].is_a?(String) && incoming_config["linked_project_id"].strip.empty?
-            incoming_config["linked_project_id"] = nil
-          end
-
-          if @connector.source_control? && (linked_id = incoming_config["linked_project_id"]).present?
-            unless current_organization.projects.exists?(id: linked_id)
-              return render json: {
-                error: "Unprocessable Entity",
-                errors: { linked_project_id: [ "must belong to the current organization" ] }
-              }, status: :unprocessable_content
-            end
-          end
-
           attrs["config"] = merge_connector_config(incoming_config) if @connector.source_control?
-
-          if @connector.source_control? && incoming_config.key?("webhook_enabled")
-            attrs["webhook_active"] = ActiveModel::Type::Boolean.new.cast(incoming_config["webhook_enabled"])
-          end
         end
 
         if @connector.update(attrs)
@@ -365,7 +348,7 @@ module Api
       def connector_update_params
         params.permit(:access_token, :refresh_token, :token_expires_at,
                       :external_account_id, :external_account_name, :webhook_secret, :is_active, :label,
-                      config: [ :sync_repositories, :sync_pull_requests, :webhook_enabled, :linked_project_id ])
+                      config: [ :sync_repositories, :sync_pull_requests ])
       end
 
       def merge_connector_config(incoming_config)

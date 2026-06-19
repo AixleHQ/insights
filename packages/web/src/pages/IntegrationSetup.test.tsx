@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -19,7 +19,6 @@ vi.mock("@/contexts/OrgContext", () => ({
 }));
 
 vi.mock("@/hooks/useApi", () => ({
-  useProjects: () => ({ data: [{ id: "proj-1", name: "Project Alpha" }] }),
   useCreateConnector: () => ({ mutateAsync: mockCreateConnector }),
   useUpdateConnector: () => ({ mutateAsync: mockUpdateConnector }),
 }));
@@ -59,8 +58,6 @@ async function advanceToConfigureStep(connectorId = "conn-42") {
         scope: "project",
         syncRepositories: true,
         syncPullRequests: true,
-        webhookEnabled: false,
-        linkedProjectId: null,
       },
     });
     window.dispatchEvent(
@@ -80,14 +77,14 @@ describe("IntegrationSetup — configure step (step 3)", () => {
     mockUpdateConnector.mockResolvedValue({ data: { id: "conn-42" } });
   });
 
-  it("renders Sync Options and Link to Project for github (source-control)", async () => {
+  it("renders Sync Options for github (source-control)", async () => {
     renderSetup("github");
     await advanceToConfigureStep();
 
     expect(screen.getByText("Sync Repositories")).toBeInTheDocument();
     expect(screen.getByText("Sync Pull Requests / MRs")).toBeInTheDocument();
-    expect(screen.getByText("Enable Webhooks")).toBeInTheDocument();
-    expect(screen.getByText("Link to Project")).toBeInTheDocument();
+    expect(screen.queryByText("Enable Webhooks")).not.toBeInTheDocument();
+    expect(screen.queryByText("Link to Project")).not.toBeInTheDocument();
   });
 
   it("does NOT render Sync Options for non-source-control providers (jira)", async () => {
@@ -133,8 +130,6 @@ describe("IntegrationSetup — configure step (step 3)", () => {
         config: {
           sync_repositories: true,
           sync_pull_requests: true,
-          webhook_enabled: false,
-          linked_project_id: null,
         },
       },
     });
@@ -159,21 +154,6 @@ describe("IntegrationSetup — configure step (step 3)", () => {
 
     expect(screen.getByText(/failed to complete setup/i)).toBeInTheDocument();
     expect(screen.queryByText("Connection Successful!")).not.toBeInTheDocument();
-  });
-
-  it("includes linked_project_id in payload when a project is selected", async () => {
-    renderSetup("github");
-    await advanceToConfigureStep("conn-42");
-
-    // Open and select a project
-    fireEvent.click(screen.getByRole("combobox"));
-    const option = await screen.findByText("Project Alpha");
-    fireEvent.click(option);
-
-    await userEvent.click(screen.getByRole("button", { name: /connect/i }));
-
-    const call = mockUpdateConnector.mock.calls[0][0];
-    expect(call.data.config.linked_project_id).toBe("proj-1");
   });
 
   it("shows an error and stays on configure when source-control connector id is missing", async () => {

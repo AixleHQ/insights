@@ -1177,14 +1177,6 @@ paths:
                     sync_pull_requests:
                       type: boolean
                       description: When false, PR/MR ingestion is skipped (source-control only)
-                    webhook_enabled:
-                      type: boolean
-                      description: Reflects webhook_active state for source-control connectors (state only — no provider-side provisioning)
-                    linked_project_id:
-                      type: string
-                      format: uuid
-                      nullable: true
-                      description: ID of an org project to associate with this connector (reference only — no token duplication). Send null to clear.
       responses:
         '200':
           description: Connector updated
@@ -5993,15 +5985,6 @@ components:
           type: boolean
           nullable: true
           description: Whether PR/MR ingestion is enabled (source-control only; null for other types)
-        webhookEnabled:
-          type: boolean
-          nullable: true
-          description: Whether the webhook toggle is on (source-control only; null for other types)
-        linkedProjectId:
-          type: string
-          format: uuid
-          nullable: true
-          description: ID of the linked org project, if any (source-control only; null for other types)
         repositoryCount:
           type: integer
         syncedEventCount:

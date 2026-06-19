@@ -166,8 +166,6 @@ export interface Connector {
   // Source-control configuration fields (null for non-source-control connectors)
   syncRepositories?: boolean | null;
   syncPullRequests?: boolean | null;
-  webhookEnabled?: boolean | null;
-  linkedProjectId?: string | null;
 }
 
 // Project connector types
