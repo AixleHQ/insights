@@ -7,7 +7,7 @@ export { normalizeRiskLevel } from "@/lib/riskLevel";
 export { TopToolsChart, type ToolUsageData } from "./TopToolsChart";
 export { AlertsPanel, type Alert } from "./AlertsPanel";
 export { ActivityHeatmap } from "./ActivityHeatmap";
-export { ToolUsageByDayChart, TOOL_USAGE_DEFAULT_DAYS } from "./ToolUsageByDayChart";
+export { ToolUsageByDayChart } from "./ToolUsageByDayChart";
 export { ToolInsightsSection } from "./ToolInsightsSection";
 export { ToolModelCostChart } from "./ToolModelCostChart";
 export { ToolModelTable } from "./ToolModelTable";
