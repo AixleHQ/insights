@@ -10,10 +10,14 @@ vi.mock("@/contexts/OrgContext", () => ({
   useOrg: () => ({ currentRole: mockCurrentRole() }),
 }));
 
-vi.mock("@/components/dashboard/ActivityFeed", () => ({
+vi.mock("@/components/ui/risk-badge", () => ({
   RiskBadge: ({ level }: { level: string }) => (
     <span data-testid="risk-badge">{level}</span>
   ),
+}));
+
+vi.mock("@/lib/riskLevel", () => ({
+  normalizeRiskLevel: (value: string | null | undefined) => value ?? "none",
 }));
 
 vi.mock("./RecentCommitDetail", () => ({

@@ -1,13 +1,14 @@
 import { Link } from "react-router-dom";
 import { formatDistanceToNow, humanizeToolName } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/error-state";
 import { cn } from "@/lib/utils";
 import { formatCost, getEventActorLabel } from "@/lib/formatters";
 import { ProviderLogo } from "@/components/icons/ProviderLogo";
+import { RiskBadge } from "@/components/ui/risk-badge";
+import { normalizeRiskLevel } from "@/lib/riskLevel";
 import { ArrowRight } from "lucide-react";
 
 export interface ActivityEvent {
@@ -36,58 +37,6 @@ interface ActivityFeedProps {
   selectedEventId?: string | null;
 }
 
-const riskColors: Record<string, { bg: string; text: string; border: string }> = {
-  critical: {
-    bg: "bg-risk-critical/10",
-    text: "text-risk-critical",
-    border: "border-risk-critical/30",
-  },
-  high: {
-    bg: "bg-risk-high/10",
-    text: "text-risk-high",
-    border: "border-risk-high/30",
-  },
-  medium: {
-    bg: "bg-risk-medium/10",
-    text: "text-risk-medium",
-    border: "border-risk-medium/30",
-  },
-  low: {
-    bg: "bg-risk-low/10",
-    text: "text-risk-low",
-    border: "border-risk-low/30",
-  },
-  none: {
-    bg: "bg-muted",
-    text: "text-muted-foreground",
-    border: "border-muted",
-  },
-};
-
-export function RiskBadge({
-  level,
-  className,
-}: {
-  level: string;
-  className?: string;
-}) {
-  const colors = riskColors[level] || riskColors.none;
-
-  return (
-    <Badge
-      variant="outline"
-      className={cn(
-        "font-mono-display text-[10px] uppercase tracking-wider",
-        colors.bg,
-        colors.text,
-        colors.border,
-        className
-      )}
-    >
-      {level}
-    </Badge>
-  );
-}
 
 function ActivityItem({
   event,
@@ -106,7 +55,7 @@ function ActivityItem({
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex items-center gap-2">
           <span className="truncate text-sm font-medium">{humanizeToolName(event.tool_name)}</span>
-          <RiskBadge level={event.risk_level || "none"} />
+          <RiskBadge level={normalizeRiskLevel(event.risk_level)} />
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span className="truncate">{getEventActorLabel(event)}</span>

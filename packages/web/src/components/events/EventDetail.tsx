@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RiskBadge } from "@/components/dashboard/ActivityFeed";
+import { RiskBadge } from "@/components/ui/risk-badge";
+import { normalizeRiskLevel } from "@/lib/riskLevel";
 import { useOrg } from "@/contexts/OrgContext";
 import { labelForEventType } from "@/lib/eventTypes";
 import { cn, humanizeToolName } from "@/lib/utils";
@@ -143,7 +144,7 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="type-h3">{humanizeToolName(event.tool_name)}</h1>
-              <RiskBadge level={event.risk_level || "none"} />
+              <RiskBadge level={normalizeRiskLevel(event.risk_level)} />
             </div>
             <p className="text-sm text-muted-foreground">
               {labelForEventType(event.event_type || "unknown")} · {formattedDate}
@@ -225,7 +226,7 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
             <DetailRow
               icon={Shield}
               label="Risk Level"
-              value={<RiskBadge level={event.risk_level || "none"} />}
+              value={<RiskBadge level={normalizeRiskLevel(event.risk_level)} />}
             />
           </CardContent>
         </Card>

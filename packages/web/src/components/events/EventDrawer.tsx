@@ -25,7 +25,8 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { RiskBadge } from "@/components/dashboard/ActivityFeed";
+import { RiskBadge } from "@/components/ui/risk-badge";
+import { normalizeRiskLevel } from "@/lib/riskLevel";
 import { useOrg } from "@/contexts/OrgContext";
 import { useEvent } from "@/hooks/useApi";
 import { labelForEventType } from "@/lib/eventTypes";
@@ -154,7 +155,7 @@ export function EventDrawer({
                     <SheetTitle className="truncate text-lg">
                       {humanizeToolName(event.toolName)}
                     </SheetTitle>
-                    <RiskBadge level={event.riskLevel || "none"} />
+                    <RiskBadge level={normalizeRiskLevel(event.riskLevel)} />
                   </div>
                   <SheetDescription className="mt-1">
                     <span>{labelForEventType(event.eventType || "unknown")}</span>
@@ -242,7 +243,7 @@ export function EventDrawer({
                     <DetailRow
                       icon={Shield}
                       label="Risk Level"
-                      value={<RiskBadge level={event.riskLevel || "none"} />}
+                      value={<RiskBadge level={normalizeRiskLevel(event.riskLevel)} />}
                     />
                     <DetailRow
                       icon={DollarSign}

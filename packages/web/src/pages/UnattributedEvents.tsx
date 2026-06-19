@@ -52,6 +52,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { RiskBadge } from "@/components/dashboard";
+import { normalizeRiskLevel } from "@/lib/riskLevel";
 import { formatCost } from "@/lib/formatters";
 import { labelForEventType } from "@/lib/eventTypes";
 import { formatDistanceToNow } from "@/lib/utils";
@@ -577,7 +578,7 @@ export function UnattributedEvents() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <RiskBadge level={event.riskLevel || "none"} />
+                    <RiskBadge level={normalizeRiskLevel(event.riskLevel)} />
                   </TableCell>
                   <TableCell className="hidden sm:table-cell font-mono text-sm">
                     {formatCost(event.costUsd ?? 0)}

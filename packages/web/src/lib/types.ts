@@ -232,7 +232,8 @@ export interface McpIngestExchangeData {
 }
 
 // Event types
-export type RiskLevel = "none" | "low" | "medium" | "high" | "critical";
+export const RISK_LEVELS = ["none", "low", "medium", "high", "critical"] as const;
+export type RiskLevel = (typeof RISK_LEVELS)[number];
 export type EventType =
   | "chat"
   | "completion"

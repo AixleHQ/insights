@@ -89,7 +89,7 @@ describe("MemberProfileView", () => {
 
     it("displays join date from camelCase createdAt field (API response format)", () => {
       mockUseMember.mockReturnValue({
-        data: { ...mockMember, createdAt: "2024-03-15T00:00:00Z" },
+        data: { ...mockMember, createdAt: "2024-03-15T12:00:00Z" },
         isLoading: false,
       });
       render(<MemberProfileView memberId="mem-1" />);

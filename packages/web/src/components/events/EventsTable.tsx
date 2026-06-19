@@ -9,7 +9,8 @@ import {
 import { EventRowSkeleton } from "@/components/ui/skeletons";
 import { ErrorState } from "@/components/ui/error-state";
 import { SortButton, type SortDirection } from "@/components/ui/sort-button";
-import { RiskBadge } from "@/components/dashboard/ActivityFeed";
+import { RiskBadge } from "@/components/ui/risk-badge";
+import { normalizeRiskLevel } from "@/lib/riskLevel";
 import { labelForEventType } from "@/lib/eventTypes";
 import { formatDistanceToNow, humanizeToolName, cn } from "@/lib/utils";
 import {
@@ -168,7 +169,7 @@ export function EventsTable({
                   </span>
                 </TableCell>
                 <TableCell>
-                  <RiskBadge level={event.risk_level || "none"} />
+                  <RiskBadge level={normalizeRiskLevel(event.risk_level)} />
                 </TableCell>
                 {showUserColumn && (
                   <TableCell>
