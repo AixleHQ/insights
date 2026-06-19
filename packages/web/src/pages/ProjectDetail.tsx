@@ -64,6 +64,7 @@ import {
   ProjectIssuesTab,
   ProjectConnectorsTab,
   ProjectMembersTab,
+  ProjectAlertsTab,
   ProjectTeamSection,
 } from "@/components/project";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -140,7 +141,10 @@ export function ProjectDetail() {
   const activeTab = useMemo(() => {
     const allowed = new Set(["overview", "events", "issues"]);
     if (isMemberOfProject) allowed.add("members");
-    if (isProjectOwner) allowed.add("integrations");
+    if (isProjectOwner) {
+      allowed.add("integrations");
+      allowed.add("alerts");
+    }
     if (tabParam && allowed.has(tabParam)) return tabParam;
     return "overview";
   }, [tabParam, isMemberOfProject, isProjectOwner]);
@@ -263,6 +267,7 @@ export function ProjectDetail() {
           <TabsTrigger value="events">Events</TabsTrigger>
           {isMemberOfProject && <TabsTrigger value="members">Members</TabsTrigger>}
           {isProjectOwner && <TabsTrigger value="integrations">Integrations</TabsTrigger>}
+          {isProjectOwner && <TabsTrigger value="alerts">Alerts</TabsTrigger>}
           <TabsTrigger value="issues">Issues</TabsTrigger>
         </TabsList>
 
@@ -569,6 +574,13 @@ export function ProjectDetail() {
         <TabsContent value="issues" className="mt-4">
           <ProjectIssuesTab projectId={id || ""} project={project} />
         </TabsContent>
+
+        {/* ── Alerts (owner-only) ── */}
+        {isProjectOwner && (
+          <TabsContent value="alerts" className="mt-4">
+            <ProjectAlertsTab projectId={id || ""} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

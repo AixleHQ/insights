@@ -342,6 +342,11 @@ export interface Alert {
   message: string;
   is_read: boolean;
   created_at: string;
+  triggered_by?: string;
+  project_name?: string;
+  project_id?: string;
+  event_id?: string;
+  notification_status?: "sent" | "failed" | "pending";
 }
 
 // Audit log types (shared shape — both serializers output identical JSON)

@@ -28,6 +28,7 @@ import { TeamInvite } from "./pages/TeamInvite";
 import { MemberProfile } from "./pages/MemberProfile";
 import { UserSettings } from "./pages/UserSettings";
 import { Settings } from "./pages/Settings";
+import { OrgAlerts } from "./pages/OrgAlerts";
 import { UnattributedEvents } from "./pages/UnattributedEvents";
 import { Notifications } from "./pages/Notifications";
 import { Onboarding } from "./pages/Onboarding";
@@ -154,6 +155,14 @@ function App() {
                   <Route path="/settings/members/invite" element={<Navigate to="/members/invite" replace />} />
                   <Route path="/settings/members/invitations" element={<Navigate to="/members/invitations" replace />} />
                   <Route path="/settings/members/:id" element={<SettingsMembersIdRedirect />} />
+                  <Route
+                    path="/alerts"
+                    element={
+                      <ProtectedRoute requireRoles={["owner"]}>
+                        <OrgAlerts />
+                      </ProtectedRoute>
+                    }
+                  />
                   <Route path="/settings/*" element={<Settings />} />
                   <Route path="/settings/tool-accounts" element={<Navigate to="/profile/tools" replace />} />
                   <Route path="/events/unattributed" element={<UnattributedEvents />} />

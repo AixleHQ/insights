@@ -11,3 +11,4 @@ export { ConnectJiraSheet } from "./ConnectJiraSheet";
 export { ConnectLinearSheet } from "./ConnectLinearSheet";
 export { ProjectIssuesTab } from "./ProjectIssuesTab";
 export { ProjectMembersTab } from "./ProjectMembersTab";
+export { ProjectAlertsTab } from "./ProjectAlertsTab";
