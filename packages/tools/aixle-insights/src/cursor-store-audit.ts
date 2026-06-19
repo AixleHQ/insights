@@ -123,7 +123,7 @@ export function auditLegacyCursorDbFile(dbPath: string, rootDir?: string): Legac
 
   let db: Database.Database | null = null;
   try {
-    const opened = openCursorSqliteReadonly(dbPath, { rootDir });
+    const opened = openCursorSqliteReadonly(resolved.path, { rootDir });
     if (!opened.ok) return entry;
     db = opened.db;
     if (!tableExists(db, LEGACY_TABLE)) return entry;

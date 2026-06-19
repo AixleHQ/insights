@@ -180,6 +180,7 @@ Reference runbook: `packages/tools/RELEASING.md`.
 - Cursor payload preparation: `src/collect-cursor-payloads.ts`
 - Claude reader/mapper: `src/readers/claude.ts`
 - Cursor readers/mappers: `src/readers/cursor.ts`
+- Cursor SQLite security helper (readonly open + path containment): `src/readers/cursor-sqlite.ts`
 - Auth flow: `src/auth/flow.ts`, `src/auth/keycloak.ts`, `src/auth/exchange.ts`
 - Credentials: `src/auth/credentials.ts`
 - State/lock/log: `src/state.ts`, `src/lock.ts`, `src/log.ts`
