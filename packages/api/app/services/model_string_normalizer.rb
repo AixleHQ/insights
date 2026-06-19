@@ -20,7 +20,7 @@ class ModelStringNormalizer
 
   # Allows: letters, digits, hyphens, underscores, dots, forward slashes, colons.
   # Must start with a letter or digit (prevents leading formula-injection chars).
-  MODEL_FORMAT = /\A[a-zA-Z0-9][a-zA-Z0-9._:\-\/]*\z/
+  MODEL_FORMAT = /\A[a-zA-Z0-9][a-zA-Z0-9._:\/\-]*\z/
 
   UNKNOWN = "unknown"
 
