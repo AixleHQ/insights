@@ -253,22 +253,12 @@ module Api
           date_map[date][tool_key] += row.event_count
         end
 
-        # Zero-fill the full range
-        all_buckets = if granularity == "month"
-          start_month = time_range_start.beginning_of_month.to_date
-          end_month = time_range_end.beginning_of_month.to_date
-          months = []
-          m = start_month
-          while m <= end_month
-            months << m.iso8601
-            m = m.next_month
-          end
-          months
-        else
-          (time_range_start.to_date..time_range_end.to_date).map(&:iso8601)
-        end
-
-        filled = all_buckets.map { |d| date_map[d] || { date: d } }
+        filled = DateBucketFiller.fill(
+          start: time_range_start,
+          finish: time_range_end,
+          granularity: granularity,
+          data_map: date_map
+        )
 
         render json: {
           data: filled,
