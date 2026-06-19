@@ -97,6 +97,10 @@ describe("parseArgs", () => {
     expect(parseArgs(["node", "cli.js", "init", "--force"]).force).toBe(true);
   });
 
+  it("parses init --insecure", () => {
+    expect(parseArgs(["node", "cli.js", "init", "--insecure"]).insecure).toBe(true);
+  });
+
   it("treats init --force=false as help (force is boolean-only)", () => {
     expect(parseArgs(["node", "cli.js", "init", "--force=false"]).command).toBe("help");
   });
@@ -111,6 +115,10 @@ describe("parseArgs", () => {
 
   it("treats run --host as help (host is init-only)", () => {
     expect(parseArgs(["node", "cli.js", "run", "--host", "http://x"]).command).toBe("help");
+  });
+
+  it("treats run --insecure as help (insecure is init-only)", () => {
+    expect(parseArgs(["node", "cli.js", "run", "--insecure"]).command).toBe("help");
   });
 });
 
@@ -294,6 +302,113 @@ describe("runOnce", () => {
 });
 
 describe("runInit", () => {
+  it.each(["http://localhost:3000", "http://127.0.0.1:3000"])(
+    "allows local HTTP init without --insecure or warnings: %s",
+    async (host) => {
+      const errors: string[] = [];
+      let loginHost: string | undefined;
+      let allowInsecureHttp: boolean | undefined;
+
+      const code = await runInit(
+        {
+          command: "init",
+          help: false,
+          once: false,
+          host,
+          keycloakUrl: "http://localhost:8080/realms/db90",
+          toolName: "claude_code",
+        },
+        {
+          loginAndPersistCredentials: async (opts) => {
+            loginHost = opts.db90Host;
+            allowInsecureHttp = opts.allowInsecureHttp;
+            return { ok: true, organizationId: "org-1" };
+          },
+          defaultKeycloakIssuer: () => "",
+          getAppDir: () => "/tmp/db90-mcp-init-test",
+          installClaudeUserMcp: () => ({ kind: "installed" }),
+          log: () => undefined,
+          error: (message) => errors.push(message),
+        }
+      );
+
+      expect(code).toBe(0);
+      expect(loginHost).toBe(host);
+      expect(allowInsecureHttp).toBe(false);
+      expect(errors).toEqual([]);
+    }
+  );
+
+  it("rejects remote HTTP init before login when --insecure is omitted", async () => {
+    const errors: string[] = [];
+    let loginCalled = false;
+
+    const code = await runInit(
+      {
+        command: "init",
+        help: false,
+        once: false,
+        host: "http://api.example.com",
+        keycloakUrl: "https://keycloak.example.com/realms/db90",
+        toolName: "claude_code",
+      },
+      {
+        loginAndPersistCredentials: async () => {
+          loginCalled = true;
+          return { ok: true, organizationId: "org-1" };
+        },
+        defaultKeycloakIssuer: () => "",
+        getAppDir: () => "/tmp/db90-mcp-init-test",
+        installClaudeUserMcp: () => ({ kind: "installed" }),
+        log: () => undefined,
+        error: (message) => errors.push(message),
+      }
+    );
+
+    expect(code).toBe(1);
+    expect(loginCalled).toBe(false);
+    expect(errors.join("\n")).toContain("api.example.com");
+    expect(errors.join("\n")).toContain("plaintext HTTP");
+    expect(errors.join("\n")).toContain("ingest tokens and telemetry");
+    expect(errors.join("\n")).toContain("HTTPS");
+    expect(errors.join("\n")).toContain("--insecure");
+  });
+
+  it("allows remote HTTP init with --insecure and prints a warning", async () => {
+    const errors: string[] = [];
+    let allowInsecureHttp: boolean | undefined;
+
+    const code = await runInit(
+      {
+        command: "init",
+        help: false,
+        once: false,
+        host: "http://api.example.com",
+        keycloakUrl: "https://keycloak.example.com/realms/db90",
+        toolName: "claude_code",
+        insecure: true,
+      },
+      {
+        loginAndPersistCredentials: async (opts) => {
+          allowInsecureHttp = opts.allowInsecureHttp;
+          return { ok: true, organizationId: "org-1" };
+        },
+        defaultKeycloakIssuer: () => "",
+        getAppDir: () => "/tmp/db90-mcp-init-test",
+        installClaudeUserMcp: () => ({ kind: "installed" }),
+        log: () => undefined,
+        error: (message) => errors.push(message),
+      }
+    );
+
+    expect(code).toBe(0);
+    expect(allowInsecureHttp).toBe(true);
+    expect(errors.join("\n")).toContain("api.example.com");
+    expect(errors.join("\n")).toContain("plaintext HTTP");
+    expect(errors.join("\n")).toContain("ingest tokens and telemetry");
+    expect(errors.join("\n")).toContain("HTTPS");
+  });
+
   it("calls install only after successful login", async () => {
     const events: string[] = [];
     const code = await runInit(

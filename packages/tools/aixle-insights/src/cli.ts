@@ -13,6 +13,7 @@ import { resolveCursorPricing } from "./cursor-config.js";
 import { buildHealthSnapshot, formatHealthForCli } from "./health.js";
 import { installClaudeUserMcp, type InstallClaudeUserMcpOptions, type InstallResult } from "./install/claude.js";
 import { installHooksConfig, uninstallHooksConfig, verifyHooksConfig, FORWARDER_FILENAME } from "./hooks/hooks-config.js";
+import { evaluateTransportSecurity } from "./lib/transport-security.js";
 import { join } from "node:path";
 import { fileURLToPath as nodeFileURLToPath } from "node:url";
 import { mcpLog } from "./log.js";
@@ -31,6 +32,8 @@ export interface Args {
   force?: boolean;
   /** When set on init, install the Cursor hooks forwarder into ~/.cursor/hooks.json. */
   hooks?: boolean;
+  /** Allow remote plaintext HTTP hosts for trusted non-production test environments. */
+  insecure?: boolean;
 }
 
 interface RunOnceDeps {
@@ -55,7 +58,7 @@ interface InitDeps {
 
 const GLOBAL_FLAGS = new Set(["--help", "-h", "--once", "--full"]);
 const INIT_VALUE_FLAGS = new Set(["--host", "--keycloak-url", "--tool-name", "--organization-id"]);
-const INIT_BOOLEAN_FLAGS = new Set(["--force", "--hooks"]);
+const INIT_BOOLEAN_FLAGS = new Set(["--force", "--hooks", "--insecure"]);
 
 /** Matches DB90 Rails `McpController` UUID check for `X-Organization-ID` (RFC 4122 variant). */
 export const DB90_ORGANIZATION_UUID_PATTERN =
@@ -160,7 +163,8 @@ export function parseArgs(argv: string[]): Args {
     const organizationId = takeFlagValue(args, "--organization-id");
     const force = args.includes("--force");
     const hooks = args.includes("--hooks");
-    return { command: "init", help, once: false, host, keycloakUrl, toolName, organizationId, force, hooks };
+    const insecure = args.includes("--insecure");
+    return { command: "init", help, once: false, host, keycloakUrl, toolName, organizationId, force, hooks, insecure };
   }
 
   const nonInitBad = args.filter((a) => {
@@ -229,6 +233,7 @@ init options:
   --force                  Replace an existing user "aixle-insights" MCP entry in ~/.claude.json if it differs.
   --hooks                  (opt-in) Install Cursor hook forwarder for per-turn model attribution.
                            Requires Cursor restart. Run 'aixle-insights uninstall-hooks' to remove.
+  --insecure               Allow remote http:// hosts for trusted non-production test endpoints only.
 
 Multi-org:
   Set \`DB90_ORGANIZATION_ID\` to a UUID, or pass \`--organization-id\` on \`init\`, so ingest tokens are minted for that membership instead of the default (oldest) org.
@@ -269,6 +274,18 @@ export async function runInit(cliArgs: Args, deps?: Partial<InitDeps>): Promise<
   };
 
   const db90Host = (cliArgs.host ?? defaultDb90Host()).replace(/\/$/, "");
+  const transportSecurity = evaluateTransportSecurity(db90Host, {
+    allowInsecureHttp: cliArgs.insecure === true,
+    label: "DB90 API host",
+  });
+  if (!transportSecurity.ok) {
+    runtime.error(`Error: ${transportSecurity.error}`);
+    return 1;
+  }
+  if (transportSecurity.warning) {
+    runtime.error(`Warning: ${transportSecurity.warning}`);
+  }
+
   const kcIssuer = (cliArgs.keycloakUrl ?? runtime.defaultKeycloakIssuer()).trim();
   if (!kcIssuer) {
     runtime.error(
@@ -310,6 +327,10 @@ export async function runInit(cliArgs: Args, deps?: Partial<InitDeps>): Promise<
     deviceLabel: "aixle-insights CLI init",
     appDir: runtime.getAppDir(),
     exchangeOrganizationId: exchangeOrganizationId || undefined,
+    allowInsecureHttp: cliArgs.insecure === true,
+    onSecurityWarning: (message) => {
+      runtime.error(`Warning: ${message}`);
+    },
     onVisitInstructions: (uri, code) => {
       runtime.log(`Visit ${uri} and enter code ${code}`);
     },

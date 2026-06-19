@@ -2,6 +2,18 @@
 
 All notable changes to `@aixle/insights` will be documented in this file.
 
+## 0.2.0 — unreleased
+
+### Security
+
+- `aixle-insights init` now refuses to proceed against a non-loopback host that uses plaintext `http://`. Both the user-supplied `--host` flag and the `ingestHost` returned by the server's token-exchange response are checked. Loopback (`localhost`, `127.0.0.0/8`, `[::1]`) is unaffected. Pass `--insecure` only for trusted non-production test endpoints; the override is **init-only** and not honored by `run`. (AIX-339)
+- README has a new **Security** section (developer guide for the TLS gate model) and a **Troubleshooting** section covering common local-tracking failure modes (401 ingest, fetch-failed, npm-link vs published-version confusion, missing Temporal worker).
+
+### Internal
+
+- New module `src/lib/transport-security.ts` exports a pure `evaluateTransportSecurity()` for reuse by future entry points.
+- Test suite grows from 394 → 407 (5 transport-security unit tests + 3 post-exchange gate cases + 5 CLI gate cases).
+
 ## 0.1.1 — 2026-06-12
 
 ### Internal
