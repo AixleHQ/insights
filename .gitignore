@@ -9,6 +9,7 @@ CLAUDE.local.md
 .cursor/skills/
 .agents/skills/
 .claude/skills/bmad-*
+.claude/launch.json
 
 # Build outputs
 dist/

@@ -1528,16 +1528,16 @@ export interface EventsParams {
   [key: string]: string | number | string[] | undefined;
   page?: number;
   per_page?: number;
-  tool_name?: string;
-  risk_level?: string;
+  tool_name?: string | string[];
+  risk_level?: string | string[];
   event_type?: string | string[];
   start_date?: string;
   end_date?: string;
   user_id?: string;
-  project_id?: string;
+  project_id?: string | string[];
 }
 
-/** Serializes query values; arrays become comma-separated (API normalize_event_types splits commas). */
+/** Serializes query values; arrays become comma-separated. */
 export function appendQueryParam(
   params: URLSearchParams,
   key: string,

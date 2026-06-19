@@ -29,6 +29,7 @@ export interface EventRow {
   created_at?: string;
   user?: { email: string };
   project?: { name: string };
+  project_id?: string;
   token_count?: number;
 }
 

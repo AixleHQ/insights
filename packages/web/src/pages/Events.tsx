@@ -7,6 +7,13 @@ import { useEvents, useExportEvents, useProjects, useCurrentUser, useEventsSumma
 import { useEventsPageUpdates } from "@/hooks/useWebSocket";
 import { Button } from "@/components/ui/button";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   EventFilters,
   EventsTable,
   EventDrawer,
@@ -28,7 +35,7 @@ export function Events() {
   const queryClient = useQueryClient();
   const [urlParams] = useSearchParams();
   const [filters, setFilters] = useState<EventFiltersState>(() => ({
-    tool: urlParams.get("tool_name") ?? undefined,
+    tools: urlParams.get("tool_name") ? [urlParams.get("tool_name")!] : undefined,
     riskLevels: urlParams.get("risk_level")
       ? [urlParams.get("risk_level")!]
       : undefined,
@@ -36,6 +43,7 @@ export function Events() {
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [exportQueued, setExportQueued] = useState(false);
@@ -52,17 +60,16 @@ export function Events() {
       .map((slug) => ({ value: slug, label: humanizeToolName(slug) }));
   }, [eventsSummary]);
 
-  // Build API params from filters (keep in sync with handleExport)
   const apiParams = useMemo(() => ({
     page,
-    per_page: 25,
-    tool_name: filters.tool,
-    risk_level: filters.riskLevels?.length === 1 ? filters.riskLevels[0] : undefined,
-    event_type: filters.eventType ? dbTypesForCategory(filters.eventType) : undefined,
+    per_page: pageSize,
+    tool_name: filters.tools,
+    risk_level: filters.riskLevels,
+    event_type: filters.eventTypes?.flatMap(dbTypesForCategory),
+    project_id: filters.projectIds,
     start_date: filters.dateFrom,
     end_date: filters.dateTo,
-    project_id: filters.projectId,
-  }), [page, filters]);
+  }), [page, pageSize, filters.tools, filters.riskLevels, filters.eventTypes, filters.projectIds, filters.dateFrom, filters.dateTo]);
 
   const { data: eventsResponse, isLoading, isFetching, isError, refetch } = useEvents(
     currentOrg?.id || "",
@@ -96,6 +103,7 @@ export function Events() {
       created_at: e.occurredAt || e.createdAt,
       user: e.user ? { email: e.user.email } : undefined,
       project: e.project ? { name: e.project.name } : undefined,
+      project_id: e.project?.id,
     })) || [];
   }, [eventsResponse]);
 
@@ -108,24 +116,16 @@ export function Events() {
     }
   };
 
-  // Client-side sorting and filtering for search
+  // Client-side: text search only (tool/risk/type/project are server-side)
   const filteredAndSortedEvents = useMemo(() => {
     let result = [...events];
 
-    // Apply client-side search filter (tool name and project only)
     if (filters.search) {
       const search = filters.search.toLowerCase();
       result = result.filter(
         (e) =>
           (e.tool_name || "").toLowerCase().includes(search) ||
           (e.project?.name || "").toLowerCase().includes(search)
-      );
-    }
-
-    // Client-side risk filter (API handles single value; client handles multi-select)
-    if (filters.riskLevels && filters.riskLevels.length > 0) {
-      result = result.filter((e) =>
-        filters.riskLevels!.includes(e.risk_level || "none")
       );
     }
 
@@ -150,7 +150,7 @@ export function Events() {
     });
 
     return result;
-  }, [events, filters.search, filters.riskLevels, sortField, sortDirection]);
+  }, [events, filters.search, sortField, sortDirection]);
 
   const handleExport = async () => {
     setExportQueued(false);
@@ -161,12 +161,12 @@ export function Events() {
 
     try {
       const result = await exportEvents({
-        tool_name: filters.tool,
-        risk_level: filters.riskLevels?.[0],
-        event_type: filters.eventType ? dbTypesForCategory(filters.eventType) : undefined,
+        tool_name: filters.tools,
+        risk_level: filters.riskLevels,
+        event_type: filters.eventTypes?.flatMap(dbTypesForCategory),
         start_date: filters.dateFrom,
         end_date: filters.dateTo,
-        project_id: filters.projectId,
+        project_id: filters.projectIds,
         filename,
       });
 
@@ -205,6 +205,7 @@ export function Events() {
 
   const totalPages = eventsResponse?.meta?.total_pages || 1;
   const totalCount = eventsResponse?.meta?.total_count || 0;
+  const hasClientSideFilters = !!filters.search;
 
   return (
     <div className="space-y-6">
@@ -283,9 +284,29 @@ export function Events() {
       )}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm text-muted-foreground">
-        <p>
-          Showing {filteredAndSortedEvents.length} of {totalCount} events
-        </p>
+        <div className="flex items-center gap-2">
+          <p>
+            {hasClientSideFilters
+              ? `Showing ${filteredAndSortedEvents.length} filtered events`
+              : `Showing ${filteredAndSortedEvents.length} of ${totalCount} events`}
+          </p>
+          <Select
+            value={String(pageSize)}
+            onValueChange={(v) => {
+              setPageSize(Number(v));
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="h-8 w-auto">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[10, 25, 50, 100].map((n) => (
+                <SelectItem key={n} value={String(n)}>{n} / page</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         {totalPages > 1 && (
           <div className="flex items-center justify-between sm:justify-end gap-2">
             <Button

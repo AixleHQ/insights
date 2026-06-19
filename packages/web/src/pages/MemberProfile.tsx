@@ -23,6 +23,13 @@ import {
 import { useOrg } from "@/contexts/OrgContext";
 import { useMember, useMemberEvents, useMemberStats, useProject, useEvents } from "@/hooks/useApi";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -173,11 +180,12 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
   );
 
   const [projectCommitsPage, setProjectCommitsPage] = useState(1);
+  const [projectCommitsPageSize, setProjectCommitsPageSize] = useState(20);
 
   const { data: projectData } = useProject(projectId || "");
   const { data: projectCommitsResponse, isLoading: projectCommitsLoading } = useEvents(
     currentOrg?.id || "",
-    { user_id: member?.user_id, project_id: projectId, event_type: "commit", per_page: 20, page: projectCommitsPage },
+    { user_id: member?.user_id, project_id: projectId, event_type: "commit", per_page: projectCommitsPageSize, page: projectCommitsPage },
     { enabled: !!projectId && !!member?.user_id }
   );
 
@@ -797,26 +805,46 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
               className="border-0 rounded-none"
             />
             {projectCommitsResponse?.meta && projectCommitsResponse.meta.total_pages > 1 && (
-              <div className="flex items-center justify-end gap-2 px-6 py-3 text-sm text-muted-foreground">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setProjectCommitsPage((p) => Math.max(1, p - 1))}
-                  disabled={projectCommitsPage === 1}
-                >
-                  Previous
-                </Button>
-                <span className="text-xs">
-                  Page {projectCommitsPage} of {projectCommitsResponse.meta.total_pages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setProjectCommitsPage((p) => Math.min(projectCommitsResponse.meta.total_pages, p + 1))}
-                  disabled={projectCommitsPage === projectCommitsResponse.meta.total_pages}
-                >
-                  Next
-                </Button>
+              <div className="flex items-center justify-between px-6 py-3 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={String(projectCommitsPageSize)}
+                    onValueChange={(v) => {
+                      setProjectCommitsPageSize(Number(v));
+                      setProjectCommitsPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-auto">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[10, 25, 50, 100].map((n) => (
+                        <SelectItem key={n} value={String(n)}>{n} / page</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setProjectCommitsPage((p) => Math.max(1, p - 1))}
+                    disabled={projectCommitsPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-xs">
+                    Page {projectCommitsPage} of {projectCommitsResponse.meta.total_pages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setProjectCommitsPage((p) => Math.min(projectCommitsResponse.meta.total_pages, p + 1))}
+                    disabled={projectCommitsPage === projectCommitsResponse.meta.total_pages}
+                  >
+                    Next
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>

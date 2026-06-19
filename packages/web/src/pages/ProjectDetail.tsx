@@ -30,6 +30,13 @@ import {
 import { useProjectEventsTab } from "@/hooks/useProjectEventsTab";
 import { formatCost, formatCount } from "@/lib/formatters";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -486,7 +493,26 @@ export function ProjectDetail() {
           />
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm text-muted-foreground">
-            <p>Showing {eventsTab.filteredAndSortedEvents.length} of {eventsTab.totalCount} events</p>
+            <div className="flex items-center gap-2">
+              <p>
+                {eventsTab.hasClientSideFilters
+                  ? `Showing ${eventsTab.filteredAndSortedEvents.length} filtered events`
+                  : `Showing ${eventsTab.filteredAndSortedEvents.length} of ${eventsTab.totalCount} events`}
+              </p>
+              <Select
+                value={String(eventsTab.pageSize)}
+                onValueChange={(v) => eventsTab.setPageSize(Number(v))}
+              >
+                <SelectTrigger className="h-8 w-auto">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[10, 25, 50, 100].map((n) => (
+                    <SelectItem key={n} value={String(n)}>{n} / page</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             {eventsTab.totalPages > 1 && (
               <div className="flex items-center gap-2">
                 <Button

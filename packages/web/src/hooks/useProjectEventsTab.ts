@@ -19,6 +19,8 @@ export interface ProjectEventsTab {
   sortDir: SortDirection;
   page: number;
   setPage: React.Dispatch<React.SetStateAction<number>>;
+  pageSize: number;
+  setPageSize: (size: number) => void;
   selectedId: string | null;
   setSelectedId: React.Dispatch<React.SetStateAction<string | null>>;
   drawerOpen: boolean;
@@ -33,6 +35,7 @@ export interface ProjectEventsTab {
   totalCount: number;
   selectedIndex: number;
   showUserCol: boolean;
+  hasClientSideFilters: boolean;
   handleFiltersChange: (f: EventFiltersState) => void;
   handleSort: (field: SortField) => void;
   handleNavigate: (direction: "prev" | "next") => void;
@@ -53,6 +56,12 @@ export function useProjectEventsTab({
 
   const [filters, setFilters] = useState<EventFiltersState>({});
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSizeState] = useState(25);
+
+  const setPageSize = useCallback((size: number) => {
+    setPageSizeState(size);
+    setPage(1);
+  }, []);
   const [sort, setSort] = useState<SortField>("created_at");
   const [sortDir, setSortDir] = useState<SortDirection>("desc");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -63,15 +72,15 @@ export function useProjectEventsTab({
   const eventsParams = useMemo(
     () => ({
       page,
-      per_page: 25,
+      per_page: pageSize,
       project_id: projectId,
-      tool_name: filters.tool,
-      risk_level: filters.riskLevels?.length === 1 ? filters.riskLevels[0] : undefined,
-      event_type: filters.eventType ? dbTypesForCategory(filters.eventType) : undefined,
+      tool_name: filters.tools,
+      risk_level: filters.riskLevels,
+      event_type: filters.eventTypes?.flatMap(dbTypesForCategory),
       start_date: filters.dateFrom,
       end_date: filters.dateTo,
     }),
-    [projectId, page, filters]
+    [projectId, page, pageSize, filters.tools, filters.riskLevels, filters.eventTypes, filters.dateFrom, filters.dateTo]
   );
 
   const { data: eventsResponse, isLoading } = useEvents(orgId, eventsParams);
@@ -104,18 +113,13 @@ export function useProjectEventsTab({
   const filteredAndSortedEvents = useMemo(() => {
     let result = [...tabEvents];
 
+    // Client-side: text search only (tool/risk/type are server-side via eventsParams)
     if (filters.search) {
       const s = filters.search.toLowerCase();
       result = result.filter(
         (e) =>
           (e.tool_name || "").toLowerCase().includes(s) ||
           (e.project?.name || "").toLowerCase().includes(s)
-      );
-    }
-
-    if (filters.riskLevels && filters.riskLevels.length > 0) {
-      result = result.filter((e) =>
-        filters.riskLevels!.includes(e.risk_level || "none")
       );
     }
 
@@ -143,10 +147,11 @@ export function useProjectEventsTab({
     });
 
     return result;
-  }, [tabEvents, filters.search, filters.riskLevels, sort, sortDir]);
+  }, [tabEvents, filters.search, sort, sortDir]);
 
   const totalPages = eventsResponse?.meta?.total_pages || 1;
   const totalCount = eventsResponse?.meta?.total_count || 0;
+  const hasClientSideFilters = !!filters.search;
   const selectedIndex = selectedId
     ? filteredAndSortedEvents.findIndex((e) => e.id === selectedId)
     : -1;
@@ -188,9 +193,9 @@ export function useProjectEventsTab({
     const endStr = filters.dateTo ?? new Date().toISOString().split("T")[0];
     try {
       const result = await exportEvents({
-        tool_name: filters.tool,
-        risk_level: filters.riskLevels?.[0],
-        event_type: filters.eventType ? dbTypesForCategory(filters.eventType) : undefined,
+        tool_name: filters.tools,
+        risk_level: filters.riskLevels,
+        event_type: filters.eventTypes?.flatMap(dbTypesForCategory),
         start_date: filters.dateFrom,
         end_date: filters.dateTo,
         project_id: projectId,
@@ -208,6 +213,8 @@ export function useProjectEventsTab({
     sortDir,
     page,
     setPage,
+    pageSize,
+    setPageSize,
     selectedId,
     setSelectedId,
     drawerOpen,
@@ -220,6 +227,7 @@ export function useProjectEventsTab({
     toolFilterOptions,
     totalPages,
     totalCount,
+    hasClientSideFilters,
     selectedIndex,
     showUserCol,
     handleFiltersChange,

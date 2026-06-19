@@ -102,6 +102,7 @@ export function toEventRow(e: ToolEvent) {
     created_at: e.occurredAt || e.createdAt,
     user: e.user ? { email: e.user.email } : undefined,
     project: e.project ? { name: e.project.name } : undefined,
+    project_id: e.project?.id,
   };
 }
 
