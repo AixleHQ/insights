@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/chart";
 import type { ChartConfig } from "@/components/ui/chart";
 import { cn, getToolColor, humanizeToolName } from "@/lib/utils";
+import { formatCount } from "@/lib/formatters";
 import type { DailyToolData } from "@/hooks/useApi";
 import { type TimeRange, TIME_RANGE_OPTIONS } from "@/lib/chartUtils";
 
@@ -85,7 +86,7 @@ export function ToolUsageByDayChart({ data, tools, isLoading, className, timeRan
         <div>
           <CardTitle className="text-base font-medium">Usage by Tool</CardTitle>
           <CardDescription className="text-xs">
-            {totalEvents.toLocaleString()} events in the last {getRangeLabel(timeRange)}
+            {formatCount(totalEvents)} events in the last {getRangeLabel(timeRange)}
           </CardDescription>
         </div>
         <Select value={timeRange} onValueChange={(value) => onTimeRangeChange(value as TimeRange)}>
