@@ -167,6 +167,19 @@ describe("IntegrationSetup — configure step (step 3)", () => {
     expect(screen.queryByText("Connection Successful!")).not.toBeInTheDocument();
   });
 
+  it("disables Connect button and shows hint when both sync options are off", async () => {
+    renderSetup("github");
+    await advanceToConfigureStep();
+
+    // Turn off both toggles
+    const [reposSwitch, prsSwitch] = screen.getAllByRole("switch");
+    await userEvent.click(reposSwitch);
+    await userEvent.click(prsSwitch);
+
+    expect(screen.getByRole("button", { name: /connect/i })).toBeDisabled();
+    expect(screen.getByText(/enable at least one sync option/i)).toBeInTheDocument();
+  });
+
   it("does NOT call updateConnector for non-source-control providers", async () => {
     renderSetup("jira");
 
