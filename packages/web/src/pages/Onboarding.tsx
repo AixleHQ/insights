@@ -240,7 +240,7 @@ export function Onboarding() {
           <div className="flex items-center gap-3">
             <div className="flex size-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70">
               <span className="font-mono text-sm font-bold text-primary-foreground">
-                90
+                AI
               </span>
             </div>
             <span className="type-h4">Aixle Insights</span>

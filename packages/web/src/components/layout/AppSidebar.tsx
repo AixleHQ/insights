@@ -427,7 +427,7 @@ export function AppSidebar() {
               <Link to="/" className="flex items-center gap-2">
                 <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70">
                   <span className="font-mono-display text-sm font-bold text-primary-foreground">
-                    90
+                    AI
                   </span>
                 </div>
                 <div className="grid flex-1 text-left leading-tight">

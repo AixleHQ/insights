@@ -92,7 +92,7 @@ export function Login() {
         {/* Logo */}
         <div className="mb-8 flex flex-col items-center gap-4 text-center">
           <div className="flex size-14 items-center justify-center rounded-2xl bg-primary shadow-lg">
-            <span className="font-mono-display type-h2 text-primary-foreground">90</span>
+            <span className="font-mono-display type-h2 text-primary-foreground">AI</span>
           </div>
           <div>
             <h1 className="type-h2 text-foreground">Aixle Insights</h1>
