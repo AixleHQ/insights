@@ -66,9 +66,22 @@ describe("OrgProvider — org selection priority", () => {
     vi.restoreAllMocks();
   });
 
-  it("selects default_org_id when set, ignoring localStorage", async () => {
+  it("prefers localStorage over default_org_id (explicit user selection persists across refresh)", async () => {
     localStorage.setItem(ORG_STORAGE_KEY, ORG_A.id);
 
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(makeOrgsResponse([ORG_A, ORG_B, ORG_C]) as never)
+      .mockResolvedValueOnce(makeUserResponse(ORG_B.id) as never);
+
+    const { result } = renderHook(() => useOrg(), { wrapper });
+
+    await waitFor(() => expect(result.current.isInitialized).toBe(true));
+
+    // localStorage (ORG_A) wins over default_org_id (ORG_B)
+    expect(result.current.currentOrg?.id).toBe(ORG_A.id);
+  });
+
+  it("falls back to default_org_id when localStorage is empty", async () => {
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(makeOrgsResponse([ORG_A, ORG_B, ORG_C]) as never)
       .mockResolvedValueOnce(makeUserResponse(ORG_B.id) as never);
@@ -122,6 +135,21 @@ describe("OrgProvider — org selection priority", () => {
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("stale-org-id"));
   });
 
+  it("falls back to first org when stored org ID is invalid and no default_org_id is set", async () => {
+    localStorage.setItem(ORG_STORAGE_KEY, "stale-org-id");
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(makeOrgsResponse([ORG_A, ORG_B]) as never)
+      .mockResolvedValueOnce(makeUserResponse(null) as never);
+
+    const { result } = renderHook(() => useOrg(), { wrapper });
+
+    await waitFor(() => expect(result.current.isInitialized).toBe(true));
+
+    expect(result.current.currentOrg?.id).toBe(ORG_A.id);
+  });
+
   it("syncs localStorage only when the selected org differs from the stored value", async () => {
     localStorage.setItem(ORG_STORAGE_KEY, ORG_A.id);
     const setItemSpy = vi.spyOn(localStorageMock, "setItem");
@@ -138,8 +166,23 @@ describe("OrgProvider — org selection priority", () => {
     expect(setItemSpy).not.toHaveBeenCalledWith(ORG_STORAGE_KEY, ORG_A.id);
   });
 
-  it("writes localStorage when default_org_id differs from stored value", async () => {
+  it("does not overwrite localStorage when user has an explicit org selection", async () => {
     localStorage.setItem(ORG_STORAGE_KEY, ORG_A.id);
+    const setItemSpy = vi.spyOn(localStorageMock, "setItem");
+
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(makeOrgsResponse([ORG_A, ORG_B]) as never)
+      .mockResolvedValueOnce(makeUserResponse(ORG_B.id) as never);
+
+    const { result } = renderHook(() => useOrg(), { wrapper });
+
+    await waitFor(() => expect(result.current.isInitialized).toBe(true));
+
+    // localStorage already has ORG_A which wins — no write to storage key
+    expect(setItemSpy).not.toHaveBeenCalledWith(ORG_STORAGE_KEY, expect.anything());
+  });
+
+  it("writes localStorage when default_org_id is used as fallback (no stored org)", async () => {
     const setItemSpy = vi.spyOn(localStorageMock, "setItem");
 
     vi.spyOn(globalThis, "fetch")

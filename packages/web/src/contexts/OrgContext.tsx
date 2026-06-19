@@ -122,22 +122,29 @@ export function OrgProvider({ children, apiBaseUrl = "/api/v1" }: OrgProviderPro
         defaultOrgId = (userData.data?.settings?.default_org_id as string) ?? null;
       }
 
-      // Select org: default_org_id preference > last used (localStorage) > first org
-      let currentOrg: Organization | null = null;
-
-      if (defaultOrgId) {
-        currentOrg = organizations.find((o) => o.id === defaultOrgId) || null;
-      }
-
+      // Select org: last used (localStorage) > default_org_id preference > first org
+      // localStorage represents the user's explicit selection and takes highest priority.
+      // default_org_id is only used as a fallback when the user has never switched orgs.
       const storedOrgId = localStorage.getItem(ORG_STORAGE_KEY);
 
-      if (!currentOrg) {
+      let currentOrg: Organization | null = null;
+
+      if (storedOrgId) {
         currentOrg = organizations.find((o) => o.id === storedOrgId) || null;
+      }
+
+      if (!currentOrg && defaultOrgId) {
+        currentOrg = organizations.find((o) => o.id === defaultOrgId) || null;
       }
 
       if (!currentOrg && organizations.length > 0) {
         if (storedOrgId) {
-          console.warn(`[OrgContext] Stored org ${storedOrgId} not found, switching to first org`);
+          // Avoid leaking org UUIDs in production logs
+          if (import.meta.env.DEV) {
+            console.warn(`[OrgContext] Stored org ${storedOrgId} not found in membership list, switching to first org`);
+          } else {
+            console.warn("[OrgContext] Stored org not found in membership list, switching to first org");
+          }
         }
         currentOrg = organizations[0];
       }
