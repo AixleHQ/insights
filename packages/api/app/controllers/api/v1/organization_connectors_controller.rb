@@ -317,6 +317,13 @@ module Api
             errors: format_validation_errors(connector.errors)
           }, status: :unprocessable_content
         end
+      rescue ActiveRecord::RecordNotUnique
+        # Two simultaneous OAuth callbacks for the same org + external_org_id raced on
+        # idx_org_connectors_oauth_dedup. The other request already inserted the row —
+        # return it as if this callback succeeded (idempotent reconnect).
+        connector = current_organization.organization_connectors
+                                        .find_by!(connector_type: connector_type, external_org_id: external_org_id)
+        render_resource(connector, OrganizationConnectorSerializer)
       rescue Oauth::MissingCredentialsError => e
         render json: { error: e.message, code: "integration_not_configured" }, status: :service_unavailable
       end
