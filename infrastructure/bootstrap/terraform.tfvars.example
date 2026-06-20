@@ -1,0 +1,14 @@
+# Copy to terraform.tfvars and fill GitHub App credentials before enabling runners.
+# Bootstrap uses local state — keep secrets out of git.
+
+# enable_github_runners = true
+
+# github_app = {
+#   id             = "123456"
+#   webhook_secret = "generate-a-random-secret"
+#   key_base64     = "base64-encoded-pem-from-github-app-private-key"
+# }
+
+# runners_maximum_count       = 5
+# runner_instance_type        = "c7i.large"
+# enable_organization_runners = false

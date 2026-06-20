@@ -64,8 +64,14 @@ coverage/
 
 # Terraform
 infrastructure/**/.terraform/
-infrastructure/**/backend.tf
+infrastructure/backend.tf
+!infrastructure/bootstrap/backend.tf
 infrastructure/tfvars/
+infrastructure/bootstrap/terraform.tfvars
+infrastructure/bootstrap/terraform.tfstate
+infrastructure/bootstrap/terraform.tfstate.backup
+infrastructure/bootstrap/*.tfstate*
+infrastructure/modules/github-runners/lambdas-download/*.zip
 
 # Misc
 *.log

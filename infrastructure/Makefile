@@ -16,7 +16,7 @@ ifeq ($(INSIDE_CONTAINER),true)
   endif
 endif
 
-.PHONY: push_vars pull_vars unlock fmt shell help
+.PHONY: push_vars pull_vars unlock fmt shell help download-runner-lambdas
 
 push_vars:
 	aws s3 cp --sse="AES256" $(LOCAL_TFVARS_PATH) $(REMOTE_TFVARS_PATH)
@@ -45,10 +45,14 @@ else
 	docker compose run --rm infra bash
 endif
 
+download-runner-lambdas:
+	bash modules/github-runners/lambdas-download/download.sh
+
 help:
 	@echo "Available commands:"
-	@echo "  make shell      - Open a shell in the infrastructure container"
-	@echo "  make fmt        - Format Terraform and Terragrunt code"
-	@echo "  make push_vars  - Push terraform.tfvars to S3"
-	@echo "  make pull_vars  - Pull terraform.tfvars from S3"
-	@echo "  make unlock     - Force unlock the Terraform state"
+	@echo "  make shell                  - Open a shell in the infrastructure container"
+	@echo "  make fmt                    - Format Terraform and Terragrunt code"
+	@echo "  make push_vars              - Push terraform.tfvars to S3"
+	@echo "  make pull_vars              - Pull terraform.tfvars from S3"
+	@echo "  make unlock                 - Force unlock the Terraform state"
+	@echo "  make download-runner-lambdas - Download GitHub runner Lambda zips for bootstrap"

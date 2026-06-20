@@ -5,6 +5,14 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.45"
     }
+    null = {
+      source  = "hashicorp/null"
+      version = "~> 3.2"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
   }
 }
 
@@ -188,9 +196,9 @@ resource "aws_iam_policy" "github_deploy" {
         Resource = "*"
       },
       {
-        Sid    = "PassRole"
-        Effect = "Allow"
-        Action = "iam:PassRole"
+        Sid      = "PassRole"
+        Effect   = "Allow"
+        Action   = "iam:PassRole"
         Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project}-*-ecs-role"
       },
       {
@@ -218,4 +226,49 @@ resource "aws_iam_policy" "github_deploy" {
 resource "aws_iam_role_policy_attachment" "github_deploy" {
   role       = aws_iam_role.github_deploy.name
   policy_arn = aws_iam_policy.github_deploy.arn
+}
+
+# =============================================================================
+# CI/CD VPC + GitHub Actions self-hosted runners (spot EC2 via Lambda scaling)
+# =============================================================================
+
+module "vpc_cicd" {
+  count = var.enable_github_runners ? 1 : 0
+
+  source  = "terraform-aws-modules/vpc/aws"
+  version = "5.19.0"
+
+  name = "${var.project}-vpc-cicd"
+
+  cidr            = var.cicd_vpc.cidr
+  azs             = var.cicd_vpc.azs
+  private_subnets = var.cicd_vpc.private_subnets
+  public_subnets  = var.cicd_vpc.public_subnets
+
+  enable_nat_gateway     = true
+  single_nat_gateway     = true
+  one_nat_gateway_per_az = false
+
+  enable_flow_log                                 = true
+  create_flow_log_cloudwatch_iam_role             = true
+  create_flow_log_cloudwatch_log_group            = true
+  flow_log_traffic_type                           = "REJECT"
+  flow_log_cloudwatch_log_group_retention_in_days = 365
+}
+
+module "github_runners" {
+  count = var.enable_github_runners ? 1 : 0
+
+  source = "../modules/github-runners"
+
+  project = var.project
+  region  = var.region
+
+  vpc_id     = module.vpc_cicd[0].vpc_id
+  subnet_ids = module.vpc_cicd[0].private_subnets
+
+  github_app                  = var.github_app
+  runners_maximum_count       = var.runners_maximum_count
+  runner_instance_type        = var.runner_instance_type
+  enable_organization_runners = var.enable_organization_runners
 }

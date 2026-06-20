@@ -204,14 +204,17 @@ A dashboard named `db90-{env}-monitoring` provides four widget groups:
 ### State Management
 
 - **Backend:** S3 bucket `db90-tf-bucket` with DynamoDB lock table `db90-tf-lock`
-- **Workspaces:** `staging` and `prod` (never use `default`)
+- **Bootstrap state:** `db90/us-east-2/bootstrap/terraform.tfstate` (committed `bootstrap/backend.tf`)
+- **Bootstrap variables:** `s3://db90-tf-bucket/bootstrap/terraform.tfvars` (local `bootstrap/terraform.tfvars`, gitignored)
+- **Environment state:** `db90/us-east-2/terraform.tfstate` with workspaces `staging` / `prod` (never use `default`)
 - **Variables:** stored encrypted in S3 and loaded automatically by Terragrunt
 
 ### Module Structure
 
 ```
 infrastructure/
-├── bootstrap/              # One-time setup: S3 bucket, DynamoDB, Route53, ECR repos
+├── bootstrap/              # One-time setup: S3 bucket, DynamoDB, Route53, ECR repos, CI runners VPC
+│   └── backend.tf          # Remote state (committed)
 ├── common/terragrunt.hcl   # Shared backend configuration
 ├── terragrunt.hcl          # Workspace-based variable loading
 ├── main.tf                 # Root module: all resources and service definitions
@@ -223,6 +226,7 @@ infrastructure/
 ├── tfvars/
 │   └── staging/terraform.tfvars
 └── modules/
+    ├── github-runners/     # Wrapper: GitHub Actions spot runners (bootstrap only)
     ├── network/            # VPC, subnets, NAT gateway
     ├── security_groups/    # ALB, ECS, DB security groups
     ├── roles/              # IAM roles and policies

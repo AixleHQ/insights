@@ -85,17 +85,66 @@ make fmt
 
 ### Step 1: Bootstrap (one-time, shared across environments)
 
-Bootstrap creates the S3 state bucket, DynamoDB lock table, Route53 hosted zone, and ECR repositories.
+Bootstrap creates the S3 state bucket, DynamoDB lock table, Route53 hosted zone, ECR repositories, GitHub OIDC deploy role, and optionally **self-hosted GitHub Actions runners** on EC2 Spot.
+
+State is stored remotely in the same bucket the stack creates (`db90-tf-bucket`, key `db90/us-east-2/bootstrap/terraform.tfstate`). Local `terraform.tfstate` files are gitignored.
+
+**Blank AWS account (bucket does not exist yet):**
 
 ```bash
 cd infrastructure/bootstrap
-terraform init
+make init-local    # local state — required once so apply can create the S3 bucket
 terraform apply
+make migrate-state # copy state to S3; confirm "yes" when prompted
 ```
+
+**Existing bootstrap (local state file on disk, bucket already exists):**
+
+```bash
+cd infrastructure/bootstrap
+make migrate-state
+# Remove local state from git if it was committed: git rm --cached terraform.tfstate terraform.tfstate.backup
+```
+
+**Day-to-day (remote state already configured):**
+
+```bash
+cd infrastructure/bootstrap
+make pull_vars   # optional — sync secrets from S3 when setting up a new machine
+make init
+make plan
+make apply       # uploads terraform.tfvars to S3 after apply
+```
+
+Bootstrap variables (`bootstrap/terraform.tfvars`, gitignored) sync to `s3://db90-tf-bucket/bootstrap/terraform.tfvars` via `make push_vars` / `make pull_vars` — same pattern as env tfvars under `tfvars/{workspace}/`.
 
 Save the output values:
 - `zone_id` goes into `tfvars/{env}/terraform.tfvars`
 - `nameservers` must be configured at your domain registrar
+
+#### GitHub Actions self-hosted runners (optional)
+
+Runners use the [`github-aws-runners/github-runner/aws`](https://github.com/github-aws-runners/terraform-aws-github-runner) module (same pattern as threpo-infra `common/`). Spot EC2 instances scale via Lambda; a dedicated VPC (`10.200.0.0/16`) keeps CI traffic separate from staging/prod app VPCs. Runner user-data installs `make`, `gcc`, `gcc-c++`, and `python3` for native npm modules (e.g. `better-sqlite3`).
+
+1. Create a [GitHub App](https://github-aws-runners.github.io/terraform-aws-github-runner/getting-started/#setup-github-app-part-1) with Actions/Checks/Metadata (read) and Self-hosted runners (read/write). For repo-level runners also grant Administration read/write.
+2. Download Lambda artifacts (required once before apply):
+
+```bash
+make download-runner-lambdas
+```
+
+3. Copy `bootstrap/terraform.tfvars.example` → `bootstrap/terraform.tfvars`, set `enable_github_runners = true` and fill `github_app` credentials.
+4. Apply bootstrap, then copy outputs into the GitHub App webhook settings:
+
+```bash
+terraform output github_runners_webhook_endpoint
+terraform output -raw github_runners_webhook_secret
+```
+
+5. Install the GitHub App on `dualboot-partners/db90-rails` (or enable org runners via `enable_organization_runners = true`).
+6. Switch workflow jobs to `runs-on: self-hosted` when ready (OIDC deploy role is unchanged).
+
+Runners are **disabled by default** (`enable_github_runners = false`) so existing bootstrap applies stay unchanged.
 
 ### Step 2: Create the Workspace
 
@@ -195,6 +244,14 @@ The pipeline:
 | `AWS_REGION` | AWS region | `us-east-2` |
 
 The OIDC provider and deploy role are created by the bootstrap module. After `terraform apply` in `bootstrap/`, copy the `github_deploy_role_arn` output into GitHub repository settings at **Settings > Secrets and variables > Actions**.
+
+### GHCR base image mirrors
+
+Self-hosted runners hit Docker Hub rate limits when many jobs pull the same base images. CI service images and Dockerfile `FROM` lines use mirrors under `ghcr.io/dualboot-partners/db90-rails/*`, published by [`.github/workflows/ghcr-mirror-base-images.yml`](../.github/workflows/ghcr-mirror-base-images.yml).
+
+**One-time bootstrap:** push changes under `docker/ghcr-mirrors/` (triggers the workflow automatically), or after merge to `develop` use Actions → **Mirror base images to GHCR** → **Run workflow**. Until the workflow file is on the default branch, it does not appear in the left sidebar — only `workflow_dispatch` from the UI requires that; push and schedule still work on feature branches.
+
+Mirror definitions live in [`docker/ghcr-mirrors/`](../docker/ghcr-mirrors/). CI jobs log in to GHCR with `GITHUB_TOKEN` (`packages: read`) before `docker compose` / `docker build`.
 
 ## Manual Deployment
 

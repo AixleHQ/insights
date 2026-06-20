@@ -10,7 +10,7 @@ on:
 jobs:
   check-pricing:
     name: Check Claude pricing page for rate changes
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     permissions:
       issues: write
 
