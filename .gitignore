@@ -62,11 +62,6 @@ temporal-data/
 coverage/
 .coverage
 
-# Terraform
-infrastructure/**/.terraform/
-infrastructure/**/backend.tf
-infrastructure/tfvars/
-
 # Misc
 *.log
 *.pid

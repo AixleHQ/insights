@@ -27,7 +27,7 @@ env:
 jobs:
   resolve:
     name: Resolve target package + version
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     outputs:
       package: ${{ steps.target.outputs.package }}
       working_directory: ${{ steps.target.outputs.working_directory }}
@@ -67,7 +67,7 @@ jobs:
   publish:
     name: Publish ${{ needs.resolve.outputs.package }} to npm
     needs: resolve
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     environment: npm-publish
     steps:
       - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0  # v6.0.3
