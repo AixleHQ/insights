@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { CheckCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/ui/error-state";
 import {
   Table,
   TableBody,
@@ -40,7 +41,7 @@ function SkeletonRow() {
 
 export function RiskAlertsTable({ orgId, projectId, className }: RiskAlertsTableProps) {
   const navigate = useNavigate();
-  const { data: rows, isLoading } = useOrgRiskAlerts(orgId, projectId, currentMonth());
+  const { data: rows, isLoading, isError, refetch } = useOrgRiskAlerts(orgId, projectId, currentMonth());
 
   const handleRowClick = (toolName: string) => {
     navigate(`/events?tool_name=${encodeURIComponent(toolName)}&risk_level=not_none`);
@@ -63,7 +64,18 @@ export function RiskAlertsTable({ orgId, projectId, className }: RiskAlertsTable
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
+            {isError ? (
+              <TableRow>
+                <TableCell colSpan={5} className="h-24">
+                  <ErrorState
+                    compact
+                    title="Could not load risk alerts"
+                    description="Something went wrong fetching the data."
+                    onRetry={() => refetch()}
+                  />
+                </TableCell>
+              </TableRow>
+            ) : isLoading ? (
               Array.from({ length: 3 }).map((_, i) => <SkeletonRow key={i} />)
             ) : !rows || rows.length === 0 ? (
               <TableRow>

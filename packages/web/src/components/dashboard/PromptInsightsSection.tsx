@@ -2,6 +2,7 @@ import { Sparkles, Wrench, Target, type LucideIcon } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/ui/error-state";
 import { usePromptInsights, type PromptInsightsCallout } from "@/hooks/useApi";
 
 interface Props {
@@ -23,7 +24,7 @@ const DIMENSIONS = [
 ];
 
 export function PromptInsightsSection({ orgId, userId, period }: Props) {
-  const { data, isLoading, isError } = usePromptInsights(orgId, userId, period);
+  const { data, isLoading, isError, refetch } = usePromptInsights(orgId, userId, period);
 
   return (
     <Card>
@@ -40,7 +41,12 @@ export function PromptInsightsSection({ orgId, userId, period }: Props) {
             <Skeleton className="h-4 w-full" />
           </div>
         ) : isError ? (
-          <p className="text-sm text-muted-foreground">Could not load insights.</p>
+          <ErrorState
+            compact
+            title="Could not load insights"
+            description="Something went wrong fetching prompt insights."
+            onRetry={() => refetch()}
+          />
         ) : !data || data.callouts.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">
             Not enough data yet. Keep using your AI tools and check back soon.

@@ -24,6 +24,7 @@ import {
 import type { ChartConfig } from "@/components/ui/chart";
 import { cn, getToolColor, humanizeToolName } from "@/lib/utils";
 import { formatCount } from "@/lib/formatters";
+import { ErrorState } from "@/components/ui/error-state";
 import type { DailyToolData } from "@/hooks/useApi";
 import { type TimeRange, TIME_RANGE_OPTIONS } from "@/lib/chartUtils";
 
@@ -31,6 +32,8 @@ interface ToolUsageByDayChartProps {
   data: DailyToolData[];
   tools: string[];
   isLoading?: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
   className?: string;
   timeRange: TimeRange;
   onTimeRangeChange: (range: TimeRange) => void;
@@ -55,7 +58,7 @@ function getRangeLabel(range: TimeRange): string {
   return TIME_RANGE_OPTIONS.find((opt) => opt.value === range)?.label || "30 days";
 }
 
-export function ToolUsageByDayChart({ data, tools, isLoading, className, timeRange, onTimeRangeChange }: ToolUsageByDayChartProps) {
+export function ToolUsageByDayChart({ data, tools, isLoading, isError, onRetry, className, timeRange, onTimeRangeChange }: ToolUsageByDayChartProps) {
   const filteredData = useMemo(() => {
     return data.map((item) => ({
       ...item,
@@ -103,7 +106,16 @@ export function ToolUsageByDayChart({ data, tools, isLoading, className, timeRan
         </Select>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {isError ? (
+          <div className="flex h-[280px] items-center justify-center">
+            <ErrorState
+              compact
+              title="Could not load chart"
+              description="Something went wrong fetching the data."
+              onRetry={onRetry}
+            />
+          </div>
+        ) : isLoading ? (
           <div className="flex h-[280px] items-center justify-center">
             <div className="size-8 animate-spin rounded-full border-2 border-muted border-t-primary" />
           </div>

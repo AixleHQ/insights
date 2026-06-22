@@ -19,7 +19,7 @@ import {
 import type { ChartConfig } from "@/components/ui/chart";
 import { useQueryClient } from "@tanstack/react-query";
 import { Activity, DollarSign, Coins, Users, RefreshCw, LayoutGrid } from "lucide-react";
-import { formatCost, formatTokens } from "@/lib/formatters";
+import { formatCost, formatTokens, formatCount } from "@/lib/formatters";
 import type { Connector } from "@/lib/types";
 import {
   useToolOverview,
@@ -35,6 +35,7 @@ import { ToolModelTable } from "./ToolModelTable";
 import { ToolUsersTable } from "./ToolUsersTable";
 import { ToolEventTypesTable } from "./ToolEventTypesTable";
 import { ToolModelCostChart } from "./ToolModelCostChart";
+import { ErrorState } from "@/components/ui/error-state";
 
 interface ToolInsightsSectionProps {
   orgId: string;
@@ -177,9 +178,9 @@ function SyncStatusSubsection({ orgId, connectorId }: { orgId: string; connector
 
 function OpenRouterTabContent({ orgId, days, period }: { orgId: string; days: number; period: "day" | "week" | "month" }) {
   const { data: connectorsResp } = useConnectors(orgId);
-  const { data: dailyResp, isLoading: isLoadingDaily } = useToolDaily(orgId, "openrouter_api", days, period === "month" ? undefined : period);
-  const { data: modelsResp, isLoading: isLoadingModels } = useToolModels(orgId, "openrouter_api", days);
-  const { data: usersResp, isLoading: isLoadingUsers } = useToolUsers(orgId, "openrouter_api", days);
+  const { data: dailyResp, isLoading: isLoadingDaily, isError: isErrorDaily, refetch: refetchDaily } = useToolDaily(orgId, "openrouter_api", days, period === "month" ? undefined : period);
+  const { data: modelsResp, isLoading: isLoadingModels, isError: isErrorModels, refetch: refetchModels } = useToolModels(orgId, "openrouter_api", days);
+  const { data: usersResp, isLoading: isLoadingUsers, isError: isErrorUsers, refetch: refetchUsers } = useToolUsers(orgId, "openrouter_api", days);
 
   const activeOpenRouterConnector = connectorsResp?.find(isActiveOpenRouterConnector);
 
@@ -192,10 +193,23 @@ function OpenRouterTabContent({ orgId, days, period }: { orgId: string; days: nu
   const activeUsers = users.length;
   const modelsUsed = models.length;
 
-  if (!isLoadingDaily && totalEvents === 0) {
+  if (!isLoadingDaily && !isErrorDaily && totalEvents === 0) {
     return (
       <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
         No OpenRouter events in the last {humanizeDays(days)}.
+      </div>
+    );
+  }
+
+  if (isErrorDaily && !isLoadingDaily) {
+    return (
+      <div className="flex h-40 items-center justify-center">
+        <ErrorState
+          compact
+          title="Could not load data"
+          description="Something went wrong fetching OpenRouter data."
+          onRetry={() => refetchDaily()}
+        />
       </div>
     );
   }
@@ -211,7 +225,7 @@ function OpenRouterTabContent({ orgId, days, period }: { orgId: string; days: nu
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
         <StatCard
           title="Total Events"
-          value={totalEvents.toLocaleString()}
+          value={formatCount(totalEvents)}
           icon={Activity}
           isLoading={isLoadingDaily}
         />
@@ -236,28 +250,28 @@ function OpenRouterTabContent({ orgId, days, period }: { orgId: string; days: nu
       </div>
 
       {/* Cost by model chart */}
-      <ToolModelCostChart models={models} isLoading={isLoadingModels} />
+      <ToolModelCostChart models={models} isLoading={isLoadingModels} isError={isErrorModels} onRetry={() => refetchModels()} />
 
       {/* Full model table */}
       <div className="space-y-2">
         <h4 className="type-label text-muted-foreground">Model Breakdown</h4>
-        <ToolModelTable models={models} isLoading={isLoadingModels} />
+        <ToolModelTable models={models} isLoading={isLoadingModels} isError={isErrorModels} onRetry={() => refetchModels()} />
       </div>
 
       {/* Users table */}
       <div className="space-y-2">
         <h4 className="type-label text-muted-foreground">Top Users</h4>
-        <ToolUsersTable users={users} isLoading={isLoadingUsers} />
+        <ToolUsersTable users={users} isLoading={isLoadingUsers} isError={isErrorUsers} onRetry={() => refetchUsers()} />
       </div>
     </div>
   );
 }
 
 function CursorTabContent({ orgId, days, period }: { orgId: string; days: number; period: "day" | "week" | "month" }) {
-  const { data: dailyResp, isLoading: isLoadingDaily } = useToolDaily(orgId, "cursor", days, period === "month" ? undefined : period);
-  const { data: modelsResp, isLoading: isLoadingModels } = useToolModels(orgId, "cursor", days);
-  const { data: usersResp, isLoading: isLoadingUsers } = useToolUsers(orgId, "cursor", days);
-  const { data: eventTypesResp, isLoading: isLoadingEventTypes } = useToolEventTypes(orgId, "cursor", days);
+  const { data: dailyResp, isLoading: isLoadingDaily, isError: isErrorDaily, refetch: refetchDaily } = useToolDaily(orgId, "cursor", days, period === "month" ? undefined : period);
+  const { data: modelsResp, isLoading: isLoadingModels, isError: isErrorModels, refetch: refetchModels } = useToolModels(orgId, "cursor", days);
+  const { data: usersResp, isLoading: isLoadingUsers, isError: isErrorUsers, refetch: refetchUsers } = useToolUsers(orgId, "cursor", days);
+  const { data: eventTypesResp, isLoading: isLoadingEventTypes, isError: isErrorEventTypes, refetch: refetchEventTypes } = useToolEventTypes(orgId, "cursor", days);
 
   const daily = dailyResp?.daily ?? [];
   const models = modelsResp?.models ?? [];
@@ -275,10 +289,23 @@ function CursorTabContent({ orgId, days, period }: { orgId: string; days: number
     costUsd: d.costUsd,
   }));
 
-  if (!isLoadingDaily && totalEvents === 0) {
+  if (!isLoadingDaily && !isErrorDaily && totalEvents === 0) {
     return (
       <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
         No Cursor events in the last {humanizeDays(days)}.
+      </div>
+    );
+  }
+
+  if (isErrorDaily && !isLoadingDaily) {
+    return (
+      <div className="flex h-40 items-center justify-center">
+        <ErrorState
+          compact
+          title="Could not load data"
+          description="Something went wrong fetching Cursor data."
+          onRetry={() => refetchDaily()}
+        />
       </div>
     );
   }
@@ -289,7 +316,7 @@ function CursorTabContent({ orgId, days, period }: { orgId: string; days: number
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
         <StatCard
           title="Total Events"
-          value={totalEvents.toLocaleString()}
+          value={formatCount(totalEvents)}
           icon={Activity}
           isLoading={isLoadingDaily}
         />
@@ -380,27 +407,27 @@ function CursorTabContent({ orgId, days, period }: { orgId: string; days: number
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         <div className="space-y-2">
           <h4 className="type-label text-muted-foreground">Model Breakdown</h4>
-          <ToolModelTable models={models} isLoading={isLoadingModels} />
+          <ToolModelTable models={models} isLoading={isLoadingModels} isError={isErrorModels} onRetry={() => refetchModels()} />
         </div>
         <div className="space-y-2">
           <h4 className="type-label text-muted-foreground">Event Types</h4>
-          <ToolEventTypesTable eventTypes={eventTypes} isLoading={isLoadingEventTypes} />
+          <ToolEventTypesTable eventTypes={eventTypes} isLoading={isLoadingEventTypes} isError={isErrorEventTypes} onRetry={() => refetchEventTypes()} />
         </div>
       </div>
 
       {/* Users table */}
       <div className="space-y-2">
         <h4 className="type-label text-muted-foreground">Top Users</h4>
-        <ToolUsersTable users={users} isLoading={isLoadingUsers} />
+        <ToolUsersTable users={users} isLoading={isLoadingUsers} isError={isErrorUsers} onRetry={() => refetchUsers()} />
       </div>
     </div>
   );
 }
 
 function AnthropicTabContent({ orgId, days, period }: { orgId: string; days: number; period: "day" | "week" | "month" }) {
-  const { data: dailyResp, isLoading: isLoadingDaily } = useToolDaily(orgId, "anthropic_api", days, period === "month" ? undefined : period);
-  const { data: modelsResp, isLoading: isLoadingModels } = useToolModels(orgId, "anthropic_api", days);
-  const { data: usersResp, isLoading: isLoadingUsers } = useToolUsers(orgId, "anthropic_api", days);
+  const { data: dailyResp, isLoading: isLoadingDaily, isError: isErrorDaily, refetch: refetchDaily } = useToolDaily(orgId, "anthropic_api", days, period === "month" ? undefined : period);
+  const { data: modelsResp, isLoading: isLoadingModels, isError: isErrorModels, refetch: refetchModels } = useToolModels(orgId, "anthropic_api", days);
+  const { data: usersResp, isLoading: isLoadingUsers, isError: isErrorUsers, refetch: refetchUsers } = useToolUsers(orgId, "anthropic_api", days);
 
   const daily = dailyResp?.daily ?? [];
   const models = modelsResp?.models ?? [];
@@ -411,7 +438,7 @@ function AnthropicTabContent({ orgId, days, period }: { orgId: string; days: num
   const totalTokensIn = daily.reduce((s, d) => s + d.tokensIn, 0);
   const totalTokensOut = daily.reduce((s, d) => s + d.tokensOut, 0);
 
-  if (!isLoadingDaily && totalEvents === 0) {
+  if (!isLoadingDaily && !isErrorDaily && totalEvents === 0) {
     return (
       <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
         No Anthropic API events in the last {humanizeDays(days)}.
@@ -419,10 +446,23 @@ function AnthropicTabContent({ orgId, days, period }: { orgId: string; days: num
     );
   }
 
+  if (isErrorDaily && !isLoadingDaily) {
+    return (
+      <div className="flex h-40 items-center justify-center">
+        <ErrorState
+          compact
+          title="Could not load data"
+          description="Something went wrong fetching Anthropic data."
+          onRetry={() => refetchDaily()}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 mt-4">
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
-        <StatCard title="Total Events" value={totalEvents.toLocaleString()} icon={Activity} isLoading={isLoadingDaily} />
+        <StatCard title="Total Events" value={formatCount(totalEvents)} icon={Activity} isLoading={isLoadingDaily} />
         <StatCard title="Total Cost" value={formatCost(totalCost)} icon={DollarSign} isLoading={isLoadingDaily} />
         <StatCard title="Tokens In" value={formatTokens(totalTokensIn)} icon={Coins} isLoading={isLoadingDaily} />
         <StatCard title="Tokens Out" value={formatTokens(totalTokensOut)} icon={Coins} isLoading={isLoadingDaily} />
@@ -430,12 +470,12 @@ function AnthropicTabContent({ orgId, days, period }: { orgId: string; days: num
 
       <div className="space-y-2">
         <h4 className="type-label text-muted-foreground">Model Breakdown</h4>
-        <ToolModelTable models={models} isLoading={isLoadingModels} />
+        <ToolModelTable models={models} isLoading={isLoadingModels} isError={isErrorModels} onRetry={() => refetchModels()} />
       </div>
 
       <div className="space-y-2">
         <h4 className="type-label text-muted-foreground">Top Users</h4>
-        <ToolUsersTable users={users} isLoading={isLoadingUsers} />
+        <ToolUsersTable users={users} isLoading={isLoadingUsers} isError={isErrorUsers} onRetry={() => refetchUsers()} />
       </div>
     </div>
   );
