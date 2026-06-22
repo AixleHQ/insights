@@ -44,6 +44,7 @@ interface ProviderConfig {
   scopes: { name: string; description: string }[];
   requiresWebhook: boolean;
   requiresOAuth: boolean;
+  docUrl?: string;
 }
 
 const providers: Record<string, ProviderConfig> = {
@@ -65,6 +66,7 @@ const providers: Record<string, ProviderConfig> = {
     ],
     requiresWebhook: true,
     requiresOAuth: true,
+    docUrl: "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/authorizing-oauth-apps",
   },
   gitlab: {
     id: "gitlab",
@@ -83,6 +85,7 @@ const providers: Record<string, ProviderConfig> = {
     ],
     requiresWebhook: true,
     requiresOAuth: true,
+    docUrl: "https://docs.gitlab.com/ee/api/oauth2.html",
   },
   bitbucket: {
     id: "bitbucket",
@@ -101,6 +104,7 @@ const providers: Record<string, ProviderConfig> = {
     ],
     requiresWebhook: true,
     requiresOAuth: true,
+    docUrl: "https://support.atlassian.com/bitbucket-cloud/docs/use-oauth-on-bitbucket-cloud/",
   },
   jira: {
     id: "jira",
@@ -119,6 +123,7 @@ const providers: Record<string, ProviderConfig> = {
     ],
     requiresWebhook: false,
     requiresOAuth: true,
+    docUrl: "https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/",
   },
   linear: {
     id: "linear",
@@ -137,6 +142,7 @@ const providers: Record<string, ProviderConfig> = {
     ],
     requiresWebhook: true,
     requiresOAuth: true,
+    docUrl: "https://developers.linear.app/docs/oauth/authentication",
   },
   github_copilot: {
     id: "github_copilot",
@@ -155,6 +161,7 @@ const providers: Record<string, ProviderConfig> = {
     ],
     requiresWebhook: false,
     requiresOAuth: true,
+    docUrl: "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/authorizing-oauth-apps",
   },
   "claude-code": {
     id: "claude-code",
@@ -456,13 +463,17 @@ export function IntegrationSetup() {
                     <Shield className="size-4 text-primary" />
                     <span className="text-sm">Secure OAuth 2.0 authorization</span>
                   </div>
-                  <a
-                    href="#"
-                    className="flex items-center gap-1 text-sm text-primary hover:underline"
-                  >
-                    Learn more
-                    <ExternalLink className="size-3" />
-                  </a>
+                  {provider.docUrl && (
+                    <a
+                      href={provider.docUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-sm text-primary hover:underline"
+                    >
+                      Learn more
+                      <ExternalLink className="size-3" />
+                    </a>
+                  )}
                 </div>
               </>
             ) : (
