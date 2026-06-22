@@ -104,11 +104,13 @@ describe("PromptInsightsSection", () => {
       data: undefined,
       isLoading: false,
       isError: true,
-    } as ReturnType<typeof usePromptInsights>);
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof usePromptInsights>);
 
     renderSection();
 
-    expect(screen.getByText("Could not load insights.")).toBeInTheDocument();
+    expect(screen.getByText("Could not load insights")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
 
   it("progress bars have accessible aria-labels", () => {

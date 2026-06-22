@@ -7,29 +7,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/ui/error-state";
+import { formatCost, formatTokens, formatCount } from "@/lib/formatters";
 import type { ToolEventTypeStat } from "@/lib/types";
 
 interface ToolEventTypesTableProps {
   eventTypes: ToolEventTypeStat[];
   isLoading: boolean;
-}
-
-function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return String(n);
-}
-
-function formatCost(n: number): string {
-  if (n === 0) return "$0.00";
-  if (n < 0.001) return `$${n.toFixed(6)}`;
-  if (n < 0.01) return `$${n.toFixed(4)}`;
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(n);
+  isError?: boolean;
+  onRetry?: () => void;
 }
 
 function humanizeEventType(name: string): string {
@@ -48,7 +34,7 @@ function SkeletonRow() {
   );
 }
 
-export function ToolEventTypesTable({ eventTypes, isLoading }: ToolEventTypesTableProps) {
+export function ToolEventTypesTable({ eventTypes, isLoading, isError, onRetry }: ToolEventTypesTableProps) {
   return (
     <div className="rounded-md border">
       <Table>
@@ -62,7 +48,18 @@ export function ToolEventTypesTable({ eventTypes, isLoading }: ToolEventTypesTab
           </TableRow>
         </TableHeader>
         <TableBody>
-          {isLoading ? (
+          {isError ? (
+            <TableRow>
+              <TableCell colSpan={5} className="h-24">
+                <ErrorState
+                  compact
+                  title="Could not load event types"
+                  description="Something went wrong fetching the data."
+                  onRetry={onRetry}
+                />
+              </TableCell>
+            </TableRow>
+          ) : isLoading ? (
             Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} />)
           ) : eventTypes.length === 0 ? (
             <TableRow>
@@ -75,7 +72,7 @@ export function ToolEventTypesTable({ eventTypes, isLoading }: ToolEventTypesTab
               <TableRow key={row.name}>
                 <TableCell className="font-medium">{humanizeEventType(row.name)}</TableCell>
                 <TableCell className="text-right font-mono text-sm">
-                  {row.eventCount.toLocaleString()}
+                  {formatCount(row.eventCount)}
                 </TableCell>
                 <TableCell className="hidden sm:table-cell text-right font-mono text-sm text-muted-foreground">
                   {formatTokens(row.tokensIn)}
