@@ -895,7 +895,7 @@ export function useProjectMembers(projectId: string) {
   });
 }
 
-export function useAddProjectMember(projectId: string) {
+export function useAddProjectMember(projectId: string, orgId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: { user_id: string; role: string }) =>
@@ -903,6 +903,9 @@ export function useAddProjectMember(projectId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects", projectId, "members"] });
       queryClient.invalidateQueries({ queryKey: ["projects", projectId, "members", "stats"] });
+      queryClient.invalidateQueries({
+        queryKey: ["organizations", orgId, "stats", "overview"],
+      });
     },
   });
 }
@@ -918,13 +921,17 @@ export function useUpdateProjectMember(projectId: string) {
   });
 }
 
-export function useRemoveProjectMember(projectId: string) {
+export function useRemoveProjectMember(projectId: string, orgId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
       api.delete(`/projects/${projectId}/members/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects", projectId, "members"] });
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "members", "stats"] });
+      queryClient.invalidateQueries({
+        queryKey: ["organizations", orgId, "stats", "overview"],
+      });
     },
   });
 }
