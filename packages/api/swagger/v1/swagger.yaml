@@ -1275,6 +1275,10 @@ paths:
                     type: integer
                   repository_count:
                     type: integer
+                    nullable: true
+                  synced_event_count:
+                    type: integer
+                    nullable: true
                   last_event_at:
                     type: string
                     format: date-time

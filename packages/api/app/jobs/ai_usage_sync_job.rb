@@ -178,8 +178,9 @@ class AiUsageSyncJob
 
   def upsert_usage_one_by_one(org, connector, provider, usage_data)
     reconciled = 0
+    single_connector = org.organization_connectors.where(connector_type: provider, is_active: true).count == 1
     usage_data.each do |usage|
-      event = find_matching_event(org, connector, provider, usage)
+      event = find_matching_event(org, connector, provider, usage, single_connector:)
 
       if event
         attributes = tool_event_attributes_for_usage(usage, connector)
@@ -288,7 +289,7 @@ class AiUsageSyncJob
     end
   end
 
-  def find_matching_event(org, connector, provider, usage)
+  def find_matching_event(org, connector, provider, usage, single_connector: nil)
     scope = org.tool_events.where(tool_name: "#{provider}_api")
 
     all_ids = ([ usage[:external_id] ] + Array(usage[:legacy_external_ids])).map(&:to_s)
@@ -300,7 +301,8 @@ class AiUsageSyncJob
     return match if match
 
     # Legacy fallback: events created before connector-scoped dedup did not include connector_id.
-    if org.organization_connectors.where(connector_type: provider, is_active: true).count == 1
+    single_connector = org.organization_connectors.where(connector_type: provider, is_active: true).count == 1 if single_connector.nil?
+    if single_connector
       legacy_match = scope
         .where("metadata->>'connector_id' IS NULL")
         .where("metadata->>'external_id' IN (?)", all_ids)
