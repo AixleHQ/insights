@@ -63,14 +63,27 @@ RSpec.describe ModelPricingService do
           expect(result).to eq({ input: 5.00, output: 25.00 })
         end
 
-        it 'matches claude-opus-4-1-20250601 at $15/$75' do
+        it 'matches claude-opus-4-1-20250601 at $15/$75 (distinct from opus-4-5 $5/$25)' do
           result = described_class.pricing_for_model("claude-opus-4-1-20250601")
           expect(result).to eq({ input: 15.00, output: 75.00 })
+          expect(result).not_to eq(described_class.pricing_for_model("claude-opus-4-5"))
         end
 
         it 'matches claude-sonnet-4-6-20260201 at $3/$15' do
           result = described_class.pricing_for_model("claude-sonnet-4-6-20260201")
           expect(result).to eq({ input: 3.00, output: 15.00 })
+        end
+      end
+
+      context 'OpenAI substring-match ordering (AIX-349)' do
+        it 'matches o1-mini at $1.10/$4.40 (not o1 $15/$60)' do
+          result = described_class.pricing_for_model("o1-mini")
+          expect(result).to eq({ input: 1.10, output: 4.40 })
+        end
+
+        it 'matches gpt-4o-mini at $0.15/$0.60 (not gpt-4o $2.50/$10)' do
+          result = described_class.pricing_for_model("gpt-4o-mini-2024-07-18")
+          expect(result).to eq({ input: 0.15, output: 0.60 })
         end
       end
     end
