@@ -107,6 +107,7 @@ class RawEventStore
     def s3_client_options
       options = { region: region }
 
+      # Production: credentials resolved from ECS task IAM role (no explicit keys needed)
       if minio_mode?
         options[:endpoint] = endpoint_url
         options[:force_path_style] = true
