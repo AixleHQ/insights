@@ -2,7 +2,7 @@
  * Model pricing table and cost calculation for @aixle/insights.
  *
  * Default rates source: https://platform.claude.com/docs/en/about-claude/pricing
- * Rates last verified: 2026-05-04
+ * Rates last verified: 2026-06-17
  */
 
 export interface ModelPricing {
@@ -24,7 +24,20 @@ export type PricingTable = Record<string, ModelPricing>;
  * breakdown is a future improvement.
  */
 export const DEFAULT_PRICING: PricingTable = {
-  // Opus 4.7/4.6/4.5 — $5 input / $25 output
+  // Fable 5 — $10 input / $50 output
+  "claude-fable-5": {
+    input_per_mtok: 10.0,
+    output_per_mtok: 50.0,
+    cache_write_per_mtok: 12.5,
+    cache_read_per_mtok: 1.0,
+  },
+  // Opus 4.8/4.7/4.6/4.5 — $5 input / $25 output
+  "claude-opus-4-8": {
+    input_per_mtok: 5.0,
+    output_per_mtok: 25.0,
+    cache_write_per_mtok: 6.25,
+    cache_read_per_mtok: 0.5,
+  },
   "claude-opus-4-7": {
     input_per_mtok: 5.0,
     output_per_mtok: 25.0,
@@ -57,26 +70,26 @@ export const DEFAULT_PRICING: PricingTable = {
     cache_read_per_mtok: 1.5,
   },
   // Sonnet 4.x family — $3 input / $15 output
-  "claude-sonnet-4": {
-    input_per_mtok: 3.0,
-    output_per_mtok: 15.0,
-    cache_write_per_mtok: 3.75,
-    cache_read_per_mtok: 0.3,
-  },
   "claude-sonnet-4-6": {
     input_per_mtok: 3.0,
     output_per_mtok: 15.0,
     cache_write_per_mtok: 3.75,
     cache_read_per_mtok: 0.3,
   },
-  "claude-sonnet-4-5-20251001": {
+  "claude-sonnet-4-5": {
+    input_per_mtok: 3.0,
+    output_per_mtok: 15.0,
+    cache_write_per_mtok: 3.75,
+    cache_read_per_mtok: 0.3,
+  },
+  "claude-sonnet-4": {
     input_per_mtok: 3.0,
     output_per_mtok: 15.0,
     cache_write_per_mtok: 3.75,
     cache_read_per_mtok: 0.3,
   },
   // Haiku 4.5 — $1 input / $5 output
-  "claude-haiku-4-5-20251001": {
+  "claude-haiku-4-5": {
     input_per_mtok: 1.0,
     output_per_mtok: 5.0,
     cache_write_per_mtok: 1.25,
@@ -122,6 +135,21 @@ export function mergePricing(base: PricingTable, overrides: PricingTable): Prici
   return result;
 }
 
+/**
+ * Strips a trailing -YYYYMMDD date suffix to produce the bare model key used
+ * in the pricing table. Returns the original ID when:
+ *  - it has no date suffix, OR
+ *  - the bare form is not in the table (i.e. the dated form IS the canonical key,
+ *    like legacy "claude-3-5-sonnet-20241022").
+ */
+export function normalizeModelId(model: string, pricing: PricingTable): string {
+  if (pricing[model]) return model;
+  const match = model.match(/^(.+)-(\d{8})$/);
+  if (!match) return model;
+  const bare = match[1];
+  return pricing[bare] ? bare : model;
+}
+
 /** Returns true only when all four rate fields are finite numbers. */
 function hasValidRates(rates: ModelPricing): boolean {
   return (
@@ -141,7 +169,8 @@ export function calculateCost(
   pricing: PricingTable
 ): number | null {
   if (!model) return null;
-  const rates = pricing[model];
+  const resolved = normalizeModelId(model, pricing);
+  const rates = pricing[resolved];
   if (!rates || !hasValidRates(rates)) return null;
 
   const raw =
@@ -161,7 +190,8 @@ export function calculateCost(
  */
 export function getCostWarning(model: string | null, pricing: PricingTable): string | null {
   if (!model) return null;
-  const rates = pricing[model];
+  const resolved = normalizeModelId(model, pricing);
+  const rates = pricing[resolved];
   if (!rates) {
     return `Model "${model}" not in pricing table — cost_usd will be null. Extend DEFAULT_PRICING or add future pricing overrides when supported.`;
   }
