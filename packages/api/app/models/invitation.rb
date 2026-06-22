@@ -61,8 +61,10 @@ class Invitation < ApplicationRecord
 
       membership
     end
-  rescue ActiveRecord::RecordNotUnique
-    retry
+  rescue ActiveRecord::RecordNotUnique => e
+    retries = retries.to_i + 1
+    retry if retries < 3
+    raise e
   end
 
   def revoke!
