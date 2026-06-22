@@ -164,6 +164,56 @@ RSpec.describe 'Api::V1::Events', type: :request do
       expect(json_data[:attribution]).to eq("organization")
     end
 
+    it "returns jiraTicket, prNumber, prUrl and branch from metadata (AIX-261)" do
+      enriched = create(:tool_event,
+                        organization: organization,
+                        user: user,
+                        event_type: 'commit',
+                        metadata: {
+                          'jira_ticket' => 'AIX-157',
+                          'pr_number' => 42,
+                          'pr_url' => 'https://github.com/acme/demo/pull/42',
+                          'branch_name' => 'feature/AIX-157-foo'
+                        })
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/events/#{enriched.id}",
+                        user: user,
+                        organization: organization
+
+      expect_success
+      expect(json_data[:jiraTicket]).to eq('AIX-157')
+      expect(json_data[:prNumber]).to eq(42)
+      expect(json_data[:prUrl]).to eq('https://github.com/acme/demo/pull/42')
+      expect(json_data[:branch]).to eq('feature/AIX-157-foo')
+    end
+
+    it "returns null enrichment fields when metadata has none (AIX-261)" do
+      authenticated_get "/api/v1/organizations/#{organization.id}/events/#{tool_event.id}",
+                        user: user,
+                        organization: organization
+
+      expect_success
+      expect(json_data).to have_key(:jiraTicket)
+      expect(json_data[:jiraTicket]).to be_nil
+      expect(json_data[:prNumber]).to be_nil
+      expect(json_data[:prUrl]).to be_nil
+      expect(json_data[:branch]).to be_nil
+    end
+
+    it "prefers the branch key over branch_name (AIX-261)" do
+      enriched = create(:tool_event,
+                        organization: organization,
+                        user: user,
+                        metadata: { 'branch' => 'main', 'branch_name' => 'feature/x' })
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/events/#{enriched.id}",
+                        user: user,
+                        organization: organization
+
+      expect_success
+      expect(json_data[:branch]).to eq('main')
+    end
+
     it "falls back to workspace_name for project when no project is assigned" do
       ws_event = create(:tool_event,
                         organization: organization,

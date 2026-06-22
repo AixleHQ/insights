@@ -175,6 +175,8 @@ module Oauth
       @http_client ||= Faraday.new do |conn|
         conn.headers["Authorization"] = "Bearer #{connector.access_token}"
         conn.headers["Accept"] = "application/json"
+        conn.options.timeout = ENV.fetch("OAUTH_HTTP_TIMEOUT", 15).to_i
+        conn.options.open_timeout = ENV.fetch("OAUTH_HTTP_OPEN_TIMEOUT", 5).to_i
         conn.adapter Faraday.default_adapter
       end
     end

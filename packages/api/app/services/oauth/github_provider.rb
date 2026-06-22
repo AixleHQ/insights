@@ -4,6 +4,10 @@ module Oauth
   class GithubProvider < BaseProvider
     API_URL = "https://api.github.com"
 
+    # Commit identifiers must be plain hex — anything else would let a
+    # client-supplied value reshape the request path (AIX-261 review).
+    COMMIT_SHA_PATTERN = /\A\h{4,64}\z/
+
     def test_connection
       response = http_client.get("#{API_URL}/user")
 
@@ -72,6 +76,33 @@ module Oauth
       end
 
       all
+    end
+
+    # Pull requests associated with a commit (PR correlation, AIX-261).
+    # Raises Oauth::GithubApiError on non-success so Sidekiq can retry —
+    # callers must not cache failures.
+    def fetch_pull_requests_for_commit(full_name, sha)
+      ensure_fresh_token!
+
+      owner, repo = full_name.to_s.split("/", 2)
+      raise ArgumentError, "malformed repository full_name: #{full_name.inspect}" if owner.blank? || repo.blank?
+      raise ArgumentError, "malformed commit sha: #{sha.inspect}" unless sha.to_s.match?(COMMIT_SHA_PATTERN)
+
+      response = http_client.get("#{API_URL}/repos/#{owner}/#{repo}/commits/#{sha}/pulls")
+      unless response.success?
+        raise Oauth::GithubApiError, "GitHub commit-pulls lookup failed (#{response.status}) for #{full_name}@#{sha}"
+      end
+
+      pulls = begin
+        JSON.parse(response.body)
+      rescue JSON::ParserError
+        raise Oauth::GithubApiError, "GitHub commit-pulls returned an unparseable body for #{full_name}@#{sha}"
+      end
+      unless pulls.is_a?(Array)
+        raise Oauth::GithubApiError, "GitHub commit-pulls returned a non-array body for #{full_name}@#{sha}"
+      end
+
+      pulls
     end
 
     class << self

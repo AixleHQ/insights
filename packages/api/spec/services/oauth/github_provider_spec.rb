@@ -174,6 +174,87 @@ RSpec.describe Oauth::GithubProvider, type: :service do
     end
   end
 
+  describe '#fetch_pull_requests_for_commit' do
+    let(:sha) { 'abc123def456' }
+
+    context 'when the commit has associated pull requests' do
+      it 'returns the parsed array' do
+        stub_request(:get, "https://api.github.com/repos/octocat/hello-world/commits/#{sha}/pulls")
+          .with(headers: { 'Authorization' => 'Bearer gho_test123' })
+          .to_return(
+            status: 200,
+            body: [ { number: 42, html_url: 'https://github.com/octocat/hello-world/pull/42', state: 'open' } ].to_json,
+            headers: { 'Content-Type' => 'application/json' }
+          )
+
+        result = provider.fetch_pull_requests_for_commit('octocat/hello-world', sha)
+
+        expect(result.size).to eq(1)
+        expect(result.first['number']).to eq(42)
+        expect(result.first['html_url']).to eq('https://github.com/octocat/hello-world/pull/42')
+        expect(result.first['state']).to eq('open')
+      end
+    end
+
+    context 'when the commit has no pull requests' do
+      it 'returns an empty array' do
+        stub_request(:get, "https://api.github.com/repos/octocat/hello-world/commits/#{sha}/pulls")
+          .to_return(status: 200, body: '[]', headers: { 'Content-Type' => 'application/json' })
+
+        expect(provider.fetch_pull_requests_for_commit('octocat/hello-world', sha)).to eq([])
+      end
+    end
+
+    context 'when the API responds with an error' do
+      it 'raises Oauth::GithubApiError so callers can retry' do
+        stub_request(:get, "https://api.github.com/repos/octocat/hello-world/commits/#{sha}/pulls")
+          .to_return(status: 502, body: '{"message":"Bad gateway"}')
+
+        expect {
+          provider.fetch_pull_requests_for_commit('octocat/hello-world', sha)
+        }.to raise_error(Oauth::GithubApiError, /502/)
+      end
+    end
+
+    context 'with a malformed full_name' do
+      it 'raises ArgumentError without an HTTP call' do
+        expect {
+          provider.fetch_pull_requests_for_commit('no-slash', sha)
+        }.to raise_error(ArgumentError)
+      end
+    end
+
+    context 'with a malformed commit sha' do
+      it 'raises ArgumentError without an HTTP call' do
+        expect {
+          provider.fetch_pull_requests_for_commit('octocat/hello-world', 'abc/../evil')
+        }.to raise_error(ArgumentError)
+      end
+    end
+
+    context 'when the API returns a non-array 200 body' do
+      it 'raises Oauth::GithubApiError' do
+        stub_request(:get, "https://api.github.com/repos/octocat/hello-world/commits/#{sha}/pulls")
+          .to_return(status: 200, body: '{"message":"ok"}', headers: { 'Content-Type' => 'application/json' })
+
+        expect {
+          provider.fetch_pull_requests_for_commit('octocat/hello-world', sha)
+        }.to raise_error(Oauth::GithubApiError, /non-array/)
+      end
+    end
+
+    context 'when the API returns an unparseable 200 body' do
+      it 'raises Oauth::GithubApiError' do
+        stub_request(:get, "https://api.github.com/repos/octocat/hello-world/commits/#{sha}/pulls")
+          .to_return(status: 200, body: '<html>oops</html>', headers: { 'Content-Type' => 'text/html' })
+
+        expect {
+          provider.fetch_pull_requests_for_commit('octocat/hello-world', sha)
+        }.to raise_error(Oauth::GithubApiError, /unparseable/)
+      end
+    end
+  end
+
   describe '.authorization_url' do
     before do
       allow(described_class).to receive(:client_id).and_return('gh-client-id')

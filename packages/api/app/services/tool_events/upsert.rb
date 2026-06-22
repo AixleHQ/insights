@@ -22,9 +22,15 @@ module ToolEvents
       model duration_ms project_id metadata
     ].freeze
 
-    # Server-stamped renormalization provenance (AIX-260) — stripped from
-    # incoming metadata so clients cannot forge it.
-    RESERVED_METADATA_KEYS = %w[renormalized_from renormalized_by].freeze
+    # Server-stamped metadata — stripped from incoming payloads so clients
+    # cannot forge it: renormalization provenance (AIX-260) and PR
+    # correlation results (AIX-261; a forged pr_url is a malicious link
+    # rendered in the UI). jira_ticket is deliberately NOT reserved — clients
+    # may supply it directly.
+    RESERVED_METADATA_KEYS = %w[
+      renormalized_from renormalized_by
+      pr_number pr_url pr_state pr_lookup_status
+    ].freeze
 
     # @return [Hash] { tool_event: ToolEvent, created: Boolean }
     def self.call(attributes)
@@ -46,7 +52,9 @@ module ToolEvents
         upsert_with_lock
       else
         normalize_event_type!
+        extract_jira_ticket!
         event = ToolEvent.create!(@attributes)
+        enqueue_pr_correlation(event)
         { tool_event: event, created: true }
       end
     end
@@ -122,11 +130,62 @@ module ToolEvents
       )
     end
 
+    # Stamps the Jira ticket key derived from metadata hints (AIX-261).
+    # Create branches only — session re-sends must not stamp (same contract
+    # as normalize_event_type!). A client-supplied value wins only when it
+    # fully matches the ticket pattern; anything else is dropped before it
+    # can reach the serializer (review decision D4).
+    def extract_jira_ticket!
+      metadata = @attributes[:metadata]
+      client_value = metadata.is_a?(Hash) ? (metadata["jira_ticket"] || metadata[:jira_ticket]) : nil
+
+      if client_value.present?
+        normalized = MetadataEnrichers::JiraTicketExtractor.normalize(client_value)
+        if normalized
+          @attributes[:metadata] = metadata.except(:jira_ticket).merge("jira_ticket" => normalized)
+          return
+        end
+
+        metadata = metadata.except("jira_ticket", :jira_ticket)
+        @attributes[:metadata] = metadata
+      end
+
+      ticket = MetadataEnrichers::JiraTicketExtractor.extract(metadata)
+      return if ticket.nil?
+
+      @attributes[:metadata] = (metadata || {}).merge("jira_ticket" => ticket)
+    end
+
     # Default ON outside production; production opts in by setting
     # DB90_EVENT_TYPE_RENORMALIZATION=true on the Rails API deployment.
     def renormalization_enabled?
       default = Rails.env.production? ? "false" : "true"
       ActiveModel::Type::Boolean.new.cast(ENV.fetch("DB90_EVENT_TYPE_RENORMALIZATION", default)) || false
+    end
+
+    # Kicks off async PR correlation for freshly created commit events
+    # (AIX-261). Create-only by construction (both call sites sit on the
+    # create branches); the GitHub lookup itself runs in Sidekiq, never on
+    # the ingest hot path.
+    def enqueue_pr_correlation(event)
+      return unless pr_correlation_enabled?
+      return unless @attributes[:event_type] == "commit"
+
+      metadata = @attributes[:metadata]
+      return unless metadata.is_a?(Hash)
+
+      commit_hash = metadata["commit_hash"].presence || metadata[:commit_hash].presence ||
+                    metadata["sha"].presence || metadata[:sha].presence
+      return if commit_hash.blank?
+
+      PrCorrelationJob.perform_later(event.id)
+    end
+
+    # Default ON outside production; production opts in by setting
+    # DB90_PR_CORRELATION=true on the Rails API deployment.
+    def pr_correlation_enabled?
+      default = Rails.env.production? ? "false" : "true"
+      ActiveModel::Type::Boolean.new.cast(ENV.fetch("DB90_PR_CORRELATION", default)) || false
     end
 
     def upsert_with_lock
@@ -146,7 +205,9 @@ module ToolEvents
           { tool_event: existing, created: false }
         else
           normalize_event_type!
+          extract_jira_ticket!
           event = ToolEvent.create!(@attributes)
+          enqueue_pr_correlation(event)
           { tool_event: event, created: true }
         end
       end

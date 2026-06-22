@@ -447,4 +447,235 @@ RSpec.describe ToolEvents::Upsert do
       end
     end
   end
+
+  describe ".call — jira_ticket extraction (AIX-261)" do
+    let(:organization) { create(:organization) }
+    let(:user)         { create(:user) }
+
+    let(:base_attributes) do
+      {
+        organization_id: organization.id,
+        user_id: user.id,
+        tool_name: "cursor",
+        event_type: "commit",
+        model: "gpt-4o",
+        tokens_in: 100,
+        tokens_out: 50,
+        cost_usd: 0.01,
+        occurred_at: Time.current,
+        metadata: {}
+      }
+    end
+
+    it "stamps jira_ticket on the direct-create path" do
+      attrs = base_attributes.merge(metadata: { "branch_name" => "feature/AIX-157-foo" })
+      event = described_class.call(attrs)[:tool_event]
+      expect(event.metadata["jira_ticket"]).to eq("AIX-157")
+    end
+
+    it "stamps jira_ticket on the locked create path (session_id present)" do
+      attrs = base_attributes.merge(
+        metadata: { "session_id" => SecureRandom.uuid, "branch_name" => "feature/AIX-8-bar" }
+      )
+      result = described_class.call(attrs)
+      expect(result[:created]).to be(true)
+      expect(result[:tool_event].metadata["jira_ticket"]).to eq("AIX-8")
+    end
+
+    it "adds no jira_ticket key when nothing matches" do
+      attrs = base_attributes.merge(metadata: { "branch_name" => "main" })
+      event = described_class.call(attrs)[:tool_event]
+      expect(event.metadata).not_to have_key("jira_ticket")
+    end
+
+    it "preserves a client-supplied non-blank jira_ticket" do
+      attrs = base_attributes.merge(
+        metadata: { "jira_ticket" => "CLIENT-99", "branch_name" => "feature/AIX-1-x" }
+      )
+      event = described_class.call(attrs)[:tool_event]
+      expect(event.metadata["jira_ticket"]).to eq("CLIENT-99")
+    end
+
+    it "overrides a blank client-supplied jira_ticket" do
+      attrs = base_attributes.merge(
+        metadata: { "jira_ticket" => "", "branch_name" => "feature/AIX-1-x" }
+      )
+      event = described_class.call(attrs)[:tool_event]
+      expect(event.metadata["jira_ticket"]).to eq("AIX-1")
+    end
+
+    it "drops an invalid client-supplied jira_ticket and falls back to extraction (review decision D4)" do
+      attrs = base_attributes.merge(
+        metadata: { "jira_ticket" => "<img src=x onerror=alert(1)>", "branch_name" => "feature/AIX-1-x" }
+      )
+      event = described_class.call(attrs)[:tool_event]
+      expect(event.metadata["jira_ticket"]).to eq("AIX-1")
+    end
+
+    it "drops an invalid client-supplied jira_ticket entirely when nothing matches" do
+      attrs = base_attributes.merge(
+        metadata: { "jira_ticket" => "not a ticket!", "branch_name" => "main" }
+      )
+      event = described_class.call(attrs)[:tool_event]
+      expect(event.metadata).not_to have_key("jira_ticket")
+    end
+
+    it "uppercases a lowercase client-supplied jira_ticket" do
+      attrs = base_attributes.merge(metadata: { "jira_ticket" => "client-99" })
+      event = described_class.call(attrs)[:tool_event]
+      expect(event.metadata["jira_ticket"]).to eq("CLIENT-99")
+    end
+
+    it "respects a symbol-keyed client-supplied jira_ticket" do
+      attrs = base_attributes.merge(
+        metadata: { jira_ticket: "CLIENT-7", branch_name: "feature/AIX-1-x" }
+      )
+      event = described_class.call(attrs)[:tool_event]
+      # JSONB round-trip stringifies keys — the stored value must be the client's
+      expect(event.reload.metadata["jira_ticket"]).to eq("CLIENT-7")
+    end
+
+    it "never stamps on the dedupe-update path" do
+      session_id = SecureRandom.uuid
+      existing = described_class.call(
+        base_attributes.merge(metadata: { "session_id" => session_id })
+      )[:tool_event]
+      expect(existing.metadata).not_to have_key("jira_ticket")
+
+      resend = base_attributes.merge(
+        metadata: { "session_id" => session_id, "branch_name" => "feature/AIX-9-z" }
+      )
+      result = described_class.call(resend)
+      expect(result[:created]).to be(false)
+      expect(result[:tool_event].id).to eq(existing.id)
+      expect(result[:tool_event].reload.metadata).not_to have_key("jira_ticket")
+    end
+
+    it "coexists with renormalization stamps on chat→commit re-tags" do
+      attrs = base_attributes.merge(
+        event_type: "chat",
+        metadata: { "source" => "recent_commit", "branch_name" => "feature/AIX-3-y" }
+      )
+      event = described_class.call(attrs)[:tool_event]
+      expect(event.event_type).to eq("commit")
+      expect(event.metadata["renormalized_from"]).to eq("chat")
+      expect(event.metadata["jira_ticket"]).to eq("AIX-3")
+      expect(event.metadata["cost_source"]).to eq("client")
+    end
+  end
+
+  describe ".call — PR correlation enqueue (AIX-261)" do
+    let(:organization) { create(:organization) }
+    let(:user)         { create(:user) }
+
+    let(:base_attributes) do
+      {
+        organization_id: organization.id,
+        user_id: user.id,
+        tool_name: "cursor",
+        event_type: "commit",
+        cost_usd: 0.01,
+        occurred_at: Time.current,
+        metadata: { "commit_hash" => "abc123" }
+      }
+    end
+
+    it "enqueues PrCorrelationJob after creating a commit event with a commit_hash" do
+      expect {
+        described_class.call(base_attributes)
+      }.to have_enqueued_job(PrCorrelationJob)
+    end
+
+    it "enqueues with the created event's id" do
+      result = nil
+      expect {
+        result = described_class.call(base_attributes)
+      }.to have_enqueued_job(PrCorrelationJob).with { |id|
+        expect(id).to eq(result[:tool_event].id)
+      }
+    end
+
+    it "enqueues when the hash arrives under the sha key" do
+      attrs = base_attributes.merge(metadata: { "sha" => "fff999" })
+      expect { described_class.call(attrs) }.to have_enqueued_job(PrCorrelationJob)
+    end
+
+    it "falls back to sha when commit_hash is present but blank" do
+      attrs = base_attributes.merge(metadata: { "commit_hash" => "", "sha" => "fff999" })
+      expect { described_class.call(attrs) }.to have_enqueued_job(PrCorrelationJob)
+    end
+
+    it "enqueues for a chat event re-tagged to commit by the normalizer" do
+      attrs = base_attributes.merge(
+        event_type: "chat",
+        metadata: { "source" => "recent_commit", "commit_hash" => "abc123" }
+      )
+      expect { described_class.call(attrs) }.to have_enqueued_job(PrCorrelationJob)
+    end
+
+    it "does not enqueue for non-commit events" do
+      attrs = base_attributes.merge(event_type: "chat")
+      expect { described_class.call(attrs) }.not_to have_enqueued_job(PrCorrelationJob)
+    end
+
+    it "does not enqueue without a commit hash" do
+      attrs = base_attributes.merge(metadata: { "branch_name" => "main" })
+      expect { described_class.call(attrs) }.not_to have_enqueued_job(PrCorrelationJob)
+    end
+
+    it "does not enqueue on the dedupe-update path" do
+      session_id = SecureRandom.uuid
+      attrs = base_attributes.merge(metadata: { "session_id" => session_id, "commit_hash" => "abc123" })
+      described_class.call(attrs)
+
+      expect { described_class.call(attrs) }.not_to have_enqueued_job(PrCorrelationJob)
+    end
+
+    it "does not enqueue when DB90_PR_CORRELATION is off" do
+      stub_const("ENV", ENV.to_h.merge("DB90_PR_CORRELATION" => "false"))
+      expect { described_class.call(base_attributes) }.not_to have_enqueued_job(PrCorrelationJob)
+    end
+
+    it "enqueues when DB90_PR_CORRELATION is explicitly on" do
+      stub_const("ENV", ENV.to_h.merge("DB90_PR_CORRELATION" => "true"))
+      expect { described_class.call(base_attributes) }.to have_enqueued_job(PrCorrelationJob)
+    end
+  end
+
+  describe ".call — reserved pr_* metadata keys (AIX-261)" do
+    let(:organization) { create(:organization) }
+    let(:user)         { create(:user) }
+
+    let(:base_attributes) do
+      {
+        organization_id: organization.id,
+        user_id: user.id,
+        tool_name: "cursor",
+        event_type: "commit",
+        cost_usd: 0.01,
+        occurred_at: Time.current,
+        metadata: {}
+      }
+    end
+
+    it "strips forged pr_* keys from incoming metadata" do
+      attrs = base_attributes.merge(
+        metadata: {
+          "pr_number" => 666, "pr_url" => "https://evil.example", "pr_state" => "open",
+          "pr_lookup_status" => "not_found", "branch_name" => "main"
+        }
+      )
+      event = described_class.call(attrs)[:tool_event]
+      expect(event.metadata.keys).not_to include("pr_number", "pr_url", "pr_state", "pr_lookup_status")
+      expect(event.metadata["branch_name"]).to eq("main")
+    end
+
+    it "strips symbol-keyed pr_* keys" do
+      attrs = base_attributes.merge(
+        metadata: { pr_number: 1, pr_url: "https://evil.example" }
+      )
+      event = described_class.call(attrs)[:tool_event]
+      expect(event.reload.metadata.keys).not_to include("pr_number", "pr_url")
+    end
+  end
 end

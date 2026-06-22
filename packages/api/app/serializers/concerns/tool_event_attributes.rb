@@ -38,5 +38,21 @@ module ToolEventAttributes
     attribute :correlation_confidence do |event|
       event.metadata&.dig("correlation_confidence")
     end
+
+    attribute :jira_ticket do |event|
+      event.metadata&.dig("jira_ticket")
+    end
+
+    attribute :pr_number do |event|
+      event.metadata&.dig("pr_number")
+    end
+
+    attribute :pr_url do |event|
+      event.metadata&.dig("pr_url")
+    end
+
+    attribute :branch do |event|
+      event.metadata&.dig("branch") || event.metadata&.dig("branch_name")
+    end
   end
 end

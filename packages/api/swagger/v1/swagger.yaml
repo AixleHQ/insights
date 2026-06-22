@@ -6507,6 +6507,22 @@ components:
           format: float
           nullable: true
           description: Confidence score (0.0–1.0) for the best correlation attempt
+        jiraTicket:
+          type: string
+          nullable: true
+          description: Jira ticket key the event relates to — client-supplied or server-extracted from branch/commit metadata (AIX-261)
+        prNumber:
+          type: integer
+          nullable: true
+          description: Pull request number correlated from the event's commit via the GitHub connector
+        prUrl:
+          type: string
+          nullable: true
+          description: HTML URL of the correlated pull request
+        branch:
+          type: string
+          nullable: true
+          description: Git branch from event metadata (branch or branch_name key)
         securityFindings:
           type: array
           items:
