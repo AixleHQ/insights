@@ -9,12 +9,13 @@ module Api
       # GET /api/v1/organizations/:organization_id/connectors
       def index
         connectors = current_organization.organization_connectors.order(:connector_type)
+        authorize! connectors.new
 
         # Allow filtering by type
         connectors = connectors.by_type(params[:type]) if params[:type].present?
         connectors = connectors.active if params[:active] == "true"
 
-        render_collection(connectors, OrganizationConnectorSerializer)
+        render_collection(connectors, OrganizationConnectorSerializer, serializer_params: { collection: true })
       end
 
       # GET /api/v1/organizations/:organization_id/connectors/:id
@@ -271,19 +272,34 @@ module Api
         provider_class = Oauth::BaseProvider.provider_class(connector_type)
         token_data = provider_class.exchange_code(code, redirect_uri: oauth_callback_url)
 
-        connector = current_organization.organization_connectors
-                                        .find_or_initialize_by(connector_type: connector_type)
+        external_org_id = token_data[:account_id]
+        multi_instance = OrganizationConnector::MULTI_INSTANCE_CONNECTOR_TYPES.include?(connector_type)
+        if multi_instance && external_org_id.blank?
+          return render json: {
+            error: "Unprocessable Entity",
+            errors: { external_org_id: [ "is required for this connector type" ] }
+          }, status: :unprocessable_content
+        end
+
+        connector = if multi_instance
+          current_organization.organization_connectors
+                              .find_or_initialize_by(connector_type: connector_type, external_org_id: external_org_id)
+        else
+          current_organization.organization_connectors
+                              .find_or_initialize_by(connector_type: connector_type)
+        end
         creating = connector.new_record?
         connector.assign_attributes(
           access_token: token_data[:access_token],
           refresh_token: token_data[:refresh_token],
           token_expires_at: token_data[:expires_at],
-          external_org_id: token_data[:account_id],
+          external_org_id: external_org_id,
           external_org_name: token_data[:account_name],
           is_active: true,
           status: "connected",
           last_error: nil
         )
+        connector.label = params[:label] if params[:label].present?
 
         if connector.save
           OrganizationAuditLog.log(
@@ -301,6 +317,13 @@ module Api
             errors: format_validation_errors(connector.errors)
           }, status: :unprocessable_content
         end
+      rescue ActiveRecord::RecordNotUnique
+        # Two simultaneous OAuth callbacks for the same org + external_org_id raced on
+        # idx_org_connectors_oauth_dedup. The other request already inserted the row —
+        # return it as if this callback succeeded (idempotent reconnect).
+        connector = current_organization.organization_connectors
+                                        .find_by!(connector_type: connector_type, external_org_id: external_org_id)
+        render_resource(connector, OrganizationConnectorSerializer)
       rescue Oauth::MissingCredentialsError => e
         render json: { error: e.message, code: "integration_not_configured" }, status: :service_unavailable
       end
@@ -313,12 +336,12 @@ module Api
 
       def connector_params
         params.permit(:connector_type, :access_token, :refresh_token, :token_expires_at,
-                      :external_account_id, :external_account_name, :webhook_secret, :is_active)
+                      :external_account_id, :external_account_name, :webhook_secret, :is_active, :label)
       end
 
       def connector_update_params
         params.permit(:access_token, :refresh_token, :token_expires_at,
-                      :external_account_id, :external_account_name, :webhook_secret, :is_active)
+                      :external_account_id, :external_account_name, :webhook_secret, :is_active, :label)
       end
 
       def oauth_callback_url

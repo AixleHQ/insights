@@ -1,5 +1,6 @@
 class OrganizationConnector < ApplicationRecord
   CONNECTOR_TYPES = %w[github gitlab bitbucket jira linear openrouter anthropic openai gemini slack github_copilot cursor].freeze
+  MULTI_INSTANCE_CONNECTOR_TYPES = %w[github gitlab bitbucket jira linear openrouter openai].freeze
   STATUSES = %w[connected testing error disconnected].freeze
   SCOPES = %w[org project persona].freeze
 
@@ -18,11 +19,15 @@ class OrganizationConnector < ApplicationRecord
   has_many :connector_health_snapshots, dependent: :destroy
 
   validates :connector_type, presence: true, inclusion: { in: CONNECTOR_TYPES }
-  validates :connector_type, uniqueness: { scope: :organization_id, message: "already exists for this organization" }
+  validates :connector_type, uniqueness: { scope: :organization_id, message: "already exists for this organization" },
+            unless: :multi_instance?
+  validates :external_org_id, uniqueness: { scope: [ :organization_id, :connector_type ] },
+            if: -> { multi_instance? && external_org_id.present? }
   validates :is_active, inclusion: { in: [ true, false ] }
   validates :status, inclusion: { in: STATUSES }
   validates :connector_scope, inclusion: { in: SCOPES }
 
+  before_validation :normalize_external_org_id
   before_validation :assign_scope, on: :create
 
   encrypts :access_token
@@ -38,6 +43,10 @@ class OrganizationConnector < ApplicationRecord
   def token_expired?
     return false if token_expires_at.nil?
     token_expires_at < Time.current
+  end
+
+  def multi_instance?
+    connector_type.in?(MULTI_INSTANCE_CONNECTOR_TYPES)
   end
 
   def source_control?
@@ -133,6 +142,10 @@ class OrganizationConnector < ApplicationRecord
 
   def assign_scope
     self.connector_scope = SCOPE_BY_TYPE.fetch(connector_type.to_s, "org")
+  end
+
+  def normalize_external_org_id
+    self.external_org_id = external_org_id.to_s.strip.presence
   end
 
   def assign_webhook_token

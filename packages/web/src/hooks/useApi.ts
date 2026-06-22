@@ -1184,14 +1184,17 @@ export function useCreateConnector() {
       orgId,
       code,
       connectorType,
+      label,
     }: {
       orgId: string;
       code: string;
       connectorType: string;
+      label?: string;
     }) =>
       api.post<Connector>(`/organizations/${orgId}/connectors/callback`, {
         code,
         connector_type: connectorType,
+        ...(label ? { label } : {}),
       }, {
         // Rails sets current_organization from this header only (see ApplicationController#set_current_organization);
         // the :organization_id path segment is not used for org context. Global api.ts also adds the header when
@@ -1214,14 +1217,17 @@ export function useConnectWithApiKey() {
       orgId,
       connectorType,
       apiKey,
+      label,
     }: {
       orgId: string;
       connectorType: string;
       apiKey: string;
+      label?: string;
     }) =>
       api.post<Connector>(`/organizations/${orgId}/connectors`, {
         connector_type: connectorType,
         access_token: apiKey,
+        ...(label ? { label } : {}),
       }),
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });

@@ -45,6 +45,7 @@ interface ProviderConfig {
   requiresWebhook: boolean;
   requiresOAuth: boolean;
   docUrl?: string;
+  multiInstance?: boolean;
 }
 
 const providers: Record<string, ProviderConfig> = {
@@ -67,6 +68,7 @@ const providers: Record<string, ProviderConfig> = {
     requiresWebhook: true,
     requiresOAuth: true,
     docUrl: "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/authorizing-oauth-apps",
+    multiInstance: true,
   },
   gitlab: {
     id: "gitlab",
@@ -86,6 +88,7 @@ const providers: Record<string, ProviderConfig> = {
     requiresWebhook: true,
     requiresOAuth: true,
     docUrl: "https://docs.gitlab.com/ee/api/oauth2.html",
+    multiInstance: true,
   },
   bitbucket: {
     id: "bitbucket",
@@ -105,6 +108,7 @@ const providers: Record<string, ProviderConfig> = {
     requiresWebhook: true,
     requiresOAuth: true,
     docUrl: "https://support.atlassian.com/bitbucket-cloud/docs/use-oauth-on-bitbucket-cloud/",
+    multiInstance: true,
   },
   jira: {
     id: "jira",
@@ -124,6 +128,7 @@ const providers: Record<string, ProviderConfig> = {
     requiresWebhook: false,
     requiresOAuth: true,
     docUrl: "https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/",
+    multiInstance: true,
   },
   linear: {
     id: "linear",
@@ -143,6 +148,7 @@ const providers: Record<string, ProviderConfig> = {
     requiresWebhook: true,
     requiresOAuth: true,
     docUrl: "https://developers.linear.app/docs/oauth/authentication",
+    multiInstance: true,
   },
   github_copilot: {
     id: "github_copilot",
@@ -198,6 +204,7 @@ export function IntegrationSetup() {
   const [error, setError] = useState<string | null>(null);
   const [config, setConfig] = useState({
     name: "",
+    label: "",
     syncRepos: true,
     syncPRs: true,
     webhookEnabled: true,
@@ -225,7 +232,12 @@ export function IntegrationSetup() {
         isProcessingCallback.current = true;
 
         try {
-          await createConnector({ orgId: currentOrg.id, code, connectorType: provider.name });
+          await createConnector({
+            orgId: currentOrg.id,
+            code,
+            connectorType: provider.name,
+            ...(config.label.trim() ? { label: config.label.trim() } : {}),
+          });
           setError(null);
           setIsAuthorizing(false);
           setStep("configure");
@@ -239,7 +251,7 @@ export function IntegrationSetup() {
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [currentOrg, provider, createConnector]);
+  }, [currentOrg, provider, createConnector, config.label]);
 
   if (!provider) {
     return (
@@ -455,6 +467,21 @@ export function IntegrationSetup() {
                     Aixle Insights will request read-only access to monitor AI tool activity.
                     <br />
                     We never store your credentials.
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="oauth-label">Label <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <Input
+                    id="oauth-label"
+                    type="text"
+                    placeholder="e.g. Work org, Personal account"
+                    value={config.label}
+                    onChange={(e) => setConfig({ ...config, label: e.target.value })}
+                    autoComplete="off"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Optional display name for this connection.
                   </p>
                 </div>
 

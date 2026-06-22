@@ -24,6 +24,7 @@ vi.mock("@/hooks/useApi", () => ({
   useSyncConnector: () => ({ mutateAsync: mockMutateAsync }),
   useDeleteConnector: () => ({ mutateAsync: mockMutateAsync }),
   useTestConnector: () => ({ mutateAsync: mockMutateAsync }),
+  useUpdateConnector: () => ({ mutateAsync: mockMutateAsync }),
   useConnectWithApiKey: () => ({ mutateAsync: mockMutateAsync }),
   useConnectSlack: () => ({ mutateAsync: mockMutateAsync }),
   useToolAccounts: vi.fn(() => ({ data: [], isLoading: false })),
@@ -46,14 +47,14 @@ vi.mock("@/components/integrations/ApiKeyConnectSheet", () => ({
 
 const mockConnector = {
   id: "conn-1",
-  connector_type: "gitlab",
+  connectorType: "gitlab",
   status: "connected" as const,
-  external_account_name: "my-org",
-  last_sync_at: null,
-  last_error: null,
-  repository_count: 4,
-  synced_event_count: 12,
-  last_event_at: "2026-04-28T10:00:00Z",
+  externalAccountName: "my-org",
+  lastSyncAt: null,
+  lastError: null,
+  repositoryCount: 4,
+  syncedEventCount: 12,
+  lastEventAt: "2026-04-28T10:00:00Z",
 };
 
 function renderAt(path: string) {
@@ -165,6 +166,44 @@ describe("Integrations", () => {
       expect(screen.getByText(/12 synced events/i)).toBeInTheDocument();
     });
 
+    it("calls useUpdateConnector when rename is confirmed", async () => {
+      const user = userEvent.setup();
+      vi.mocked(useConnectors).mockReturnValue({
+        data: [mockConnector],
+        isLoading: false,
+      } as ReturnType<typeof useConnectors>);
+
+      renderAt("/integrations/connected");
+
+      await user.click(screen.getByRole("button", { name: /actions/i }));
+      await user.click(screen.getByRole("menuitem", { name: /rename/i }));
+      await user.clear(screen.getByLabelText(/label/i));
+      await user.type(screen.getByLabelText(/label/i), "Renamed");
+      await user.click(screen.getByRole("button", { name: /save/i }));
+
+      expect(mockMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { label: "Renamed" } }),
+      );
+    });
+
+    it("shows rename error and keeps dialog open when update fails", async () => {
+      const user = userEvent.setup();
+      mockMutateAsync.mockRejectedValueOnce(new Error("Update failed"));
+      vi.mocked(useConnectors).mockReturnValue({
+        data: [mockConnector],
+        isLoading: false,
+      } as ReturnType<typeof useConnectors>);
+
+      renderAt("/integrations/connected");
+
+      await user.click(screen.getByRole("button", { name: /actions/i }));
+      await user.click(screen.getByRole("menuitem", { name: /rename/i }));
+      await user.click(screen.getByRole("button", { name: /save/i }));
+
+      expect(await screen.findByText("Update failed")).toBeInTheDocument();
+      expect(screen.getByRole("dialog", { name: /rename/i })).toBeInTheDocument();
+    });
+
     it("does not render personal tool accounts in Connected tab", () => {
       vi.mocked(useToolAccounts).mockReturnValue({
         data: [
@@ -208,14 +247,29 @@ describe("Integrations", () => {
       expect(within(geminiCard).getByRole("button", { name: "Connect" })).toBeInTheDocument();
     });
 
-    it("does not show providers that are already connected", () => {
+    it("still shows multi-instance providers (GitLab) even when already connected", () => {
       vi.mocked(useConnectors).mockReturnValue({
         data: [mockConnector],
         isLoading: false,
       } as ReturnType<typeof useConnectors>);
 
       renderAt("/integrations/available");
-      expect(screen.queryByText("GitLab")).not.toBeInTheDocument();
+      expect(screen.getByText("GitLab")).toBeInTheDocument();
+    });
+
+    it("hides single-instance providers (Slack) once connected", () => {
+      const slackConnector = {
+        ...mockConnector,
+        id: "conn-slack",
+        connectorType: "slack",
+      };
+      vi.mocked(useConnectors).mockReturnValue({
+        data: [slackConnector],
+        isLoading: false,
+      } as ReturnType<typeof useConnectors>);
+
+      renderAt("/integrations/available");
+      expect(screen.queryByText("Slack")).not.toBeInTheDocument();
     });
   });
 

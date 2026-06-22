@@ -982,4 +982,112 @@ RSpec.describe AiUsageSyncJob, type: :job do
       }.to raise_error(RuntimeError, /HTTP 429/)
     end
   end
+
+  # R1 (AIX-347): Two openrouter connectors in one org — both must be reconciled.
+  # Note: usage events share tool_name="openrouter_api" namespace; per-connector dedup
+  # requires a separate ticket (see story risks R1).
+  describe "#perform — multiple openrouter connectors per org" do
+    let(:connector_a) do
+      create(:organization_connector, organization: organization, connector_type: "openrouter", is_active: true)
+    end
+    let(:connector_b) do
+      create(:organization_connector, organization: organization, connector_type: "openrouter", is_active: true)
+    end
+    let(:usage_a) do
+      [ { external_id: "or-a-1", model: "gpt-4o", tokens_in: 100, tokens_out: 50, cost_usd: 0.001, occurred_at: 1.day.ago } ]
+    end
+    let(:usage_b) do
+      [ { external_id: "or-b-1", model: "claude-3-5-sonnet", tokens_in: 200, tokens_out: 100, cost_usd: 0.002, occurred_at: 1.day.ago } ]
+    end
+
+    before do
+      connector_a
+      connector_b
+      allow_any_instance_of(Oauth::OpenrouterProvider).to receive(:fetch_activity) do |provider_instance|
+        if provider_instance.instance_variable_get(:@connector) == connector_a
+          usage_a
+        else
+          usage_b
+        end
+      end
+    end
+
+    it "reconciles both connectors (calls fetch_activity for each)" do
+      allow(connector_a).to receive(:webhook_active?).and_return(false)
+      allow(connector_b).to receive(:webhook_active?).and_return(false)
+
+      provider_a = instance_double(Oauth::OpenrouterProvider, fetch_activity: usage_a)
+      provider_b = instance_double(Oauth::OpenrouterProvider, fetch_activity: usage_b)
+
+      call_count = 0
+      allow(Oauth::OpenrouterProvider).to receive(:new) do
+        call_count += 1
+        call_count == 1 ? provider_a : provider_b
+      end
+
+      job.perform(organization.id, "openrouter")
+
+      expect(provider_a).to have_received(:fetch_activity)
+      expect(provider_b).to have_received(:fetch_activity)
+    end
+
+    it "marks both connectors synced after reconciliation" do
+      job.perform(organization.id, "openrouter")
+
+      expect(connector_a.reload.status).to eq("connected")
+      expect(connector_b.reload.status).to eq("connected")
+    end
+  end
+
+  describe "#perform — multiple openai connectors per org" do
+    let(:connector_a) do
+      create(:organization_connector, organization: organization, connector_type: "openai", is_active: true)
+    end
+    let(:connector_b) do
+      create(:organization_connector, organization: organization, connector_type: "openai", is_active: true)
+    end
+    let(:usage_a) do
+      [ { external_id: "oa-a-1", model: "gpt-4o", tokens_in: 100, tokens_out: 50, occurred_at: 1.day.ago } ]
+    end
+    let(:usage_b) do
+      [ { external_id: "oa-b-1", model: "gpt-4.1-mini", tokens_in: 200, tokens_out: 100, occurred_at: 1.day.ago } ]
+    end
+
+    before do
+      connector_a
+      connector_b
+    end
+
+    it "reconciles both connectors (fetch_usage is called for each)" do
+      provider_a = instance_double(Oauth::OpenaiProvider, fetch_usage: usage_a, fetch_costs: {})
+      provider_b = instance_double(Oauth::OpenaiProvider, fetch_usage: usage_b, fetch_costs: {})
+      call_count = 0
+
+      allow(Oauth::OpenaiProvider).to receive(:new) do
+        call_count += 1
+        call_count == 1 ? provider_a : provider_b
+      end
+
+      job.perform(organization.id, "openai")
+
+      expect(provider_a).to have_received(:fetch_usage)
+      expect(provider_b).to have_received(:fetch_usage)
+    end
+
+    it "marks both connectors synced after reconciliation" do
+      provider_a = instance_double(Oauth::OpenaiProvider, fetch_usage: usage_a, fetch_costs: {})
+      provider_b = instance_double(Oauth::OpenaiProvider, fetch_usage: usage_b, fetch_costs: {})
+      call_count = 0
+
+      allow(Oauth::OpenaiProvider).to receive(:new) do
+        call_count += 1
+        call_count == 1 ? provider_a : provider_b
+      end
+
+      job.perform(organization.id, "openai")
+
+      expect(connector_a.reload.status).to eq("connected")
+      expect(connector_b.reload.status).to eq("connected")
+    end
+  end
 end

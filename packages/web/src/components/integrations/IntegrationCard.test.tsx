@@ -188,6 +188,77 @@ describe("IntegrationCard — connected integration", () => {
       expect(onDisconnect).toHaveBeenCalledWith("conn-1");
     });
   });
+
+  describe("rename menu item", () => {
+    it("shows Rename when onRename is provided", async () => {
+      const user = userEvent.setup();
+      render(<IntegrationCard integration={baseIntegration} onRename={vi.fn()} />);
+
+      await user.click(screen.getByRole("button", { name: /actions/i }));
+      expect(screen.getByRole("menuitem", { name: /rename/i })).toBeInTheDocument();
+    });
+
+    it("does not show Rename when onRename is not provided", async () => {
+      const user = userEvent.setup();
+      render(<IntegrationCard integration={baseIntegration} onDisconnect={vi.fn()} />);
+
+      await user.click(screen.getByRole("button", { name: /actions/i }));
+      expect(screen.queryByRole("menuitem", { name: /rename/i })).not.toBeInTheDocument();
+    });
+
+    it("opens dialog pre-filled with current label on Rename click", async () => {
+      const user = userEvent.setup();
+      const integration: IntegrationData = { ...baseIntegration, label: "My label" };
+      render(<IntegrationCard integration={integration} onRename={vi.fn()} />);
+
+      await user.click(screen.getByRole("button", { name: /actions/i }));
+      await user.click(screen.getByRole("menuitem", { name: /rename/i }));
+
+      expect(screen.getByRole("dialog", { name: /rename/i })).toBeInTheDocument();
+      expect(screen.getByLabelText(/label/i)).toHaveValue("My label");
+    });
+
+    it("calls onRename with connector id and new label on Save", async () => {
+      const user = userEvent.setup();
+      const onRename = vi.fn();
+      render(<IntegrationCard integration={baseIntegration} onRename={onRename} />);
+
+      await user.click(screen.getByRole("button", { name: /actions/i }));
+      await user.click(screen.getByRole("menuitem", { name: /rename/i }));
+
+      await user.clear(screen.getByLabelText(/label/i));
+      await user.type(screen.getByLabelText(/label/i), "New name");
+      await user.click(screen.getByRole("button", { name: /save/i }));
+
+      expect(onRename).toHaveBeenCalledWith("conn-1", "New name");
+    });
+
+    it("keeps dialog open and shows error when rename fails", async () => {
+      const user = userEvent.setup();
+      const onRename = vi.fn().mockRejectedValueOnce(new Error("Rename failed"));
+      render(<IntegrationCard integration={baseIntegration} onRename={onRename} />);
+
+      await user.click(screen.getByRole("button", { name: /actions/i }));
+      await user.click(screen.getByRole("menuitem", { name: /rename/i }));
+      await user.click(screen.getByRole("button", { name: /save/i }));
+
+      expect(await screen.findByText("Rename failed")).toBeInTheDocument();
+      expect(screen.getByRole("dialog", { name: /rename/i })).toBeInTheDocument();
+    });
+
+    it("closes dialog on Cancel without calling onRename", async () => {
+      const user = userEvent.setup();
+      const onRename = vi.fn();
+      render(<IntegrationCard integration={baseIntegration} onRename={onRename} />);
+
+      await user.click(screen.getByRole("button", { name: /actions/i }));
+      await user.click(screen.getByRole("menuitem", { name: /rename/i }));
+      await user.click(screen.getByRole("button", { name: /cancel/i }));
+
+      expect(onRename).not.toHaveBeenCalled();
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+  });
 });
 
 describe("IntegrationCard — available provider", () => {
@@ -227,5 +298,54 @@ describe("IntegrationCard — available provider", () => {
   it("returns null when no provider or integration is given", () => {
     const { container } = render(<IntegrationCard />);
     expect(container.firstChild).toBeNull();
+  });
+});
+
+describe("IntegrationCard — label display", () => {
+  it("renders label when present on connected integration", () => {
+    const integration: IntegrationData = {
+      ...baseIntegration,
+      provider: "github",
+      name: "GitHub",
+      label: "Work account",
+    };
+    render(<IntegrationCard integration={integration} />);
+    expect(screen.getByText(/Work account/)).toBeInTheDocument();
+  });
+
+  it("renders account_name when label is absent", () => {
+    const integration: IntegrationData = {
+      ...baseIntegration,
+      provider: "github",
+      name: "GitHub",
+      metadata: { account_name: "my-org" },
+    };
+    render(<IntegrationCard integration={integration} />);
+    expect(screen.getByText(/my-org/)).toBeInTheDocument();
+  });
+
+  it("prefers label over account_name when both are present", () => {
+    const integration: IntegrationData = {
+      ...baseIntegration,
+      provider: "github",
+      name: "GitHub",
+      label: "Primary org",
+      metadata: { account_name: "secondary-name" },
+    };
+    render(<IntegrationCard integration={integration} />);
+    expect(screen.getByText(/Primary org/)).toBeInTheDocument();
+    expect(screen.queryByText(/secondary-name/)).not.toBeInTheDocument();
+  });
+
+  it("falls back to account_name when label is whitespace-only", () => {
+    const integration: IntegrationData = {
+      ...baseIntegration,
+      provider: "github",
+      name: "GitHub",
+      label: "   ",
+      metadata: { account_name: "fallback-org" },
+    };
+    render(<IntegrationCard integration={integration} />);
+    expect(screen.getByText(/fallback-org/)).toBeInTheDocument();
   });
 });

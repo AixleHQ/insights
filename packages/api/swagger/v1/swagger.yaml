@@ -1091,6 +1091,10 @@ paths:
                 is_active:
                   type: boolean
                   default: true
+                label:
+                  type: string
+                  nullable: true
+                  description: Optional user-supplied label to distinguish multiple connectors of the same provider
               required:
                 - connector_type
       responses:
@@ -1159,6 +1163,10 @@ paths:
                   type: string
                 is_active:
                   type: boolean
+                label:
+                  type: string
+                  nullable: true
+                  description: Optional user-supplied label to distinguish multiple connectors of the same provider
       responses:
         '200':
           description: Connector updated
@@ -1267,6 +1275,10 @@ paths:
                     type: integer
                   repository_count:
                     type: integer
+                    nullable: true
+                  synced_event_count:
+                    type: integer
+                    nullable: true
                   last_event_at:
                     type: string
                     format: date-time
@@ -1380,7 +1392,12 @@ paths:
   /api/v1/organizations/{organization_id}/connectors/callback:
     post:
       summary: OAuth callback
-      description: Handles the OAuth callback and exchanges the code for tokens
+      description: |
+        Handles the OAuth callback and exchanges the code for tokens.
+        For multi-instance providers (github, gitlab, bitbucket, jira, linear), re-authorizing
+        the same external account (same external_org_id) updates the existing connector; a different
+        external account creates a new connector row. Single-instance providers always upsert by
+        connector_type.
       tags:
         - Organization Connectors
       parameters:
@@ -1399,6 +1416,10 @@ paths:
                 code:
                   type: string
                   description: OAuth authorization code
+                label:
+                  type: string
+                  nullable: true
+                  description: Optional user-supplied label to distinguish multiple connectors of the same provider
               required:
                 - connector_type
                 - code
@@ -5851,6 +5872,10 @@ components:
           enum: [github, gitlab, bitbucket, jira, linear, openrouter, anthropic, openai, gemini, slack, github_copilot, cursor]
         isActive:
           type: boolean
+        label:
+          type: string
+          nullable: true
+          description: User-supplied label to distinguish multiple connectors of the same provider
         externalAccountId:
           type: string
           nullable: true

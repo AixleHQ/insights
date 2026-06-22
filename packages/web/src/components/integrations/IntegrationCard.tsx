@@ -10,6 +10,7 @@ import {
   ChevronDown,
   KeyRound,
   Zap,
+  Pencil,
   Building2,
   FolderKanban,
   User,
@@ -25,6 +26,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { cn, formatDistanceToNow } from "@/lib/utils";
 import { ProviderLogo } from "@/components/icons";
 import type { ConnectorStatus, ConnectorHealthStats } from "@/lib/types";
@@ -41,6 +51,7 @@ export interface IntegrationData {
   last_sync_at?: string;
   last_event_at?: string;
   sync_error?: string;
+  label?: string | null;
   metadata?: {
     account_name?: string;
     resources_count?: number;
@@ -64,6 +75,7 @@ interface IntegrationCardProps {
   onSync?: (id: string) => void;
   onTest?: (id: string) => void;
   onDisconnect?: (id: string) => void;
+  onRename?: (id: string, newLabel: string) => Promise<void> | void;
   onRegenerateToken?: (id: string) => void;
   onConnect?: (providerId: string) => void;
   onSetupWebhook?: (id: string) => void;
@@ -147,12 +159,17 @@ export function IntegrationCard({
   onSync,
   onTest,
   onDisconnect,
+  onRename,
   onRegenerateToken,
   onConnect,
   onSetupWebhook,
   isTesting = false,
   className,
 }: IntegrationCardProps) {
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
+  const [renameError, setRenameError] = useState<string | null>(null);
+  const [isRenaming, setIsRenaming] = useState(false);
   // Display as available provider to connect
   if (provider && !integration) {
     return (
@@ -180,8 +197,8 @@ export function IntegrationCard({
         </CardHeader>
         <CardContent className="space-y-4">
           <ul className="space-y-1 text-xs text-muted-foreground">
-            {provider.features.slice(0, 3).map((feature, i) => (
-              <li key={i} className="flex items-center gap-2">
+            {provider.features.slice(0, 3).map((feature) => (
+              <li key={feature} className="flex items-center gap-2">
                 <div className="size-1 rounded-full bg-muted-foreground" />
                 {feature}
               </li>
@@ -206,6 +223,23 @@ export function IntegrationCard({
   const StatusIcon = status.icon;
   const isSyncing = integration.status === "testing" && !isTesting;
   const statusLabel = isSyncing ? "Syncing…" : status.label;
+  const normalizedLabel = integration.label?.trim();
+  const displayAccountLabel = normalizedLabel || integration.metadata?.account_name;
+
+  const submitRename = async () => {
+    if (!onRename) return;
+
+    setRenameError(null);
+    setIsRenaming(true);
+    try {
+      await onRename(integration.id, renameValue.trim());
+      setRenameOpen(false);
+    } catch (error) {
+      setRenameError(error instanceof Error ? error.message : "Failed to rename connector.");
+    } finally {
+      setIsRenaming(false);
+    }
+  };
 
   return (
     <Card className={cn("group relative transition-all hover:shadow-md", className)}>
@@ -217,8 +251,7 @@ export function IntegrationCard({
               <CardTitle className="text-base">{integration.name}</CardTitle>
               <CardDescription className="text-xs capitalize">
                 {integration.provider.replace("-", " ")}
-                {integration.metadata?.account_name &&
-                  ` · ${integration.metadata.account_name}`}
+                {displayAccountLabel && ` · ${displayAccountLabel}`}
               </CardDescription>
               {integration.scope && (
                 <div className="mt-1">
@@ -266,7 +299,19 @@ export function IntegrationCard({
                   Setup webhook
                 </DropdownMenuItem>
               )}
-              {(onSync || onTest || onRegenerateToken || onSetupWebhook) && <DropdownMenuSeparator />}
+              {onRename && (
+                <DropdownMenuItem
+                  onClick={() => {
+                    setRenameValue(normalizedLabel ?? "");
+                    setRenameError(null);
+                    setRenameOpen(true);
+                  }}
+                >
+                  <Pencil className="mr-2 size-4" />
+                  Rename
+                </DropdownMenuItem>
+              )}
+              {(onSync || onTest || onRegenerateToken || onSetupWebhook || onRename) && <DropdownMenuSeparator />}
               <DropdownMenuItem
                 className="text-destructive"
                 onClick={() => onDisconnect?.(integration.id)}
@@ -276,6 +321,47 @@ export function IntegrationCard({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+            <DialogContent aria-describedby={undefined}>
+              <DialogHeader>
+                <DialogTitle>Rename connector</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-2 py-2">
+                <Label htmlFor="rename-label">Label</Label>
+                <Input
+                  id="rename-label"
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  placeholder="e.g. Work account, Team A"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      void submitRename();
+                    }
+                  }}
+                  autoFocus
+                />
+                {renameError && (
+                  <p className="text-xs text-destructive">{renameError}</p>
+                )}
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setRenameOpen(false)}
+                  disabled={isRenaming}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => void submitRename()}
+                  disabled={isRenaming}
+                >
+                  {isRenaming ? "Saving…" : "Save"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
