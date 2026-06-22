@@ -59,7 +59,15 @@ Decision hierarchy: standard Rails patterns first → existing codebase patterns
 
 **Branch naming:** always branch from `develop` (never `staging` or `main`). Format: `<prefix>/AIX-XX-short-description`. Prefixes: `feature/` for new functionality, `bugfix/` for bug fixes (e.g. `feature/AIX-61-user-auth`, `bugfix/AIX-319-google-sign-in`).
 
-**Commit messages:** `[AIX-XX] Short imperative description` — imperative mood, subject under 72 chars (e.g. `[AIX-58] Add connector health display`).
+**Commit messages:** Conventional Commits are mandatory. Format: `<type>(<scope>): [AIX-XX] short imperative description`. Subject under 72 chars.
+
+Valid types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `perf`, `ci`. Scope is optional but encouraged for package-scoped changes (e.g. `api`, `web`, `aixle-insights`, `temporal-worker`).
+
+Examples:
+- `feat(api): [AIX-184] Add project route guard and token refresh`
+- `fix(aixle-insights): [AIX-338] Pass resolved path to sqlite open helper`
+
+The `[AIX-XX]` ticket prefix is required in the subject (not the footer). Conventional Commits enable automated CHANGELOG generation and clear release notes.
 
 - Branch from `develop`. Full git conventions also in [AGENTS.md](AGENTS.md#git-conventions).
 - **Before every commit, run linters**: `make lint-api` (RuboCop) and/or `make lint-web` (ESLint) for what changed. Errors must be resolved; warnings are acceptable.
