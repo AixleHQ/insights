@@ -458,12 +458,110 @@ RSpec.describe 'Api::V1::Projects', type: :request do
     end
 
     context 'without events' do
-      it 'returns empty data' do
-        authenticated_get "/api/v1/projects/#{project.id}/stats/daily_by_tool", user: user
+      it 'returns zero-filled data for the requested window' do
+        authenticated_get "/api/v1/projects/#{project.id}/stats/daily_by_tool", user: user,
+                          params: { days: 7 }
 
         expect_success
-        expect(json_response[:data]).to eq([])
+        expect(json_response[:data].length).to eq(8) # 7 days + today, zero-filled
+        expect(json_response[:data]).to all(have_key(:date))
         expect(json_response[:tools]).to eq([ 'Other' ])
+      end
+    end
+
+    context 'with granularity=day (default)' do
+      before do
+        create(:tool_event, project: project, organization: organization, tool_name: 'claude_code',
+               occurred_at: 2.days.ago)
+        create(:tool_event, project: project, organization: organization, tool_name: 'claude_code',
+               occurred_at: 2.days.ago)
+        create(:tool_event, project: project, organization: organization, tool_name: 'cursor',
+               occurred_at: 1.day.ago)
+      end
+
+      it 'returns daily data points for the specified days window' do
+        authenticated_get "/api/v1/projects/#{project.id}/stats/daily_by_tool", user: user,
+                          params: { days: 7 }
+
+        expect_success
+        dates = json_response[:data].map { |d| d[:date] }
+        expect(dates.length).to eq(8) # today + 7 days back
+        expect(json_response[:granularity]).to eq('day')
+      end
+
+      it 'zero-fills days with no events' do
+        authenticated_get "/api/v1/projects/#{project.id}/stats/daily_by_tool", user: user,
+                          params: { days: 7 }
+
+        expect_success
+        today = json_response[:data].find { |d| d[:date] == Date.today.iso8601 }
+        expect(today).to be_present
+        expect(today.keys).to contain_exactly(:date)
+      end
+    end
+
+    context 'with granularity=month' do
+      before do
+        create(:tool_event, project: project, organization: organization, tool_name: 'claude_code',
+               occurred_at: 2.months.ago)
+        create(:tool_event, project: project, organization: organization, tool_name: 'claude_code',
+               occurred_at: 2.months.ago)
+        create(:tool_event, project: project, organization: organization, tool_name: 'cursor',
+               occurred_at: 1.month.ago)
+      end
+
+      it 'returns monthly buckets for days=365' do
+        authenticated_get "/api/v1/projects/#{project.id}/stats/daily_by_tool", user: user,
+                          params: { days: 365, granularity: 'month' }
+
+        expect_success
+        expect(json_response[:data].length).to eq(13) # current month + 12 months back
+        expect(json_response[:granularity]).to eq('month')
+      end
+
+      it 'zero-fills months with no events' do
+        authenticated_get "/api/v1/projects/#{project.id}/stats/daily_by_tool", user: user,
+                          params: { days: 365, granularity: 'month' }
+
+        expect_success
+        this_month = Date.today.beginning_of_month.iso8601
+        current_bucket = json_response[:data].find { |d| d[:date] == this_month }
+        expect(current_bucket).to be_present
+      end
+
+      it 'aggregates tool events by month correctly' do
+        authenticated_get "/api/v1/projects/#{project.id}/stats/daily_by_tool", user: user,
+                          params: { days: 365, granularity: 'month' }
+
+        expect_success
+        two_months_ago = 2.months.ago.beginning_of_month.to_date.iso8601
+        bucket = json_response[:data].find { |d| d[:date] == two_months_ago }
+        expect(bucket).to be_present
+        expect(bucket[:claude_code]).to eq(2)
+      end
+
+      it 'returns granularity=month in response' do
+        authenticated_get "/api/v1/projects/#{project.id}/stats/daily_by_tool", user: user,
+                          params: { days: 365, granularity: 'month' }
+
+        expect_success
+        expect(json_response[:granularity]).to eq('month')
+      end
+    end
+
+    context 'with days=90' do
+      before do
+        create(:tool_event, project: project, organization: organization, tool_name: 'claude_code',
+               occurred_at: 45.days.ago)
+      end
+
+      it 'returns 91 daily data points (zero-filled)' do
+        authenticated_get "/api/v1/projects/#{project.id}/stats/daily_by_tool", user: user,
+                          params: { days: 90 }
+
+        expect_success
+        expect(json_response[:data].length).to eq(91) # today + 90 days back
+        expect(json_response[:granularity]).to eq('day')
       end
     end
   end

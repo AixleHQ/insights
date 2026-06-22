@@ -826,10 +826,17 @@ export function useProjectStats(projectId: string, days = 30) {
 }
 
 // Project daily by tool for stacked bar chart
-export function useProjectDailyByTool(projectId: string, days = 30) {
+export function useProjectDailyByTool(
+  projectId: string,
+  days = 30,
+  granularity: "day" | "month" = "day"
+) {
   return useQuery({
-    queryKey: ["projects", projectId, "stats", "daily_by_tool", days],
-    queryFn: () => api.get<DailyByToolResponse>(`/projects/${projectId}/stats/daily_by_tool?days=${days}`),
+    queryKey: ["projects", projectId, "stats", "daily_by_tool", days, granularity],
+    queryFn: () => {
+      const p = new URLSearchParams({ days: String(days), granularity });
+      return api.get<DailyByToolResponse>(`/projects/${projectId}/stats/daily_by_tool?${p}`);
+    },
     enabled: !!projectId,
   });
 }
@@ -1748,11 +1755,13 @@ export interface DailyToolData {
 export interface DailyByToolResponse {
   data: DailyToolData[];
   tools: string[];
+  granularity: "day" | "month";
+  period?: "day" | "week" | "month";
 }
 
 export interface DailyByToolOpts {
   days?: number;
-  period?: "day" | "week";
+  period?: "day" | "week" | "month";
   month?: string;
   projectId?: string;
 }

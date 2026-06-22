@@ -177,8 +177,8 @@ function SyncStatusSubsection({ orgId, connectorId }: { orgId: string; connector
 
 function OpenRouterTabContent({ orgId, days, period }: { orgId: string; days: number; period: "day" | "week" | "month" }) {
   const { data: connectorsResp } = useConnectors(orgId);
-  const { data: dailyResp, isLoading: isLoadingDaily } = useToolDaily(orgId, "openrouter_api", days, period);
-  const { data: modelsResp, isLoading: isLoadingModels, isError: isModelsError, refetch: refetchModels } = useToolModels(orgId, "openrouter_api", days);
+  const { data: dailyResp, isLoading: isLoadingDaily } = useToolDaily(orgId, "openrouter_api", days, period === "month" ? undefined : period);
+  const { data: modelsResp, isLoading: isLoadingModels } = useToolModels(orgId, "openrouter_api", days);
   const { data: usersResp, isLoading: isLoadingUsers } = useToolUsers(orgId, "openrouter_api", days);
 
   const activeOpenRouterConnector = connectorsResp?.find(isActiveOpenRouterConnector);
@@ -236,7 +236,7 @@ function OpenRouterTabContent({ orgId, days, period }: { orgId: string; days: nu
       </div>
 
       {/* Cost by model chart */}
-      <ToolModelCostChart models={models} isLoading={isLoadingModels} isError={isModelsError} onRetry={refetchModels} />
+      <ToolModelCostChart models={models} isLoading={isLoadingModels} />
 
       {/* Full model table */}
       <div className="space-y-2">
@@ -254,7 +254,7 @@ function OpenRouterTabContent({ orgId, days, period }: { orgId: string; days: nu
 }
 
 function CursorTabContent({ orgId, days, period }: { orgId: string; days: number; period: "day" | "week" | "month" }) {
-  const { data: dailyResp, isLoading: isLoadingDaily } = useToolDaily(orgId, "cursor", days, period);
+  const { data: dailyResp, isLoading: isLoadingDaily } = useToolDaily(orgId, "cursor", days, period === "month" ? undefined : period);
   const { data: modelsResp, isLoading: isLoadingModels } = useToolModels(orgId, "cursor", days);
   const { data: usersResp, isLoading: isLoadingUsers } = useToolUsers(orgId, "cursor", days);
   const { data: eventTypesResp, isLoading: isLoadingEventTypes } = useToolEventTypes(orgId, "cursor", days);
@@ -398,7 +398,7 @@ function CursorTabContent({ orgId, days, period }: { orgId: string; days: number
 }
 
 function AnthropicTabContent({ orgId, days, period }: { orgId: string; days: number; period: "day" | "week" | "month" }) {
-  const { data: dailyResp, isLoading: isLoadingDaily } = useToolDaily(orgId, "anthropic_api", days, period);
+  const { data: dailyResp, isLoading: isLoadingDaily } = useToolDaily(orgId, "anthropic_api", days, period === "month" ? undefined : period);
   const { data: modelsResp, isLoading: isLoadingModels } = useToolModels(orgId, "anthropic_api", days);
   const { data: usersResp, isLoading: isLoadingUsers } = useToolUsers(orgId, "anthropic_api", days);
 

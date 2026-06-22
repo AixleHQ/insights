@@ -215,7 +215,8 @@ module Api
       def daily_by_tool
         authorize! @project, to: :show?
 
-        days = (params[:days] || 30).to_i
+        granularity = params[:granularity].presence_in(%w[day month]) || "day"
+        days = (params[:days] || 30).to_i.clamp(1, 365)
         time_range_start = days.days.ago.beginning_of_day
         time_range_end = Time.current
 
@@ -228,20 +229,22 @@ module Api
           .limit(3)
           .pluck(:tool_name)
 
-        # Get daily data grouped by date and tool
-        daily_tool_data = events
-          .group("DATE_TRUNC('day', occurred_at)", :tool_name)
+        trunc = granularity == "month" ? "month" : "day"
+
+        # Get data grouped by bucket and tool
+        bucketed_tool_data = events
+          .group("DATE_TRUNC('#{trunc}', occurred_at)", :tool_name)
           .select(
-            "DATE_TRUNC('day', occurred_at) as day",
+            "DATE_TRUNC('#{trunc}', occurred_at) as bucket",
             "tool_name",
             "COUNT(*) as event_count"
           )
-          .order("day")
+          .order("bucket")
 
         # Transform into chart-friendly format
         date_map = {}
-        daily_tool_data.each do |row|
-          date = row.day&.to_date&.iso8601
+        bucketed_tool_data.each do |row|
+          date = row.bucket&.to_date&.iso8601
           next unless date
 
           date_map[date] ||= { date: date }
@@ -250,9 +253,17 @@ module Api
           date_map[date][tool_key] += row.event_count
         end
 
+        filled = DateBucketFiller.fill(
+          start: time_range_start,
+          finish: time_range_end,
+          granularity: granularity,
+          data_map: date_map
+        )
+
         render json: {
-          data: date_map.values.sort_by { |d| d[:date] },
-          tools: top_tools + [ "Other" ]
+          data: filled,
+          tools: top_tools + [ "Other" ],
+          granularity: granularity
         }
       end
 
