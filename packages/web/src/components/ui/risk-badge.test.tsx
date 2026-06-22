@@ -3,31 +3,24 @@ import { render, screen } from "@/test/utils";
 import { RiskBadge } from "./risk-badge";
 
 describe("RiskBadge", () => {
-  it("renders nothing for none", () => {
+  it("renders the None icon and label for none", () => {
     const { container } = render(<RiskBadge level="none" />);
-    expect(container).toBeEmptyDOMElement();
+    expect(screen.getByText("None")).toBeInTheDocument();
+    expect(container.querySelector("svg")).toBeTruthy();
   });
 
   it.each([
-    ["critical", "text-risk-critical", "bg-risk-critical"],
-    ["high", "text-risk-high", "bg-risk-high"],
-    ["medium", "text-risk-medium", "bg-risk-medium"],
-    ["low", "text-risk-low", "bg-risk-low"],
-  ] as const)("renders %s badge with dot and label", (level, textClass, dotClass) => {
+    ["critical", "Critical"],
+    ["high",     "High"],
+    ["medium",   "Medium"],
+    ["low",      "Low"],
+  ] as const)("renders %s badge with icon and sentence-case label", (level, label) => {
     render(<RiskBadge level={level} />);
-
-    expect(screen.getByText(level)).toBeInTheDocument();
-
-    const badge = screen.getByText(level).closest("[data-slot='badge']");
-    expect(badge).toHaveClass(textClass);
-
-    const dot = badge?.querySelector("span.rounded-full");
-    expect(dot).toHaveClass("size-1.5", dotClass);
+    expect(screen.getByText(label)).toBeInTheDocument();
   });
 
   it("merges custom className", () => {
-    render(<RiskBadge level="high" className="ml-2" />);
-    const badge = screen.getByText("high").closest("[data-slot='badge']");
-    expect(badge).toHaveClass("ml-2");
+    const { container } = render(<RiskBadge level="high" className="ml-2" />);
+    expect(container.firstChild).toHaveClass("ml-2");
   });
 });

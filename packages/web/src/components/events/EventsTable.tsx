@@ -11,7 +11,7 @@ import { ErrorState } from "@/components/ui/error-state";
 import { SortButton, type SortDirection } from "@/components/ui/sort-button";
 import { RiskBadge } from "@/components/ui/risk-badge";
 import { normalizeRiskLevel } from "@/lib/riskLevel";
-import { labelForEventType } from "@/lib/eventTypes";
+import { EventTypeBadge } from "@/components/ui/event-type-badge";
 import { formatDistanceToNow, humanizeToolName, cn } from "@/lib/utils";
 import {
   formatCost as formatCostValue,
@@ -92,6 +92,8 @@ export function EventsTable({
               </SortButton>
             </TableHead>
             <TableHead className="hidden sm:table-cell w-[100px]">Type</TableHead>
+            {showUserColumn && <TableHead className="w-[150px]">User</TableHead>}
+            <TableHead className="min-w-[100px]">Project</TableHead>
             <TableHead className="w-[80px] sm:w-[100px]">
               <SortButton
                 field="risk_level"
@@ -102,8 +104,6 @@ export function EventsTable({
                 Risk
               </SortButton>
             </TableHead>
-            {showUserColumn && <TableHead className="w-[150px]">User</TableHead>}
-            <TableHead className="min-w-[100px]">Project</TableHead>
             <TableHead className="w-[100px] sm:w-[120px]">
               <SortButton
                 field="created_at"
@@ -165,12 +165,7 @@ export function EventsTable({
                   </span>
                 </TableCell>
                 <TableCell className="hidden sm:table-cell">
-                  <span className="text-xs text-muted-foreground">
-                    {labelForEventType(event.event_type || "unknown")}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <RiskBadge level={normalizeRiskLevel(event.risk_level)} />
+                  <EventTypeBadge type={event.event_type} />
                 </TableCell>
                 {showUserColumn && (
                   <TableCell>
@@ -183,6 +178,9 @@ export function EventsTable({
                   <span className="text-sm text-muted-foreground truncate max-w-[140px] block">
                     {event.project?.name || "-"}
                   </span>
+                </TableCell>
+                <TableCell>
+                  <RiskBadge level={normalizeRiskLevel(event.risk_level)} />
                 </TableCell>
                 <TableCell>
                   <span

@@ -29,7 +29,7 @@ import { RiskBadge } from "@/components/ui/risk-badge";
 import { normalizeRiskLevel } from "@/lib/riskLevel";
 import { useOrg } from "@/contexts/OrgContext";
 import { useEvent } from "@/hooks/useApi";
-import { labelForEventType } from "@/lib/eventTypes";
+import { EventTypeBadge } from "@/components/ui/event-type-badge";
 import { cn, humanizeToolName } from "@/lib/utils";
 import { formatCost, formatTokens } from "@/lib/formatters";
 import { canViewEventPrompt } from "@/lib/eventAccess";
@@ -155,12 +155,10 @@ export function EventDrawer({
                     <SheetTitle className="truncate text-lg">
                       {humanizeToolName(event.toolName)}
                     </SheetTitle>
-                    <RiskBadge level={normalizeRiskLevel(event.riskLevel)} />
                   </div>
-                  <SheetDescription className="mt-1">
-                    <span>{labelForEventType(event.eventType || "unknown")}</span>
-                    {" · "}
-                    {formattedDate}
+                  <SheetDescription className="mt-1 flex flex-wrap items-center gap-2">
+                    <EventTypeBadge type={event.eventType} />
+                    <span>· {formattedDate}</span>
                   </SheetDescription>
                 </div>
                 <div className="flex items-center gap-1">
@@ -243,7 +241,7 @@ export function EventDrawer({
                     <DetailRow
                       icon={Shield}
                       label="Risk Level"
-                      value={<RiskBadge level={normalizeRiskLevel(event.riskLevel)} />}
+                      value={<RiskBadge level={normalizeRiskLevel(event.riskLevel)} className="text-sm" />}
                     />
                     <DetailRow
                       icon={DollarSign}

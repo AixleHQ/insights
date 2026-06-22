@@ -24,18 +24,21 @@ import { cn } from "@/lib/utils";
 import { humanizeToolName } from "@/lib/utils";
 import type { EventsToolFilterOption } from "@/lib/eventsToolFilters";
 import {
-  EVENT_CATEGORY_LABEL,
-  type EventCategory,
-} from "@/lib/eventTypes";
-import type { ProjectWithStats } from "@/lib/types";
+  EVENT_TYPES_BY_BAND,
+  EVENT_TYPE_BAND_DOT_CLASS,
+  EVENT_TYPE_BAND_LABEL,
+  EVENT_TYPE_BAND_ORDER,
+  EVENT_TYPE_META,
+} from "@/lib/event-types";
+import type { ProjectWithStats, EventType } from "@/lib/types";
 
 export interface EventFiltersState {
   search?: string;
   /** Canonical tool names (e.g. `["cursor", "claude_code"]`). */
   tools?: string[];
   riskLevels?: string[];
-  /** UI category keys, expanded to DB types before API calls. */
-  eventTypes?: EventCategory[];
+  /** Raw DB event_type strings (14 types). */
+  eventTypes?: EventType[];
   dateFrom?: string;
   dateTo?: string;
   /** Organization project UUIDs. */
@@ -59,9 +62,6 @@ const riskLevelOptions = [
   { value: "none", label: "None", color: "bg-muted-foreground" },
 ];
 
-const eventTypeOptions = (
-  Object.entries(EVENT_CATEGORY_LABEL) as [EventCategory, string][]
-).map(([value, label]) => ({ value, label }));
 
 function toggleArray<T extends string>(
   current: T[] | undefined,
@@ -185,7 +185,7 @@ export function EventFilters({
     chips.push({
       key: "eventTypes",
       label: "Type",
-      value: filters.eventTypes.map((t) => EVENT_CATEGORY_LABEL[t] ?? t).join(", "),
+      value: filters.eventTypes.map((t) => EVENT_TYPE_META[t].label).join(", "),
       onRemove: () => onFiltersChange({ ...filters, eventTypes: undefined }),
     });
   }
@@ -330,22 +330,36 @@ export function EventFilters({
               <DropdownMenuSubTrigger className="text-sm">
                 Event type
               </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
-                {eventTypeOptions.map((type) => (
-                  <DropdownMenuCheckboxItem
-                    key={type.value}
-                    checked={(filters.eventTypes ?? []).includes(type.value)}
-                    onSelect={(e) => e.preventDefault()}
-                    onCheckedChange={(checked) =>
-                      onFiltersChange({
-                        ...filters,
-                        eventTypes: toggleArray(filters.eventTypes, type.value, checked),
-                      })
-                    }
-                  >
-                    {type.label}
-                  </DropdownMenuCheckboxItem>
-                ))}
+              <DropdownMenuSubContent className="max-h-80 overflow-y-auto">
+                {(() => {
+                  const visibleBands = EVENT_TYPE_BAND_ORDER.filter(
+                    (b) => EVENT_TYPES_BY_BAND[b].length > 0
+                  );
+                  return visibleBands.map((band, idx) => (
+                    <div key={band}>
+                      <div className="px-2 pt-1 pb-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                        {EVENT_TYPE_BAND_LABEL[band]}
+                      </div>
+                      {EVENT_TYPES_BY_BAND[band].map((type) => (
+                        <DropdownMenuCheckboxItem
+                          key={type}
+                          checked={(filters.eventTypes ?? []).includes(type)}
+                          onSelect={(e) => e.preventDefault()}
+                          onCheckedChange={(checked) =>
+                            onFiltersChange({
+                              ...filters,
+                              eventTypes: toggleArray(filters.eventTypes, type, checked),
+                            })
+                          }
+                        >
+                          <span className={cn("mr-1.5 inline-block size-1.5 shrink-0 rounded-[2px]", EVENT_TYPE_BAND_DOT_CLASS[band])} />
+                          {EVENT_TYPE_META[type].label}
+                        </DropdownMenuCheckboxItem>
+                      ))}
+                      {idx < visibleBands.length - 1 && <DropdownMenuSeparator />}
+                    </div>
+                  ));
+                })()}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
 

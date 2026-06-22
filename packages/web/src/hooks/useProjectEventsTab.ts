@@ -8,7 +8,6 @@ import {
 } from "@/hooks/useApi";
 import { useEventsPageUpdates } from "@/hooks/useWebSocket";
 import { showEventsUserColumn, type SortField, type SortDirection, riskLevelOrder } from "@/lib/eventAccess";
-import { dbTypesForCategory } from "@/lib/eventTypes";
 import { humanizeToolName, toEventRow } from "@/lib/utils";
 import type { EventFiltersState, EventRow } from "@/components/events";
 import type { EventsToolFilterOption } from "@/lib/eventsToolFilters";
@@ -76,7 +75,7 @@ export function useProjectEventsTab({
       project_id: projectId,
       tool_name: filters.tools,
       risk_level: filters.riskLevels,
-      event_type: filters.eventTypes?.flatMap(dbTypesForCategory),
+      event_type: filters.eventTypes,
       start_date: filters.dateFrom,
       end_date: filters.dateTo,
     }),
@@ -195,7 +194,7 @@ export function useProjectEventsTab({
       const result = await exportEvents({
         tool_name: filters.tools,
         risk_level: filters.riskLevels,
-        event_type: filters.eventTypes?.flatMap(dbTypesForCategory),
+        event_type: filters.eventTypes,
         start_date: filters.dateFrom,
         end_date: filters.dateTo,
         project_id: projectId,

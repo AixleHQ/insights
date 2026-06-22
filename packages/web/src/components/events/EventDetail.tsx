@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RiskBadge } from "@/components/ui/risk-badge";
 import { normalizeRiskLevel } from "@/lib/riskLevel";
 import { useOrg } from "@/contexts/OrgContext";
-import { labelForEventType } from "@/lib/eventTypes";
+import { EventTypeBadge } from "@/components/ui/event-type-badge";
 import { cn, humanizeToolName } from "@/lib/utils";
 import { formatCost, formatTokens } from "@/lib/formatters";
 import { canViewEventPrompt } from "@/lib/eventAccess";
@@ -146,9 +146,10 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
               <h1 className="type-h3">{humanizeToolName(event.tool_name)}</h1>
               <RiskBadge level={normalizeRiskLevel(event.risk_level)} />
             </div>
-            <p className="text-sm text-muted-foreground">
-              {labelForEventType(event.event_type || "unknown")} · {formattedDate}
-            </p>
+            <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+              <EventTypeBadge type={event.event_type} />
+              <span>· {formattedDate}</span>
+            </div>
           </div>
         </div>
       </div>
