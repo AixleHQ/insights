@@ -60,12 +60,26 @@ RSpec.describe ProjectPolicy, type: :policy do
     let!(:project_membership) { create(:project_membership, user: user, project: org_project, role: "owner") }
 
     describe '#show?' do
-      it 'allows org members to view' do
+      it 'allows users with an explicit project membership to view' do
         expect(policy(org_project, current_user: user).apply(:show?)).to be true
       end
 
       it 'denies non-members' do
         expect(policy(org_project, current_user: other_user).apply(:show?)).to be false
+      end
+
+      it 'denies an org member who has no explicit project membership (AIX-381)' do
+        bare_member = create(:user)
+        create(:organization_membership, user: bare_member, organization: organization, role: 'member')
+
+        expect(policy(org_project, current_user: bare_member).apply(:show?)).to be false
+      end
+
+      it 'allows an org owner without a project membership row (implicit owner)' do
+        org_owner = create(:user)
+        create(:organization_membership, user: org_owner, organization: organization, role: 'owner')
+
+        expect(policy(org_project, current_user: org_owner).apply(:show?)).to be true
       end
     end
 

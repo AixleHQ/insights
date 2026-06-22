@@ -80,7 +80,7 @@ RSpec.describe 'Api::V1::Events', type: :request do
       expect_forbidden
     end
 
-    it 'returns only the requesting member\'s events' do
+    it 'returns all organization events to a plain member (AIX-381)' do
       other_user = create(:user)
       create(:organization_membership, user: other_user, organization: organization, role: 'member')
       other_event = create(:tool_event, organization: organization, user: other_user, tool_name: 'cursor')
@@ -91,8 +91,7 @@ RSpec.describe 'Api::V1::Events', type: :request do
 
       expect_success
       ids = json_data.map { |e| e[:id] }
-      expect(ids).to include(tool_event.id)
-      expect(ids).not_to include(other_event.id)
+      expect(ids).to include(tool_event.id, other_event.id)
     end
 
     context 'as an owner' do
@@ -135,7 +134,7 @@ RSpec.describe 'Api::V1::Events', type: :request do
       expect(json_data[:attribution]).to eq("user")
     end
 
-    it "returns 404 when a member requests a reconciled org event they do not own" do
+    it "returns a reconciled org event (attribution 'organization') to a plain member (AIX-381)" do
       org_event = create(:tool_event,
                          organization: organization,
                          user: nil,
@@ -145,7 +144,9 @@ RSpec.describe 'Api::V1::Events', type: :request do
                         user: user,
                         organization: organization
 
-      expect_not_found
+      expect_success
+      expect(json_data[:id]).to eq(org_event.id)
+      expect(json_data[:attribution]).to eq("organization")
     end
 
     it "returns attribution 'organization' for reconciled events when requested by an owner" do
@@ -196,7 +197,7 @@ RSpec.describe 'Api::V1::Events', type: :request do
       expect(json_data[:project][:slug]).to eq(project.slug)
     end
 
-    it 'returns 404 when a member requests another member\'s event' do
+    it 'returns another member\'s event to a plain member (AIX-381)' do
       other_user = create(:user)
       create(:organization_membership, user: other_user, organization: organization, role: 'member')
       other_event = create(:tool_event, organization: organization, user: other_user, tool_name: 'cursor')
@@ -205,7 +206,8 @@ RSpec.describe 'Api::V1::Events', type: :request do
                         user: user,
                         organization: organization
 
-      expect_not_found
+      expect_success
+      expect(json_data[:id]).to eq(other_event.id)
     end
 
     it 'returns 404 for non-existent event' do
@@ -501,11 +503,12 @@ RSpec.describe 'Api::V1::Events', type: :request do
         expect(response.content_type).to include("text/csv")
       end
 
-      it "includes only the requesting user's events" do
+      it "includes all org events as rows, but with member-redacted columns (AIX-381)" do
         authenticated_get export_path, user: user, organization: organization
 
+        # Member now sees every org event (rows); column redaction is asserted separately.
         expect(response.body).to include("claude_code")
-        expect(response.body).not_to include("cursor")
+        expect(response.body).to include("cursor")
       end
 
       it "does not include user_email in the header row" do

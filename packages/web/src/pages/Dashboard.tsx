@@ -1,9 +1,7 @@
-import { useOrg } from "@/contexts/OrgContext";
 import { OrgDashboard } from "./OrgDashboard";
-import { MemberDashboard } from "./MemberDashboard";
 
+// AIX-381: all org roles (including plain members) see the org-wide dashboard.
+// Personal stats remain available via the "Personal" tab inside OrgDashboard.
 export function Dashboard() {
-  const { currentRole } = useOrg();
-  if (currentRole === "member") return <MemberDashboard />;
   return <OrgDashboard />;
 }
