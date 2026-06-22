@@ -96,6 +96,12 @@ The `[AIX-XX]` ticket prefix is required in the subject (not the footer). Conven
 
 Use Grep, Glob, and Read directly for known files/symbols. Use the Explore subagent for broader open-ended exploration.
 
+## Architecture Reference Documents
+
+- Package-level ARDs (for example, `packages/tools/aixle-insights/ARD.md`) are living architecture references.
+- When a change alters package architecture, runtime layers, data flow, security boundaries, release/verification architecture, or major design decisions, update the relevant `ARD.md` in the same PR.
+- If an architecture change introduces a new package or subsystem without an ARD, create one near that subsystem and link it from the package README when useful.
+
 ## Jira ticket discipline — MANDATORY
 
 **Before suggesting that a new Jira ticket be created (or calling `createJiraIssue`), you MUST first search Jira via the Atlassian MCP to verify no existing ticket already covers the work.**

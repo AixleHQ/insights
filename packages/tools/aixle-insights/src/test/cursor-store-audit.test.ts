@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import Database from "better-sqlite3";
@@ -81,6 +81,28 @@ describe("auditLegacyCursorDbFile", () => {
       feedback_row_count: 0,
     });
   });
+
+  it("does not read symlinked legacy db files outside provided root", () => {
+    const root = mkdtempSync(join(tmpdir(), "db90-legacy-root-"));
+    const outsideRoot = mkdtempSync(join(tmpdir(), "db90-legacy-outside-"));
+    try {
+      const targetDb = join(outsideRoot, "outside", "cursor.db");
+      createLegacyDb(targetDb, 4);
+
+      const symlinkPath = join(root, "workspaceStorage", "ws1", "cursor.db");
+      mkdirSync(join(symlinkPath, ".."), { recursive: true });
+      symlinkSync(targetDb, symlinkPath);
+
+      expect(auditLegacyCursorDbFile(symlinkPath, root)).toMatchObject({
+        file_bytes: 0,
+        has_feedback_table: false,
+        feedback_row_count: 0,
+      });
+    } finally {
+      rmSync(outsideRoot, { recursive: true, force: true });
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("auditCursorLocalStores", () => {
@@ -98,5 +120,57 @@ describe("auditCursorLocalStores", () => {
     expect(report.path_c_verdict).toBe("no_legacy_dbs");
     expect(report.state_vscdb.global.daily_stats_key_count).toBe(1);
     expect(report.daily_stats_versions.buckets.some((b) => b.version === "v1.5")).toBe(true);
+  });
+
+  it("returns legacy_present_empty when cursor.db exists but has zero rows", () => {
+    const root = mkdtempSync(join(tmpdir(), "db90-audit-legacy-empty-"));
+    createItemTableDb(join(root, "globalStorage", "state.vscdb"), [
+      {
+        key: "aiCodeTracking.dailyStats.v1.5.2026-06-12",
+        value: JSON.stringify({ tabSuggestedLines: 1, tabAcceptedLines: 0 }),
+      },
+    ]);
+    createLegacyDb(join(root, "workspaceStorage", "ws1", "cursor.db"), 0);
+
+    const report = auditCursorLocalStores(root);
+    expect(report.sqlite_probe_ok).toBe(true);
+    expect(report.path_c_verdict).toBe("legacy_present_empty");
+    expect(report.legacy_cursor_db.count).toBe(1);
+    expect(report.legacy_cursor_db.total_feedback_rows).toBe(0);
+  });
+
+  it("returns legacy_has_rows when cursor.db has feedback rows", () => {
+    const root = mkdtempSync(join(tmpdir(), "db90-audit-legacy-rows-"));
+    createItemTableDb(join(root, "globalStorage", "state.vscdb"), [
+      {
+        key: "aiCodeTracking.dailyStats.v1.5.2026-06-12",
+        value: JSON.stringify({ tabSuggestedLines: 1, tabAcceptedLines: 0 }),
+      },
+    ]);
+    createLegacyDb(join(root, "workspaceStorage", "ws1", "cursor.db"), 2);
+
+    const report = auditCursorLocalStores(root);
+    expect(report.sqlite_probe_ok).toBe(true);
+    expect(report.path_c_verdict).toBe("legacy_has_rows");
+    expect(report.legacy_cursor_db.count).toBe(1);
+    expect(report.legacy_cursor_db.total_feedback_rows).toBe(2);
+  });
+
+  it("uses provided baseDir for sqlite probe", () => {
+    const root = mkdtempSync(join(tmpdir(), "db90-audit-probe-"));
+    const dbPath = join(root, "globalStorage", "state.vscdb");
+    createItemTableDb(dbPath, [
+      {
+        key: "aiCodeTracking.dailyStats.v1.5.2026-06-12",
+        value: JSON.stringify({ tabSuggestedLines: 1, tabAcceptedLines: 0 }),
+      },
+    ]);
+
+    const ok = auditCursorLocalStores(root);
+    expect(ok.sqlite_probe_ok).toBe(true);
+
+    const emptyRoot = mkdtempSync(join(tmpdir(), "db90-audit-probe-empty-"));
+    const missing = auditCursorLocalStores(emptyRoot);
+    expect(missing.sqlite_probe_ok).toBe(false);
   });
 });

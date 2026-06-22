@@ -1,7 +1,7 @@
 import { existsSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import Database from "better-sqlite3";
+import type Database from "better-sqlite3";
 import {
   DailyStatsVersionDiscovery,
   discoverDailyStatsVersionsInDb,
@@ -14,6 +14,7 @@ import {
   isGlobalStateDbPath,
   probeCursorGlobalStateDb,
 } from "./readers/cursor.js";
+import { openCursorSqliteReadonly, resolveCursorSqlitePath } from "./readers/cursor-sqlite.js";
 
 export type { DailyStatsVersionDiscovery } from "./daily-stats-versions.js";
 
@@ -74,7 +75,7 @@ function tableExists(db: Database.Database, tableName: string): boolean {
   return row !== undefined;
 }
 
-export function auditStateVscdbFile(dbPath: string): StateVscdbAuditEntry {
+export function auditStateVscdbFile(dbPath: string, rootDir?: string): StateVscdbAuditEntry {
   const entry: StateVscdbAuditEntry = {
     db_path_redacted: redactCursorPath(dbPath),
     exists: existsSync(dbPath),
@@ -85,7 +86,9 @@ export function auditStateVscdbFile(dbPath: string): StateVscdbAuditEntry {
 
   let db: Database.Database | null = null;
   try {
-    db = new Database(dbPath, { readonly: true });
+    const opened = openCursorSqliteReadonly(dbPath, { rootDir });
+    if (!opened.ok) return entry;
+    db = opened.db;
     const ds = db
       .prepare(
         `SELECT count(*) AS c FROM ${STATE_TABLE} WHERE key LIKE 'aiCodeTracking.dailyStats%'`
@@ -104,18 +107,25 @@ export function auditStateVscdbFile(dbPath: string): StateVscdbAuditEntry {
   return entry;
 }
 
-export function auditLegacyCursorDbFile(dbPath: string): LegacyDbAuditEntry {
+export function auditLegacyCursorDbFile(dbPath: string, rootDir?: string): LegacyDbAuditEntry {
   const entry: LegacyDbAuditEntry = {
     db_path_redacted: redactCursorPath(dbPath),
-    file_bytes: existsSync(dbPath) ? statSync(dbPath).size : 0,
+    file_bytes: 0,
     has_feedback_table: false,
     feedback_row_count: 0,
   };
   if (!existsSync(dbPath)) return entry;
 
+  const resolved = resolveCursorSqlitePath(dbPath, { rootDir });
+  if (!resolved.ok) return entry;
+
+  entry.file_bytes = statSync(resolved.path).size;
+
   let db: Database.Database | null = null;
   try {
-    db = new Database(dbPath, { readonly: true });
+    const opened = openCursorSqliteReadonly(resolved.path, { rootDir });
+    if (!opened.ok) return entry;
+    db = opened.db;
     if (!tableExists(db, LEGACY_TABLE)) return entry;
     entry.has_feedback_table = true;
     const row = db.prepare(`SELECT count(*) AS c FROM ${LEGACY_TABLE}`).get() as { c: number };
@@ -175,23 +185,24 @@ function pathCIngestNote(verdict: PathCLegacyVerdict, legacyCount: number, total
  * Does not read disk outside Cursor's User directory unless `baseDir` is passed (tests).
  */
 export function auditCursorLocalStores(baseDir?: string): CursorStoreAuditReport {
-  const sqlite_probe_ok = probeCursorGlobalStateDb(false);
+  const rootDir = baseDir ?? cursorUserDir();
+  const sqlite_probe_ok = probeCursorGlobalStateDb(false, baseDir);
   const statePaths = findStateVscDbs(baseDir);
   const globalPath =
     statePaths.find((p) => isGlobalStateDbPath(p)) ??
     join(baseDir ?? cursorUserDir(), "globalStorage", "state.vscdb");
 
-  const global = auditStateVscdbFile(globalPath);
+  const global = auditStateVscdbFile(globalPath, rootDir);
   const workspacePaths = statePaths.filter((p) => !isGlobalStateDbPath(p));
-  const workspaceAudits = workspacePaths.map(auditStateVscdbFile);
+  const workspaceAudits = workspacePaths.map((p) => auditStateVscdbFile(p, rootDir));
 
   const versionDiscoveries = statePaths
     .filter((p) => existsSync(p))
-    .map(discoverDailyStatsVersionsInDb);
+    .map((p) => discoverDailyStatsVersionsInDb(p, { rootDir }));
   const daily_stats_versions = mergeDailyStatsVersionDiscoveries(versionDiscoveries);
 
   const legacyPaths = findCursorDbs(baseDir);
-  const legacyEntries = legacyPaths.map(auditLegacyCursorDbFile);
+  const legacyEntries = legacyPaths.map((p) => auditLegacyCursorDbFile(p, rootDir));
   const withFeedbackTable = legacyEntries.filter((e) => e.has_feedback_table).length;
   const totalFeedbackRows = legacyEntries.reduce((sum, e) => sum + e.feedback_row_count, 0);
 

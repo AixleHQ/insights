@@ -8,6 +8,7 @@ Runbook for cutting a public npm release of **`@aixle/insights`**. The package l
 - Commit access to this repo.
 - **No long-lived npm token required.** Publishing uses OIDC Trusted Publishing (GitHub Actions OIDC). The `npm-publish` GitHub Environment must be configured with the intended reviewer(s).
 - `gh` CLI authenticated (`gh auth status` succeeds) for tag pushes via the terminal (optional if you use the GitHub UI).
+- Node.js must satisfy `@aixle/insights` engine requirements (`>=20`).
 
 **Break-glass only** (if OIDC ever fails at npm Inc.'s side): create a short-lived Granular Access Token (90-day max) scoped to `@aixle/insights`, set as `NPM_TOKEN` in GitHub Secrets, then delete it immediately after the publish completes. Never store permanently.
 
@@ -32,6 +33,7 @@ For a release of `@aixle/insights@X.Y.Z`:
    ```bash
    cd packages/tools
    npm ci
+   npm rebuild better-sqlite3
    npm run build --workspace=@aixle/insights
    npm test --workspace=@aixle/insights
    # Pack sanity:
@@ -39,6 +41,7 @@ For a release of `@aixle/insights@X.Y.Z`:
    npm pack --dry-run
    # Expect: dist/**, README.md, LICENSE, package.json
    ```
+   If `better-sqlite3` cannot load after a Node upgrade (ABI mismatch), rerun `npm rebuild better-sqlite3` before retrying build/tests.
 4. **Commit + PR** (message example):
    ```
    [AIX-<ticket>] Release @aixle/insights X.Y.Z

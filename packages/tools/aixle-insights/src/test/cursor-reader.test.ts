@@ -1,14 +1,17 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
 import {
   findCursorDbs,
   findCursorTranscriptFiles,
   findStateVscDbs,
+  probeCursorGlobalStateDb,
   parseCursorTranscriptFile,
+  dedupeDailyStatsEntries,
   readLegacyEvents,
   readCursorTranscriptSessions,
   readDailyStats,
@@ -61,6 +64,20 @@ function createEmptyDb(dbPath: string): void {
   const db = new Database(dbPath);
   db.close();
 }
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const malformedNotSqliteFixture = join(
+  __dirname,
+  "fixtures",
+  "malformed",
+  "not-sqlite.db"
+);
+const malformedTruncatedFixture = join(
+  __dirname,
+  "fixtures",
+  "malformed",
+  "sqlite-truncated.db"
+);
 
 // ─── findCursorDbs ────────────────────────────────────────────────────────────
 
@@ -132,6 +149,39 @@ describe("findStateVscDbs", () => {
     }
     // +1 for the always-included globalStorage path
     expect(findStateVscDbs(tempDir).length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("probeCursorGlobalStateDb", () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = makeTempDir();
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  it("returns true for a readable global state.vscdb with ItemTable", () => {
+    const globalDir = join(tempDir, "globalStorage");
+    mkdirSync(globalDir, { recursive: true });
+    createItemTableDb(join(globalDir, "state.vscdb"), [
+      {
+        key: "aiCodeTracking.dailyStats.v1.5.2026-06-12",
+        value: JSON.stringify({ tabSuggestedLines: 1, tabAcceptedLines: 1 }),
+      },
+    ]);
+
+    expect(probeCursorGlobalStateDb(false, tempDir)).toBe(true);
+  });
+
+  it("returns false when global state.vscdb is missing under baseDir", () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(probeCursorGlobalStateDb(false, tempDir)).toBe(false);
+    expect(errorSpy).toHaveBeenCalled();
   });
 });
 
@@ -221,6 +271,41 @@ describe("readLegacyEvents", () => {
     const results = readLegacyEvents(null, tempDir);
     expect(results[0].workspacePath).not.toContain("cursor.db");
     expect(results[0].workspacePath).toContain("ws1");
+  });
+
+  it("returns empty when a discovered cursor.db is malformed", () => {
+    const wsDir = join(tempDir, "workspaceStorage", "ws1");
+    mkdirSync(wsDir, { recursive: true });
+    writeFileSync(join(wsDir, "cursor.db"), readFileSync(malformedNotSqliteFixture));
+
+    expect(readLegacyEvents(null, tempDir)).toEqual([]);
+  });
+
+  it("ignores symlinked cursor.db files that resolve outside baseDir", () => {
+    const outsideRoot = makeTempDir();
+    try {
+      const targetDb = join(outsideRoot, "outside", "cursor.db");
+      mkdirSync(join(targetDb, ".."), { recursive: true });
+      createLegacyDb(targetDb, [
+        {
+          requestId: "r1",
+          timestamp: 1700000000000,
+          model: "gpt-4",
+          promptTokens: 10,
+          generatedTokens: 5,
+          type: 0,
+          sessionId: null,
+        },
+      ]);
+
+      const symlinkPath = join(tempDir, "workspaceStorage", "ws1", "cursor.db");
+      mkdirSync(join(symlinkPath, ".."), { recursive: true });
+      symlinkSync(targetDb, symlinkPath);
+
+      expect(readLegacyEvents(null, tempDir)).toEqual([]);
+    } finally {
+      rmSync(outsideRoot, { recursive: true, force: true });
+    }
   });
 });
 
@@ -319,6 +404,47 @@ describe("readDailyStats", () => {
   });
 });
 
+describe("dedupeDailyStatsEntries", () => {
+  it("prefers globalStorage when multiple entries share the same date", () => {
+    const entries = [
+      {
+        date: "2026-06-12",
+        dbPath: "/tmp/User/workspaceStorage/ws1/state.vscdb",
+        value: { tabSuggestedLines: 100, tabAcceptedLines: 100 },
+      },
+      {
+        date: "2026-06-12",
+        dbPath: "/tmp/User/globalStorage/state.vscdb",
+        value: { tabSuggestedLines: 1, tabAcceptedLines: 1 },
+      },
+    ];
+
+    expect(dedupeDailyStatsEntries(entries)).toEqual([entries[1]]);
+  });
+
+  it("dedupes identical workspace values and otherwise keeps highest-activity workspace value", () => {
+    const lowActivity = {
+      date: "2026-06-12",
+      dbPath: "/tmp/User/workspaceStorage/ws1/state.vscdb",
+      value: { tabSuggestedLines: 1, tabAcceptedLines: 1 },
+    };
+    const highActivity = {
+      date: "2026-06-12",
+      dbPath: "/tmp/User/workspaceStorage/ws2/state.vscdb",
+      value: { tabSuggestedLines: 5, tabAcceptedLines: 5 },
+    };
+    const duplicateHighActivity = {
+      date: "2026-06-12",
+      dbPath: "/tmp/User/workspaceStorage/ws3/state.vscdb",
+      value: { tabSuggestedLines: 5, tabAcceptedLines: 5 },
+    };
+
+    expect(
+      dedupeDailyStatsEntries([lowActivity, highActivity, duplicateHighActivity])
+    ).toEqual([highActivity]);
+  });
+});
+
 // ─── readRecentCommitSnapshots ────────────────────────────────────────────────
 
 describe("readRecentCommitSnapshots", () => {
@@ -371,6 +497,14 @@ describe("readRecentCommitSnapshots", () => {
   it("returns empty when key is absent", () => {
     makeGlobalDb([{ key: "other.key", value: "{}" }]);
     expect(readRecentCommitSnapshots(null, tempDir)).toHaveLength(0);
+  });
+
+  it("returns empty when global state.vscdb is malformed", () => {
+    const globalDir = join(tempDir, "globalStorage");
+    mkdirSync(globalDir, { recursive: true });
+    writeFileSync(join(globalDir, "state.vscdb"), readFileSync(malformedNotSqliteFixture));
+
+    expect(readRecentCommitSnapshots(null, tempDir)).toEqual([]);
   });
 });
 
@@ -539,5 +673,38 @@ describe("readDailyStats — security", () => {
     // ../../../etc is resolved by glob but no .vscdb files exist there
     const result = readDailyStats(null, join(tmpdir(), "..", "..", "etc"), false);
     expect(result).toEqual([]);
+  });
+
+  it.each([
+    ["plain text", malformedNotSqliteFixture],
+    ["truncated sqlite", malformedTruncatedFixture],
+  ])("returns empty when global state.vscdb is malformed: %s", (_label, fixturePath) => {
+    const globalDir = join(tempDir, "globalStorage");
+    mkdirSync(globalDir, { recursive: true });
+    writeFileSync(join(globalDir, "state.vscdb"), readFileSync(fixturePath));
+
+    expect(readDailyStats(null, tempDir)).toEqual([]);
+  });
+
+  it("ignores symlinked state.vscdb files that resolve outside baseDir", () => {
+    const outsideRoot = makeTempDir();
+    try {
+      const targetDb = join(outsideRoot, "outside", "state.vscdb");
+      mkdirSync(join(targetDb, ".."), { recursive: true });
+      createItemTableDb(targetDb, [
+        {
+          key: "aiCodeTracking.dailyStats.v1.5.2026-06-12",
+          value: JSON.stringify({ tabSuggestedLines: 3, tabAcceptedLines: 1 }),
+        },
+      ]);
+
+      const symlinkPath = join(tempDir, "workspaceStorage", "ws1", "state.vscdb");
+      mkdirSync(join(symlinkPath, ".."), { recursive: true });
+      symlinkSync(targetDb, symlinkPath);
+
+      expect(readDailyStats(null, tempDir)).toEqual([]);
+    } finally {
+      rmSync(outsideRoot, { recursive: true, force: true });
+    }
   });
 });
