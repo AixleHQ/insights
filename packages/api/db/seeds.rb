@@ -457,7 +457,7 @@ if org && KNOWN_DEV_USERS.any?
         ) do |ta|
           ta.external_user_id = "#{user.email.split('@').first}-#{tool}"
           ta.external_username = user.email.split('@').first
-          ta.is_active = true
+          ta.connection_state = "active"
         end
       end
       puts "  #{user.email}: created tool accounts"
