@@ -8,6 +8,7 @@ module Api
 
       # GET /api/v1/projects/:project_id/repositories
       def index
+        authorize! @project, to: :show?
         repositories = @project.repositories.includes(:organization_connector).order(:name)
 
         # Allow filtering
@@ -87,7 +88,7 @@ module Api
       private
 
       def set_project
-        @project = Project.find(params[:project_id])
+        @project = authorized_scope(Project.all).find(params[:project_id])
       end
 
       def set_repository

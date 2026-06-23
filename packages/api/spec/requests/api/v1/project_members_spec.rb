@@ -127,11 +127,11 @@ RSpec.describe "Api::V1::ProjectMembers", type: :request do
       expect(json_data.length).to eq(2)
     end
 
-    it "returns 403 for outsiders" do
+    it "returns 404 for outsiders (project not visible via authorized_scope)" do
       outsider = create(:user)
       authenticated_get "/api/v1/projects/#{project.id}/members", user: outsider
 
-      expect_forbidden
+      expect_not_found
     end
   end
 
@@ -458,6 +458,24 @@ RSpec.describe "Api::V1::ProjectMembers", type: :request do
                            user: project_owner_user
 
       expect_forbidden
+    end
+  end
+
+  # SECURITY: AIX-368 — BOLA cross-tenant access prevention
+  context "when accessing another organization's project" do
+    let(:org_b) { create(:organization) }
+    let(:org_b_project) { create(:project, organization: org_b, owner: nil) }
+
+    it "returns 404 when listing members of another org's project" do
+      authenticated_get "/api/v1/projects/#{org_b_project.id}/members", user: project_owner_user
+
+      expect_not_found
+    end
+
+    it "returns 404 when accessing member stats of another org's project" do
+      authenticated_get "/api/v1/projects/#{org_b_project.id}/members/stats", user: project_owner_user
+
+      expect_not_found
     end
   end
 end

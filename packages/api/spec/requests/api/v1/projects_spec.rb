@@ -618,10 +618,10 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       end
     end
 
-    it 'returns 403 for unauthorized users' do
+    it 'returns 404 for unauthorized users (project not visible via authorized_scope)' do
       authenticated_get "/api/v1/projects/#{project.id}/members", user: other_user
 
-      expect_forbidden
+      expect_not_found
     end
   end
 

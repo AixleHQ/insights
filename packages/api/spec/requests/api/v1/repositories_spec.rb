@@ -144,4 +144,32 @@ RSpec.describe 'Api::V1::Repositories', type: :request do
       expect(connector.reload.status).to eq('testing')
     end
   end
+
+  # SECURITY: AIX-368 — BOLA cross-tenant access prevention
+  context "when accessing another organization's project" do
+    let(:org_b) { create(:organization) }
+    let(:org_b_project) { create(:project, organization: org_b, owner: nil) }
+    let(:org_b_connector) { create(:organization_connector, organization: org_b, connector_type: "github") }
+    let!(:org_b_repo) { create(:repository, project: org_b_project, organization_connector: org_b_connector) }
+
+    it "returns 404 when listing repositories of another org's project" do
+      authenticated_get "/api/v1/projects/#{org_b_project.id}/repositories", user: admin
+
+      expect_not_found
+    end
+
+    it "returns 404 when showing a repository from another org's project" do
+      authenticated_get "/api/v1/projects/#{org_b_project.id}/repositories/#{org_b_repo.id}", user: admin
+
+      expect_not_found
+    end
+
+    it "returns 404 when creating a repository in another org's project" do
+      authenticated_post "/api/v1/projects/#{org_b_project.id}/repositories",
+                         user: admin,
+                         params: { organization_connector_id: org_b_connector.id, external_id: "999", name: "x" }
+
+      expect_not_found
+    end
+  end
 end
