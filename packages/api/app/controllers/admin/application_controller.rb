@@ -39,24 +39,14 @@ module Admin
     end
 
     def authenticate_from_jwt
-      # Try to get JWT from cookie or Authorization header
       token = cookies[:admin_token] || request.headers["Authorization"]&.sub(/^Bearer /, "")
       return nil unless token
 
-      # Decode and validate JWT (simplified - in production use proper JWT validation)
-      claims = decode_jwt(token)
+      claims = Keycloak::JwtVerifier.verify(token)
       return nil unless claims
 
       User.find_by(keycloak_sub: claims["sub"])
     rescue StandardError
-      nil
-    end
-
-    def decode_jwt(token)
-      # Simplified JWT decode - in production use proper validation with Keycloak
-      payload, = JWT.decode(token, nil, false)
-      payload
-    rescue JWT::DecodeError
       nil
     end
 
