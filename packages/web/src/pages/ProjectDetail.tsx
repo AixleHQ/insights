@@ -15,6 +15,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useOrg } from "@/contexts/OrgContext";
+import { useOrgNavGuard } from "@/hooks/useOrgNavGuard";
 
 import {
   useProject,
@@ -116,6 +117,7 @@ export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const { currentOrg, currentRole, hasRole } = useOrg();
   const navigate = useNavigate();
+  useOrgNavGuard("/projects");
   const [connectRepoOpen, setConnectRepoOpen] = useState(false);
   const [timeRange, setTimeRange] = useState<TimeRange>("7d");
 
