@@ -21,6 +21,7 @@ module Keycloak
       decoded = JWT.decode(token, public_key, true, {
         algorithm: "RS256",
         verify_expiration: true,
+        verify_not_before: true,
         verify_iss: true,
         iss: Keycloak.configuration.issuer,
         verify_aud: true,

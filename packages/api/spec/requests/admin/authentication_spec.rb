@@ -91,6 +91,18 @@ RSpec.describe 'Admin Authentication', type: :request do
       end
     end
 
+    context 'when JwtVerifier returns claims for an unrecognized keycloak_sub' do
+      before do
+        allow(Keycloak::JwtVerifier).to receive(:verify)
+          .and_return({ 'sub' => 'unknown-uuid-not-in-db' })
+      end
+
+      it 'redirects to login' do
+        get admin_root_path, headers: { 'Authorization' => 'Bearer valid.jwt.token' }
+        expect(response).to redirect_to('/admin/login')
+      end
+    end
+
     context 'when no JWT and no session cookie are present' do
       it 'redirects to login' do
         get admin_root_path
