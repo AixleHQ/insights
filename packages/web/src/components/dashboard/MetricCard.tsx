@@ -95,13 +95,13 @@ export function MetricCard({
       )}
     >
       <CardContent className="px-6 py-0">
-        <div className="flex items-start justify-between">
-          <div className="space-y-2">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 space-y-2">
             <p className="type-label text-muted-foreground">{resolvedLabel}</p>
-            <div className="flex items-baseline gap-2">
+            <div className="flex min-w-0 flex-wrap items-baseline gap-2">
               <p
                 className={cn(
-                  "font-mono-display type-h1",
+                  "min-w-0 max-w-full break-all font-mono-display type-h1",
                   isAnimating && "animate-metric-update"
                 )}
               >
