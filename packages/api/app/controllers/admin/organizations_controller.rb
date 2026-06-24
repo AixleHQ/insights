@@ -25,8 +25,10 @@ module Admin
           request:         request
         )
       end
-      deleted = orgs.destroy_all.size
-      redirect_to admin_organizations_path, notice: "Successfully deleted #{deleted} organizations."
+      destroyed, skipped = orgs.partition { |org| org.destroy }
+      notice = "Successfully deleted #{destroyed.size} organizations."
+      notice += " #{skipped.size} could not be deleted: #{skipped.map { |o| "#{o.name} (#{o.errors.full_messages.join(', ')})" }.join('; ')}." if skipped.any?
+      redirect_to admin_organizations_path, notice: notice
     end
 
     private

@@ -10,6 +10,7 @@ class User < ApplicationRecord
   has_one :personal_setting, class_name: "UserPersonalSettings", dependent: :destroy
   has_many :tool_events, class_name: "ToolEvent", dependent: :restrict_with_error
   has_many :admin_audit_logs, foreign_key: :admin_user_id, dependent: :restrict_with_error
+  has_many :actor_organization_audit_logs, class_name: "OrganizationAuditLog", foreign_key: :actor_id, dependent: :nullify
   has_many :notifications, dependent: :destroy
   has_many :user_project_favorites, dependent: :destroy
   has_many :favorited_projects, through: :user_project_favorites, source: :project
