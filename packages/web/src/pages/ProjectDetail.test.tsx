@@ -1,3 +1,4 @@
+import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@/test/utils";
 import userEvent from "@testing-library/user-event";
@@ -26,6 +27,28 @@ vi.mock("@/contexts/OrgContext", () => ({
 
 vi.mock("@/hooks/useWebSocket", () => ({
   useEventsPageUpdates: vi.fn(),
+}));
+
+vi.mock("recharts", () => ({
+  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="chart-container">{children}</div>
+  ),
+  BarChart: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="bar-chart">{children}</div>
+  ),
+  Bar: () => null,
+  CartesianGrid: () => null,
+  XAxis: () => null,
+  YAxis: () => null,
+  Legend: () => null,
+}));
+
+vi.mock("@/components/ui/chart", () => ({
+  ChartContainer: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="chart">{children}</div>
+  ),
+  ChartTooltip: () => null,
+  ChartTooltipContent: () => null,
 }));
 
 const mockUseProject = vi.fn();
@@ -285,7 +308,7 @@ describe("ProjectDetail", () => {
     });
   });
 
-  describe("ToolUsageByDayChart integration", () => {
+  describe("GroupedBarChart integration", () => {
     it("calls useProjectDailyByTool with default 7-day range and day granularity", () => {
       render(<ProjectDetail />);
 
