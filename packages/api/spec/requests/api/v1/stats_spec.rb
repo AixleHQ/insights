@@ -993,6 +993,60 @@ RSpec.describe 'Api::V1::Stats', type: :request do
 
       expect_forbidden
     end
+
+    context 'metadata fallback (no audit_log)' do
+      it 'includes events with risk_level in metadata when no audit_log exists' do
+        meta_event = create(:tool_event, organization: organization, user: user,
+                            tool_name: 'windsurf', tokens_in: 200, tokens_out: 100,
+                            cost_usd: 0.5, occurred_at: Time.current,
+                            metadata: { "risk_level" => "high" })
+
+        authenticated_get path, user: user, organization: organization
+
+        expect_success
+        row = json_response.find { |r| r[:toolName] == 'windsurf' }
+        expect(row).to be_present
+        expect(row[:eventCount]).to eq(1)
+      end
+
+      it 'excludes events with metadata risk_level "none"' do
+        create(:tool_event, organization: organization, user: user,
+               tool_name: 'aider', occurred_at: Time.current,
+               metadata: { "risk_level" => "none" })
+
+        authenticated_get path, user: user, organization: organization
+
+        expect_success
+        tool_names = json_response.map { |r| r[:toolName] }
+        expect(tool_names).not_to include('aider')
+      end
+
+      it 'prefers audit_log over metadata when both exist' do
+        event = create(:tool_event, organization: organization, user: user,
+                       tool_name: 'cody', tokens_in: 300, tokens_out: 150,
+                       cost_usd: 1.0, occurred_at: Time.current,
+                       metadata: { "risk_level" => "medium" })
+        create(:audit_log, organization: organization, tool_event: event, risk_level: 'none')
+
+        authenticated_get path, user: user, organization: organization
+
+        expect_success
+        tool_names = json_response.map { |r| r[:toolName] }
+        expect(tool_names).not_to include('cody')
+      end
+
+      it 'counts metadata-only events in overview risk_alerts' do
+        create(:tool_event, organization: organization, user: user,
+               tool_name: 'cursor', occurred_at: Time.current,
+               metadata: { "risk_level" => "critical" })
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/overview",
+                          user: user, organization: organization
+
+        expect_success
+        expect(json_response[:risk_alerts]).to be >= 1
+      end
+    end
   end
 
   describe 'GET /api/v1/organizations/:organization_id/stats/daily_by_model' do
