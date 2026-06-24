@@ -144,6 +144,8 @@ export const queryKeys = {
       ["organizations", orgId, "stats", "tools", tool, "daily", days, period] as const,
     toolEventTypes: (orgId: string, tool: string, days?: number) =>
       ["organizations", orgId, "stats", "tools", tool, "event_types", days] as const,
+    activeTools: (orgId: string) =>
+      ["organizations", orgId, "stats", "active_tools"] as const,
   },
   alerts: {
     all: (orgId: string) => ["organizations", orgId, "alerts"] as const,
@@ -1851,6 +1853,18 @@ export function useDailyByModel(orgId: string, opts: DailyByToolOpts | number = 
 // ============================================================================
 // Tool Analytics Hooks (shared by Cursor & OpenRouter pages)
 // ============================================================================
+
+export function useActiveTools(orgId: string) {
+  return useQuery({
+    queryKey: queryKeys.stats.activeTools(orgId),
+    queryFn: () =>
+      api.get<{ tools: Array<{ tool_name: string; total_events: number; total_cost_usd: number; active_users: number }> }>(
+        `/organizations/${orgId}/stats/active_tools`
+      ),
+    enabled: !!orgId,
+    refetchInterval: 30000,
+  });
+}
 
 export function useToolOverview(orgId: string, tool: string) {
   return useQuery({

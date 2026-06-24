@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useId } from "react";
 import {
   Area,
   AreaChart,
@@ -20,9 +20,8 @@ import type { ChartConfig } from "@/components/ui/chart";
 import { useQueryClient } from "@tanstack/react-query";
 import { Activity, DollarSign, Coins, Users, RefreshCw, LayoutGrid } from "lucide-react";
 import { formatCost, formatTokens, formatCount } from "@/lib/formatters";
-import type { Connector } from "@/lib/types";
 import {
-  useToolOverview,
+  useActiveTools,
   useToolModels,
   useToolUsers,
   useToolDaily,
@@ -41,6 +40,38 @@ interface ToolInsightsSectionProps {
   orgId: string;
   days: number;
   onDaysChange: (days: number) => void;
+}
+
+const TOOL_LABELS: Record<string, string> = {
+  claude_code: "Claude Code",
+  cursor: "Cursor",
+  windsurf: "Windsurf",
+  github_copilot: "GitHub Copilot",
+  aider: "Aider",
+  continue: "Continue",
+  cody: "Cody",
+  tabnine: "Tabnine",
+  amazon_q: "Amazon Q",
+  openrouter_api: "OpenRouter",
+  anthropic_api: "Anthropic API",
+  openai_api: "OpenAI API",
+  gemini_api: "Gemini API",
+};
+
+const TOOL_CONNECTOR: Record<string, string> = {
+  cursor: "cursor",
+  github_copilot: "github_copilot",
+  openrouter_api: "openrouter",
+  anthropic_api: "anthropic",
+  openai_api: "openai",
+  gemini_api: "gemini",
+};
+
+const TOOLS_WITH_EVENT_TYPES = new Set(["claude_code", "cursor", "windsurf", "github_copilot"]);
+const TOOLS_WITH_COST_CHART = new Set(["openrouter_api"]);
+
+function toolLabel(slug: string): string {
+  return TOOL_LABELS[slug] ?? slug.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 const DAY_OPTIONS = [7, 30, 90, 365] as const;
@@ -125,12 +156,6 @@ function StatCard({
   );
 }
 
-function isActiveOpenRouterConnector(c: Connector): boolean {
-  const type = c.connectorType ?? c.connector_type;
-  const active = c.isActive ?? c.is_active;
-  return type === "openrouter" && !!active;
-}
-
 function SyncStatusSubsection({ orgId, connectorId }: { orgId: string; connectorId: string }) {
   const { data: syncStatus, isLoading: isLoadingSync, isError: isSyncError } = useConnectorSyncStatus(orgId, connectorId);
   const { mutate: syncConnector, isPending: isSyncing } = useSyncConnector();
@@ -176,102 +201,36 @@ function SyncStatusSubsection({ orgId, connectorId }: { orgId: string; connector
   );
 }
 
-function OpenRouterTabContent({ orgId, days, period }: { orgId: string; days: number; period: "day" | "week" | "month" }) {
+function ToolTabContent({
+  orgId,
+  toolSlug,
+  days,
+  period,
+}: {
+  orgId: string;
+  toolSlug: string;
+  days: number;
+  period: "day" | "week" | "month";
+}) {
+  const gradientId = useId();
+  const connectorType = TOOL_CONNECTOR[toolSlug] ?? null;
+  const showEventTypes = TOOLS_WITH_EVENT_TYPES.has(toolSlug);
+  const showCostChart = TOOLS_WITH_COST_CHART.has(toolSlug);
+  const label = toolLabel(toolSlug);
+
   const { data: connectorsResp } = useConnectors(orgId);
-  const { data: dailyResp, isLoading: isLoadingDaily, isError: isErrorDaily, refetch: refetchDaily } = useToolDaily(orgId, "openrouter_api", days, period === "month" ? undefined : period);
-  const { data: modelsResp, isLoading: isLoadingModels, isError: isErrorModels, refetch: refetchModels } = useToolModels(orgId, "openrouter_api", days);
-  const { data: usersResp, isLoading: isLoadingUsers, isError: isErrorUsers, refetch: refetchUsers } = useToolUsers(orgId, "openrouter_api", days);
+  const { data: dailyResp, isLoading: isLoadingDaily, isError: isErrorDaily, refetch: refetchDaily } = useToolDaily(orgId, toolSlug, days, period === "month" ? undefined : period);
+  const { data: modelsResp, isLoading: isLoadingModels, isError: isErrorModels, refetch: refetchModels } = useToolModels(orgId, toolSlug, days);
+  const { data: usersResp, isLoading: isLoadingUsers, isError: isErrorUsers, refetch: refetchUsers } = useToolUsers(orgId, toolSlug, days);
+  const { data: eventTypesResp, isLoading: isLoadingEventTypes, isError: isErrorEventTypes, refetch: refetchEventTypes } = useToolEventTypes(orgId, showEventTypes ? toolSlug : "", days);
 
-  const activeOpenRouterConnector = connectorsResp?.find(isActiveOpenRouterConnector);
-
-  const daily = dailyResp?.daily ?? [];
-  const models = modelsResp?.models ?? [];
-  const users = usersResp?.users ?? [];
-
-  const totalEvents = daily.reduce((s, d) => s + d.eventCount, 0);
-  const totalCost = daily.reduce((s, d) => s + d.costUsd, 0);
-  const activeUsers = users.length;
-  const modelsUsed = models.length;
-
-  if (!isLoadingDaily && !isErrorDaily && totalEvents === 0) {
-    return (
-      <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-        No OpenRouter events in the last {humanizeDays(days)}.
-      </div>
-    );
-  }
-
-  if (isErrorDaily && !isLoadingDaily) {
-    return (
-      <div className="flex h-40 items-center justify-center">
-        <ErrorState
-          compact
-          title="Could not load data"
-          description="Something went wrong fetching OpenRouter data."
-          onRetry={() => refetchDaily()}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6 mt-4">
-      {/* Sync status — only shown when an active OpenRouter connector exists */}
-      {activeOpenRouterConnector && (
-        <SyncStatusSubsection orgId={orgId} connectorId={activeOpenRouterConnector.id} />
-      )}
-
-      {/* Overview metric cards */}
-      <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
-        <StatCard
-          title="Total Events"
-          value={formatCount(totalEvents)}
-          icon={Activity}
-          isLoading={isLoadingDaily}
-        />
-        <StatCard
-          title="Total Cost"
-          value={formatCost(totalCost)}
-          icon={DollarSign}
-          isLoading={isLoadingDaily}
-        />
-        <StatCard
-          title="Models Used"
-          value={String(modelsUsed)}
-          icon={LayoutGrid}
-          isLoading={isLoadingModels}
-        />
-        <StatCard
-          title="Active Users"
-          value={String(activeUsers)}
-          icon={Users}
-          isLoading={isLoadingUsers}
-        />
-      </div>
-
-      {/* Cost by model chart */}
-      <ToolModelCostChart models={models} isLoading={isLoadingModels} isError={isErrorModels} onRetry={() => refetchModels()} />
-
-      {/* Full model table */}
-      <div className="space-y-2">
-        <h4 className="type-label text-muted-foreground">Model Breakdown</h4>
-        <ToolModelTable models={models} isLoading={isLoadingModels} isError={isErrorModels} onRetry={() => refetchModels()} />
-      </div>
-
-      {/* Users table */}
-      <div className="space-y-2">
-        <h4 className="type-label text-muted-foreground">Top Users</h4>
-        <ToolUsersTable users={users} isLoading={isLoadingUsers} isError={isErrorUsers} onRetry={() => refetchUsers()} />
-      </div>
-    </div>
-  );
-}
-
-function CursorTabContent({ orgId, days, period }: { orgId: string; days: number; period: "day" | "week" | "month" }) {
-  const { data: dailyResp, isLoading: isLoadingDaily, isError: isErrorDaily, refetch: refetchDaily } = useToolDaily(orgId, "cursor", days, period === "month" ? undefined : period);
-  const { data: modelsResp, isLoading: isLoadingModels, isError: isErrorModels, refetch: refetchModels } = useToolModels(orgId, "cursor", days);
-  const { data: usersResp, isLoading: isLoadingUsers, isError: isErrorUsers, refetch: refetchUsers } = useToolUsers(orgId, "cursor", days);
-  const { data: eventTypesResp, isLoading: isLoadingEventTypes, isError: isErrorEventTypes, refetch: refetchEventTypes } = useToolEventTypes(orgId, "cursor", days);
+  const activeConnector = connectorType
+    ? connectorsResp?.find((c) => {
+        const type = c.connectorType ?? c.connector_type;
+        const active = c.isActive ?? c.is_active;
+        return type === connectorType && !!active;
+      })
+    : undefined;
 
   const daily = dailyResp?.daily ?? [];
   const models = modelsResp?.models ?? [];
@@ -283,6 +242,7 @@ function CursorTabContent({ orgId, days, period }: { orgId: string; days: number
   const totalTokensIn = daily.reduce((s, d) => s + d.tokensIn, 0);
   const totalTokensOut = daily.reduce((s, d) => s + d.tokensOut, 0);
   const activeUsers = users.length;
+  const modelsUsed = models.length;
 
   const chartData = daily.map((d) => ({
     date: formatDate(d.date),
@@ -292,7 +252,7 @@ function CursorTabContent({ orgId, days, period }: { orgId: string; days: number
   if (!isLoadingDaily && !isErrorDaily && totalEvents === 0) {
     return (
       <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-        No Cursor events in the last {humanizeDays(days)}.
+        No {label} events in the last {humanizeDays(days)}.
       </div>
     );
   }
@@ -303,50 +263,36 @@ function CursorTabContent({ orgId, days, period }: { orgId: string; days: number
         <ErrorState
           compact
           title="Could not load data"
-          description="Something went wrong fetching Cursor data."
+          description={`Something went wrong fetching ${label} data.`}
           onRetry={() => refetchDaily()}
         />
       </div>
     );
   }
 
+  const hasTokenData = totalTokensIn > 0 || totalTokensOut > 0;
+
   return (
     <div className="space-y-6 mt-4">
-      {/* Overview metric cards */}
+      {activeConnector && (
+        <SyncStatusSubsection orgId={orgId} connectorId={activeConnector.id} />
+      )}
+
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
-        <StatCard
-          title="Total Events"
-          value={formatCount(totalEvents)}
-          icon={Activity}
-          isLoading={isLoadingDaily}
-        />
-        <StatCard
-          title="Total Cost"
-          value={formatCost(totalCost)}
-          icon={DollarSign}
-          isLoading={isLoadingDaily}
-        />
-        <StatCard
-          title="Tokens In"
-          value={formatTokens(totalTokensIn)}
-          icon={Coins}
-          isLoading={isLoadingDaily}
-        />
-        <StatCard
-          title="Tokens Out"
-          value={formatTokens(totalTokensOut)}
-          icon={Coins}
-          isLoading={isLoadingDaily}
-        />
-        <StatCard
-          title="Active Users"
-          value={String(activeUsers)}
-          icon={Users}
-          isLoading={isLoadingUsers}
-        />
+        <StatCard title="Total Events" value={formatCount(totalEvents)} icon={Activity} isLoading={isLoadingDaily} />
+        <StatCard title="Total Cost" value={formatCost(totalCost)} icon={DollarSign} isLoading={isLoadingDaily} />
+        {hasTokenData && (
+          <>
+            <StatCard title="Tokens In" value={formatTokens(totalTokensIn)} icon={Coins} isLoading={isLoadingDaily} />
+            <StatCard title="Tokens Out" value={formatTokens(totalTokensOut)} icon={Coins} isLoading={isLoadingDaily} />
+          </>
+        )}
+        {!hasTokenData && (
+          <StatCard title="Models Used" value={String(modelsUsed)} icon={LayoutGrid} isLoading={isLoadingModels} />
+        )}
+        <StatCard title="Active Users" value={String(activeUsers)} icon={Users} isLoading={isLoadingUsers} />
       </div>
 
-      {/* Trend chart */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="type-body-lg font-medium">{chartTitleForPeriod(period)}</CardTitle>
@@ -361,7 +307,7 @@ function CursorTabContent({ orgId, days, period }: { orgId: string; days: number
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                   <defs>
-                    <linearGradient id="cursorCostGradient" x1="0" y1="0" x2="0" y2="1">
+                    <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.3} />
                       <stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0} />
                     </linearGradient>
@@ -394,7 +340,7 @@ function CursorTabContent({ orgId, days, period }: { orgId: string; days: number
                     dataKey="costUsd"
                     stroke="var(--chart-1)"
                     strokeWidth={2}
-                    fill="url(#cursorCostGradient)"
+                    fill={`url(#${gradientId})`}
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -403,75 +349,27 @@ function CursorTabContent({ orgId, days, period }: { orgId: string; days: number
         </CardContent>
       </Card>
 
-      {/* Model and event type tables */}
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+      {showCostChart && (
+        <ToolModelCostChart models={models} isLoading={isLoadingModels} isError={isErrorModels} onRetry={() => refetchModels()} />
+      )}
+
+      {showEventTypes && eventTypes.length > 0 ? (
+        <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+          <div className="space-y-2">
+            <h4 className="type-label text-muted-foreground">Model Breakdown</h4>
+            <ToolModelTable models={models} isLoading={isLoadingModels} isError={isErrorModels} onRetry={() => refetchModels()} />
+          </div>
+          <div className="space-y-2">
+            <h4 className="type-label text-muted-foreground">Event Types</h4>
+            <ToolEventTypesTable eventTypes={eventTypes} isLoading={isLoadingEventTypes} isError={isErrorEventTypes} onRetry={() => refetchEventTypes()} />
+          </div>
+        </div>
+      ) : (
         <div className="space-y-2">
           <h4 className="type-label text-muted-foreground">Model Breakdown</h4>
           <ToolModelTable models={models} isLoading={isLoadingModels} isError={isErrorModels} onRetry={() => refetchModels()} />
         </div>
-        <div className="space-y-2">
-          <h4 className="type-label text-muted-foreground">Event Types</h4>
-          <ToolEventTypesTable eventTypes={eventTypes} isLoading={isLoadingEventTypes} isError={isErrorEventTypes} onRetry={() => refetchEventTypes()} />
-        </div>
-      </div>
-
-      {/* Users table */}
-      <div className="space-y-2">
-        <h4 className="type-label text-muted-foreground">Top Users</h4>
-        <ToolUsersTable users={users} isLoading={isLoadingUsers} isError={isErrorUsers} onRetry={() => refetchUsers()} />
-      </div>
-    </div>
-  );
-}
-
-function AnthropicTabContent({ orgId, days, period }: { orgId: string; days: number; period: "day" | "week" | "month" }) {
-  const { data: dailyResp, isLoading: isLoadingDaily, isError: isErrorDaily, refetch: refetchDaily } = useToolDaily(orgId, "anthropic_api", days, period === "month" ? undefined : period);
-  const { data: modelsResp, isLoading: isLoadingModels, isError: isErrorModels, refetch: refetchModels } = useToolModels(orgId, "anthropic_api", days);
-  const { data: usersResp, isLoading: isLoadingUsers, isError: isErrorUsers, refetch: refetchUsers } = useToolUsers(orgId, "anthropic_api", days);
-
-  const daily = dailyResp?.daily ?? [];
-  const models = modelsResp?.models ?? [];
-  const users = usersResp?.users ?? [];
-
-  const totalEvents = daily.reduce((s, d) => s + d.eventCount, 0);
-  const totalCost = daily.reduce((s, d) => s + d.costUsd, 0);
-  const totalTokensIn = daily.reduce((s, d) => s + d.tokensIn, 0);
-  const totalTokensOut = daily.reduce((s, d) => s + d.tokensOut, 0);
-
-  if (!isLoadingDaily && !isErrorDaily && totalEvents === 0) {
-    return (
-      <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-        No Anthropic API events in the last {humanizeDays(days)}.
-      </div>
-    );
-  }
-
-  if (isErrorDaily && !isLoadingDaily) {
-    return (
-      <div className="flex h-40 items-center justify-center">
-        <ErrorState
-          compact
-          title="Could not load data"
-          description="Something went wrong fetching Anthropic data."
-          onRetry={() => refetchDaily()}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6 mt-4">
-      <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
-        <StatCard title="Total Events" value={formatCount(totalEvents)} icon={Activity} isLoading={isLoadingDaily} />
-        <StatCard title="Total Cost" value={formatCost(totalCost)} icon={DollarSign} isLoading={isLoadingDaily} />
-        <StatCard title="Tokens In" value={formatTokens(totalTokensIn)} icon={Coins} isLoading={isLoadingDaily} />
-        <StatCard title="Tokens Out" value={formatTokens(totalTokensOut)} icon={Coins} isLoading={isLoadingDaily} />
-      </div>
-
-      <div className="space-y-2">
-        <h4 className="type-label text-muted-foreground">Model Breakdown</h4>
-        <ToolModelTable models={models} isLoading={isLoadingModels} isError={isErrorModels} onRetry={() => refetchModels()} />
-      </div>
+      )}
 
       <div className="space-y-2">
         <h4 className="type-label text-muted-foreground">Top Users</h4>
@@ -480,46 +378,33 @@ function AnthropicTabContent({ orgId, days, period }: { orgId: string; days: num
     </div>
   );
 }
-
-// Maps tab value → connector_type used to find the right connector for sync
-const TAB_TO_CONNECTOR: Record<string, string> = {
-  cursor: "cursor",
-  openrouter_api: "openrouter",
-  anthropic_api: "anthropic",
-};
 
 export function ToolInsightsSection({ orgId, days, onDaysChange }: ToolInsightsSectionProps) {
   const queryClient = useQueryClient();
-  const { data: cursorOverview, isLoading: isLoadingCursor } = useToolOverview(orgId, "cursor");
-  const { data: openrouterOverview, isLoading: isLoadingOpenrouter } = useToolOverview(orgId, "openrouter_api");
-  const { data: anthropicOverview, isLoading: isLoadingAnthropic } = useToolOverview(orgId, "anthropic_api");
+  const { data: activeToolsResp, isLoading } = useActiveTools(orgId);
   const { data: connectors } = useConnectors(orgId);
   const { mutateAsync: syncConnector } = useSyncConnector();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<string | null>(null);
 
-  const cursorHasData = (cursorOverview?.total_events ?? 0) > 0;
-  const openrouterHasData = (openrouterOverview?.total_events ?? 0) > 0;
-  const anthropicHasData = (anthropicOverview?.total_events ?? 0) > 0;
-
-  const resolvedTab = activeTab ?? (cursorHasData ? "cursor" : openrouterHasData ? "openrouter_api" : "anthropic_api");
+  const toolsWithData = activeToolsResp?.tools ?? [];
+  const resolvedTab = activeTab ?? toolsWithData[0]?.tool_name ?? "";
 
   async function handleRefreshNow() {
-    const connectorType = TAB_TO_CONNECTOR[resolvedTab];
-    if (!connectorType) return;
-
-    const connector = (connectors ?? []).find((c) => {
-      const type = c.connectorType ?? c.connector_type;
-      const active = c.isActive ?? c.is_active;
-      return type === connectorType && active;
-    });
+    const connectorType = TOOL_CONNECTOR[resolvedTab];
 
     setIsRefreshing(true);
     try {
-      if (connector) {
-        await syncConnector({ orgId, connectorId: connector.id });
+      if (connectorType) {
+        const connector = (connectors ?? []).find((c) => {
+          const type = c.connectorType ?? c.connector_type;
+          const active = c.isActive ?? c.is_active;
+          return type === connectorType && active;
+        });
+        if (connector) {
+          await syncConnector({ orgId, connectorId: connector.id });
+        }
       }
-      // Invalidate only the stats for the active tool
       queryClient.invalidateQueries({
         queryKey: ["organizations", orgId, "stats", "tools", resolvedTab],
       });
@@ -528,14 +413,11 @@ export function ToolInsightsSection({ orgId, days, onDaysChange }: ToolInsightsS
     }
   }
 
-  // Don't render until all overviews have resolved — avoids a flash where
-  // one finishes with 0 events before the others have returned any data.
-  if (isLoadingCursor || isLoadingOpenrouter || isLoadingAnthropic) {
+  if (isLoading) {
     return null;
   }
 
-  // Only render if at least one tool has data
-  if (!cursorHasData && !openrouterHasData && !anthropicHasData) {
+  if (toolsWithData.length === 0) {
     return null;
   }
 
@@ -572,32 +454,23 @@ export function ToolInsightsSection({ orgId, days, onDaysChange }: ToolInsightsS
       <CardContent>
         <Tabs value={resolvedTab} onValueChange={setActiveTab}>
           <TabsList>
-            {cursorHasData && <TabsTrigger value="cursor">Cursor</TabsTrigger>}
-            {openrouterHasData && (
-              <TabsTrigger value="openrouter_api">OpenRouter</TabsTrigger>
-            )}
-            {anthropicHasData && (
-              <TabsTrigger value="anthropic_api">Anthropic API</TabsTrigger>
-            )}
+            {toolsWithData.map((tool) => (
+              <TabsTrigger key={tool.tool_name} value={tool.tool_name}>
+                {toolLabel(tool.tool_name)}
+              </TabsTrigger>
+            ))}
           </TabsList>
 
-          {cursorHasData && (
-            <TabsContent value="cursor">
-              <CursorTabContent orgId={orgId} days={days} period={periodForDays(days)} />
+          {toolsWithData.map((tool) => (
+            <TabsContent key={tool.tool_name} value={tool.tool_name}>
+              <ToolTabContent
+                orgId={orgId}
+                toolSlug={tool.tool_name}
+                days={days}
+                period={periodForDays(days)}
+              />
             </TabsContent>
-          )}
-
-          {openrouterHasData && (
-            <TabsContent value="openrouter_api">
-              <OpenRouterTabContent orgId={orgId} days={days} period={periodForDays(days)} />
-            </TabsContent>
-          )}
-
-          {anthropicHasData && (
-            <TabsContent value="anthropic_api">
-              <AnthropicTabContent orgId={orgId} days={days} period={periodForDays(days)} />
-            </TabsContent>
-          )}
+          ))}
         </Tabs>
       </CardContent>
     </Card>
