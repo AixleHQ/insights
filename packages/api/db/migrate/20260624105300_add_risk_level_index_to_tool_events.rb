@@ -8,6 +8,7 @@ class AddRiskLevelIndexToToolEvents < ActiveRecord::Migration[8.0]
               "(metadata->>'risk_level')",
               name: "index_tool_events_on_metadata_risk_level",
               where: "metadata->>'risk_level' IS NOT NULL",
-              algorithm: :concurrently
+              algorithm: :concurrently,
+              if_not_exists: true
   end
 end
