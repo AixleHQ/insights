@@ -23,6 +23,7 @@ interface ProjectCardProps {
   onDelete?: (id: string) => void;
   isFavorited?: boolean;
   onToggleFavorite?: (project: { id: string; name: string }) => void;
+  onClick?: () => void;
   className?: string;
 }
 
@@ -33,17 +34,21 @@ function formatDate(dateStr: string | undefined | null): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFavorite, className }: ProjectCardProps) {
+export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFavorite, onClick, className }: ProjectCardProps) {
   const showUnlinkedRemote = isGitRemoteMissing(project);
 
   return (
-    <Card className={cn("group relative transition-shadow hover:shadow-md", className)}>
+    <Card
+      className={cn("group relative transition-shadow hover:shadow-md", onClick && "cursor-pointer", className)}
+      onClick={onClick}
+    >
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="space-y-1">
             <Link
               to={AppRoutes.projects.detail(project.id)}
               className="inline-block"
+              onClick={(e) => e.stopPropagation()}
             >
               <CardTitle className="text-base font-semibold hover:text-primary hover:underline">
                 {project.name}
@@ -60,9 +65,12 @@ export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFa
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-8 opacity-0 transition-opacity group-hover:opacity-100"
+                className={cn("size-8 transition-opacity", isFavorited ? "opacity-100" : "opacity-0 group-hover:opacity-100")}
                 aria-label="Toggle favorite"
-                onClick={() => onToggleFavorite({ id: project.id, name: project.name })}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleFavorite({ id: project.id, name: project.name });
+                }}
               >
                 <Star
                   className={cn("size-4", isFavorited && "fill-current text-warning")}
@@ -95,6 +103,7 @@ export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFa
                   variant="ghost"
                   size="icon"
                   className="size-8 opacity-0 transition-opacity group-hover:opacity-100"
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <MoreHorizontal className="size-4" />
                   <span className="sr-only">Actions</span>
@@ -156,6 +165,7 @@ export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFa
               target="_blank"
               rel="noopener noreferrer"
               className="truncate hover:text-foreground hover:underline"
+              onClick={(e) => e.stopPropagation()}
             >
               {project.repositoryUrl.replace(/^https?:\/\/(github|gitlab|bitbucket)\.com\//, "")}
             </a>

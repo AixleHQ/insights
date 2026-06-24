@@ -148,6 +148,7 @@ export function Projects() {
               onDelete={handleDelete}
               isFavorited={isFavorite(project.id)}
               onToggleFavorite={toggleFavorite}
+              onClick={() => navigate(`/projects/${project.id}`)}
             />
           ))}
         </div>
