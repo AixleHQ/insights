@@ -857,6 +857,20 @@ RSpec.describe 'Api::V1::Stats', type: :request do
       expect(chat[:eventCount]).to eq(2)
     end
 
+    it "returns all defined event types including those with zero events" do
+      travel_to(frozen_time) { authenticated_get path, user: user, organization: organization }
+
+      expect_success
+      names = json_response[:eventTypes].map { |e| e[:name] }
+      expect(names).to match_array(ToolEvent::EVENT_TYPES)
+
+      zero_type = json_response[:eventTypes].find { |e| e[:name] == "debug" }
+      expect(zero_type[:eventCount]).to eq(0)
+      expect(zero_type[:tokensIn]).to eq(0)
+      expect(zero_type[:tokensOut]).to eq(0)
+      expect(zero_type[:costUsd]).to eq(0.0)
+    end
+
     it "supports ?days= param" do
       travel_to(frozen_time) do
         authenticated_get path, user: user, organization: organization, params: { days: 7 }
