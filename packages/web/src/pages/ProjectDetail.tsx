@@ -157,11 +157,9 @@ export function ProjectDetail() {
       return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
     });
 
-    const data: Record<string, number>[] = rawData.map((item) => {
-      const entry: Record<string, number> = {};
-      tools.forEach((t) => { entry[t] = Number(item[t]) || 0; });
-      return entry;
-    });
+    const data: Record<string, number>[] = rawData.map((item) =>
+      Object.fromEntries(tools.map((t) => [t, Number(item[t]) || 0])),
+    );
 
     const series: GroupedBarSeries[] = tools.map((t) => ({
       key: t,
