@@ -41,6 +41,16 @@ export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFa
     <Card
       className={cn("group relative transition-shadow hover:shadow-md", onClick && "cursor-pointer", className)}
       onClick={onClick}
+      {...(onClick && {
+        role: "button" as const,
+        tabIndex: 0,
+        onKeyDown: (e: React.KeyboardEvent) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onClick();
+          }
+        },
+      })}
     >
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">

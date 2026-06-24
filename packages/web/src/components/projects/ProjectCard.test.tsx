@@ -14,8 +14,6 @@ const baseProject: ProjectWithStats = {
 };
 
 describe("ProjectCard", () => {
-  // ── Existing tests (unchanged) ────────────────────────────────────────────
-
   it("renders serializer-backed event count and formatted cost", () => {
     render(
       <ProjectCard project={baseProject}/>
@@ -38,8 +36,6 @@ describe("ProjectCard", () => {
     const tooltips = await screen.findAllByText("No git remote configured — CLI events won't be attributed.");
     expect(tooltips.length).toBeGreaterThanOrEqual(1);
   });
-
-  // ── Gap 1: star visibility ────────────────────────────────────────────────
 
   it("shows filled star when isFavorited is true", () => {
     render(
@@ -69,8 +65,6 @@ describe("ProjectCard", () => {
     expect(starBtn).not.toHaveClass("opacity-100");
   });
 
-  // ── Gap 2: favorite toggle callback ──────────────────────────────────────
-
   it("calls onToggleFavorite with project id and name when star clicked", async () => {
     const user = userEvent.setup();
     const onToggleFavorite = vi.fn();
@@ -87,8 +81,6 @@ describe("ProjectCard", () => {
     expect(onToggleFavorite).toHaveBeenCalledOnce();
     expect(onToggleFavorite).toHaveBeenCalledWith({ id: "p1", name: "Alpha" });
   });
-
-  // ── Gap 2: card onClick ───────────────────────────────────────────────────
 
   it("calls onClick when card body is clicked", async () => {
     const user = userEvent.setup();
