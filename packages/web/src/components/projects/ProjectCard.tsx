@@ -109,6 +109,7 @@ export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFa
                   <span className="sr-only">Actions</span>
                 </Button>
               </DropdownMenuTrigger>
+              {/* DropdownMenuContent renders in a Radix portal — menu item clicks do not bubble up through <Card>, so no stopPropagation needed on items */}
               <DropdownMenuContent align="end">
                 <DropdownMenuItem asChild>
                   <Link to={AppRoutes.projects.detail(project.id)}>View details</Link>

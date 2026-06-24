@@ -66,6 +66,7 @@ describe("ProjectCard", () => {
 
     const starBtn = screen.getByRole("button", { name: /toggle favorite/i });
     expect(starBtn).toHaveClass("opacity-0");
+    expect(starBtn).not.toHaveClass("opacity-100");
   });
 
   // ── Gap 2: favorite toggle callback ──────────────────────────────────────
