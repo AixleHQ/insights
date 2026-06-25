@@ -197,6 +197,7 @@ export function IntegrationSetup() {
   const { data: projects } = useProjects(currentOrg?.id || "");
   const { mutateAsync: createConnector } = useCreateConnector();
   const isProcessingCallback = useRef(false);
+  const oauthPopupPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [step, setStep] = useState<SetupStep>("overview");
   const [isAuthorizing, setIsAuthorizing] = useState(false);
@@ -213,11 +214,24 @@ export function IntegrationSetup() {
 
   const provider = providerKey ? providers[providerKey] : null;
 
+  // Clear popup poll on unmount to avoid state updates after component is gone
+  useEffect(() => {
+    return () => {
+      if (oauthPopupPollRef.current) clearInterval(oauthPopupPollRef.current);
+    };
+  }, []);
+
   // Listen for OAuth callback messages
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
       if (event.data?.type !== "integration_oauth_callback") return;
+
+      // Popup completed (success or error) — stop polling for manual close
+      if (oauthPopupPollRef.current) {
+        clearInterval(oauthPopupPollRef.current);
+        oauthPopupPollRef.current = null;
+      }
 
       const { code, error: oauthError } = event.data;
 
@@ -273,6 +287,31 @@ export function IntegrationSetup() {
     setIsAuthorizing(true);
     setError(null);
 
+    // Clear any previous popup poll
+    if (oauthPopupPollRef.current) {
+      clearInterval(oauthPopupPollRef.current);
+      oauthPopupPollRef.current = null;
+    }
+
+    // Open popup synchronously within the user gesture context.
+    // Browsers block window.open() called after an await, so we open
+    // a blank popup first and navigate it to the auth URL once obtained.
+    const width = 600;
+    const height = 700;
+    const left = window.screenX + (window.innerWidth - width) / 2;
+    const top = window.screenY + (window.innerHeight - height) / 2;
+    const popup = window.open(
+      "about:blank",
+      "oauth_popup",
+      `width=${width},height=${height},left=${left},top=${top}`
+    );
+
+    if (!popup) {
+      setError("A popup window was blocked. Please allow popups for this site and try again.");
+      setIsAuthorizing(false);
+      return;
+    }
+
     try {
       // Get authorization URL from API
       const response = await api.get<{ data: { authorize_url: string } }>(
@@ -280,21 +319,19 @@ export function IntegrationSetup() {
       );
       const authUrl = response.data.authorize_url;
 
-      // Open popup for OAuth
-      const width = 600;
-      const height = 700;
-      const left = window.screenX + (window.innerWidth - width) / 2;
-      const top = window.screenY + (window.innerHeight - height) / 2;
+      // Navigate the already-open popup to the authorization URL
+      popup.location.href = authUrl;
 
-      window.open(
-        authUrl,
-        "oauth_popup",
-        `width=${width},height=${height},left=${left},top=${top}`
-      );
-
-      // The popup will post a message back when authorization is complete
-      // We listen for this in the useEffect above
+      // Poll so that closing the popup without completing OAuth resets the button
+      oauthPopupPollRef.current = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(oauthPopupPollRef.current!);
+          oauthPopupPollRef.current = null;
+          setIsAuthorizing(false);
+        }
+      }, 500);
     } catch (err) {
+      popup.close();
       const isNotConfigured =
         err instanceof ApiError &&
         (err.data as { code?: string })?.code === "integration_not_configured";
