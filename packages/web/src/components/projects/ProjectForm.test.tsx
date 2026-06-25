@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { ProjectForm } from "./ProjectForm";
+import { ApiError } from "@/lib/api";
 
 const mockNavigate = vi.fn();
 
@@ -105,6 +106,25 @@ describe("ProjectForm", () => {
       await user.click(screen.getByRole("button", { name: /create project/i }));
       await waitFor(() => expect(onSubmit).toHaveBeenCalled());
       expect(screen.queryByText(/valid url/i)).not.toBeInTheDocument();
+    });
+
+    it("shows server-side git_remote_url error from 422 response", async () => {
+      const user = userEvent.setup();
+      const onSubmit = vi.fn().mockRejectedValue(
+        new ApiError("Validation error", 422, {
+          errors: {
+            git_remote_url: [
+              'Git remote url is already linked to project "Other Project" in this organization',
+            ],
+          },
+        })
+      );
+      renderForm({ onSubmit });
+      await user.type(screen.getByLabelText(/project name/i), "My Project");
+      await user.click(screen.getByRole("button", { name: /create project/i }));
+      await waitFor(() =>
+        expect(screen.getByText(/already linked to project/i)).toBeInTheDocument()
+      );
     });
 
     it("clears field error when the user types in that field", async () => {

@@ -79,6 +79,11 @@ module Api
           error: "Unprocessable Entity",
           errors: format_validation_errors(e.record.errors)
         }, status: :unprocessable_content
+      rescue ActiveRecord::RecordNotUnique
+        render json: {
+          error: "Unprocessable Entity",
+          errors: { git_remote_url: [ "has already been taken" ] }
+        }, status: :unprocessable_content
       end
 
       # PATCH /api/v1/projects/:id
@@ -97,6 +102,11 @@ module Api
             errors: format_validation_errors(@project.errors)
           }, status: :unprocessable_content
         end
+      rescue ActiveRecord::RecordNotUnique
+        render json: {
+          error: "Unprocessable Entity",
+          errors: { git_remote_url: [ "has already been taken" ] }
+        }, status: :unprocessable_content
       end
 
       # DELETE /api/v1/projects/:id

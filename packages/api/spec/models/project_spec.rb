@@ -112,18 +112,18 @@ RSpec.describe Project, type: :model do
 
       it 'rejects duplicate git_remote_url within the same organization' do
         org = create(:organization)
-        create(:project, organization: org, git_remote_url: 'git@github.com:org/repo.git')
+        existing = create(:project, organization: org, git_remote_url: 'git@github.com:org/repo.git')
         duplicate = build(:project, organization: org, git_remote_url: 'git@github.com:org/repo.git')
         expect(duplicate).not_to be_valid
-        expect(duplicate.errors[:git_remote_url]).to be_present
+        expect(duplicate.errors[:git_remote_url].first).to include(existing.name)
       end
 
       it 'rejects duplicate git_remote_url for the same personal owner' do
         user = create(:user)
-        create(:project, :personal, owner: user, git_remote_url: 'git@github.com:user/repo.git')
+        existing = create(:project, :personal, owner: user, git_remote_url: 'git@github.com:user/repo.git')
         duplicate = build(:project, :personal, owner: user, git_remote_url: 'git@github.com:user/repo.git')
         expect(duplicate).not_to be_valid
-        expect(duplicate.errors[:git_remote_url]).to be_present
+        expect(duplicate.errors[:git_remote_url].first).to include(existing.name)
       end
 
       it 'allows nil git_remote_url in the same organization' do

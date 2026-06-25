@@ -14,8 +14,7 @@ class Project < ApplicationRecord
   validates :name, presence: true
   validates :slug, presence: true, format: { with: /\A[a-z0-9]+(?:-[a-z0-9]+)*\z/, message: "must be lowercase alphanumeric with hyphens" }
   validates :is_active, inclusion: { in: [ true, false ] }
-  validates :git_remote_url, uniqueness: { scope: :organization_id, allow_nil: true }, if: -> { organization_id.present? }
-  validates :git_remote_url, uniqueness: { scope: :owner_id, allow_nil: true }, if: -> { owner_id.present? }
+  validate :git_remote_url_unique_within_scope
   validate :must_belong_to_org_or_owner
 
   after_create :create_default_retention_policy
@@ -88,6 +87,27 @@ class Project < ApplicationRecord
   def generate_slug
     return if slug.present?
     self.slug = name.to_s.parameterize
+  end
+
+  # Runs after normalize_git_remote_url_field, so git_remote_url is already canonical.
+  def git_remote_url_unique_within_scope
+    return if git_remote_url.blank?
+
+    if organization_id.present?
+      conflict = Project.where(organization_id: organization_id, git_remote_url: git_remote_url)
+                        .where.not(id: id).first
+      return unless conflict
+
+      errors.add(:git_remote_url,
+                 "is already linked to project \"#{conflict.name}\" in this organization")
+    elsif owner_id.present?
+      conflict = Project.where(owner_id: owner_id, git_remote_url: git_remote_url)
+                        .where.not(id: id).first
+      return unless conflict
+
+      errors.add(:git_remote_url,
+                 "is already linked to project \"#{conflict.name}\" on your account")
+    end
   end
 
   def must_belong_to_org_or_owner
