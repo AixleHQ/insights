@@ -12,12 +12,13 @@ import { SortButton, type SortDirection } from "@/components/ui/sort-button";
 import { RiskBadge } from "@/components/ui/risk-badge";
 import { normalizeRiskLevel } from "@/lib/riskLevel";
 import { EventTypeBadge } from "@/components/ui/event-type-badge";
-import { formatDistanceToNow, humanizeToolName, cn } from "@/lib/utils";
+import { humanizeToolName, cn } from "@/lib/utils";
 import {
   formatCost as formatCostValue,
   formatTokens as formatTokensValue,
   getEventActorLabel,
 } from "@/lib/formatters";
+import { EventTimeCell } from "./EventTimeCell";
 
 export interface EventRow {
   id: string;
@@ -183,16 +184,10 @@ export function EventsTable({
                   <RiskBadge level={normalizeRiskLevel(event.risk_level)} />
                 </TableCell>
                 <TableCell>
-                  <span
-                    className="text-xs sm:text-sm text-muted-foreground"
-                    title={
-                      event.created_at
-                        ? new Date(event.created_at).toLocaleString()
-                        : undefined
-                    }
-                  >
-                    {formatDistanceToNow(event.created_at)}
-                  </span>
+                  <EventTimeCell
+                    toolName={event.tool_name}
+                    occurredAt={event.created_at}
+                  />
                 </TableCell>
                 <TableCell className="hidden sm:table-cell text-right">
                   <span className="font-mono-display text-sm text-muted-foreground">

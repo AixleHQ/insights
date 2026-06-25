@@ -12,7 +12,7 @@ import { normalizeRiskLevel } from "@/lib/riskLevel";
 import { useOrg } from "@/contexts/OrgContext";
 import { EventTypeBadge } from "@/components/ui/event-type-badge";
 import { cn, humanizeToolName } from "@/lib/utils";
-import { formatCost, formatTokens } from "@/lib/formatters";
+import { formatCost, formatTokens, isDayGranularityEvent, formatEventDate, formatDateTime } from "@/lib/formatters";
 import { canViewEventPrompt } from "@/lib/eventAccess";
 import { parseRecentCommitFields } from "@/lib/recentCommitEvent";
 import { RecentCommitDetail } from "./RecentCommitDetail";
@@ -125,10 +125,9 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
     );
   }
 
-  const formattedDate = new Date(event.created_at).toLocaleString("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+  const formattedDate = isDayGranularityEvent(event.tool_name, event.created_at)
+    ? formatEventDate(event.created_at)
+    : formatDateTime(event.created_at);
 
   const recentCommit = parseRecentCommitFields(event.metadata, event.event_type);
 

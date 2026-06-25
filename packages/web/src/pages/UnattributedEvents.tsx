@@ -55,7 +55,7 @@ import { RiskBadge } from "@/components/dashboard";
 import { normalizeRiskLevel } from "@/lib/riskLevel";
 import { formatCost } from "@/lib/formatters";
 import { EventTypeBadge } from "@/components/ui/event-type-badge";
-import { formatDistanceToNow } from "@/lib/utils";
+import { EventTimeCell } from "@/components/events";
 
 type UnattributedSortField = "tool_name" | "risk_level" | "cost_usd" | "created_at";
 
@@ -598,8 +598,11 @@ export function UnattributedEvents() {
                       <span className="type-caption text-muted-foreground">—</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {formatDistanceToNow(event.occurredAt || event.createdAt)}
+                  <TableCell>
+                    <EventTimeCell
+                      toolName={event.toolName}
+                      occurredAt={event.occurredAt || event.createdAt}
+                    />
                   </TableCell>
                   {canManageAttribution && (
                     <TableCell>

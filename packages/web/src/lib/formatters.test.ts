@@ -3,8 +3,10 @@ import {
   formatCost,
   formatTokens,
   formatDateTime,
+  formatEventDate,
   formatLongUsDate,
   getEventActorLabel,
+  isDayGranularityEvent,
   EventAttribution,
 } from "./formatters";
 
@@ -58,6 +60,38 @@ describe("formatDateTime", () => {
     expect(s).not.toBe("—");
     expect(s.length).toBeGreaterThan(4);
     expect(s).toMatch(/2024/);
+  });
+});
+
+describe("isDayGranularityEvent", () => {
+  it("returns true for github_copilot regardless of timestamp", () => {
+    expect(isDayGranularityEvent("github_copilot", "2026-06-22T14:30:00Z")).toBe(true);
+  });
+
+  it("returns false for precise-time connectors with non-midnight timestamps", () => {
+    expect(isDayGranularityEvent("cursor", "2026-06-22T14:30:00Z")).toBe(false);
+  });
+
+  it("returns false for connectors not in the allowlist regardless of timestamp", () => {
+    expect(isDayGranularityEvent("openrouter_api", "2026-06-22T00:00:00.000Z")).toBe(false);
+    expect(isDayGranularityEvent("openrouter_api", "2026-06-22T14:00:00Z")).toBe(false);
+  });
+
+  it("returns false when toolName is missing", () => {
+    expect(isDayGranularityEvent(undefined)).toBe(false);
+  });
+});
+
+describe("formatEventDate", () => {
+  it("returns em dash for null, undefined, empty, and invalid", () => {
+    expect(formatEventDate(null)).toBe("—");
+    expect(formatEventDate(undefined)).toBe("—");
+    expect(formatEventDate("")).toBe("—");
+    expect(formatEventDate("not-a-date")).toBe("—");
+  });
+
+  it("formats UTC midnight as medium en-US date", () => {
+    expect(formatEventDate("2026-06-22T00:00:00Z")).toBe("Jun 22, 2026");
   });
 });
 

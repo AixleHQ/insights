@@ -65,6 +65,35 @@ const US_LONG_DATE: Intl.DateTimeFormatOptions = {
   year: "numeric",
 };
 
+const US_MEDIUM_DATE: Intl.DateTimeFormatOptions = {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+};
+
+/** Connectors whose sync jobs bucket occurred_at to calendar-day UTC midnight. */
+export const DAY_GRANULARITY_TOOL_NAMES = new Set<string>([
+  "github_copilot", // packages/api/app/jobs/github_copilot_sync_job.rb
+]);
+
+/** True when the event should show a calendar date instead of relative time.
+ *  Relies solely on the allowlist — new day-granularity connectors must be added
+ *  to DAY_GRANULARITY_TOOL_NAMES when their sync job is introduced. */
+export function isDayGranularityEvent(
+  toolName: string | undefined,
+  _occurredAtIso?: string | null
+): boolean {
+  return !!(toolName && DAY_GRANULARITY_TOOL_NAMES.has(toolName));
+}
+
+/** Calendar date for day-granularity events (e.g. "Jun 22, 2026"). Uses UTC — matches backend day bucketing. */
+export function formatEventDate(iso: string | null | undefined): string {
+  if (iso == null || String(iso).trim() === "") return "—";
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "—";
+  return d.toLocaleDateString("en-US", { ...US_MEDIUM_DATE, timeZone: "UTC" });
+}
+
 /** ISO (or parseable) timestamp for tables; en-US; invalid → em dash. */
 export function formatDateTime(iso: string | null | undefined): string {
   if (iso == null || String(iso).trim() === "") return "—";

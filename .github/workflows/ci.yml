@@ -63,7 +63,7 @@ jobs:
     uses: ./.github/workflows/code-check.yml
     secrets: inherit
     with:
-      check_command: bash -c "bundle exec rails db:create db:schema:load && bundle exec rspec"
+      check_command: bash -c "bundle exec rails db:drop db:create db:schema:load && bundle exec rspec"
       container_name: api
 
   api_lint:
