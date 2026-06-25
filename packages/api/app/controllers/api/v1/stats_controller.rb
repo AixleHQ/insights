@@ -33,15 +33,9 @@ module Api
         # they start generating activity.
         active_users = base_scope.where("occurred_at > ?", 7.days.ago).distinct.count(:user_id)
 
-        # Count distinct tool_events that have at least one non-none audit log in the current month.
-        # Distinct avoids inflation when one event has multiple audit_log rows.
-        high_risk_count = AuditLog
-          .joins(:tool_event)
-          .where(tool_events: { id: current_events.select(:id) })
-          .where.not(risk_level: "none")
-          .select(:tool_event_id)
-          .distinct
-          .count
+        # Count distinct tool_events flagged with a non-trivial risk level in the current month.
+        # Checks audit_logs (canonical) OR metadata (fallback for events that bypassed Temporal).
+        high_risk_count = current_events.where(risky_event_condition).distinct.count
 
         current_count = current_events.count
         prev_count    = prev_events.count
@@ -256,16 +250,16 @@ module Api
       end
 
       # GET /api/v1/organizations/:organization_id/stats/risk_alerts
-      # Returns tool-grouped events that have >=1 non-none audit log.
-      # Subquery form prevents SUM inflation from the ToolEvent has_many :audit_logs relation.
+      # Returns tool-grouped events flagged with a non-trivial risk level.
+      # Checks both audit_logs (canonical) and tool_events.metadata (fallback for
+      # events that bypassed the Temporal workflow or whose audit_log creation failed).
       def risk_alerts
         authorize! current_organization, to: :show?
 
         time_range = month_or_days_time_range
 
         risky_ids = scoped_events(time_range)
-          .joins("INNER JOIN audit_logs ON audit_logs.tool_event_id = tool_events.id")
-          .where.not("audit_logs.risk_level": "none")
+          .where(risky_event_condition)
           .select("tool_events.id")
           .distinct
 
@@ -615,6 +609,27 @@ module Api
           current_organization.tool_events
         end
         base.where(occurred_at: time_range[:start]..time_range[:end])
+      end
+
+      # SQL condition matching events with a non-trivial risk level.
+      # Prefers audit_logs when present; falls back to metadata->>'risk_level'.
+      def risky_event_condition
+        <<~SQL.squish
+          (
+            EXISTS (
+              SELECT 1 FROM audit_logs
+              WHERE audit_logs.tool_event_id = tool_events.id
+                AND audit_logs.risk_level NOT IN ('none')
+            )
+            OR (
+              NOT EXISTS (
+                SELECT 1 FROM audit_logs WHERE audit_logs.tool_event_id = tool_events.id
+              )
+              AND tool_events.metadata->>'risk_level' IS NOT NULL
+              AND tool_events.metadata->>'risk_level' NOT IN ('none', '')
+            )
+          )
+        SQL
       end
     end
   end

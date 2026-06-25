@@ -2202,6 +2202,12 @@ CREATE INDEX idx_tool_events_user_occurred ON timeseries.tool_events USING btree
 CREATE INDEX tool_events_occurred_at_idx ON timeseries.tool_events USING btree (occurred_at DESC);
 
 --
+-- Name: index_tool_events_on_metadata_risk_level; Type: INDEX; Schema: timeseries; Owner: -
+--
+
+CREATE INDEX index_tool_events_on_metadata_risk_level ON timeseries.tool_events USING btree (((metadata ->> 'risk_level'::text))) WHERE ((metadata ->> 'risk_level'::text) IS NOT NULL);
+
+--
 -- Name: retention_purge_logs retention_purge_logs_append_only; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -2570,6 +2576,7 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260624105300'),
 ('20260616120937'),
 ('20260615174550'),
 ('20260609191045'),

@@ -9,6 +9,12 @@ Sidekiq.configure_server do |config|
         "queue" => "ai",
         "description" => "Sync AI tool usage from provider APIs (OpenRouter, Anthropic, OpenAI) every 4 hours. Gemini: connector heartbeat only — usage captured per request via AI Gateway."
       },
+      "post_sync_classification" => {
+        "class" => "PostSyncClassificationJob",
+        "cron" => "30 */4 * * *",
+        "queue" => "ai",
+        "description" => "Backfill audit_logs for events without risk classification (runs 30 min after provider sync)"
+      },
       "github_copilot_daily" => {
         "class" => "GithubCopilotDailyJob",
         "cron" => "0 6 * * *",
