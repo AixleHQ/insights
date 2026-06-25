@@ -1968,6 +1968,46 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /api/v1/organizations/{organization_id}/stats/active_tools:
+    get:
+      summary: Active tools
+      description: Returns all tools with events in the last 30 days, ordered by usage. Use to discover which tool insight tabs to render.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      responses:
+        '200':
+          description: List of tools with activity
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tools:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        tool_name:
+                          type: string
+                          example: claude_code
+                        total_events:
+                          type: integer
+                          example: 1200
+                        total_cost_usd:
+                          type: number
+                          format: float
+                          example: 45.67
+                        active_users:
+                          type: integer
+                          example: 8
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/overview:
     get:
       summary: Tool overview stats

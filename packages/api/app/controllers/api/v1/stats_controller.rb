@@ -208,6 +208,28 @@ module Api
         }
       end
 
+      # GET /api/v1/organizations/:organization_id/stats/active_tools
+      def active_tools
+        authorize! current_organization, to: :show?
+
+        rows = current_organization.tool_events
+          .where(occurred_at: 30.days.ago.beginning_of_day..Time.current)
+          .group(:tool_name)
+          .select(
+            "tool_name",
+            "COUNT(*) as total_events",
+            "COALESCE(SUM(cost_usd), 0) as total_cost_usd",
+            "COUNT(DISTINCT user_id) as active_users"
+          )
+          .order(Arel.sql("COUNT(*) DESC"))
+
+        render json: {
+          tools: rows.map { |r|
+            { tool_name: r.tool_name, total_events: r.total_events, total_cost_usd: r.total_cost_usd.to_f, active_users: r.active_users }
+          }
+        }
+      end
+
       # GET /api/v1/organizations/:organization_id/stats/heatmap
       # Returns activity data for the past year for heatmap visualization
       def heatmap
