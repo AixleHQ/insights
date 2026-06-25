@@ -83,11 +83,22 @@ export function ProjectForm({
       if (error instanceof ApiError && error.status === 422) {
         const data = error.data as { errors?: Record<string, string[]> } | null;
         if (data?.errors) {
+          const knownFields = ["name", "description", "repository_url", "git_remote_url", "is_active"];
           const fieldErrors: Record<string, string> = {};
+          const unmapped: string[] = [];
+
           for (const [field, messages] of Object.entries(data.errors)) {
-            fieldErrors[field] = messages[0];
+            if (knownFields.includes(field)) {
+              fieldErrors[field] = messages[0];
+            } else {
+              unmapped.push(...messages);
+            }
           }
+
           setErrors(fieldErrors);
+          if (unmapped.length > 0) {
+            setGeneralError(unmapped.join(". "));
+          }
         } else {
           setGeneralError("The server rejected the request. Please check your inputs.");
         }
@@ -146,6 +157,7 @@ export function ProjectForm({
                 value={formData.name}
                 onChange={(e) => updateField("name", e.target.value)}
                 className={cn(errors.name && "border-destructive")}
+                aria-invalid={!!errors.name}
               />
               {errors.name && (
                 <p className="text-xs text-destructive">{errors.name}</p>
@@ -170,6 +182,7 @@ export function ProjectForm({
                 value={formData.repository_url || ""}
                 onChange={(e) => updateField("repository_url", e.target.value)}
                 className={cn(errors.repository_url && "border-destructive")}
+                aria-invalid={!!errors.repository_url}
               />
               {errors.repository_url && (
                 <p className="text-xs text-destructive">{errors.repository_url}</p>
@@ -183,7 +196,12 @@ export function ProjectForm({
                 placeholder="git@github.com:org/repo.git"
                 value={formData.git_remote_url || ""}
                 onChange={(e) => updateField("git_remote_url", e.target.value)}
+                className={cn(errors.git_remote_url && "border-destructive")}
+                aria-invalid={!!errors.git_remote_url}
               />
+              {errors.git_remote_url && (
+                <p className="text-xs text-destructive">{errors.git_remote_url}</p>
+              )}
               <p className="type-caption text-muted-foreground">
                 Paste the output of <code className="font-mono">git remote get-url origin</code> from the repository where
                 developers run the CLI. When the CLI runs inside that repo, events are auto-attributed to this project.
