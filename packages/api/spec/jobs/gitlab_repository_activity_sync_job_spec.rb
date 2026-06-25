@@ -106,6 +106,20 @@ RSpec.describe GitlabRepositoryActivitySyncJob, type: :job do
       end
     end
 
+    context "when sync_pull_requests is disabled" do
+      before { connector.update_column(:config, { "sync_pull_requests" => false }) }
+
+      it "skips MR ingestion but still creates commit and pipeline events" do
+        expect {
+          described_class.new.perform(connector.id, repository.id)
+        }.to change(ToolEvent, :count).by(2)
+
+        expect(ToolEvent.where(tool_name: "gitlab", event_type: "review").count).to eq(0)
+        expect(ToolEvent.where(tool_name: "gitlab", event_type: "commit").count).to eq(1)
+        expect(ToolEvent.where(tool_name: "gitlab", event_type: "other").count).to eq(1)
+      end
+    end
+
     context "when there are still other pending jobs (counter > 1)" do
       it "decrements the counter without calling mark_synced!" do
         connector.update_column(:pending_activity_jobs, 3)
