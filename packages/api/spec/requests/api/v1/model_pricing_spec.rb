@@ -77,10 +77,10 @@ RSpec.describe 'Api::V1::ModelPricing', type: :request do
     end
 
     context 'as non-member' do
-      it 'returns 403' do
+      it 'returns 404 (organization not visible via authorized_scope)' do
         authenticated_get path, user: outsider
 
-        expect_forbidden
+        expect_not_found
       end
     end
 
