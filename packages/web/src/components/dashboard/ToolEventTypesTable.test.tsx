@@ -52,15 +52,13 @@ describe("ToolEventTypesTable", () => {
     expect(screen.getByText("Unknown")).toBeInTheDocument();
   });
 
-  it("dims zero-count rows with reduced opacity", () => {
+  it("hides zero-count event types from the table", () => {
     const types: ToolEventTypeStat[] = [
       { name: "chat", eventCount: 5, tokensIn: 100, tokensOut: 50, costUsd: 0.01 },
       { name: "debug", eventCount: 0, tokensIn: 0, tokensOut: 0, costUsd: 0 },
     ];
     render(<ToolEventTypesTable eventTypes={types} isLoading={false} />);
-    const debugRow = screen.getByText("Debug").closest("tr");
-    expect(debugRow).toHaveClass("opacity-40");
-    const chatRow = screen.getByText("Chat").closest("tr");
-    expect(chatRow).not.toHaveClass("opacity-40");
+    expect(screen.getByText("Chat")).toBeInTheDocument();
+    expect(screen.queryByText("Debug")).not.toBeInTheDocument();
   });
 });

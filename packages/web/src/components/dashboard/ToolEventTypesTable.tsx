@@ -65,13 +65,12 @@ export function ToolEventTypesTable({ eventTypes, isLoading, isError, onRetry }:
               </TableCell>
             </TableRow>
           ) : (
-            eventTypes.map((row) => {
+            eventTypes.filter((row) => row.eventCount > 0).map((row) => {
               const meta = getEventTypeMeta(row.name);
               const Icon = meta.icon;
-              const isEmpty = row.eventCount === 0;
 
               return (
-                <TableRow key={row.name} className={isEmpty ? "opacity-40" : undefined}>
+                <TableRow key={row.name}>
                   <TableCell className="font-medium">
                     <span className="inline-flex items-center gap-1.5">
                       <Icon className="size-3.5 text-muted-foreground" />
