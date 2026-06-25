@@ -730,7 +730,7 @@ export function useUpdateProject() {
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<Project> }) => {
-      const response = await api.patch<Project>(`/projects/${id}`, data);
+      const response = await api.patch<{ data: Project }>(`/projects/${id}`, data);
       return response.data;
     },
     onSuccess: (_, { id }) => {
