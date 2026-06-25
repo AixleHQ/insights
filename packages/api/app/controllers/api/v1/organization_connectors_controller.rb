@@ -62,6 +62,18 @@ module Api
       def update
         authorize! @connector
 
+        if params[:access_token].present? && (@connector.ai_provider? || @connector.slack_webhook? || @connector.cursor?)
+          @connector.assign_attributes(connector_update_params)
+          provider = Oauth::BaseProvider.for(@connector)
+          result = provider.test_connection
+          unless result[:success]
+            return render json: {
+              error: "Unprocessable Entity",
+              errors: { access_token: [ result[:error] || "Invalid API key" ] }
+            }, status: :unprocessable_content
+          end
+        end
+
         changes_before = @connector.slice(:is_active, :status, :external_account_name)
 
         attrs = connector_update_params.to_h.stringify_keys

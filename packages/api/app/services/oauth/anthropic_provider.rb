@@ -79,6 +79,12 @@ module Oauth
 
     def test_connection
       # Admin keys are scoped to usage-reporting endpoints, not /v1/models.
+      # Guard on format first — non-admin keys can return HTTP 200 with empty data
+      # from the usage endpoint, which would silently pass the HTTP-status check.
+      unless connector.access_token.to_s.start_with?("sk-ant-admin")
+        return { success: false, error: "Invalid API key — ensure you are using an Admin API key (sk-ant-admin-...)" }
+      end
+
       # Validate by hitting the usage report endpoint with a minimal date range.
       response = READ_ONLY_CONNECTION.get(USAGE_URL) do |req|
         req.headers["x-api-key"] = connector.access_token
