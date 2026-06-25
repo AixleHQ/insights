@@ -1600,7 +1600,12 @@ paths:
   /api/v1/organizations/{organization_id}/stats/overview:
     get:
       summary: Organization stats overview
-      description: Returns aggregate event count, cost, active users, and risk alert count for the current month, with percentage change vs the previous month. Pass project_id to scope all counts to a single project.
+      description: |
+        Returns aggregate event count, cost, active users, and risk alert count for a reporting period,
+        with percentage change vs the previous period. Default period is the current calendar month.
+        Pass `month` for a specific past month, or `all_time=true` for unbounded totals (change_percent fields will be null).
+        Pass `project_id` to scope all counts to a single project.
+        Active users always reflects the last 7 days regardless of the selected period.
       tags:
         - Stats
       parameters:
@@ -1611,6 +1616,17 @@ paths:
           description: Scope stats to a specific project (must belong to this organization)
           schema:
             type: string
+        - name: month
+          in: query
+          description: Exact calendar month to query (YYYY-MM). Overrides the default current-month window.
+          schema:
+            type: string
+            example: '2026-05'
+        - name: all_time
+          in: query
+          description: When true, aggregate over all available events with no date bound. Overrides month. Change-percent fields will be null.
+          schema:
+            type: boolean
       responses:
         '200':
           description: Overview stats
@@ -1626,15 +1642,20 @@ paths:
                     format: float
                   risk_alerts:
                     type: integer
-                    description: Count of distinct tool_events with at least one non-none audit log in the current month
+                    description: Count of distinct tool_events with at least one non-none audit log in the reporting period
                   active_users:
                     type: integer
+                    description: Users with at least one event in the last 7 days (always rolling, not period-scoped)
                   events_change_percent:
                     type: number
                     format: float
+                    nullable: true
+                    description: Null when all_time=true
                   cost_change_percent:
                     type: number
                     format: float
+                    nullable: true
+                    description: Null when all_time=true
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1700,7 +1721,7 @@ paths:
   /api/v1/organizations/{organization_id}/stats/daily:
     get:
       summary: Daily stats
-      description: Returns daily event counts and cost, plus a per-tool breakdown. Defaults to the last 30 days; pass `days` to override.
+      description: Returns event counts and cost bucketed by day/week/month, plus a per-tool breakdown. Defaults to the last 30 days at daily granularity. Pass `month=YYYY-MM` to scope to a specific calendar month. Pass `all_time=true` for unbounded data at the specified granularity (no zero-fill).
       tags:
         - Stats
       parameters:
@@ -1708,10 +1729,34 @@ paths:
         - $ref: '#/components/parameters/X-Organization-ID'
         - name: days
           in: query
-          description: Number of days to look back (default 30)
+          description: Number of days to look back (default 30). Ignored when month or all_time is present.
           schema:
             type: integer
             default: 30
+        - name: month
+          in: query
+          description: Scope to a specific calendar month (YYYY-MM). Ignored when all_time=true.
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}$'
+            example: '2025-03'
+        - name: period
+          in: query
+          description: Bucket granularity (default day). When all_time=true, defaults to month.
+          schema:
+            type: string
+            enum: [day, week, month]
+            default: day
+        - name: all_time
+          in: query
+          description: When true, return unbounded data across all history at the requested granularity. No zero-fill is applied.
+          schema:
+            type: boolean
+        - name: project_id
+          in: query
+          description: Scope to a specific project.
+          schema:
+            type: string
         - $ref: '#/components/parameters/start_date'
         - $ref: '#/components/parameters/end_date'
       responses:
@@ -1755,7 +1800,7 @@ paths:
   /api/v1/organizations/{organization_id}/stats/daily_by_tool:
     get:
       summary: Daily stats by tool
-      description: Returns event counts grouped by the top 3 tools plus an "Other" bucket — shaped for stacked bar charts. Granularity is day (default), week, or month. Use month (YYYY-MM) or days to set the window.
+      description: Returns event counts grouped by the top 3 tools plus an "Other" bucket — shaped for stacked bar charts. Granularity is day (default), week, or month. Use month (YYYY-MM) or days to set the window. Pass all_time=true for unbounded data (defaults to monthly granularity; no zero-fill).
       tags:
         - Stats
       parameters:
@@ -1763,13 +1808,13 @@ paths:
         - $ref: '#/components/parameters/X-Organization-ID'
         - name: days
           in: query
-          description: Rolling window in days (default 30). Ignored when month is present.
+          description: Rolling window in days (default 30). Ignored when month or all_time is present.
           schema:
             type: integer
             default: 30
         - name: period
           in: query
-          description: Bucket granularity
+          description: Bucket granularity. Defaults to month when all_time=true.
           schema:
             type: string
             enum: [day, week, month]
@@ -1780,6 +1825,11 @@ paths:
           schema:
             type: string
             example: '2026-05'
+        - name: all_time
+          in: query
+          description: When true, aggregate over all available events with no date bound. No zero-fill is applied. Defaults granularity to month.
+          schema:
+            type: boolean
         - name: project_id
           in: query
           description: Scope to a specific project (must belong to this organization)
@@ -1856,6 +1906,7 @@ paths:
         Returns tool-grouped events that have at least one audit log with risk_level != 'none' in the given window.
         Uses a subquery to prevent SUM inflation from the ToolEvent has_many :audit_logs relation.
         The SUM(eventCount) across rows approximates the risk_alerts value in /stats/overview when both use the same window.
+        Pass all_time=true for unbounded history.
       tags:
         - Stats
       parameters:
@@ -1863,7 +1914,7 @@ paths:
         - $ref: '#/components/parameters/X-Organization-ID'
         - name: days
           in: query
-          description: Rolling window in days (default 30). Ignored when month is present.
+          description: Rolling window in days (default 30). Ignored when month or all_time is present.
           schema:
             type: integer
             default: 30
@@ -1873,6 +1924,11 @@ paths:
           schema:
             type: string
             example: '2026-05'
+        - name: all_time
+          in: query
+          description: When true, aggregate over all available events with no date bound.
+          schema:
+            type: boolean
         - name: project_id
           in: query
           description: Scope to a specific project (must belong to this organization)
@@ -1909,7 +1965,7 @@ paths:
   /api/v1/organizations/{organization_id}/stats/daily_by_model:
     get:
       summary: Daily stats by model
-      description: Returns event counts grouped by the top 3 AI models plus an "Other" bucket. Granularity is day (default) or week. Use month (YYYY-MM) or days to set the window.
+      description: Returns event counts grouped by the top 3 AI models plus an "Other" bucket. Granularity is day (default), week, or month. Use month (YYYY-MM) or days to set the window. Pass all_time=true for unbounded data (defaults to monthly granularity).
       tags:
         - Stats
       parameters:
@@ -1917,16 +1973,16 @@ paths:
         - $ref: '#/components/parameters/X-Organization-ID'
         - name: days
           in: query
-          description: Rolling window in days (default 30). Ignored when month is present.
+          description: Rolling window in days (default 30). Ignored when month or all_time is present.
           schema:
             type: integer
             default: 30
         - name: period
           in: query
-          description: Bucket granularity
+          description: Bucket granularity. Defaults to month when all_time=true.
           schema:
             type: string
-            enum: [day, week]
+            enum: [day, week, month]
             default: day
         - name: month
           in: query
@@ -1934,6 +1990,11 @@ paths:
           schema:
             type: string
             example: '2026-05'
+        - name: all_time
+          in: query
+          description: When true, aggregate over all available events with no date bound. Defaults granularity to month.
+          schema:
+            type: boolean
         - name: project_id
           in: query
           description: Scope to a specific project (must belong to this organization)

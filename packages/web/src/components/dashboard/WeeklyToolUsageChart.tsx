@@ -27,10 +27,13 @@ import { ChartSkeleton } from "@/components/ui/skeletons";
 import { ErrorState } from "@/components/ui/error-state";
 import { cn, getToolColor, humanizeToolName } from "@/lib/utils";
 import { useDailyByTool, useDailyByModel } from "@/hooks/useApi";
+import type { DashboardPeriod } from "@/lib/types";
+import { currentMonth, getLast12Months } from "@/lib/dashboardUtils";
 
 interface WeeklyToolUsageChartProps {
   orgId: string;
   projectId?: string;
+  externalPeriod?: DashboardPeriod;
   className?: string;
 }
 
@@ -49,23 +52,6 @@ function getModelColor(index: number): string {
   return MODEL_PALETTE[index % MODEL_PALETTE.length];
 }
 
-function currentMonth(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function getLast12Months(): { value: string; label: string }[] {
-  const months: { value: string; label: string }[] = [];
-  const now = new Date();
-  for (let i = 0; i < 12; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const label = d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-    months.push({ value, label });
-  }
-  return months;
-}
-
 function formatWeekDate(dateStr: string): string {
   const start = new Date(dateStr + "T00:00:00");
   const end = new Date(start);
@@ -79,13 +65,20 @@ function formatWeekDate(dateStr: string): string {
   return `${fmt(start)} – ${fmt(end)}`;
 }
 
-export function WeeklyToolUsageChart({ orgId, projectId, className }: WeeklyToolUsageChartProps) {
+export function WeeklyToolUsageChart({ orgId, projectId, externalPeriod, className }: WeeklyToolUsageChartProps) {
   const [groupBy, setGroupBy] = useState<"tool" | "model">("tool");
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
 
   const months = useMemo(() => getLast12Months(), []);
-  const period = groupBy === "tool" ? ("day" as const) : ("week" as const);
-  const opts = { period, month: selectedMonth, projectId };
+
+  const controlled = !!externalPeriod;
+  const isAllTime = externalPeriod?.type === "all_time";
+
+  const opts = useMemo(() => {
+    if (isAllTime) return { allTime: true, period: "month" as const, projectId };
+    const month = externalPeriod?.value ?? selectedMonth;
+    return { period: "week" as const, month, projectId };
+  }, [isAllTime, externalPeriod, selectedMonth, projectId]);
 
   const { data: toolData, isLoading: isLoadingTool, isError: isErrorTool, refetch: refetchTool } = useDailyByTool(orgId, opts);
   const { data: modelData, isLoading: isLoadingModel, isError: isErrorModel, refetch: refetchModel } = useDailyByModel(orgId, opts);
@@ -94,12 +87,19 @@ export function WeeklyToolUsageChart({ orgId, projectId, className }: WeeklyTool
   const isError = groupBy === "tool" ? isErrorTool : isErrorModel;
   const refetch = groupBy === "tool" ? refetchTool : refetchModel;
 
+  const useMonthlyLabels = isAllTime || opts.period === "month";
+
   const { keys, chartData, chartConfig } = useMemo(() => {
+    const formatLabel = (dateStr: string) =>
+      useMonthlyLabels
+        ? new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", { month: "short", year: "numeric" })
+        : formatWeekDate(dateStr);
+
     if (groupBy === "tool") {
       const tools = toolData?.tools ?? [];
       const data = (toolData?.data ?? []).map((row) => ({
         ...row,
-        dateLabel: formatWeekDate(row.date),
+        dateLabel: formatLabel(row.date),
       }));
       const config: ChartConfig = {};
       tools.forEach((tool) => {
@@ -110,7 +110,7 @@ export function WeeklyToolUsageChart({ orgId, projectId, className }: WeeklyTool
       const models = modelData?.models ?? [];
       const data = (modelData?.data ?? []).map((row) => ({
         ...row,
-        dateLabel: formatWeekDate(row.date),
+        dateLabel: formatLabel(row.date),
       }));
       const config: ChartConfig = {};
       models.forEach((model, i) => {
@@ -118,7 +118,7 @@ export function WeeklyToolUsageChart({ orgId, projectId, className }: WeeklyTool
       });
       return { keys: models, chartData: data, chartConfig: config };
     }
-  }, [groupBy, toolData, modelData]);
+  }, [groupBy, toolData, modelData, useMonthlyLabels]);
 
   const getColor = (key: string, index: number) =>
     groupBy === "tool" ? getToolColor(key) : getModelColor(index);
@@ -126,7 +126,9 @@ export function WeeklyToolUsageChart({ orgId, projectId, className }: WeeklyTool
   return (
     <Card className={cn("col-span-full", className)}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-base font-medium">{groupBy === "tool" ? "Daily Usage" : "Weekly Usage"}</CardTitle>
+        <CardTitle className="text-base font-medium">
+          {isAllTime ? "Monthly Usage" : "Weekly Usage"}
+        </CardTitle>
         <div className="flex items-center gap-2">
           <div className="flex rounded-md border overflow-hidden">
             <Button
@@ -146,18 +148,20 @@ export function WeeklyToolUsageChart({ orgId, projectId, className }: WeeklyTool
               Model
             </Button>
           </div>
-          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="h-8 w-36 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {months.map((m) => (
-                <SelectItem key={m.value} value={m.value} className="text-xs">
-                  {m.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {!controlled && (
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="h-8 w-36 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {months.map((m) => (
+                  <SelectItem key={m.value} value={m.value} className="text-xs">
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
       </CardHeader>
       <CardContent>

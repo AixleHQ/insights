@@ -45,6 +45,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Export DOCKER_CONFIG for BuildKit
+        run: echo "DOCKER_CONFIG=$HOME/.docker" >> "$GITHUB_ENV"
+
       - name: Run check
         run: |
           docker compose -f ${{ inputs.docker_compose_file }} run --rm ${{ inputs.container_name }} ${{ inputs.check_command }}

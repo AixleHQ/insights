@@ -29,7 +29,9 @@ import {
 } from "@/components/ui/select";
 import { MemberDashboard } from "@/pages/MemberDashboard";
 import { StatCardSkeleton } from "@/components/ui/skeletons";
-import { formatPercent } from "@/lib/formatters";
+import { formatPercent, periodLabel } from "@/lib/formatters";
+import { type DashboardPeriod } from "@/lib/types";
+import { currentMonth, getLast12Months } from "@/lib/dashboardUtils";
 
 function ProjectFilterDropdown({
   orgId,
@@ -62,6 +64,38 @@ function ProjectFilterDropdown({
   );
 }
 
+function PeriodSelector({
+  value,
+  onChange,
+}: {
+  value: DashboardPeriod;
+  onChange: (p: DashboardPeriod) => void;
+}) {
+  const months = useMemo(() => getLast12Months(), []);
+  const selectValue = value.type === "all_time" ? "all_time" : value.value;
+
+  return (
+    <Select
+      value={selectValue}
+      onValueChange={(v) =>
+        onChange(v === "all_time" ? { type: "all_time" } : { type: "month", value: v })
+      }
+    >
+      <SelectTrigger className="w-44">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all_time">All time</SelectItem>
+        {months.map((m) => (
+          <SelectItem key={m.value} value={m.value}>
+            {m.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 export function OrgDashboard() {
   const { currentOrg } = useOrg();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -71,11 +105,22 @@ export function OrgDashboard() {
   const activeTab = (searchParams.get("tab") as "team" | "personal") ?? "team";
 
   const [selectedProjectId, setSelectedProjectId] = useState<string | undefined>();
+  const [selectedPeriod, setSelectedPeriod] = useState<DashboardPeriod>({
+    type: "month",
+    value: currentMonth(),
+  });
 
   const orgId = currentOrg?.id || "";
+  const isAllTime = selectedPeriod.type === "all_time";
 
-  const { data: stats, isLoading: isLoadingStats, isError: isErrorStats, refetch: refetchStats } = useOverviewStats(orgId, selectedProjectId);
-  const { data: dailyData, isLoading: isLoadingDaily, isError: isErrorDaily, refetch: refetchDaily } = useDailyStats(orgId, 30);
+  const { data: stats, isLoading: isLoadingStats, isError: isErrorStats, refetch: refetchStats } = useOverviewStats(orgId, selectedProjectId, selectedPeriod);
+  const { data: dailyData, isLoading: isLoadingDaily, isError: isErrorDaily, refetch: refetchDaily } = useDailyStats(
+    orgId,
+    selectedPeriod,
+    30,
+    isAllTime ? "month" : undefined,
+    selectedProjectId,
+  );
   const { data: eventsResponse, isLoading: isLoadingEvents, isError: isErrorEvents, refetch: refetchEvents } = useEvents(orgId, { per_page: 10 });
 
   const chartData: DailyCostData[] = dailyData?.data?.map((d) => ({
@@ -133,6 +178,8 @@ export function OrgDashboard() {
     ? events.findIndex((e) => e.id === selectedEventId)
     : -1;
 
+  const periodDesc = periodLabel(selectedPeriod);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -144,11 +191,14 @@ export function OrgDashboard() {
         </div>
         <div className="flex items-center gap-3">
           {activeTab === "team" && (
-            <ProjectFilterDropdown
-              orgId={orgId}
-              value={selectedProjectId}
-              onChange={setSelectedProjectId}
-            />
+            <>
+              <ProjectFilterDropdown
+                orgId={orgId}
+                value={selectedProjectId}
+                onChange={setSelectedProjectId}
+              />
+              <PeriodSelector value={selectedPeriod} onChange={setSelectedPeriod} />
+            </>
           )}
           <Tabs
             value={activeTab}
@@ -166,7 +216,7 @@ export function OrgDashboard() {
         <MemberDashboard hideHeader />
       ) : (
         <>
-          <WeeklyToolUsageChart orgId={orgId} projectId={selectedProjectId} />
+          <WeeklyToolUsageChart orgId={orgId} projectId={selectedProjectId} externalPeriod={selectedPeriod} />
 
           {isErrorStats ? (
             <Card>
@@ -195,18 +245,18 @@ export function OrgDashboard() {
               format="number"
               icon={<Activity className="size-5" />}
               trend={
-                stats?.events_change_percent
+                stats?.events_change_percent != null
                   ? stats.events_change_percent > 0
                     ? "up"
                     : "down"
                   : "neutral"
               }
               trendValue={
-                stats?.events_change_percent
+                stats?.events_change_percent != null
                   ? formatPercent(Math.abs(stats.events_change_percent))
                   : undefined
               }
-              description="This month"
+              description={periodDesc}
             />
             <MetricCard
               title="Total Cost"
@@ -214,25 +264,25 @@ export function OrgDashboard() {
               format="currency"
               icon={<DollarSign className="size-5" />}
               trend={
-                stats?.cost_change_percent
+                stats?.cost_change_percent != null
                   ? stats.cost_change_percent > 0
                     ? "up"
                     : "down"
                   : "neutral"
               }
               trendValue={
-                stats?.cost_change_percent
+                stats?.cost_change_percent != null
                   ? formatPercent(Math.abs(stats.cost_change_percent))
                   : undefined
               }
-              description="This month"
+              description={periodDesc}
             />
             <MetricCard
               title="Risk Alerts"
               value={stats?.risk_alerts ?? 0}
               format="number"
               icon={<AlertTriangle className="size-5" />}
-              description="This month"
+              description={periodDesc}
             />
             <MetricCard
               title="Active Members"
@@ -247,7 +297,7 @@ export function OrgDashboard() {
           )}
 
           <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
-            <CostTrendChart data={chartData} isLoading={isLoadingDaily} isError={isErrorDaily} onRetry={() => refetchDaily()} />
+            <CostTrendChart data={chartData} isLoading={isLoadingDaily} isError={isErrorDaily} onRetry={() => refetchDaily()} allTime={isAllTime} />
             <ActivityFeed
               events={events}
               isLoading={isLoadingEvents}
@@ -259,8 +309,8 @@ export function OrgDashboard() {
           </div>
 
           <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-            <TopToolsChart data={toolUsage} isLoading={isLoadingDaily} isError={isErrorDaily} onRetry={() => refetchDaily()} />
-            <RiskAlertsTable orgId={orgId} projectId={selectedProjectId} />
+            <TopToolsChart data={toolUsage} isLoading={isLoadingDaily} isError={isErrorDaily} onRetry={() => refetchDaily()} periodDesc={periodLabel(selectedPeriod)} />
+            <RiskAlertsTable orgId={orgId} projectId={selectedProjectId} period={selectedPeriod} />
           </div>
 
           <ToolInsightsSection

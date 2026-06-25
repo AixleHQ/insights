@@ -21,6 +21,7 @@ interface TopToolsChartProps {
   isLoading?: boolean;
   isError?: boolean;
   onRetry?: () => void;
+  periodDesc?: string;
   className?: string;
 }
 
@@ -35,7 +36,7 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-export function TopToolsChart({ data, isLoading, isError, onRetry, className }: TopToolsChartProps) {
+export function TopToolsChart({ data, isLoading, isError, onRetry, periodDesc, className }: TopToolsChartProps) {
   const sortedData = [...data]
     .sort((a, b) => b.event_count - a.event_count)
     .slice(0, 5)
@@ -50,7 +51,7 @@ export function TopToolsChart({ data, isLoading, isError, onRetry, className }: 
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-medium">Top Tools</CardTitle>
         <CardDescription className="text-xs">
-          Most used AI tools by event count
+          {periodDesc ? `Most used AI tools — ${periodDesc}` : "Most used AI tools by event count"}
         </CardDescription>
       </CardHeader>
       <CardContent>

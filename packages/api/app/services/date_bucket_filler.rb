@@ -18,7 +18,8 @@ module DateBucketFiller
 
   # Returns a flat Array of ISO-8601 strings covering the range.
   def self.all_buckets(start:, finish:, granularity:)
-    if granularity == "month"
+    case granularity
+    when "month"
       start_month = start.to_date.beginning_of_month
       end_month   = finish.to_date.beginning_of_month
       months = []
@@ -28,6 +29,16 @@ module DateBucketFiller
         m = m.next_month
       end
       months
+    when "week"
+      start_week = start.to_date.beginning_of_week(:monday)
+      end_week   = finish.to_date.beginning_of_week(:monday)
+      weeks = []
+      w = start_week
+      while w <= end_week
+        weeks << w.iso8601
+        w += 7
+      end
+      weeks
     else
       (start.to_date..finish.to_date).map(&:iso8601)
     end

@@ -14,26 +14,44 @@ module Api
       def overview
         authorize! current_organization, to: :show?
 
-        base_scope = if params[:project_id].present?
-          current_organization.projects.find(params[:project_id]).tool_events
-        else
-          current_organization.tool_events
-        end
-
-        current_start  = Time.current.beginning_of_month
-        current_end    = Time.current
-        current_events = base_scope.where(occurred_at: current_start..current_end)
-
-        prev_start  = 1.month.ago.beginning_of_month
-        prev_end    = 1.month.ago.end_of_month
-        prev_events = base_scope.where(occurred_at: prev_start..prev_end)
+        base_scope = scoped_events_base
 
         # Counts users with at least one event in the last 7 days — intentionally activity-based,
         # not membership-based. A newly-added member with no events will not appear here until
-        # they start generating activity.
+        # they start generating activity. This metric does not change with the selected period.
         active_users = base_scope.where("occurred_at > ?", 7.days.ago).distinct.count(:user_id)
 
-        # Count distinct tool_events flagged with a non-trivial risk level in the current month.
+        if ActiveModel::Type::Boolean.new.cast(params[:all_time])
+          current_events  = base_scope
+          high_risk_count = current_events.where(risky_event_condition).distinct.count
+
+          render json: {
+            total_events:          current_events.count,
+            total_cost_usd:        current_events.sum(:cost_usd).to_f,
+            risk_alerts:           high_risk_count,
+            active_users:          active_users,
+            events_change_percent: nil,
+            cost_change_percent:   nil
+          }
+          return
+        end
+
+        # Determine reporting month: selected past month or current month (default).
+        parsed_month = parse_month_param!
+        return if performed?
+
+        anchor = parsed_month || Date.current.beginning_of_month
+
+        current_start  = anchor.beginning_of_month.beginning_of_day
+        current_end    = params[:month].present? ? anchor.end_of_month.end_of_day : Time.current
+        current_events = base_scope.where(occurred_at: current_start..current_end)
+
+        prev_anchor = anchor - 1.month
+        prev_start  = prev_anchor.beginning_of_month.beginning_of_day
+        prev_end    = prev_anchor.end_of_month.end_of_day
+        prev_events = base_scope.where(occurred_at: prev_start..prev_end)
+
+        # Count distinct tool_events flagged with a non-trivial risk level in the reporting period.
         # Checks audit_logs (canonical) OR metadata (fallback for events that bypassed Temporal).
         high_risk_count = current_events.where(risky_event_condition).distinct.count
 
@@ -101,18 +119,51 @@ module Api
       def daily
         authorize! current_organization, to: :show?
 
-        days = (params[:days] || 30).to_i
-        time_range = parse_time_range(default_days: days)
-        events = current_organization.tool_events
-                                     .where(occurred_at: time_range[:start]..time_range[:end])
+        all_time    = ActiveModel::Type::Boolean.new.cast(params[:all_time])
+        granularity = %w[week month].include?(params[:period]) ? params[:period] : "day"
+        trunc_sql   = "DATE_TRUNC('#{granularity}', occurred_at)"
+
+        if all_time
+          events = scoped_events_base
+
+          rows_by_date = events
+            .group(trunc_sql)
+            .select("#{trunc_sql} as day, COUNT(*) as event_count, SUM(cost_usd) as cost_usd")
+            .order("day")
+            .each_with_object({}) do |row, h|
+              h[row.day.to_date.iso8601] = {
+                date: row.day.to_date.iso8601,
+                event_count: row.event_count,
+                cost_usd: (row.cost_usd || 0).to_f
+              }
+            end
+
+          tool_breakdown = events
+            .group(:tool_name)
+            .select("tool_name, COUNT(*) as event_count, SUM(cost_usd) as cost_usd")
+            .order(Arel.sql("event_count DESC"))
+            .map { |r| { tool_name: r.tool_name, event_count: r.event_count, cost_usd: (r.cost_usd || 0).to_f } }
+
+          render json: { data: rows_by_date.values, tool_breakdown: tool_breakdown }
+          return
+        end
+
+        parsed_month = parse_month_param!
+        return if performed?
+
+        time_range = if parsed_month
+          { start: parsed_month.beginning_of_month.beginning_of_day,
+            end:   parsed_month.end_of_month.end_of_day }
+        else
+          days = (params[:days] || 30).to_i
+          parse_time_range(default_days: days)
+        end
+
+        events = scoped_events_base.where(occurred_at: time_range[:start]..time_range[:end])
 
         rows_by_date = events
-          .group("DATE_TRUNC('day', occurred_at)")
-          .select(
-            "DATE_TRUNC('day', occurred_at) as day",
-            "COUNT(*) as event_count",
-            "SUM(cost_usd) as cost_usd"
-          )
+          .group(trunc_sql)
+          .select("#{trunc_sql} as day, COUNT(*) as event_count, SUM(cost_usd) as cost_usd")
           .order("day")
           .each_with_object({}) do |row, h|
             h[row.day.to_date.iso8601] = {
@@ -122,44 +173,36 @@ module Api
             }
           end
 
-        # Zero-fill every calendar day in the range so the chart always shows
-        # the correct window (e.g. "7 days" = last 7 calendar days, not last 7 active days).
-        daily_data = (time_range[:start].to_date..time_range[:end].to_date).map do |date|
-          rows_by_date[date.iso8601] || { date: date.iso8601, event_count: 0, cost_usd: 0.0 }
-        end
+        # Zero-fill every bucket in the range so the chart always shows the full window.
+        # Uses granularity-aware bucketing: day/week/month match the DB truncation above.
+        daily_data = DateBucketFiller.fill(
+          start:       time_range[:start],
+          finish:      time_range[:end],
+          granularity: granularity,
+          data_map:    rows_by_date
+        ).map { |e| { event_count: 0, cost_usd: 0.0 }.merge(e) }
 
         tool_breakdown = events
           .group(:tool_name)
-          .select(
-            "tool_name",
-            "COUNT(*) as event_count",
-            "SUM(cost_usd) as cost_usd"
-          )
+          .select("tool_name, COUNT(*) as event_count, SUM(cost_usd) as cost_usd")
           .order(Arel.sql("event_count DESC"))
-          .map do |row|
-            {
-              tool_name: row.tool_name,
-              event_count: row.event_count,
-              cost_usd: (row.cost_usd || 0).to_f
-            }
-          end
+          .map { |r| { tool_name: r.tool_name, event_count: r.event_count, cost_usd: (r.cost_usd || 0).to_f } }
 
-        render json: {
-          data: daily_data,
-          tool_breakdown: tool_breakdown
-        }
+        render json: { data: daily_data, tool_breakdown: tool_breakdown }
       end
 
       # GET /api/v1/organizations/:organization_id/stats/daily_by_tool
-      # Optional params: period (day|week|month), month (YYYY-MM), project_id
+      # Optional params: period (day|week|month), month (YYYY-MM), project_id, all_time (bool)
       def daily_by_tool
         authorize! current_organization, to: :show?
 
         time_range = month_or_days_time_range
-        trunc      = case params[:period]
+        return if performed?
+
+        trunc = case params[:period]
         when "month" then "month"
         when "week"  then "week"
-        else              "day"
+        else              time_range.nil? ? "month" : "day"
         end
         events     = scoped_events(time_range)
 
@@ -188,15 +231,20 @@ module Api
           date_map[date][tool_key] = (date_map[date][tool_key] || 0) + row.event_count
         end
 
-        filled = DateBucketFiller.fill(
-          start: time_range[:start],
-          finish: time_range[:end],
-          granularity: trunc,
-          data_map: date_map
-        )
+        # All-time: no zero-fill; return raw aggregated buckets only.
+        data = if time_range.nil?
+          date_map.values.sort_by { |d| d[:date] }
+        else
+          DateBucketFiller.fill(
+            start: time_range[:start],
+            finish: time_range[:end],
+            granularity: trunc,
+            data_map: date_map
+          )
+        end
 
         render json: {
-          data:   filled,
+          data:   data,
           tools:  top_tools + [ "Other" ],
           period: trunc
         }
@@ -257,6 +305,7 @@ module Api
         authorize! current_organization, to: :show?
 
         time_range = month_or_days_time_range
+        return if performed?
 
         risky_ids = scoped_events(time_range)
           .where(risky_event_condition)
@@ -286,12 +335,18 @@ module Api
       end
 
       # GET /api/v1/organizations/:organization_id/stats/daily_by_model
-      # Optional params: period (day|week), month (YYYY-MM), project_id
+      # Optional params: period (day|week|month), month (YYYY-MM), project_id, all_time (bool)
       def daily_by_model
         authorize! current_organization, to: :show?
 
         time_range = month_or_days_time_range
-        trunc      = params[:period] == "week" ? "week" : "day"
+        return if performed?
+
+        trunc = case params[:period]
+        when "month" then "month"
+        when "week"  then "week"
+        else              time_range.nil? ? "month" : "day"
+        end
         events     = scoped_events(time_range)
 
         top_models = events
@@ -589,25 +644,48 @@ module Api
         }
       end
 
-      # Resolves time range from ?month=YYYY-MM (exact calendar month) or ?days=N (rolling window).
+      # Resolves time range from ?all_time=true (nil = no date bound), ?month=YYYY-MM
+      # (exact calendar month), or ?days=N (rolling window).
       def month_or_days_time_range
-        if params[:month].present?
-          month = Date.parse("#{params[:month]}-01")
+        if ActiveModel::Type::Boolean.new.cast(params[:all_time])
+          nil
+        elsif (month = parse_month_param!)
           { start: month.beginning_of_month.beginning_of_day,
             end:   month.end_of_month.end_of_day }
+        elsif performed?
+          nil  # parse_month_param! rendered a 422; callers check performed? after this
         else
           parse_time_range(default_days: (params[:days] || 30).to_i)
         end
       end
 
-      # Returns a time-scoped ToolEvent relation, optionally filtered to a project.
+      # Validates and parses ?month=YYYY-MM. Returns a Date on success.
+      # Renders 422 and returns nil on bad input — callers must `return` on nil.
+      def parse_month_param!
+        return nil unless params[:month].present?
+        unless params[:month].match?(/\A\d{4}-(0[1-9]|1[0-2])\z/)
+          render json: { error: "Invalid month format. Use YYYY-MM (e.g. 2025-03)." },
+                 status: :unprocessable_entity
+          return nil
+        end
+        Date.parse("#{params[:month]}-01")
+      end
+
+      # Returns a ToolEvent relation scoped to the org (and optionally a project).
       # project_id is validated through the org to prevent cross-org data access.
-      def scoped_events(time_range)
-        base = if params[:project_id].present?
+      def scoped_events_base
+        if params[:project_id].present?
           current_organization.projects.find(params[:project_id]).tool_events
         else
           current_organization.tool_events
         end
+      end
+
+      # Returns a time-scoped ToolEvent relation. When time_range is nil (all_time),
+      # returns the full base scope with no date filter.
+      def scoped_events(time_range)
+        base = scoped_events_base
+        return base if time_range.nil?
         base.where(occurred_at: time_range[:start]..time_range[:end])
       end
 

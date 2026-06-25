@@ -1,3 +1,5 @@
+import type { DashboardPeriod } from "@/lib/types";
+
 export function formatCost(n: number | string | null | undefined): string {
   const num = typeof n === "number" ? n : Number(n);
   if (!Number.isFinite(num) || num === 0) return "$0.00";
@@ -37,6 +39,15 @@ export function formatPercent(n: number, decimals = 1): string {
 export function formatAiPercentage(value: number): string {
   const decimals = value % 1 === 0 ? 0 : 2;
   return `${value.toFixed(decimals)}%`;
+}
+
+export function periodLabel(p: DashboardPeriod): string {
+  if (p.type === "all_time") return "All time";
+  const [y, m] = p.value.split("-");
+  return new Date(Number(y), Number(m) - 1).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
 }
 
 export function truncateModelName(name: string): string {

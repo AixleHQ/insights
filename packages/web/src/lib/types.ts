@@ -302,14 +302,21 @@ export interface OverviewStats {
   cost_today_usd: number;
   active_users: number;
   risk_alerts: number;
-  events_change_percent: number;
-  cost_change_percent: number;
+  events_change_percent: number | null;
+  cost_change_percent: number | null;
   // Token metrics
   total_tokens_in?: number;
   total_tokens_out?: number;
   total_tokens?: number;
   tokens_today?: number;
 }
+
+// Discriminated union for the dashboard period selector.
+// type: "month" = a specific calendar month (value = "YYYY-MM")
+// type: "all_time" = unbounded, all available history
+export type DashboardPeriod =
+  | { type: "month"; value: string }
+  | { type: "all_time" };
 
 export interface DailyStats {
   date: string;

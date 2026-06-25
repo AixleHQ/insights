@@ -17,6 +17,7 @@ import {
 import type { ChartConfig } from "@/components/ui/chart";
 import { ChartSkeleton } from "@/components/ui/skeletons";
 import { ErrorState } from "@/components/ui/error-state";
+import { formatCost } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 
 export interface DailyCostData {
@@ -30,6 +31,7 @@ interface CostTrendChartProps {
   isLoading?: boolean;
   isError?: boolean;
   onRetry?: () => void;
+  allTime?: boolean;
   className?: string;
 }
 
@@ -46,34 +48,29 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-function formatDate(dateStr: string, range: TimeRange): string {
-  const date = new Date(dateStr);
+function formatDateLabel(dateStr: string, allTime: boolean, range: TimeRange): string {
+  const date = new Date(dateStr + "T00:00:00");
+  if (allTime) {
+    return date.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+  }
   if (range === "7d") {
     return date.toLocaleDateString("en-US", { weekday: "short" });
   }
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-export function CostTrendChart({ data, isLoading, isError, onRetry, className }: CostTrendChartProps) {
+export function CostTrendChart({ data, isLoading, isError, onRetry, allTime = false, className }: CostTrendChartProps) {
   const [timeRange, setTimeRange] = useState<TimeRange>("7d");
 
-  const filteredData = timeRange === "7d" ? data.slice(-7) : data.slice(-30);
+  const filteredData = allTime ? data : (timeRange === "7d" ? data.slice(-7) : data.slice(-30));
   const formattedData = filteredData.map((item) => ({
     ...item,
-    dateLabel: formatDate(item.date, timeRange),
+    dateLabel: formatDateLabel(item.date, allTime, timeRange),
   }));
 
   const totalCost = filteredData.reduce((sum, item) => sum + item.cost, 0);
   const avgCost = filteredData.length > 0 ? totalCost / filteredData.length : 0;
+  const avgLabel = allTime ? `${formatCost(avgCost)}/mo` : `${formatCost(avgCost)}/day`;
 
   return (
     <Card className={cn("col-span-full lg:col-span-2", className)}>
@@ -81,27 +78,29 @@ export function CostTrendChart({ data, isLoading, isError, onRetry, className }:
         <div>
           <CardTitle className="text-base font-medium">Cost Trend</CardTitle>
           <CardDescription className="text-xs">
-            Total: {formatCurrency(totalCost)} | Avg: {formatCurrency(avgCost)}/day
+            Total: {formatCost(totalCost)} | Avg: {avgLabel}
           </CardDescription>
         </div>
-        <div className="flex gap-1">
-          <Button
-            variant={timeRange === "7d" ? "secondary" : "ghost"}
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => setTimeRange("7d")}
-          >
-            7 days
-          </Button>
-          <Button
-            variant={timeRange === "30d" ? "secondary" : "ghost"}
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => setTimeRange("30d")}
-          >
-            30 days
-          </Button>
-        </div>
+        {!allTime && (
+          <div className="flex gap-1">
+            <Button
+              variant={timeRange === "7d" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => setTimeRange("7d")}
+            >
+              7 days
+            </Button>
+            <Button
+              variant={timeRange === "30d" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => setTimeRange("30d")}
+            >
+              30 days
+            </Button>
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         {isError ? (
@@ -146,7 +145,7 @@ export function CostTrendChart({ data, isLoading, isError, onRetry, className }:
                   content={
                     <ChartTooltipContent
                       formatter={(value, name) =>
-                        name === "cost" ? formatCurrency(value as number) : value
+                        name === "cost" ? formatCost(value as number) : value
                       }
                     />
                   }

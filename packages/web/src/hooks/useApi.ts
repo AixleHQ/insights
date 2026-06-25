@@ -55,6 +55,7 @@ import type {
   NotificationRoute,
   MyToolAccountMetadata,
   McpIngestExchangeData,
+  DashboardPeriod,
 } from "@/lib/types";
 import type { IntegrationProvider } from "@/lib/providers";
 
@@ -124,16 +125,16 @@ export const queryKeys = {
     summary: (orgId: string) => ["organizations", orgId, "events", "summary"] as const,
   },
   stats: {
-    overview: (orgId: string, projectId?: string) =>
-      ["organizations", orgId, "stats", "overview", { projectId }] as const,
-    daily: (orgId: string, days?: number) =>
-      ["organizations", orgId, "stats", "daily", days] as const,
+    overview: (orgId: string, projectId?: string, period?: DashboardPeriod) =>
+      ["organizations", orgId, "stats", "overview", { projectId, period }] as const,
+    daily: (orgId: string, period?: DashboardPeriod, days?: number, granularity?: string, projectId?: string) =>
+      ["organizations", orgId, "stats", "daily", { period, days, granularity, projectId }] as const,
     hourly: (orgId: string, hours?: number) =>
       ["organizations", orgId, "stats", "hourly", hours] as const,
-    riskAlerts: (orgId: string, projectId?: string, month?: string) =>
-      ["organizations", orgId, "stats", "risk_alerts", { projectId, month }] as const,
-    dailyByModel: (orgId: string, days: number, projectId?: string) =>
-      ["organizations", orgId, "stats", "daily_by_model", { days, projectId }] as const,
+    riskAlerts: (orgId: string, projectId?: string, period?: DashboardPeriod) =>
+      ["organizations", orgId, "stats", "risk_alerts", { projectId, period }] as const,
+    dailyByModel: (orgId: string, opts: DailyByToolOpts) =>
+      ["organizations", orgId, "stats", "daily_by_model", opts] as const,
     toolOverview: (orgId: string, tool: string) =>
       ["organizations", orgId, "stats", "tools", tool, "overview"] as const,
     toolModels: (orgId: string, tool: string, days?: number) =>
@@ -1718,25 +1719,52 @@ export function useBulkAttributeEvents(orgId: string) {
 // Stats Hooks
 // ============================================================================
 
-export function useOverviewStats(orgId: string, projectId?: string) {
+export function useOverviewStats(orgId: string, projectId?: string, period?: DashboardPeriod) {
   return useQuery({
-    queryKey: queryKeys.stats.overview(orgId, projectId),
+    queryKey: queryKeys.stats.overview(orgId, projectId, period),
     queryFn: () => {
-      const params = projectId ? `?project_id=${projectId}` : "";
-      return api.get<OverviewStats>(`/organizations/${orgId}/stats/overview${params}`);
+      const p = new URLSearchParams();
+      if (projectId) p.set("project_id", projectId);
+      if (period?.type === "all_time") {
+        p.set("all_time", "true");
+      } else if (period?.type === "month") {
+        p.set("month", period.value);
+      }
+      const qs = p.toString();
+      return api.get<OverviewStats>(`/organizations/${orgId}/stats/overview${qs ? `?${qs}` : ""}`);
     },
     enabled: !!orgId,
     refetchInterval: 30000,
   });
 }
 
-export function useDailyStats(orgId: string, days = 30) {
+export function useDailyStats(
+  orgId: string,
+  period?: DashboardPeriod,
+  days = 30,
+  granularity?: "day" | "week" | "month",
+  projectId?: string
+) {
+  const allTime = period?.type === "all_time";
+  const month = period?.type === "month" ? period.value : undefined;
+
   return useQuery({
-    queryKey: queryKeys.stats.daily(orgId, days),
-    queryFn: () =>
-      api.get<{ data: DailyStats[]; tool_breakdown: ToolUsageStats[] }>(
-        `/organizations/${orgId}/stats/daily?days=${days}`
-      ),
+    queryKey: queryKeys.stats.daily(orgId, period, days, granularity, projectId),
+    queryFn: () => {
+      const p = new URLSearchParams();
+      if (allTime) {
+        p.set("all_time", "true");
+        p.set("period", granularity ?? "month");
+      } else if (month) {
+        p.set("month", month);
+      } else {
+        p.set("days", String(days));
+      }
+      if (projectId) p.set("project_id", projectId);
+      return api.get<{ data: DailyStats[]; tool_breakdown: ToolUsageStats[] }>(
+        `/organizations/${orgId}/stats/daily?${p}`
+      );
+    },
     enabled: !!orgId,
   });
 }
@@ -1779,19 +1807,25 @@ export interface DailyByToolOpts {
   period?: "day" | "week" | "month";
   month?: string;
   projectId?: string;
+  allTime?: boolean;
 }
 
 export function useDailyByTool(orgId: string, opts: DailyByToolOpts | number = {}) {
   const normalized: DailyByToolOpts = typeof opts === "number" ? { days: opts } : opts;
-  const { days = 30, period, month, projectId } = normalized;
+  const { days = 30, period, month, projectId, allTime } = normalized;
 
   return useQuery({
     queryKey: ["organizations", orgId, "stats", "daily_by_tool", normalized],
     queryFn: () => {
       const p = new URLSearchParams();
-      if (!month) p.set("days", String(days));
-      if (period) p.set("period", period);
-      if (month) p.set("month", month);
+      if (allTime) {
+        p.set("all_time", "true");
+        if (period) p.set("period", period);
+      } else {
+        if (!month) p.set("days", String(days));
+        if (period) p.set("period", period);
+        if (month) p.set("month", month);
+      }
       if (projectId) p.set("project_id", projectId);
       return api.get<DailyByToolResponse>(`/organizations/${orgId}/stats/daily_by_tool?${p}`);
     },
@@ -1807,13 +1841,17 @@ export interface RiskAlertRow {
   costUsd: number;
 }
 
-export function useOrgRiskAlerts(orgId: string, projectId?: string, month?: string) {
+export function useOrgRiskAlerts(orgId: string, projectId?: string, period?: DashboardPeriod) {
   return useQuery({
-    queryKey: queryKeys.stats.riskAlerts(orgId, projectId, month),
+    queryKey: queryKeys.stats.riskAlerts(orgId, projectId, period),
     queryFn: () => {
       const p = new URLSearchParams();
       if (projectId) p.set("project_id", projectId);
-      if (month) p.set("month", month);
+      if (period?.type === "all_time") {
+        p.set("all_time", "true");
+      } else if (period?.type === "month") {
+        p.set("month", period.value);
+      }
       const qs = p.toString();
       return api.get<RiskAlertRow[]>(`/organizations/${orgId}/stats/risk_alerts${qs ? `?${qs}` : ""}`);
     },
@@ -1834,15 +1872,20 @@ export interface DailyByModelResponse {
 
 export function useDailyByModel(orgId: string, opts: DailyByToolOpts | number = {}) {
   const normalized: DailyByToolOpts = typeof opts === "number" ? { days: opts } : opts;
-  const { days = 30, period, month, projectId } = normalized;
+  const { days = 30, period, month, projectId, allTime } = normalized;
 
   return useQuery({
-    queryKey: queryKeys.stats.dailyByModel(orgId, days, projectId),
+    queryKey: queryKeys.stats.dailyByModel(orgId, normalized),
     queryFn: () => {
       const p = new URLSearchParams();
-      if (!month) p.set("days", String(days));
-      if (period) p.set("period", period);
-      if (month) p.set("month", month);
+      if (allTime) {
+        p.set("all_time", "true");
+        if (period) p.set("period", period);
+      } else {
+        if (!month) p.set("days", String(days));
+        if (period) p.set("period", period);
+        if (month) p.set("month", month);
+      }
       if (projectId) p.set("project_id", projectId);
       return api.get<DailyByModelResponse>(`/organizations/${orgId}/stats/daily_by_model?${p}`);
     },

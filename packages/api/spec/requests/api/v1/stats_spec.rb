@@ -81,6 +81,57 @@ RSpec.describe 'Api::V1::Stats', type: :request do
 
       expect_forbidden
     end
+
+    context 'with month= param' do
+      it 'returns stats for the specified calendar month vs prior month' do
+        target_month = 2.months.ago
+        create(:tool_event, organization: organization, user: user,
+               cost_usd: 5.0, occurred_at: target_month.beginning_of_month + 5.days)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/overview",
+                          user: user,
+                          organization: organization,
+                          params: { month: target_month.strftime("%Y-%m") }
+
+        expect_success
+        expect(json_response[:total_events]).to be_a(Integer)
+        expect(json_response[:events_change_percent]).to be_a(Numeric)
+        expect(json_response[:cost_change_percent]).to be_a(Numeric)
+      end
+    end
+
+    context 'with all_time=true' do
+      it 'returns unbounded totals with nil change_percents' do
+        create(:tool_event, organization: organization, user: user,
+               cost_usd: 2.0, occurred_at: 6.months.ago)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/overview",
+                          user: user,
+                          organization: organization,
+                          params: { all_time: true }
+
+        expect_success
+        expect(json_response[:total_events]).to be_a(Integer)
+        expect(json_response[:total_cost_usd]).to be_a(Numeric)
+        expect(json_response[:events_change_percent]).to be_nil
+        expect(json_response[:cost_change_percent]).to be_nil
+      end
+
+      it 'scopes to project_id when combined with all_time=true' do
+        project = create(:project, organization: organization)
+        create(:tool_event, organization: organization, project: project, user: user,
+               cost_usd: 3.0, occurred_at: 1.year.ago)
+        other_event_count = organization.tool_events.count
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/overview",
+                          user: user,
+                          organization: organization,
+                          params: { all_time: true, project_id: project.id }
+
+        expect_success
+        expect(json_response[:total_events]).to be < other_event_count
+      end
+    end
   end
 
   describe 'GET /api/v1/organizations/:organization_id/stats/hourly' do
@@ -119,6 +170,81 @@ RSpec.describe 'Api::V1::Stats', type: :request do
                         }
 
       expect_success
+    end
+
+    context 'with month= param' do
+      it 'returns daily rows scoped to that calendar month' do
+        target_month = 2.months.ago.beginning_of_month
+        create(:tool_event, organization: organization, user: user,
+               cost_usd: 5.0, occurred_at: target_month + 5.days)
+        create(:tool_event, organization: organization, user: user,
+               cost_usd: 3.0, occurred_at: 6.months.ago)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/daily",
+                          user: user,
+                          organization: organization,
+                          params: { month: target_month.strftime("%Y-%m") }
+
+        expect_success
+        dates = json_response[:data].map { |r| Date.parse(r[:date]) }
+        expect(dates).to all(be >= target_month.to_date)
+        expect(dates).to all(be <= target_month.end_of_month.to_date)
+        total_cost = json_response[:data].sum { |r| r[:cost_usd] }
+        expect(total_cost).to be_within(0.01).of(5.0)
+      end
+
+      it 'scopes to project_id when provided' do
+        project = create(:project, organization: organization)
+        project_event = create(:tool_event, organization: organization, user: user,
+                               project: project, cost_usd: 7.0,
+                               occurred_at: Date.current.beginning_of_month + 1.day)
+        create(:tool_event, organization: organization, user: user,
+               cost_usd: 2.0, occurred_at: Date.current.beginning_of_month + 2.days)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/daily",
+                          user: user,
+                          organization: organization,
+                          params: { month: Date.current.strftime("%Y-%m"), project_id: project.id }
+
+        expect_success
+        total_cost = json_response[:data].sum { |r| r[:cost_usd] }
+        expect(total_cost).to be_within(0.01).of(project_event.cost_usd)
+      end
+    end
+
+    context 'with all_time=true and period=month' do
+      it 'returns monthly-bucketed rows without zero-fill' do
+        create(:tool_event, organization: organization, user: user,
+               cost_usd: 1.0, occurred_at: 3.months.ago)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/daily",
+                          user: user,
+                          organization: organization,
+                          params: { all_time: true, period: "month" }
+
+        expect_success
+        expect(json_response[:data]).to be_an(Array)
+        expect(json_response[:tool_breakdown]).to be_an(Array)
+        # Should have sparse data only (no zero-filled months)
+        expect(json_response[:data].length).to be < 13
+      end
+
+      it 'scopes to project_id when provided' do
+        project = create(:project, organization: organization)
+        create(:tool_event, organization: organization, user: user,
+               project: project, cost_usd: 9.0, occurred_at: 1.month.ago)
+        create(:tool_event, organization: organization, user: user,
+               cost_usd: 2.0, occurred_at: 1.month.ago)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/daily",
+                          user: user,
+                          organization: organization,
+                          params: { all_time: true, period: "month", project_id: project.id }
+
+        expect_success
+        total_cost = json_response[:data].sum { |r| r[:cost_usd] }
+        expect(total_cost).to be_within(0.01).of(9.0)
+      end
     end
   end
 
@@ -223,6 +349,23 @@ RSpec.describe 'Api::V1::Stats', type: :request do
                         params: { project_id: project.id }
 
       expect_success
+    end
+
+    context 'with all_time=true' do
+      it 'returns monthly-bucketed aggregated rows without zero-fill' do
+        create(:tool_event, organization: organization, user: user,
+               tool_name: 'claude_code', occurred_at: 4.months.ago)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/daily_by_tool",
+                          user: user,
+                          organization: organization,
+                          params: { all_time: true }
+
+        expect_success
+        expect(json_response[:data]).to be_an(Array)
+        expect(json_response[:tools]).to be_an(Array)
+        expect(json_response[:period]).to eq("month")
+      end
     end
   end
 
@@ -1045,6 +1188,21 @@ RSpec.describe 'Api::V1::Stats', type: :request do
 
         expect_success
         expect(json_response[:risk_alerts]).to be >= 1
+      end
+    end
+
+    context 'with all_time=true' do
+      it 'returns risk alerts across all available history' do
+        old_event = create(:tool_event, organization: organization, user: user,
+                           tool_name: 'claude_code', cost_usd: 1.0, occurred_at: 8.months.ago)
+        create(:audit_log, organization: organization, tool_event: old_event, risk_level: 'high')
+
+        authenticated_get path, user: user, organization: organization,
+                          params: { all_time: true }
+
+        expect_success
+        tool_names = json_response.map { |r| r[:toolName] }
+        expect(tool_names).to include('claude_code')
       end
     end
   end
