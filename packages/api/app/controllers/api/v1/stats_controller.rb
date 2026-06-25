@@ -491,7 +491,7 @@ module Api
           }
         else
           {
-            start: default_days.days.ago.beginning_of_day,
+            start: (default_days - 1).days.ago.beginning_of_day,
             end: Time.current
           }
         end
