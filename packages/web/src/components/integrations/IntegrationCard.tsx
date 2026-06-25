@@ -183,11 +183,11 @@ export function IntegrationCard({
       >
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <ProviderLogo provider={provider.id} size="md" showBackground />
-              <div>
-                <CardTitle className="text-base">{provider.name}</CardTitle>
-                <CardDescription className="text-xs">
+              <div className="min-w-0">
+                <CardTitle className="truncate text-base">{provider.name}</CardTitle>
+                <CardDescription className="line-clamp-2 text-xs">
                   {provider.description}
                 </CardDescription>
               </div>
@@ -245,11 +245,11 @@ export function IntegrationCard({
     <Card className={cn("group relative transition-all hover:shadow-md", className)}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <ProviderLogo provider={integration.provider} size="md" showBackground />
-            <div>
-              <CardTitle className="text-base">{integration.name}</CardTitle>
-              <CardDescription className="text-xs capitalize">
+            <div className="min-w-0">
+              <CardTitle className="truncate text-base">{integration.name}</CardTitle>
+              <CardDescription className="truncate text-xs capitalize">
                 {integration.provider.replace("-", " ")}
                 {displayAccountLabel && ` · ${displayAccountLabel}`}
               </CardDescription>
