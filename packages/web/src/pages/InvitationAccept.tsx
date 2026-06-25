@@ -529,7 +529,7 @@ export function InvitationAccept() {
       <footer className="relative z-10 border-t bg-background/80 backdrop-blur-sm">
         <div className="mx-auto flex h-14 max-w-4xl items-center justify-center px-6">
           <p className="type-caption text-muted-foreground">
-            &copy; {new Date().getFullYear()} Acme Corp. All rights
+            &copy; {new Date().getFullYear()} Aixle Insights. All rights
             reserved.
           </p>
         </div>

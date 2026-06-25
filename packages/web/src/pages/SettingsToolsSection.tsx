@@ -136,7 +136,7 @@ export function SettingsToolsSection() {
                 standalone CLI after replacing{" "}
                 <code className="rounded bg-muted px-1 py-0.5 text-xs">&lt;YOUR_INGEST_TOKEN&gt;</code>{" "}
                 with your token. Prefer{" "}
-                <code className="rounded bg-muted px-1 py-0.5 text-xs">npx -y @db90/telemetry-mcp init</code>{" "}
+                <code className="rounded bg-muted px-1 py-0.5 text-xs">npx -y @aixle/insights init</code>{" "}
                 when you want MCP setup without pasting a token.
               </p>
               <div className="space-y-4">

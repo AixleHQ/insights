@@ -163,7 +163,7 @@ describe("IngestTokenConnectSheet", () => {
       const mcpTab = screen.getByRole("tab", { name: /MCP \(recommended\)/i });
       expect(mcpTab).toHaveAttribute("aria-selected", "true");
       expect(screen.getByLabelText(/Recommended MCP install command/i)).toHaveTextContent(
-        /npx -y @db90\/telemetry-mcp init --host http:\/\/localhost:3000/,
+        /npx -y @aixle\/insights init --host http:\/\/localhost:3000/,
       );
     });
 
@@ -173,7 +173,7 @@ describe("IngestTokenConnectSheet", () => {
       await user.click(screen.getByRole("tab", { name: /Standalone CLI/i }));
       expect(
         screen.getByText(
-          /npx -y @db90\/cursor --token db90_abc123testtoken --host http:\/\/localhost:3000/,
+          /npx -y @aixle\/insights --token db90_abc123testtoken --host http:\/\/localhost:3000/,
         ),
       ).toBeInTheDocument();
     });
@@ -183,7 +183,7 @@ describe("IngestTokenConnectSheet", () => {
       const mcpTab = screen.getByRole("tab", { name: /MCP \(recommended\)/i });
       expect(mcpTab).toHaveAttribute("aria-selected", "true");
       expect(screen.getByLabelText(/Recommended MCP install command/i)).toHaveTextContent(
-        /npx -y @db90\/telemetry-mcp init --host http:\/\/localhost:3000/,
+        /npx -y @aixle\/insights init --host http:\/\/localhost:3000/,
       );
     });
 
@@ -193,7 +193,7 @@ describe("IngestTokenConnectSheet", () => {
       await user.click(screen.getByRole("tab", { name: /Standalone CLI/i }));
       expect(
         screen.getByText(
-          /npx -y @db90\/claude --token db90_abc123testtoken --host http:\/\/localhost:3000/,
+          /npx -y @aixle\/insights --token db90_abc123testtoken --host http:\/\/localhost:3000/,
         ),
       ).toBeInTheDocument();
     });

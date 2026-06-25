@@ -286,8 +286,7 @@ describe("UserSettings", () => {
 
       expect(screen.getByText(/ingest tokens/i)).toBeInTheDocument();
       expect(screen.getByText(/no ingest-linked tools yet/i)).toBeInTheDocument();
-      expect(screen.getByText(/npx -y @db90\/claude --token <YOUR_INGEST_TOKEN> --host/)).toBeInTheDocument();
-      expect(screen.getByText(/npx -y @db90\/cursor --token <YOUR_INGEST_TOKEN> --host/)).toBeInTheDocument();
+      expect(screen.getAllByText(/npx -y @aixle\/insights --token <YOUR_INGEST_TOKEN> --host/).length).toBeGreaterThanOrEqual(1);
       expect(screen.getByRole("tab", { name: /available/i })).toBeInTheDocument();
     });
 

@@ -410,17 +410,6 @@ export function Onboarding() {
             </Card>
           </div>
 
-          {/* Help text */}
-          <p className="text-center text-sm text-muted-foreground">
-            Need help getting started?{" "}
-            {/* TODO: update to Aixle Insights support email when db90.dev domain migrates — track in a follow-up infra ticket */}
-            <a
-              href="mailto:support@db90.dev"
-              className="text-primary underline-offset-4 hover:underline"
-            >
-              Contact support
-            </a>
-          </p>
         </div>
       </main>
 
@@ -428,7 +417,7 @@ export function Onboarding() {
       <footer className="relative z-10 border-t bg-background/80 backdrop-blur-sm">
         <div className="mx-auto flex h-14 max-w-4xl items-center justify-center px-6">
           <p className="type-caption text-muted-foreground">
-            &copy; {new Date().getFullYear()} Acme Corp. All rights reserved.
+            &copy; {new Date().getFullYear()} Aixle Insights. All rights reserved.
           </p>
         </div>
       </footer>

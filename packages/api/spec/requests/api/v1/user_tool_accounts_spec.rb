@@ -109,7 +109,7 @@ RSpec.describe 'Api::V1::UserToolAccounts', type: :request do
 
         expect_created
         expect(json_data[:ingestToken]).to be_present
-        expect(json_data[:ingestToken]).to start_with('db90_')
+        expect(json_data[:ingestToken]).to start_with('aixle_')
       end
 
       it 'creates ingest accounts as inactive until the first successful ingest event' do
@@ -132,7 +132,7 @@ RSpec.describe 'Api::V1::UserToolAccounts', type: :request do
 
         expect_created
         expect(json_data[:ingestToken]).to be_present
-        expect(json_data[:ingestToken]).to start_with('db90_')
+        expect(json_data[:ingestToken]).to start_with('aixle_')
       end
     end
 
@@ -265,7 +265,7 @@ RSpec.describe 'Api::V1::UserToolAccounts', type: :request do
 
       expect_success
       expect(json_data[:ingestToken]).to be_present
-      expect(json_data[:ingestToken]).to start_with('db90_')
+      expect(json_data[:ingestToken]).to start_with('aixle_')
     end
 
     it 'creates a tool_account.regenerate audit log without the token value' do
@@ -277,7 +277,7 @@ RSpec.describe 'Api::V1::UserToolAccounts', type: :request do
 
       log = OrganizationAuditLog.last
       expect(log.action).to eq('tool_account.regenerate')
-      expect(log.tracked_changes.to_s).not_to include('db90_')
+      expect(log.tracked_changes.to_s).not_to include('aixle_')
     end
 
     it 'issues a different token each time' do

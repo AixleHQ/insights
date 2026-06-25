@@ -75,6 +75,6 @@ class UserToolAccount < ApplicationRecord
   end
 
   def new_raw_token
-    "db90_#{SecureRandom.hex(32)}"
+    "aixle_#{SecureRandom.hex(32)}"
   end
 end

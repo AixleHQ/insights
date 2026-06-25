@@ -107,12 +107,12 @@ RSpec.describe UserToolAccount, type: :model do
 
       it 'sets access_token on create' do
         account = create(:user_tool_account, tool_name: 'cursor')
-        expect(account.access_token).to start_with('db90_')
+        expect(account.access_token).to start_with('aixle_')
       end
 
       it 'exposes plaintext_token immediately after create' do
         account = create(:user_tool_account, tool_name: 'claude_code')
-        expect(account.plaintext_token).to start_with('db90_')
+        expect(account.plaintext_token).to start_with('aixle_')
       end
 
       it 'does not persist plaintext_token (nil on a fresh load from DB)' do

@@ -29,7 +29,7 @@ export function CliStatusBadge({ connected, className }: CliStatusBadgeProps) {
         </Badge>
       </TooltipTrigger>
       <TooltipContent>
-        User needs to run db90 login to start sending events
+        User needs to log in with the Aixle Insights CLI to start sending events
       </TooltipContent>
     </Tooltip>
   );

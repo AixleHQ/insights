@@ -9,7 +9,7 @@ RSpec.describe "Api::V1::Integrations::Mcp", type: :request do
     create(:organization_membership, user: internal_user, organization: organization)
   end
 
-  TOKEN_RE = /\Adb90_[a-f0-9]{64}\z/
+  TOKEN_RE = /\Aaixle_[a-f0-9]{64}\z/
 
   def expect_single_tool_shape(body)
     expect(body["data"]).to be_a(Hash)

@@ -79,7 +79,7 @@ function buildClaudeCodeSettingsSnippet(token: string): string {
 }`;
 }
 
-const MCP_TELEMETRY_INIT = "npx -y @db90/telemetry-mcp init";
+const MCP_TELEMETRY_INIT = "npx -y @aixle/insights init";
 
 function ClaudeCodeSetupInstructions({ token }: { token: string }) {
   const [copiedInit, setCopiedInit] = useState(false);
@@ -170,7 +170,7 @@ function ClaudeCodeSetupInstructions({ token }: { token: string }) {
           </div>
           <p className="text-xs text-muted-foreground">
             After provisioning through this sheet, rerun <code className="bg-muted px-1 rounded whitespace-pre-wrap break-all">{initCommand}</code> whenever you rotate hosts or reinstall.
-            Troubleshooting: issuer configuration, duplicate <code className="bg-muted px-1 rounded">db90</code> MCP entries (<code className="bg-muted px-1 rounded">init --force</code>), logs under <code className="bg-muted px-1 rounded">~/.db90-mcp</code> — see <code className="bg-muted px-1 rounded">@db90/telemetry-mcp</code> README.
+            Troubleshooting: issuer configuration, duplicate <code className="bg-muted px-1 rounded">aixle-insights</code> MCP entries (<code className="bg-muted px-1 rounded">init --force</code>), logs under <code className="bg-muted px-1 rounded">~/.aixle-mcp</code> — see <code className="bg-muted px-1 rounded">@aixle/insights</code> README.
           </p>
         </TabsContent>
 
@@ -266,7 +266,7 @@ function CursorSetupInstructions({ token }: { token: string }) {
         <TabsContent value="mcp-recommended" className="space-y-2 pt-2">
           <p className="text-xs text-muted-foreground">
             One-time Keycloak device login stores credentials in{" "}
-            <code className="bg-muted px-1 rounded whitespace-pre-wrap break-all">~/.db90-mcp</code>.
+            <code className="bg-muted px-1 rounded whitespace-pre-wrap break-all">~/.aixle-mcp</code>.
             After provisioning Cursor through this sheet, run{" "}
             <code className="bg-muted px-1 rounded">init</code> — add{" "}
             <code className="bg-muted px-1 rounded">--tool-name cursor</code> if you only use Cursor
@@ -295,10 +295,10 @@ function CursorSetupInstructions({ token }: { token: string }) {
           </div>
           <p className="text-xs text-muted-foreground">
             Cursor telemetry syncs from the MCP process (e.g.{" "}
-            <code className="bg-muted px-1 rounded">db90-mcp run --once</code> or{" "}
-            <code className="bg-muted px-1 rounded">db90_sync_now</code> when Claude Code has the db90
+            <code className="bg-muted px-1 rounded">aixle-insights run --once</code> or{" "}
+            <code className="bg-muted px-1 rounded">db90_sync_now</code> when Claude Code has the Aixle Insights
             MCP). For Cursor-only workflows without Claude Code, prefer the Standalone CLI tab with cron or
-            launchd — see <code className="bg-muted px-1 rounded">@db90/cursor</code> README.
+            launchd — see <code className="bg-muted px-1 rounded">@aixle/insights</code> README.
           </p>
         </TabsContent>
 

@@ -1,6 +1,5 @@
 class InvitationMailer < ApplicationMailer
-  # TODO: update fallback domain when infrastructure migrates from db90.dev (tracked: AIX-348)
-  default from: ENV.fetch("MAILER_FROM", "noreply@db90.dev")
+  default from: ENV.fetch("MAILER_FROM", "noreply@aixle.ai")
 
   def invite(invitation)
     @invitation = invitation

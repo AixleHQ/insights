@@ -84,8 +84,7 @@ describe("InvitationAccept", () => {
     );
 
     expect(screen.getByText(/you're connected/i)).toBeInTheDocument();
-    expect(screen.getByText(/npx -y @db90\/claude --token <YOUR_INGEST_TOKEN> --host/)).toBeInTheDocument();
-    expect(screen.getByText(/npx -y @db90\/cursor --token <YOUR_INGEST_TOKEN> --host/)).toBeInTheDocument();
+    expect(screen.getAllByText(/npx -y @aixle\/insights --token <YOUR_INGEST_TOKEN> --host/).length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText(/redirecting you to your profile/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /continue to dashboard/i })).toBeInTheDocument();
   });
