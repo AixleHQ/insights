@@ -267,10 +267,10 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       expect(json_data[:name]).to eq('Updated')
     end
 
-    it 'returns 403 for non-owners of personal projects' do
+    it 'returns 404 for non-owners of personal projects (project not visible via authorized_scope)' do
       authenticated_patch "/api/v1/projects/#{project.id}", user: other_user, params: { name: 'Hacked' }
 
-      expect_forbidden
+      expect_not_found
     end
   end
 
@@ -438,10 +438,10 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       end
     end
 
-    it 'returns 403 for unauthorized users' do
+    it 'returns 404 for unauthorized users (project not visible via authorized_scope)' do
       authenticated_get "/api/v1/projects/#{project.id}/stats", user: other_user
 
-      expect_forbidden
+      expect_not_found
     end
   end
 
@@ -640,12 +640,12 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       expect(json_data[:projectId]).to eq(project.id)
     end
 
-    it 'returns 403 for non-admin members' do
+    it 'returns 404 for non-admin members (not a project member — project not visible via authorized_scope)' do
       non_admin = create(:user)
       create(:organization_membership, user: non_admin, organization: organization, role: 'member')
       authenticated_get "/api/v1/projects/#{project.id}/retention_policy", user: non_admin
 
-      expect_forbidden
+      expect_not_found
     end
 
     it 'returns 401 for unauthenticated requests' do
@@ -720,10 +720,10 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       end
     end
 
-    it 'returns 403 for unauthorized users' do
+    it 'returns 404 for unauthorized users (project not visible via authorized_scope)' do
       authenticated_get "/api/v1/projects/#{project.id}/stats/commits_by_user", user: other_user
 
-      expect_forbidden
+      expect_not_found
     end
   end
 
@@ -771,14 +771,14 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       expect(json_response[:errors]).to be_present
     end
 
-    it 'returns 403 for non-admin members' do
+    it 'returns 404 for non-admin members (not a project member — project not visible via authorized_scope)' do
       non_admin = create(:user)
       create(:organization_membership, user: non_admin, organization: organization, role: 'member')
       authenticated_patch "/api/v1/projects/#{project.id}/retention_policy",
                           user: non_admin,
                           params: { raw_event_ttl: '48_hours' }
 
-      expect_forbidden
+      expect_not_found
     end
 
     it 'persists cost_threshold_cents and token_threshold alert fields' do

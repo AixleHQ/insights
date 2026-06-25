@@ -22,7 +22,7 @@ module Api
       private
 
       def set_organization
-        @organization = Organization.find(params[:id])
+        @organization = authorized_scope(Organization.all).find(params[:id])
       end
     end
   end

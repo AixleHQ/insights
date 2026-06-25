@@ -455,7 +455,8 @@ module Api
 
       def set_project
         includes = PROJECT_INCLUDES_BY_ACTION[action_name] || []
-        scope = includes.any? ? Project.includes(*includes) : Project
+        scope = authorized_scope(Project.all)
+        scope = scope.includes(*includes) if includes.any?
         @project = scope.find(params[:id])
       end
 
