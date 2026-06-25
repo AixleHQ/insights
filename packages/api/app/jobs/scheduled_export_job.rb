@@ -29,6 +29,6 @@ class ScheduledExportJob
       }
     ).call
 
-    ScheduledExportMailer.deliver(export, report).deliver_later
+    ScheduledExportMailer.export_report(export, report).deliver_now
   end
 end
