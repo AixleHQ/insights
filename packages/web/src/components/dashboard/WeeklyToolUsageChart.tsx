@@ -67,8 +67,16 @@ function getLast12Months(): { value: string; label: string }[] {
 }
 
 function formatWeekDate(dateStr: string): string {
-  const date = new Date(dateStr + "T00:00:00");
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const start = new Date(dateStr + "T00:00:00");
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+
+  const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+  if (start.getMonth() === end.getMonth()) {
+    return `${fmt(start)} – ${end.getDate()}`;
+  }
+  return `${fmt(start)} – ${fmt(end)}`;
 }
 
 export function WeeklyToolUsageChart({ orgId, projectId, className }: WeeklyToolUsageChartProps) {
