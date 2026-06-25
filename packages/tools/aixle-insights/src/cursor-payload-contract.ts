@@ -29,6 +29,7 @@ const TOP_LEVEL_KEYS = new Set([
 ]);
 
 const METADATA_BASE_KEYS = new Set([
+  "session_id",
   "cursor_session_id",
   "workspace",
   "workspace_scope",

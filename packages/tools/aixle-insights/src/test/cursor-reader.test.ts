@@ -342,7 +342,7 @@ describe("readDailyStats", () => {
     expect((results[0].value as Record<string, number>).tabSuggestedLines).toBe(6);
   });
 
-  it("filters entries on or before since date", () => {
+  it("filters entries before since date", () => {
     makeGlobalDb([
       {
         key: "aiCodeTracking.dailyStats.v1.5.2026-01-01",
@@ -355,6 +355,24 @@ describe("readDailyStats", () => {
     ]);
 
     const since = new Date("2026-01-15");
+    const results = readDailyStats(since, tempDir);
+    expect(results).toHaveLength(1);
+    expect(results[0].date).toBe("2026-03-01");
+  });
+
+  it("includes entry on the since date for same-day re-read (AIX-354)", () => {
+    makeGlobalDb([
+      {
+        key: "aiCodeTracking.dailyStats.v1.5.2026-03-01",
+        value: JSON.stringify({ tabSuggestedLines: 10 }),
+      },
+      {
+        key: "aiCodeTracking.dailyStats.v1.5.2026-02-28",
+        value: JSON.stringify({ tabSuggestedLines: 3 }),
+      },
+    ]);
+
+    const since = new Date("2026-03-01T00:00:00.000Z");
     const results = readDailyStats(since, tempDir);
     expect(results).toHaveLength(1);
     expect(results[0].date).toBe("2026-03-01");

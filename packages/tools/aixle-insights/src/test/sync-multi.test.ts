@@ -369,6 +369,76 @@ describe("syncTelemetryTools", () => {
     expect(state.sessions[CURSOR_DAILY_STATS_WATERMARK_KEY]?.sentAt).toBe("2026-05-19T00:00:00.000Z");
   });
 
+  it("re-reads same-day daily stats after watermark is set (AIX-354)", async () => {
+    const cursorToken = "db90_cursor_token";
+    const dailyDate = "2026-06-23";
+    const dailyPayload = {
+      tool_name: "cursor" as const,
+      event_type: "completion" as const,
+      model: "unknown",
+      tokens_in: 5,
+      tokens_out: 2,
+      cost_usd: 0.1,
+      occurred_at: `${dailyDate}T00:00:00.000Z`,
+      metadata: {
+        session_id: `cursor:daily_stats:${dailyDate}:completion`,
+        cursor_session_id: null,
+        workspace: "/tmp/state.vscdb",
+        cost_model: "estimated_line_count" as const,
+        scannable: false,
+        risk_level: "none" as const,
+      },
+    };
+
+    mocks.readDailyStats.mockReturnValue({
+      raw: [{ date: dailyDate, value: { tabSuggestedLines: 5, tabAcceptedLines: 2 }, dbPath: "/tmp/state.vscdb" }],
+      deduped: [{ date: dailyDate, value: { tabSuggestedLines: 5, tabAcceptedLines: 2 }, dbPath: "/tmp/state.vscdb" }],
+    });
+    mocks.mapDailyStats.mockReturnValue([dailyPayload]);
+
+    await syncTelemetryTools({
+      credentials: { host, accounts: { cursor: cursorToken } },
+      dryRun: false,
+      verbose: false,
+      projectId: null,
+      pricing: DEFAULT_PRICING,
+      appDir,
+      tools: ["cursor"],
+    });
+
+    mocks.postEvent.mockClear();
+    mocks.readDailyStats.mockImplementation((since: Date | null) => {
+      expect(since?.toISOString()).toBe(`${dailyDate}T00:00:00.000Z`);
+      const entry = [{ date: dailyDate, value: { tabSuggestedLines: 12, tabAcceptedLines: 4 }, dbPath: "/tmp/state.vscdb" }];
+      return { raw: entry, deduped: entry };
+    });
+    mocks.mapDailyStats.mockReturnValue([
+      {
+        ...dailyPayload,
+        tokens_in: 12,
+        tokens_out: 4,
+      },
+    ]);
+
+    const result = await syncTelemetryTools({
+      credentials: { host, accounts: { cursor: cursorToken } },
+      dryRun: false,
+      verbose: false,
+      projectId: null,
+      pricing: DEFAULT_PRICING,
+      appDir,
+      tools: ["cursor"],
+    });
+
+    expect(result.sent).toBe(1);
+    expect(mocks.postEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ tokens_in: 12, tokens_out: 4 }),
+      host,
+      cursorToken,
+      expect.any(Object)
+    );
+  });
+
   it("checkpoints cursor transcript sessions by file size and suppresses aggregate chat duplicates", async () => {
     const cursorToken = "db90_cursor_token";
     mocks.readCursorTranscriptSessions.mockResolvedValue([

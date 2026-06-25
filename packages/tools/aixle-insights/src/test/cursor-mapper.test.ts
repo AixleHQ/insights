@@ -219,6 +219,7 @@ describe("mapDailyStats", () => {
     expect(tab.metadata.cost_model).toBe("estimated_line_count");
     expect(tab.metadata.scannable).toBe(false);
     expect(tab.metadata.risk_level).toBe("none");
+    expect(tab.metadata.session_id).toBe("cursor:daily_stats:2026-02-09:completion");
 
     const composer = results.find((r) => r.event_type === "chat")!;
     expect(composer.tokens_in).toBe(43);
@@ -227,6 +228,7 @@ describe("mapDailyStats", () => {
     expect(composer.metadata.cost_model).toBe("estimated_line_count");
     expect(composer.metadata.scannable).toBe(false);
     expect(composer.metadata.risk_level).toBe("none");
+    expect(composer.metadata.session_id).toBe("cursor:daily_stats:2026-02-09:chat");
   });
 
   it("emits only tab event when composer counts are zero", () => {
@@ -277,6 +279,7 @@ describe("mapDailyStats", () => {
     expect(results[0].tokens_out).toBe(1200);
     expect(results[0].cost_usd).toBeTypeOf("number");
     expect(results[0].metadata.cost_model).toBe("token_count");
+    expect(results[0].metadata.session_id).toBe("cursor:daily_stats:2026-01-01:chat:claude-3-5-sonnet");
   });
 
   it("returns empty array for unknown shape", () => {

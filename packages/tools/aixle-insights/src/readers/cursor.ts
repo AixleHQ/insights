@@ -357,7 +357,7 @@ function readDailyStatsFromDb(
       if (!dateMatch) continue;
 
       const date = dateMatch[1];
-      if (since && date <= since.toISOString().slice(0, 10)) continue;
+      if (since && date < since.toISOString().slice(0, 10)) continue;
 
       let parsed: unknown;
       try {
@@ -962,6 +962,15 @@ function pick(obj: unknown, ...keys: string[]): number | null {
   return typeof cur === "number" ? cur : null;
 }
 
+function dailyStatsSessionId(
+  date: string,
+  eventType: "completion" | "chat",
+  modelKey?: string
+): string {
+  const suffix = modelKey ? `${eventType}:${modelKey}` : eventType;
+  return `cursor:daily_stats:${date}:${suffix}`;
+}
+
 function buildPayload(opts: {
   eventType: "completion" | "chat";
   tokensIn: number;
@@ -969,7 +978,9 @@ function buildPayload(opts: {
   costUsd: number;
   occurredAt: string;
   dbPath: string;
+  date: string;
   model?: string;
+  modelKey?: string;
   projectId?: string;
   costModel?: CursorLineCostModel | CursorTokenCostModel;
 }): CursorDb90Payload {
@@ -980,7 +991,9 @@ function buildPayload(opts: {
     costUsd,
     occurredAt,
     dbPath,
+    date,
     model = "unknown",
+    modelKey,
     projectId,
     costModel = LINE_COST_MODEL,
   } = opts;
@@ -993,6 +1006,7 @@ function buildPayload(opts: {
     cost_usd: costUsd,
     occurred_at: occurredAt,
     metadata: {
+      session_id: dailyStatsSessionId(date, eventType, modelKey),
       cursor_session_id: null,
       ...cursorWorkspaceMetadata(dbPath),
       cost_model: costModel,
@@ -1032,6 +1046,7 @@ export function mapDailyStats(
         costUsd: computeLineCost("completion", tabSuggested, pricing),
         occurredAt,
         dbPath,
+        date,
         model,
         projectId,
       })
@@ -1047,6 +1062,7 @@ export function mapDailyStats(
         costUsd: computeLineCost("chat", composerSuggested, pricing),
         occurredAt,
         dbPath,
+        date,
         model,
         projectId,
       })
@@ -1069,7 +1085,9 @@ export function mapDailyStats(
         costUsd: computeTokenCost("chat", tokensIn, tokensOut, pricing),
         occurredAt,
         dbPath,
+        date,
         model,
+        modelKey: model,
         projectId,
         costModel: TOKEN_COST_MODEL,
       })
