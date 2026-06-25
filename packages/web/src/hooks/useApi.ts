@@ -729,8 +729,10 @@ export function useUpdateProject() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Project> }) =>
-      api.patch<Project>(`/projects/${id}`, data),
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Project> }) => {
+      const response = await api.patch<Project>(`/projects/${id}`, data);
+      return response.data;
+    },
     onSuccess: (_, { id }) => {
       const cached = queryClient.getQueryData<ProjectWithStats>(queryKeys.projects.detail(id));
       const orgId = cached?.organization_id ?? cached?.organizationId;
