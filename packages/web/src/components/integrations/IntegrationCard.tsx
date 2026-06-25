@@ -176,13 +176,13 @@ export function IntegrationCard({
       <Card
         data-testid={`provider-card-${provider.id}`}
         className={cn(
-          "group relative transition-all hover:shadow-md",
+          "group relative overflow-hidden transition-all hover:shadow-md",
           !provider.available && "opacity-60",
           className
         )}
       >
         <CardHeader className="pb-3">
-          <div className="flex items-start justify-between">
+          <div className="flex min-w-0 items-start justify-between gap-2">
             <div className="flex min-w-0 items-center gap-3">
               <ProviderLogo provider={provider.id} size="md" showBackground />
               <div className="min-w-0">
@@ -242,9 +242,9 @@ export function IntegrationCard({
   };
 
   return (
-    <Card className={cn("group relative transition-all hover:shadow-md", className)}>
+    <Card className={cn("group relative overflow-hidden transition-all hover:shadow-md", className)}>
       <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
+        <div className="flex min-w-0 items-start justify-between gap-2">
           <div className="flex min-w-0 items-center gap-3">
             <ProviderLogo provider={integration.provider} size="md" showBackground />
             <div className="min-w-0">
@@ -420,7 +420,7 @@ export function IntegrationCard({
         )}
 
         {integration.metadata?.event_count !== undefined && (
-          <div className="text-xs text-muted-foreground">
+          <div className="truncate text-xs text-muted-foreground">
             {integration.metadata.event_count} synced events
             {integration.last_event_at ? ` · latest activity ${formatDistanceToNow(integration.last_event_at)}` : ""}
           </div>
