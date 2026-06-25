@@ -84,7 +84,8 @@ export function WeeklyToolUsageChart({ orgId, projectId, className }: WeeklyTool
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
 
   const months = useMemo(() => getLast12Months(), []);
-  const opts = { period: "week" as const, month: selectedMonth, projectId };
+  const period = groupBy === "tool" ? ("day" as const) : ("week" as const);
+  const opts = { period, month: selectedMonth, projectId };
 
   const { data: toolData, isLoading: isLoadingTool, isError: isErrorTool, refetch: refetchTool } = useDailyByTool(orgId, opts);
   const { data: modelData, isLoading: isLoadingModel, isError: isErrorModel, refetch: refetchModel } = useDailyByModel(orgId, opts);
@@ -125,7 +126,7 @@ export function WeeklyToolUsageChart({ orgId, projectId, className }: WeeklyTool
   return (
     <Card className={cn("col-span-full", className)}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-base font-medium">Weekly Usage</CardTitle>
+        <CardTitle className="text-base font-medium">{groupBy === "tool" ? "Daily Usage" : "Weekly Usage"}</CardTitle>
         <div className="flex items-center gap-2">
           <div className="flex rounded-md border overflow-hidden">
             <Button
