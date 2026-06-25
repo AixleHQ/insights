@@ -6,6 +6,7 @@ vendor/bundle/
 settings.local.json
 CLAUDE.local.md
 /_bmad/
+/_bmad-output/
 .cursor/skills/
 .agents/skills/
 .claude/skills/bmad-*
