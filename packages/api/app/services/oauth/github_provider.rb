@@ -19,6 +19,7 @@ module Oauth
     end
 
     def fetch_repositories(page: 1, per_page: 100)
+      ensure_fresh_token!
       response = http_client.get("#{API_URL}/user/repos") do |req|
         req.params["page"] = page
         req.params["per_page"] = per_page

@@ -146,6 +146,38 @@ RSpec.describe Oauth::GithubProvider, type: :service do
         expect(provider.fetch_repositories).to eq([])
       end
     end
+
+    context 'when the token is expired but can be refreshed' do
+      let(:connector) do
+        instance_double(
+          'OrganizationConnector',
+          access_token: 'gho_new456',
+          token_expired?: true,
+          refresh_token: 'ghr_refresh',
+          mark_error!: nil
+        )
+      end
+
+      it 'refreshes the token and returns repositories' do
+        allow(provider).to receive(:refresh_token!).and_return(true)
+        allow(provider).to receive(:reset_http_client!).and_call_original
+
+        stub_request(:get, 'https://api.github.com/user/repos')
+          .with(query: hash_including('page' => '1', 'per_page' => '100', 'sort' => 'updated'))
+          .to_return(
+            status: 200,
+            body: [ { id: 1, name: 'repo', full_name: 'org/repo', description: nil,
+                      default_branch: 'main', clone_url: 'https://github.com/org/repo.git',
+                      html_url: 'https://github.com/org/repo', private: false } ].to_json,
+            headers: { 'Content-Type' => 'application/json' }
+          )
+
+        result = provider.fetch_repositories
+
+        expect(result.length).to eq(1)
+        expect(result.first[:name]).to eq('repo')
+      end
+    end
   end
 
   describe '#fetch_commits' do
