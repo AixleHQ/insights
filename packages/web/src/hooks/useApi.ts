@@ -1317,6 +1317,7 @@ export function useTestConnector() {
       ),
     onSettled: (_, __, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.connectors.health(orgId) });
     },
   });
 }
