@@ -297,7 +297,14 @@ export function OrgDashboard() {
           )}
 
           <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
-            <CostTrendChart data={chartData} isLoading={isLoadingDaily} isError={isErrorDaily} onRetry={() => refetchDaily()} allTime={isAllTime} />
+            <CostTrendChart
+              data={chartData}
+              isLoading={isLoadingDaily}
+              isError={isErrorDaily}
+              onRetry={() => refetchDaily()}
+              allTime={isAllTime}
+              monthScoped={selectedPeriod.type === "month"}
+            />
             <ActivityFeed
               events={events}
               isLoading={isLoadingEvents}

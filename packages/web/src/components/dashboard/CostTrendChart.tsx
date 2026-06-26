@@ -17,6 +17,7 @@ import {
 import type { ChartConfig } from "@/components/ui/chart";
 import { ChartSkeleton } from "@/components/ui/skeletons";
 import { ErrorState } from "@/components/ui/error-state";
+import { sliceCostTrendWindow } from "@/lib/dashboardUtils";
 import { formatCost } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +33,7 @@ interface CostTrendChartProps {
   isError?: boolean;
   onRetry?: () => void;
   allTime?: boolean;
+  monthScoped?: boolean;
   className?: string;
 }
 
@@ -59,10 +61,21 @@ function formatDateLabel(dateStr: string, allTime: boolean, range: TimeRange): s
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-export function CostTrendChart({ data, isLoading, isError, onRetry, allTime = false, className }: CostTrendChartProps) {
+export function CostTrendChart({
+  data,
+  isLoading,
+  isError,
+  onRetry,
+  allTime = false,
+  monthScoped = false,
+  className,
+}: CostTrendChartProps) {
   const [timeRange, setTimeRange] = useState<TimeRange>("7d");
 
-  const filteredData = allTime ? data : (timeRange === "7d" ? data.slice(-7) : data.slice(-30));
+  const windowDays = timeRange === "7d" ? 7 : 30;
+  const filteredData = allTime
+    ? data
+    : sliceCostTrendWindow(data, windowDays, { monthScoped });
   const formattedData = filteredData.map((item) => ({
     ...item,
     dateLabel: formatDateLabel(item.date, allTime, timeRange),
