@@ -1,6 +1,6 @@
-export function formatDateLabel(dateStr: string, allTime: boolean): string {
+export function formatDateLabel(dateStr: string, granularity: "month" | "day"): string {
   const date = new Date(dateStr + "T00:00:00");
-  if (allTime) {
+  if (granularity === "month") {
     return date.toLocaleDateString("en-US", { month: "short", year: "numeric" });
   }
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });

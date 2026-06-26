@@ -68,7 +68,7 @@ export function CostTrendChart({
     : sliceCostTrendWindow(data, windowDays, { monthScoped });
   const formattedData = filteredData.map((item) => ({
     ...item,
-    dateLabel: formatDateLabel(item.date, allTime),
+    dateLabel: formatDateLabel(item.date, allTime ? "month" : "day"),
   }));
 
   const totalCost = filteredData.reduce((sum, item) => sum + item.cost, 0);
