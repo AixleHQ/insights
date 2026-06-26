@@ -718,8 +718,10 @@ export function useCreateProject() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ orgId, data }: { orgId: string; data: Partial<Project> }) =>
-      api.post<Project>(`/organizations/${orgId}/projects`, data),
+    mutationFn: async ({ orgId, data }: { orgId: string; data: Partial<Project> }) => {
+      const response = await api.post<{ data: Project }>(`/organizations/${orgId}/projects`, data);
+      return response.data;
+    },
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projects.all(orgId) });
     },
@@ -730,8 +732,10 @@ export function useUpdateProject() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Project> }) =>
-      api.patch<Project>(`/projects/${id}`, data),
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Project> }) => {
+      const response = await api.patch<{ data: Project }>(`/projects/${id}`, data);
+      return response.data;
+    },
     onSuccess: (_, { id }) => {
       const cached = queryClient.getQueryData<ProjectWithStats>(queryKeys.projects.detail(id));
       const orgId = cached?.organization_id ?? cached?.organizationId;
