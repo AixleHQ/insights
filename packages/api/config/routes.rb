@@ -140,6 +140,7 @@ Rails.application.routes.draw do
 
         # Stats
         get "stats/overview", to: "stats#overview"
+        get "stats/active_users", to: "stats#active_users"
         get "stats/hourly", to: "stats#hourly"
         get "stats/daily", to: "stats#daily"
         get "stats/daily_by_tool", to: "stats#daily_by_tool"

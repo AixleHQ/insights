@@ -613,6 +613,11 @@ export interface ToolUsersResponse {
   users: ToolUserStat[];
 }
 
+export interface ActiveUsersResponse {
+  active_users: number;
+  timeRange: { start: string; end: string };
+}
+
 export interface ToolDailyResponse {
   tool: string;
   timeRange: { start: string; end: string };

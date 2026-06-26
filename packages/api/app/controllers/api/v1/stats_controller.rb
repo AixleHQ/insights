@@ -5,6 +5,9 @@ module Api
     class StatsController < BaseController
       TOOL_SCOPED_ACTIONS = %i[tool_overview tool_models tool_users tool_daily tool_event_types].freeze
       ALLOWED_PERIODS = %w[day week month].freeze
+      MAX_ACTIVE_USERS_DAYS = 365
+
+      rescue_from Date::Error, with: :render_invalid_month_format
 
       before_action :require_organization!
       before_action :set_tool_scope, only: TOOL_SCOPED_ACTIONS
@@ -16,14 +19,14 @@ module Api
 
         base_scope = scoped_events_base
 
-        # Counts users with at least one event in the last 7 days — intentionally activity-based,
+        # Counts users with at least one event in the selected month — intentionally activity-based,
         # not membership-based. A newly-added member with no events will not appear here until
-        # they start generating activity. This metric does not change with the selected period.
-        active_users = base_scope.where("occurred_at > ?", 7.days.ago).distinct.count(:user_id)
+        # they start generating activity.
 
         if ActiveModel::Type::Boolean.new.cast(params[:all_time])
-          current_events  = base_scope
+          current_events = base_scope
           high_risk_count = current_events.where(risky_event_condition).distinct.count
+          active_users = current_events.distinct.count(:user_id)
 
           render json: {
             total_events:          current_events.count,
@@ -45,6 +48,7 @@ module Api
         current_start  = anchor.beginning_of_month.beginning_of_day
         current_end    = params[:month].present? ? anchor.end_of_month.end_of_day : Time.current
         current_events = base_scope.where(occurred_at: current_start..current_end)
+        active_users   = current_events.distinct.count(:user_id)
 
         prev_anchor = anchor - 1.month
         prev_start  = prev_anchor.beginning_of_month.beginning_of_day
@@ -70,6 +74,27 @@ module Api
           active_users:          active_users,
           events_change_percent: events_change.round(1),
           cost_change_percent:   cost_change.round(1)
+        }
+      end
+
+      # GET /api/v1/organizations/:organization_id/stats/active_users
+      # Distinct active users over a rolling window (default 7 days). Intentionally
+      # decoupled from the dashboard month filter — stable regardless of which month
+      # the user is exploring. Still honours the optional project_id scope.
+      def active_users
+        authorize! current_organization, to: :show?
+
+        days = (params[:days] || 7).to_i
+        unless (1..MAX_ACTIVE_USERS_DAYS).cover?(days)
+          return render_bad_request("days must be between 1 and #{MAX_ACTIVE_USERS_DAYS}")
+        end
+
+        time_range = parse_time_range(default_days: days)
+        events = scoped_events_base.where(occurred_at: time_range[:start]..time_range[:end])
+
+        render json: {
+          active_users: events.where.not(user_id: nil).distinct.count(:user_id),
+          timeRange: { start: time_range[:start].iso8601, end: time_range[:end].iso8601 }
         }
       end
 
@@ -664,13 +689,16 @@ module Api
         end
       end
 
+      def render_invalid_month_format
+        render_bad_request("Invalid month format — expected YYYY-MM")
+      end
+
       # Validates and parses ?month=YYYY-MM. Returns a Date on success.
-      # Renders 422 and returns nil on bad input — callers must `return` on nil.
+      # Renders 400 and returns nil on bad input — callers must `return` on nil.
       def parse_month_param!
         return nil unless params[:month].present?
         unless params[:month].match?(/\A\d{4}-(0[1-9]|1[0-2])\z/)
-          render json: { error: "Invalid month format. Use YYYY-MM (e.g. 2025-03)." },
-                 status: :unprocessable_entity
+          render_bad_request("Invalid month format — expected YYYY-MM")
           return nil
         end
         Date.parse("#{params[:month]}-01")

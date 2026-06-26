@@ -35,6 +35,8 @@ interface WeeklyToolUsageChartProps {
   projectId?: string;
   externalPeriod?: DashboardPeriod;
   className?: string;
+  selectedMonth?: string;
+  onMonthChange?: (month: string) => void;
 }
 
 const MODEL_PALETTE = [
@@ -65,14 +67,17 @@ function formatWeekDate(dateStr: string): string {
   return `${fmt(start)} – ${fmt(end)}`;
 }
 
-export function WeeklyToolUsageChart({ orgId, projectId, externalPeriod, className }: WeeklyToolUsageChartProps) {
+export function WeeklyToolUsageChart({ orgId, projectId, externalPeriod, className, selectedMonth: selectedMonthProp, onMonthChange }: WeeklyToolUsageChartProps) {
   const [groupBy, setGroupBy] = useState<"tool" | "model">("tool");
-  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+  const [internalMonth, setInternalMonth] = useState(currentMonth);
 
   const months = useMemo(() => getLast12Months(), []);
 
   const controlled = !!externalPeriod;
   const isAllTime = externalPeriod?.type === "all_time";
+
+  const selectedMonth = selectedMonthProp ?? internalMonth;
+  const setSelectedMonth = onMonthChange ?? setInternalMonth;
 
   const opts = useMemo(() => {
     if (isAllTime) return { allTime: true, period: "month" as const, projectId };

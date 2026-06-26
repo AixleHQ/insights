@@ -1605,7 +1605,6 @@ paths:
         with percentage change vs the previous period. Default period is the current calendar month.
         Pass `month` for a specific past month, or `all_time=true` for unbounded totals (change_percent fields will be null).
         Pass `project_id` to scope all counts to a single project.
-        Active users always reflects the last 7 days regardless of the selected period.
       tags:
         - Stats
       parameters:
@@ -1645,7 +1644,7 @@ paths:
                     description: Count of distinct tool_events with at least one non-none audit log in the reporting period
                   active_users:
                     type: integer
-                    description: Users with at least one event in the last 7 days (always rolling, not period-scoped)
+                    description: Count of distinct users who generated at least one event during the selected period
                   events_change_percent:
                     type: number
                     format: float
@@ -1656,6 +1655,61 @@ paths:
                     format: float
                     nullable: true
                     description: Null when all_time=true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/organizations/{organization_id}/stats/active_users:
+    get:
+      summary: Active users over a rolling window
+      description: |
+        Returns the count of distinct users who generated at least one event over a rolling
+        window (default 7 days). Intentionally decoupled from the dashboard month filter
+        (AIX-446) — the value does not change when a month is selected. Pass `project_id`
+        to scope to a single project.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: project_id
+          in: query
+          description: Scope to a specific project (must belong to this organization)
+          schema:
+            type: string
+        - name: days
+          in: query
+          description: Rolling window size in days. Defaults to 7.
+          schema:
+            type: integer
+            default: 7
+            minimum: 1
+            maximum: 365
+      responses:
+        '200':
+          description: Active users count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  active_users:
+                    type: integer
+                    description: Count of distinct users with at least one event in the window
+                  timeRange:
+                    type: object
+                    properties:
+                      start:
+                        type: string
+                        format: date-time
+                      end:
+                        type: string
+                        format: date-time
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

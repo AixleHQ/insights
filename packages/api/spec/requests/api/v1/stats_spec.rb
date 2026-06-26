@@ -82,11 +82,74 @@ RSpec.describe 'Api::V1::Stats', type: :request do
       expect_forbidden
     end
 
-    context 'with month= param' do
-      it 'returns stats for the specified calendar month vs prior month' do
-        target_month = 2.months.ago
+    it 'defaults overview to current calendar month when month is not provided' do
+      org = create(:organization)
+      member = create(:user)
+      create(:organization_membership, user: member, organization: org, role: "member")
+
+      travel_to(Time.zone.parse("2026-03-10 12:00:00")) do
+        create(:tool_event, organization: org, user: member, occurred_at: Time.zone.parse("2026-02-20 09:00:00"))
+        create(:tool_event, organization: org, user: member, occurred_at: Time.zone.parse("2026-03-05 09:00:00"))
+
+        authenticated_get "/api/v1/organizations/#{org.id}/stats/overview",
+                          user: member,
+                          organization: org
+      end
+
+      expect_success
+      expect(json_response[:total_events]).to eq(1)
+    end
+
+    it 'returns 400 for invalid month format' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/overview",
+                        user: user,
+                        organization: organization,
+                        params: { month: "2026-13" }
+
+      expect(response).to have_http_status(:bad_request)
+      expect(json_response[:message]).to eq("Invalid month format — expected YYYY-MM")
+    end
+
+    context 'with ?month= param' do
+      it 'scopes stats to the given calendar month' do
         create(:tool_event, organization: organization, user: user,
-               cost_usd: 5.0, occurred_at: target_month.beginning_of_month + 5.days)
+               cost_usd: 9.99, occurred_at: 2.months.ago)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/overview",
+                          user: user,
+                          organization: organization,
+                          params: { month: 2.months.ago.strftime("%Y-%m") }
+
+        expect_success
+        expect(json_response[:total_events]).to eq(1)
+        expect(json_response[:total_cost_usd]).to be_within(0.01).of(9.99)
+      end
+
+      it 'counts active_users within the given month (not rolling 7 days)' do
+        create(:tool_event, organization: organization, user: user,
+               occurred_at: 2.months.ago)
+        other_user = create(:user)
+        create(:organization_membership, user: other_user, organization: organization)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/overview",
+                          user: user,
+                          organization: organization,
+                          params: { month: 2.months.ago.strftime("%Y-%m") }
+
+        expect_success
+        expect(json_response[:active_users]).to eq(1)
+      end
+
+      it 'compares selected month trends against the previous month' do
+        target_month = 2.months.ago
+        previous_month = target_month.prev_month
+
+        create(:tool_event, organization: organization, user: user,
+               cost_usd: 5.0, occurred_at: target_month.beginning_of_month + 1.day)
+        create(:tool_event, organization: organization, user: user,
+               cost_usd: 5.0, occurred_at: target_month.beginning_of_month + 2.days)
+        create(:tool_event, organization: organization, user: user,
+               cost_usd: 5.0, occurred_at: previous_month.beginning_of_month + 1.day)
 
         authenticated_get "/api/v1/organizations/#{organization.id}/stats/overview",
                           user: user,
@@ -94,9 +157,8 @@ RSpec.describe 'Api::V1::Stats', type: :request do
                           params: { month: target_month.strftime("%Y-%m") }
 
         expect_success
-        expect(json_response[:total_events]).to be_a(Integer)
-        expect(json_response[:events_change_percent]).to be_a(Numeric)
-        expect(json_response[:cost_change_percent]).to be_a(Numeric)
+        expect(json_response[:events_change_percent]).to eq(100.0)
+        expect(json_response[:cost_change_percent]).to eq(100.0)
       end
     end
 
@@ -131,6 +193,106 @@ RSpec.describe 'Api::V1::Stats', type: :request do
         expect_success
         expect(json_response[:total_events]).to be < other_event_count
       end
+    end
+  end
+
+  describe 'GET /api/v1/organizations/:organization_id/stats/active_users' do
+    it 'returns the active user count for the default 7-day window' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/active_users",
+                        user: user,
+                        organization: organization
+
+      expect_success
+      expect(json_response[:active_users]).to eq(1)
+      expect(json_response[:timeRange][:start]).to be_present
+      expect(json_response[:timeRange][:end]).to be_present
+    end
+
+    it 'ignores the month filter and stays on the rolling window (AIX-446)' do
+      # An event two months ago must not count toward the 7-day window even
+      # though the month param would otherwise select it.
+      old_user = create(:user)
+      create(:organization_membership, user: old_user, organization: organization)
+      create(:tool_event, organization: organization, user: old_user, occurred_at: 2.months.ago)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/active_users",
+                        user: user,
+                        organization: organization,
+                        params: { month: 2.months.ago.strftime("%Y-%m") }
+
+      expect_success
+      # Only the current-week user (from the top-level before block) is counted.
+      expect(json_response[:active_users]).to eq(1)
+    end
+
+    it 'returns 400 for days=0' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/active_users",
+                        user: user,
+                        organization: organization,
+                        params: { days: 0 }
+
+      expect(response).to have_http_status(:bad_request)
+    end
+
+    it 'returns 400 for days exceeding the maximum' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/active_users",
+                        user: user,
+                        organization: organization,
+                        params: { days: 366 }
+
+      expect(response).to have_http_status(:bad_request)
+    end
+
+    it 'honours a custom days window' do
+      old_user = create(:user)
+      create(:organization_membership, user: old_user, organization: organization)
+      create(:tool_event, organization: organization, user: old_user, occurred_at: 20.days.ago)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/active_users",
+                        user: user,
+                        organization: organization,
+                        params: { days: 30 }
+
+      expect_success
+      expect(json_response[:active_users]).to eq(2)
+    end
+
+    it 'scopes to project_id when provided' do
+      project = create(:project, organization: organization)
+      project_user = create(:user)
+      create(:organization_membership, user: project_user, organization: organization)
+      create(:tool_event, organization: organization, project: project, user: project_user,
+             occurred_at: Time.current)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/active_users",
+                        user: user,
+                        organization: organization,
+                        params: { project_id: project.id }
+
+      expect_success
+      expect(json_response[:active_users]).to eq(1)
+    end
+
+    it 'returns 404 for project_id belonging to another org' do
+      other_org = create(:organization)
+      other_project = create(:project, organization: other_org)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/active_users",
+                        user: user,
+                        organization: organization,
+                        params: { project_id: other_project.id }
+
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it 'returns 403 for non-members' do
+      non_member = create(:user)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/active_users",
+                        user: non_member,
+                        organization: organization
+
+      expect_forbidden
     end
   end
 

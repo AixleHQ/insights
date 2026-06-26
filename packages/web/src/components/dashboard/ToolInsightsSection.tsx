@@ -77,6 +77,7 @@ function toolLabel(slug: string): string {
 const DAY_OPTIONS = [7, 30, 90, 365] as const;
 
 const PERIOD_THRESHOLDS = { month: 365, week: 60 } as const;
+const ACTIVE_USERS_DAYS = 7;
 
 function periodForDays(days: number): "day" | "week" | "month" {
   if (days >= PERIOD_THRESHOLDS.month) return "month";
@@ -221,7 +222,7 @@ function ToolTabContent({
   const { data: connectorsResp } = useConnectors(orgId);
   const { data: dailyResp, isLoading: isLoadingDaily, isError: isErrorDaily, refetch: refetchDaily } = useToolDaily(orgId, toolSlug, days, period === "month" ? undefined : period);
   const { data: modelsResp, isLoading: isLoadingModels, isError: isErrorModels, refetch: refetchModels } = useToolModels(orgId, toolSlug, days);
-  const { data: usersResp, isLoading: isLoadingUsers, isError: isErrorUsers, refetch: refetchUsers } = useToolUsers(orgId, toolSlug, days);
+  const { data: usersResp, isLoading: isLoadingUsers, isError: isErrorUsers, refetch: refetchUsers } = useToolUsers(orgId, toolSlug, ACTIVE_USERS_DAYS);
   const { data: eventTypesResp, isLoading: isLoadingEventTypes, isError: isErrorEventTypes, refetch: refetchEventTypes } = useToolEventTypes(orgId, showEventTypes ? toolSlug : "", days);
 
   const activeConnector = connectorType

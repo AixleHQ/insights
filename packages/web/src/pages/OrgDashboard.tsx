@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Activity, DollarSign, AlertTriangle, Users } from "lucide-react";
 import { useOrg } from "@/contexts/OrgContext";
-import { useOverviewStats, useDailyStats, useEvents, useProjects } from "@/hooks/useApi";
+import { useOverviewStats, useActiveUsers, useDailyStats, useEvents, useProjects } from "@/hooks/useApi";
 import {
   MetricCard,
   MetricGrid,
@@ -32,6 +32,10 @@ import { StatCardSkeleton } from "@/components/ui/skeletons";
 import { formatPercent, periodLabel } from "@/lib/formatters";
 import { type DashboardPeriod } from "@/lib/types";
 import { currentMonth, getLast12Months } from "@/lib/dashboardUtils";
+
+// Active Members intentionally uses a fixed rolling window, not the month filter,
+// so the number stays stable while users explore historical months.
+const ACTIVE_USERS_WINDOW_DAYS = 7;
 
 function ProjectFilterDropdown({
   orgId,
@@ -114,6 +118,8 @@ export function OrgDashboard() {
   const isAllTime = selectedPeriod.type === "all_time";
 
   const { data: stats, isLoading: isLoadingStats, isError: isErrorStats, refetch: refetchStats } = useOverviewStats(orgId, selectedProjectId, selectedPeriod);
+  // Active Members is intentionally pinned to a rolling window, not the month selector.
+  const { data: activeUsersData } = useActiveUsers(orgId, selectedProjectId, ACTIVE_USERS_WINDOW_DAYS);
   const { data: dailyData, isLoading: isLoadingDaily, isError: isErrorDaily, refetch: refetchDaily } = useDailyStats(
     orgId,
     selectedPeriod,
@@ -286,10 +292,10 @@ export function OrgDashboard() {
             />
             <MetricCard
               title="Active Members"
-              value={stats?.active_users ?? 0}
+              value={activeUsersData?.active_users ?? 0}
               format="number"
               icon={<Users className="size-5" />}
-              description="Last 7 days"
+              description={`Last ${ACTIVE_USERS_WINDOW_DAYS} days`}
             />
               </>
             )}

@@ -25,6 +25,7 @@ import type {
   UnifiedAuditLog,
   UnifiedPaginatedMeta,
   OverviewStats,
+  ActiveUsersResponse,
   DailyStats,
   HourlyStats,
   ToolUsageStats,
@@ -127,6 +128,8 @@ export const queryKeys = {
   stats: {
     overview: (orgId: string, projectId?: string, period?: DashboardPeriod) =>
       ["organizations", orgId, "stats", "overview", { projectId, period }] as const,
+    activeUsers: (orgId: string, projectId?: string, days?: number) =>
+      ["organizations", orgId, "stats", "active_users", { projectId, days }] as const,
     daily: (orgId: string, period?: DashboardPeriod, days?: number, granularity?: string, projectId?: string) =>
       ["organizations", orgId, "stats", "daily", { period, days, granularity, projectId }] as const,
     hourly: (orgId: string, hours?: number) =>
@@ -1740,6 +1743,23 @@ export function useOverviewStats(orgId: string, projectId?: string, period?: Das
     },
     enabled: !!orgId,
     refetchInterval: 30000,
+  });
+}
+
+// Active users over a rolling window (default 7 days), decoupled from the dashboard
+// month filter. Honours the optional project scope.
+export function useActiveUsers(orgId: string, projectId?: string, days = 7) {
+  return useQuery({
+    queryKey: queryKeys.stats.activeUsers(orgId, projectId, days),
+    queryFn: () => {
+      const p = new URLSearchParams();
+      p.set("days", String(days));
+      if (projectId) p.set("project_id", projectId);
+      return api.get<ActiveUsersResponse>(`/organizations/${orgId}/stats/active_users?${p.toString()}`);
+    },
+    enabled: !!orgId,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
   });
 }
 
