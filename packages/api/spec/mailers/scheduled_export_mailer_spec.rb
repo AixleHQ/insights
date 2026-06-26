@@ -36,7 +36,7 @@ RSpec.describe ScheduledExportMailer, type: :mailer do
 
     it "attaches a CSV file" do
       expect(mail.attachments.size).to eq(1)
-      expect(mail.attachments.first.filename).to match(/\Adb90-report-cost_by_tool-.*\.csv\z/)
+      expect(mail.attachments.first.filename).to match(/\Aacme-corp-report-cost_by_tool-.*\.csv\z/)
       expect(mail.attachments.first.mime_type).to eq("text/csv")
     end
 
