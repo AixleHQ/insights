@@ -54,6 +54,42 @@ RSpec.describe 'Api::V1::Events', type: :request do
       expect(json_data.first[:eventType]).to eq('chat')
     end
 
+    it 'filters by risk_level=not_none using audit_log association (AIX-414)' do
+      risky_event = create(:tool_event, organization: organization, user: user, tool_name: 'cursor')
+      create(:audit_log, organization: organization, tool_event: risky_event, risk_level: 'high')
+
+      safe_event = create(:tool_event, organization: organization, user: user, tool_name: 'windsurf')
+      create(:audit_log, organization: organization, tool_event: safe_event, risk_level: 'none')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                        user: user,
+                        organization: organization,
+                        params: { risk_level: 'not_none' }
+
+      expect_success
+      ids = json_data.map { |e| e[:id] }
+      expect(ids).to include(risky_event.id)
+      expect(ids).not_to include(safe_event.id)
+      expect(ids).not_to include(tool_event.id)
+    end
+
+    it 'filters by risk_level=not_none using metadata fallback when no audit_log exists (AIX-414)' do
+      risky_event = create(:tool_event, organization: organization, user: user,
+                           tool_name: 'cursor', metadata: { 'risk_level' => 'medium' })
+      clean_event = create(:tool_event, organization: organization, user: user, tool_name: 'windsurf')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                        user: user,
+                        organization: organization,
+                        params: { risk_level: 'not_none' }
+
+      expect_success
+      ids = json_data.map { |e| e[:id] }
+      expect(ids).to include(risky_event.id)
+      expect(ids).not_to include(clean_event.id)
+      expect(ids).not_to include(tool_event.id)
+    end
+
     it 'filters by multiple comma-separated event_types' do
       chat_event = create(:tool_event, organization: organization, user: user, event_type: 'chat')
       edit_event = create(:tool_event, organization: organization, user: user, event_type: 'edit')

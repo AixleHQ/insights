@@ -41,9 +41,23 @@ module ToolEventFilterable
     levels = normalize_string_array(risk_level)
     return scope if levels.empty?
 
-    # Special sentinel values cannot be mixed with explicit levels.
+    # "not_none" mirrors the risky_event_condition used by the Risk Alerts dashboard:
+    # prefer the canonical audit_log risk_level when available, fall back to metadata.
     if levels.include?("not_none")
-      return scope.where("metadata->>'risk_level' IS NOT NULL AND metadata->>'risk_level' NOT IN ('none', '')")
+      return scope.where(<<~SQL.squish)
+        (
+          EXISTS (
+            SELECT 1 FROM audit_logs
+            WHERE audit_logs.tool_event_id = tool_events.id
+              AND audit_logs.risk_level NOT IN ('none')
+          )
+          OR (
+            NOT EXISTS (SELECT 1 FROM audit_logs WHERE audit_logs.tool_event_id = tool_events.id)
+            AND tool_events.metadata->>'risk_level' IS NOT NULL
+            AND tool_events.metadata->>'risk_level' NOT IN ('none', '')
+          )
+        )
+      SQL
     end
 
     none_selected = levels.include?("none")
