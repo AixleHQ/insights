@@ -44,6 +44,52 @@ RSpec.describe Oauth::GithubProvider, type: :service do
       end
     end
 
+    context 'when the token is expired but can be refreshed' do
+      let(:connector) do
+        instance_double(
+          'OrganizationConnector',
+          access_token: 'gho_new456',
+          token_expired?: true,
+          refresh_token: 'ghr_refresh',
+          mark_error!: nil
+        )
+      end
+
+      it 'refreshes the token and returns success' do
+        allow(provider).to receive(:refresh_token!).and_return(true)
+        allow(provider).to receive(:reset_http_client!).and_call_original
+
+        stub_request(:get, 'https://api.github.com/user')
+          .with(headers: { 'Authorization' => 'Bearer gho_new456' })
+          .to_return(
+            status: 200,
+            body: { login: 'octocat', name: 'The Octocat' }.to_json,
+            headers: { 'Content-Type' => 'application/json' }
+          )
+
+        result = provider.test_connection
+
+        expect(result[:success]).to be true
+        expect(result[:account]).to eq('octocat')
+      end
+    end
+
+    context 'when the token is expired and cannot be refreshed' do
+      let(:connector) do
+        instance_double(
+          'OrganizationConnector',
+          access_token: 'gho_expired',
+          token_expired?: true,
+          refresh_token: nil,
+          mark_error!: nil
+        )
+      end
+
+      it 'raises TokenRefreshError which bubbles up as a connection error' do
+        expect { provider.test_connection }.to raise_error(Oauth::TokenRefreshError)
+      end
+    end
+
     context 'when a network error occurs' do
       it 'returns failure with connection error message' do
         stub_request(:get, 'https://api.github.com/user')
@@ -98,6 +144,38 @@ RSpec.describe Oauth::GithubProvider, type: :service do
           .to_return(status: 401, body: '{}')
 
         expect(provider.fetch_repositories).to eq([])
+      end
+    end
+
+    context 'when the token is expired but can be refreshed' do
+      let(:connector) do
+        instance_double(
+          'OrganizationConnector',
+          access_token: 'gho_new456',
+          token_expired?: true,
+          refresh_token: 'ghr_refresh',
+          mark_error!: nil
+        )
+      end
+
+      it 'refreshes the token and returns repositories' do
+        allow(provider).to receive(:refresh_token!).and_return(true)
+        allow(provider).to receive(:reset_http_client!).and_call_original
+
+        stub_request(:get, 'https://api.github.com/user/repos')
+          .with(query: hash_including('page' => '1', 'per_page' => '100', 'sort' => 'updated'))
+          .to_return(
+            status: 200,
+            body: [ { id: 1, name: 'repo', full_name: 'org/repo', description: nil,
+                      default_branch: 'main', clone_url: 'https://github.com/org/repo.git',
+                      html_url: 'https://github.com/org/repo', private: false } ].to_json,
+            headers: { 'Content-Type' => 'application/json' }
+          )
+
+        result = provider.fetch_repositories
+
+        expect(result.length).to eq(1)
+        expect(result.first[:name]).to eq('repo')
       end
     end
   end

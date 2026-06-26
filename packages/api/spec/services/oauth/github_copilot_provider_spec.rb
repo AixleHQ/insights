@@ -8,7 +8,8 @@ RSpec.describe Oauth::GithubCopilotProvider, type: :service do
     instance_double(
       "OrganizationConnector",
       access_token:       "ghs_token123",
-      external_org_name:  org
+      external_org_name:  org,
+      token_expired?:     false
     )
   end
   let(:provider) { described_class.new(connector) }

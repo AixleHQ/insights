@@ -9,6 +9,7 @@ module Oauth
     COMMIT_SHA_PATTERN = /\A\h{4,64}\z/
 
     def test_connection
+      ensure_fresh_token!
       response = http_client.get("#{API_URL}/user")
 
       if response.success?
@@ -22,6 +23,7 @@ module Oauth
     end
 
     def fetch_repositories(page: 1, per_page: 100)
+      ensure_fresh_token!
       response = http_client.get("#{API_URL}/user/repos") do |req|
         req.params["page"] = page
         req.params["per_page"] = per_page

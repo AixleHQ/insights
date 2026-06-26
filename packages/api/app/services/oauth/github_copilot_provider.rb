@@ -13,6 +13,7 @@ module Oauth
     # GET /orgs/{org}/copilot/billing returns 200 with seat summary or
     # 404/403 if Copilot is not enabled / token lacks scope.
     def test_connection
+      ensure_fresh_token!
       org = connector.external_org_name
       unless org.present?
         return { success: false, error: "GitHub org not set — OAuth did not resolve an admin org" }
