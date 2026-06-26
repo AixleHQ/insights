@@ -94,6 +94,7 @@ export interface ProjectWithStats extends Project {
   linearProjectId?: string | null;
   linearProjectName?: string | null;
   linearConnectorId?: string | null;
+  issuesSyncedAt?: string | null;
   sourceControlSummary?: SourceControlSummary[];
   issueThroughputSummary?: IssueThroughputSummary[];
 }

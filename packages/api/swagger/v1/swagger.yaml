@@ -7244,6 +7244,26 @@ components:
               type: integer
             repositoryCount:
               type: integer
+            jiraProjectKey:
+              type: string
+              nullable: true
+            jiraConnectorId:
+              type: string
+              nullable: true
+            linearProjectId:
+              type: string
+              nullable: true
+            linearProjectName:
+              type: string
+              nullable: true
+            linearConnectorId:
+              type: string
+              nullable: true
+            issuesSyncedAt:
+              type: string
+              format: date-time
+              nullable: true
+              description: "Timestamp of the last successful issue sync. Null if issues have never been synced."
             sourceControlSummary:
               type: array
               items:

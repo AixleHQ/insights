@@ -47,6 +47,10 @@ class ProjectFullSerializer < ProjectSerializer
     project.project_settings.to_a.find { |s| s.key == "linear_connector_id" }&.value
   end
 
+  attribute :issues_synced_at do |project|
+    project.issues_synced_at&.iso8601
+  end
+
   attribute :source_control_summary do |project|
     ProjectFullSerializer.build_source_control_summary(project)
   end

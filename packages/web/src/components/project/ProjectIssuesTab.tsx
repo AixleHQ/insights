@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Layers, Bug, BookOpen, CheckSquare, Zap, Circle, RefreshCw } from "lucide-react";
-import { useProjectIssues, useSyncProjectIssues } from "@/hooks/useApi";
+import { useProject, useProjectIssues, useSyncProjectIssues } from "@/hooks/useApi";
 import type { ProjectWithStats } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -79,6 +79,11 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
 
   const linkedProvider = project.linearProjectId ? "linear" : project.jiraProjectKey ? "jira" : null;
   const isLinked = !!linkedProvider;
+  const isSyncing = isLinked && !project.issuesSyncedAt;
+
+  // Poll project until issuesSyncedAt is set — deduped with the parent's useProject call.
+  useProject(projectId, { refetchInterval: isSyncing ? 5000 : false });
+
   const syncIssues = useSyncProjectIssues(projectId);
   const linkedProjectLabel = project.linearProjectName || project.jiraProjectKey || undefined;
 
@@ -217,6 +222,10 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
                   </div>
                 ))}
               </div>
+            ) : isSyncing ? (
+              <p className="text-sm text-muted-foreground text-center py-8 px-6">
+                Syncing issues… This may take a moment. The list will update automatically.
+              </p>
             ) : issues.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8 px-6">
                 No issues found{statusFilter || typeFilter || assigneeFilter ? " matching the selected filters" : ""}.
