@@ -68,7 +68,8 @@ import {
   ProjectAlertsTab,
   ProjectTeamSection,
 } from "@/components/project";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TabNav } from "@/components/ui/tab-nav";
+import { TabsContent } from "@/components/ui/tabs";
 import { formatDistanceToNow } from "@/lib/utils";
 import { isGitRemoteMissing } from "@/lib/project-git-remote";
 
@@ -262,18 +263,18 @@ export function ProjectDetail() {
         </Alert>
       )}
 
-      <Tabs
-        value={activeTab}
-        onValueChange={(value) => setSearchParams({ tab: value }, { replace: true })}
+      <TabNav
+        tabs={[
+          { label: "Overview", key: "overview" },
+          { label: "Events", key: "events" },
+          ...(isMemberOfProject ? [{ label: "Members", key: "members" }] : []),
+          ...(isProjectOwner ? [{ label: "Integrations", key: "integrations" }] : []),
+          ...(isProjectOwner ? [{ label: "Alerts", key: "alerts" }] : []),
+          { label: "Issues", key: "issues" },
+        ]}
+        activeTab={activeTab}
+        onChange={(value) => setSearchParams({ tab: value }, { replace: true })}
       >
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="events">Events</TabsTrigger>
-          {isMemberOfProject && <TabsTrigger value="members">Members</TabsTrigger>}
-          {isProjectOwner && <TabsTrigger value="integrations">Integrations</TabsTrigger>}
-          {isProjectOwner && <TabsTrigger value="alerts">Alerts</TabsTrigger>}
-          <TabsTrigger value="issues">Issues</TabsTrigger>
-        </TabsList>
 
         {/* ── Overview ── */}
         <TabsContent value="overview" className="space-y-6 mt-4">
@@ -588,7 +589,7 @@ export function ProjectDetail() {
             <ProjectAlertsTab projectId={id || ""} />
           </TabsContent>
         )}
-      </Tabs>
+      </TabNav>
     </div>
   );
 }

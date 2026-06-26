@@ -17,7 +17,7 @@ import {
   type ToolUsageData,
 } from "@/components/dashboard";
 import { EventDrawer } from "@/components/events";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TabNav } from "@/components/ui/tab-nav";
 import { Card, CardContent } from "@/components/ui/card";
 import { ErrorState } from "@/components/ui/error-state";
 import {
@@ -206,15 +206,15 @@ export function OrgDashboard() {
               <PeriodSelector value={selectedPeriod} onChange={setSelectedPeriod} />
             </>
           )}
-          <Tabs
-            value={activeTab}
-            onValueChange={(v) => setSearchParams({ tab: v })}
-          >
-            <TabsList>
-              <TabsTrigger value="team">Team</TabsTrigger>
-              <TabsTrigger value="personal">Personal</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <TabNav
+            tabs={[
+              { label: "Team", key: "team" },
+              { label: "Personal", key: "personal" },
+            ]}
+            variant="default"
+            activeTab={activeTab}
+            onChange={(v) => setSearchParams({ tab: v })}
+          />
         </div>
       </div>
 
