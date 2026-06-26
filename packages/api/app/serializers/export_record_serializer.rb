@@ -7,14 +7,10 @@ class ExportRecordSerializer < BaseSerializer
   attribute :download_url do |record|
     next nil unless record.status == "ready" && !record.expired? && record.file.attached?
 
-    url_opts = Rails.application.config.action_mailer.default_url_options || {}
-    Rails.application.routes.url_helpers.rails_blob_url(
-      record.file,
-      host:        url_opts.fetch(:host, "localhost"),
-      protocol:    url_opts.fetch(:protocol, "http"),
-      disposition: "attachment",
-      expires_in:  7.days
-    )
+    # Generate a direct service URL (S3 presigned URL in staging/production).
+    # rails_blob_url routes through the Rails redirect endpoint, which fails when
+    # the API is not publicly reachable at the frontend host.
+    record.file.blob.url(expires_in: 7.days, disposition: "attachment")
   end
 
   datetime_attribute :expires_at
