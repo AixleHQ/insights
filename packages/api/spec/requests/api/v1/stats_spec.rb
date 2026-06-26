@@ -848,14 +848,14 @@ RSpec.describe 'Api::V1::Stats', type: :request do
       expect(json_response[:tool]).to eq("claude_code")
     end
 
-    it "returns 31 entries for the default 30-day range" do
+    it "returns 30 entries for the default 30-day range" do
       travel_to(frozen_time) do
         authenticated_get path, user: user, organization: organization
       end
 
       expect_success
-      # 30.days.ago.beginning_of_day (Mar 16) to Time.current (Apr 15) inclusive = 31 days
-      expect(json_response[:daily].length).to eq(31)
+      # (30-1).days.ago.beginning_of_day (Mar 17) to Time.current (Apr 15) inclusive = 30 days
+      expect(json_response[:daily].length).to eq(30)
     end
 
     it "supports ?start_date= / ?end_date= params" do
@@ -916,8 +916,8 @@ RSpec.describe 'Api::V1::Stats', type: :request do
       end
 
       expect_success
-      # 7 days back from Apr 8 to Apr 15 inclusive = 8 entries
-      expect(json_response[:daily].length).to eq(8)
+      # (7-1) days back from Apr 9 to Apr 15 inclusive = 7 entries
+      expect(json_response[:daily].length).to eq(7)
     end
 
     it "returns 403 for non-members" do
