@@ -17,7 +17,7 @@ import {
 import type { ChartConfig } from "@/components/ui/chart";
 import { ChartSkeleton } from "@/components/ui/skeletons";
 import { ErrorState } from "@/components/ui/error-state";
-import { sliceCostTrendWindow } from "@/lib/dashboardUtils";
+import { formatDateLabel, sliceCostTrendWindow } from "@/lib/dashboardUtils";
 import { formatCost } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 
@@ -50,16 +50,6 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-function formatDateLabel(dateStr: string, allTime: boolean, range: TimeRange): string {
-  const date = new Date(dateStr + "T00:00:00");
-  if (allTime) {
-    return date.toLocaleDateString("en-US", { month: "short", year: "numeric" });
-  }
-  if (range === "7d") {
-    return date.toLocaleDateString("en-US", { weekday: "short" });
-  }
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
 
 export function CostTrendChart({
   data,
@@ -78,7 +68,7 @@ export function CostTrendChart({
     : sliceCostTrendWindow(data, windowDays, { monthScoped });
   const formattedData = filteredData.map((item) => ({
     ...item,
-    dateLabel: formatDateLabel(item.date, allTime, timeRange),
+    dateLabel: formatDateLabel(item.date, allTime),
   }));
 
   const totalCost = filteredData.reduce((sum, item) => sum + item.cost, 0);

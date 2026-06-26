@@ -1,3 +1,11 @@
+export function formatDateLabel(dateStr: string, allTime: boolean): string {
+  const date = new Date(dateStr + "T00:00:00");
+  if (allTime) {
+    return date.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+  }
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 export function formatLocalDate(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
