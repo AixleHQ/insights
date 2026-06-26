@@ -5,7 +5,7 @@ module Oauth
     API_URL = "https://api.atlassian.com"
 
     def test_connection
-      # First get accessible resources (cloud instances)
+      ensure_fresh_token!
       response = http_client.get("#{API_URL}/oauth/token/accessible-resources")
 
       if response.success?
