@@ -176,18 +176,18 @@ export function IntegrationCard({
       <Card
         data-testid={`provider-card-${provider.id}`}
         className={cn(
-          "group relative transition-all hover:shadow-md",
+          "group relative overflow-hidden transition-all hover:shadow-md",
           !provider.available && "opacity-60",
           className
         )}
       >
         <CardHeader className="pb-3">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-start justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-3">
               <ProviderLogo provider={provider.id} size="md" showBackground />
-              <div>
-                <CardTitle className="text-base">{provider.name}</CardTitle>
-                <CardDescription className="text-xs">
+              <div className="min-w-0">
+                <CardTitle className="truncate text-base">{provider.name}</CardTitle>
+                <CardDescription className="line-clamp-2 text-xs">
                   {provider.description}
                 </CardDescription>
               </div>
@@ -242,14 +242,14 @@ export function IntegrationCard({
   };
 
   return (
-    <Card className={cn("group relative transition-all hover:shadow-md", className)}>
+    <Card className={cn("group relative overflow-hidden transition-all hover:shadow-md", className)}>
       <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-start justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-3">
             <ProviderLogo provider={integration.provider} size="md" showBackground />
-            <div>
-              <CardTitle className="text-base">{integration.name}</CardTitle>
-              <CardDescription className="text-xs capitalize">
+            <div className="min-w-0">
+              <CardTitle className="truncate text-base">{integration.name}</CardTitle>
+              <CardDescription className="truncate text-xs capitalize">
                 {integration.provider.replace("-", " ")}
                 {displayAccountLabel && ` · ${displayAccountLabel}`}
               </CardDescription>
@@ -420,7 +420,7 @@ export function IntegrationCard({
         )}
 
         {integration.metadata?.event_count !== undefined && (
-          <div className="text-xs text-muted-foreground">
+          <div className="truncate text-xs text-muted-foreground">
             {integration.metadata.event_count} synced events
             {integration.last_event_at ? ` · latest activity ${formatDistanceToNow(integration.last_event_at)}` : ""}
           </div>
