@@ -1687,13 +1687,14 @@ export function useUnattributedEvents(
       if (params?.endDate) query.set("end_date", params.endDate);
       if (params?.minConfidence != null) query.set("min_confidence", String(params.minConfidence));
       const qs = query.toString();
-      const response = await api.get<{ data: ToolEvent[] }>(
+      const payload = await api.get<{ data: ToolEvent[] } | ToolEvent[]>(
         `/organizations/${orgId}/events/unattributed${qs ? `?${qs}` : ""}`
       );
-      const rows = response.data;
+      const rows = Array.isArray(payload) ? payload : (payload as { data: ToolEvent[] }).data ?? [];
       return Array.isArray(rows) ? rows : [];
     },
     enabled,
+    staleTime: 30_000,
   });
 }
 

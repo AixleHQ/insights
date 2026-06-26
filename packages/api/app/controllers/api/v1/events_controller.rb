@@ -12,17 +12,20 @@ module Api
 
       # GET /api/v1/organizations/:organization_id/events
       def index
+        authorize! current_organization, to: :show?
         events = authorized_scope(current_organization.tool_events)
         events = apply_filters(events)
         events = events.includes(:user, :project).order(occurred_at: :desc)
 
-        render_collection(events, ToolEventSerializer)
+        render_collection(events, ToolEventSerializer, serializer_params: ->(paginated) {
+          { candidate_users: candidate_users_for(paginated) }
+        })
       end
 
       # GET /api/v1/organizations/:organization_id/events/:id
       def show
         authorize! @event
-        render_resource(@event, ToolEventDetailSerializer)
+        render_resource(@event, ToolEventDetailSerializer, serializer_params: { candidate_users: candidate_users_for(@event) })
       end
 
       # GET /api/v1/organizations/:organization_id/events/summary
@@ -62,7 +65,9 @@ module Api
 
         events = events.includes(:project).order(occurred_at: :desc)
 
-        render_collection(events, ToolEventSerializer)
+        render_collection(events, ToolEventSerializer, serializer_params: ->(paginated) {
+          { candidate_users: candidate_users_for(paginated) }
+        })
       end
 
       # POST /api/v1/organizations/:organization_id/events/:id/attribute
@@ -80,7 +85,8 @@ module Api
           user_id: user.id,
           metadata: (@event.metadata || {}).merge(
             "correlation_method" => "manual",
-            "correlation_confidence" => 1.0
+            "correlation_confidence" => 1.0,
+            "candidate_user_id" => nil
           )
         )
 
@@ -93,7 +99,7 @@ module Api
           request: request
         )
 
-        render_resource(@event, ToolEventSerializer)
+        render_resource(@event, ToolEventSerializer, serializer_params: { candidate_users: candidate_users_for(@event) })
       end
 
       # POST /api/v1/organizations/:organization_id/events/attribute_bulk
@@ -181,6 +187,12 @@ module Api
       end
 
       private
+
+      def candidate_users_for(events_or_event)
+        events = Array(events_or_event)
+        ids = events.filter_map { |e| e.metadata&.dig("candidate_user_id") }.uniq
+        ids.any? ? current_organization.members.where(id: ids).index_by { |u| u.id.to_s } : {}
+      end
 
       # All organization members can view every event in the org (AIX-381).
       # Per-event authorization is still enforced via ToolEventPolicy in each action.

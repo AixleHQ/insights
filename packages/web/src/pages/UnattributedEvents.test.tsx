@@ -75,13 +75,13 @@ describe("UnattributedEvents access gate", () => {
     mockCurrentUser.mockReturnValue({ data: { globalAdmin: false }, isLoading: false });
     renderPage();
     expect(screen.getByTestId("events-page")).toBeInTheDocument();
-    expect(screen.queryByText("Unattributed Events")).not.toBeInTheDocument();
+    expect(screen.queryByText("Not Assigned")).not.toBeInTheDocument();
   });
 
   it("renders page for org owner", () => {
     mockHasRole.mockReturnValue(true);
     renderPage();
-    expect(screen.getByText("Unattributed Events")).toBeInTheDocument();
+    expect(screen.getByText("Not Assigned")).toBeInTheDocument();
     expect(screen.queryByTestId("events-page")).not.toBeInTheDocument();
   });
 
@@ -89,7 +89,7 @@ describe("UnattributedEvents access gate", () => {
     mockHasRole.mockReturnValue(false);
     mockCurrentUser.mockReturnValue({ data: { globalAdmin: true }, isLoading: false });
     renderPage();
-    expect(screen.getByText("Unattributed Events")).toBeInTheDocument();
+    expect(screen.getByText("Not Assigned")).toBeInTheDocument();
     expect(screen.queryByTestId("events-page")).not.toBeInTheDocument();
   });
 
@@ -97,7 +97,7 @@ describe("UnattributedEvents access gate", () => {
     mockHasRole.mockReturnValue(false);
     mockCurrentUser.mockReturnValue({ data: undefined, isLoading: true });
     renderPage();
-    expect(screen.getByText("Unattributed Events")).toBeInTheDocument();
+    expect(screen.getByText("Not Assigned")).toBeInTheDocument();
     expect(screen.queryByTestId("events-page")).not.toBeInTheDocument();
   });
 });

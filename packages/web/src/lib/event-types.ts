@@ -99,3 +99,14 @@ export const EVENT_TYPES_BY_BAND: Record<EventTypeBand, EventType[]> = EVENT_TYP
   },
   {} as Record<EventTypeBand, EventType[]>
 );
+
+export const EVENT_TYPE_BAND_TO_BADGE_VARIANT: Record<
+  EventTypeBand,
+  "aiEvent" | "codeEvent" | "qualityEvent" | "pmEvent" | "otherEvent"
+> = {
+  ai: "aiEvent",
+  code: "codeEvent",
+  quality: "qualityEvent",
+  pm: "pmEvent",
+  other: "otherEvent",
+};

@@ -43,6 +43,8 @@ export interface EventFiltersState {
   dateTo?: string;
   /** Organization project UUIDs. */
   projectIds?: string[];
+  /** Minimum correlation confidence (0–1). Only used in "Not Assigned" mode. */
+  minConfidence?: number;
 }
 
 interface EventFiltersProps {
@@ -51,6 +53,14 @@ interface EventFiltersProps {
   tools: readonly EventsToolFilterOption[];
   /** When provided, shows a project sub-menu in the filter panel. */
   projects?: ProjectWithStats[];
+  /** Node rendered to the left of the search bar (e.g. tab switcher). */
+  leading?: React.ReactNode;
+  /** When true, shows a Confidence sub-menu in the filter dropdown. */
+  showConfidence?: boolean;
+  /** When true, hides Risk level, Event type and Project filters. */
+  hideAdvancedFilters?: boolean;
+  /** Node rendered to the right of the Filters button (e.g. bulk-assign action). */
+  trailing?: React.ReactNode;
   className?: string;
 }
 
@@ -124,11 +134,22 @@ export function FilterChip({
   );
 }
 
+const confidenceOptions = [
+  { value: 0.5, label: "≥ 50%" },
+  { value: 0.7, label: "≥ 70%" },
+  { value: 0.85, label: "≥ 85%" },
+  { value: 0.9, label: "≥ 90%" },
+];
+
 export function EventFilters({
   filters,
   onFiltersChange,
   tools,
   projects,
+  leading,
+  trailing,
+  showConfidence,
+  hideAdvancedFilters,
   className,
 }: EventFiltersProps) {
   const [customDateOpen, setCustomDateOpen] = useState(false);
@@ -141,6 +162,7 @@ export function EventFilters({
     filters.eventTypes?.length,
     filters.projectIds?.length,
     (filters.dateFrom || filters.dateTo) ? 1 : 0,
+    filters.minConfidence != null ? 1 : 0,
   ].filter(Boolean).length;
 
   const clearAll = () => onFiltersChange({});
@@ -214,6 +236,17 @@ export function EventFilters({
     });
   }
 
+  if (filters.minConfidence != null) {
+    const label = confidenceOptions.find((o) => o.value === filters.minConfidence)?.label
+      ?? `≥ ${Math.round(filters.minConfidence * 100)}%`;
+    chips.push({
+      key: "confidence",
+      label: "Confidence",
+      value: label,
+      onRemove: () => onFiltersChange({ ...filters, minConfidence: undefined }),
+    });
+  }
+
   if (filters.dateFrom || filters.dateTo) {
     const fmt = (d: string) =>
       new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -235,6 +268,8 @@ export function EventFilters({
     <div className={cn("space-y-3", className)}>
       {/* Main filter bar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
+        {leading}
+        {leading && <div className="hidden sm:block h-5 w-px bg-border" />}
         {/* Search input */}
         <div className="relative w-full sm:w-64">
           <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -256,8 +291,6 @@ export function EventFilters({
             </button>
           )}
         </div>
-
-        <div className="hidden sm:block h-5 w-px bg-border" />
 
         {/* Filter dropdown */}
         <DropdownMenu>
@@ -302,69 +335,73 @@ export function EventFilters({
             )}
 
             {/* Risk level */}
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger className="text-sm">
-                Risk level
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
-                {riskLevelOptions.map((level) => (
-                  <DropdownMenuCheckboxItem
-                    key={level.value}
-                    checked={(filters.riskLevels ?? []).includes(level.value)}
-                    onSelect={(e) => e.preventDefault()}
-                    onCheckedChange={(checked) =>
-                      onFiltersChange({
-                        ...filters,
-                        riskLevels: toggleArray(filters.riskLevels, level.value, checked),
-                      })
-                    }
-                  >
-                    {level.label}
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
+            {!hideAdvancedFilters && (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="text-sm">
+                  Risk level
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  {riskLevelOptions.map((level) => (
+                    <DropdownMenuCheckboxItem
+                      key={level.value}
+                      checked={(filters.riskLevels ?? []).includes(level.value)}
+                      onSelect={(e) => e.preventDefault()}
+                      onCheckedChange={(checked) =>
+                        onFiltersChange({
+                          ...filters,
+                          riskLevels: toggleArray(filters.riskLevels, level.value, checked),
+                        })
+                      }
+                    >
+                      {level.label}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            )}
 
             {/* Event type */}
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger className="text-sm">
-                Event type
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="max-h-80 overflow-y-auto">
-                {(() => {
-                  const visibleBands = EVENT_TYPE_BAND_ORDER.filter(
-                    (b) => EVENT_TYPES_BY_BAND[b].length > 0
-                  );
-                  return visibleBands.map((band, idx) => (
-                    <div key={band}>
-                      <div className="px-2 pt-1 pb-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                        {EVENT_TYPE_BAND_LABEL[band]}
+            {!hideAdvancedFilters && (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="text-sm">
+                  Event type
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="max-h-80 overflow-y-auto">
+                  {(() => {
+                    const visibleBands = EVENT_TYPE_BAND_ORDER.filter(
+                      (b) => EVENT_TYPES_BY_BAND[b].length > 0
+                    );
+                    return visibleBands.map((band, idx) => (
+                      <div key={band}>
+                        <div className="px-2 pt-1 pb-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                          {EVENT_TYPE_BAND_LABEL[band]}
+                        </div>
+                        {EVENT_TYPES_BY_BAND[band].map((type) => (
+                          <DropdownMenuCheckboxItem
+                            key={type}
+                            checked={(filters.eventTypes ?? []).includes(type)}
+                            onSelect={(e) => e.preventDefault()}
+                            onCheckedChange={(checked) =>
+                              onFiltersChange({
+                                ...filters,
+                                eventTypes: toggleArray(filters.eventTypes, type, checked),
+                              })
+                            }
+                          >
+                            <span className={cn("mr-1.5 inline-block size-1.5 shrink-0 rounded-[2px]", EVENT_TYPE_BAND_DOT_CLASS[band])} />
+                            {EVENT_TYPE_META[type].label}
+                          </DropdownMenuCheckboxItem>
+                        ))}
+                        {idx < visibleBands.length - 1 && <DropdownMenuSeparator />}
                       </div>
-                      {EVENT_TYPES_BY_BAND[band].map((type) => (
-                        <DropdownMenuCheckboxItem
-                          key={type}
-                          checked={(filters.eventTypes ?? []).includes(type)}
-                          onSelect={(e) => e.preventDefault()}
-                          onCheckedChange={(checked) =>
-                            onFiltersChange({
-                              ...filters,
-                              eventTypes: toggleArray(filters.eventTypes, type, checked),
-                            })
-                          }
-                        >
-                          <span className={cn("mr-1.5 inline-block size-1.5 shrink-0 rounded-[2px]", EVENT_TYPE_BAND_DOT_CLASS[band])} />
-                          {EVENT_TYPE_META[type].label}
-                        </DropdownMenuCheckboxItem>
-                      ))}
-                      {idx < visibleBands.length - 1 && <DropdownMenuSeparator />}
-                    </div>
-                  ));
-                })()}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
+                    ));
+                  })()}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            )}
 
             {/* Project */}
-            {projects && projects.length > 0 && (
+            {!hideAdvancedFilters && projects && projects.length > 0 && (
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger className="text-sm">
                   Project
@@ -383,6 +420,32 @@ export function EventFilters({
                       }
                     >
                       {p.name}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            )}
+
+            {/* Confidence (Not Assigned tab only) */}
+            {showConfidence && (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="text-sm">
+                  Confidence
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  {confidenceOptions.map((opt) => (
+                    <DropdownMenuCheckboxItem
+                      key={opt.value}
+                      checked={filters.minConfidence === opt.value}
+                      onSelect={(e) => e.preventDefault()}
+                      onCheckedChange={(checked) =>
+                        onFiltersChange({
+                          ...filters,
+                          minConfidence: checked ? opt.value : undefined,
+                        })
+                      }
+                    >
+                      {opt.label}
                     </DropdownMenuCheckboxItem>
                   ))}
                 </DropdownMenuSubContent>
@@ -450,6 +513,11 @@ export function EventFilters({
           </DropdownMenuContent>
         </DropdownMenu>
 
+        {trailing && (
+          <div className="sm:ml-auto flex items-center gap-2">
+            {trailing}
+          </div>
+        )}
       </div>
 
       {/* Active filter chips */}

@@ -54,5 +54,15 @@ module ToolEventAttributes
     attribute :branch do |event|
       event.metadata&.dig("branch") || event.metadata&.dig("branch_name")
     end
+
+    attribute :suggested_user do |event|
+      candidate_id = event.metadata&.dig("candidate_user_id")
+      next nil unless candidate_id
+
+      user = params[:candidate_users]&.[](candidate_id)
+      next nil unless user
+
+      { id: user.id, email: user.email, name: user.name, avatarUrl: user.avatar_url }
+    end
   end
 end

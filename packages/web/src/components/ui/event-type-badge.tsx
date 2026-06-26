@@ -11,21 +11,22 @@ const ICON_COLOR = {
 
 interface EventTypeBadgeProps {
   type: string | null | undefined;
+  showIcon?: boolean;
   className?: string;
 }
 
-export function EventTypeBadge({ type, className }: EventTypeBadgeProps) {
+export function EventTypeBadge({ type, showIcon = true, className }: EventTypeBadgeProps) {
   const meta = getEventTypeMeta(type);
   const Icon = meta.icon;
 
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border border-foreground/10 bg-foreground/5 px-[7px] py-[3px] font-mono text-[11px] font-medium",
+        "inline-flex items-center gap-1 rounded-full border border-foreground/10 bg-foreground/5 px-[7px] py-[3px] text-xs font-medium",
         className
       )}
     >
-      <Icon className={cn("size-3 shrink-0", ICON_COLOR[meta.band])} />
+      {showIcon && <Icon className={cn("size-3 shrink-0", ICON_COLOR[meta.band])} />}
       <span className="text-foreground">{meta.label}</span>
     </span>
   );

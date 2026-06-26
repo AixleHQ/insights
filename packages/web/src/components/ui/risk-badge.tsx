@@ -46,12 +46,12 @@ function NoneIcon() {
 function CriticalIcon() {
   return (
     <svg width="1em" height="1em" viewBox="0 0 10 10" fill="none" aria-hidden="true" className="shrink-0">
-      <rect width="10" height="10" rx="2.5" fill="#FFB800" />
+      <rect width="10" height="10" rx="2.5" className="fill-foreground" />
       <path
         fillRule="evenodd"
         clipRule="evenodd"
         d="M5 2.14286C5.14208 2.14286 5.27834 2.1993 5.37881 2.29976C5.47927 2.40023 5.53571 2.53649 5.53571 2.67857V4.82143C5.53571 4.96351 5.47927 5.09977 5.37881 5.20024C5.27834 5.3007 5.14208 5.35714 5 5.35714C4.85792 5.35714 4.72166 5.3007 4.62119 5.20024C4.52073 5.09977 4.46429 4.96351 4.46429 4.82143V2.67857C4.46429 2.53649 4.52073 2.40023 4.62119 2.29976C4.72166 2.1993 4.85792 2.14286 5 2.14286ZM5 7.85714C5.18944 7.85714 5.37112 7.78189 5.50508 7.64793C5.63903 7.51398 5.71429 7.3323 5.71429 7.14286C5.71429 6.95342 5.63903 6.77174 5.50508 6.63778C5.37112 6.50383 5.18944 6.42857 5 6.42857C4.81056 6.42857 4.62888 6.50383 4.49492 6.63778C4.36097 6.77174 4.28571 6.95342 4.28571 7.14286C4.28571 7.3323 4.36097 7.51398 4.49492 7.64793C4.62888 7.78189 4.81056 7.85714 5 7.85714Z"
-        fill="#2C2C39"
+        className="fill-background"
       />
     </svg>
   );
@@ -74,7 +74,7 @@ export function RiskBadge({ level, className }: RiskBadgeProps) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-[6px] font-mono text-[11px] font-medium text-foreground",
+        "inline-flex items-center gap-[6px] text-sm font-medium text-foreground",
         className
       )}
     >

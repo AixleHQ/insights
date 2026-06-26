@@ -197,7 +197,7 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
               label="Cost"
               value={
                 event.cost_usd !== undefined ? (
-                  <span className="font-mono-display">{formatCost(event.cost_usd)}</span>
+                  <span className="text-sm">{formatCost(event.cost_usd)}</span>
                 ) : (
                   <span className="text-muted-foreground">-</span>
                 )
@@ -208,7 +208,7 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
               label="Tokens"
               value={
                 event.token_count !== undefined ? (
-                  <span className="font-mono-display">
+                  <span className="text-sm">
                     {formatTokens(event.token_count)}
                   </span>
                 ) : (

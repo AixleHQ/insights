@@ -100,7 +100,8 @@ export function toEventRow(e: ToolEvent) {
     cost_usd: e.costUsd,
     token_count: (e.inputTokens || 0) + (e.outputTokens || 0),
     created_at: e.occurredAt || e.createdAt,
-    user: e.user ? { email: e.user.email } : undefined,
+    user: e.user ? { email: e.user.email, name: e.user.name, avatarUrl: e.user.avatarUrl } : undefined,
+    suggested_user: e.suggestedUser ? { email: e.suggestedUser.email, name: e.suggestedUser.name, avatarUrl: e.suggestedUser.avatarUrl } : null,
     project: e.project ? { name: e.project.name } : undefined,
     project_id: e.project?.id,
   };

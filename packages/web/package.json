@@ -45,6 +45,7 @@
     "react-router-dom": "^7.13.0",
     "recharts": "^2.15.4",
     "rollbar": "^3.0.0",
+    "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {

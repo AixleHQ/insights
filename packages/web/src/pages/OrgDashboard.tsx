@@ -229,7 +229,7 @@ export function OrgDashboard() {
               </CardContent>
             </Card>
           ) : (
-          <MetricGrid>
+          <MetricGrid className="lg:grid-cols-4 xl:grid-cols-4">
             {isLoadingStats ? (
               <>
                 <StatCardSkeleton showDescription />

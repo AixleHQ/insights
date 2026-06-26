@@ -266,12 +266,13 @@ export interface ToolEvent {
   tokensTotal?: number | null;
   model: string | null;
   securityFindings: SecurityFinding[];
-  user: { id: string; email: string; name: string | null } | null;
+  user: { id: string; email: string; name: string | null; avatarUrl?: string | null } | null;
   project: { id: string; name: string } | null;
   createdAt: string;
   occurredAt: string;
   correlationMethod?: string | null;
   correlationConfidence?: number | null;
+  suggestedUser?: { id: string; email: string; name: string | null; avatarUrl?: string | null } | null;
   // Detail-only fields (returned by the show endpoint, not the list endpoint)
   sanitizedContent?: string | null;
   metadata?: Record<string, unknown> | null;

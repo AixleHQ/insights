@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, useParams, useSearchParams } from "react-router-dom";
+import { Toaster } from "sonner";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { OrgProvider } from "./contexts/OrgContext";
@@ -67,6 +68,7 @@ function EditProjectRedirect() {
 
 function App() {
   return (
+    <>
     <BrowserRouter>
       <ImpersonationProvider>
         <AuthProvider>
@@ -189,6 +191,8 @@ function App() {
         </AuthProvider>
       </ImpersonationProvider>
     </BrowserRouter>
+    <Toaster position="bottom-right" richColors />
+    </>
   );
 }
 

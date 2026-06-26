@@ -6649,6 +6649,25 @@ components:
           type: string
           nullable: true
           description: Git branch from event metadata (branch or branch_name key)
+        suggestedUser:
+          type: object
+          nullable: true
+          description: >
+            Candidate user resolved from metadata.candidate_user_id. Only populated on the
+            unattributed events endpoint when a candidate was identified by AttributionJob.
+          properties:
+            id:
+              type: string
+              format: uuid
+            email:
+              type: string
+              format: email
+            name:
+              type: string
+              nullable: true
+            avatarUrl:
+              type: string
+              nullable: true
         securityFindings:
           type: array
           items:
@@ -6670,6 +6689,9 @@ components:
               type: string
               format: email
             name:
+              type: string
+              nullable: true
+            avatarUrl:
               type: string
               nullable: true
         project:

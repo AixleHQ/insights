@@ -43,6 +43,7 @@ interface EventDrawerProps {
   onNavigate?: (direction: "prev" | "next") => void;
   hasPrev?: boolean;
   hasNext?: boolean;
+  onAssign?: (eventId: string) => void;
 }
 
 function DetailRow({
@@ -110,6 +111,7 @@ export function EventDrawer({
   onNavigate,
   hasPrev = false,
   hasNext = false,
+  onAssign: _onAssign,
 }: EventDrawerProps) {
   const { currentOrg, currentRole } = useOrg();
   const isOwner = canViewEventPrompt(currentRole);
@@ -215,9 +217,9 @@ export function EventDrawer({
                       label="User"
                       value={
                         event.user ? (
-                          <span>{event.user.email}</span>
+                          <span>{event.user.name || event.user.email}</span>
                         ) : (
-                          <span className="text-muted-foreground">Unknown</span>
+                          <span className="text-muted-foreground">Not assigned</span>
                         )
                       }
                     />
@@ -248,7 +250,7 @@ export function EventDrawer({
                       label="Cost"
                       value={
                         event.costUsd !== undefined ? (
-                          <span className="font-mono-display">
+                          <span className="text-sm">
                             {formatCost(event.costUsd)}
                           </span>
                         ) : (
@@ -261,7 +263,7 @@ export function EventDrawer({
                       label="Tokens"
                       value={
                         tokenCount > 0 ? (
-                          <span className="font-mono-display">
+                          <span className="text-sm">
                             {formatTokens(tokenCount)}
                           </span>
                         ) : (

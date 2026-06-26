@@ -10,6 +10,7 @@ import { EventRowSkeleton } from "@/components/ui/skeletons";
 import { ErrorState } from "@/components/ui/error-state";
 import { SortButton, type SortDirection } from "@/components/ui/sort-button";
 import { RiskBadge } from "@/components/ui/risk-badge";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { normalizeRiskLevel } from "@/lib/riskLevel";
 import { EventTypeBadge } from "@/components/ui/event-type-badge";
 import { humanizeToolName, cn } from "@/lib/utils";
@@ -28,7 +29,8 @@ export interface EventRow {
   risk_level?: "critical" | "high" | "medium" | "low" | "none";
   cost_usd?: number;
   created_at?: string;
-  user?: { email: string };
+  user?: { email: string; name?: string | null; avatarUrl?: string | null };
+  suggested_user?: { email: string; name?: string | null; avatarUrl?: string | null } | null;
   project?: { name: string };
   project_id?: string;
   token_count?: number;
@@ -82,7 +84,7 @@ export function EventsTable({
       <Table className="min-w-[800px]">
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[120px] sm:w-[140px]">
+            <TableHead className="w-[160px]">
               <SortButton
                 field="tool_name"
                 currentField={sortField}
@@ -92,10 +94,10 @@ export function EventsTable({
                 Tool
               </SortButton>
             </TableHead>
-            <TableHead className="hidden sm:table-cell w-[100px]">Type</TableHead>
-            {showUserColumn && <TableHead className="w-[150px]">User</TableHead>}
-            <TableHead className="min-w-[100px]">Project</TableHead>
-            <TableHead className="w-[80px] sm:w-[100px]">
+            <TableHead className="hidden sm:table-cell w-[120px]">Type</TableHead>
+            {showUserColumn && <TableHead className="w-[160px]">User</TableHead>}
+            <TableHead className="w-[160px]">Project</TableHead>
+            <TableHead className="w-[90px]">
               <SortButton
                 field="risk_level"
                 currentField={sortField}
@@ -105,7 +107,7 @@ export function EventsTable({
                 Risk
               </SortButton>
             </TableHead>
-            <TableHead className="w-[100px] sm:w-[120px]">
+            <TableHead className="w-[120px]">
               <SortButton
                 field="created_at"
                 currentField={sortField}
@@ -115,8 +117,8 @@ export function EventsTable({
                 Time
               </SortButton>
             </TableHead>
-            <TableHead className="hidden sm:table-cell w-[80px] text-right">Tokens</TableHead>
-            <TableHead className="w-[80px] sm:w-[100px] text-right">
+            <TableHead className="hidden sm:table-cell w-[100px]">Tokens</TableHead>
+            <TableHead className="w-[100px]">
               <SortButton
                 field="cost_usd"
                 currentField={sortField}
@@ -170,13 +172,19 @@ export function EventsTable({
                 </TableCell>
                 {showUserColumn && (
                   <TableCell>
-                    <span className="text-sm text-muted-foreground truncate max-w-[150px] block">
-                      {getEventActorLabel(event)}
-                    </span>
+                    {event.user ? (
+                      <UserAvatar name={event.user.name} email={event.user.email} avatarUrl={event.user.avatarUrl} />
+                    ) : event.suggested_user ? (
+                      <UserAvatar name={event.suggested_user.name} email={event.suggested_user.email} avatarUrl={event.suggested_user.avatarUrl} suggested />
+                    ) : event.attribution && event.attribution !== "unknown" ? (
+                      <span className="text-sm text-muted-foreground">{getEventActorLabel({ attribution: event.attribution })}</span>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                 )}
                 <TableCell>
-                  <span className="text-sm text-muted-foreground truncate max-w-[140px] block">
+                  <span className="text-sm truncate max-w-[160px] block">
                     {event.project?.name || "-"}
                   </span>
                 </TableCell>
@@ -189,13 +197,13 @@ export function EventsTable({
                     occurredAt={event.created_at}
                   />
                 </TableCell>
-                <TableCell className="hidden sm:table-cell text-right">
-                  <span className="font-mono-display text-sm text-muted-foreground">
+                <TableCell className="hidden sm:table-cell">
+                  <span className="text-sm">
                     {formatTokenCount(event.token_count)}
                   </span>
                 </TableCell>
-                <TableCell className="text-right">
-                  <span className="font-mono-display text-sm">
+                <TableCell>
+                  <span className="text-sm">
                     {formatCost(event.cost_usd)}
                   </span>
                 </TableCell>

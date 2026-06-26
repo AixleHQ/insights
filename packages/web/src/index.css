@@ -312,3 +312,21 @@
 .bg-risk-medium { background-color: oklch(from var(--risk-medium) l c h / 0.15); }
 .bg-risk-low { background-color: oklch(from var(--risk-low) l c h / 0.15); }
 .bg-risk-none { background-color: oklch(from var(--risk-none) l c h / 0.15); }
+
+.bg-et-ai      { background-color: oklch(from var(--et-ai)      l c h / 0.12); }
+.bg-et-code    { background-color: oklch(from var(--et-code)    l c h / 0.12); }
+.bg-et-quality { background-color: oklch(from var(--et-quality) l c h / 0.14); }
+.bg-et-pm      { background-color: oklch(from var(--et-pm)      l c h / 0.12); }
+.bg-et-other   { background-color: oklch(from var(--et-other)   l c h / 0.12); }
+
+.border-et-ai      { border-color: oklch(from var(--et-ai)      l c h / 0.25); }
+.border-et-code    { border-color: oklch(from var(--et-code)    l c h / 0.25); }
+.border-et-quality { border-color: oklch(from var(--et-quality) l c h / 0.30); }
+.border-et-pm      { border-color: oklch(from var(--et-pm)      l c h / 0.25); }
+.border-et-other   { border-color: oklch(from var(--et-other)   l c h / 0.25); }
+
+.text-et-ai      { color: var(--et-ai); }
+.text-et-code    { color: var(--et-code); }
+.text-et-quality { color: var(--et-quality); }
+.text-et-pm      { color: var(--et-pm); }
+.text-et-other   { color: var(--et-other); }
