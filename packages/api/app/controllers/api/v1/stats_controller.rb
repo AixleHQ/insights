@@ -526,12 +526,17 @@ module Api
 
         time_range  = parse_time_range(default_days: (params[:days] || 30).to_i)
         events      = @tool_events.where(occurred_at: time_range[:start]..time_range[:end])
-        event_types = aggregate_by_column(events, :event_type)
+        aggregated  = aggregate_by_column(events, :event_type)
+
+        existing_names = aggregated.map { |e| e[:name] }
+        all_event_types = aggregated + (ToolEvent::EVENT_TYPES - existing_names).map do |name|
+          { name: name, eventCount: 0, tokensIn: 0, tokensOut: 0, costUsd: 0.0 }
+        end
 
         render json: {
           tool:       @tool_name,
           timeRange:  { start: time_range[:start].iso8601, end: time_range[:end].iso8601 },
-          eventTypes: event_types
+          eventTypes: all_event_types
         }
       end
 

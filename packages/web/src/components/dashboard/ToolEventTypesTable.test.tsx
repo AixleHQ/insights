@@ -44,11 +44,21 @@ describe("ToolEventTypesTable", () => {
     expect(screen.getByText("12.0K")).toBeInTheDocument();
   });
 
-  it("humanizes snake_case event type names to Title Case", () => {
+  it("falls back to 'Unknown' label for unrecognized event types", () => {
     const types: ToolEventTypeStat[] = [
       { name: "tab_completion", eventCount: 10, tokensIn: 0, tokensOut: 0, costUsd: 0 },
     ];
     render(<ToolEventTypesTable eventTypes={types} isLoading={false} />);
-    expect(screen.getByText("Tab Completion")).toBeInTheDocument();
+    expect(screen.getByText("Unknown")).toBeInTheDocument();
+  });
+
+  it("hides zero-count event types from the table", () => {
+    const types: ToolEventTypeStat[] = [
+      { name: "chat", eventCount: 5, tokensIn: 100, tokensOut: 50, costUsd: 0.01 },
+      { name: "debug", eventCount: 0, tokensIn: 0, tokensOut: 0, costUsd: 0 },
+    ];
+    render(<ToolEventTypesTable eventTypes={types} isLoading={false} />);
+    expect(screen.getByText("Chat")).toBeInTheDocument();
+    expect(screen.queryByText("Debug")).not.toBeInTheDocument();
   });
 });

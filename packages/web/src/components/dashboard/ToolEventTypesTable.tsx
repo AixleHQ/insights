@@ -9,6 +9,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/error-state";
 import { formatCost, formatTokens, formatCount } from "@/lib/formatters";
+import { getEventTypeMeta } from "@/lib/event-types";
 import type { ToolEventTypeStat } from "@/lib/types";
 
 interface ToolEventTypesTableProps {
@@ -16,10 +17,6 @@ interface ToolEventTypesTableProps {
   isLoading: boolean;
   isError?: boolean;
   onRetry?: () => void;
-}
-
-function humanizeEventType(name: string): string {
-  return name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function SkeletonRow() {
@@ -68,23 +65,33 @@ export function ToolEventTypesTable({ eventTypes, isLoading, isError, onRetry }:
               </TableCell>
             </TableRow>
           ) : (
-            eventTypes.map((row) => (
-              <TableRow key={row.name}>
-                <TableCell className="font-medium">{humanizeEventType(row.name)}</TableCell>
-                <TableCell className="text-right font-mono text-sm">
-                  {formatCount(row.eventCount)}
-                </TableCell>
-                <TableCell className="hidden sm:table-cell text-right font-mono text-sm text-muted-foreground">
-                  {formatTokens(row.tokensIn)}
-                </TableCell>
-                <TableCell className="hidden sm:table-cell text-right font-mono text-sm text-muted-foreground">
-                  {formatTokens(row.tokensOut)}
-                </TableCell>
-                <TableCell className="text-right font-mono text-sm">
-                  {formatCost(row.costUsd)}
-                </TableCell>
-              </TableRow>
-            ))
+            eventTypes.filter((row) => row.eventCount > 0).map((row) => {
+              const meta = getEventTypeMeta(row.name);
+              const Icon = meta.icon;
+
+              return (
+                <TableRow key={row.name}>
+                  <TableCell className="font-medium">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Icon className="size-3.5 text-muted-foreground" />
+                      {meta.label}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm">
+                    {formatCount(row.eventCount)}
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell text-right font-mono text-sm text-muted-foreground">
+                    {formatTokens(row.tokensIn)}
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell text-right font-mono text-sm text-muted-foreground">
+                    {formatTokens(row.tokensOut)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm">
+                    {formatCost(row.costUsd)}
+                  </TableCell>
+                </TableRow>
+              );
+            })
           )}
         </TableBody>
       </Table>
