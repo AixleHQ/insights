@@ -65,41 +65,63 @@ RSpec.describe ToolEvent, type: :model do
       expect(event).not_to be_valid
     end
 
-    describe 'model format' do
+    describe 'model normalization (before_validation)' do
       it 'accepts nil model' do
         event = build(:tool_event, model: nil)
         expect(event).to be_valid
+        event.valid?
+        expect(event.model).to be_nil
       end
 
-      it 'accepts a blank model' do
+      it 'normalizes a blank model to nil' do
         event = build(:tool_event, model: "")
         expect(event).to be_valid
+        event.valid?
+        expect(event.model).to be_nil
       end
 
-      it 'accepts a valid model string' do
+      it 'keeps a valid model string unchanged' do
         event = build(:tool_event, model: "claude-sonnet-4-6")
+        event.valid?
+        expect(event.model).to eq("claude-sonnet-4-6")
         expect(event).to be_valid
       end
 
-      it 'accepts a namespaced model string' do
+      it 'keeps a namespaced model string unchanged' do
         event = build(:tool_event, model: "anthropic/claude-opus-4")
+        event.valid?
+        expect(event.model).to eq("anthropic/claude-opus-4")
         expect(event).to be_valid
       end
 
-      it 'rejects a model string containing HTML tags' do
+      it 'normalizes a model string containing HTML tags to "unknown" instead of rejecting' do
         event = build(:tool_event, model: "<script>alert(1)</script>")
-        expect(event).not_to be_valid
-        expect(event.errors[:model]).to be_present
+        expect(event).to be_valid
+        event.valid?
+        expect(event.model).to eq("unknown")
       end
 
-      it 'rejects a model string with spaces' do
+      it 'normalizes a model string with spaces to "unknown"' do
         event = build(:tool_event, model: "my model name")
-        expect(event).not_to be_valid
+        expect(event).to be_valid
+        event.valid?
+        expect(event.model).to eq("unknown")
       end
 
-      it 'rejects a model string starting with =' do
+      it 'normalizes a formula-injection model string to "unknown"' do
         event = build(:tool_event, model: "=HYPERLINK()")
-        expect(event).not_to be_valid
+        expect(event).to be_valid
+        event.valid?
+        expect(event.model).to eq("unknown")
+      end
+
+      it 'self-heals a legacy out-of-band row on save (no RecordInvalid)' do
+        event = create(:tool_event, model: "claude-sonnet-4-6")
+        event.update_columns(model: "legacy model with spaces")
+
+        reloaded = ToolEvent.find(event.id)
+        expect { reloaded.update!(tokens_in: 5) }.not_to raise_error
+        expect(reloaded.reload.model).to eq("unknown")
       end
     end
   end

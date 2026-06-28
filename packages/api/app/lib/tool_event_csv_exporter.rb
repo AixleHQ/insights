@@ -96,12 +96,15 @@ module ToolEventCsvExporter
 
   # Neutralises CSV formula-injection for values that may contain arbitrary
   # strings (e.g. model column) from legacy/pre-normalisation rows.
-  # Prefixes cells starting with = + - @ with a single quote so spreadsheet
-  # applications treat them as literals rather than formulas.
+  # Prefixes cells starting with a formula trigger (= + @ or a leading tab)
+  # with a single quote so spreadsheet applications treat them as literals.
+  # NOTE: "-" is intentionally NOT guarded — it is not a formula trigger in
+  # Excel/Sheets and prefixing it would corrupt legitimate names like
+  # "-preview-model" for any consumer that re-imports the export.
   def self.csv_safe(value)
     return value if value.nil?
 
     str = value.to_s
-    str.start_with?("=", "+", "-", "@") ? "'#{str}" : str
+    str.start_with?("=", "+", "@", "\t") ? "'#{str}" : str
   end
 end

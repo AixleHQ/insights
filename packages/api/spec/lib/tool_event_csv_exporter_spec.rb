@@ -20,12 +20,16 @@ RSpec.describe ToolEventCsvExporter do
       expect(described_class.csv_safe("+1")).to eq("'+1")
     end
 
-    it "prefixes - with a single quote" do
-      expect(described_class.csv_safe("-1+2")).to eq("'-1+2")
+    it "does NOT prefix - (not a formula trigger; would corrupt names like -preview-model)" do
+      expect(described_class.csv_safe("-preview-model")).to eq("-preview-model")
     end
 
     it "prefixes @ with a single quote" do
       expect(described_class.csv_safe("@SUM(A1)")).to eq("'@SUM(A1)")
+    end
+
+    it "prefixes a leading tab with a single quote" do
+      expect(described_class.csv_safe("\tcmd")).to eq("'\tcmd")
     end
   end
 
