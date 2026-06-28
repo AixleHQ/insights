@@ -19,13 +19,13 @@ const routeLabels: Record<string, string> = {
   events: "Events",
   projects: "Projects",
   integrations: "Integrations",
+  members: "Members",
   team: "Team",
   settings: "Settings",
   new: "New",
   invite: "Invite",
   policies: "Policies",
   alerts: "Alerts",
-  billing: "Billing",
 };
 
 function useBreadcrumbs(): BreadcrumbConfig[] {

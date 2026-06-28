@@ -3,7 +3,7 @@
 module Api
   module V1
     class OrganizationsController < BaseController
-      before_action :set_organization, only: %i[show update destroy retention_policy update_retention_policy settings update_setting destroy_setting]
+      before_action :set_organization, only: %i[show update destroy retention_policy update_retention_policy retention_preview settings update_setting destroy_setting]
 
       # GET /api/v1/organizations
       def index
@@ -33,7 +33,7 @@ module Api
         render json: {
           error: "Unprocessable Entity",
           errors: format_validation_errors(e.record.errors)
-        }, status: :unprocessable_entity
+        }, status: :unprocessable_content
       end
 
       # PATCH /api/v1/organizations/:id
@@ -59,7 +59,7 @@ module Api
           render json: {
             error: "Unprocessable Entity",
             errors: format_validation_errors(@organization.errors)
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
       end
 
@@ -72,24 +72,24 @@ module Api
 
       # GET /api/v1/organizations/:id/retention_policy
       def retention_policy
-        authorize! @organization, to: :retention_policy?
+        authorize! (@organization.retention_policy || OrganizationRetentionPolicy.new(organization: @organization)), to: :show?
         render_resource(@organization.retention_policy, OrganizationRetentionPolicySerializer)
       end
 
       # PATCH /api/v1/organizations/:id/retention_policy
       def update_retention_policy
-        authorize! @organization, to: :retention_policy?
+        authorize! (@organization.retention_policy || OrganizationRetentionPolicy.new(organization: @organization)), to: :update?
 
         policy = @organization.retention_policy || @organization.build_retention_policy
         changes_before = policy.attributes.slice(*retention_policy_params.keys)
 
         if policy.update(retention_policy_params)
-          OrganizationAuditLog.log(
+          AuditLogRetentionPolicyLogger.log!(
             organization: @organization,
             actor: current_user,
-            action: "settings.update",
-            resource: policy,
-            tracked_changes: { before: changes_before, after: policy.attributes.slice(*retention_policy_params.keys) },
+            policy: policy,
+            param_keys: retention_policy_params.keys,
+            changes_before: changes_before,
             request: request
           )
           render_resource(policy, OrganizationRetentionPolicySerializer)
@@ -97,8 +97,39 @@ module Api
           render json: {
             error: "Unprocessable Entity",
             errors: format_validation_errors(policy.errors)
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
+      end
+
+      # GET /api/v1/organizations/:id/retention_preview
+      def retention_preview
+        authorize! @organization, to: :retention_preview?
+
+        cutoff = RetentionService.retention_cutoff(@organization, :tool_events_retention)
+
+        if cutoff.nil?
+          render_resource(
+            RetentionPreviewSerializer::Payload.new(cutoff_date: nil, estimated_records: nil),
+            RetentionPreviewSerializer
+          )
+          return
+        end
+
+        estimated = begin
+          Timeout.timeout(3) do
+            ToolEvent.for_organization(@organization).before_cutoff(cutoff).count
+          end
+        rescue Timeout::Error
+          nil
+        end
+
+        render_resource(
+          RetentionPreviewSerializer::Payload.new(
+            cutoff_date: cutoff.to_date.iso8601,
+            estimated_records: estimated
+          ),
+          RetentionPreviewSerializer
+        )
       end
 
       # GET /api/v1/organizations/:id/settings
@@ -134,7 +165,7 @@ module Api
           render json: {
             error: "Unprocessable Entity",
             errors: format_validation_errors(setting.errors)
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
       end
 
@@ -160,7 +191,7 @@ module Api
       private
 
       def set_organization
-        @organization = Organization.find(params[:id])
+        @organization = Organization.includes(:retention_policy).find(params[:id])
       end
 
       def organization_params
@@ -169,7 +200,8 @@ module Api
 
       def retention_policy_params
         params.permit(:raw_event_ttl, :tool_events_retention, :hourly_aggregate_retention,
-                      :daily_aggregate_retention, :retention_reason)
+                      :daily_aggregate_retention, :retention_reason,
+                      :cost_threshold_cents, :token_threshold, :alert_enabled)
       end
     end
   end

@@ -9,6 +9,9 @@ FactoryBot.define do
     resource_id { SecureRandom.uuid }
     tracked_changes { { connector_type: "github" } }
     metadata { {} }
+    severity { "info" }
+    outcome { "success" }
+    user_agent { Faker::Internet.user_agent }
 
     trait :settings_update do
       action { "settings.update" }

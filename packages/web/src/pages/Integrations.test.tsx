@@ -1,13 +1,18 @@
+import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { Integrations } from "./Integrations";
+import { useConnectors, useToolAccounts } from "../hooks/useApi";
+
+const mockHasRole = vi.fn(() => true);
 
 vi.mock("@/contexts/OrgContext", () => ({
   useOrg: () => ({
     currentOrg: { id: "test-org-id", name: "Test Org", slug: "test-org" },
     isLoading: false,
+    hasRole: mockHasRole,
   }),
 }));
 
@@ -15,9 +20,11 @@ const mockMutateAsync = vi.fn();
 
 vi.mock("@/hooks/useApi", () => ({
   useConnectors: vi.fn(() => ({ data: [], isLoading: false })),
+  useConnectorHealth: vi.fn(() => ({ data: undefined })),
   useSyncConnector: () => ({ mutateAsync: mockMutateAsync }),
   useDeleteConnector: () => ({ mutateAsync: mockMutateAsync }),
   useTestConnector: () => ({ mutateAsync: mockMutateAsync }),
+  useUpdateConnector: () => ({ mutateAsync: mockMutateAsync }),
   useConnectWithApiKey: () => ({ mutateAsync: mockMutateAsync }),
   useConnectSlack: () => ({ mutateAsync: mockMutateAsync }),
   useToolAccounts: vi.fn(() => ({ data: [], isLoading: false })),
@@ -38,15 +45,16 @@ vi.mock("@/components/integrations/ApiKeyConnectSheet", () => ({
   ),
 }));
 
-import { useConnectors } from "@/hooks/useApi";
-
 const mockConnector = {
   id: "conn-1",
-  connector_type: "github",
+  connectorType: "gitlab",
   status: "connected" as const,
-  external_account_name: "my-org",
-  last_sync_at: null,
-  last_error: null,
+  externalAccountName: "my-org",
+  lastSyncAt: null,
+  lastError: null,
+  repositoryCount: 4,
+  syncedEventCount: 12,
+  lastEventAt: "2026-04-28T10:00:00Z",
 };
 
 function renderAt(path: string) {
@@ -63,7 +71,9 @@ function renderAt(path: string) {
 describe("Integrations", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockHasRole.mockReturnValue(true);
     vi.mocked(useConnectors).mockReturnValue({ data: [], isLoading: false } as ReturnType<typeof useConnectors>);
+    vi.mocked(useToolAccounts).mockReturnValue({ data: [], isLoading: false } as ReturnType<typeof useToolAccounts>);
   });
 
   describe("URL → active tab", () => {
@@ -152,6 +162,63 @@ describe("Integrations", () => {
 
       renderAt("/integrations/connected");
       expect(screen.getByText("my-org")).toBeInTheDocument();
+      expect(screen.getByText(/4 resources/i)).toBeInTheDocument();
+      expect(screen.getByText(/12 synced events/i)).toBeInTheDocument();
+    });
+
+    it("calls useUpdateConnector when rename is confirmed", async () => {
+      const user = userEvent.setup();
+      vi.mocked(useConnectors).mockReturnValue({
+        data: [mockConnector],
+        isLoading: false,
+      } as ReturnType<typeof useConnectors>);
+
+      renderAt("/integrations/connected");
+
+      await user.click(screen.getByRole("button", { name: /actions/i }));
+      await user.click(screen.getByRole("menuitem", { name: /rename/i }));
+      await user.clear(screen.getByLabelText(/label/i));
+      await user.type(screen.getByLabelText(/label/i), "Renamed");
+      await user.click(screen.getByRole("button", { name: /save/i }));
+
+      expect(mockMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { label: "Renamed" } }),
+      );
+    });
+
+    it("shows rename error and keeps dialog open when update fails", async () => {
+      const user = userEvent.setup();
+      mockMutateAsync.mockRejectedValueOnce(new Error("Update failed"));
+      vi.mocked(useConnectors).mockReturnValue({
+        data: [mockConnector],
+        isLoading: false,
+      } as ReturnType<typeof useConnectors>);
+
+      renderAt("/integrations/connected");
+
+      await user.click(screen.getByRole("button", { name: /actions/i }));
+      await user.click(screen.getByRole("menuitem", { name: /rename/i }));
+      await user.click(screen.getByRole("button", { name: /save/i }));
+
+      expect(await screen.findByText("Update failed")).toBeInTheDocument();
+      expect(screen.getByRole("dialog", { name: /rename/i })).toBeInTheDocument();
+    });
+
+    it("does not render personal tool accounts in Connected tab", () => {
+      vi.mocked(useToolAccounts).mockReturnValue({
+        data: [
+          {
+            id: "acct-1",
+            toolName: "cursor",
+            isActive: true,
+          },
+        ],
+        isLoading: false,
+      } as ReturnType<typeof useToolAccounts>);
+
+      renderAt("/integrations/connected");
+      expect(screen.getByText("No integrations configured")).toBeInTheDocument();
+      expect(screen.queryByText("Cursor")).not.toBeInTheDocument();
     });
   });
 
@@ -162,14 +229,61 @@ describe("Integrations", () => {
       expect(screen.getByText("Code Hosting")).toBeInTheDocument();
     });
 
-    it("does not show providers that are already connected", () => {
+    it("does not show personal tools in Available tab", () => {
+      renderAt("/integrations/available");
+      expect(screen.queryByText("Claude Code")).not.toBeInTheDocument();
+      expect(screen.queryByText("Cursor")).not.toBeInTheDocument();
+    });
+
+    it("shows OpenAI and Gemini as connectable", () => {
+      renderAt("/integrations/available");
+      expect(screen.getByText("OpenAI")).toBeInTheDocument();
+      expect(screen.getByText("Gemini")).toBeInTheDocument();
+
+      const openaiCard = screen.getByTestId("provider-card-openai");
+      expect(within(openaiCard).getByRole("button", { name: "Connect" })).toBeInTheDocument();
+
+      const geminiCard = screen.getByTestId("provider-card-gemini");
+      expect(within(geminiCard).getByRole("button", { name: "Connect" })).toBeInTheDocument();
+    });
+
+    it("still shows multi-instance providers (GitLab) even when already connected", () => {
       vi.mocked(useConnectors).mockReturnValue({
         data: [mockConnector],
         isLoading: false,
       } as ReturnType<typeof useConnectors>);
 
       renderAt("/integrations/available");
-      expect(screen.queryByText("GitHub")).not.toBeInTheDocument();
+      expect(screen.getByText("GitLab")).toBeInTheDocument();
+    });
+
+    it("hides single-instance providers (Slack) once connected", () => {
+      const slackConnector = {
+        ...mockConnector,
+        id: "conn-slack",
+        connectorType: "slack",
+      };
+      vi.mocked(useConnectors).mockReturnValue({
+        data: [slackConnector],
+        isLoading: false,
+      } as ReturnType<typeof useConnectors>);
+
+      renderAt("/integrations/available");
+      expect(screen.queryByText("Slack")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Manage Catalog button", () => {
+    it("is visible for org owners", () => {
+      mockHasRole.mockReturnValue(true);
+      renderAt("/integrations/connected");
+      expect(screen.getByRole("button", { name: /manage catalog/i })).toBeInTheDocument();
+    });
+
+    it("is not rendered for non-owners (org members)", () => {
+      mockHasRole.mockReturnValue(false);
+      renderAt("/integrations/connected");
+      expect(screen.queryByRole("button", { name: /manage catalog/i })).not.toBeInTheDocument();
     });
   });
 });

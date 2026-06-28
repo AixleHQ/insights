@@ -10,7 +10,7 @@ on:
 jobs:
   check-pricing:
     name: Check Claude pricing page for rate changes
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     permissions:
       issues: write
 
@@ -31,13 +31,20 @@ jobs:
           # These values are highly distinctive and unlikely to appear outside a
           # pricing table. If any are absent the rates have likely changed.
           # Keep this list in sync with DEFAULT_PRICING in
-          # packages/db90-claude/src/pricing.ts.
+          # packages/tools/db90-claude/src/pricing.ts.
           declare -A RATES=(
-            ["Opus output (\$75/MTok)"]="75\.00"
-            ["Opus/Haiku cache-write (\$18.75/MTok)"]="18\.75"
-            ["Sonnet cache-write (\$3.75/MTok)"]="3\.75"
+            # Claude 3 Opus (legacy) rates
+            ["Claude 3 Opus output (\$75/MTok)"]="75\.00"
+            ["Claude 3 Opus cache-write (\$18.75/MTok)"]="18\.75"
+            # Opus 4.x rates
+            ["Opus 4 input (\$5/MTok)"]="5\.00"
+            ["Opus 4 output (\$25/MTok)"]="25\.00"
+            ["Opus 4 cache-write (\$6.25/MTok)"]="6\.25"
+            # Sonnet rates
             ["Sonnet input (\$3/MTok)"]="3\.00"
-            ["Haiku input (\$0.80/MTok)"]="0\.80"
+            ["Sonnet cache-write (\$3.75/MTok)"]="3\.75"
+            # Haiku 3.5 rates
+            ["Haiku 3.5 input (\$0.80/MTok)"]="0\.80"
           )
 
           for label in "${!RATES[@]}"; do
@@ -82,7 +89,7 @@ jobs:
         run: |
           gh issue create \
             --repo "${{ github.repository }}" \
-            --title "Claude pricing may have changed — update packages/db90-claude/src/pricing.ts" \
+            --title "Claude pricing may have changed — update packages/tools/db90-claude/src/pricing.ts" \
             --label "pricing" \
             --body "The weekly pricing monitor detected that one or more expected rate values are no longer present on the [Claude pricing page](https://platform.claude.com/docs/en/about-claude/pricing).
 
@@ -90,7 +97,7 @@ jobs:
           ${{ steps.check.outputs.missing }}
 
           **Action required:**
-          1. Open [packages/db90-claude/src/pricing.ts](https://github.com/${{ github.repository }}/blob/develop/packages/db90-claude/src/pricing.ts)
+          1. Open [packages/tools/db90-claude/src/pricing.ts](https://github.com/${{ github.repository }}/blob/develop/packages/tools/db90-claude/src/pricing.ts)
           2. Compare \`DEFAULT_PRICING\` entries against the current [Claude pricing page](https://platform.claude.com/docs/en/about-claude/pricing)
           3. Update any rates that have changed
           4. Bump the \`Rates last verified\` date at the top of the file

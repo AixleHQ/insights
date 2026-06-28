@@ -5,7 +5,7 @@ module Oauth
     API_URL = "https://api.atlassian.com"
 
     def test_connection
-      # First get accessible resources (cloud instances)
+      ensure_fresh_token!
       response = http_client.get("#{API_URL}/oauth/token/accessible-resources")
 
       if response.success?
@@ -73,8 +73,8 @@ module Oauth
         assignee_account_id: fields.dig("assignee", "accountId"),
         assignee_name:       fields.dig("assignee", "displayName"),
         reporter_name:       fields.dig("reporter", "displayName"),
-        jira_project_key:    fields.dig("project", "key"),
-        jira_project_id:     fields.dig("project", "id"),
+        provider_project_key: fields.dig("project", "key"),
+        provider_project_id:  fields.dig("project", "id"),
         parent_key:          fields.dig("parent", "key"),
         labels:              fields["labels"] || [],
         due_date:            fields["duedate"],

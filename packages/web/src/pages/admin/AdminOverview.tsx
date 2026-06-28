@@ -50,7 +50,7 @@ function StatCard({
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
+        <CardTitle className="type-label text-muted-foreground">
           {title}
         </CardTitle>
         <Icon className="size-4 text-muted-foreground" />
@@ -63,11 +63,11 @@ function StatCard({
           </div>
         ) : (
           <>
-            <div className="text-2xl font-bold">
+            <div className="type-h2">
               {format === "currency" ? formatCurrency(value) : formatNumber(value)}
             </div>
             {subValue && (
-              <p className="text-xs text-muted-foreground">{subValue}</p>
+              <p className="type-caption text-muted-foreground">{subValue}</p>
             )}
           </>
         )}
@@ -127,7 +127,7 @@ export function AdminOverview() {
         {/* Quick actions */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Quick Actions</CardTitle>
+            <CardTitle className="type-body-lg">Quick Actions</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-2">
             <Button variant="outline" className="justify-start" asChild>
@@ -164,7 +164,7 @@ export function AdminOverview() {
         {/* Recent activity */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base">Recent Activity</CardTitle>
+            <CardTitle className="type-body-lg">Recent Activity</CardTitle>
             <Button variant="ghost" size="sm" asChild>
               <Link to="/admin/activity">View All</Link>
             </Button>

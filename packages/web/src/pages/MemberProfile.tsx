@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -8,7 +8,6 @@ import {
   Activity,
   Code2,
   TrendingUp,
-  Shield,
   ShieldCheck,
   User,
   Eye,
@@ -24,6 +23,13 @@ import {
 import { useOrg } from "@/contexts/OrgContext";
 import { useMember, useMemberEvents, useMemberStats, useProject, useEvents } from "@/hooks/useApi";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -37,17 +43,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { EventsTable, type EventRow } from "@/components/events";
+import { EventsTable, EventDrawer, type EventRow } from "@/components/events";
 import { ActivityHeatmap } from "@/components/dashboard";
 import { SortButton, type SortDirection } from "@/components/ui/sort-button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn, humanizeToolName, toEventRow } from "@/lib/utils";
+import { formatTokens } from "@/lib/formatters";
 
-type MemberRole = "owner" | "admin" | "member" | "viewer";
+type MemberRole = "owner" | "member" | "viewer";
 
-const roleConfig: Record<MemberRole, { label: string; icon: typeof Shield; color: string; bg: string }> = {
+const roleConfig: Record<MemberRole, { label: string; icon: typeof ShieldCheck; color: string; bg: string }> = {
   owner: { label: "Owner", icon: ShieldCheck, color: "text-violet-400", bg: "bg-violet-500/10" },
-  admin: { label: "Admin", icon: Shield, color: "text-amber-400", bg: "bg-amber-500/10" },
   member: { label: "Member", icon: User, color: "text-blue-400", bg: "bg-blue-500/10" },
   viewer: { label: "Viewer", icon: Eye, color: "text-slate-400", bg: "bg-slate-500/10" },
 };
@@ -64,15 +70,15 @@ function getInitials(name?: string | null, email?: string): string {
   return email?.slice(0, 2).toUpperCase() || "U";
 }
 
-function formatTokens(tokens: number): string {
-  if (tokens >= 1_000_000) {
-    return `${(tokens / 1_000_000).toFixed(2)}M`;
-  }
-  if (tokens >= 1_000) {
-    return `${(tokens / 1_000).toFixed(1)}K`;
-  }
-  return tokens.toLocaleString();
-}
+type EventSortField = "created_at" | "tool_name" | "risk_level" | "cost_usd";
+
+const riskOrder: Record<string, number> = {
+  critical: 4,
+  high: 3,
+  medium: 2,
+  low: 1,
+  none: 0,
+};
 
 function StatCard({
   title,
@@ -90,14 +96,14 @@ function StatCard({
   return (
     <Card className={cn("relative overflow-hidden", className)}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        <CardTitle className="type-label text-muted-foreground">{title}</CardTitle>
         <div className="flex size-8 items-center justify-center rounded-md bg-muted">
           <Icon className="size-4 text-muted-foreground" />
         </div>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold tracking-tight">{value}</div>
-        {subtitle && <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>}
+        <div className="type-h1">{value}</div>
+        {subtitle && <p className="mt-1 type-caption text-muted-foreground">{subtitle}</p>}
       </CardContent>
     </Card>
   );
@@ -148,6 +154,23 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
   const [modelSortField, setModelSortField] = useState<ModelSortField>("tokens");
   const [modelSortDirection, setModelSortDirection] = useState<SortDirection>("desc");
 
+  // Recent Activity sorting state
+  const [eventSortField, setEventSortField] = useState<EventSortField>("created_at");
+  const [eventSortDirection, setEventSortDirection] = useState<SortDirection>("desc");
+
+  // Project commits sorting state
+  const [commitSortField, setCommitSortField] = useState<EventSortField>("created_at");
+  const [commitSortDirection, setCommitSortDirection] = useState<SortDirection>("desc");
+
+  // Event detail drawer state
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const handleEventClick = useCallback((eventId: string) => {
+    setSelectedEventId(eventId);
+    setDrawerOpen(true);
+  }, []);
+
   const { data: member, isLoading: memberLoading } = useMember(currentOrg?.id || "", memberId);
   const { data: statsData } = useMemberStats(currentOrg?.id || "", memberId);
   const { data: eventsResponse, isLoading: eventsLoading } = useMemberEvents(
@@ -157,11 +180,12 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
   );
 
   const [projectCommitsPage, setProjectCommitsPage] = useState(1);
+  const [projectCommitsPageSize, setProjectCommitsPageSize] = useState(20);
 
   const { data: projectData } = useProject(projectId || "");
   const { data: projectCommitsResponse, isLoading: projectCommitsLoading } = useEvents(
     currentOrg?.id || "",
-    { user_id: member?.user_id, project_id: projectId, event_type: "commit", per_page: 20, page: projectCommitsPage },
+    { user_id: member?.user_id, project_id: projectId, event_type: "commit", per_page: projectCommitsPageSize, page: projectCommitsPage },
     { enabled: !!projectId && !!member?.user_id }
   );
 
@@ -174,6 +198,56 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
     () => projectCommitsResponse?.data?.map(toEventRow) ?? [],
     [projectCommitsResponse]
   );
+
+  const sortedEvents: EventRow[] = useMemo(() => {
+    return [...events].sort((a, b) => {
+      let comparison = 0;
+      switch (eventSortField) {
+        case "created_at":
+          comparison =
+            new Date(a.created_at || 0).getTime() -
+            new Date(b.created_at || 0).getTime();
+          break;
+        case "tool_name":
+          comparison = (a.tool_name || "").localeCompare(b.tool_name || "");
+          break;
+        case "risk_level":
+          comparison =
+            (riskOrder[a.risk_level || "none"] ?? 0) -
+            (riskOrder[b.risk_level || "none"] ?? 0);
+          break;
+        case "cost_usd":
+          comparison = (a.cost_usd || 0) - (b.cost_usd || 0);
+          break;
+      }
+      return eventSortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [events, eventSortField, eventSortDirection]);
+
+  const sortedProjectCommits: EventRow[] = useMemo(() => {
+    return [...projectCommits].sort((a, b) => {
+      let comparison = 0;
+      switch (commitSortField) {
+        case "created_at":
+          comparison =
+            new Date(a.created_at || 0).getTime() -
+            new Date(b.created_at || 0).getTime();
+          break;
+        case "tool_name":
+          comparison = (a.tool_name || "").localeCompare(b.tool_name || "");
+          break;
+        case "risk_level":
+          comparison =
+            (riskOrder[a.risk_level || "none"] ?? 0) -
+            (riskOrder[b.risk_level || "none"] ?? 0);
+          break;
+        case "cost_usd":
+          comparison = (a.cost_usd || 0) - (b.cost_usd || 0);
+          break;
+      }
+      return commitSortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [projectCommits, commitSortField, commitSortDirection]);
 
   const handleToolSort = (field: ToolSortField) => {
     if (toolSortField === field) {
@@ -190,6 +264,24 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
     } else {
       setModelSortField(field);
       setModelSortDirection("desc");
+    }
+  };
+
+  const handleEventSort = (field: EventSortField) => {
+    if (eventSortField === field) {
+      setEventSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setEventSortField(field);
+      setEventSortDirection("desc");
+    }
+  };
+
+  const handleCommitSort = (field: EventSortField) => {
+    if (commitSortField === field) {
+      setCommitSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setCommitSortField(field);
+      setCommitSortDirection("desc");
     }
   };
 
@@ -263,7 +355,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
       <div className="flex flex-col items-center justify-center py-12">
         <p className="text-muted-foreground">Member not found</p>
         <Button asChild variant="link" className="mt-2">
-          <Link to="/settings/members">
+          <Link to="/members">
             <ArrowLeft className="mr-2 size-4" />
             Back to team
           </Link>
@@ -275,8 +367,9 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
   const role = roleConfig[(member.role as MemberRole) || "member"];
   const RoleIcon = role.icon;
 
-  const formattedJoinDate = member.created_at
-    ? new Date(member.created_at).toLocaleDateString("en-US", {
+  const joinDateRaw = member.createdAt;
+  const formattedJoinDate = joinDateRaw
+    ? new Date(joinDateRaw).toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
         year: "numeric",
@@ -290,7 +383,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-3 sm:gap-4">
             <Button asChild variant="ghost" size="icon" className="shrink-0">
-              <Link to="/settings/members">
+              <Link to="/members">
                 <ArrowLeft className="size-4" />
               </Link>
             </Button>
@@ -367,36 +460,36 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Tokens In</CardTitle>
+            <CardTitle className="type-label text-muted-foreground">Tokens In</CardTitle>
             <ArrowDownToLine className="size-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold tracking-tight font-mono">
+            <div className="type-h1 font-mono">
               {formatTokens(stats.tokens?.total_in || 0)}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">Input tokens (prompts)</p>
+            <p className="mt-1 type-caption text-muted-foreground">Input tokens (prompts)</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Tokens Out</CardTitle>
-            <ArrowUpFromLine className="size-4 text-emerald-500" />
+            <CardTitle className="type-label text-muted-foreground">Tokens Out</CardTitle>
+            <ArrowUpFromLine className="size-4 text-success" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold tracking-tight font-mono">
+            <div className="type-h1 font-mono">
               {formatTokens(stats.tokens?.total_out || 0)}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">Output tokens (completions)</p>
+            <p className="mt-1 type-caption text-muted-foreground">Output tokens (completions)</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Today's Activity</CardTitle>
+            <CardTitle className="type-label text-muted-foreground">Today's Activity</CardTitle>
             <TrendingUp className="size-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold tracking-tight">{stats.events_today}</div>
-            <p className="mt-1 text-xs text-muted-foreground">Events today</p>
+            <div className="type-h1">{stats.events_today}</div>
+            <p className="mt-1 type-caption text-muted-foreground">Events today</p>
           </CardContent>
         </Card>
       </div>
@@ -406,7 +499,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
         {/* Tool Usage with Token Breakdown */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
+            <CardTitle className="flex items-center gap-2 type-body-lg">
               <Layers className="size-4" />
               Tool Usage
             </CardTitle>
@@ -468,7 +561,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm">
                         <div>{formatTokens(tool.tokens_total)}</div>
-                        <div className="text-xs text-muted-foreground">
+                        <div className="type-caption text-muted-foreground">
                           {formatTokens(tool.tokens_in)} / {formatTokens(tool.tokens_out)}
                         </div>
                       </TableCell>
@@ -488,7 +581,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
         {/* Model Usage with Pricing */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
+            <CardTitle className="flex items-center gap-2 type-body-lg">
               <Code2 className="size-4" />
               Model Usage
             </CardTitle>
@@ -539,7 +632,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
                       <TableCell className="text-right font-mono text-sm">
                         {formatTokens(model.tokens_total)}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                      <TableCell className="text-right font-mono type-caption text-muted-foreground">
                         <div>${model.price_per_million_input} in</div>
                         <div>${model.price_per_million_output} out</div>
                       </TableCell>
@@ -562,7 +655,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
         {/* Projects */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
+            <CardTitle className="flex items-center gap-2 type-body-lg">
               <Folder className="size-4" />
               Projects
             </CardTitle>
@@ -593,7 +686,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
         {/* Organizations */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
+            <CardTitle className="flex items-center gap-2 type-body-lg">
               <Building2 className="size-4" />
               Organizations
             </CardTitle>
@@ -624,7 +717,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
         {/* Connected Tools */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
+            <CardTitle className="flex items-center gap-2 type-body-lg">
               <Plug className="size-4" />
               Connected Tools
             </CardTitle>
@@ -641,11 +734,18 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
                     <div>
                       <div className="font-medium text-sm">{humanizeToolName(account.tool_name)}</div>
                       {account.external_username && (
-                        <div className="text-xs text-muted-foreground">@{account.external_username}</div>
+                        <div className="type-caption text-muted-foreground">@{account.external_username}</div>
                       )}
                     </div>
-                    <Badge variant={account.is_active ? "default" : "secondary"} className="text-xs">
-                      {account.is_active ? "Active" : "Inactive"}
+                    <Badge
+                      variant={account.connection_state === "active" ? "default" : "secondary"}
+                      className="text-xs"
+                    >
+                      {account.connection_state === "waiting_for_connection"
+                        ? "Setup required"
+                        : account.connection_state === "active"
+                          ? "Active"
+                          : "Inactive"}
                     </Badge>
                   </div>
                 ))}
@@ -661,17 +761,22 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div>
-            <CardTitle className="text-base">Recent Activity</CardTitle>
+            <CardTitle className="type-body-lg">Recent Activity</CardTitle>
             <CardDescription>Latest events from this team member</CardDescription>
           </div>
           <Button asChild variant="outline" size="sm">
-            <Link to={`/events?user_id=${member.user_id}`}>View all</Link>
+            <Link to={`/events?user_id=${member.user.id}`}>View all</Link>
           </Button>
         </CardHeader>
         <CardContent className="px-0 pb-0">
           <EventsTable
-            events={events}
+            events={sortedEvents}
             isLoading={eventsLoading}
+            sortField={eventSortField}
+            sortDirection={eventSortDirection}
+            onSort={handleEventSort}
+            onEventClick={handleEventClick}
+            selectedEventId={selectedEventId}
             className="border-0 rounded-none"
           />
         </CardContent>
@@ -680,7 +785,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
       {projectId && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
+            <CardTitle className="flex items-center gap-2 type-body-lg">
               <GitCommitHorizontal className="size-4" />
               Commits in {projectData?.name ?? "Project"}
             </CardTitle>
@@ -690,36 +795,67 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
           </CardHeader>
           <CardContent className="px-0 pb-0">
             <EventsTable
-              events={projectCommits}
+              events={sortedProjectCommits}
               isLoading={projectCommitsLoading}
+              sortField={commitSortField}
+              sortDirection={commitSortDirection}
+              onSort={handleCommitSort}
+              onEventClick={handleEventClick}
+              selectedEventId={selectedEventId}
               className="border-0 rounded-none"
             />
             {projectCommitsResponse?.meta && projectCommitsResponse.meta.total_pages > 1 && (
-              <div className="flex items-center justify-end gap-2 px-6 py-3 text-sm text-muted-foreground">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setProjectCommitsPage((p) => Math.max(1, p - 1))}
-                  disabled={projectCommitsPage === 1}
-                >
-                  Previous
-                </Button>
-                <span className="text-xs">
-                  Page {projectCommitsPage} of {projectCommitsResponse.meta.total_pages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setProjectCommitsPage((p) => Math.min(projectCommitsResponse.meta.total_pages, p + 1))}
-                  disabled={projectCommitsPage === projectCommitsResponse.meta.total_pages}
-                >
-                  Next
-                </Button>
+              <div className="flex items-center justify-between px-6 py-3 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={String(projectCommitsPageSize)}
+                    onValueChange={(v) => {
+                      setProjectCommitsPageSize(Number(v));
+                      setProjectCommitsPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-auto">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[10, 25, 50, 100].map((n) => (
+                        <SelectItem key={n} value={String(n)}>{n} / page</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setProjectCommitsPage((p) => Math.max(1, p - 1))}
+                    disabled={projectCommitsPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-xs">
+                    Page {projectCommitsPage} of {projectCommitsResponse.meta.total_pages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setProjectCommitsPage((p) => Math.min(projectCommitsResponse.meta.total_pages, p + 1))}
+                    disabled={projectCommitsPage === projectCommitsResponse.meta.total_pages}
+                  >
+                    Next
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>
         </Card>
       )}
+
+      <EventDrawer
+        eventId={selectedEventId}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+      />
     </div>
   );
 }

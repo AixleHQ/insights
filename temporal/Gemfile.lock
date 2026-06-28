@@ -76,6 +76,7 @@ GEM
       tsort
     reline (0.6.3)
       io-console (~> 0.5)
+    rexml (3.4.4)
     rspec (3.13.2)
       rspec-core (~> 3.13.0)
       rspec-expectations (~> 3.13.0)
@@ -130,6 +131,7 @@ DEPENDENCIES
   aws-sdk-s3
   concurrent-ruby
   debug
+  rexml
   rspec
   temporalio
 

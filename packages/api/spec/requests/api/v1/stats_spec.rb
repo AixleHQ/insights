@@ -41,15 +41,254 @@ RSpec.describe 'Api::V1::Stats', type: :request do
       expect(json_response[:total_events]).to be_a(Integer)
       expect(json_response[:total_cost_usd]).to be_a(Numeric)
       expect(json_response[:active_users]).to be_a(Integer)
-      expect(json_response[:high_risk_events]).to be_a(Integer)
+      expect(json_response[:risk_alerts]).to be_a(Integer)
       expect(json_response[:events_change_percent]).to be_a(Numeric)
       expect(json_response[:cost_change_percent]).to be_a(Numeric)
+    end
+
+    it 'scopes by project_id when provided' do
+      project = create(:project, organization: organization)
+      create(:tool_event, organization: organization, project: project, user: user,
+             tool_name: 'claude_code', cost_usd: 1.5, occurred_at: Time.current)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/overview",
+                        user: user,
+                        organization: organization,
+                        params: { project_id: project.id }
+
+      expect_success
+      expect(json_response[:risk_alerts]).to be_a(Integer)
+    end
+
+    it 'returns 404 for project_id belonging to another org' do
+      other_org = create(:organization)
+      other_project = create(:project, organization: other_org)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/overview",
+                        user: user,
+                        organization: organization,
+                        params: { project_id: other_project.id }
+
+      expect(response).to have_http_status(:not_found)
     end
 
     it 'returns 403 for non-members' do
       non_member = create(:user)
 
       authenticated_get "/api/v1/organizations/#{organization.id}/stats/overview",
+                        user: non_member,
+                        organization: organization
+
+      expect_forbidden
+    end
+
+    it 'defaults overview to current calendar month when month is not provided' do
+      org = create(:organization)
+      member = create(:user)
+      create(:organization_membership, user: member, organization: org, role: "member")
+
+      travel_to(Time.zone.parse("2026-03-10 12:00:00")) do
+        create(:tool_event, organization: org, user: member, occurred_at: Time.zone.parse("2026-02-20 09:00:00"))
+        create(:tool_event, organization: org, user: member, occurred_at: Time.zone.parse("2026-03-05 09:00:00"))
+
+        authenticated_get "/api/v1/organizations/#{org.id}/stats/overview",
+                          user: member,
+                          organization: org
+      end
+
+      expect_success
+      expect(json_response[:total_events]).to eq(1)
+    end
+
+    it 'returns 400 for invalid month format' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/overview",
+                        user: user,
+                        organization: organization,
+                        params: { month: "2026-13" }
+
+      expect(response).to have_http_status(:bad_request)
+      expect(json_response[:message]).to eq("Invalid month format — expected YYYY-MM")
+    end
+
+    context 'with ?month= param' do
+      it 'scopes stats to the given calendar month' do
+        create(:tool_event, organization: organization, user: user,
+               cost_usd: 9.99, occurred_at: 2.months.ago)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/overview",
+                          user: user,
+                          organization: organization,
+                          params: { month: 2.months.ago.strftime("%Y-%m") }
+
+        expect_success
+        expect(json_response[:total_events]).to eq(1)
+        expect(json_response[:total_cost_usd]).to be_within(0.01).of(9.99)
+      end
+
+      it 'counts active_users within the given month (not rolling 7 days)' do
+        create(:tool_event, organization: organization, user: user,
+               occurred_at: 2.months.ago)
+        other_user = create(:user)
+        create(:organization_membership, user: other_user, organization: organization)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/overview",
+                          user: user,
+                          organization: organization,
+                          params: { month: 2.months.ago.strftime("%Y-%m") }
+
+        expect_success
+        expect(json_response[:active_users]).to eq(1)
+      end
+
+      it 'compares selected month trends against the previous month' do
+        target_month = 2.months.ago
+        previous_month = target_month.prev_month
+
+        create(:tool_event, organization: organization, user: user,
+               cost_usd: 5.0, occurred_at: target_month.beginning_of_month + 1.day)
+        create(:tool_event, organization: organization, user: user,
+               cost_usd: 5.0, occurred_at: target_month.beginning_of_month + 2.days)
+        create(:tool_event, organization: organization, user: user,
+               cost_usd: 5.0, occurred_at: previous_month.beginning_of_month + 1.day)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/overview",
+                          user: user,
+                          organization: organization,
+                          params: { month: target_month.strftime("%Y-%m") }
+
+        expect_success
+        expect(json_response[:events_change_percent]).to eq(100.0)
+        expect(json_response[:cost_change_percent]).to eq(100.0)
+      end
+    end
+
+    context 'with all_time=true' do
+      it 'returns unbounded totals with nil change_percents' do
+        create(:tool_event, organization: organization, user: user,
+               cost_usd: 2.0, occurred_at: 6.months.ago)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/overview",
+                          user: user,
+                          organization: organization,
+                          params: { all_time: true }
+
+        expect_success
+        expect(json_response[:total_events]).to be_a(Integer)
+        expect(json_response[:total_cost_usd]).to be_a(Numeric)
+        expect(json_response[:events_change_percent]).to be_nil
+        expect(json_response[:cost_change_percent]).to be_nil
+      end
+
+      it 'scopes to project_id when combined with all_time=true' do
+        project = create(:project, organization: organization)
+        create(:tool_event, organization: organization, project: project, user: user,
+               cost_usd: 3.0, occurred_at: 1.year.ago)
+        other_event_count = organization.tool_events.count
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/overview",
+                          user: user,
+                          organization: organization,
+                          params: { all_time: true, project_id: project.id }
+
+        expect_success
+        expect(json_response[:total_events]).to be < other_event_count
+      end
+    end
+  end
+
+  describe 'GET /api/v1/organizations/:organization_id/stats/active_users' do
+    it 'returns the active user count for the default 7-day window' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/active_users",
+                        user: user,
+                        organization: organization
+
+      expect_success
+      expect(json_response[:active_users]).to eq(1)
+      expect(json_response[:timeRange][:start]).to be_present
+      expect(json_response[:timeRange][:end]).to be_present
+    end
+
+    it 'ignores the month filter and stays on the rolling window (AIX-446)' do
+      # An event two months ago must not count toward the 7-day window even
+      # though the month param would otherwise select it.
+      old_user = create(:user)
+      create(:organization_membership, user: old_user, organization: organization)
+      create(:tool_event, organization: organization, user: old_user, occurred_at: 2.months.ago)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/active_users",
+                        user: user,
+                        organization: organization,
+                        params: { month: 2.months.ago.strftime("%Y-%m") }
+
+      expect_success
+      # Only the current-week user (from the top-level before block) is counted.
+      expect(json_response[:active_users]).to eq(1)
+    end
+
+    it 'returns 400 for days=0' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/active_users",
+                        user: user,
+                        organization: organization,
+                        params: { days: 0 }
+
+      expect(response).to have_http_status(:bad_request)
+    end
+
+    it 'returns 400 for days exceeding the maximum' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/active_users",
+                        user: user,
+                        organization: organization,
+                        params: { days: 366 }
+
+      expect(response).to have_http_status(:bad_request)
+    end
+
+    it 'honours a custom days window' do
+      old_user = create(:user)
+      create(:organization_membership, user: old_user, organization: organization)
+      create(:tool_event, organization: organization, user: old_user, occurred_at: 20.days.ago)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/active_users",
+                        user: user,
+                        organization: organization,
+                        params: { days: 30 }
+
+      expect_success
+      expect(json_response[:active_users]).to eq(2)
+    end
+
+    it 'scopes to project_id when provided' do
+      project = create(:project, organization: organization)
+      project_user = create(:user)
+      create(:organization_membership, user: project_user, organization: organization)
+      create(:tool_event, organization: organization, project: project, user: project_user,
+             occurred_at: Time.current)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/active_users",
+                        user: user,
+                        organization: organization,
+                        params: { project_id: project.id }
+
+      expect_success
+      expect(json_response[:active_users]).to eq(1)
+    end
+
+    it 'returns 404 for project_id belonging to another org' do
+      other_org = create(:organization)
+      other_project = create(:project, organization: other_org)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/active_users",
+                        user: user,
+                        organization: organization,
+                        params: { project_id: other_project.id }
+
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it 'returns 403 for non-members' do
+      non_member = create(:user)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/active_users",
                         user: non_member,
                         organization: organization
 
@@ -93,6 +332,81 @@ RSpec.describe 'Api::V1::Stats', type: :request do
                         }
 
       expect_success
+    end
+
+    context 'with month= param' do
+      it 'returns daily rows scoped to that calendar month' do
+        target_month = 2.months.ago.beginning_of_month
+        create(:tool_event, organization: organization, user: user,
+               cost_usd: 5.0, occurred_at: target_month + 5.days)
+        create(:tool_event, organization: organization, user: user,
+               cost_usd: 3.0, occurred_at: 6.months.ago)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/daily",
+                          user: user,
+                          organization: organization,
+                          params: { month: target_month.strftime("%Y-%m") }
+
+        expect_success
+        dates = json_response[:data].map { |r| Date.parse(r[:date]) }
+        expect(dates).to all(be >= target_month.to_date)
+        expect(dates).to all(be <= target_month.end_of_month.to_date)
+        total_cost = json_response[:data].sum { |r| r[:cost_usd] }
+        expect(total_cost).to be_within(0.01).of(5.0)
+      end
+
+      it 'scopes to project_id when provided' do
+        project = create(:project, organization: organization)
+        project_event = create(:tool_event, organization: organization, user: user,
+                               project: project, cost_usd: 7.0,
+                               occurred_at: Date.current.beginning_of_month + 1.day)
+        create(:tool_event, organization: organization, user: user,
+               cost_usd: 2.0, occurred_at: Date.current.beginning_of_month + 2.days)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/daily",
+                          user: user,
+                          organization: organization,
+                          params: { month: Date.current.strftime("%Y-%m"), project_id: project.id }
+
+        expect_success
+        total_cost = json_response[:data].sum { |r| r[:cost_usd] }
+        expect(total_cost).to be_within(0.01).of(project_event.cost_usd)
+      end
+    end
+
+    context 'with all_time=true and period=month' do
+      it 'returns monthly-bucketed rows without zero-fill' do
+        create(:tool_event, organization: organization, user: user,
+               cost_usd: 1.0, occurred_at: 3.months.ago)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/daily",
+                          user: user,
+                          organization: organization,
+                          params: { all_time: true, period: "month" }
+
+        expect_success
+        expect(json_response[:data]).to be_an(Array)
+        expect(json_response[:tool_breakdown]).to be_an(Array)
+        # Should have sparse data only (no zero-filled months)
+        expect(json_response[:data].length).to be < 13
+      end
+
+      it 'scopes to project_id when provided' do
+        project = create(:project, organization: organization)
+        create(:tool_event, organization: organization, user: user,
+               project: project, cost_usd: 9.0, occurred_at: 1.month.ago)
+        create(:tool_event, organization: organization, user: user,
+               cost_usd: 2.0, occurred_at: 1.month.ago)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/daily",
+                          user: user,
+                          organization: organization,
+                          params: { all_time: true, period: "month", project_id: project.id }
+
+        expect_success
+        total_cost = json_response[:data].sum { |r| r[:cost_usd] }
+        expect(total_cost).to be_within(0.01).of(9.0)
+      end
     end
   end
 
@@ -145,6 +459,75 @@ RSpec.describe 'Api::V1::Stats', type: :request do
                         params: { days: 7 }
 
       expect_success
+    end
+
+    it 'accepts period=week and month params' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/daily_by_tool",
+                        user: user,
+                        organization: organization,
+                        params: { period: 'week', month: Time.current.strftime('%Y-%m') }
+
+      expect_success
+      expect(json_response[:data]).to be_an(Array)
+      expect(json_response[:tools]).to be_an(Array)
+    end
+
+    it 'accepts period=month and returns monthly buckets' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/daily_by_tool",
+                        user: user,
+                        organization: organization,
+                        params: { period: 'month', days: 365 }
+
+      expect_success
+      expect(json_response[:data]).to be_an(Array)
+      expect(json_response[:tools]).to be_an(Array)
+      expect(json_response[:period]).to eq('month')
+    end
+
+    it 'zero-fills the full monthly range when period=month' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/daily_by_tool",
+                        user: user,
+                        organization: organization,
+                        params: { period: 'month', days: 365 }
+
+      expect_success
+      dates = json_response[:data].map { |d| d[:date] }
+      # All dates should be the 1st of their respective months
+      dates.each do |d|
+        expect(Date.parse(d).day).to eq(1)
+      end
+      # Should span approximately 12 months (±1 for boundaries)
+      expect(dates.length).to be_between(12, 14)
+    end
+
+    it 'scopes by project_id' do
+      project = create(:project, organization: organization)
+      create(:tool_event, organization: organization, project: project, user: user,
+             tool_name: 'claude_code', occurred_at: Time.current)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/daily_by_tool",
+                        user: user,
+                        organization: organization,
+                        params: { project_id: project.id }
+
+      expect_success
+    end
+
+    context 'with all_time=true' do
+      it 'returns monthly-bucketed aggregated rows without zero-fill' do
+        create(:tool_event, organization: organization, user: user,
+               tool_name: 'claude_code', occurred_at: 4.months.ago)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/daily_by_tool",
+                          user: user,
+                          organization: organization,
+                          params: { all_time: true }
+
+        expect_success
+        expect(json_response[:data]).to be_an(Array)
+        expect(json_response[:tools]).to be_an(Array)
+        expect(json_response[:period]).to eq("month")
+      end
     end
   end
 
@@ -549,7 +932,7 @@ RSpec.describe 'Api::V1::Stats', type: :request do
                           user: user,
                           organization: organization
 
-        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response).to have_http_status(:unprocessable_content)
         expect(json_response[:error]).to eq('Unknown tool: invalid')
       end
 
@@ -627,14 +1010,14 @@ RSpec.describe 'Api::V1::Stats', type: :request do
       expect(json_response[:tool]).to eq("claude_code")
     end
 
-    it "returns 31 entries for the default 30-day range" do
+    it "returns 30 entries for the default 30-day range" do
       travel_to(frozen_time) do
         authenticated_get path, user: user, organization: organization
       end
 
       expect_success
-      # 30.days.ago.beginning_of_day (Mar 16) to Time.current (Apr 15) inclusive = 31 days
-      expect(json_response[:daily].length).to eq(31)
+      # (30-1).days.ago.beginning_of_day (Mar 17) to Time.current (Apr 15) inclusive = 30 days
+      expect(json_response[:daily].length).to eq(30)
     end
 
     it "supports ?start_date= / ?end_date= params" do
@@ -695,8 +1078,8 @@ RSpec.describe 'Api::V1::Stats', type: :request do
       end
 
       expect_success
-      # 7 days back from Apr 8 to Apr 15 inclusive = 8 entries
-      expect(json_response[:daily].length).to eq(8)
+      # (7-1) days back from Apr 9 to Apr 15 inclusive = 7 entries
+      expect(json_response[:daily].length).to eq(7)
     end
 
     it "returns 403 for non-members" do
@@ -779,6 +1162,20 @@ RSpec.describe 'Api::V1::Stats', type: :request do
       expect(chat[:eventCount]).to eq(2)
     end
 
+    it "returns all defined event types including those with zero events" do
+      travel_to(frozen_time) { authenticated_get path, user: user, organization: organization }
+
+      expect_success
+      names = json_response[:eventTypes].map { |e| e[:name] }
+      expect(names).to match_array(ToolEvent::EVENT_TYPES)
+
+      zero_type = json_response[:eventTypes].find { |e| e[:name] == "debug" }
+      expect(zero_type[:eventCount]).to eq(0)
+      expect(zero_type[:tokensIn]).to eq(0)
+      expect(zero_type[:tokensOut]).to eq(0)
+      expect(zero_type[:costUsd]).to eq(0.0)
+    end
+
     it "supports ?days= param" do
       travel_to(frozen_time) do
         authenticated_get path, user: user, organization: organization, params: { days: 7 }
@@ -835,6 +1232,214 @@ RSpec.describe 'Api::V1::Stats', type: :request do
       expect_success
       expect(json_response.first).to have_key(:date)
       expect(json_response.first).to have_key(:count)
+    end
+  end
+
+  describe 'GET /api/v1/organizations/:organization_id/stats/risk_alerts' do
+    let(:path) { "/api/v1/organizations/#{organization.id}/stats/risk_alerts" }
+    let!(:risky_event) do
+      create(:tool_event, organization: organization, user: user,
+             tool_name: 'claude_code', tokens_in: 1000, tokens_out: 500,
+             cost_usd: 2.0, occurred_at: Time.current)
+    end
+
+    before do
+      create(:audit_log, organization: organization, tool_event: risky_event, risk_level: 'high')
+    end
+
+    it 'returns tool-grouped risk alert rows' do
+      authenticated_get path, user: user, organization: organization
+
+      expect_success
+      expect(json_response).to be_an(Array)
+      row = json_response.find { |r| r[:toolName] == 'claude_code' }
+      expect(row).to be_present
+      expect(row[:eventCount]).to be_a(Integer)
+      expect(row[:tokensIn]).to be_a(Integer)
+      expect(row[:tokensOut]).to be_a(Integer)
+      expect(row[:costUsd]).to be_a(Numeric)
+    end
+
+    it 'does not inflate counts when a tool_event has multiple audit_logs' do
+      create(:audit_log, organization: organization, tool_event: risky_event, risk_level: 'medium')
+
+      authenticated_get path, user: user, organization: organization
+
+      expect_success
+      row = json_response.find { |r| r[:toolName] == 'claude_code' }
+      expect(row[:eventCount]).to eq(1)
+      expect(row[:tokensIn]).to eq(1000)
+    end
+
+    it 'excludes events with only none-level audit logs' do
+      safe_event = create(:tool_event, organization: organization, user: user,
+                          tool_name: 'cursor', cost_usd: 0.0, occurred_at: Time.current)
+      create(:audit_log, organization: organization, tool_event: safe_event, risk_level: 'none')
+
+      authenticated_get path, user: user, organization: organization
+
+      expect_success
+      tool_names = json_response.map { |r| r[:toolName] }
+      expect(tool_names).not_to include('cursor')
+    end
+
+    it 'scopes by project_id' do
+      project = create(:project, organization: organization)
+      proj_event = create(:tool_event, organization: organization, project: project,
+                          user: user, tool_name: 'cursor', cost_usd: 1.0, occurred_at: Time.current)
+      create(:audit_log, organization: organization, tool_event: proj_event, risk_level: 'high')
+
+      authenticated_get path, user: user, organization: organization,
+                        params: { project_id: project.id }
+
+      expect_success
+      tool_names = json_response.map { |r| r[:toolName] }
+      expect(tool_names).to include('cursor')
+      expect(tool_names).not_to include('claude_code')
+    end
+
+    it 'returns 404 for cross-org project_id' do
+      other_project = create(:project, organization: create(:organization))
+
+      authenticated_get path, user: user, organization: organization,
+                        params: { project_id: other_project.id }
+
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it 'returns 403 for non-members' do
+      authenticated_get path, user: create(:user), organization: organization
+
+      expect_forbidden
+    end
+
+    context 'metadata fallback (no audit_log)' do
+      it 'includes events with risk_level in metadata when no audit_log exists' do
+        meta_event = create(:tool_event, organization: organization, user: user,
+                            tool_name: 'windsurf', tokens_in: 200, tokens_out: 100,
+                            cost_usd: 0.5, occurred_at: Time.current,
+                            metadata: { "risk_level" => "high" })
+
+        authenticated_get path, user: user, organization: organization
+
+        expect_success
+        row = json_response.find { |r| r[:toolName] == 'windsurf' }
+        expect(row).to be_present
+        expect(row[:eventCount]).to eq(1)
+      end
+
+      it 'excludes events with metadata risk_level "none"' do
+        create(:tool_event, organization: organization, user: user,
+               tool_name: 'aider', occurred_at: Time.current,
+               metadata: { "risk_level" => "none" })
+
+        authenticated_get path, user: user, organization: organization
+
+        expect_success
+        tool_names = json_response.map { |r| r[:toolName] }
+        expect(tool_names).not_to include('aider')
+      end
+
+      it 'prefers audit_log over metadata when both exist' do
+        event = create(:tool_event, organization: organization, user: user,
+                       tool_name: 'cody', tokens_in: 300, tokens_out: 150,
+                       cost_usd: 1.0, occurred_at: Time.current,
+                       metadata: { "risk_level" => "medium" })
+        create(:audit_log, organization: organization, tool_event: event, risk_level: 'none')
+
+        authenticated_get path, user: user, organization: organization
+
+        expect_success
+        tool_names = json_response.map { |r| r[:toolName] }
+        expect(tool_names).not_to include('cody')
+      end
+
+      it 'counts metadata-only events in overview risk_alerts' do
+        create(:tool_event, organization: organization, user: user,
+               tool_name: 'cursor', occurred_at: Time.current,
+               metadata: { "risk_level" => "critical" })
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/overview",
+                          user: user, organization: organization
+
+        expect_success
+        expect(json_response[:risk_alerts]).to be >= 1
+      end
+    end
+
+    context 'with all_time=true' do
+      it 'returns risk alerts across all available history' do
+        old_event = create(:tool_event, organization: organization, user: user,
+                           tool_name: 'claude_code', cost_usd: 1.0, occurred_at: 8.months.ago)
+        create(:audit_log, organization: organization, tool_event: old_event, risk_level: 'high')
+
+        authenticated_get path, user: user, organization: organization,
+                          params: { all_time: true }
+
+        expect_success
+        tool_names = json_response.map { |r| r[:toolName] }
+        expect(tool_names).to include('claude_code')
+      end
+    end
+  end
+
+  describe 'GET /api/v1/organizations/:organization_id/stats/daily_by_model' do
+    let(:path) { "/api/v1/organizations/#{organization.id}/stats/daily_by_model" }
+
+    before do
+      create(:tool_event, organization: organization, user: user,
+             model: 'claude-3-5-sonnet', occurred_at: Time.current)
+      create(:tool_event, organization: organization, user: user,
+             model: 'gpt-4o', occurred_at: Time.current)
+      create(:tool_event, organization: organization, user: user,
+             model: 'claude-3-5-sonnet', occurred_at: 1.day.ago)
+    end
+
+    it 'returns model-grouped daily data' do
+      authenticated_get path, user: user, organization: organization
+
+      expect_success
+      expect(json_response[:data]).to be_an(Array)
+      expect(json_response[:models]).to be_an(Array)
+    end
+
+    it 'accepts period=week and month params' do
+      authenticated_get path, user: user, organization: organization,
+                        params: { period: 'week', month: Time.current.strftime('%Y-%m') }
+
+      expect_success
+      expect(json_response[:data]).to be_an(Array)
+      expect(json_response[:models]).to be_an(Array)
+    end
+
+    it 'returns 403 for non-members' do
+      authenticated_get path, user: create(:user), organization: organization
+
+      expect_forbidden
+    end
+  end
+
+  describe 'not_none risk_level filter on events' do
+    it 'filters tool_events by classification risk_level' do
+      # Use a fresh org to avoid interference from the global before block
+      fresh_org  = create(:organization)
+      fresh_user = create(:user)
+      create(:organization_membership, user: fresh_user, organization: fresh_org, role: 'member')
+
+      create(:tool_event, organization: fresh_org, user: fresh_user,
+             tool_name: 'claude_code', metadata: { "risk_level" => "low" }, occurred_at: Time.current)
+      create(:tool_event, organization: fresh_org, user: fresh_user,
+             tool_name: 'cursor', metadata: { "risk_level" => "none" }, occurred_at: Time.current)
+
+      authenticated_get "/api/v1/organizations/#{fresh_org.id}/events",
+                        user: fresh_user,
+                        organization: fresh_org,
+                        params: { risk_level: 'not_none' }
+
+      expect_success
+      tool_names = json_response[:data].map { |e| e[:toolName] }
+      expect(tool_names).to include('claude_code')
+      expect(tool_names).not_to include('cursor')
     end
   end
 end

@@ -6,7 +6,9 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { useState, useCallback, useMemo } from "react";
+import { api, downloadBlob } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 import type {
   CurrentUser,
   Organization,
@@ -20,7 +22,10 @@ import type {
   EventAuditEntry,
   OrganizationAuditLog,
   ProjectAuditLog,
+  UnifiedAuditLog,
+  UnifiedPaginatedMeta,
   OverviewStats,
+  ActiveUsersResponse,
   DailyStats,
   HourlyStats,
   ToolUsageStats,
@@ -33,13 +38,27 @@ import type {
   MemberRole,
   Issue,
   JiraProject,
+  IssueProviderProject,
   ToolOverviewStats,
   ToolModelsResponse,
   ToolUsersResponse,
   ToolDailyResponse,
   ToolEventTypesResponse,
   ConnectorSyncStatus,
+  ConnectorHealthRollup,
+  ModelPricingResponse,
+  ModelPricingOverride,
+  ModelPricingOverrideInput,
+  ModelPricingOverridesResponse,
+  RetentionPreview,
+  RetentionPurgeLog,
+  UserPersonalSettings,
+  NotificationRoute,
+  MyToolAccountMetadata,
+  McpIngestExchangeData,
+  DashboardPeriod,
 } from "@/lib/types";
+import type { IntegrationProvider } from "@/lib/providers";
 
 // Query keys factory
 export const queryKeys = {
@@ -47,6 +66,7 @@ export const queryKeys = {
     current: ["user", "current"] as const,
     organizations: ["user", "organizations"] as const,
     settings: ["user", "settings"] as const,
+    myToolAccounts: (orgId: string) => ["user", "me", "tool_accounts", orgId] as const,
   },
   organizations: {
     all: ["organizations"] as const,
@@ -58,10 +78,19 @@ export const queryKeys = {
     detail: (orgId: string, id: string) => ["organizations", orgId, "members", id] as const,
     events: (orgId: string, id: string) => ["organizations", orgId, "members", id, "events"] as const,
     stats: (orgId: string, id: string) => ["organizations", orgId, "members", id, "stats"] as const,
+    dashboardStats: (orgId: string, userId: string, period: string) =>
+      ["organizations", orgId, "members", userId, "dashboard_stats", period] as const,
+    heatmap: (orgId: string, userId: string) =>
+      ["organizations", orgId, "members", userId, "heatmap"] as const,
+    promptInsights: (orgId: string, userId: string, period: string) =>
+      ["organizations", orgId, "members", userId, "prompt_insights", period] as const,
   },
   projects: {
     all: (orgId: string) => ["organizations", orgId, "projects"] as const,
     detail: (id: string) => ["projects", id] as const,
+  },
+  favorites: {
+    all: () => ["favorites"] as const,
   },
   connectors: {
     all: (orgId: string) => ["organizations", orgId, "connectors"] as const,
@@ -72,6 +101,8 @@ export const queryKeys = {
       ["organizations", orgId, "connectors", connectorId, "available_projects"] as const,
     syncStatus: (orgId: string, connectorId: string) =>
       ["organizations", orgId, "connectors", connectorId, "sync_status"] as const,
+    health: (orgId: string) =>
+      ["organizations", orgId, "connectors", "health"] as const,
   },
   issues: {
     all: (projectId: string, filters?: Record<string, unknown>) =>
@@ -95,21 +126,30 @@ export const queryKeys = {
     summary: (orgId: string) => ["organizations", orgId, "events", "summary"] as const,
   },
   stats: {
-    overview: (orgId: string) => ["organizations", orgId, "stats", "overview"] as const,
-    daily: (orgId: string, days?: number) =>
-      ["organizations", orgId, "stats", "daily", days] as const,
+    overview: (orgId: string, projectId?: string, period?: DashboardPeriod) =>
+      ["organizations", orgId, "stats", "overview", { projectId, period }] as const,
+    activeUsers: (orgId: string, projectId?: string, days?: number) =>
+      ["organizations", orgId, "stats", "active_users", { projectId, days }] as const,
+    daily: (orgId: string, period?: DashboardPeriod, days?: number, granularity?: string, projectId?: string) =>
+      ["organizations", orgId, "stats", "daily", { period, days, granularity, projectId }] as const,
     hourly: (orgId: string, hours?: number) =>
       ["organizations", orgId, "stats", "hourly", hours] as const,
+    riskAlerts: (orgId: string, projectId?: string, period?: DashboardPeriod) =>
+      ["organizations", orgId, "stats", "risk_alerts", { projectId, period }] as const,
+    dailyByModel: (orgId: string, opts: DailyByToolOpts) =>
+      ["organizations", orgId, "stats", "daily_by_model", opts] as const,
     toolOverview: (orgId: string, tool: string) =>
       ["organizations", orgId, "stats", "tools", tool, "overview"] as const,
     toolModels: (orgId: string, tool: string, days?: number) =>
       ["organizations", orgId, "stats", "tools", tool, "models", days] as const,
     toolUsers: (orgId: string, tool: string, days?: number) =>
       ["organizations", orgId, "stats", "tools", tool, "users", days] as const,
-    toolDaily: (orgId: string, tool: string, days?: number) =>
-      ["organizations", orgId, "stats", "tools", tool, "daily", days] as const,
+    toolDaily: (orgId: string, tool: string, days?: number, period?: string) =>
+      ["organizations", orgId, "stats", "tools", tool, "daily", days, period] as const,
     toolEventTypes: (orgId: string, tool: string, days?: number) =>
       ["organizations", orgId, "stats", "tools", tool, "event_types", days] as const,
+    activeTools: (orgId: string) =>
+      ["organizations", orgId, "stats", "active_tools"] as const,
   },
   alerts: {
     all: (orgId: string) => ["organizations", orgId, "alerts"] as const,
@@ -128,6 +168,15 @@ export const queryKeys = {
     all: (projectId: string, params?: Record<string, unknown>) =>
       ["projects", projectId, "audit_logs", params] as const,
   },
+  unifiedAuditLogs: {
+    all: (orgId: string, params?: Record<string, unknown>) =>
+      ["organizations", orgId, "audit_logs", "unified", params] as const,
+  },
+  webhookDeliveries: {
+    all: (orgId: string) => ["admin", "webhook_deliveries", orgId] as const,
+    list: (orgId: string, filters: object) =>
+      ["admin", "webhook_deliveries", orgId, "list", filters] as const,
+  },
 };
 
 // ============================================================================
@@ -135,12 +184,14 @@ export const queryKeys = {
 // ============================================================================
 
 export function useCurrentUser() {
+  const { isAuthenticated, isLoading } = useAuth();
   return useQuery({
     queryKey: queryKeys.user.current,
     queryFn: async () => {
       const response = await api.get<{ data: CurrentUser }>("/users/me");
       return response.data;
     },
+    enabled: !isLoading && isAuthenticated,
   });
 }
 
@@ -250,7 +301,7 @@ export function useUpdateRetentionPolicy() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ orgId, data }: { orgId: string; data: Record<string, string> }) =>
+    mutationFn: ({ orgId, data }: { orgId: string; data: Record<string, string | number | boolean | null> }) =>
       api.patch<{ data: RetentionPolicy }>(`/organizations/${orgId}/retention_policy`, data),
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: ["organizations", orgId, "retention_policy"] });
@@ -273,11 +324,35 @@ export function useUpdateProjectRetentionPolicy() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ projectId, data }: { projectId: string; data: Record<string, string> }) =>
+    mutationFn: ({ projectId, data }: { projectId: string; data: Record<string, string | number | boolean | null> }) =>
       api.patch<{ data: ProjectRetentionPolicy }>(`/projects/${projectId}/retention_policy`, data),
     onSuccess: (_, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: ["projects", projectId, "retention_policy"] });
     },
+  });
+}
+
+export function useRetentionPreview(orgId: string) {
+  return useQuery({
+    queryKey: ["organizations", orgId, "retention_preview"],
+    queryFn: async () => {
+      const response = await api.get<{ data: RetentionPreview }>(`/organizations/${orgId}/retention_preview`);
+      return response.data;
+    },
+    enabled: !!orgId,
+  });
+}
+
+export function useRetentionLogs(orgId: string, page = 1) {
+  return useQuery({
+    queryKey: ["organizations", orgId, "retention_logs", page],
+    queryFn: async () => {
+      const params = new URLSearchParams({ page: String(page), per_page: "20" });
+      return api.get<PaginatedResponse<RetentionPurgeLog>>(
+        `/organizations/${orgId}/retention_logs?${params.toString()}`
+      );
+    },
+    enabled: !!orgId,
   });
 }
 
@@ -361,14 +436,18 @@ export function useDeleteProjectSetting() {
 // Organization Members Hooks
 // ============================================================================
 
-export function useOrganizationMembers(orgId: string) {
+export function useOrganizationMembers(
+  orgId: string,
+  options?: { enabled?: boolean }
+) {
+  const enabled = (options?.enabled ?? true) && !!orgId;
   return useQuery({
     queryKey: queryKeys.members.all(orgId),
     queryFn: async () => {
       const response = await api.get<{ data: OrganizationMember[] }>(`/organizations/${orgId}/members`);
       return response.data;
     },
-    enabled: !!orgId,
+    enabled,
   });
 }
 
@@ -390,7 +469,23 @@ export function useUpdateMemberRole() {
   return useMutation({
     mutationFn: ({ orgId, memberId, role }: { orgId: string; memberId: string; role: string }) =>
       api.patch<OrganizationMember>(`/organizations/${orgId}/members/${memberId}`, { role }),
-    onSuccess: (_, { orgId }) => {
+    onMutate: async ({ orgId, memberId, role }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.members.all(orgId) });
+      const previous = queryClient.getQueryData<OrganizationMember[]>(queryKeys.members.all(orgId));
+      if (previous) {
+        queryClient.setQueryData<OrganizationMember[]>(
+          queryKeys.members.all(orgId),
+          previous.map((m) => (m.id === memberId ? { ...m, role: role as OrganizationMember["role"] } : m))
+        );
+      }
+      return { previous, orgId };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKeys.members.all(context.orgId), context.previous);
+      }
+    },
+    onSettled: (_, __, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.members.all(orgId) });
     },
   });
@@ -507,7 +602,7 @@ export interface MemberStats {
     id: string;
     tool_name: string;
     external_username: string | null;
-    is_active: boolean;
+    connection_state: "inactive" | "active" | "waiting_for_connection";
   }[];
 }
 
@@ -519,6 +614,80 @@ export function useMemberStats(orgId: string, memberId: string) {
       return response;
     },
     enabled: !!orgId && !!memberId,
+  });
+}
+
+export interface MemberDashboardStats {
+  total_events: number;
+  total_cost_usd: number;
+  total_tokens_in: number;
+  total_tokens_out: number;
+  events_change_percent: number;
+  cost_change_percent: number;
+  tokens_change_percent: number;
+  tool_breakdown: { tool_name: string; event_count: number; cost_usd: number }[];
+}
+
+export interface MemberHeatmapEntry {
+  date: string;
+  count: number;
+}
+
+export function useMemberDashboardStats(orgId: string, userId: string, period = "30d") {
+  return useQuery({
+    queryKey: queryKeys.members.dashboardStats(orgId, userId, period),
+    queryFn: async () => {
+      const response = await api.get<MemberDashboardStats>(
+        `/organizations/${orgId}/members/${userId}/dashboard_stats?period=${period}`
+      );
+      return response;
+    },
+    enabled: !!orgId && !!userId,
+    staleTime: 60_000,
+  });
+}
+
+export function useMemberHeatmap(orgId: string, userId: string) {
+  return useQuery({
+    queryKey: queryKeys.members.heatmap(orgId, userId),
+    queryFn: async () => {
+      const response = await api.get<MemberHeatmapEntry[]>(
+        `/organizations/${orgId}/members/${userId}/stats/heatmap`
+      );
+      return response;
+    },
+    enabled: !!orgId && !!userId,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export interface PromptInsightsCallout {
+  type: "strength" | "tool" | "opportunity";
+  label: string;
+  text: string;
+}
+
+export interface PromptInsights {
+  score: number;
+  dimensions: {
+    structure: number;
+    context: number;
+    specificity: number;
+  };
+  callouts: PromptInsightsCallout[];
+}
+
+export function usePromptInsights(orgId: string, userId: string, period = "30d") {
+  return useQuery({
+    queryKey: queryKeys.members.promptInsights(orgId, userId, period),
+    queryFn: async () => {
+      const response = await api.get<PromptInsights>(
+        `/organizations/${orgId}/members/${userId}/prompt_insights?period=${period}`
+      );
+      return response;
+    },
+    enabled: !!orgId && !!userId,
+    staleTime: 60_000,
   });
 }
 
@@ -552,8 +721,10 @@ export function useCreateProject() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ orgId, data }: { orgId: string; data: Partial<Project> }) =>
-      api.post<Project>(`/organizations/${orgId}/projects`, data),
+    mutationFn: async ({ orgId, data }: { orgId: string; data: Partial<Project> }) => {
+      const response = await api.post<{ data: Project }>(`/organizations/${orgId}/projects`, data);
+      return response.data;
+    },
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projects.all(orgId) });
     },
@@ -564,10 +735,17 @@ export function useUpdateProject() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Project> }) =>
-      api.patch<Project>(`/projects/${id}`, data),
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Project> }) => {
+      const response = await api.patch<{ data: Project }>(`/projects/${id}`, data);
+      return response.data;
+    },
     onSuccess: (_, { id }) => {
+      const cached = queryClient.getQueryData<ProjectWithStats>(queryKeys.projects.detail(id));
+      const orgId = cached?.organization_id ?? cached?.organizationId;
       queryClient.invalidateQueries({ queryKey: queryKeys.projects.detail(id) });
+      if (orgId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.projects.all(orgId) });
+      }
       queryClient.invalidateQueries({ queryKey: ["organizations"] });
     },
   });
@@ -585,6 +763,53 @@ export function useDeleteProject() {
   });
 }
 
+// ============================================================================
+// Favorites Hooks
+// ============================================================================
+
+export interface FavoriteProject {
+  id: string;
+  name: string;
+}
+
+export function useFavoriteProjects() {
+  return useQuery({
+    queryKey: queryKeys.favorites.all(),
+    queryFn: async () => {
+      const response = await api.get<{ data: FavoriteProject[] }>("/users/me/favorites");
+      return response.data;
+    },
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useToggleFavorite() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, favorited }: { id: string; name: string; favorited: boolean }) =>
+      favorited
+        ? api.delete(`/projects/${id}/favorite`)
+        : api.post(`/projects/${id}/favorite`),
+    onMutate: async ({ id, name, favorited }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.favorites.all() });
+      const previous = queryClient.getQueryData<FavoriteProject[]>(queryKeys.favorites.all());
+      queryClient.setQueryData<FavoriteProject[]>(queryKeys.favorites.all(), (old = []) =>
+        favorited ? old.filter((f) => f.id !== id) : [...old, { id, name }],
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(queryKeys.favorites.all(), context.previous);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.favorites.all() });
+    },
+  });
+}
+
 // Project stats for activity charts
 export interface ProjectStatsData {
   date: string;
@@ -596,6 +821,10 @@ export interface ProjectStatsResponse {
   daily: ProjectStatsData[];
   totalEvents: number;
   totalCost: number;
+  previousPeriod?: {
+    totalEvents: number;
+    totalCost: number;
+  };
 }
 
 export function useProjectStats(projectId: string, days = 30) {
@@ -607,15 +836,43 @@ export function useProjectStats(projectId: string, days = 30) {
 }
 
 // Project daily by tool for stacked bar chart
-export function useProjectDailyByTool(projectId: string, days = 30) {
+export function useProjectDailyByTool(
+  projectId: string,
+  days = 30,
+  granularity: "day" | "month" = "day"
+) {
   return useQuery({
-    queryKey: ["projects", projectId, "stats", "daily_by_tool", days],
-    queryFn: () => api.get<DailyByToolResponse>(`/projects/${projectId}/stats/daily_by_tool?days=${days}`),
+    queryKey: ["projects", projectId, "stats", "daily_by_tool", days, granularity],
+    queryFn: () => {
+      const p = new URLSearchParams({ days: String(days), granularity });
+      return api.get<DailyByToolResponse>(`/projects/${projectId}/stats/daily_by_tool?${p}`);
+    },
     enabled: !!projectId,
   });
 }
 
 // Project members
+interface RawProjectMember {
+  id: string;
+  userId: string;
+  email: string;
+  name: string | null;
+  avatarUrl: string | null;
+  role: string;
+  joinedAt: string;
+  createdById?: string | null;
+  // Stats merged after Alba serialisation — snake_case because they bypass transform_keys :lower_camel
+  total_events?: number;
+  total_cost?: number;
+  last_active_at?: string | null;
+  cli_connected?: boolean;
+  /** Present if the API ever sends camelCase stats alongside membership fields */
+  totalEvents?: number;
+  totalCost?: number;
+  lastActiveAt?: string | null;
+  cliConnected?: boolean;
+}
+
 export interface ProjectMember {
   id: string;
   userId: string;
@@ -624,16 +881,188 @@ export interface ProjectMember {
   avatarUrl: string | null;
   role: string;
   joinedAt: string;
+  createdById?: string | null;
+  totalEvents: number;
+  totalCost: number;
+  lastActiveAt: string | null;
+  cliConnected?: boolean;
 }
 
 export function useProjectMembers(projectId: string) {
   return useQuery({
     queryKey: ["projects", projectId, "members"],
     queryFn: async () => {
-      const response = await api.get<{ data: ProjectMember[] }>(`/projects/${projectId}/members`);
-      return response.data;
+      const response = await api.get<{ data: RawProjectMember[] }>(`/projects/${projectId}/members`);
+      return response.data.map((m): ProjectMember => ({
+        ...m,
+        totalEvents: m.total_events ?? m.totalEvents ?? 0,
+        totalCost: m.total_cost ?? m.totalCost ?? 0,
+        lastActiveAt: m.last_active_at ?? m.lastActiveAt ?? null,
+        cliConnected: m.cli_connected ?? m.cliConnected,
+      }));
     },
     enabled: !!projectId,
+  });
+}
+
+export function useAddProjectMember(projectId: string, orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { user_id: string; role: string }) =>
+      api.post<{ data: ProjectMember }>(`/projects/${projectId}/members`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "members"] });
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "members", "stats"] });
+      queryClient.invalidateQueries({
+        queryKey: ["organizations", orgId, "stats", "overview"],
+      });
+    },
+  });
+}
+
+export function useUpdateProjectMember(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, role }: { id: string; role: string }) =>
+      api.patch<{ data: ProjectMember }>(`/projects/${projectId}/members/${id}`, { role }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "members"] });
+    },
+  });
+}
+
+export function useRemoveProjectMember(projectId: string, orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api.delete(`/projects/${projectId}/members/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "members"] });
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "members", "stats"] });
+      queryClient.invalidateQueries({
+        queryKey: ["organizations", orgId, "stats", "overview"],
+      });
+    },
+  });
+}
+
+export interface ProjectMemberStat {
+  userId: string;
+  email: string;
+  name: string | null;
+  role: string;
+  eventCount: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  lastEventAt: string | null;
+  primaryTool: string | null;
+}
+
+// Pass enabled=false for non-project-owners — the API returns 403 for plain members.
+export function useProjectMemberStats(projectId: string, days = 30, enabled = true) {
+  return useQuery({
+    queryKey: ["projects", projectId, "members", "stats", days],
+    queryFn: async () => {
+      const res = await api.get<{ data: ProjectMemberStat[] }>(
+        `/projects/${projectId}/members/stats?days=${days}`
+      );
+      return res.data;
+    },
+    enabled: !!projectId && enabled,
+  });
+}
+
+// Personal settings
+export function usePersonalSettings() {
+  return useQuery({
+    queryKey: ["user", "personal-settings"],
+    queryFn: async () => {
+      const response = await api.get<{ data: UserPersonalSettings }>("/users/me/personal_settings");
+      return response.data;
+    },
+  });
+}
+
+export function useUpdatePersonalSettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      costThresholdCents?: number | null;
+      tokenThreshold?: number | null;
+      alertEmail?: boolean;
+      alertSlack?: boolean;
+    }) =>
+      api.patch<{ data: UserPersonalSettings }>("/users/me/personal_settings", {
+        personal_settings: {
+          cost_threshold_cents: data.costThresholdCents,
+          token_threshold: data.tokenThreshold,
+          alert_email: data.alertEmail,
+          alert_slack: data.alertSlack,
+        },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user", "personal-settings"] });
+    },
+  });
+}
+
+// Notification routes
+export function useNotificationRoutes(orgId: string) {
+  return useQuery({
+    queryKey: ["organizations", orgId, "notification_routes"],
+    queryFn: async () => {
+      const response = await api.get<{ data: NotificationRoute[] }>(
+        `/organizations/${orgId}/notification_routes`
+      );
+      return response.data;
+    },
+    enabled: !!orgId,
+  });
+}
+
+export function useCreateNotificationRoute(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      notification_type: NotificationRoute["notificationType"];
+      recipient_type: NotificationRoute["recipientType"];
+      recipient_role?: MemberRole | null;
+      recipient_user_id?: string | null;
+      enabled: boolean;
+    }) =>
+      api.post<{ data: NotificationRoute }>(
+        `/organizations/${orgId}/notification_routes`,
+        { notification_route: data }
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["organizations", orgId, "notification_routes"] });
+    },
+  });
+}
+
+export function useUpdateNotificationRoute(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: { id: string; enabled?: boolean }) =>
+      api.patch<{ data: NotificationRoute }>(
+        `/organizations/${orgId}/notification_routes/${id}`,
+        { notification_route: data }
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["organizations", orgId, "notification_routes"] });
+    },
+  });
+}
+
+export function useDeleteNotificationRoute(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api.delete(`/organizations/${orgId}/notification_routes/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["organizations", orgId, "notification_routes"] });
+    },
   });
 }
 
@@ -696,7 +1125,7 @@ export function useConnectRepo(projectId: string) {
       is_private: boolean;
     }) => api.post<{ data: ProjectRepository }>(`/projects/${projectId}/repositories`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "repositories"] });
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId] });
     },
   });
 }
@@ -707,30 +1136,8 @@ export function useDisconnectRepo(projectId: string) {
   return useMutation({
     mutationFn: (repoId: string) => api.delete(`/projects/${projectId}/repositories/${repoId}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "repositories"] });
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId] });
     },
-  });
-}
-
-export interface MemberCommitStat {
-  userId: string;
-  name: string | null;
-  email: string;
-  avatarUrl: string | null;
-  commitCount: number;
-  lastCommitAt: string | null;
-}
-
-export function useProjectCommitStats(projectId: string, days = 30) {
-  return useQuery({
-    queryKey: ["projects", projectId, "stats", "commits_by_user", days],
-    queryFn: async () => {
-      const response = await api.get<{ data: MemberCommitStat[] }>(
-        `/projects/${projectId}/stats/commits_by_user?days=${days}`
-      );
-      return response.data;
-    },
-    enabled: !!projectId,
   });
 }
 
@@ -746,6 +1153,27 @@ export function useConnectors(orgId: string) {
       return response.data;
     },
     enabled: !!orgId,
+    // POST /sync returns before the Sidekiq job finishes; status stays "testing" until mark_synced!.
+    // Poll so /integrations/connected updates when the job completes (or errors).
+    refetchInterval: (query) => {
+      const data = query.state.data as Connector[] | undefined;
+      if (!data?.length) return false;
+      return data.some((c) => c.status === "testing") ? 3_000 : false;
+    },
+  });
+}
+
+export function useConnectorHealth(orgId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: queryKeys.connectors.health(orgId),
+    queryFn: async () => {
+      const response = await api.get<{ data: ConnectorHealthRollup }>(
+        `/organizations/${orgId}/connectors/health`
+      );
+      return response.data;
+    },
+    enabled: !!orgId && (options?.enabled ?? true),
+    staleTime: 60_000,
   });
 }
 
@@ -766,14 +1194,24 @@ export function useCreateConnector() {
       orgId,
       code,
       connectorType,
+      label,
     }: {
       orgId: string;
       code: string;
       connectorType: string;
+      label?: string;
     }) =>
       api.post<Connector>(`/organizations/${orgId}/connectors/callback`, {
         code,
         connector_type: connectorType,
+        ...(label ? { label } : {}),
+      }, {
+        // Rails sets current_organization from this header only (see ApplicationController#set_current_organization);
+        // the :organization_id path segment is not used for org context. Global api.ts also adds the header when
+        // currentOrgId is set — this explicit value covers OAuth return paths where OrgContext may not have synced yet.
+        headers: {
+          "X-Organization-ID": orgId,
+        },
       }),
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
@@ -789,14 +1227,17 @@ export function useConnectWithApiKey() {
       orgId,
       connectorType,
       apiKey,
+      label,
     }: {
       orgId: string;
       connectorType: string;
       apiKey: string;
+      label?: string;
     }) =>
       api.post<Connector>(`/organizations/${orgId}/connectors`, {
         connector_type: connectorType,
         access_token: apiKey,
+        ...(label ? { label } : {}),
       }),
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
@@ -812,6 +1253,8 @@ export function useSyncConnector() {
       api.post(`/organizations/${orgId}/connectors/${connectorId}/sync`),
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
     },
   });
 }
@@ -822,6 +1265,25 @@ export function useDeleteConnector() {
   return useMutation({
     mutationFn: ({ orgId, connectorId }: { orgId: string; connectorId: string }) =>
       api.delete(`/organizations/${orgId}/connectors/${connectorId}`),
+    onSuccess: (_, { orgId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
+    },
+  });
+}
+
+export function useUpdateConnector() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      orgId,
+      connectorId,
+      data,
+    }: {
+      orgId: string;
+      connectorId: string;
+      data: Record<string, unknown>;
+    }) => api.patch(`/organizations/${orgId}/connectors/${connectorId}`, data),
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
     },
@@ -994,6 +1456,7 @@ export function useCreateToolAccount() {
       }),
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.toolAccounts.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.myToolAccounts(orgId) });
     },
   });
 }
@@ -1006,6 +1469,7 @@ export function useDeleteToolAccount() {
       api.delete(`/organizations/${orgId}/tool_accounts/${accountId}`),
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.toolAccounts.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.myToolAccounts(orgId) });
     },
   });
 }
@@ -1017,20 +1481,21 @@ export function useUpdateToolAccount() {
     mutationFn: ({
       orgId,
       accountId,
-      isActive,
+      connectionState,
       accessToken,
     }: {
       orgId: string;
       accountId: string;
-      isActive?: boolean;
+      connectionState?: "inactive" | "active" | "waiting_for_connection";
       accessToken?: string;
     }) =>
       api.patch<{ data: ToolAccount }>(`/organizations/${orgId}/tool_accounts/${accountId}`, {
-        ...(isActive !== undefined && { is_active: isActive }),
+        ...(connectionState !== undefined && { connection_state: connectionState }),
         ...(accessToken !== undefined && { access_token: accessToken }),
       }),
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.toolAccounts.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.myToolAccounts(orgId) });
     },
   });
 }
@@ -1043,6 +1508,44 @@ export function useRegenerateIngestToken() {
       api.post<{ data: ToolAccount }>(`/organizations/${orgId}/tool_accounts/${accountId}/regenerate_token`),
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.toolAccounts.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.myToolAccounts(orgId) });
+    },
+  });
+}
+
+export function useMyToolAccounts(orgId: string) {
+  return useQuery({
+    queryKey: queryKeys.user.myToolAccounts(orgId),
+    queryFn: async () => {
+      const response = await api.get<{ data: MyToolAccountMetadata[] }>("/users/me/tool_accounts", {
+        headers: { "X-Organization-ID": orgId },
+      });
+      return response.data;
+    },
+    enabled: !!orgId,
+    staleTime: 60_000,
+  });
+}
+
+export function useMcpIngestExchange() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ toolName, orgId }: { toolName: string; orgId: string }) => {
+      const response = await api.post<{ data: McpIngestExchangeData }>(
+        "/integrations/mcp/exchange",
+        {
+          tool_name: toolName,
+        },
+        {
+          headers: { "X-Organization-ID": orgId },
+        }
+      );
+      return response.data;
+    },
+    onSuccess: (_data, { orgId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.myToolAccounts(orgId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.toolAccounts.all(orgId) });
     },
   });
 }
@@ -1052,16 +1555,31 @@ export function useRegenerateIngestToken() {
 // ============================================================================
 
 export interface EventsParams {
-  [key: string]: string | number | undefined;
+  [key: string]: string | number | string[] | undefined;
   page?: number;
   per_page?: number;
-  tool_name?: string;
-  risk_level?: string;
-  event_type?: string;
+  tool_name?: string | string[];
+  risk_level?: string | string[];
+  event_type?: string | string[];
   start_date?: string;
   end_date?: string;
   user_id?: string;
-  project_id?: string;
+  project_id?: string | string[];
+}
+
+/** Serializes query values; arrays become comma-separated. */
+export function appendQueryParam(
+  params: URLSearchParams,
+  key: string,
+  value: string | number | string[] | undefined
+): void {
+  if (value === undefined || value === null || value === "") return;
+  if (Array.isArray(value)) {
+    if (value.length === 0) return;
+    params.append(key, value.join(","));
+    return;
+  }
+  params.append(key, String(value));
 }
 
 export function useEvents(orgId: string, params?: EventsParams, options?: { enabled?: boolean }) {
@@ -1071,9 +1589,7 @@ export function useEvents(orgId: string, params?: EventsParams, options?: { enab
       const searchParams = new URLSearchParams();
       if (params) {
         Object.entries(params).forEach(([key, value]) => {
-          if (value !== undefined && value !== null && value !== "") {
-            searchParams.append(key, String(value));
-          }
+          appendQueryParam(searchParams, key, value);
         });
       }
       const query = searchParams.toString();
@@ -1096,6 +1612,32 @@ export function useEvent(orgId: string, id: string) {
   });
 }
 
+export function useExportEvents(orgId: string) {
+  const [isExporting, setIsExporting] = useState(false);
+
+  const exportEvents = useCallback(
+    async (params: EventsParams & { filename: string }) => {
+      if (!orgId) return;
+      setIsExporting(true);
+      try {
+        const { filename, ...filterParams } = params;
+        const searchParams = new URLSearchParams();
+        Object.entries(filterParams).forEach(([k, v]) => {
+          appendQueryParam(searchParams, k, v);
+        });
+        const query = searchParams.toString();
+        const endpoint = `/organizations/${orgId}/events/export${query ? `?${query}` : ""}`;
+        return await downloadBlob(endpoint, filename, "text/csv", orgId);
+      } finally {
+        setIsExporting(false);
+      }
+    },
+    [orgId]
+  );
+
+  return { exportEvents, isExporting };
+}
+
 export function useEventAuditTrail(orgId: string, id: string) {
   return useQuery({
     queryKey: queryKeys.events.auditTrail(orgId, id),
@@ -1104,14 +1646,80 @@ export function useEventAuditTrail(orgId: string, id: string) {
   });
 }
 
-export function useUnattributedEvents(orgId: string) {
+export interface EventsSummary {
+  totalEvents: number;
+  totalTokensIn: number;
+  totalTokensOut: number;
+  totalCostUsd: number;
+  byTool: Record<string, number>;
+  byEventType: Record<string, number>;
+  byUser: Record<string, number>;
+  timeRange: { start: string | null; end: string | null };
+}
+
+export function useEventsSummary(orgId: string) {
   return useQuery({
-    queryKey: queryKeys.events.unattributed(orgId),
+    queryKey: queryKeys.events.summary(orgId),
     queryFn: async () => {
-      const response = await api.get<{ data: ToolEvent[] }>(`/organizations/${orgId}/events/unattributed`);
+      const response = await api.get<{ data: EventsSummary }>(`/organizations/${orgId}/events/summary`);
       return response.data;
     },
     enabled: !!orgId,
+  });
+}
+
+export interface UnattributedEventsParams {
+  toolName?: string;
+  startDate?: string;
+  endDate?: string;
+  minConfidence?: number;
+}
+
+export function useUnattributedEvents(
+  orgId: string,
+  params?: UnattributedEventsParams,
+  options?: { enabled?: boolean }
+) {
+  const enabled = (options?.enabled ?? true) && !!orgId;
+  return useQuery({
+    queryKey: [...queryKeys.events.unattributed(orgId), params] as const,
+    queryFn: async () => {
+      const query = new URLSearchParams();
+      if (params?.toolName) query.set("tool_name", params.toolName);
+      if (params?.startDate) query.set("start_date", params.startDate);
+      if (params?.endDate) query.set("end_date", params.endDate);
+      if (params?.minConfidence != null) query.set("min_confidence", String(params.minConfidence));
+      const qs = query.toString();
+      const payload = await api.get<{ data: ToolEvent[] } | ToolEvent[]>(
+        `/organizations/${orgId}/events/unattributed${qs ? `?${qs}` : ""}`
+      );
+      const rows = Array.isArray(payload) ? payload : (payload as { data: ToolEvent[] }).data ?? [];
+      return Array.isArray(rows) ? rows : [];
+    },
+    enabled,
+    staleTime: 30_000,
+  });
+}
+
+export function useAttributeEvent(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ eventId, userId }: { eventId: string; userId: string }) =>
+      api.post(`/organizations/${orgId}/events/${eventId}/attribute`, { user_id: userId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.events.unattributed(orgId) });
+    },
+  });
+}
+
+export function useBulkAttributeEvents(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ eventIds, userId }: { eventIds: string[]; userId: string }) =>
+      api.post(`/organizations/${orgId}/events/attribute_bulk`, { event_ids: eventIds, user_id: userId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.events.unattributed(orgId) });
+    },
   });
 }
 
@@ -1119,22 +1727,69 @@ export function useUnattributedEvents(orgId: string) {
 // Stats Hooks
 // ============================================================================
 
-export function useOverviewStats(orgId: string) {
+export function useOverviewStats(orgId: string, projectId?: string, period?: DashboardPeriod) {
   return useQuery({
-    queryKey: queryKeys.stats.overview(orgId),
-    queryFn: () => api.get<OverviewStats>(`/organizations/${orgId}/stats/overview`),
+    queryKey: queryKeys.stats.overview(orgId, projectId, period),
+    queryFn: () => {
+      const p = new URLSearchParams();
+      if (projectId) p.set("project_id", projectId);
+      if (period?.type === "all_time") {
+        p.set("all_time", "true");
+      } else if (period?.type === "month") {
+        p.set("month", period.value);
+      }
+      const qs = p.toString();
+      return api.get<OverviewStats>(`/organizations/${orgId}/stats/overview${qs ? `?${qs}` : ""}`);
+    },
     enabled: !!orgId,
-    refetchInterval: 30000, // Refetch every 30 seconds for live dashboard
+    refetchInterval: 30000,
   });
 }
 
-export function useDailyStats(orgId: string, days = 30) {
+// Active users over a rolling window (default 7 days), decoupled from the dashboard
+// month filter. Honours the optional project scope.
+export function useActiveUsers(orgId: string, projectId?: string, days = 7) {
   return useQuery({
-    queryKey: queryKeys.stats.daily(orgId, days),
-    queryFn: () =>
-      api.get<{ data: DailyStats[]; tool_breakdown: ToolUsageStats[] }>(
-        `/organizations/${orgId}/stats/daily?days=${days}`
-      ),
+    queryKey: queryKeys.stats.activeUsers(orgId, projectId, days),
+    queryFn: () => {
+      const p = new URLSearchParams();
+      p.set("days", String(days));
+      if (projectId) p.set("project_id", projectId);
+      return api.get<ActiveUsersResponse>(`/organizations/${orgId}/stats/active_users?${p.toString()}`);
+    },
+    enabled: !!orgId,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+  });
+}
+
+export function useDailyStats(
+  orgId: string,
+  period?: DashboardPeriod,
+  days = 30,
+  granularity?: "day" | "week" | "month",
+  projectId?: string
+) {
+  const allTime = period?.type === "all_time";
+  const month = period?.type === "month" ? period.value : undefined;
+
+  return useQuery({
+    queryKey: queryKeys.stats.daily(orgId, period, days, granularity, projectId),
+    queryFn: () => {
+      const p = new URLSearchParams();
+      if (allTime) {
+        p.set("all_time", "true");
+        p.set("period", granularity ?? "month");
+      } else if (month) {
+        p.set("month", month);
+      } else {
+        p.set("days", String(days));
+      }
+      if (projectId) p.set("project_id", projectId);
+      return api.get<{ data: DailyStats[]; tool_breakdown: ToolUsageStats[] }>(
+        `/organizations/${orgId}/stats/daily?${p}`
+      );
+    },
     enabled: !!orgId,
   });
 }
@@ -1162,18 +1817,103 @@ export function useActivityHeatmap(orgId: string) {
 
 export interface DailyToolData {
   date: string;
-  [toolName: string]: string | number; // date is string, tool counts are numbers
+  [toolName: string]: string | number;
 }
 
 export interface DailyByToolResponse {
   data: DailyToolData[];
   tools: string[];
+  granularity: "day" | "month";
+  period?: "day" | "week" | "month";
 }
 
-export function useDailyByTool(orgId: string, days = 30) {
+export interface DailyByToolOpts {
+  days?: number;
+  period?: "day" | "week" | "month";
+  month?: string;
+  projectId?: string;
+  allTime?: boolean;
+}
+
+export function useDailyByTool(orgId: string, opts: DailyByToolOpts | number = {}) {
+  const normalized: DailyByToolOpts = typeof opts === "number" ? { days: opts } : opts;
+  const { days = 30, period, month, projectId, allTime } = normalized;
+
   return useQuery({
-    queryKey: ["organizations", orgId, "stats", "daily_by_tool", days],
-    queryFn: () => api.get<DailyByToolResponse>(`/organizations/${orgId}/stats/daily_by_tool?days=${days}`),
+    queryKey: ["organizations", orgId, "stats", "daily_by_tool", normalized],
+    queryFn: () => {
+      const p = new URLSearchParams();
+      if (allTime) {
+        p.set("all_time", "true");
+        if (period) p.set("period", period);
+      } else {
+        if (!month) p.set("days", String(days));
+        if (period) p.set("period", period);
+        if (month) p.set("month", month);
+      }
+      if (projectId) p.set("project_id", projectId);
+      return api.get<DailyByToolResponse>(`/organizations/${orgId}/stats/daily_by_tool?${p}`);
+    },
+    enabled: !!orgId,
+  });
+}
+
+export interface RiskAlertRow {
+  toolName: string;
+  eventCount: number;
+  tokensIn: number;
+  tokensOut: number;
+  costUsd: number;
+}
+
+export function useOrgRiskAlerts(orgId: string, projectId?: string, period?: DashboardPeriod) {
+  return useQuery({
+    queryKey: queryKeys.stats.riskAlerts(orgId, projectId, period),
+    queryFn: () => {
+      const p = new URLSearchParams();
+      if (projectId) p.set("project_id", projectId);
+      if (period?.type === "all_time") {
+        p.set("all_time", "true");
+      } else if (period?.type === "month") {
+        p.set("month", period.value);
+      }
+      const qs = p.toString();
+      return api.get<RiskAlertRow[]>(`/organizations/${orgId}/stats/risk_alerts${qs ? `?${qs}` : ""}`);
+    },
+    enabled: !!orgId,
+    staleTime: 60_000,
+  });
+}
+
+export interface DailyModelData {
+  date: string;
+  [modelName: string]: string | number;
+}
+
+export interface DailyByModelResponse {
+  data: DailyModelData[];
+  models: string[];
+}
+
+export function useDailyByModel(orgId: string, opts: DailyByToolOpts | number = {}) {
+  const normalized: DailyByToolOpts = typeof opts === "number" ? { days: opts } : opts;
+  const { days = 30, period, month, projectId, allTime } = normalized;
+
+  return useQuery({
+    queryKey: queryKeys.stats.dailyByModel(orgId, normalized),
+    queryFn: () => {
+      const p = new URLSearchParams();
+      if (allTime) {
+        p.set("all_time", "true");
+        if (period) p.set("period", period);
+      } else {
+        if (!month) p.set("days", String(days));
+        if (period) p.set("period", period);
+        if (month) p.set("month", month);
+      }
+      if (projectId) p.set("project_id", projectId);
+      return api.get<DailyByModelResponse>(`/organizations/${orgId}/stats/daily_by_model?${p}`);
+    },
     enabled: !!orgId,
   });
 }
@@ -1181,6 +1921,18 @@ export function useDailyByTool(orgId: string, days = 30) {
 // ============================================================================
 // Tool Analytics Hooks (shared by Cursor & OpenRouter pages)
 // ============================================================================
+
+export function useActiveTools(orgId: string) {
+  return useQuery({
+    queryKey: queryKeys.stats.activeTools(orgId),
+    queryFn: () =>
+      api.get<{ tools: Array<{ tool_name: string; total_events: number; total_cost_usd: number; active_users: number }> }>(
+        `/organizations/${orgId}/stats/active_tools`
+      ),
+    enabled: !!orgId,
+    refetchInterval: 30000,
+  });
+}
 
 export function useToolOverview(orgId: string, tool: string) {
   return useQuery({
@@ -1210,11 +1962,14 @@ export function useToolUsers(orgId: string, tool: string, days = 30) {
   });
 }
 
-export function useToolDaily(orgId: string, tool: string, days = 30) {
+export function useToolDaily(orgId: string, tool: string, days = 30, period?: "day" | "week" | "month") {
   return useQuery({
-    queryKey: queryKeys.stats.toolDaily(orgId, tool, days),
-    queryFn: () =>
-      api.get<ToolDailyResponse>(`/organizations/${orgId}/stats/tools/${tool}/daily?days=${days}`),
+    queryKey: queryKeys.stats.toolDaily(orgId, tool, days, period),
+    queryFn: () => {
+      const p = new URLSearchParams({ days: String(days) });
+      if (period) p.set("period", period);
+      return api.get<ToolDailyResponse>(`/organizations/${orgId}/stats/tools/${tool}/daily?${p}`);
+    },
     enabled: !!orgId && !!tool,
   });
 }
@@ -1356,6 +2111,17 @@ export interface AuditLogFilters {
   to_date?: string;
 }
 
+export interface UnifiedAuditLogFilters {
+  page?: number;
+  per_page?: number;
+  scope?: "organization" | "project" | "admin";
+  severity?: "info" | "warning" | "critical";
+  outcome?: "success" | "failure";
+  from_date?: string;
+  to_date?: string;
+  actor_id?: string;
+}
+
 export function useOrganizationAuditLogs(orgId: string, filters: AuditLogFilters = {}) {
   return useQuery({
     queryKey: queryKeys.auditLogs.all(orgId, filters as Record<string, unknown>),
@@ -1398,8 +2164,56 @@ export function useProjectAuditLogs(projectId: string, filters: AuditLogFilters 
   });
 }
 
+export function useUnifiedAuditLogs(orgId: string, filters: UnifiedAuditLogFilters = {}) {
+  return useQuery({
+    queryKey: queryKeys.unifiedAuditLogs.all(orgId, filters as Record<string, unknown>),
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (filters.page) params.set("page", String(filters.page));
+      if (filters.per_page) params.set("per_page", String(filters.per_page));
+      if (filters.scope) params.set("scope", filters.scope);
+      if (filters.severity) params.set("severity", filters.severity);
+      if (filters.outcome) params.set("outcome", filters.outcome);
+      if (filters.from_date) params.set("from_date", filters.from_date);
+      if (filters.to_date) params.set("to_date", filters.to_date);
+      if (filters.actor_id) params.set("actor_id", filters.actor_id);
+      const query = params.toString();
+      return api.get<{ data: UnifiedAuditLog[]; meta: UnifiedPaginatedMeta }>(
+        `/organizations/${orgId}/audit_logs/unified${query ? `?${query}` : ""}`
+      );
+    },
+    enabled: !!orgId,
+  });
+}
+
+export function useExportUnifiedAuditLogs(orgId: string) {
+  const [isExporting, setIsExporting] = useState(false);
+
+  const exportLogs = useCallback(
+    async (filters: Omit<UnifiedAuditLogFilters, "page" | "per_page">) => {
+      if (!orgId) return;
+      setIsExporting(true);
+      try {
+        const searchParams = new URLSearchParams();
+        Object.entries(filters).forEach(([k, v]) => {
+          if (v !== undefined && v !== null && v !== "") searchParams.append(k, String(v));
+        });
+        const query = searchParams.toString();
+        const endpoint = `/organizations/${orgId}/audit_logs/unified/export${query ? `?${query}` : ""}`;
+        const filename = `audit_log_${new Date().toISOString().slice(0, 10)}.csv`;
+        return await downloadBlob(endpoint, filename, "text/csv", orgId);
+      } finally {
+        setIsExporting(false);
+      }
+    },
+    [orgId]
+  );
+
+  return { exportLogs, isExporting };
+}
+
 // ============================================================================
-// Jira Issues Hooks
+// Issue Provider Hooks
 // ============================================================================
 
 export interface IssueFilters {
@@ -1441,9 +2255,22 @@ export function useAvailableJiraProjects(orgId: string, connectorId: string) {
   });
 }
 
+export function useAvailableLinearProjects(orgId: string, connectorId: string) {
+  return useQuery({
+    queryKey: queryKeys.connectors.availableProjects(orgId, connectorId),
+    queryFn: async () => {
+      const response = await api.get<{ data: IssueProviderProject[] }>(
+        `/organizations/${orgId}/connectors/${connectorId}/available_projects`
+      );
+      return response.data;
+    },
+    enabled: !!orgId && !!connectorId,
+  });
+}
+
 // POST /api/v1/projects/:projectId/sync_issues
 // Runs synchronously — only invalidate after the server confirms completion.
-export function useSyncJiraIssues(projectId: string) {
+export function useSyncProjectIssues(projectId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -1464,6 +2291,164 @@ export function useLinkJira(projectId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projects.detail(projectId) });
       queryClient.invalidateQueries({ queryKey: ["projects", projectId, "issues"] });
+    },
+  });
+}
+
+export function useLinkLinear(projectId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: { connector_id: string; linear_project_id: string; linear_project_name: string }) =>
+      api.post<{ data: { linked: boolean } }>(`/projects/${projectId}/link_linear`, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects.detail(projectId) });
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "issues"] });
+    },
+  });
+}
+
+// Model Pricing
+export function useModelPricing(orgId: string) {
+  return useQuery({
+    queryKey: ["organizations", orgId, "model_pricing"],
+    queryFn: () => api.get<ModelPricingResponse>(`/organizations/${orgId}/model_pricing`),
+    enabled: !!orgId,
+  });
+}
+
+// Model Pricing Overrides
+export function useModelPricingOverrides(orgId: string) {
+  return useQuery({
+    queryKey: ["organizations", orgId, "model_pricing_overrides"],
+    queryFn: () =>
+      api.get<ModelPricingOverridesResponse>(`/organizations/${orgId}/model_pricing/overrides`),
+    enabled: !!orgId,
+  });
+}
+
+function toOverridePayload(input: ModelPricingOverrideInput) {
+  return {
+    model_pattern: input.modelPattern,
+    input_per_mtok: input.inputPerMtok,
+    output_per_mtok: input.outputPerMtok,
+  };
+}
+
+export function useCreateModelPricingOverride(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ModelPricingOverrideInput) =>
+      api.post<{ data: ModelPricingOverride }>(
+        `/organizations/${orgId}/model_pricing/overrides`,
+        toOverridePayload(input),
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["organizations", orgId, "model_pricing_overrides"],
+      });
+    },
+  });
+}
+
+export function useUpdateModelPricingOverride(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...input }: ModelPricingOverrideInput & { id: string }) =>
+      api.put<{ data: ModelPricingOverride }>(
+        `/organizations/${orgId}/model_pricing/overrides/${id}`,
+        toOverridePayload(input),
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["organizations", orgId, "model_pricing_overrides"],
+      });
+    },
+  });
+}
+
+// AIX-206 ticket naming aliases
+export { useRetentionPolicy as useOrgPolicy, useUpdateRetentionPolicy as useUpdateOrgPolicy };
+export { useProjectMembers as useProjectMemberships };
+
+export function useDeleteModelPricingOverride(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api.delete(`/organizations/${orgId}/model_pricing/overrides/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["organizations", orgId, "model_pricing_overrides"],
+      });
+    },
+  });
+}
+
+// ─── Organization Provider Settings (AIX-121) ──────────────────────────────
+
+export interface OrgProviderSetting {
+  id: string;
+  provider: IntegrationProvider;
+  enabled: boolean;
+}
+
+interface OrgProviderSettingsResponse {
+  data: OrgProviderSetting[];
+}
+
+export function useOrgProviderSettings(orgId: string) {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["organizations", orgId, "organization_provider_settings"],
+    queryFn: () =>
+      api.get<OrgProviderSettingsResponse>(
+        `/organizations/${orgId}/organization_provider_settings`
+      ),
+    enabled: !!orgId,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const enabledMap: Partial<Record<IntegrationProvider, boolean>> = useMemo(() => {
+    if (!data?.data) return {};
+    return Object.fromEntries(data.data.map((s) => [s.provider, s.enabled]));
+  }, [data]);
+
+  return { data: data?.data, enabledMap, isLoading, isError };
+}
+
+export function useUpdateOrgProviderSetting(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ provider, enabled }: { provider: IntegrationProvider; enabled: boolean }) =>
+      api.patch<{ data: OrgProviderSetting }>(
+        `/organizations/${orgId}/organization_provider_settings/${provider}`,
+        { organization_provider_setting: { enabled } }
+      ),
+    onMutate: async ({ provider, enabled }) => {
+      const queryKey = ["organizations", orgId, "organization_provider_settings"];
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<OrgProviderSettingsResponse>(queryKey);
+      if (previous) {
+        queryClient.setQueryData<OrgProviderSettingsResponse>(queryKey, {
+          ...previous,
+          data: previous.data.some((s) => s.provider === provider)
+            ? previous.data.map((s) => (s.provider === provider ? { ...s, enabled } : s))
+            : [...previous.data, { id: `optimistic-${provider}`, provider, enabled }],
+        });
+      }
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(
+          ["organizations", orgId, "organization_provider_settings"],
+          context.previous
+        );
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["organizations", orgId, "organization_provider_settings"],
+      });
     },
   });
 }

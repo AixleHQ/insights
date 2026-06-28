@@ -85,6 +85,20 @@ RSpec.describe 'Admin Organizations', type: :request do
         expect(Organization.find_by(id: id)).to be_nil
       end
     end
+
+    it 'creates an AdminAuditLog entry for each deleted organization' do
+      orgs = create_list(:organization, 3)
+      ids  = orgs.map(&:id)
+
+      expect {
+        post batch_delete_admin_organizations_path, params: { ids: ids }
+      }.to change(AdminAuditLog, :count).by(3)
+
+      logs = AdminAuditLog.order(:created_at).last(3)
+      expect(logs.map(&:action)).to all(eq('batch_delete'))
+      expect(logs.map(&:resource_type)).to all(eq('Organization'))
+      expect(logs.first.tracked_changes).to include('name', 'slug')
+    end
   end
 
   describe 'audit logging' do

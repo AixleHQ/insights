@@ -2,7 +2,7 @@ require 'rails_helper'
 
 RSpec.describe Repository, type: :model do
   describe 'associations' do
-    it { should belong_to(:project) }
+    it { should belong_to(:project).optional }
     it { should belong_to(:organization_connector) }
 
     # Note: tool_events association uses timeseries schema, tested separately
@@ -53,6 +53,16 @@ RSpec.describe Repository, type: :model do
         expect(Repository.recently_synced).to include(recent)
         expect(Repository.recently_synced).not_to include(old)
         expect(Repository.recently_synced).not_to include(never)
+      end
+    end
+
+    describe '.linked' do
+      it 'returns only repositories with a project' do
+        linked = create(:repository)
+        orphan = create(:repository, project: nil)
+
+        expect(Repository.linked).to include(linked)
+        expect(Repository.linked).not_to include(orphan)
       end
     end
   end

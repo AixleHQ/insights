@@ -98,9 +98,12 @@ function DropdownMenuCheckboxItem({
       checked={checked}
       {...props}
     >
-      <span className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
+      <span className={cn(
+        "pointer-events-none absolute left-2 flex size-3.5 items-center justify-center rounded-[3px] border transition-colors",
+        checked ? "bg-foreground border-foreground" : "border-input"
+      )}>
         <DropdownMenuPrimitive.ItemIndicator>
-          <CheckIcon className="size-4" />
+          <CheckIcon className="size-3 text-background" />
         </DropdownMenuPrimitive.ItemIndicator>
       </span>
       {children}
@@ -155,7 +158,7 @@ function DropdownMenuLabel({
       data-slot="dropdown-menu-label"
       data-inset={inset}
       className={cn(
-        "px-2 py-1.5 text-sm font-medium data-[inset]:pl-8",
+        "px-2 py-1.5 type-label data-[inset]:pl-8",
         className
       )}
       {...props}
@@ -184,7 +187,7 @@ function DropdownMenuShortcut({
     <span
       data-slot="dropdown-menu-shortcut"
       className={cn(
-        "text-muted-foreground ml-auto text-xs tracking-widest",
+        "text-muted-foreground ml-auto text-caption tracking-widest",
         className
       )}
       {...props}

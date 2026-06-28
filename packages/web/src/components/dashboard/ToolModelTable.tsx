@@ -8,6 +8,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/ui/error-state";
 import { Button } from "@/components/ui/button";
 import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import type { ToolModelStat } from "@/lib/types";
@@ -16,6 +17,8 @@ import { formatCost, formatTokens } from "@/lib/formatters";
 interface ToolModelTableProps {
   models: ToolModelStat[];
   isLoading: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
 }
 
 type SortKey = "eventCount" | "costUsd";
@@ -24,6 +27,10 @@ type SortDir = "asc" | "desc";
 function formatPerMillion(n: number | null): string {
   if (n === null || n === undefined) return "—";
   return `$${n.toFixed(2)}`;
+}
+
+function modelLabel(model: ToolModelStat): string {
+  return model.displayName || model.name;
 }
 
 function SortButton({
@@ -75,7 +82,7 @@ function SkeletonRow() {
   );
 }
 
-export function ToolModelTable({ models, isLoading }: ToolModelTableProps) {
+export function ToolModelTable({ models, isLoading, isError, onRetry }: ToolModelTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("costUsd");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
@@ -124,7 +131,18 @@ export function ToolModelTable({ models, isLoading }: ToolModelTableProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {isLoading ? (
+          {isError ? (
+            <TableRow>
+              <TableCell colSpan={7} className="h-24">
+                <ErrorState
+                  compact
+                  title="Could not load models"
+                  description="Something went wrong fetching the data."
+                  onRetry={onRetry}
+                />
+              </TableCell>
+            </TableRow>
+          ) : isLoading ? (
             Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} />)
           ) : sorted.length === 0 ? (
             <TableRow>
@@ -135,7 +153,7 @@ export function ToolModelTable({ models, isLoading }: ToolModelTableProps) {
           ) : (
             sorted.map((row) => (
               <TableRow key={row.name}>
-                <TableCell className="font-medium font-mono text-sm">{row.name}</TableCell>
+                <TableCell className="font-medium font-mono text-sm">{modelLabel(row)}</TableCell>
                 <TableCell className="text-right font-mono text-sm">
                   {row.eventCount.toLocaleString()}
                 </TableCell>

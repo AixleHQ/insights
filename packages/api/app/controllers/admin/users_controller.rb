@@ -16,21 +16,19 @@ module Admin
         )
       else
         render :new, locals: { page: Administrate::Page::Form.new(dashboard, resource) },
-               status: :unprocessable_entity
+               status: :unprocessable_content
       end
     end
 
     def impersonate
       user = User.find(params[:id])
 
-      AdminAuditLog.create!(
+      AdminAuditLog.log_action(
         admin_user: current_admin_user,
-        action: "impersonate",
-        resource_type: "User",
-        resource_id: user.id,
-        metadata: { impersonated_user_email: user.email },
-        ip_address: request.remote_ip,
-        user_agent: request.user_agent
+        action:     "impersonate",
+        resource:   user,
+        metadata:   { impersonated_user_email: user.email },
+        request:    request
       )
 
       ImpersonationAuditService.log_started(user: user, actor: current_admin_user, request: request)
@@ -44,12 +42,6 @@ module Admin
       # Redirect to frontend with impersonation token
       frontend_url = ENV.fetch("FRONTEND_URL", "http://localhost:5173")
       redirect_to "#{frontend_url}/?impersonate=#{token}", allow_other_host: true
-    end
-
-    def stop_impersonation
-      session.delete(:impersonated_user_id)
-      session.delete(:admin_user_id)
-      redirect_to admin_users_path, notice: "Stopped impersonating user."
     end
 
     def export

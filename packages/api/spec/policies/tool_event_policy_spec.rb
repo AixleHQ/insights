@@ -37,7 +37,7 @@ RSpec.describe ToolEventPolicy do
   end
 
   describe 'organization admin' do
-    before { create(:organization_membership, user: user, organization: organization, role: 'admin') }
+    before { create(:organization_membership, user: user, organization: organization, role: 'owner') }
 
     it 'allows index access' do
       expect(policy(tool_event, user: user, organization: organization)).to be_index

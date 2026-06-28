@@ -12,14 +12,16 @@ env:
 permissions:
   id-token: write
   contents: read
+  packages: read
 
 jobs:
   build:
     name: Build & Push Images
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     container: ghcr.io/artempartos/ecs_toolbox:latest
     env:
       ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+      PROJECT: ${{ github.ref_name == 'main' && 'aixle-db90' || 'db90' }}
     strategy:
       matrix:
         image:
@@ -29,12 +31,19 @@ jobs:
           - keycloak
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-to-assume: ${{ github.ref_name == 'main' && secrets.AWS_PRODUCTION_DEPLOY_ROLE_ARN || secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Build and push ${{ matrix.image }}
@@ -43,6 +52,11 @@ jobs:
             --image=${{ matrix.image }} \
             --file=./Dockerfile.${{ matrix.image }}
 
+      # Container steps run as root; host-native jobs need a writable default workspace.
+      - name: Fix workspace permissions
+        if: always()
+        run: chown -R 1000:1000 "$GITHUB_WORKSPACE"
+
   # --- API checks (build from source with CI target) ---
 
   api_test:
@@ -50,7 +64,7 @@ jobs:
     uses: ./.github/workflows/code-check.yml
     secrets: inherit
     with:
-      check_command: bash -c "bundle exec rails db:create db:schema:load && bundle exec rspec"
+      check_command: bash -c "bundle exec rails db:drop db:create db:schema:load && bundle exec rspec"
       container_name: api
 
   api_lint:
@@ -98,66 +112,73 @@ jobs:
       container_name: web
       docker_compose_file: docker-compose.ci-web.yml
 
-  # --- db90-cursor package checks ---
+  # --- @aixle/insights (packages/tools/aixle-insights/) ---
 
-  cursor_check:
-    name: db90-cursor (build + test)
-    runs-on: ubuntu-latest
+  aixle_insights_check:
+    name: "@aixle/insights (build + test)"
+    runs-on: self-hosted
+    env:
+      # Fresh path per run — container jobs leave root-owned files in the default workspace.
+      REPO_DIR: ws-${{ github.run_id }}-insights
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
         with:
-          node-version: '20'
+          path: ${{ env.REPO_DIR }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
           cache: 'npm'
-          cache-dependency-path: packages/db90-cursor/package-lock.json
-      - name: Install dependencies
+          cache-dependency-path: ${{ env.REPO_DIR }}/packages/tools/package-lock.json
+      - name: Install workspace
         run: npm ci
-        working-directory: packages/db90-cursor
+        working-directory: ${{ env.REPO_DIR }}/packages/tools
       - name: Build
-        run: npm run build
-        working-directory: packages/db90-cursor
+        run: npm run build --workspace=@aixle/insights
+        working-directory: ${{ env.REPO_DIR }}/packages/tools
       - name: Test
-        run: npm test
-        working-directory: packages/db90-cursor
+        run: npm test --workspace=@aixle/insights
+        working-directory: ${{ env.REPO_DIR }}/packages/tools
 
-  # --- db90-claude package checks ---
-
-  claude_check:
-    name: db90-claude (build + test)
-    runs-on: ubuntu-latest
+  aixle_insights_windows_install:
+    name: "@aixle/insights (Windows install smoke — better-sqlite3)"
+    runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
-          cache-dependency-path: packages/db90-claude/package-lock.json
-      - name: Install dependencies
+          cache-dependency-path: packages/tools/package-lock.json
+      # Upgrade npm so its bundled node-gyp (12.x+) recognises VS 2025/2026
+      # (version "18" in the install path). The default npm on windows-latest
+      # ships node-gyp 10.x which reports VS 18.x as "unknown version undefined"
+      # and cannot find any VS installation to compile better-sqlite3.
+      - name: Upgrade npm (ships node-gyp 12+ with VS 2025/2026 support)
+        run: npm install -g npm@latest
+      - name: Install workspace
         run: npm ci
-        working-directory: packages/db90-claude
-      - name: Build
-        run: npm run build
-        working-directory: packages/db90-claude
-      - name: Test
-        run: npm test
-        working-directory: packages/db90-claude
+        working-directory: packages/tools
+      - name: Build aixle-insights native dependency
+        run: npm run build --workspace=@aixle/insights
+        working-directory: packages/tools
 
   # --- Deploy pipeline (staging and main only) ---
 
   migrate:
     name: Run DB Migrations
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     container: ghcr.io/artempartos/ecs_toolbox:latest
-    needs: [build, api_test, api_lint, api_security, web_test, web_lint, web_typecheck, cursor_check, claude_check]
+    needs: [build, api_test, api_lint, api_security, web_test, web_lint, web_typecheck, aixle_insights_check, aixle_insights_windows_install]
     if: github.ref_name == 'staging' || github.ref_name == 'main'
     env:
       ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+      PROJECT: ${{ github.ref_name == 'main' && 'aixle-db90' || 'db90' }}
       APPLICATION: api
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-to-assume: ${{ github.ref_name == 'main' && secrets.AWS_PRODUCTION_DEPLOY_ROLE_ARN || secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Run db:migrate
@@ -166,12 +187,13 @@ jobs:
 
   deploy:
     name: Deploy Services
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     container: ghcr.io/artempartos/ecs_toolbox:latest
     needs: [migrate]
     if: github.ref_name == 'staging' || github.ref_name == 'main'
     env:
       ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+      PROJECT: ${{ github.ref_name == 'main' && 'aixle-db90' || 'db90' }}
     strategy:
       matrix:
         service:
@@ -185,7 +207,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-to-assume: ${{ github.ref_name == 'main' && secrets.AWS_PRODUCTION_DEPLOY_ROLE_ARN || secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Deploy ${{ matrix.service }}
@@ -193,18 +215,19 @@ jobs:
 
   post_deploy:
     name: Post Deploy (Rollbar)
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     container: ghcr.io/artempartos/ecs_toolbox:latest
     if: github.ref_name == 'staging' || github.ref_name == 'main'
     env:
       ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+      PROJECT: ${{ github.ref_name == 'main' && 'aixle-db90' || 'db90' }}
       APPLICATION: api
     needs: [deploy]
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-to-assume: ${{ github.ref_name == 'main' && secrets.AWS_PRODUCTION_DEPLOY_ROLE_ARN || secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
       - name: Notify Rollbar of deploy
         run: |

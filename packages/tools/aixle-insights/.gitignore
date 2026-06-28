@@ -1,0 +1,6 @@
+node_modules/
+dist/
+*.log
+
+# npm pack smoke-test artifacts (any version)
+aixle-insights-*.tgz

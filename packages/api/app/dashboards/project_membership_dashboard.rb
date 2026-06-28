@@ -7,6 +7,7 @@ class ProjectMembershipDashboard < Administrate::BaseDashboard
     id: Field::String,
     user: Field::BelongsTo,
     project: Field::BelongsTo,
+    created_by: Field::BelongsTo,
     role: Field::Select.with_options(searchable: false, collection: ProjectMembership::ROLES),
     created_at: Field::DateTime,
     updated_at: Field::DateTime
@@ -24,6 +25,7 @@ class ProjectMembershipDashboard < Administrate::BaseDashboard
     id
     user
     project
+    created_by
     role
     created_at
     updated_at
@@ -37,7 +39,7 @@ class ProjectMembershipDashboard < Administrate::BaseDashboard
 
   COLLECTION_FILTERS = {
     owners: ->(resources) { resources.where(role: "owner") },
-    admins: ->(resources) { resources.where(role: %w[owner admin]) }
+    admins: ->(resources) { resources.where(role: "owner") } # post-AIX-202: admin removed
   }.freeze
 
   def display_resource(membership)

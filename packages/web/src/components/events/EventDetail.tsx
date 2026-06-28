@@ -1,20 +1,27 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Clock, User, Folder, DollarSign, FileText, Shield } from "lucide-react";
+import { ArrowLeft, Clock, User, Folder, DollarSign, FileText, Shield, Cpu } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RiskBadge } from "@/components/dashboard/ActivityFeed";
+import { RiskBadge } from "@/components/ui/risk-badge";
+import { normalizeRiskLevel } from "@/lib/riskLevel";
+import { useOrg } from "@/contexts/OrgContext";
+import { EventTypeBadge } from "@/components/ui/event-type-badge";
 import { cn, humanizeToolName } from "@/lib/utils";
-import { formatTokens } from "@/lib/formatters";
+import { formatCost, formatTokens, isDayGranularityEvent, formatEventDate, formatDateTime } from "@/lib/formatters";
+import { canViewEventPrompt } from "@/lib/eventAccess";
+import { parseRecentCommitFields } from "@/lib/recentCommitEvent";
+import { RecentCommitDetail } from "./RecentCommitDetail";
 
 export interface EventDetailData {
   id: string;
   tool_name?: string;
   event_type?: string;
+  model?: string | null;
   risk_level?: "critical" | "high" | "medium" | "low" | "none";
   cost_usd?: number;
   token_count?: number;
@@ -64,8 +71,8 @@ function DetailRow({
         <Icon className="size-4 text-muted-foreground" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <div className="mt-0.5 text-sm font-medium">{value}</div>
+        <p className="type-caption text-muted-foreground">{label}</p>
+        <div className="mt-0.5 type-label">{value}</div>
       </div>
     </div>
   );
@@ -74,7 +81,7 @@ function DetailRow({
 function ContentPanel({ title, content }: { title: string; content?: string }) {
   return (
     <div className="space-y-2">
-      <h4 className="text-sm font-medium">{title}</h4>
+      <h4 className="type-label">{title}</h4>
       <pre className="max-h-96 overflow-auto rounded-md bg-muted p-4 text-xs">
         <code>{content || "No content available"}</code>
       </pre>
@@ -83,6 +90,9 @@ function ContentPanel({ title, content }: { title: string; content?: string }) {
 }
 
 export function EventDetail({ event, isLoading, className }: EventDetailProps) {
+  const { currentRole } = useOrg();
+  const isOwner = canViewEventPrompt(currentRole);
+
   if (isLoading) {
     return (
       <div className={cn("space-y-6", className)}>
@@ -115,28 +125,30 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
     );
   }
 
-  const formattedDate = new Date(event.created_at).toLocaleString("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+  const formattedDate = isDayGranularityEvent(event.tool_name, event.created_at)
+    ? formatEventDate(event.created_at)
+    : formatDateTime(event.created_at);
+
+  const recentCommit = parseRecentCommitFields(event.metadata, event.event_type);
 
   return (
     <div className={cn("space-y-6", className)}>
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-4">
-          <Button asChild variant="ghost" size="icon">
+          <Button asChild variant="ghost" size="icon" aria-label="Back to events">
             <Link to="/events">
               <ArrowLeft className="size-4" />
             </Link>
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-semibold">{humanizeToolName(event.tool_name)}</h1>
-              <RiskBadge level={event.risk_level || "none"} />
+              <h1 className="type-h3">{humanizeToolName(event.tool_name)}</h1>
+              <RiskBadge level={normalizeRiskLevel(event.risk_level)} />
             </div>
-            <p className="text-sm text-muted-foreground">
-              {(event.event_type || "unknown").replace("_", " ")} · {formattedDate}
-            </p>
+            <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+              <EventTypeBadge type={event.event_type} />
+              <span>· {formattedDate}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -144,7 +156,7 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
       <div className="grid gap-6 md:grid-cols-3">
         <Card className="md:col-span-1">
           <CardHeader>
-            <CardTitle className="text-base">Details</CardTitle>
+            <CardTitle className="type-body-lg">Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <DetailRow
@@ -185,7 +197,7 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
               label="Cost"
               value={
                 event.cost_usd !== undefined ? (
-                  <span className="font-mono-display">${Number(event.cost_usd).toFixed(4)}</span>
+                  <span className="text-sm">{formatCost(event.cost_usd)}</span>
                 ) : (
                   <span className="text-muted-foreground">-</span>
                 )
@@ -196,7 +208,7 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
               label="Tokens"
               value={
                 event.token_count !== undefined ? (
-                  <span className="font-mono-display">
+                  <span className="text-sm">
                     {formatTokens(event.token_count)}
                   </span>
                 ) : (
@@ -204,56 +216,77 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
                 )
               }
             />
+            {event.model && event.model !== "unknown" && (
+              <DetailRow
+                icon={Cpu}
+                label="Model"
+                value={<span className="font-mono text-sm">{event.model}</span>}
+              />
+            )}
             <DetailRow
               icon={Shield}
               label="Risk Level"
-              value={<RiskBadge level={event.risk_level || "none"} />}
+              value={<RiskBadge level={normalizeRiskLevel(event.risk_level)} />}
             />
           </CardContent>
         </Card>
 
+        {recentCommit && (
+          <Card className="md:col-span-3">
+            <CardContent className="pt-6">
+              <RecentCommitDetail commit={recentCommit} />
+            </CardContent>
+          </Card>
+        )}
+
         <Card className="md:col-span-2">
           <CardHeader>
-            <CardTitle className="text-base">Content</CardTitle>
+            <CardTitle className="type-body-lg">Content</CardTitle>
             <CardDescription>
               Raw and sanitized content from this event
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="sanitized">
-              <TabsList>
-                <TabsTrigger value="sanitized">Sanitized</TabsTrigger>
-                <TabsTrigger value="raw">Raw</TabsTrigger>
-                <TabsTrigger value="metadata">Metadata</TabsTrigger>
-              </TabsList>
-              <TabsContent value="sanitized" className="mt-4">
-                <ContentPanel
-                  title="Sanitized Content"
-                  content={event.sanitized_content}
-                />
-              </TabsContent>
-              <TabsContent value="raw" className="mt-4">
-                <ContentPanel title="Raw Content" content={event.raw_content} />
-              </TabsContent>
-              <TabsContent value="metadata" className="mt-4">
-                <ContentPanel
-                  title="Event Metadata"
-                  content={
-                    event.metadata
-                      ? JSON.stringify(event.metadata, null, 2)
-                      : undefined
-                  }
-                />
-              </TabsContent>
-            </Tabs>
+            {isOwner ? (
+              <Tabs defaultValue="sanitized">
+                <TabsList>
+                  <TabsTrigger value="sanitized">Sanitized</TabsTrigger>
+                  <TabsTrigger value="raw">Raw</TabsTrigger>
+                  <TabsTrigger value="metadata">Metadata</TabsTrigger>
+                </TabsList>
+                <TabsContent value="sanitized" className="mt-4">
+                  <ContentPanel
+                    title="Sanitized Content"
+                    content={event.sanitized_content}
+                  />
+                </TabsContent>
+                <TabsContent value="raw" className="mt-4">
+                  <ContentPanel title="Raw Content" content={event.raw_content} />
+                </TabsContent>
+                <TabsContent value="metadata" className="mt-4">
+                  <ContentPanel
+                    title="Event Metadata"
+                    content={
+                      event.metadata
+                        ? JSON.stringify(event.metadata, null, 2)
+                        : undefined
+                    }
+                  />
+                </TabsContent>
+              </Tabs>
+            ) : (
+              <p className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
+                Prompt content is visible to organization owners only.
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {event.findings && event.findings.length > 0 && (
+      {isOwner && event.findings && event.findings.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Security Findings</CardTitle>
+            <CardTitle className="type-body-lg">Security Findings</CardTitle>
             <CardDescription>
               Issues detected during content analysis
             </CardDescription>
@@ -297,7 +330,7 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
                   </div>
                   <p className="mt-2 text-sm">{finding.description}</p>
                   {finding.location && (
-                    <p className="mt-1 font-mono-display text-xs text-muted-foreground">
+                    <p className="mt-1 font-mono-display type-caption text-muted-foreground">
                       Location: {finding.location}
                     </p>
                   )}

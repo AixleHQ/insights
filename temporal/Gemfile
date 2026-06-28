@@ -5,6 +5,7 @@ ruby "3.4.8"
 gem "temporalio"
 gem "concurrent-ruby"
 gem "aws-sdk-s3"
+gem "rexml" # required by aws-sdk-core in the worker container
 
 group :development, :test do
   gem "rspec"

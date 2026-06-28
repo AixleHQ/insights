@@ -10,10 +10,12 @@ import {
   SheetDescription,
   SheetFooter,
 } from "@/components/ui/sheet";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ProviderLogo } from "@/components/icons";
+import { Zap } from "lucide-react";
 import type { ProviderInfo } from "./IntegrationCard";
 
 interface ApiKeyConnectSheetProps {
@@ -36,12 +38,15 @@ export function ApiKeyConnectSheet({
   const connectWithApiKey = useConnectWithApiKey();
 
   const [apiKey, setApiKey] = useState("");
+  const [label, setLabel] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isOpenRouter = provider?.id === "openrouter";
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
       setApiKey("");
+      setLabel("");
       setError(null);
     }
     onOpenChange(nextOpen);
@@ -63,9 +68,11 @@ export function ApiKeyConnectSheet({
           orgId: currentOrg.id,
           connectorType: provider.id,
           apiKey,
+          ...(label.trim() ? { label: label.trim() } : {}),
         });
       }
       setApiKey("");
+      setLabel("");
       onOpenChange(false);
       onSuccess();
     } catch (err) {
@@ -108,10 +115,42 @@ export function ApiKeyConnectSheet({
               onChange={(e) => setApiKey(e.target.value)}
               autoComplete="off"
             />
+            <div className="space-y-1 pt-1">
+              <Label htmlFor="connector-label">Label <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Input
+                id="connector-label"
+                type="text"
+                placeholder="e.g. Production key, Team A"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                autoComplete="off"
+              />
+              <p className="text-xs text-muted-foreground">
+                Optional display name for this connection.
+              </p>
+            </div>
+            {isOpenRouter && (
+              <p className="text-sm text-muted-foreground">
+                Use an OpenRouter management key for usage sync. Standard API keys can proxy model
+                requests, but they cannot fetch activity data for the dashboard.
+              </p>
+            )}
             {error && (
               <p className="text-sm text-destructive">{error}</p>
             )}
           </div>
+
+          {isOpenRouter && (
+            <Alert>
+              <Zap className="size-4" />
+              <AlertTitle>Enable per-request tracking</AlertTitle>
+              <AlertDescription>
+                After connecting, use <strong>Setup webhook</strong> from the
+                integration menu to get a unique webhook URL and configure
+                real-time per-request tracking in OpenRouter.
+              </AlertDescription>
+            </Alert>
+          )}
         </form>
 
         <SheetFooter>

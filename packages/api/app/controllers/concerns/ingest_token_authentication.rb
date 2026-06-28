@@ -14,9 +14,19 @@ module IngestTokenAuthentication
     raw = auth_header&.start_with?("Bearer ") ? auth_header.delete_prefix("Bearer ").strip : nil
     @tool_account = raw.present? ? UserToolAccount.find_by_ingest_token(raw) : nil
 
-    unless @tool_account&.is_active? && @tool_account.organization.present?
+    unless ingest_token_authorized?
       render json: { error: "Unauthorized" }, status: :unauthorized
     end
+  end
+
+  def ingest_token_authorized?
+    return false unless @tool_account&.organization.present?
+    return true if @tool_account.active?
+
+    # Ingest tools are allowed through while waiting_for_connection so the first
+    # ingested event can auto-activate the account (see IngestController#activate_tool_account_if_needed!).
+    # Non-ingest tools (e.g. GitHub Copilot) must be explicitly activated before ingesting.
+    @tool_account.ingest_tool? && @tool_account.waiting_for_connection?
   end
 
   def accessible_projects

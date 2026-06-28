@@ -14,11 +14,15 @@ class ToolEventPolicy < ApplicationPolicy
   end
 
   def update?
-    org_admin?(record_organization) || global_admin?
+    org_owner?(record_organization) || global_admin?
   end
 
   def destroy?
-    org_admin?(record_organization) || global_admin?
+    org_owner?(record_organization) || global_admin?
+  end
+
+  def attribute?
+    org_owner?(record_organization) || global_admin?
   end
 
   # Scoped query for authorized events

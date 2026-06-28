@@ -1,9 +1,17 @@
 # Dependencies
 node_modules/
 vendor/bundle/
+.base-build-args.mk
 
 .playwright-mcp/
 settings.local.json
+CLAUDE.local.md
+/_bmad/
+/_bmad-output/
+.cursor/skills/
+.agents/skills/
+.claude/skills/bmad-*
+.claude/launch.json
 
 # Build outputs
 dist/
@@ -30,6 +38,8 @@ log/
 /packages/api/public/assets
 /packages/api/public/packs
 /packages/api/.bundle
+/packages/tools/db90-mcp/credentials.json
+/packages/tools/db90-mcp/state-localhost*
 !/packages/api/log/.keep
 !/packages/api/tmp/.keep
 
@@ -54,11 +64,9 @@ temporal-data/
 coverage/
 .coverage
 
-# Terraform
-infrastructure/**/.terraform/
-infrastructure/**/backend.tf
-infrastructure/tfvars/
-
 # Misc
 *.log
 *.pid
+
+# Personal Spanish copy of telemetry-mcp local guide (committed doc: LOCAL-DEV.md)
+packages/tools/db90-telemetry-mcp/LOCAL-DEV.es.md

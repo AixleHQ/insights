@@ -88,11 +88,11 @@ RSpec.describe 'Api::V1::Organizations', type: :request do
       expect(Organization.find_by(id: organization.id)).to be_nil
     end
 
-    it 'returns 403 for admins (non-owners)' do
-      admin = create(:user)
-      create(:organization_membership, user: admin, organization: organization, role: 'admin')
+    it 'returns 403 for members' do
+      member = create(:user)
+      create(:organization_membership, user: member, organization: organization, role: 'member')
 
-      authenticated_delete "/api/v1/organizations/#{organization.id}", user: admin
+      authenticated_delete "/api/v1/organizations/#{organization.id}", user: member
 
       expect_forbidden
     end
@@ -187,6 +187,109 @@ RSpec.describe 'Api::V1::Organizations', type: :request do
                           params: { raw_event_ttl: '6_hours' }
 
       expect_forbidden
+    end
+
+    it 'persists cost_threshold_cents and token_threshold alert fields' do
+      authenticated_patch "/api/v1/organizations/#{organization.id}/retention_policy",
+                          user: user,
+                          params: { cost_threshold_cents: 500, token_threshold: 100_000, alert_enabled: true }
+
+      expect_success
+      expect(json_data[:costThresholdCents]).to eq(500)
+      expect(json_data[:tokenThreshold]).to eq(100_000)
+      expect(json_data[:alertEnabled]).to be true
+      expect(organization.retention_policy.reload.cost_threshold_cents).to eq(500)
+    end
+
+    it 'creates alert.update audit log when alert thresholds change' do
+      expect {
+        authenticated_patch "/api/v1/organizations/#{organization.id}/retention_policy",
+                            user: user,
+                            params: { cost_threshold_cents: 500, alert_enabled: true }
+      }.to change(OrganizationAuditLog, :count).by(1)
+
+      expect(OrganizationAuditLog.last.action).to eq('alert.update')
+    end
+
+    it 'creates retention.update audit log when retention TTLs change' do
+      expect {
+        authenticated_patch "/api/v1/organizations/#{organization.id}/retention_policy",
+                            user: user,
+                            params: { tool_events_retention: '180_days' }
+      }.to change(OrganizationAuditLog, :count).by(1)
+
+      expect(OrganizationAuditLog.last.action).to eq('retention.update')
+    end
+
+    it 'allows clearing alert thresholds to nil' do
+      organization.retention_policy.update!(cost_threshold_cents: 500)
+
+      authenticated_patch "/api/v1/organizations/#{organization.id}/retention_policy",
+                          user: user,
+                          params: { cost_threshold_cents: nil }
+
+      expect_success
+      expect(json_data[:costThresholdCents]).to be_nil
+    end
+  end
+
+  describe 'GET /api/v1/organizations/:id/retention_preview' do
+    it 'returns cutoff_date and estimated_records for org owner' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/retention_preview", user: user
+
+      expect_success
+      expect(json_data).to have_key(:cutoffDate)
+      expect(json_data).to have_key(:estimatedRecords)
+    end
+
+    it 'returns cutoff_date as ISO 8601 date string when retention is not forever' do
+      organization.retention_policy.update!(tool_events_retention: '90_days')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/retention_preview", user: user
+
+      expect_success
+      expect(json_data[:cutoffDate]).to match(/\A\d{4}-\d{2}-\d{2}\z/)
+    end
+
+    it 'returns null cutoff_date when retention policy is forever' do
+      organization.retention_policy.update!(
+        tool_events_retention: '30_days',
+        daily_aggregate_retention: 'forever'
+      )
+      # Stub RetentionService to simulate "forever" for tool_events_retention
+      allow(RetentionService).to receive(:retention_cutoff).and_return(nil)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/retention_preview", user: user
+
+      expect_success
+      expect(json_data[:cutoffDate]).to be_nil
+      expect(json_data[:estimatedRecords]).to be_nil
+    end
+
+    it 'returns 403 for org member (non-owner)' do
+      member = create(:user)
+      create(:organization_membership, user: member, organization: organization, role: 'member')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/retention_preview", user: member
+
+      expect_forbidden
+    end
+
+    it 'returns 403 for users not in the organization' do
+      outsider = create(:user)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/retention_preview", user: outsider
+
+      expect_forbidden
+    end
+
+    it 'returns estimated_records as nil when COUNT query times out' do
+      allow(Timeout).to receive(:timeout).and_raise(Timeout::Error)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/retention_preview", user: user
+
+      expect_success
+      expect(json_data[:estimatedRecords]).to be_nil
     end
   end
 end

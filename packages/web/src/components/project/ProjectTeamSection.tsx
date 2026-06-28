@@ -1,18 +1,20 @@
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { Users, GitCommitHorizontal } from "lucide-react";
+import { Trophy } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn, formatDistanceToNow, getMemberDisplayName } from "@/lib/utils";
-import type { ProjectMember, MemberCommitStat } from "@/hooks/useApi";
+import { getMemberDisplayName } from "@/lib/utils";
+import { formatCost, formatCount } from "@/lib/formatters";
+import type { ProjectMember } from "@/hooks/useApi";
 
 interface ProjectTeamSectionProps {
   members: ProjectMember[] | undefined;
   isLoading?: boolean;
   className?: string;
-  commitStats?: MemberCommitStat[];
   projectId?: string;
+  orgId?: string;
+  canManage?: boolean;
 }
 
 function getInitials(name?: string | null, email?: string): string {
@@ -27,29 +29,34 @@ function getInitials(name?: string | null, email?: string): string {
   return email?.slice(0, 2).toUpperCase() || "U";
 }
 
-const roleColors: Record<string, string> = {
-  owner: "bg-violet-500/10 text-violet-400",
-  admin: "bg-amber-500/10 text-amber-400",
-  member: "bg-blue-500/10 text-blue-400",
-  viewer: "bg-slate-500/10 text-slate-400",
-};
+export function ProjectTeamSection({
+  members,
+  isLoading,
+  className,
+  projectId,
+}: ProjectTeamSectionProps) {
+  const ranked = useMemo(
+    () =>
+      [...(members ?? [])]
+        .sort((a, b) => (b.totalCost ?? 0) - (a.totalCost ?? 0))
+        .slice(0, 3),
+    [members]
+  );
 
-export function ProjectTeamSection({ members, isLoading, className, commitStats, projectId }: ProjectTeamSectionProps) {
-  const commitsByUserId = new Map(commitStats?.map((s) => [s.userId, s]) ?? []);
   if (isLoading) {
     return (
       <Card className={className}>
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
-            <Users className="size-4 text-muted-foreground" />
-            <CardTitle className="text-base">Team</CardTitle>
+            <Trophy className="size-4 text-muted-foreground" />
+            <CardTitle className="text-base">Leaderboard</CardTitle>
           </div>
-          <CardDescription>Loading team members...</CardDescription>
+          <CardDescription>Top contributors by spend</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-3">
+          <div className="space-y-2">
             {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="size-10 rounded-full" />
+              <Skeleton key={i} className="h-10 w-full rounded-lg" />
             ))}
           </div>
         </CardContent>
@@ -57,61 +64,57 @@ export function ProjectTeamSection({ members, isLoading, className, commitStats,
     );
   }
 
-  const memberCount = members?.length || 0;
-
   return (
     <Card className={className}>
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
-          <Users className="size-4 text-muted-foreground" />
-          <CardTitle className="text-base">Team</CardTitle>
+          <Trophy className="size-4 text-muted-foreground" />
+          <CardTitle className="text-base">Leaderboard</CardTitle>
         </div>
-        <CardDescription>
-          {memberCount} {memberCount === 1 ? "member" : "members"}
-        </CardDescription>
+        <CardDescription>Top contributors by spend</CardDescription>
       </CardHeader>
       <CardContent>
-        {memberCount > 0 ? (
-          <div className="flex flex-wrap gap-3">
-            {members?.map((member) => {
-              const stats = commitsByUserId.get(member.userId);
-              return (
+        {ranked.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No members yet.</p>
+        ) : (
+          <div className="space-y-1">
+            {ranked.map((member, i) => (
                 <Link
                   key={member.id}
-                  to={projectId ? `/team/${member.userId}?projectId=${projectId}` : `/team/${member.userId}`}
-                  className="group flex items-center gap-2 rounded-lg border p-2 transition-colors hover:bg-muted/50"
+                  to={
+                    projectId
+                      ? `/members/${member.userId}?projectId=${projectId}`
+                      : `/members/${member.userId}`
+                  }
+                  className="flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-muted/50"
                 >
-                  <Avatar className="size-8">
-                    {member.avatarUrl && <AvatarImage src={member.avatarUrl} alt={member.name || member.email} />}
+                  <span className="w-4 shrink-0 text-center text-xs font-medium tabular-nums text-muted-foreground">
+                    {i + 1}
+                  </span>
+                  <Avatar className="size-7 shrink-0">
+                    {member.avatarUrl && (
+                      <AvatarImage src={member.avatarUrl} alt={member.name ?? member.email} />
+                    )}
                     <AvatarFallback className="text-xs bg-muted">
                       {getInitials(member.name, member.email)}
                     </AvatarFallback>
                   </Avatar>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium group-hover:underline">
+                    <p className="truncate text-sm font-medium">
                       {getMemberDisplayName(member)}
                     </p>
-                    <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0", roleColors[member.role])}>
-                      {member.role}
-                    </Badge>
                   </div>
-                  {stats && (
-                    <div className="flex flex-col items-end shrink-0 text-muted-foreground">
-                      <span className="flex items-center gap-1 text-xs font-medium">
-                        <GitCommitHorizontal className="size-3" />
-                        {stats.commitCount}
-                      </span>
-                      {stats.lastCommitAt && (
-                        <span className="text-[10px]">{formatDistanceToNow(stats.lastCommitAt)}</span>
-                      )}
-                    </div>
-                  )}
+                  <div className="shrink-0 text-right">
+                    <p className="text-xs font-medium tabular-nums">
+                      {formatCost(member.totalCost ?? 0)}
+                    </p>
+                    <p className="text-xs text-muted-foreground tabular-nums">
+                      {formatCount(member.totalEvents ?? 0)} events
+                    </p>
+                  </div>
                 </Link>
-              );
-            })}
+              ))}
           </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">No team members assigned to this project</p>
         )}
       </CardContent>
     </Card>

@@ -18,6 +18,7 @@ export function EventDetailPage() {
       id: apiEvent.id,
       tool_name: apiEvent.toolName,
       event_type: apiEvent.eventType,
+      model: apiEvent.model,
       risk_level: apiEvent.riskLevel,
       cost_usd: apiEvent.costUsd,
       token_count:

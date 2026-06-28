@@ -10,7 +10,7 @@ module Api
 
       # POST /api/v1/webhooks/:provider/:connector_id
       def receive
-        provider = params[:provider]
+        provider     = params[:provider]
         connector_id = params[:connector_id]
 
         connector = OrganizationConnector.find(connector_id)
@@ -19,20 +19,27 @@ module Api
           return render json: { error: "Provider mismatch" }, status: :bad_request
         end
 
-        # Parse webhook payload
-        payload = parse_payload
+        payload    = parse_payload
+        raw_key    = store_raw_webhook(connector, payload)
+        event_type = extract_event_type(provider, payload)
 
-        # Store raw webhook
-        raw_key = store_raw_webhook(connector, payload)
+        delivery = WebhookDelivery.create!(
+          organization_connector: connector,
+          provider:       provider,
+          event_type:     event_type || "unknown",
+          raw_event_key:  raw_key,
+          status:         "pending"
+        )
 
-        # Route to appropriate handler
-        result = route_webhook(provider, connector, payload, raw_key)
+        unless WebhookRouter.dispatch(connector, event_type, raw_key, payload: payload, delivery_id: delivery.id)
+          delivery.mark_failed!("No webhook sync job is registered for connector type #{connector.connector_type.inspect}")
+        end
 
         render json: {
           data: {
-            received: true,
-            event_type: result[:event_type],
-            workflow_id: result[:workflow_id]
+            received:   true,
+            event_type: event_type,
+            workflow_id: nil
           }
         }
       rescue ActiveRecord::RecordNotFound
@@ -43,28 +50,28 @@ module Api
         render json: { error: "Missing signature", message: e.message }, status: :bad_request
       rescue StandardError => e
         Rails.logger.error "[Webhooks] Processing failed: #{e.message}"
-        render json: { error: "Processing failed", message: e.message }, status: :unprocessable_entity
+        render json: { error: "Processing failed", message: e.message }, status: :unprocessable_content
       end
 
       private
 
       def verify_signature!
-        provider = params[:provider]
+        provider     = params[:provider]
         connector_id = params[:connector_id]
 
         connector = OrganizationConnector.find_by(id: connector_id)
         return render json: { error: "Connector not found" }, status: :not_found unless connector
 
         secret = connector.webhook_secret
-        return if secret.blank? # Skip verification if no secret configured
+        return if secret.blank?
 
-        verifier = Webhooks::SignatureVerifier.for(provider)
+        verifier  = Webhooks::SignatureVerifier.for(provider)
         signature = verifier.extract_signature(request)
 
         verifier.verify!(
-          payload: request.raw_post,
+          payload:   request.raw_post,
           signature: signature,
-          secret: secret
+          secret:    secret
         )
       end
 
@@ -81,30 +88,13 @@ module Api
 
       def store_raw_webhook(connector, payload)
         RawEventStore.store(
+          payload,
           organization_id: connector.organization_id,
-          payload: payload.to_json,
-          content_type: "application/json",
-          prefix: "webhooks/#{connector.connector_type}"
+          metadata: {
+            content_type: "application/json",
+            source: "webhooks/#{connector.connector_type}"
+          }
         )
-      end
-
-      def route_webhook(provider, connector, payload, raw_key)
-        event_type = extract_event_type(provider, payload)
-
-        case provider
-        when "github"
-          handle_github_webhook(connector, payload, event_type, raw_key)
-        when "gitlab"
-          handle_gitlab_webhook(connector, payload, event_type, raw_key)
-        when "bitbucket"
-          handle_bitbucket_webhook(connector, payload, event_type, raw_key)
-        when "jira"
-          handle_jira_webhook(connector, payload, event_type, raw_key)
-        when "linear"
-          handle_linear_webhook(connector, payload, event_type, raw_key)
-        else
-          { event_type: "unknown", workflow_id: nil }
-        end
       end
 
       def extract_event_type(provider, payload)
@@ -122,67 +112,6 @@ module Api
         else
           "unknown"
         end
-      end
-
-      def handle_github_webhook(connector, payload, event_type, raw_key)
-        # Queue job to process GitHub webhook
-        GithubSyncJob.perform_later(
-          connector.id,
-          "webhook",
-          event_type: event_type,
-          payload: payload,
-          raw_key: raw_key
-        )
-
-        { event_type: event_type, workflow_id: nil }
-      end
-
-      def handle_gitlab_webhook(connector, payload, event_type, raw_key)
-        GitlabSyncJob.perform_later(
-          connector.id,
-          "webhook",
-          event_type: event_type,
-          payload: payload,
-          raw_key: raw_key
-        )
-
-        { event_type: event_type, workflow_id: nil }
-      end
-
-      def handle_bitbucket_webhook(connector, payload, event_type, raw_key)
-        BitbucketSyncJob.perform_later(
-          connector.id,
-          "webhook",
-          event_type: event_type,
-          payload: payload,
-          raw_key: raw_key
-        )
-
-        { event_type: event_type, workflow_id: nil }
-      end
-
-      def handle_jira_webhook(connector, payload, event_type, raw_key)
-        JiraSyncJob.perform_later(
-          connector.id,
-          "webhook",
-          event_type: event_type,
-          payload: payload,
-          raw_key: raw_key
-        )
-
-        { event_type: event_type, workflow_id: nil }
-      end
-
-      def handle_linear_webhook(connector, payload, event_type, raw_key)
-        LinearSyncJob.perform_later(
-          connector.id,
-          "webhook",
-          event_type: event_type,
-          payload: payload,
-          raw_key: raw_key
-        )
-
-        { event_type: event_type, workflow_id: nil }
       end
     end
   end

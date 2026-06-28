@@ -7,6 +7,7 @@ import {
   DollarSign,
   FileText,
   Shield,
+  Cpu,
   ExternalLink,
   ChevronLeft,
   ChevronRight,
@@ -24,11 +25,16 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { RiskBadge } from "@/components/dashboard/ActivityFeed";
+import { RiskBadge } from "@/components/ui/risk-badge";
+import { normalizeRiskLevel } from "@/lib/riskLevel";
 import { useOrg } from "@/contexts/OrgContext";
 import { useEvent } from "@/hooks/useApi";
+import { EventTypeBadge } from "@/components/ui/event-type-badge";
 import { cn, humanizeToolName } from "@/lib/utils";
-import { formatTokens } from "@/lib/formatters";
+import { formatCost, formatTokens } from "@/lib/formatters";
+import { canViewEventPrompt } from "@/lib/eventAccess";
+import { parseRecentCommitFields } from "@/lib/recentCommitEvent";
+import { RecentCommitDetail } from "./RecentCommitDetail";
 
 interface EventDrawerProps {
   eventId: string | null;
@@ -37,6 +43,7 @@ interface EventDrawerProps {
   onNavigate?: (direction: "prev" | "next") => void;
   hasPrev?: boolean;
   hasNext?: boolean;
+  onAssign?: (eventId: string) => void;
 }
 
 function DetailRow({
@@ -56,8 +63,8 @@ function DetailRow({
         <Icon className="size-4 text-muted-foreground" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <div className="mt-0.5 text-sm font-medium">{value}</div>
+        <p className="type-caption text-muted-foreground">{label}</p>
+        <div className="mt-0.5 type-label">{value}</div>
       </div>
     </div>
   );
@@ -66,7 +73,7 @@ function DetailRow({
 function ContentPanel({ title, content }: { title: string; content?: string }) {
   return (
     <div className="space-y-2">
-      <h4 className="text-sm font-medium">{title}</h4>
+      <h4 className="type-label">{title}</h4>
       <pre className="max-h-64 overflow-auto rounded-md bg-muted p-4 text-xs">
         <code className="whitespace-pre-wrap break-all">{content || "No content available"}</code>
       </pre>
@@ -104,8 +111,10 @@ export function EventDrawer({
   onNavigate,
   hasPrev = false,
   hasNext = false,
+  onAssign: _onAssign,
 }: EventDrawerProps) {
-  const { currentOrg } = useOrg();
+  const { currentOrg, currentRole } = useOrg();
+  const isOwner = canViewEventPrompt(currentRole);
   const { data: event, isLoading } = useEvent(currentOrg?.id || "", eventId || "");
 
   const formattedDate = event?.createdAt
@@ -118,6 +127,10 @@ export function EventDrawer({
   const tokenCount =
     event?.tokensTotal ??
     (event?.inputTokens || 0) + (event?.outputTokens || 0);
+
+  const recentCommit = event
+    ? parseRecentCommitFields(event.metadata, event.eventType)
+    : null;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -144,12 +157,10 @@ export function EventDrawer({
                     <SheetTitle className="truncate text-lg">
                       {humanizeToolName(event.toolName)}
                     </SheetTitle>
-                    <RiskBadge level={event.riskLevel || "none"} />
                   </div>
-                  <SheetDescription className="mt-1">
-                    <span className="capitalize">{(event.eventType || "unknown").replace("_", " ")}</span>
-                    {" · "}
-                    {formattedDate}
+                  <SheetDescription className="mt-1 flex flex-wrap items-center gap-2">
+                    <EventTypeBadge type={event.eventType} />
+                    <span>· {formattedDate}</span>
                   </SheetDescription>
                 </div>
                 <div className="flex items-center gap-1">
@@ -188,7 +199,7 @@ export function EventDrawer({
             </SheetHeader>
 
             {/* Scrollable content */}
-            <ScrollArea className="flex-1">
+            <ScrollArea className="flex-1 min-h-0">
               <div className="space-y-6 p-6">
                 {/* Details section */}
                 <div className="space-y-4">
@@ -206,9 +217,9 @@ export function EventDrawer({
                       label="User"
                       value={
                         event.user ? (
-                          <span>{event.user.email}</span>
+                          <span>{event.user.name || event.user.email}</span>
                         ) : (
-                          <span className="text-muted-foreground">Unknown</span>
+                          <span className="text-muted-foreground">Not assigned</span>
                         )
                       }
                     />
@@ -232,15 +243,15 @@ export function EventDrawer({
                     <DetailRow
                       icon={Shield}
                       label="Risk Level"
-                      value={<RiskBadge level={event.riskLevel || "none"} />}
+                      value={<RiskBadge level={normalizeRiskLevel(event.riskLevel)} className="text-sm" />}
                     />
                     <DetailRow
                       icon={DollarSign}
                       label="Cost"
                       value={
                         event.costUsd !== undefined ? (
-                          <span className="font-mono-display">
-                            ${Number(event.costUsd).toFixed(4)}
+                          <span className="text-sm">
+                            {formatCost(event.costUsd)}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">-</span>
@@ -252,7 +263,7 @@ export function EventDrawer({
                       label="Tokens"
                       value={
                         tokenCount > 0 ? (
-                          <span className="font-mono-display">
+                          <span className="text-sm">
                             {formatTokens(tokenCount)}
                           </span>
                         ) : (
@@ -260,49 +271,62 @@ export function EventDrawer({
                         )
                       }
                     />
+                    {event.model && event.model !== "unknown" && (
+                      <DetailRow
+                        icon={Cpu}
+                        label="Model"
+                        value={<span className="font-mono text-sm">{event.model}</span>}
+                      />
+                    )}
                   </div>
                 </div>
 
+                {recentCommit && (
+                  <>
+                    <Separator />
+                    <RecentCommitDetail commit={recentCommit} />
+                  </>
+                )}
+
                 <Separator />
 
-                {/* Content tabs */}
+                {/* Content tabs — owner only */}
                 <div className="space-y-4">
                   <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
                     Content
                   </h3>
-                  <Tabs defaultValue="sanitized">
-                    <TabsList className="w-full justify-start">
-                      <TabsTrigger value="sanitized">Sanitized</TabsTrigger>
-                      <TabsTrigger value="raw">Raw</TabsTrigger>
-                      <TabsTrigger value="metadata">Metadata</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="sanitized" className="mt-4">
-                      <ContentPanel
-                        title="Sanitized Content"
-                        content={event.sanitizedContent || undefined}
-                      />
-                    </TabsContent>
-                    <TabsContent value="raw" className="mt-4">
-                      <ContentPanel
-                        title="Raw Content"
-                        content={event.sanitizedContent || undefined}
-                      />
-                    </TabsContent>
-                    <TabsContent value="metadata" className="mt-4">
-                      <ContentPanel
-                        title="Event Metadata"
-                        content={
-                          event.metadata
-                            ? JSON.stringify(event.metadata, null, 2)
-                            : undefined
-                        }
-                      />
-                    </TabsContent>
-                  </Tabs>
+                  {isOwner ? (
+                    <Tabs defaultValue="sanitized">
+                      <TabsList className="w-full justify-start">
+                        <TabsTrigger value="sanitized">Sanitized</TabsTrigger>
+                        <TabsTrigger value="metadata">Metadata</TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="sanitized" className="mt-4">
+                        <ContentPanel
+                          title="Sanitized Content"
+                          content={event.sanitizedContent || undefined}
+                        />
+                      </TabsContent>
+                      <TabsContent value="metadata" className="mt-4">
+                        <ContentPanel
+                          title="Event Metadata"
+                          content={
+                            event.metadata
+                              ? JSON.stringify(event.metadata, null, 2)
+                              : undefined
+                          }
+                        />
+                      </TabsContent>
+                    </Tabs>
+                  ) : (
+                    <p className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
+                      Prompt content is visible to organization owners only.
+                    </p>
+                  )}
                 </div>
 
-                {/* Security findings */}
-                {event.securityFindings && event.securityFindings.length > 0 && (
+                {/* Security findings — owner only */}
+                {isOwner && event.securityFindings && event.securityFindings.length > 0 && (
                   <>
                     <Separator />
                     <div className="space-y-4">
@@ -347,7 +371,7 @@ export function EventDrawer({
                             </div>
                             <p className="mt-2 text-sm">{finding.description}</p>
                             {finding.location && (
-                              <p className="mt-1 font-mono-display text-xs text-muted-foreground">
+                              <p className="mt-1 font-mono-display type-caption text-muted-foreground">
                                 Location: {finding.location.start}-{finding.location.end}
                               </p>
                             )}

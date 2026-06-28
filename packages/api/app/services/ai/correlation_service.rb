@@ -34,7 +34,7 @@ module Ai
       end
 
       # Batch correlate unattributed events
-      def correlate_unattributed(organization:, limit: 1000)
+      def correlate_unattributed(organization:, limit: 1000, min_confidence: 0.7)
         events = ToolEvent.where(
           organization_id: organization.id,
           user_id: nil
@@ -48,15 +48,28 @@ module Ai
             event_data: extract_event_data(event)
           )
 
-          if result[:user] && result[:confidence] >= 0.7
+          if result[:user] && result[:confidence] >= min_confidence
             event.update!(
               user_id: result[:user].id,
               metadata: event.metadata.merge(
-                correlation_method: result[:correlation_method],
-                correlation_confidence: result[:confidence]
+                "correlation_method" => result[:correlation_method],
+                "correlation_confidence" => result[:confidence]
               )
             )
             results[:correlated] += 1
+          elsif result[:user]
+            # Record the best candidate even when below threshold so the UI can
+            # show why attribution failed and surface it for manual resolution.
+            # candidate_user_id is used by the unattributed events endpoint to
+            # return a suggested user for the one-click confirm flow.
+            event.update!(
+              metadata: event.metadata.merge(
+                "correlation_method" => result[:correlation_method],
+                "correlation_confidence" => result[:confidence],
+                "candidate_user_id" => result[:user].id.to_s
+              )
+            )
+            results[:failed] += 1
           else
             results[:failed] += 1
           end

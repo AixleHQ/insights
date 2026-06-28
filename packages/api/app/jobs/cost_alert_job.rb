@@ -42,6 +42,8 @@ class CostAlertJob
 
   def check_organization_thresholds(org)
     thresholds = load_thresholds(org)
+    return 0 unless thresholds[:alert_enabled]
+
     alerts_sent = 0
 
     slack_enabled = thresholds[:alert_slack]
@@ -71,16 +73,22 @@ class CostAlertJob
   end
 
   def load_thresholds(org)
-    settings = org.organization_settings.where(key: %w[cost_threshold_daily cost_threshold_weekly cost_threshold_monthly cost_threshold_per_user alert_slack])
-                  .pluck(:key, :value)
-                  .to_h
+    # Cost/token thresholds are now stored on the retention policy record (migrated from KV).
+    # A single cost_threshold_cents value replaces the old daily/weekly/monthly KV keys.
+    # daily and weekly periods are no longer configured separately via the UI.
+    policy = org.retention_policy
+
+    cost_usd = policy&.cost_threshold_cents&.fdiv(100) || DEFAULT_THRESHOLDS[:monthly]
+    per_user_raw = OrganizationSetting.get(org, "cost_threshold_per_user")
 
     {
-      daily: settings["cost_threshold_daily"]&.to_f || DEFAULT_THRESHOLDS[:daily],
-      weekly: settings["cost_threshold_weekly"]&.to_f || DEFAULT_THRESHOLDS[:weekly],
-      monthly: settings["cost_threshold_monthly"]&.to_f || DEFAULT_THRESHOLDS[:monthly],
-      per_user: settings["cost_threshold_per_user"]&.to_f,
-      alert_slack: settings["alert_slack"] == "true"
+      daily: DEFAULT_THRESHOLDS[:daily],
+      weekly: nil,
+      monthly: cost_usd,
+      token: policy&.token_threshold,
+      per_user: per_user_raw&.to_f,
+      alert_enabled: policy.nil? || policy.alert_enabled,
+      alert_slack: OrganizationSetting.get(org, "alert_slack") == "true"
     }
   end
 

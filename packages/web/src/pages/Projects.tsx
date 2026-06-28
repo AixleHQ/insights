@@ -3,59 +3,30 @@ import { Link, useNavigate } from "react-router-dom";
 import { Plus, Grid, List, Search } from "lucide-react";
 import { useOrg } from "@/contexts/OrgContext";
 import { useProjects, useDeleteProject } from "@/hooks/useApi";
+import { useFavorites } from "@/hooks/useFavorites";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ProjectCard, type ProjectData } from "@/components/projects";
+import { ProjectCardSkeleton } from "@/components/ui/skeletons";
+import { ProjectCard } from "@/components/projects";
 import { cn } from "@/lib/utils";
 
 type ViewMode = "grid" | "list";
 
-function ProjectSkeleton() {
-  return (
-    <div className="rounded-lg border p-4 space-y-4">
-      <div className="flex items-start justify-between">
-        <div className="space-y-2">
-          <Skeleton className="h-5 w-32" />
-          <Skeleton className="h-4 w-48" />
-        </div>
-        <Skeleton className="h-5 w-16" />
-      </div>
-      <div className="grid grid-cols-3 gap-4">
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-      </div>
-    </div>
-  );
-}
-
 export function Projects() {
-  const { currentOrg } = useOrg();
+  const { currentOrg, currentRole } = useOrg();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const { toggleFavorite, favorites } = useFavorites();
+  const favoritedIds = useMemo(() => new Set(favorites.map((f) => f.id)), [favorites]);
+  const isFavorite = (id: string) => favoritedIds.has(id);
 
-  const { data: projectsData, isLoading } = useProjects(currentOrg?.id || "");
+  const { data: projects, isLoading } = useProjects(currentOrg?.id || "");
   const deleteProject = useDeleteProject();
 
-  // Transform API response to component format
-  const projects: ProjectData[] = useMemo(() => {
-    return projectsData?.map((p) => ({
-      id: p.id,
-      name: p.name,
-      description: p.description || undefined,
-      repository_url: p.repositoryUrl || undefined,
-      is_active: p.isActive ?? true,
-      event_count: p.event_count,
-      total_cost_usd: p.total_cost_usd,
-      last_event_at: p.last_event_at || undefined,
-      created_at: p.created_at,
-      connectors: p.connectors,
-    })) || [];
-  }, [projectsData]);
-
   const filteredProjects = useMemo(() => {
+    if (!projects) return [];
+
     return projects.filter((project) =>
       project.name.toLowerCase().includes(search.toLowerCase()) ||
       project.description?.toLowerCase().includes(search.toLowerCase())
@@ -80,17 +51,19 @@ export function Projects() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
+          <h1 className="type-h2">Projects</h1>
           <p className="text-sm text-muted-foreground">
             Manage your projects and track AI tool usage
           </p>
         </div>
-        <Button asChild className="w-full sm:w-auto">
-          <Link to="/projects/new">
-            <Plus className="mr-2 size-4" />
-            New Project
-          </Link>
-        </Button>
+        {currentRole === "owner" && (
+          <Button asChild className="w-full sm:w-auto">
+            <Link to="/projects/new">
+              <Plus className="mr-2 size-4" />
+              New Project
+            </Link>
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -135,7 +108,7 @@ export function Projects() {
           )}
         >
           {Array.from({ length: 6 }).map((_, i) => (
-            <ProjectSkeleton key={i} />
+            <ProjectCardSkeleton key={i} />
           ))}
         </div>
       ) : filteredProjects.length === 0 ? (
@@ -151,11 +124,11 @@ export function Projects() {
             >
               Clear search
             </Button>
-          ) : (
+          ) : currentRole === "owner" ? (
             <Button asChild variant="link" className="mt-2">
               <Link to="/projects/new">Create your first project</Link>
             </Button>
-          )}
+          ) : null}
         </div>
       ) : (
         <div
@@ -172,6 +145,8 @@ export function Projects() {
               project={project}
               onEdit={handleEdit}
               onDelete={handleDelete}
+              isFavorited={isFavorite(project.id)}
+              onToggleFavorite={toggleFavorite}
             />
           ))}
         </div>

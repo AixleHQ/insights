@@ -158,13 +158,50 @@ describe("IngestTokenConnectSheet", () => {
       return user;
     }
 
-    it("shows npx db90-cursor command for cursor", async () => {
+    it("defaults MCP (recommended) tab with npx telemetry-mcp init for cursor", async () => {
       await goToSetupStep(cursorProvider);
-      expect(screen.getByText(/npx db90-cursor --token/i)).toBeInTheDocument();
+      const mcpTab = screen.getByRole("tab", { name: /MCP \(recommended\)/i });
+      expect(mcpTab).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByLabelText(/Recommended MCP install command/i)).toHaveTextContent(
+        /npx -y @aixle\/insights init --host http:\/\/localhost:3000/,
+      );
     });
 
-    it("shows settings.json instructions for claude-code", async () => {
+    it("shows standalone Cursor CLI after selecting Standalone CLI tab", async () => {
+      const user = userEvent.setup();
+      await goToSetupStep(cursorProvider);
+      await user.click(screen.getByRole("tab", { name: /Standalone CLI/i }));
+      expect(
+        screen.getByText(
+          /npx -y @aixle\/insights --token db90_abc123testtoken --host http:\/\/localhost:3000/,
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("defaults MCP (recommended) tab with npx telemetry-mcp init for claude-code", async () => {
       await goToSetupStep(claudeCodeProvider);
+      const mcpTab = screen.getByRole("tab", { name: /MCP \(recommended\)/i });
+      expect(mcpTab).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByLabelText(/Recommended MCP install command/i)).toHaveTextContent(
+        /npx -y @aixle\/insights init --host http:\/\/localhost:3000/,
+      );
+    });
+
+    it("shows standalone Claude CLI after selecting Standalone CLI tab", async () => {
+      const user = userEvent.setup();
+      await goToSetupStep(claudeCodeProvider);
+      await user.click(screen.getByRole("tab", { name: /Standalone CLI/i }));
+      expect(
+        screen.getByText(
+          /npx -y @aixle\/insights --token db90_abc123testtoken --host http:\/\/localhost:3000/,
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("shows ~/.claude/settings.json hook snippet on Advanced hooks tab", async () => {
+      const user = userEvent.setup();
+      await goToSetupStep(claudeCodeProvider);
+      await user.click(screen.getByRole("tab", { name: /Advanced hooks/i }));
       expect(screen.getByText(/~\/.claude\/settings\.json/i)).toBeInTheDocument();
     });
   });

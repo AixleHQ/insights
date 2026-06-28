@@ -12,7 +12,8 @@ class RawEventStore
   class << self
     def store(payload, organization_id:, metadata: {})
       key = generate_key(organization_id)
-      encrypted_data, iv, auth_tag = encrypt(payload.to_json)
+      plaintext = payload.is_a?(String) ? payload : payload.to_json
+      encrypted_data, iv, auth_tag = encrypt(plaintext)
 
       client.put_object(
         bucket: bucket_name,
@@ -40,7 +41,9 @@ class RawEventStore
       encrypted_data = response.body.read
 
       decrypted = decrypt(encrypted_data, iv, auth_tag)
-      JSON.parse(decrypted)
+      parsed = JSON.parse(decrypted)
+      parsed = JSON.parse(parsed) if parsed.is_a?(String)
+      parsed
     rescue Aws::S3::Errors::NoSuchKey
       nil
     end

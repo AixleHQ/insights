@@ -77,7 +77,7 @@ function InvitationCard({
           <p className="text-sm text-muted-foreground">
             Invited by {invitation.invitedByName}
           </p>
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1 type-caption text-muted-foreground">
             <Clock className="size-3" />
             <span>
               {isExpired ? "Expired" : `Expires ${formatDate(invitation.expiresAt)}`}
@@ -178,7 +178,7 @@ export function Onboarding() {
 
       // Navigate to dashboard
       if (result.data?.organization) {
-        navigate("/profile");
+        navigate("/");
       }
     } catch (err) {
       console.error("Failed to accept invitation:", err);
@@ -240,10 +240,10 @@ export function Onboarding() {
           <div className="flex items-center gap-3">
             <div className="flex size-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70">
               <span className="font-mono text-sm font-bold text-primary-foreground">
-                90
+                AI
               </span>
             </div>
-            <span className="text-lg font-semibold tracking-tight">DB90</span>
+            <span className="type-h4">Aixle Insights</span>
           </div>
           {profile && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -261,8 +261,8 @@ export function Onboarding() {
             <div className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-primary/10">
               <Sparkles className="size-8 text-primary" />
             </div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              Welcome to DB90
+            <h1 className="type-h1">
+              Welcome to Aixle Insights
             </h1>
             <p className="mx-auto max-w-md text-muted-foreground">
               You're not part of any organization yet. Create your own organization or
@@ -410,24 +410,14 @@ export function Onboarding() {
             </Card>
           </div>
 
-          {/* Help text */}
-          <p className="text-center text-sm text-muted-foreground">
-            Need help getting started?{" "}
-            <a
-              href="mailto:support@db90.dev"
-              className="text-primary underline-offset-4 hover:underline"
-            >
-              Contact support
-            </a>
-          </p>
         </div>
       </main>
 
       {/* Footer */}
       <footer className="relative z-10 border-t bg-background/80 backdrop-blur-sm">
         <div className="mx-auto flex h-14 max-w-4xl items-center justify-center px-6">
-          <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} Acme Corp. All rights reserved.
+          <p className="type-caption text-muted-foreground">
+            &copy; {new Date().getFullYear()} Aixle Insights. All rights reserved.
           </p>
         </div>
       </footer>

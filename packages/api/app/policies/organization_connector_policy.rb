@@ -12,27 +12,27 @@ class OrganizationConnectorPolicy < ApplicationPolicy
 
   # Only admins can create connectors
   def create?
-    org_admin?(record.organization) || global_admin?
+    org_owner?(record.organization) || global_admin?
   end
 
   # Only admins can update connectors
   def update?
-    org_admin?(record.organization) || global_admin?
+    org_owner?(record.organization) || global_admin?
   end
 
   # Only admins can delete connectors
   def destroy?
-    org_admin?(record.organization) || global_admin?
+    org_owner?(record.organization) || global_admin?
   end
 
   # Only admins can test connectors
   def test?
-    org_admin?(record.organization) || global_admin?
+    org_owner?(record.organization) || global_admin?
   end
 
   # Only admins can trigger sync
   def sync?
-    org_admin?(record.organization) || global_admin?
+    org_owner?(record.organization) || global_admin?
   end
 
   # Members can view sync status
@@ -42,22 +42,27 @@ class OrganizationConnectorPolicy < ApplicationPolicy
 
   # Only admins can list available repositories from the provider
   def available_repos?
-    org_admin?(record.organization) || global_admin?
+    org_owner?(record.organization) || global_admin?
   end
 
   # Only admins can list available Jira projects from the provider
   def available_projects?
-    org_admin?(record.organization) || global_admin?
+    org_owner?(record.organization) || global_admin?
   end
 
   # Only admins can start OAuth flow
   def authorize?
-    org_admin?(record.organization) || global_admin?
+    org_owner?(record.organization) || global_admin?
   end
 
   # OAuth callback (same as authorize)
   def callback?
-    org_admin?(record.organization) || global_admin?
+    org_owner?(record.organization) || global_admin?
+  end
+
+  # Only admins can view health rollup (contains error details)
+  def health?
+    org_owner?(record.organization) || global_admin?
   end
 
   # Members can use AI connectors (proxy requests)

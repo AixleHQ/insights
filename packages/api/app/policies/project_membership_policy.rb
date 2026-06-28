@@ -1,60 +1,58 @@
 # frozen_string_literal: true
 
 class ProjectMembershipPolicy < ApplicationPolicy
-  # Project members can view membership list
   def index?
-    can_view_project?
+    can_view_membership_list?
   end
 
   def show?
-    can_view_project?
+    can_view_membership_list?
   end
 
-  # Project admins can add members
+  # Aggregate stats (collection) and per-member breakdown — intentionally tighter than
+  # index?/show? because these expose cost/token data that plain members should not see.
+  def stats?
+    return true if global_admin?
+
+    project_owner?(record.project)
+  end
+
   def create?
-    project_admin?(record.project) || global_admin?
+    can_mutate_membership?
   end
 
-  # Project admins can update memberships
   def update?
-    return true if global_admin?
-    return false unless project_admin?(record.project)
-
-    # Can't demote an owner unless you're also an owner
-    if record.owner?
-      project_owner?(record.project)
-    else
-      true
-    end
+    can_mutate_membership?
   end
 
-  # Project admins can remove members
   def destroy?
-    return true if global_admin?
-    return false unless project_admin?(record.project)
-
-    # Can't remove an owner unless you're also an owner
-    if record.owner?
-      project_owner?(record.project)
-    else
-      true
-    end
+    can_mutate_membership?
   end
 
   private
 
-  def can_view_project?
+  def can_view_membership_list?
     return true if global_admin?
+
     project = record.project
     return project.owner_id == user&.id if project.personal?
-    org_member?(project.organization)
+
+    project_owner?(project) || project_member?(project)
+  end
+
+  def can_mutate_membership?
+    return true if global_admin?
+
+    project = record.project
+    return project_owner?(project) if project.personal?
+
+    org_owner?(project.organization)
   end
 
   relation_scope do |scope|
     if global_admin?
       scope.all
     elsif user
-      # Memberships for projects user can access
       org_ids = user.organization_ids
       project_ids = Project.where(owner_id: user.id)
                            .or(Project.where(organization_id: org_ids))

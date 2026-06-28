@@ -1,28 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Shield, Activity, Lock, Mail, KeyRound } from "lucide-react";
+import { Loader2, Mail, Fingerprint } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 
-function FeatureItem({ icon: Icon, title, description }: { icon: typeof Shield; title: string; description: string }) {
-  return (
-    <div className="flex items-start gap-3">
-      <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-        <Icon className="size-4 text-primary" />
-      </div>
-      <div>
-        <p className="text-sm font-medium">{title}</p>
-        <p className="text-xs text-muted-foreground">{description}</p>
-      </div>
-    </div>
-  );
-}
-
-// Google logo SVG component
 function GoogleLogo({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -34,28 +18,35 @@ function GoogleLogo({ className }: { className?: string }) {
   );
 }
 
+const DOTS = Array.from({ length: 22 }, (_, i) => ({
+  id: i,
+  top: `${Math.floor((i * 37 + 11) % 95)}%`,
+  left: `${Math.floor((i * 53 + 7) % 95)}%`,
+  delay: `${((i * 0.47) % 4).toFixed(2)}s`,
+  duration: `${(3 + (i * 0.31) % 4).toFixed(2)}s`,
+  size: i % 3 === 0 ? 3 : 2,
+}));
+
 export function Login() {
   const navigate = useNavigate();
   const { isAuthenticated, isLoading, login, directLogin } = useAuth();
 
+  const [showEmailForm, setShowEmailForm] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
       navigate("/", { replace: true });
     }
   }, [isAuthenticated, navigate]);
 
-  // Handle direct login with username/password
   const handleDirectLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
     setIsSubmitting(true);
-
     try {
       await directLogin(email, password);
       navigate("/", { replace: true });
@@ -66,170 +57,162 @@ export function Login() {
     }
   };
 
-  // Handle SSO login - redirects to Keycloak
-  const handleSSOLogin = () => {
-    login();
-  };
-
   if (isLoading) {
     return (
-      <div className="flex min-h-svh items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="size-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Loading...</p>
-        </div>
+      // Force dark tokens — login is always dark per Figma design
+      <div className="dark flex min-h-svh items-center justify-center bg-background">
+        <Loader2 className="size-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-svh bg-background">
-      {/* Left panel - branding */}
-      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between bg-primary/5 p-12">
-        <div className="flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70">
-            <span className="font-mono text-lg font-bold text-primary-foreground">90</span>
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">DB90</h1>
-            <p className="text-xs text-muted-foreground">AI Tool Analytics</p>
-          </div>
-        </div>
-
-        <div className="space-y-8">
-          <div>
-            <h2 className="text-3xl font-bold tracking-tight">
-              Monitor, Analyze, Optimize
-            </h2>
-            <p className="mt-2 text-lg text-muted-foreground">
-              Track AI tool usage across your organization with comprehensive analytics and security monitoring.
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            <FeatureItem
-              icon={Activity}
-              title="Real-time Analytics"
-              description="Monitor usage, costs, and performance across all AI tools"
-            />
-            <FeatureItem
-              icon={Shield}
-              title="Security Compliance"
-              description="Automatic detection and sanitization of sensitive data"
-            />
-            <FeatureItem
-              icon={Lock}
-              title="Enterprise Ready"
-              description="Role-based access, audit logs, and SSO integration"
-            />
-          </div>
-        </div>
-
-        <p className="text-xs text-muted-foreground">
-          &copy; {new Date().getFullYear()} Acme Corp. All rights reserved.
-        </p>
+    // Force dark tokens — login is always dark per Figma design
+    <div className="dark relative flex min-h-svh items-center justify-center overflow-hidden bg-background">
+      {/* Particle background */}
+      <div className="pointer-events-none fixed inset-0" aria-hidden="true">
+        {DOTS.map((dot) => (
+          <span
+            key={dot.id}
+            className="absolute rounded-full bg-muted-foreground/30"
+            style={{
+              top: dot.top,
+              left: dot.left,
+              width: dot.size,
+              height: dot.size,
+              animation: `float-dot ${dot.duration} ${dot.delay} ease-in-out infinite`,
+              opacity: 0,
+            }}
+          />
+        ))}
       </div>
 
-      {/* Right panel - login form */}
-      <div className="flex flex-1 items-center justify-center p-6">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/70 lg:hidden">
-              <span className="font-mono text-xl font-bold text-primary-foreground">90</span>
-            </div>
-            <CardTitle className="text-2xl">Welcome to DB90</CardTitle>
-            <CardDescription>
-              Sign in to access your organization's AI tool analytics
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {formError && (
-              <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
-                <p className="text-sm text-destructive">{formError}</p>
-              </div>
-            )}
+      {/* Login card */}
+      <div className="relative z-10 w-full max-w-sm px-4">
+        {/* Logo */}
+        <div className="mb-8 flex flex-col items-center gap-4 text-center">
+          <div className="flex size-14 items-center justify-center rounded-2xl bg-primary shadow-lg">
+            <span className="font-mono-display type-h2 text-primary-foreground">AI</span>
+          </div>
+          <div>
+            <h1 className="type-h2 text-foreground">Aixle Insights</h1>
+            <p className="mt-1 type-body leading-snug text-muted-foreground">
+              Every AI Token your team ever spent.<br />Right Here.
+            </p>
+          </div>
+        </div>
 
-            {/* Google Sign-In Button - uses Keycloak SSO */}
+        {/* Auth buttons */}
+        <div className="space-y-3">
+          {formError && (
+            <div className="rounded-lg border border-red-800/50 bg-red-950/50 p-3">
+              <p className="text-sm text-red-400">{formError}</p>
+            </div>
+          )}
+
+          {/* Google */}
+          <Button
+            type="button"
+            size="lg"
+            className="w-full bg-primary text-primary-foreground hover:bg-primary/80"
+            onClick={login}
+          >
+            <GoogleLogo className="mr-2 size-5" />
+            Continue with Google
+          </Button>
+
+          {/* Email toggle */}
+          {!showEmailForm ? (
             <Button
               type="button"
               variant="outline"
               size="lg"
-              className="w-full"
-              onClick={handleSSOLogin}
+              className="w-full border-border bg-transparent text-foreground/80 hover:bg-accent hover:text-accent-foreground"
+              onClick={() => setShowEmailForm(true)}
             >
-              <GoogleLogo className="mr-2 size-5" />
-              Continue with Google
+              <Mail className="mr-2 size-4" />
+              Continue with Email
             </Button>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <Separator />
+          ) : (
+            <form onSubmit={handleDirectLogin} className="space-y-3 rounded-lg border border-border bg-card/60 p-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="email" className="text-foreground/70">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="you@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="border-border bg-input text-foreground placeholder:text-muted-foreground"
+                  required
+                  autoComplete="email"
+                  autoFocus
+                />
               </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">
-                  Or continue with email
-                </span>
+              <div className="space-y-1.5">
+                <Label htmlFor="password" className="text-foreground/70">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="border-border bg-input text-foreground placeholder:text-muted-foreground"
+                  required
+                  autoComplete="current-password"
+                />
               </div>
-            </div>
-
-            {/* Email/Password Form */}
-            <form onSubmit={handleDirectLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="you@company.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10"
-                    required
-                    autoComplete="email"
-                  />
-                </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-foreground"
+                  onClick={() => { setShowEmailForm(false); setFormError(null); }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="flex-1"
+                  disabled={isSubmitting || !email || !password}
+                >
+                  {isSubmitting ? (
+                    <><Loader2 className="mr-2 size-4 animate-spin" />Signing in...</>
+                  ) : (
+                    "Sign in"
+                  )}
+                </Button>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <KeyRound className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10"
-                    required
-                    autoComplete="current-password"
-                  />
-                </div>
-              </div>
-
-              <Button
-                type="submit"
-                className="w-full"
-                size="lg"
-                disabled={isSubmitting || !email || !password}
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 size-4 animate-spin" />
-                    Signing in...
-                  </>
-                ) : (
-                  "Sign in"
-                )}
-              </Button>
             </form>
+          )}
 
-            <p className="text-center text-xs text-muted-foreground">
-              By continuing, you agree to our Terms of Service and Privacy Policy.
-            </p>
-          </CardContent>
-        </Card>
+          {/* Passkey — coming soon */}
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            disabled
+            aria-disabled={true}
+            className="w-full cursor-not-allowed border-border bg-transparent text-muted-foreground"
+          >
+            <Fingerprint className="mr-2 size-4" />
+            Continue with Passkey
+            <Badge variant="secondary" className="ml-auto text-[10px]">Coming soon</Badge>
+          </Button>
+        </div>
+
+        {/* Sign up */}
+        <p className="mt-6 text-center type-body text-muted-foreground">
+          Don&apos;t have an account?{" "}
+          <button
+            type="button"
+            className="text-foreground/70 underline-offset-4 hover:text-foreground hover:underline"
+          >
+            Sign Up
+          </button>
+        </p>
       </div>
     </div>
   );

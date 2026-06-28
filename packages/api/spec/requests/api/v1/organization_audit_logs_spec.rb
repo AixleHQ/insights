@@ -7,13 +7,15 @@ RSpec.describe "Api::V1::OrganizationAuditLogs", type: :request do
   let(:admin) { create(:user) }
   let(:member) { create(:user) }
   let(:viewer) { create(:user) }
+  let(:global_admin) { create(:user, :global_admin) }
   let(:organization) { create(:organization) }
 
   before do
     create(:organization_membership, user: owner, organization: organization, role: "owner")
-    create(:organization_membership, user: admin, organization: organization, role: "admin")
+    create(:organization_membership, user: admin, organization: organization, role: "owner")
     create(:organization_membership, user: member, organization: organization, role: "member")
     create(:organization_membership, user: viewer, organization: organization, role: "viewer")
+    create(:organization_membership, user: global_admin, organization: organization, role: "member")
   end
 
   describe "GET /api/v1/organizations/:organization_id/audit_logs" do
@@ -51,6 +53,44 @@ RSpec.describe "Api::V1::OrganizationAuditLogs", type: :request do
         expect(log[:trackedChanges]).to have_key(:key)
       end
 
+      it "includes ip_address" do
+        log_with_ip = create(:organization_audit_log, organization: organization, actor: admin,
+                                                      action: "connector.delete", ip_address: "1.2.3.4")
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/audit_logs",
+                          user: owner,
+                          organization: organization
+
+        expect_success
+        log = json_data.find { |l| l[:id] == log_with_ip.id }
+        expect(log).to have_key(:ipAddress)
+      end
+
+      it "includes severity and outcome" do
+        authenticated_get "/api/v1/organizations/#{organization.id}/audit_logs",
+                          user: owner,
+                          organization: organization
+
+        expect_success
+        log = json_data.find { |l| l[:action] == "connector.create" }
+        expect(log[:severity]).to eq("info")
+        expect(log[:outcome]).to eq("success")
+      end
+
+      it "includes user_agent" do
+        log_with_ua = create(:organization_audit_log, organization: organization, actor: admin,
+                                                      action: "connector.delete",
+                                                      user_agent: "Mozilla/5.0")
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/audit_logs",
+                          user: owner,
+                          organization: organization
+
+        expect_success
+        log = json_data.find { |l| l[:id] == log_with_ua.id }
+        expect(log[:userAgent]).to eq("Mozilla/5.0")
+      end
+
       it "returns logs ordered by created_at desc" do
         authenticated_get "/api/v1/organizations/#{organization.id}/audit_logs",
                           user: owner,
@@ -70,6 +110,28 @@ RSpec.describe "Api::V1::OrganizationAuditLogs", type: :request do
 
         expect_success
         expect(json_data.length).to eq(3)
+      end
+    end
+
+    context "when authenticated as global admin" do
+      it "returns audit logs" do
+        authenticated_get "/api/v1/organizations/#{organization.id}/audit_logs",
+                          user: global_admin,
+                          organization: organization
+
+        expect_success
+        expect(json_data.length).to eq(3)
+      end
+
+      it "includes ip_address and tracked_changes" do
+        authenticated_get "/api/v1/organizations/#{organization.id}/audit_logs",
+                          user: global_admin,
+                          organization: organization
+
+        expect_success
+        log = json_data.find { |l| l[:action] == "settings.update" }
+        expect(log).to have_key(:trackedChanges)
+        expect(log).to have_key(:ipAddress)
       end
     end
 
@@ -144,6 +206,22 @@ RSpec.describe "Api::V1::OrganizationAuditLogs", type: :request do
         expect_success
         ids = json_data.map { |l| l[:id] }
         expect(ids).not_to include(future_log.id)
+      end
+
+      it "includes same-day entries for date-only to_date (HTML date input)" do
+        today = Time.zone.parse("2026-05-26 15:30:00")
+        today_log = create(:organization_audit_log, organization: organization, actor: admin,
+                                                    action: "connector.sync", created_at: today)
+
+        travel_to Time.zone.parse("2026-05-26 12:00:00") do
+          authenticated_get "/api/v1/organizations/#{organization.id}/audit_logs",
+                            user: owner,
+                            organization: organization,
+                            params: { to_date: "2026-05-26" }
+
+          expect_success
+          expect(json_data.map { |l| l[:id] }).to include(today_log.id)
+        end
       end
 
       it "filters by resource_type" do

@@ -40,9 +40,12 @@ class AttributionJob
   private
 
   def attribute_organization_events(org, batch_size, min_confidence)
+    org_threshold = OrganizationSetting.get(org, "min_attribution_confidence", default: min_confidence).to_f
+
     result = Ai::CorrelationService.correlate_unattributed(
       organization: org,
-      limit: batch_size
+      limit: batch_size,
+      min_confidence: org_threshold
     )
 
     Rails.logger.info("[AttributionJob] Org #{org.slug}: Correlated #{result[:correlated]}, Failed #{result[:failed]}")

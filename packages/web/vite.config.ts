@@ -12,8 +12,8 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg", "icon-192.svg", "icon-512.svg", "icon-maskable.svg"],
       manifest: {
-        name: "DB90 - AI Tool Analytics",
-        short_name: "DB90",
+        name: "Aixle Insights - AI Tool Analytics",
+        short_name: "Aixle Insights",
         description: "Monitor and manage AI coding tool usage across your organization",
         theme_color: "#10b981",
         background_color: "#0a0a0a",

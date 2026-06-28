@@ -5,14 +5,26 @@ import {
   useProjectConnectWithApiKey,
   useProjectDeleteConnector,
   useProjectTestConnector,
+  useOrgProviderSettings,
 } from "@/hooks/useApi";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   IntegrationCard,
+  IntegrationSkeleton,
   type IntegrationData,
   type IntegrationProvider,
+  type IntegrationScope,
   type ProviderInfo,
 } from "@/components/integrations";
 import type { ConnectorStatus } from "@/lib/types";
@@ -23,8 +35,9 @@ const PROVIDERS: ProviderInfo[] = [
   {
     id: "anthropic",
     name: "Anthropic API",
-    description: "Direct Anthropic API integration 1",
+    description: "Track Anthropic API usage, costs, and model analytics",
     category: "ai",
+    scope: "project",
     features: [
       "API key management",
       "Usage monitoring",
@@ -38,6 +51,7 @@ const PROVIDERS: ProviderInfo[] = [
     name: "OpenAI",
     description: "Track OpenAI API usage and costs",
     category: "ai",
+    scope: "project",
     features: [
       "API usage tracking",
       "GPT model analytics",
@@ -51,6 +65,7 @@ const PROVIDERS: ProviderInfo[] = [
     name: "OpenRouter",
     description: "Multi-model AI gateway tracking",
     category: "ai",
+    scope: "project",
     features: [
       "Multi-provider analytics",
       "Model comparison",
@@ -64,6 +79,7 @@ const PROVIDERS: ProviderInfo[] = [
     name: "Gemini",
     description: "Track Google Gemini API usage and costs",
     category: "ai",
+    scope: "project",
     features: [
       "API usage tracking",
       "Model analytics",
@@ -77,6 +93,7 @@ const PROVIDERS: ProviderInfo[] = [
     name: "Slack",
     description: "Send project alerts and notifications to Slack",
     category: "communication",
+    scope: "project",
     features: [
       "Cost alerts",
       "Usage notifications",
@@ -88,28 +105,16 @@ const PROVIDERS: ProviderInfo[] = [
   },
 ];
 
-function IntegrationSkeleton() {
-  return (
-    <div className="rounded-lg border p-4 space-y-4">
-      <div className="flex items-center gap-3">
-        <Skeleton className="size-10 rounded-lg" />
-        <div className="space-y-2">
-          <Skeleton className="h-5 w-32" />
-          <Skeleton className="h-4 w-24" />
-        </div>
-      </div>
-      <Skeleton className="h-6 w-24" />
-      <Skeleton className="h-4 w-40" />
-    </div>
-  );
-}
 
 interface ProjectConnectorsTabProps {
   projectId: string;
+  orgId?: string;
 }
 
-export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
+// orgId defaults to "" so useOrgProviderSettings is disabled and all providers show (fail-open)
+export function ProjectConnectorsTab({ projectId, orgId = "" }: ProjectConnectorsTabProps) {
   const { data: connectorsData, isLoading } = useProjectConnectors(projectId);
+  const { enabledMap } = useOrgProviderSettings(orgId);
   const connectWithApiKey = useProjectConnectWithApiKey();
   const deleteConnector = useProjectDeleteConnector();
   const testConnector = useProjectTestConnector();
@@ -122,6 +127,7 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
   const [testingConnectorId, setTestingConnectorId] = useState<string | null>(
     null,
   );
+  const [disconnectingConnectorId, setDisconnectingConnectorId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const integrations: IntegrationData[] = useMemo(() => {
@@ -134,6 +140,10 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
       const lastSyncAt = c.lastSyncAt || c.last_sync_at;
       const status: ConnectorStatus = c.status;
       const providerInfo = PROVIDERS.find((p) => p.id === connectorType);
+      // Only show error copy when the connector is actually in error state,
+      // so a stale last_error from a previous attempt does not appear after reconnect.
+      const syncError =
+        status === "error" && lastError ? lastError : undefined;
 
       return {
         id: c.id,
@@ -141,18 +151,19 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
         name: externalAccountName || providerInfo?.name || connectorType,
         status,
         last_sync_at: lastSyncAt || undefined,
-        sync_error: lastError || undefined,
+        sync_error: syncError,
         metadata: {
           account_name: externalAccountName || "",
           resources_count: 0,
         },
+        scope: c.scope as IntegrationScope,
       };
     });
   }, [connectorsData]);
 
   const connectedProviderIds = new Set(integrations.map((c) => c.provider));
   const availableProviders = PROVIDERS.filter(
-    (p) => !connectedProviderIds.has(p.id),
+    (p) => !connectedProviderIds.has(p.id) && enabledMap[p.id] !== false,
   );
 
   const handleConnect = (providerId: string) => {
@@ -174,16 +185,19 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
     });
   };
 
-  const handleDisconnect = async (id: string) => {
-    if (
-      window.confirm("Are you sure you want to disconnect this integration?")
-    ) {
-      setActionError(null);
-      try {
-        await deleteConnector.mutateAsync({ projectId, connectorId: id });
-      } catch {
-        setActionError("Failed to disconnect. Please try again.");
-      }
+  const handleDisconnect = (id: string) => {
+    setDisconnectingConnectorId(id);
+  };
+
+  const handleDisconnectConfirm = async () => {
+    if (!disconnectingConnectorId) return;
+    setActionError(null);
+    try {
+      await deleteConnector.mutateAsync({ projectId, connectorId: disconnectingConnectorId });
+    } catch {
+      setActionError("Failed to disconnect. Please try again.");
+    } finally {
+      setDisconnectingConnectorId(null);
     }
   };
 
@@ -287,6 +301,26 @@ export function ProjectConnectorsTab({ projectId }: ProjectConnectorsTabProps) {
         onOpenChange={setSlackSheetOpen}
         onSuccess={() => setActiveTab("connected")}
       />
+
+      <AlertDialog
+        open={disconnectingConnectorId !== null}
+        onOpenChange={(open) => { if (!open) setDisconnectingConnectorId(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disconnect integration?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the integration from this project. You can reconnect it at any time.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDisconnectConfirm}>
+              Disconnect
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

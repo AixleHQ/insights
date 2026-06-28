@@ -2,14 +2,25 @@
 
 class OrganizationAuditLog < ApplicationRecord
   ACTIONS = %w[
+    project.create
+    project.delete
     settings.create
     settings.update
     settings.delete
+    retention.update
+    alert.update
     connector.create
     connector.update
     connector.delete
     connector.test
     connector.sync
+    notification_route.create
+    notification_route.update
+    notification_route.delete
+    tool_account.create
+    tool_account.update
+    tool_account.delete
+    tool_account.regenerate
     member.invited
     member.role_changed
     member.removed
@@ -28,16 +39,20 @@ class OrganizationAuditLog < ApplicationRecord
   scope :from_date, ->(date) { where("created_at >= ?", date) }
   scope :to_date, ->(date) { where("created_at <= ?", date) }
 
-  def self.log(organization:, actor:, action:, resource: nil, tracked_changes: {}, metadata: {}, request: nil)
+  def self.log(organization:, actor:, action:, resource: nil, tracked_changes: {}, metadata: {},
+               request: nil, severity: "info", outcome: "success")
     create!(
-      organization: organization,
-      actor: actor,
-      action: action,
-      resource_type: resource&.class&.name,
-      resource_id: resource&.id,
+      organization:    organization,
+      actor:           actor,
+      action:          action,
+      resource_type:   resource&.class&.name,
+      resource_id:     resource&.id,
       tracked_changes: tracked_changes,
-      metadata: metadata,
-      ip_address: request&.remote_ip
+      metadata:        metadata,
+      ip_address:      request&.remote_ip,
+      user_agent:      request&.user_agent,
+      severity:        severity,
+      outcome:         outcome
     )
   rescue StandardError => e
     Rails.logger.error("[OrganizationAuditLog] Failed to log action '#{action}': #{e.message}")

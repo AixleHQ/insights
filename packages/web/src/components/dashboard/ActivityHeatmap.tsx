@@ -43,10 +43,10 @@ const TOOL_COLORS: Record<string, string> = {
 function getIntensityClass(count: number, maxCount: number): string {
   if (count === 0) return "bg-muted/30 dark:bg-muted/20";
   const intensity = count / maxCount;
-  if (intensity < 0.25) return "bg-emerald-400/40 dark:bg-emerald-500/30";
-  if (intensity < 0.5) return "bg-emerald-400/60 dark:bg-emerald-500/50";
-  if (intensity < 0.75) return "bg-emerald-400/80 dark:bg-emerald-500/70";
-  return "bg-emerald-500 dark:bg-emerald-400";
+  if (intensity < 0.25) return "bg-primary/20 dark:bg-primary/20";
+  if (intensity < 0.5) return "bg-primary/45 dark:bg-primary/45";
+  if (intensity < 0.75) return "bg-primary/65 dark:bg-primary/65";
+  return "bg-primary/90 dark:bg-primary/90";
 }
 
 function formatDateLong(dateStr: string): string {
@@ -273,7 +273,7 @@ export function ActivityHeatmap({ data, className }: ActivityHeatmapProps) {
       {/* Header - stacks on mobile */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 mb-4 sm:mb-6">
         <div className="flex items-center gap-2">
-          <Activity className="size-4 sm:size-5 text-emerald-500" />
+          <Activity className="size-4 sm:size-5 text-primary" />
           <span className="font-semibold text-sm sm:text-base">Activity</span>
         </div>
         <div className="flex flex-wrap items-center gap-3 sm:gap-6 text-xs sm:text-sm text-muted-foreground">
@@ -357,7 +357,7 @@ export function ActivityHeatmap({ data, className }: ActivityHeatmapProps) {
                           className={cn(
                             "aspect-square w-full rounded-[2px] sm:rounded-sm transition-colors cursor-default",
                             getIntensityClass(day.count, maxCount),
-                            day.count > 0 && "hover:ring-1 hover:ring-emerald-400/50 hover:ring-offset-1 hover:ring-offset-background"
+                            day.count > 0 && "hover:ring-1 hover:ring-success/50 hover:ring-offset-1 hover:ring-offset-background"
                           )}
                         />
                       </TooltipTrigger>
@@ -381,10 +381,10 @@ export function ActivityHeatmap({ data, className }: ActivityHeatmapProps) {
           <span>Less</span>
           <div className="flex gap-[2px] sm:gap-1">
             <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded bg-muted/30 dark:bg-muted/20" />
-            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded bg-emerald-400/40 dark:bg-emerald-500/30" />
-            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded bg-emerald-400/60 dark:bg-emerald-500/50" />
-            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded bg-emerald-400/80 dark:bg-emerald-500/70" />
-            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded bg-emerald-500 dark:bg-emerald-400" />
+            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded bg-primary/20 dark:bg-primary/20" />
+            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded bg-primary/45 dark:bg-primary/45" />
+            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded bg-primary/65 dark:bg-primary/65" />
+            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded bg-primary/90 dark:bg-primary/90" />
           </div>
           <span>More</span>
         </div>

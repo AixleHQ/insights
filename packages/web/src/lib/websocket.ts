@@ -7,10 +7,13 @@
 
 import { getAccessToken } from "./auth";
 
-export interface WebSocketMessage {
-  type: "new_event" | "event_updated" | "alert" | "ping";
-  data?: unknown;
-}
+/** Discriminated union of all messages the Rails EventsChannel can transmit. */
+export type WebSocketMessage =
+  | { type: "new_event"; event: unknown; timestamp: string }
+  | { type: "event_updated"; event_id: string; updates: Record<string, unknown>; timestamp: string }
+  | { type: "alert"; alert: unknown; timestamp: string }
+  | { type: "subscription_confirmed"; organization_id: string; subscribed_at: string }
+  | { type: "recent_events"; events: unknown[]; count: number };
 
 export interface ChannelSubscription {
   channel: string;

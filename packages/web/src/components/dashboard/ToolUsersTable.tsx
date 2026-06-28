@@ -8,29 +8,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/ui/error-state";
+import { formatCost, formatTokens, formatCount } from "@/lib/formatters";
 import type { ToolUserStat } from "@/lib/types";
 
 interface ToolUsersTableProps {
   users: ToolUserStat[];
   isLoading: boolean;
-}
-
-function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return String(n);
-}
-
-function formatCost(n: number): string {
-  if (n === 0) return "$0.00";
-  if (n < 0.001) return `$${n.toFixed(6)}`;
-  if (n < 0.01) return `$${n.toFixed(4)}`;
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(n);
+  isError?: boolean;
+  onRetry?: () => void;
 }
 
 function SkeletonRow() {
@@ -49,7 +35,7 @@ function SkeletonRow() {
   );
 }
 
-export function ToolUsersTable({ users, isLoading }: ToolUsersTableProps) {
+export function ToolUsersTable({ users, isLoading, isError, onRetry }: ToolUsersTableProps) {
   return (
     <div className="rounded-md border">
       <Table>
@@ -62,7 +48,18 @@ export function ToolUsersTable({ users, isLoading }: ToolUsersTableProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {isLoading ? (
+          {isError ? (
+            <TableRow>
+              <TableCell colSpan={4} className="h-24">
+                <ErrorState
+                  compact
+                  title="Could not load users"
+                  description="Something went wrong fetching the data."
+                  onRetry={onRetry}
+                />
+              </TableCell>
+            </TableRow>
+          ) : isLoading ? (
             Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
           ) : users.length === 0 ? (
             <TableRow>
@@ -85,7 +82,7 @@ export function ToolUsersTable({ users, isLoading }: ToolUsersTableProps) {
                   )}
                 </TableCell>
                 <TableCell className="text-right font-mono text-sm">
-                  {user.eventCount.toLocaleString()}
+                  {formatCount(user.eventCount)}
                 </TableCell>
                 <TableCell className="hidden sm:table-cell text-right font-mono text-sm text-muted-foreground">
                   {formatTokens(user.totalTokens)}

@@ -2,42 +2,9 @@
 
 require 'rails_helper'
 
-# Stub Temporalio module since it's not installed in Rails
-module Temporalio
-  class Client
-    def self.connect(host, namespace)
-      new
-    end
-
-    def start_workflow(*args)
-    end
-
-    def execute_workflow(*args)
-    end
-
-    def workflow_handle(workflow_id, run_id: nil)
-      WorkflowHandle.new
-    end
-  end
-
-  class WorkflowHandle
-    def query(name)
-    end
-
-    def signal(name, args)
-    end
-
-    def cancel
-    end
-
-    def terminate(reason: nil)
-    end
-  end
-end unless defined?(Temporalio)
-
 RSpec.describe Temporal::Client do
   let(:mock_client) { instance_double(Temporalio::Client) }
-  let(:mock_handle) { instance_double(Temporalio::WorkflowHandle) }
+  let(:mock_handle) { instance_double(Temporalio::Client::WorkflowHandle) }
 
   before do
     described_class.reset!
@@ -80,6 +47,24 @@ RSpec.describe Temporal::Client do
         'TestWorkflow',
         workflow_id: 'workflow-123',
         task_queue: 'custom-queue'
+      )
+    end
+
+    it 'passes execution_timeout when provided' do
+      expect(mock_client).to receive(:start_workflow)
+        .with(
+          'TestWorkflow',
+          nil,
+          id: 'workflow-123',
+          task_queue: 'db90-tasks',
+          execution_timeout: 300
+        )
+        .and_return(mock_handle)
+
+      described_class.start_workflow(
+        'TestWorkflow',
+        workflow_id: 'workflow-123',
+        execution_timeout: 300
       )
     end
   end
@@ -134,7 +119,7 @@ RSpec.describe Temporal::Client do
       expect(mock_client).to receive(:workflow_handle)
         .with('workflow-123', run_id: nil)
         .and_return(mock_handle)
-      expect(mock_handle).to receive(:terminate).with(reason: 'Test termination')
+      expect(mock_handle).to receive(:terminate).with('Test termination')
 
       described_class.terminate_workflow('workflow-123', reason: 'Test termination')
     end
@@ -150,6 +135,59 @@ RSpec.describe Temporal::Client do
       described_class.reset!
 
       expect(described_class.connected?).to eq(false)
+    end
+  end
+
+  describe '.workers_polling?' do
+    let(:mock_connection) { instance_double(Temporalio::Client::Connection) }
+    let(:mock_workflow_service) { instance_double(Temporalio::Client::Connection::WorkflowService) }
+
+    before do
+      allow(mock_client).to receive(:connection).and_return(mock_connection)
+      allow(mock_connection).to receive(:workflow_service).and_return(mock_workflow_service)
+      Rails.cache.clear
+    end
+
+    it 'returns true when pollers are active' do
+      poller = double("poller")
+      response = double("response", pollers: [ poller ])
+      allow(mock_workflow_service).to receive(:describe_task_queue).and_return(response)
+
+      expect(described_class.workers_polling?).to eq(true)
+    end
+
+    it 'returns false when no pollers are active' do
+      response = double("response", pollers: [])
+      allow(mock_workflow_service).to receive(:describe_task_queue).and_return(response)
+
+      expect(described_class.workers_polling?).to eq(false)
+    end
+
+    it 'returns false when Temporal is unreachable' do
+      allow(mock_workflow_service).to receive(:describe_task_queue).and_raise(StandardError)
+
+      expect(described_class.workers_polling?).to eq(false)
+    end
+
+    it 'caches true result for 5 seconds' do
+      poller = double("poller")
+      response = double("response", pollers: [ poller ])
+      allow(mock_workflow_service).to receive(:describe_task_queue).and_return(response)
+
+      result1 = described_class.workers_polling?
+      result2 = described_class.workers_polling?
+
+      expect(result1).to eq(true)
+      expect(result2).to eq(true)
+    end
+
+    it 'caches false result for only 1 second' do
+      response = double("response", pollers: [])
+      allow(mock_workflow_service).to receive(:describe_task_queue).and_return(response)
+
+      result = described_class.workers_polling?
+
+      expect(result).to eq(false)
     end
   end
 end

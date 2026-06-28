@@ -30,7 +30,7 @@ export function ProtectedRoute({
     }
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground" />
       </div>
     );
   }
@@ -56,8 +56,8 @@ export function ProtectedRoute({
     if (!hasRole(requireRoles)) {
       return (
         <div className="flex flex-col items-center justify-center min-h-screen">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h1>
-          <p className="text-gray-600">
+          <h1 className="type-h2 text-foreground mb-2">Access Denied</h1>
+          <p className="text-muted-foreground">
             You don't have permission to access this page.
           </p>
         </div>
@@ -77,11 +77,3 @@ export function OrgRoute({ children, ...props }: Omit<ProtectedRouteProps, "requ
   );
 }
 
-// Convenience wrapper for admin-only routes
-export function AdminRoute({ children, ...props }: Omit<ProtectedRouteProps, "requireRoles">) {
-  return (
-    <ProtectedRoute requireOrg requireRoles={["owner", "admin"]} {...props}>
-      {children}
-    </ProtectedRoute>
-  );
-}

@@ -1,9 +1,4 @@
 {
-  "model": "sonnet",
-  "advisorModel": "claude-opus-4-6",
-  "env": {
-    "DB90_COACHING": "true"
-  },
   "permissions": {
     "allow": [
       "Bash(make lint-api)",
@@ -19,17 +14,6 @@
     ]
   },
   "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Agent",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node --experimental-strip-types --no-warnings ${CLAUDE_PROJECT_DIR}/.claude/hooks/model-indicator.ts"
-          }
-        ]
-      }
-    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write",
@@ -37,9 +21,29 @@
           {
             "type": "command",
             "command": "node --experimental-strip-types --no-warnings ${CLAUDE_PROJECT_DIR}/.claude/hooks/on-edit-lint.ts"
+          },
+          {
+            "type": "command",
+            "command": "node --experimental-strip-types --no-warnings ${CLAUDE_PROJECT_DIR}/.claude/hooks/on-plan-task-edit.ts"
+          },
+          {
+            "type": "command",
+            "command": "node --experimental-strip-types --no-warnings ${CLAUDE_PROJECT_DIR}/.claude/hooks/on-aixle-insights-edit.ts"
+          },
+          {
+            "type": "command",
+            "command": "sh -c 'f=$CLAUDE_FILE_PATHS; case \"$f\" in *.rb) bundle exec rubocop -a \"$f\" ;; *.ts|*.tsx) npx eslint --fix \"$f\" ;; esac'",
+            "description": "Fix lint errors in the edited file"
           }
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "context7@claude-plugins-official": true,
+    "ruby-lsp@claude-plugins-official": true,
+    "typescript-lsp@claude-plugins-official": true,
+    "andrej-karpathy-skills@karpathy-skills": true,
+    "superpowers@claude-plugins-official": true
   }
 }

@@ -34,8 +34,9 @@ RSpec.describe UserToolAccount, type: :model do
       expect(duplicate.errors[:tool_name]).to include('account already exists for this membership')
     end
 
-    it { should allow_value(true).for(:is_active) }
-    it { should allow_value(false).for(:is_active) }
+    it { should allow_value('inactive').for(:connection_state) }
+    it { should allow_value('active').for(:connection_state) }
+    it { should allow_value('waiting_for_connection').for(:connection_state) }
   end
 
   describe 'encryption' do
@@ -49,11 +50,13 @@ RSpec.describe UserToolAccount, type: :model do
   describe 'scopes' do
     describe '.active' do
       it 'returns only active accounts' do
-        active = create(:user_tool_account, is_active: true)
-        inactive = create(:user_tool_account, is_active: false)
+        active = create(:user_tool_account, connection_state: 'active')
+        inactive = create(:user_tool_account, connection_state: 'inactive')
+        waiting = create(:user_tool_account, :waiting_for_connection)
 
         expect(UserToolAccount.active).to include(active)
         expect(UserToolAccount.active).not_to include(inactive)
+        expect(UserToolAccount.active).not_to include(waiting)
       end
     end
 
@@ -74,6 +77,27 @@ RSpec.describe UserToolAccount, type: :model do
     end
   end
 
+  describe 'connection state machine' do
+    it 'defaults ingest tools to waiting_for_connection when created inactive' do
+      account = create(:user_tool_account, tool_name: 'cursor', connection_state: nil)
+
+      expect(account.connection_state).to eq('waiting_for_connection')
+      expect(account).not_to be_active
+    end
+
+    it 'activates and deactivates through AASM events' do
+      account = create(:user_tool_account, :waiting_for_connection)
+
+      account.activate_connection!
+      expect(account.connection_state).to eq('active')
+      expect(account).to be_active
+
+      account.deactivate_connection!
+      expect(account.connection_state).to eq('inactive')
+      expect(account).not_to be_active
+    end
+  end
+
   describe 'ingest token generation' do
     context 'when tool is an ingest tool' do
       it 'generates a token_hash on create' do
@@ -83,12 +107,12 @@ RSpec.describe UserToolAccount, type: :model do
 
       it 'sets access_token on create' do
         account = create(:user_tool_account, tool_name: 'cursor')
-        expect(account.access_token).to start_with('db90_')
+        expect(account.access_token).to start_with('aixle_')
       end
 
       it 'exposes plaintext_token immediately after create' do
         account = create(:user_tool_account, tool_name: 'claude_code')
-        expect(account.plaintext_token).to start_with('db90_')
+        expect(account.plaintext_token).to start_with('aixle_')
       end
 
       it 'does not persist plaintext_token (nil on a fresh load from DB)' do

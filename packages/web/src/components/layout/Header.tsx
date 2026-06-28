@@ -85,8 +85,8 @@ function CommandPalette({
               <CommandItem onSelect={() => runCommand(() => onNavigate("/integrations"))}>
                 Integrations
               </CommandItem>
-              <CommandItem onSelect={() => runCommand(() => onNavigate("/team"))}>
-                Team
+              <CommandItem onSelect={() => runCommand(() => onNavigate("/members"))}>
+                Members
               </CommandItem>
               <CommandItem onSelect={() => runCommand(() => onNavigate("/settings"))}>
                 Settings
@@ -102,7 +102,7 @@ function CommandPalette({
 function NotificationBadge({ count }: { count: number }) {
   if (count === 0) return null;
   return (
-    <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">
+    <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
       {count > 9 ? "9+" : count}
     </span>
   );
@@ -116,7 +116,7 @@ function Notifications() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="relative size-8">
-          <Bell className="size-4" />
+          <Bell className={unreadCount > 0 ? "size-4 text-primary" : "size-4"} />
           <NotificationBadge count={unreadCount} />
           <span className="sr-only">Notifications</span>
         </Button>
@@ -245,8 +245,8 @@ export function Header() {
 
         <div className="ml-auto flex items-center gap-1 md:gap-2">
           <Button
-            variant="outline"
-            className="relative h-8 w-8 md:w-64 lg:w-80 justify-center md:justify-start rounded-md bg-muted/50 text-sm font-normal text-muted-foreground shadow-none"
+            variant="ghost"
+            className="relative h-8 w-8 md:w-64 lg:w-80 justify-center md:justify-start rounded-md bg-muted/50 text-sm font-normal text-muted-foreground shadow-none hover:bg-muted/70"
             onClick={() => setCommandOpen(true)}
           >
             <Search className="size-4 md:mr-2" />

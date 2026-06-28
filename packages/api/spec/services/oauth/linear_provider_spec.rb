@@ -3,7 +3,7 @@
 require 'rails_helper'
 
 RSpec.describe Oauth::LinearProvider, type: :service do
-  let(:connector) { instance_double('OrganizationConnector', access_token: 'lin-test123') }
+  let(:connector) { instance_double('OrganizationConnector', access_token: 'lin-test123', token_expired?: false) }
   let(:provider) { described_class.new(connector) }
 
   describe '#test_connection' do
@@ -176,6 +176,120 @@ RSpec.describe Oauth::LinearProvider, type: :service do
 
         expect(provider.fetch_projects).to eq([])
       end
+    end
+  end
+
+  describe '#fetch_cycles' do
+    it 'returns mapped cycles' do
+      stub_request(:post, 'https://api.linear.app/graphql')
+        .to_return(
+          status: 200,
+          body: {
+            data: {
+              cycles: {
+                nodes: [
+                  {
+                    id: 'cycle-1',
+                    number: 42,
+                    name: 'Sprint 42',
+                    startsAt: '2026-04-01T00:00:00Z',
+                    endsAt: '2026-04-14T00:00:00Z',
+                    team: { id: 'team-1', name: 'Engineering', key: 'ENG' }
+                  }
+                ]
+              }
+            }
+          }.to_json,
+          headers: { 'Content-Type' => 'application/json' }
+        )
+
+      result = provider.fetch_cycles(team_id: 'team-1')
+
+      expect(result).to eq([
+        {
+          external_id: 'cycle-1',
+          number: 42,
+          name: 'Sprint 42',
+          starts_at: '2026-04-01T00:00:00Z',
+          ends_at: '2026-04-14T00:00:00Z',
+          team_id: 'team-1',
+          team_name: 'Engineering',
+          team_key: 'ENG'
+        }
+      ])
+    end
+  end
+
+  describe '#fetch_issues' do
+    it 'paginates and maps issues' do
+      stub_request(:post, 'https://api.linear.app/graphql')
+        .to_return(
+          {
+            status: 200,
+            body: {
+              data: {
+                issues: {
+                  nodes: [
+                    {
+                      id: 'issue-1',
+                      identifier: 'ENG-101',
+                      title: 'First issue',
+                      priority: 1,
+                      createdAt: '2026-04-01T00:00:00Z',
+                      updatedAt: '2026-04-02T00:00:00Z',
+                      completedAt: nil,
+                      canceledAt: nil,
+                      state: { id: 'state-1', name: 'In Progress', type: 'started' },
+                      team: { id: 'team-1', name: 'Engineering', key: 'ENG' },
+                      project: { id: 'project-1', name: 'Platform' },
+                      cycle: { id: 'cycle-1', name: 'Sprint 42', number: 42 },
+                      assignee: { id: 'user-1', name: 'Alice', email: 'alice@example.com' },
+                      creator: { id: 'user-2', name: 'Bob', email: 'bob@example.com' }
+                    }
+                  ],
+                  pageInfo: { hasNextPage: true, endCursor: 'cursor-1' }
+                }
+              }
+            }.to_json,
+            headers: { 'Content-Type' => 'application/json' }
+          },
+          {
+            status: 200,
+            body: {
+              data: {
+                issues: {
+                  nodes: [
+                    {
+                      id: 'issue-2',
+                      identifier: 'ENG-102',
+                      title: 'Second issue',
+                      priority: 2,
+                      createdAt: '2026-04-03T00:00:00Z',
+                      updatedAt: '2026-04-04T00:00:00Z',
+                      completedAt: '2026-04-05T00:00:00Z',
+                      canceledAt: nil,
+                      state: { id: 'state-2', name: 'Done', type: 'completed' },
+                      team: { id: 'team-1', name: 'Engineering', key: 'ENG' },
+                      project: { id: 'project-1', name: 'Platform' },
+                      cycle: nil,
+                      assignee: nil,
+                      creator: { id: 'user-2', name: 'Bob', email: 'bob@example.com' }
+                    }
+                  ],
+                  pageInfo: { hasNextPage: false, endCursor: nil }
+                }
+              }
+            }.to_json,
+            headers: { 'Content-Type' => 'application/json' }
+          }
+        )
+
+      result = provider.fetch_issues(updated_after: Time.zone.parse('2026-04-01T00:00:00Z'))
+
+      expect(result.map { |issue| issue[:external_id] }).to eq(%w[issue-1 issue-2])
+      expect(result.first[:assignee_email]).to eq('alice@example.com')
+      expect(result.first[:state_type]).to eq('started')
+      expect(result.last[:completed_at]).to eq('2026-04-05T00:00:00Z')
     end
   end
 

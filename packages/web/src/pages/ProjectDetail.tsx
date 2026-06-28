@@ -1,5 +1,5 @@
-import React, { useMemo, useState, useCallback } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import React, { useMemo, useState } from "react";
+import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   AlertCircle,
   ArrowLeft,
@@ -11,22 +11,36 @@ import {
   MoreHorizontal,
   RefreshCw,
   Trash2,
+  Download,
+  Loader2,
 } from "lucide-react";
 import { useOrg } from "@/contexts/OrgContext";
+
 import {
   useProject,
-  useEvents,
   useDeleteProject,
   useProjectDailyByTool,
   useProjectRepositories,
   useDisconnectRepo,
   useProjectMembers,
+  useCurrentUser,
   type ProjectMember,
 } from "@/hooks/useApi";
+
+import { useProjectEventsTab } from "@/hooks/useProjectEventsTab";
+import { formatCost, formatCount } from "@/lib/formatters";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ProviderLogo } from "@/components/icons";
 import {
   Card,
   CardContent,
@@ -41,50 +55,55 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { EventsTable, EventDrawer, FilterChip, type EventRow } from "@/components/events";
+import { EventsTable, EventDrawer, EventFilters } from "@/components/events";
 import { ToolUsageByDayChart } from "@/components/dashboard";
-import { ProjectReposSection, ProjectNotFound, ConnectRepoSheet, ProjectIssuesTab } from "@/components/project";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { getDaysForRange, type TimeRange } from "@/lib/chartUtils";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { formatDistanceToNow, toEventRow, getMemberDisplayName } from "@/lib/utils";
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-  }).format(value);
-}
+  ProjectReposSection,
+  ProjectNotFound,
+  ConnectRepoSheet,
+  ProjectIssuesTab,
+  ProjectConnectorsTab,
+  ProjectMembersTab,
+  ProjectAlertsTab,
+  ProjectTeamSection,
+} from "@/components/project";
+import { TabNav } from "@/components/ui/tab-nav";
+import { TabsContent } from "@/components/ui/tabs";
+import { formatDistanceToNow } from "@/lib/utils";
+import { isGitRemoteMissing } from "@/lib/project-git-remote";
 
 function StatCard({
   icon: Icon,
   label,
+  subtitle,
   value,
+  delta,
   isLoading,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
+  subtitle?: string;
   value: React.ReactNode;
+  delta?: string;
   isLoading?: boolean;
 }) {
   return (
     <Card>
-      <CardContent className="flex items-center gap-4 p-4">
+      <CardContent className="flex items-center gap-4 px-4 py-0">
         <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
           <Icon className="size-5 text-muted-foreground" />
         </div>
         <div>
-          <p className="text-xs text-muted-foreground">{label}</p>
+          <p className="type-caption text-muted-foreground">{label}</p>
+          {subtitle && <p className="text-[10px] text-muted-foreground">{subtitle}</p>}
           {isLoading ? (
             <Skeleton className="h-6 w-20 mt-1" />
           ) : (
-            <p className="font-mono-display text-lg font-semibold">{value}</p>
+            <>
+              <p className="font-mono-display type-h4">{value}</p>
+              {delta && <p className="text-xs text-muted-foreground mt-0.5">{delta}</p>}
+            </>
           )}
         </div>
       </CardContent>
@@ -94,53 +113,46 @@ function StatCard({
 
 export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
-  const { currentOrg } = useOrg();
+  const { currentOrg, currentRole, hasRole } = useOrg();
   const navigate = useNavigate();
-  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [connectRepoOpen, setConnectRepoOpen] = useState(false);
+  const [timeRange, setTimeRange] = useState<TimeRange>("7d");
 
-  const [selectedUserId, setSelectedUserId] = useState<string | undefined>(undefined);
+  const selectedDays = getDaysForRange(timeRange);
+  const granularity = timeRange === "1y" ? "month" : "day";
 
   const { data: project, isLoading: isLoadingProject } = useProject(id || "");
-  const { data: projectMembers } = useProjectMembers(id || "");
-  const { data: eventsResponse, isLoading: isLoadingEvents, isError: isEventsError } = useEvents(
-    currentOrg?.id || "",
-    { project_id: id, per_page: 10, user_id: selectedUserId }
-  );
-  const { data: dailyByToolData, isLoading: isLoadingDailyByTool } = useProjectDailyByTool(id || "");
+  const { data: projectMembers, isLoading: isLoadingMembers } = useProjectMembers(id || "");
+  const { data: me } = useCurrentUser();
+  const { data: dailyByToolData, isLoading: isLoadingDailyByTool, isError: isErrorDailyByTool, refetch: refetchDailyByTool } = useProjectDailyByTool(id || "", selectedDays, granularity);
   const { data: projectRepositories, isLoading: isLoadingRepositories } = useProjectRepositories(id || "");
   const disconnectRepo = useDisconnectRepo(id || "");
   const deleteProject = useDeleteProject();
 
-  const events: EventRow[] = useMemo(
-    () => eventsResponse?.data?.map(toEventRow) ?? [],
-    [eventsResponse]
-  );
+  const eventsTab = useProjectEventsTab({
+    projectId: id || "",
+    orgId: currentOrg?.id || "",
+    currentRole,
+  });
 
-  const selectedMember = selectedUserId
-    ? projectMembers?.find((m) => m.userId === selectedUserId)
-    : undefined;
+  // Permission flags (reused by tab gates)
+  const myProjectMembership = projectMembers?.find((m: ProjectMember) => m.userId === me?.id);
+  const isProjectOwner = hasRole(["owner"]) || myProjectMembership?.role === "owner";
+  const canManageMembers = hasRole(["owner"]);
+  const isMemberOfProject = isProjectOwner || !!myProjectMembership;
 
-  const handleEventClick = useCallback((eventId: string) => {
-    setSelectedEventId(eventId);
-    setDrawerOpen(true);
-  }, []);
-
-  const handleNavigate = useCallback((direction: "prev" | "next") => {
-    if (!selectedEventId) return;
-    const currentIndex = events.findIndex((e) => e.id === selectedEventId);
-    if (currentIndex === -1) return;
-
-    const newIndex = direction === "prev" ? currentIndex - 1 : currentIndex + 1;
-    if (newIndex >= 0 && newIndex < events.length) {
-      setSelectedEventId(events[newIndex].id);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const activeTab = useMemo(() => {
+    const allowed = new Set(["overview", "events", "issues"]);
+    if (isMemberOfProject) allowed.add("members");
+    if (isProjectOwner) {
+      allowed.add("integrations");
+      allowed.add("alerts");
     }
-  }, [selectedEventId, events]);
-
-  const selectedEventIndex = selectedEventId
-    ? events.findIndex((e) => e.id === selectedEventId)
-    : -1;
+    if (tabParam && allowed.has(tabParam)) return tabParam;
+    return "overview";
+  }, [tabParam, isMemberOfProject, isProjectOwner]);
 
   const handleDelete = async () => {
     if (!id) return;
@@ -178,6 +190,14 @@ export function ProjectDetail() {
     return <ProjectNotFound />;
   }
 
+  const hasAttributedEventCount = Object.prototype.hasOwnProperty.call(project, "eventCount");
+  const hasAttributedCostUsd = Object.prototype.hasOwnProperty.call(project, "totalCostUsd");
+  const hasLastAttributedAt = Object.prototype.hasOwnProperty.call(project, "lastEventAt");
+
+  const attributedEventCount = project.eventCount;
+  const attributedCostUsd = project.totalCostUsd;
+  const lastAttributedAt = project.lastEventAt;
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between">
@@ -189,7 +209,7 @@ export function ProjectDetail() {
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-semibold">{project.name}</h1>
+              <h1 className="type-h3">{project.name}</h1>
               <Badge variant={(project.is_active ?? project.isActive) ? "default" : "secondary"}>
                 {(project.is_active ?? project.isActive) ? "Active" : "Inactive"}
               </Badge>
@@ -221,19 +241,52 @@ export function ProjectDetail() {
         </DropdownMenu>
       </div>
 
-      <Tabs defaultValue="overview">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="issues">Issues</TabsTrigger>
-        </TabsList>
+      {isGitRemoteMissing(project) && (
+        <Alert
+          className="border-warning/30 bg-warning/10 text-warning-foreground dark:border-warning/25 dark:bg-warning/10 dark:text-warning-foreground [&>svg]:text-warning dark:[&>svg]:text-warning"
+        >
+          <AlertCircle className="size-4 shrink-0" />
+          <AlertDescription className="text-warning-foreground dark:text-warning/80">
+            <p className="font-medium text-warning-foreground dark:text-warning/70">
+              No git remote configured for CLI attribution
+            </p>
+            <p className="mt-1 text-sm text-warning-foreground/90 dark:text-warning/80">
+              Events from the Aixle Insights CLI will not be automatically matched to this project until you set the
+              repository&apos;s{" "}
+              <code className="rounded bg-warning/15 px-1 py-0.5 font-mono text-xs">git remote get-url origin</code>{" "}
+              value in project settings.
+            </p>
+            <Button asChild variant="link" className="mt-2 h-auto p-0 text-warning-foreground underline dark:text-warning/70">
+              <Link to={`/projects/${id}/settings`}>Open project settings</Link>
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
+      <TabNav
+        tabs={[
+          { label: "Overview", key: "overview" },
+          { label: "Events", key: "events" },
+          ...(isMemberOfProject ? [{ label: "Members", key: "members" }] : []),
+          ...(isProjectOwner ? [{ label: "Integrations", key: "integrations" }] : []),
+          ...(isProjectOwner ? [{ label: "Alerts", key: "alerts" }] : []),
+          { label: "Issues", key: "issues" },
+        ]}
+        activeTab={activeTab}
+        onChange={(value) => setSearchParams({ tab: value }, { replace: true })}
+      >
+
+        {/* ── Overview ── */}
         <TabsContent value="overview" className="space-y-6 mt-4">
-          {/* Tool Usage Chart */}
-          {dailyByToolData && dailyByToolData.data && dailyByToolData.data.length > 0 && (
+          {dailyByToolData && dailyByToolData.data && (
             <ToolUsageByDayChart
               data={dailyByToolData.data}
               tools={dailyByToolData.tools}
               isLoading={isLoadingDailyByTool}
+              isError={isErrorDailyByTool}
+              onRetry={() => refetchDailyByTool()}
+              timeRange={timeRange}
+              onTimeRangeChange={setTimeRange}
             />
           )}
 
@@ -241,12 +294,14 @@ export function ProjectDetail() {
             <StatCard
               icon={Activity}
               label="Total Events"
-              value={(project.event_count ?? project.eventCount ?? 0).toLocaleString()}
+              subtitle="All-time attributed"
+              value={hasAttributedEventCount ? formatCount(attributedEventCount ?? 0) : "—"}
             />
             <StatCard
               icon={DollarSign}
               label="Total Cost"
-              value={formatCurrency(project.total_cost_usd ?? project.totalCostUsd ?? 0)}
+              subtitle="All-time attributed"
+              value={hasAttributedCostUsd ? formatCost(attributedCostUsd ?? 0) : "—"}
             />
             <StatCard
               icon={Calendar}
@@ -256,16 +311,125 @@ export function ProjectDetail() {
             <StatCard
               icon={GitBranch}
               label="Last Activity"
-              value={project.last_event_at || project.lastEventAt ? formatDistanceToNow(project.last_event_at || project.lastEventAt!) : "Never"}
+              subtitle="All-time attributed"
+              value={hasLastAttributedAt ? (lastAttributedAt ? formatDistanceToNow(lastAttributedAt) : "Never") : "—"}
             />
           </div>
 
-          <ProjectReposSection
-            repositories={projectRepositories}
-            isLoading={isLoadingRepositories}
-            onConnectRepo={() => setConnectRepoOpen(true)}
-            onDisconnect={(repoId) => disconnectRepo.mutateAsync(repoId)}
-          />
+          <div className="grid gap-4 md:grid-cols-2">
+            <ProjectReposSection
+              repositories={projectRepositories}
+              isLoading={isLoadingRepositories}
+              onConnectRepo={() => setConnectRepoOpen(true)}
+              onDisconnect={(repoId) => disconnectRepo.mutateAsync(repoId)}
+            />
+
+            <ProjectTeamSection
+              members={projectMembers}
+              isLoading={isLoadingMembers}
+              projectId={id}
+              orgId={currentOrg?.id}
+              canManage={canManageMembers}
+            />
+          </div>
+
+          {(project.sourceControlSummary?.length ?? 0) > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="type-body-lg">Source Control Activity</CardTitle>
+                <CardDescription>
+                  Recent synced repository activity across linked providers
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3 md:grid-cols-2">
+                {project.sourceControlSummary?.map((summary) => (
+                  <div key={summary.provider} className="rounded-lg border p-4">
+                    <div className="flex items-center gap-3">
+                      <ProviderLogo provider={summary.provider} size="sm" showBackground />
+                      <div>
+                        <p className="text-sm font-medium capitalize">{summary.provider}</p>
+                        <p className="type-caption text-muted-foreground">
+                          {summary.repositoryCount} linked repos
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">Commits</p>
+                        <p className="font-medium">{summary.commitCount}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Reviews</p>
+                        <p className="font-medium">{summary.reviewCount}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Pipelines</p>
+                        <p className="font-medium">{summary.pipelineCount}</p>
+                      </div>
+                    </div>
+                    {(summary.lastActivityAt || summary.lastSyncAt) && (
+                      <p className="mt-3 text-xs text-muted-foreground">
+                        {summary.lastActivityAt ? `Latest activity ${formatDistanceToNow(summary.lastActivityAt)}` : null}
+                        {summary.lastActivityAt && summary.lastSyncAt ? " · " : ""}
+                        {summary.lastSyncAt ? `Synced ${formatDistanceToNow(summary.lastSyncAt)}` : null}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {(project.issueThroughputSummary?.length ?? 0) > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="type-body-lg">Issue Throughput</CardTitle>
+                <CardDescription>
+                  Recent synced issue lifecycle activity for project members
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3 md:grid-cols-2">
+                {project.issueThroughputSummary?.map((summary) => (
+                  <div key={summary.provider} className="rounded-lg border p-4">
+                    <div className="flex items-center gap-3">
+                      <ProviderLogo provider={summary.provider} size="sm" showBackground />
+                      <div>
+                        <p className="text-sm font-medium capitalize">{summary.provider}</p>
+                        <p className="type-caption text-muted-foreground">
+                          Synced issue throughput
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-4 gap-2 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">Issues</p>
+                        <p className="font-medium">{summary.issueCount}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Completed</p>
+                        <p className="font-medium">{summary.completedCount}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">State Changes</p>
+                        <p className="font-medium">{summary.stateChangeCount}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Cycles</p>
+                        <p className="font-medium">{summary.cycleCount}</p>
+                      </div>
+                    </div>
+                    {(summary.lastActivityAt || summary.lastSyncAt) && (
+                      <p className="mt-3 text-xs text-muted-foreground">
+                        {summary.lastActivityAt ? `Latest activity ${formatDistanceToNow(summary.lastActivityAt)}` : null}
+                        {summary.lastActivityAt && summary.lastSyncAt ? " · " : ""}
+                        {summary.lastSyncAt ? `Synced ${formatDistanceToNow(summary.lastSyncAt)}` : null}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
 
           {project.repositoryUrl && (
             <Card>
@@ -283,66 +447,6 @@ export function ProjectDetail() {
             </Card>
           )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Recent Events</CardTitle>
-              <CardDescription>
-                Latest AI tool activity for this project
-              </CardDescription>
-            </CardHeader>
-            {projectMembers && projectMembers.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2 px-6 pb-3">
-                <Select
-                  value={selectedUserId ?? "__all__"}
-                  onValueChange={(val) => setSelectedUserId(val === "__all__" ? undefined : val)}
-                >
-                  <SelectTrigger className="h-8 w-[180px] text-sm">
-                    <SelectValue placeholder="All members" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">All members</SelectItem>
-                    {projectMembers.map((member: ProjectMember) => (
-                      <SelectItem key={member.userId} value={member.userId}>
-                        {getMemberDisplayName(member)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {selectedUserId && selectedMember && (
-                  <FilterChip
-                    label="Member"
-                    value={getMemberDisplayName(selectedMember)}
-                    onRemove={() => setSelectedUserId(undefined)}
-                  />
-                )}
-              </div>
-            )}
-            <CardContent className="p-0">
-              {isEventsError ? (
-                <Alert variant="destructive" className="m-4">
-                  <AlertCircle className="size-4" />
-                  <AlertDescription>Failed to load events. Please try again.</AlertDescription>
-                </Alert>
-              ) : (
-                <EventsTable
-                  events={events}
-                  isLoading={isLoadingEvents}
-                  onEventClick={handleEventClick}
-                  selectedEventId={selectedEventId}
-                />
-              )}
-            </CardContent>
-          </Card>
-
-          <EventDrawer
-            eventId={selectedEventId}
-            open={drawerOpen}
-            onOpenChange={setDrawerOpen}
-            onNavigate={handleNavigate}
-            hasPrev={selectedEventIndex > 0}
-            hasNext={selectedEventIndex < events.length - 1}
-          />
-
           <ConnectRepoSheet
             projectId={id || ""}
             open={connectRepoOpen}
@@ -351,10 +455,141 @@ export function ProjectDetail() {
           />
         </TabsContent>
 
+        {/* ── Events ── */}
+        <TabsContent value="events" className="space-y-4 mt-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <EventFilters
+              filters={eventsTab.filters}
+              onFiltersChange={eventsTab.handleFiltersChange}
+              tools={eventsTab.toolFilterOptions}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={eventsTab.handleExport}
+              disabled={eventsTab.isExporting}
+              className="shrink-0"
+            >
+              {eventsTab.isExporting ? (
+                <Loader2 className="mr-2 size-4 animate-spin" />
+              ) : (
+                <Download className="mr-2 size-4" />
+              )}
+              <span className="hidden sm:inline">{eventsTab.isExporting ? "Exporting…" : "Export"}</span>
+            </Button>
+          </div>
+
+          {eventsTab.exportQueued && (
+            <p className="text-sm text-muted-foreground">
+              Your export is too large to download immediately. It has been queued — check back shortly.
+            </p>
+          )}
+          {eventsTab.exportError && (
+            <Alert variant="destructive">
+              <AlertCircle className="size-4" />
+              <AlertDescription>Export failed. Please try again.</AlertDescription>
+            </Alert>
+          )}
+
+          <EventsTable
+            events={eventsTab.filteredAndSortedEvents}
+            isLoading={eventsTab.isLoading}
+            sortField={eventsTab.sort}
+            sortDirection={eventsTab.sortDir}
+            onSort={eventsTab.handleSort}
+            onEventClick={(eid) => {
+              eventsTab.setSelectedId(eid);
+              eventsTab.setDrawerOpen(true);
+            }}
+            selectedEventId={eventsTab.selectedId}
+            showUserColumn={eventsTab.showUserCol}
+          />
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <p>
+                {eventsTab.hasClientSideFilters
+                  ? `Showing ${eventsTab.filteredAndSortedEvents.length} filtered events`
+                  : `Showing ${eventsTab.filteredAndSortedEvents.length} of ${eventsTab.totalCount} events`}
+              </p>
+              <Select
+                value={String(eventsTab.pageSize)}
+                onValueChange={(v) => eventsTab.setPageSize(Number(v))}
+              >
+                <SelectTrigger className="h-8 w-auto">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[10, 25, 50, 100].map((n) => (
+                    <SelectItem key={n} value={String(n)}>{n} / page</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {eventsTab.totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => eventsTab.setPage((p) => Math.max(1, p - 1))}
+                  disabled={eventsTab.page === 1}
+                >
+                  Previous
+                </Button>
+                <span className="text-xs sm:text-sm">Page {eventsTab.page} of {eventsTab.totalPages}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => eventsTab.setPage((p) => Math.min(eventsTab.totalPages, p + 1))}
+                  disabled={eventsTab.page >= eventsTab.totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <EventDrawer
+            eventId={eventsTab.selectedId}
+            open={eventsTab.drawerOpen}
+            onOpenChange={eventsTab.setDrawerOpen}
+            onNavigate={eventsTab.handleNavigate}
+            hasPrev={eventsTab.selectedIndex > 0}
+            hasNext={eventsTab.selectedIndex < eventsTab.filteredAndSortedEvents.length - 1}
+          />
+        </TabsContent>
+
+        {/* ── Members ── */}
+        {isMemberOfProject && (
+          <TabsContent value="members" className="mt-4">
+            <ProjectMembersTab
+              projectId={id || ""}
+              orgId={currentOrg?.id || ""}
+              isProjectOwner={isProjectOwner}
+              canManageMembers={canManageMembers}
+            />
+          </TabsContent>
+        )}
+
+        {/* ── Integrations (lead-only) ── */}
+        {isProjectOwner && (
+          <TabsContent value="integrations" className="mt-4">
+            <ProjectConnectorsTab projectId={id || ""} orgId={currentOrg?.id || ""} />
+          </TabsContent>
+        )}
+
+        {/* ── Issues ── */}
         <TabsContent value="issues" className="mt-4">
           <ProjectIssuesTab projectId={id || ""} project={project} />
         </TabsContent>
-      </Tabs>
+
+        {/* ── Alerts (owner-only) ── */}
+        {isProjectOwner && (
+          <TabsContent value="alerts" className="mt-4">
+            <ProjectAlertsTab projectId={id || ""} />
+          </TabsContent>
+        )}
+      </TabNav>
     </div>
   );
 }

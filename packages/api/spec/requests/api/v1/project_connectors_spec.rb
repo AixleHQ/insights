@@ -11,9 +11,9 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
   let!(:connector) { create(:project_connector, project: project, connector_type: 'anthropic') }
 
   before do
-    create(:organization_membership, user: org_admin, organization: organization, role: 'admin')
+    create(:organization_membership, user: org_admin, organization: organization, role: 'owner')
     create(:organization_membership, user: project_member, organization: organization, role: 'member')
-    create(:project_membership, user: org_admin, project: project, role: 'admin')
+    create(:project_membership, user: org_admin, project: project, role: "owner")
     create(:project_membership, user: project_member, project: project, role: 'member')
   end
 
@@ -68,6 +68,19 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
       expect_success
       expect(json_data.map { |c| c[:id] }).not_to include(inactive.id)
     end
+
+    it 'does not expose stale lastError when status is connected' do
+      connector.update_columns(status: 'connected', is_active: true, last_error: 'stale from prior failure')
+
+      authenticated_get "/api/v1/projects/#{project.id}/connectors",
+                        user: org_admin,
+                        organization: organization
+
+      expect_success
+      row = json_data.find { |c| c[:id] == connector.id }
+      expect(row[:status]).to eq('connected')
+      expect(row[:lastError]).to be_nil
+    end
   end
 
   describe 'GET /api/v1/projects/:project_id/connectors/:id' do
@@ -103,7 +116,7 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
     # Use a fresh project with no existing connectors to avoid uniqueness conflicts
     let(:fresh_project) { create(:project, organization: organization) }
     before do
-      create(:project_membership, user: org_admin, project: fresh_project, role: 'admin')
+      create(:project_membership, user: org_admin, project: fresh_project, role: "owner")
     end
 
     context 'with Slack connector' do

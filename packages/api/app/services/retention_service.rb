@@ -1,4 +1,6 @@
 class RetentionService
+  DEFAULT_RETENTION_DAYS = 730
+
   DEFAULTS = {
     raw_event_ttl: "24_hours",
     tool_events_retention: "90_days",
@@ -46,15 +48,15 @@ class RetentionService
     def retention_options(retention_type)
       values = case retention_type
       when :raw_event_ttl
-                 OrganizationRetentionPolicy::RAW_EVENT_TTLS
+        OrganizationRetentionPolicy::RAW_EVENT_TTLS
       when :tool_events_retention
-                 OrganizationRetentionPolicy::TOOL_EVENTS_RETENTIONS
+        OrganizationRetentionPolicy::TOOL_EVENTS_RETENTIONS
       when :hourly_aggregate_retention
-                 OrganizationRetentionPolicy::HOURLY_AGGREGATE_RETENTIONS
+        OrganizationRetentionPolicy::HOURLY_AGGREGATE_RETENTIONS
       when :daily_aggregate_retention
-                 OrganizationRetentionPolicy::DAILY_AGGREGATE_RETENTIONS
+        OrganizationRetentionPolicy::DAILY_AGGREGATE_RETENTIONS
       else
-                 raise ArgumentError, "Unknown retention type: #{retention_type}"
+        raise ArgumentError, "Unknown retention type: #{retention_type}"
       end
 
       values.map do |value|
@@ -73,6 +75,13 @@ class RetentionService
         hourly_aggregate_retention: retention_options(:hourly_aggregate_retention),
         daily_aggregate_retention: retention_options(:daily_aggregate_retention)
       }
+    end
+
+    # Returns the global TimescaleDB ceiling in days from the MAX_RETENTION_DAYS
+    # environment variable. This ceiling must be >= any per-org tool_events_retention
+    # window; the DataRetentionPurgeJob enforces stricter per-org limits on top.
+    def max_tool_events_retention_days
+      ENV.fetch("MAX_RETENTION_DAYS", DEFAULT_RETENTION_DAYS).to_i
     end
 
     private

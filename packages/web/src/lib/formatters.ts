@@ -1,13 +1,20 @@
-export function formatCost(n: number): string {
-  if (n === 0) return "$0.00";
-  if (n < 0.001) return `$${n.toFixed(6)}`;
-  if (n < 0.01) return `$${n.toFixed(4)}`;
+import type { DashboardPeriod } from "@/lib/types";
+
+export function formatCost(n: number | string | null | undefined): string {
+  const num = typeof n === "number" ? n : Number(n);
+  if (!Number.isFinite(num) || num === 0) return "$0.00";
+  if (num < 0.001) return `$${num.toFixed(6)}`;
+  if (num < 0.01) return `$${num.toFixed(4)}`;
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(n);
+  }).format(num);
+}
+
+export function formatCount(n: number): string {
+  return new Intl.NumberFormat("en-US").format(n);
 }
 
 export function formatTokens(n: number): string {
@@ -16,8 +23,89 @@ export function formatTokens(n: number): string {
   return String(n);
 }
 
+export function formatPercentage(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return "—";
+  return `${(n * 100).toFixed(1)}%`;
+}
+
+// For already-computed percentage values (e.g. 12.3 → "12.3%").
+// Distinct from formatPercentage which expects a fraction (0.123 → "12.3%").
+export function formatPercent(n: number, decimals = 1): string {
+  return `${n.toFixed(decimals)}%`;
+}
+
+// For AI contribution percentages from Cursor recentCommit metadata.
+// Omits decimals when the value is a whole number (60 → "60%", 66.67 → "66.67%").
+export function formatAiPercentage(value: number): string {
+  const decimals = value % 1 === 0 ? 0 : 2;
+  return `${value.toFixed(decimals)}%`;
+}
+
+export function periodLabel(p: DashboardPeriod): string {
+  if (p.type === "all_time") return "All time";
+  const [y, m] = p.value.split("-");
+  return new Date(Number(y), Number(m) - 1).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
 export function truncateModelName(name: string): string {
   return name.length > 30 ? `${name.slice(0, 30)}…` : name;
+}
+
+const US_DATETIME_DISPLAY: Intl.DateTimeFormatOptions = {
+  dateStyle: "medium",
+  timeStyle: "short",
+};
+
+const US_LONG_DATE: Intl.DateTimeFormatOptions = {
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+};
+
+const US_MEDIUM_DATE: Intl.DateTimeFormatOptions = {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+};
+
+/** Connectors whose sync jobs bucket occurred_at to calendar-day UTC midnight. */
+export const DAY_GRANULARITY_TOOL_NAMES = new Set<string>([
+  "github_copilot", // packages/api/app/jobs/github_copilot_sync_job.rb
+]);
+
+/** True when the event should show a calendar date instead of relative time.
+ *  Relies solely on the allowlist — new day-granularity connectors must be added
+ *  to DAY_GRANULARITY_TOOL_NAMES when their sync job is introduced. */
+export function isDayGranularityEvent(
+  toolName: string | undefined,
+  _occurredAtIso?: string | null
+): boolean {
+  return !!(toolName && DAY_GRANULARITY_TOOL_NAMES.has(toolName));
+}
+
+/** Calendar date for day-granularity events (e.g. "Jun 22, 2026"). Uses UTC — matches backend day bucketing. */
+export function formatEventDate(iso: string | null | undefined): string {
+  if (iso == null || String(iso).trim() === "") return "—";
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "—";
+  return d.toLocaleDateString("en-US", { ...US_MEDIUM_DATE, timeZone: "UTC" });
+}
+
+/** ISO (or parseable) timestamp for tables; en-US; invalid → em dash. */
+export function formatDateTime(iso: string | null | undefined): string {
+  if (iso == null || String(iso).trim() === "") return "—";
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "—";
+  return d.toLocaleString("en-US", US_DATETIME_DISPLAY);
+}
+
+/** Calendar date only (e.g. invitation expiry fallback); invalid Date → em dash. */
+export function formatLongUsDate(date: Date): string {
+  if (!Number.isFinite(date.getTime())) return "—";
+  return date.toLocaleDateString("en-US", US_LONG_DATE);
 }
 
 // Event attribution — classifies who performed an event.

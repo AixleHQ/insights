@@ -19,7 +19,8 @@ class JwtAuth
   ].freeze
 
   EXCLUDED_PATTERNS = [
-    /\A\/api\/v1\/invitations\/(?!check\z)[^\/]+\z/
+    /\A\/api\/v1\/invitations\/(?!check\z)[^\/]+\z/,
+    /\A\/api\/v1\/webhooks\/openrouter_traces\/[^\/]+\z/
   ].freeze
 
   def initialize(app)
@@ -44,8 +45,13 @@ class JwtAuth
     end
 
     begin
-      impersonation_claims = ImpersonationService.decode_token(token) rescue nil
+      impersonation_claims = ImpersonationService.decode_token(token)
       if impersonation_claims
+        if ImpersonationService.revoked?(impersonation_claims["jti"])
+          Rails.logger.warn("[JwtAuth] Impersonation token has been revoked (jti=#{impersonation_claims['jti']})")
+          return unauthorized_response("Impersonation token has been revoked")
+        end
+
         env["jwt.claims"] = impersonation_claims
         env["jwt.token"] = token
         env["jwt.impersonation"] = true

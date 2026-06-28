@@ -12,9 +12,21 @@ module Admin
     end
 
     def batch_delete
-      ids = params[:ids]
-      Organization.where(id: ids).destroy_all
-      redirect_to admin_organizations_path, notice: "Successfully deleted #{ids.count} organizations."
+      ids  = Array(params[:ids])
+      return redirect_to(admin_organizations_path) if ids.empty?
+
+      orgs = Organization.where(id: ids)
+      orgs.each do |org|
+        AdminAuditLog.log_action(
+          admin_user:      current_admin_user,
+          action:          "batch_delete",
+          resource:        org,
+          tracked_changes: { name: org.name, slug: org.slug },
+          request:         request
+        )
+      end
+      deleted = orgs.destroy_all.size
+      redirect_to admin_organizations_path, notice: "Successfully deleted #{deleted} organizations."
     end
 
     private

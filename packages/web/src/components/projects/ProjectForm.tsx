@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { ApiError } from "@/lib/api";
 
 export interface ProjectFormData {
   name: string;
@@ -41,6 +42,7 @@ export function ProjectForm({
     }
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [generalError, setGeneralError] = useState<string | null>(null);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -74,11 +76,35 @@ export function ProjectForm({
     if (!validateForm()) return;
 
     setIsSubmitting(true);
+    setGeneralError(null);
     try {
       await onSubmit(formData);
-      navigate("/projects");
     } catch (error) {
-      console.error("Failed to save project:", error);
+      if (error instanceof ApiError && error.status === 422) {
+        const data = error.data as { errors?: Record<string, string[]> } | null;
+        if (data?.errors) {
+          const knownFields = ["name", "description", "repository_url", "git_remote_url", "is_active"];
+          const fieldErrors: Record<string, string> = {};
+          const unmapped: string[] = [];
+
+          for (const [field, messages] of Object.entries(data.errors)) {
+            if (knownFields.includes(field)) {
+              fieldErrors[field] = messages[0];
+            } else {
+              unmapped.push(...messages);
+            }
+          }
+
+          setErrors(fieldErrors);
+          if (unmapped.length > 0) {
+            setGeneralError(unmapped.join(". "));
+          }
+        } else {
+          setGeneralError("The server rejected the request. Please check your inputs.");
+        }
+      } else {
+        setGeneralError("Something went wrong. Please try again.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -97,11 +123,11 @@ export function ProjectForm({
   return (
     <div className={cn("space-y-6", className)}>
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/projects")}>
+        <Button variant="ghost" size="icon" onClick={() => navigate("/projects")} aria-label="Back to projects">
           <ArrowLeft className="size-4" />
         </Button>
         <div>
-          <h1 className="text-xl font-semibold">
+          <h1 className="type-h3">
             {isEditing ? "Edit Project" : "New Project"}
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -115,7 +141,7 @@ export function ProjectForm({
       <form onSubmit={handleSubmit}>
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Project Details</CardTitle>
+            <CardTitle className="type-body-lg">Project Details</CardTitle>
             <CardDescription>
               Basic information about your project
             </CardDescription>
@@ -131,6 +157,7 @@ export function ProjectForm({
                 value={formData.name}
                 onChange={(e) => updateField("name", e.target.value)}
                 className={cn(errors.name && "border-destructive")}
+                aria-invalid={!!errors.name}
               />
               {errors.name && (
                 <p className="text-xs text-destructive">{errors.name}</p>
@@ -155,6 +182,7 @@ export function ProjectForm({
                 value={formData.repository_url || ""}
                 onChange={(e) => updateField("repository_url", e.target.value)}
                 className={cn(errors.repository_url && "border-destructive")}
+                aria-invalid={!!errors.repository_url}
               />
               {errors.repository_url && (
                 <p className="text-xs text-destructive">{errors.repository_url}</p>
@@ -162,17 +190,21 @@ export function ProjectForm({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="git_remote_url">Git Remote URL</Label>
+              <Label htmlFor="git_remote_url">Git remote URL (for auto CLI attribution)</Label>
               <Input
                 id="git_remote_url"
                 placeholder="git@github.com:org/repo.git"
                 value={formData.git_remote_url || ""}
                 onChange={(e) => updateField("git_remote_url", e.target.value)}
+                className={cn(errors.git_remote_url && "border-destructive")}
+                aria-invalid={!!errors.git_remote_url}
               />
-              <p className="text-xs text-muted-foreground">
-                Used by db90-claude and db90-cursor to auto-detect this project. Paste the output of{" "}
-                <code className="font-mono">git remote get-url origin</code>
-                {" "}— the <code className="font-mono">.git</code> suffix and casing are normalized automatically.
+              {errors.git_remote_url && (
+                <p className="text-xs text-destructive">{errors.git_remote_url}</p>
+              )}
+              <p className="type-caption text-muted-foreground">
+                Paste the output of <code className="font-mono">git remote get-url origin</code> from the repository where
+                developers run the CLI. When the CLI runs inside that repo, events are auto-attributed to this project.
               </p>
             </div>
 
@@ -181,7 +213,7 @@ export function ProjectForm({
                 <Label htmlFor="is_active" className="cursor-pointer">
                   Active
                 </Label>
-                <p className="text-xs text-muted-foreground">
+                <p className="type-caption text-muted-foreground">
                   Enable event tracking for this project
                 </p>
               </div>
@@ -193,6 +225,10 @@ export function ProjectForm({
             </div>
           </CardContent>
         </Card>
+
+        {generalError && (
+          <p className="mt-4 text-sm text-destructive" role="alert">{generalError}</p>
+        )}
 
         <div className="mt-6 flex items-center justify-end gap-2">
           <Button

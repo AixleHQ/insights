@@ -5,6 +5,8 @@ module Api
     class BaseController < ApplicationController
       include ActionPolicy::Controller
 
+      wrap_parameters false
+
       authorize :user, through: :current_user
       authorize :organization, through: :current_organization
 
@@ -33,20 +35,23 @@ module Api
 
       def render_collection(collection, serializer_class, options = {})
         paginated = paginate(collection)
+        serializer_kwargs = serializer_instance_kwargs(options[:serializer_params], subject: paginated)
         render json: {
-          data: serializer_class.new(paginated).serialize,
+          data: serializer_class.new(paginated, **serializer_kwargs).serialize,
           meta: pagination_meta(paginated)
         }, status: options[:status] || :ok
       end
 
       def render_resource(resource, serializer_class, options = {})
+        status = options[:status] || :ok
+        serializer_kwargs = serializer_instance_kwargs(options[:serializer_params], subject: resource)
         render json: {
-          data: serializer_class.new(resource).serialize
-        }, status: options[:status] || :ok
+          data: serializer_class.new(resource, **serializer_kwargs).serialize
+        }, status: status
       end
 
-      def render_created(resource, serializer_class)
-        render_resource(resource, serializer_class, status: :created)
+      def render_created(resource, serializer_class, options = {})
+        render_resource(resource, serializer_class, options.merge(status: :created))
       end
 
       def render_success(message: "Success", data: nil)
@@ -61,6 +66,16 @@ module Api
 
       private
 
+      # @param serializer_params [Hash, Proc] static params for Alba, or Proc(subject) => Hash
+      def serializer_instance_kwargs(serializer_params, subject:)
+        return {} if serializer_params.nil?
+
+        params_hash = serializer_params.respond_to?(:call) ? serializer_params.call(subject) : serializer_params
+        return {} if params_hash.nil?
+
+        { params: params_hash }
+      end
+
       def render_not_found(exception = nil)
         message = exception&.message || "Resource not found"
         render json: { error: "Not Found", message: message }, status: :not_found
@@ -72,7 +87,7 @@ module Api
         else
                    { base: [ exception.message ] }
         end
-        render json: { error: "Unprocessable Entity", errors: errors }, status: :unprocessable_entity
+        render json: { error: "Unprocessable Entity", errors: errors }, status: :unprocessable_content
       end
 
       def render_forbidden(exception = nil)
@@ -97,6 +112,18 @@ module Api
       rescue ArgumentError
         render_bad_request("Invalid #{param_name} format — expected ISO 8601")
         nil
+      end
+
+      # Date-only params (YYYY-MM-DD from HTML date inputs) need inclusive day bounds.
+      def parse_audit_log_date_param(value, param_name, boundary: :start)
+        parsed = parse_date_param(value, param_name) or return nil
+        return parsed unless date_only_param?(value)
+
+        boundary == :end ? parsed.end_of_day : parsed.beginning_of_day
+      end
+
+      def date_only_param?(value)
+        value.to_s.match?(/\A\d{4}-\d{2}-\d{2}\z/)
       end
     end
   end

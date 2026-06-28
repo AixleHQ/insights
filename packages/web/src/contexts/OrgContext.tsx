@@ -7,9 +7,10 @@ import {
   type ReactNode,
 } from "react";
 import { useAuth } from "./AuthContext";
-import { setCurrentOrganizationId } from "../lib/api";
+import { useImpersonation } from "./ImpersonationContext";
+import { setCurrentOrganizationId, getAuthToken } from "../lib/api";
 
-export type MemberRole = "owner" | "admin" | "member" | "viewer";
+export type MemberRole = "owner" | "member" | "viewer";
 
 // Organization type matching the Rails API response
 export interface Organization {
@@ -54,7 +55,8 @@ interface OrgProviderProps {
 }
 
 export function OrgProvider({ children, apiBaseUrl = "/api/v1" }: OrgProviderProps) {
-  const { isAuthenticated, isLoading: authLoading, getAccessToken } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isImpersonating } = useImpersonation();
 
   const [state, setState] = useState<OrgState>({
     currentOrg: null,
@@ -80,7 +82,7 @@ export function OrgProvider({ children, apiBaseUrl = "/api/v1" }: OrgProviderPro
     setState((prev) => ({ ...prev, isLoading: true, isInitialized: false, error: null }));
 
     try {
-      const token = await getAccessToken();
+      const token = await getAuthToken();
       const headers = {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
@@ -120,23 +122,36 @@ export function OrgProvider({ children, apiBaseUrl = "/api/v1" }: OrgProviderPro
         defaultOrgId = (userData.data?.settings?.default_org_id as string) ?? null;
       }
 
-      // Restore previously selected org: localStorage > default_org_id setting > first org
+      // Select org: last used (localStorage) > default_org_id preference > first org
+      // localStorage represents the user's explicit selection and takes highest priority.
+      // default_org_id is only used as a fallback when the user has never switched orgs.
       const storedOrgId = localStorage.getItem(ORG_STORAGE_KEY);
-      let currentOrg = organizations.find((o) => o.id === storedOrgId) || null;
 
-      // No localStorage entry — try the server-persisted default_org_id
+      let currentOrg: Organization | null = null;
+
+      if (storedOrgId) {
+        currentOrg = organizations.find((o) => o.id === storedOrgId) || null;
+      }
+
       if (!currentOrg && defaultOrgId) {
         currentOrg = organizations.find((o) => o.id === defaultOrgId) || null;
       }
 
-      // If still no org, use first org
       if (!currentOrg && organizations.length > 0) {
-        currentOrg = organizations[0];
-        // Clear invalid stored org ID (e.g., after DB reseed)
         if (storedOrgId) {
-          console.warn(`[OrgContext] Stored org ${storedOrgId} not found, switching to ${currentOrg.slug}`);
-          localStorage.setItem(ORG_STORAGE_KEY, currentOrg.id);
+          // Avoid leaking org UUIDs in production logs
+          if (import.meta.env.DEV) {
+            console.warn(`[OrgContext] Stored org ${storedOrgId} not found in membership list, switching to first org`);
+          } else {
+            console.warn("[OrgContext] Stored org not found in membership list, switching to first org");
+          }
         }
+        currentOrg = organizations[0];
+      }
+
+      // Keep localStorage in sync so within-session org switches continue to work
+      if (currentOrg && currentOrg.id !== storedOrgId) {
+        localStorage.setItem(ORG_STORAGE_KEY, currentOrg.id);
       }
 
       // Update the global API client state for X-Organization-ID header
@@ -158,19 +173,17 @@ export function OrgProvider({ children, apiBaseUrl = "/api/v1" }: OrgProviderPro
         error: error instanceof Error ? error : new Error("Failed to fetch organizations"),
       }));
     }
-  }, [isAuthenticated, getAccessToken, apiBaseUrl]);
+  }, [isAuthenticated, apiBaseUrl]);
 
-  // Fetch organizations when auth state changes
+  // Fetch organizations when auth state changes or impersonation toggles
   useEffect(() => {
     if (authLoading) {
-      // Auth is still loading, don't do anything yet
       return;
     }
 
     if (isAuthenticated) {
       refreshOrganizations();
     } else {
-      // Only set initialized when auth is done AND user is not authenticated
       setState({
         currentOrg: null,
         organizations: [],
@@ -180,7 +193,8 @@ export function OrgProvider({ children, apiBaseUrl = "/api/v1" }: OrgProviderPro
         error: null,
       });
     }
-  }, [authLoading, isAuthenticated, refreshOrganizations]);
+    // isImpersonating toggles when impersonation starts/stops — re-fetch orgs as the right user
+  }, [authLoading, isAuthenticated, isImpersonating, refreshOrganizations]);
 
   // Set current organization
   const setCurrentOrg = useCallback((org: Organization | null) => {

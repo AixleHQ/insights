@@ -6,7 +6,7 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
   let(:admin) { create(:user) }
   let(:member) { create(:user) }
   let(:organization) { create(:organization) }
-  let!(:admin_membership) { create(:organization_membership, user: admin, organization: organization, role: 'admin') }
+  let!(:admin_membership) { create(:organization_membership, user: admin, organization: organization, role: 'owner') }
   let!(:member_membership) { create(:organization_membership, user: member, organization: organization, role: 'member') }
   let!(:connector) { create(:organization_connector, organization: organization, connector_type: 'github') }
 
@@ -180,6 +180,46 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
         end
       end
     end
+
+    context 'with a Cursor connector' do
+      it 'creates a cursor connector when API key is valid' do
+        allow_any_instance_of(Oauth::CursorProvider)
+          .to receive(:test_connection).and_return({ success: true })
+
+        authenticated_post "/api/v1/organizations/#{organization.id}/connectors",
+                           user: admin,
+                           organization: organization,
+                           params: { connector_type: 'cursor', access_token: 'valid-cursor-key' }
+
+        expect_created
+        expect(json_data[:connectorType]).to eq('cursor')
+      end
+
+      it 'returns 422 when Cursor API key is invalid' do
+        allow_any_instance_of(Oauth::CursorProvider)
+          .to receive(:test_connection).and_return({ success: false, error: 'Invalid or unauthorised Cursor API key.' })
+
+        authenticated_post "/api/v1/organizations/#{organization.id}/connectors",
+                           user: admin,
+                           organization: organization,
+                           params: { connector_type: 'cursor', access_token: 'bad-key' }
+
+        expect_unprocessable
+        expect(json_response[:errors][:access_token]).to include('Invalid or unauthorised Cursor API key.')
+      end
+
+      it 'does not create a cursor connector when API key is invalid' do
+        allow_any_instance_of(Oauth::CursorProvider)
+          .to receive(:test_connection).and_return({ success: false, error: 'Invalid or unauthorised Cursor API key.' })
+
+        expect {
+          authenticated_post "/api/v1/organizations/#{organization.id}/connectors",
+                             user: admin,
+                             organization: organization,
+                             params: { connector_type: 'cursor', access_token: 'bad-key' }
+        }.not_to change(OrganizationConnector, :count)
+      end
+    end
   end
 
   describe 'PATCH /api/v1/organizations/:organization_id/connectors/:id' do
@@ -191,6 +231,61 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
 
       expect_success
       expect(json_data[:isActive]).to be false
+    end
+
+    it 'updates label via PATCH' do
+      authenticated_patch "/api/v1/organizations/#{organization.id}/connectors/#{connector.id}",
+                          user: admin,
+                          organization: organization,
+                          params: { label: 'My GitHub account' }
+
+      expect_success
+      expect(json_data[:label]).to eq('My GitHub account')
+      expect(connector.reload.label).to eq('My GitHub account')
+    end
+  end
+
+  describe 'POST /api/v1/organizations/:organization_id/connectors (multi-instance)' do
+    let(:openrouter_provider_double) { instance_double(Oauth::OpenrouterProvider, test_connection: { success: true }) }
+
+    before do
+      allow(Oauth::BaseProvider).to receive(:for).and_call_original
+      allow(Oauth::OpenrouterProvider).to receive(:new).and_return(openrouter_provider_double)
+      allow(Oauth::BaseProvider).to receive(:for).with(anything) do |c|
+        openrouter_provider_double if c.connector_type == 'openrouter'
+      end
+    end
+
+    it 'allows creating two openrouter connectors in one org' do
+      allow_any_instance_of(Oauth::OpenrouterProvider).to receive(:test_connection).and_return({ success: true })
+
+      authenticated_post "/api/v1/organizations/#{organization.id}/connectors",
+                         user: admin,
+                         organization: organization,
+                         params: { connector_type: 'openrouter', access_token: 'key-1' }
+      expect_created
+
+      expect {
+        authenticated_post "/api/v1/organizations/#{organization.id}/connectors",
+                           user: admin,
+                           organization: organization,
+                           params: { connector_type: 'openrouter', access_token: 'key-2', label: 'Secondary' }
+      }.to change(OrganizationConnector, :count).by(1)
+
+      expect_created
+      expect(json_data[:label]).to eq('Secondary')
+    end
+
+    it 'persists label on connector create' do
+      allow_any_instance_of(Oauth::OpenrouterProvider).to receive(:test_connection).and_return({ success: true })
+
+      authenticated_post "/api/v1/organizations/#{organization.id}/connectors",
+                         user: admin,
+                         organization: organization,
+                         params: { connector_type: 'openrouter', access_token: 'key-1', label: 'Primary key' }
+
+      expect_created
+      expect(json_data[:label]).to eq('Primary key')
     end
   end
 
@@ -331,8 +426,20 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
                          organization: organization
 
       expect_success
-      expect(connector.reload.last_sync_at).to be_present
+      expect(connector.reload.status).to eq('testing')
       expect(GithubSyncJob).to have_received(:perform_later).with(connector.id)
+    end
+
+    it 'enqueues CursorSyncJob for a cursor connector' do
+      cursor_connector = create(:organization_connector, :cursor, organization: organization)
+      allow(CursorSyncJob).to receive(:perform_later)
+
+      authenticated_post "/api/v1/organizations/#{organization.id}/connectors/#{cursor_connector.id}/sync",
+                         user: admin,
+                         organization: organization
+
+      expect_success
+      expect(CursorSyncJob).to have_received(:perform_later).with(cursor_connector.id)
     end
   end
 
@@ -378,6 +485,26 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
 
       expect_success
       expect(json_response[:total_events]).to eq(2)
+    end
+
+    it 'counts source control events by linked repositories for gitlab connectors' do
+      gitlab_connector = create(:organization_connector, organization: organization, connector_type: 'gitlab')
+      project = create(:project, organization: organization, owner: nil)
+      repository = create(:repository, organization_connector: gitlab_connector, project: project)
+      other_repository = create(:repository, organization_connector: connector, project: project)
+
+      create(:tool_event, organization: organization, repository: repository, project: project, tool_name: 'gitlab', event_type: 'commit')
+      create(:tool_event, organization: organization, repository: repository, project: project, tool_name: 'gitlab', event_type: 'review')
+      create(:tool_event, organization: organization, repository: other_repository, project: project, tool_name: 'github', event_type: 'commit')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{gitlab_connector.id}/sync_status",
+                        user: admin,
+                        organization: organization
+
+      expect_success
+      expect(json_response[:total_events]).to eq(2)
+      expect(json_response[:repository_count]).to eq(1)
+      expect(json_response[:last_event_at]).to be_present
     end
 
     it 'returns null last_error when connection is healthy' do
@@ -461,6 +588,18 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
       unlinked = json_data.find { |r| r[:externalId] == "2" }
       expect(linked[:alreadyLinked]).to be true
       expect(unlinked[:alreadyLinked]).to be false
+    end
+
+    it 'does not mark org-level synced repos without a project link as already linked' do
+      create(:repository, organization_connector: connector, project: nil, external_id: "1")
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{connector.id}/available_repos",
+                        user: admin,
+                        organization: organization
+
+      expect_success
+      repo = json_data.find { |r| r[:externalId] == "1" }
+      expect(repo[:alreadyLinked]).to be false
     end
 
     it 'returns 403 for org members' do
@@ -556,16 +695,110 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
       expect(json_data[:externalAccountName]).to eq('octocat')
     end
 
-    it 'updates an existing connector when one already exists' do
+    it 'creates a connector.create audit log on OAuth callback' do
+      connector.destroy!
+
       expect {
         authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
                            user: admin,
                            organization: organization,
                            params: { connector_type: 'github', code: 'oauth_code_abc' }
-      }.not_to change(OrganizationConnector, :count)
+      }.to change(OrganizationAuditLog, :count).by(1)
+
+      log = OrganizationAuditLog.order(:created_at).last
+      expect(log.action).to eq('connector.create')
+      expect(log.organization).to eq(organization)
+      expect(log.actor).to eq(admin)
+      expect(log.tracked_changes).to include('connector_type' => 'github', 'via' => 'oauth_callback')
+    end
+
+    context 'when re-authing the same external account (same external_org_id)' do
+      before { connector.update!(external_org_id: 'gh-42') }
+
+      it 'updates the existing connector (count unchanged)' do
+        expect {
+          authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
+                             user: admin,
+                             organization: organization,
+                             params: { connector_type: 'github', code: 'oauth_code_abc' }
+        }.not_to change(OrganizationConnector, :count)
+
+        expect_success
+        expect(connector.reload.status).to eq('connected')
+      end
+
+      it 'creates a connector.update audit log' do
+        expect {
+          authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
+                             user: admin,
+                             organization: organization,
+                             params: { connector_type: 'github', code: 'oauth_code_abc' }
+        }.to change(OrganizationAuditLog, :count).by(1)
+
+        log = OrganizationAuditLog.order(:created_at).last
+        expect(log.action).to eq('connector.update')
+        expect(log.tracked_changes).to include('connector_type' => 'github', 'via' => 'oauth_callback')
+      end
+    end
+
+    context 'when connecting a different external account (new external_org_id)' do
+      before { connector.update!(external_org_id: 'gh-old') }
+
+      it 'creates a new connector (count +1)' do
+        expect {
+          authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
+                             user: admin,
+                             organization: organization,
+                             params: { connector_type: 'github', code: 'oauth_code_abc' }
+        }.to change(OrganizationConnector, :count).by(1)
+
+        expect_success
+        external_org_ids = organization.organization_connectors.where(connector_type: 'github').pluck(:external_org_id)
+        expect(external_org_ids).to include('gh-old', 'gh-42')
+      end
+    end
+
+    it 'persists a label when provided' do
+      connector.destroy!
+
+      authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
+                         user: admin,
+                         organization: organization,
+                         params: { connector_type: 'github', code: 'oauth_code_abc', label: 'Work account' }
 
       expect_success
-      expect(connector.reload.status).to eq('connected')
+      expect(json_data[:label]).to eq('Work account')
+    end
+
+    context 'when OAuth provider does not return account_id for multi-instance type' do
+      let(:missing_account_provider) do
+        Class.new do
+          def self.exchange_code(_code, redirect_uri:)
+            {
+              access_token: 'gho_token123',
+              refresh_token: nil,
+              expires_at: nil,
+              account_id: nil,
+              account_name: 'octocat'
+            }
+          end
+        end
+      end
+
+      before do
+        connector.destroy!
+        allow(Oauth::BaseProvider).to receive(:provider_class).with('github').and_return(missing_account_provider)
+      end
+
+      it 'returns 422 with external_org_id error' do
+        authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
+                           user: admin,
+                           organization: organization,
+                           params: { connector_type: 'github', code: 'oauth_code_abc' }
+
+        expect_unprocessable
+        expect(json_response.dig(:errors, :external_org_id)).to include('is required for this connector type')
+      end
     end
 
     it 'returns 403 for org members' do
@@ -656,6 +889,214 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
 
     it 'returns 401 without authentication' do
       get "/api/v1/organizations/#{organization.id}/connectors/#{jira_connector.id}/available_projects",
+          headers: { 'X-Organization-ID' => organization.id }
+
+      expect_unauthorized
+    end
+  end
+
+  describe 'scope field in serialized response' do
+    it 'returns scope=project for github connectors' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{connector.id}",
+                        user: member,
+                        organization: organization
+
+      expect_success
+      expect(json_data[:scope]).to eq('project')
+    end
+
+    it 'returns scope=project for gitlab connectors' do
+      gitlab = create(:organization_connector, organization: organization, connector_type: 'gitlab')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{gitlab.id}",
+                        user: member,
+                        organization: organization
+
+      expect_success
+      expect(json_data[:scope]).to eq('project')
+    end
+
+    it 'returns scope=project for bitbucket connectors' do
+      bitbucket = create(:organization_connector, organization: organization, connector_type: 'bitbucket')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{bitbucket.id}",
+                        user: member,
+                        organization: organization
+
+      expect_success
+      expect(json_data[:scope]).to eq('project')
+    end
+
+    it 'returns scope=org for jira connectors' do
+      jira = create(:organization_connector, organization: organization, connector_type: 'jira')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{jira.id}",
+                        user: member,
+                        organization: organization
+
+      expect_success
+      expect(json_data[:scope]).to eq('org')
+    end
+
+    it 'returns scope=org for anthropic connectors' do
+      anthropic = create(:organization_connector, organization: organization, connector_type: 'anthropic')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{anthropic.id}",
+                        user: member,
+                        organization: organization
+
+      expect_success
+      expect(json_data[:scope]).to eq('org')
+    end
+
+    it 'includes scope in the list response' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors",
+                        user: member,
+                        organization: organization
+
+      expect_success
+      expect(json_data.first).to have_key(:scope)
+      expect(json_data.first[:scope]).to eq('project')
+    end
+  end
+
+  describe 'Cursor connector serializer read path' do
+    let!(:cursor_connector) do
+      create(:organization_connector, :cursor, organization: organization,
+             status: 'connected',
+             config: {
+               "seat_count"            => 12,
+               "overage_spend_cents"   => 875.5,
+               "overall_spend_cents"   => 3200.0,
+               "fast_premium_requests" => 410,
+               "billing_cycle_start"   => "2026-06-01T00:00:00Z"
+             })
+    end
+
+    it 'exposes billing fields on GET /connectors/:id' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{cursor_connector.id}",
+                        user: member,
+                        organization: organization
+
+      expect_success
+      expect(json_data[:seatCount]).to eq(12)
+      expect(json_data[:overageSpendCents]).to eq(875.5)
+      expect(json_data[:overallSpendCents]).to eq(3200.0)
+      expect(json_data[:fastPremiumRequests]).to eq(410)
+      expect(json_data[:billingCycleStart]).to eq("2026-06-01T00:00:00Z")
+    end
+
+    it 'returns nil billing fields for non-cursor connectors' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{connector.id}",
+                        user: member,
+                        organization: organization
+
+      expect_success
+      expect(json_data[:overageSpendCents]).to be_nil
+      expect(json_data[:overallSpendCents]).to be_nil
+      expect(json_data[:fastPremiumRequests]).to be_nil
+      expect(json_data[:billingCycleStart]).to be_nil
+    end
+
+    it 'returns scope=org for cursor connectors' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/#{cursor_connector.id}",
+                        user: member,
+                        organization: organization
+
+      expect_success
+      expect(json_data[:scope]).to eq('org')
+    end
+  end
+
+  describe 'GET /api/v1/organizations/:organization_id/connectors/health' do
+    let!(:error_connector) do
+      create(:organization_connector, organization: organization, connector_type: 'gitlab',
+             status: 'error', last_error: 'Token expired')
+    end
+    let!(:disconnected_connector) do
+      create(:organization_connector, organization: organization, connector_type: 'linear',
+             status: 'disconnected')
+    end
+
+    it 'returns summary counts for org admin' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/health",
+                        user: admin,
+                        organization: organization
+
+      expect_success
+      summary = json_response.dig(:data, :summary)
+      # connector (github/connected) + error_connector + disconnected_connector = 3 total
+      expect(summary[:total]).to eq(3)
+      expect(summary[:connected]).to eq(1)
+      expect(summary[:error]).to eq(1)
+      expect(summary[:disconnected]).to eq(1)
+      expect(summary[:testing]).to eq(0)
+    end
+
+    it 'returns per-connector list excluding disconnected connectors' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/health",
+                        user: admin,
+                        organization: organization
+
+      expect_success
+      connectors = json_response.dig(:data, :connectors)
+      connector_types = connectors.map { |c| c[:connector_type] }
+      expect(connector_types).to include('github', 'gitlab')
+      expect(connector_types).not_to include('linear')
+    end
+
+    it 'includes health stats fields on each connector' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/health",
+                        user: admin,
+                        organization: organization
+
+      expect_success
+      c = json_response.dig(:data, :connectors).first
+      expect(c).to have_key(:success_rate_7d)
+      expect(c).to have_key(:avg_sync_duration_ms_7d)
+      expect(c).to have_key(:last_sync_at)
+      expect(c).to have_key(:last_error)
+    end
+
+    it 'returns computed success_rate_7d when snapshots exist' do
+      now = Time.current
+      create(:connector_health_snapshot, organization_connector: connector,
+             status: 'success', snapshotted_at: now, sync_duration_ms: 1000)
+      create(:connector_health_snapshot, organization_connector: connector,
+             status: 'success', snapshotted_at: now - 1.hour, sync_duration_ms: 2000)
+      create(:connector_health_snapshot, organization_connector: connector,
+             status: 'failure', snapshotted_at: now - 2.hours, sync_duration_ms: 500)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/health",
+                        user: admin,
+                        organization: organization
+
+      expect_success
+      github_data = json_response.dig(:data, :connectors).find { |c| c[:connector_type] == 'github' }
+      expect(github_data[:success_rate_7d]).to be_within(0.001).of(0.6667)
+      expect(github_data[:avg_sync_duration_ms_7d]).to be_present
+    end
+
+    it 'returns null success_rate_7d when no snapshots exist' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/health",
+                        user: admin,
+                        organization: organization
+
+      expect_success
+      github_data = json_response.dig(:data, :connectors).find { |c| c[:connector_type] == 'github' }
+      expect(github_data[:success_rate_7d]).to be_nil
+    end
+
+    it 'returns 403 for non-admin members' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/health",
+                        user: member,
+                        organization: organization
+
+      expect_forbidden
+    end
+
+    it 'returns 401 without authentication' do
+      get "/api/v1/organizations/#{organization.id}/connectors/health",
           headers: { 'X-Organization-ID' => organization.id }
 
       expect_unauthorized

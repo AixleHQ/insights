@@ -19,27 +19,37 @@ vi.mock("react-router-dom", async () => {
 const mockUseProject = vi.fn();
 const mockUseUpdateProject = vi.fn();
 const mockUseDeleteProject = vi.fn();
-const mockUseProjectMembers = vi.fn();
 const mockUseProjectRetentionPolicy = vi.fn();
 const mockUseUpdateProjectRetentionPolicy = vi.fn();
+const mockUseProjectMembers = vi.fn();
+const mockHasRole = vi.fn();
 
 vi.mock("@/hooks/useApi", () => ({
   useProject: (...args: unknown[]) => mockUseProject(...args),
   useUpdateProject: () => mockUseUpdateProject(),
   useDeleteProject: () => mockUseDeleteProject(),
-  useProjectMembers: (...args: unknown[]) => mockUseProjectMembers(...args),
-  useProjectCommitStats: () => ({ data: undefined, isLoading: false }),
   useProjectRetentionPolicy: (...args: unknown[]) => mockUseProjectRetentionPolicy(...args),
   useUpdateProjectRetentionPolicy: () => mockUseUpdateProjectRetentionPolicy(),
+  useCurrentUser: () => ({ data: { id: "user-1", email: "test@example.com" }, isLoading: false }),
+  useProjectMembers: (...args: unknown[]) => mockUseProjectMembers(...args),
+}));
+
+vi.mock("@/contexts/OrgContext", () => ({
+  useOrg: () => ({
+    currentOrg: { id: "test-org-id", name: "Test Org", slug: "test-org" },
+    currentMembership: { role: "member" },
+    isLoading: false,
+    hasRole: mockHasRole,
+  }),
 }));
 
 vi.mock("@/components/project", () => ({
-  ProjectTeamSection: () => <div>Team Section</div>,
-  ProjectConnectorsTab: () => <div>Connectors Tab</div>,
   ProjectSecurityTab: () => <div>Security Tab</div>,
   ProjectSettingsSection: () => <div>Email Domain Section</div>,
   ProjectRetentionPolicySection: () => <div>Retention Policy Section</div>,
   ProjectAlertsSection: () => <div>Alerts Section</div>,
+  ProjectMembersTab: () => <div>Members Tab</div>,
+  ProjectConnectorsTab: () => <div>Connectors Tab</div>,
   ProjectNotFound: () => (
     <div>
       <p>Project not found</p>
@@ -52,9 +62,8 @@ const mockProject = {
   id: "proj-1",
   name: "My Project",
   description: "A test project",
-  repository_url: "https://github.com/org/repo",
   repositoryUrl: "https://github.com/org/repo",
-  is_active: true,
+  gitRemoteUrl: "git@github.com:org/repo.git",
   isActive: true,
 };
 
@@ -73,13 +82,17 @@ function renderAtPath(path: string) {
   );
 }
 
+const mockProjectMember = { id: "pm-1", userId: "user-1", role: "owner" as const };
+
 function setupDefaultMocks() {
   mockUseProject.mockReturnValue({ data: mockProject, isLoading: false });
   mockUseUpdateProject.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
   mockUseDeleteProject.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
-  mockUseProjectMembers.mockReturnValue({ data: [], isLoading: false });
   mockUseProjectRetentionPolicy.mockReturnValue({ data: undefined, isLoading: false });
   mockUseUpdateProjectRetentionPolicy.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+  // Default: current user is a project member with owner role; org role is non-owner
+  mockUseProjectMembers.mockReturnValue({ data: [mockProjectMember] });
+  mockHasRole.mockReturnValue(false);
 }
 
 describe("ProjectSettings", () => {
@@ -111,26 +124,40 @@ describe("ProjectSettings", () => {
   });
 
   describe("Sidebar navigation", () => {
-    it("renders all 5 nav links", () => {
+    it("shows all 6 nav links for a project owner", () => {
+      mockHasRole.mockReturnValue(true);
       renderAtPath("/projects/proj-1/settings");
 
       expect(screen.getByRole("link", { name: /general/i })).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: /members/i })).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: /integrations/i })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /^members$/i })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /^integrations$/i })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: /security & audit/i })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: /policies/i })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /alerts/i })).toBeInTheDocument();
+    });
+
+    it("shows Members but not Integrations for a project member who is not org owner", () => {
+      mockHasRole.mockReturnValue(false);
+      mockUseProjectMembers.mockReturnValue({ data: [{ id: "pm-1", userId: "user-1", role: "member" }] });
+      renderAtPath("/projects/proj-1/settings");
+
+      expect(screen.getByRole("link", { name: /^members$/i })).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /^integrations$/i })).not.toBeInTheDocument();
+    });
+
+    it("shows neither Members nor Integrations for a non-member", () => {
+      mockHasRole.mockReturnValue(false);
+      mockUseProjectMembers.mockReturnValue({ data: [] });
+      renderAtPath("/projects/proj-1/settings");
+
+      expect(screen.queryByRole("link", { name: /^members$/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /^integrations$/i })).not.toBeInTheDocument();
     });
 
     it("marks General as active on the index route", () => {
       renderAtPath("/projects/proj-1/settings");
 
       expect(screen.getByRole("link", { name: /general/i }).className).toMatch(/text-primary/);
-    });
-
-    it("marks Members as active on the members route", () => {
-      renderAtPath("/projects/proj-1/settings/members");
-
-      expect(screen.getByRole("link", { name: /members/i }).className).toMatch(/text-primary/);
     });
   });
 
@@ -257,19 +284,64 @@ describe("ProjectSettings", () => {
         expect(screen.getByText("Failed to delete project. Please try again.")).toBeInTheDocument();
       });
     });
+
+    it("shows git remote attribution warning when git remote is missing", () => {
+      mockUseProject.mockReturnValue({
+        data: {
+          ...mockProject,
+          gitRemoteUrl: null,
+        },
+        isLoading: false,
+      });
+      renderAtPath("/projects/proj-1/settings");
+
+      expect(screen.getByText(/CLI events cannot be auto-attributed yet/i)).toBeInTheDocument();
+    });
+
+    it("does not show git remote warning when remote is configured", () => {
+      renderAtPath("/projects/proj-1/settings");
+
+      expect(screen.queryByText(/CLI events cannot be auto-attributed yet/i)).not.toBeInTheDocument();
+    });
+
+    it("uses Git remote URL (for auto CLI attribution) field label", () => {
+      renderAtPath("/projects/proj-1/settings");
+
+      expect(screen.getByLabelText(/Git remote URL \(for auto CLI attribution\)/i)).toBeInTheDocument();
+    });
   });
 
   describe("Sub-routes", () => {
-    it("renders Members section at /settings/members", () => {
+    it("renders Members tab at /settings/members for a project member", () => {
+      mockUseProjectMembers.mockReturnValue({ data: [{ id: "pm-1", userId: "user-1", role: "member" }] });
       renderAtPath("/projects/proj-1/settings/members");
 
-      expect(screen.getByText("Team Section")).toBeInTheDocument();
+      expect(screen.getByText("Members Tab")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: /members/i })).toBeInTheDocument();
     });
 
-    it("renders Integrations section at /settings/integrations", () => {
+    it("redirects /settings/members to General for a non-member", () => {
+      mockHasRole.mockReturnValue(false);
+      mockUseProjectMembers.mockReturnValue({ data: [] });
+      renderAtPath("/projects/proj-1/settings/members");
+
+      expect(screen.queryByText("Members Tab")).not.toBeInTheDocument();
+    });
+
+    it("renders Integrations tab at /settings/integrations for a project owner", () => {
+      mockHasRole.mockReturnValue(true);
       renderAtPath("/projects/proj-1/settings/integrations");
 
       expect(screen.getByText("Connectors Tab")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: /integrations/i })).toBeInTheDocument();
+    });
+
+    it("redirects /settings/integrations to General for a non-owner", () => {
+      mockHasRole.mockReturnValue(false);
+      mockUseProjectMembers.mockReturnValue({ data: [{ id: "pm-1", userId: "user-1", role: "member" }] });
+      renderAtPath("/projects/proj-1/settings/integrations");
+
+      expect(screen.queryByText("Connectors Tab")).not.toBeInTheDocument();
     });
 
     it("renders Security & Audit section at /settings/security", () => {

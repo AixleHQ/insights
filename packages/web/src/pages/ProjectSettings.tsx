@@ -4,22 +4,24 @@ import {
   ArrowLeft,
   AlertCircle,
   Building2,
-  Users,
-  Plug,
   FileSearch,
   Shield,
   Bell,
   Loader2,
   Save,
   Trash2,
+  Users,
+  Plug,
 } from "lucide-react";
 import {
   useProject,
   useUpdateProject,
   useDeleteProject,
+  useCurrentUser,
   useProjectMembers,
-  useProjectCommitStats,
+  type ProjectMember,
 } from "@/hooks/useApi";
+import { useOrg } from "@/contexts/OrgContext";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,21 +36,38 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ProjectTeamSection, ProjectConnectorsTab, ProjectSecurityTab, ProjectSettingsSection, ProjectNotFound, ProjectRetentionPolicySection, ProjectAlertsSection } from "@/components/project";
+import {
+  ProjectSecurityTab,
+  ProjectSettingsSection,
+  ProjectNotFound,
+  ProjectRetentionPolicySection,
+  ProjectAlertsSection,
+  ProjectMembersTab,
+  ProjectConnectorsTab,
+} from "@/components/project";
 import { cn } from "@/lib/utils";
+import { isGitRemoteMissing } from "@/lib/project-git-remote";
 
-const getNavItems = (id: string) => [
-  { title: "General", href: `/projects/${id}/settings`, icon: Building2 },
-  { title: "Members", href: `/projects/${id}/settings/members`, icon: Users },
-  { title: "Integrations", href: `/projects/${id}/settings/integrations`, icon: Plug },
-  { title: "Security & Audit", href: `/projects/${id}/settings/security`, icon: FileSearch },
-  { title: "Policies", href: `/projects/${id}/settings/policies`, icon: Shield },
-  { title: "Alerts", href: `/projects/${id}/settings/alerts`, icon: Bell },
+const getNavItems = (id: string, isMemberOfProject: boolean, isProjectOwner: boolean) => [
+  { title: "General",          href: `/projects/${id}/settings`,              icon: Building2  },
+  ...(isMemberOfProject ? [{ title: "Members",      href: `/projects/${id}/settings/members`,      icon: Users      }] : []),
+  ...(isProjectOwner    ? [{ title: "Integrations", href: `/projects/${id}/settings/integrations`, icon: Plug       }] : []),
+  { title: "Security & Audit", href: `/projects/${id}/settings/security`,     icon: FileSearch },
+  { title: "Policies",         href: `/projects/${id}/settings/policies`,     icon: Shield     },
+  { title: "Alerts",           href: `/projects/${id}/settings/alerts`,       icon: Bell       },
 ];
 
-function ProjectSettingsNav({ projectId }: { projectId: string }) {
+function ProjectSettingsNav({
+  projectId,
+  isMemberOfProject,
+  isProjectOwner,
+}: {
+  projectId: string;
+  isMemberOfProject: boolean;
+  isProjectOwner: boolean;
+}) {
   const location = useLocation();
-  const navItems = getNavItems(projectId);
+  const navItems = getNavItems(projectId, isMemberOfProject, isProjectOwner);
 
   return (
     <nav className="flex flex-col gap-1">
@@ -87,9 +106,11 @@ interface GeneralFormData {
 function ProjectGeneralSettingsForm({
   projectId,
   defaultValues,
+  serverGitRemoteMissing,
 }: {
   projectId: string;
   defaultValues: GeneralFormData;
+  serverGitRemoteMissing: boolean;
 }) {
   const updateProject = useUpdateProject();
   const deleteProject = useDeleteProject();
@@ -130,7 +151,7 @@ function ProjectGeneralSettingsForm({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-medium">General</h2>
+        <h2 className="type-h4">General</h2>
         <p className="text-sm text-muted-foreground">
           Manage your project's basic information
         </p>
@@ -138,9 +159,26 @@ function ProjectGeneralSettingsForm({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Project Details</CardTitle>
+          <CardTitle className="type-body-lg">Project Details</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {serverGitRemoteMissing && (
+            <Alert
+              className="border-warning/30 bg-warning/10 text-warning-foreground dark:border-warning/25 dark:bg-warning/10 dark:text-warning-foreground [&>svg]:text-warning dark:[&>svg]:text-warning"
+            >
+              <AlertCircle className="size-4 shrink-0" />
+              <AlertDescription className="text-warning-foreground dark:text-warning/80">
+                <p className="font-medium text-warning-foreground dark:text-warning/70">
+                  CLI events cannot be auto-attributed yet
+                </p>
+                <p className="mt-1 text-sm text-warning-foreground/90 dark:text-warning/80">
+                  Add the Git remote URL below (paste the output of{" "}
+                  <code className="rounded bg-warning/15 px-1 py-0.5 font-mono text-xs">git remote get-url origin</code>
+                  ) so the Aixle Insights CLI can match events to this project.
+                </p>
+              </AlertDescription>
+            </Alert>
+          )}
           <div className="space-y-2">
             <Label htmlFor="proj-name">Name</Label>
             <Input
@@ -168,16 +206,16 @@ function ProjectGeneralSettingsForm({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="proj-git-remote">Git Remote URL</Label>
+            <Label htmlFor="proj-git-remote">Git remote URL (for auto CLI attribution)</Label>
             <Input
               id="proj-git-remote"
               value={formData.git_remote_url}
               onChange={(e) => handleChange("git_remote_url", e.target.value)}
               placeholder="git@github.com:org/repo.git"
             />
-            <p className="text-xs text-muted-foreground">
-              Used by db90-claude and db90-cursor to auto-detect this project. Must match the output of{" "}
-              <code className="font-mono">git remote get-url origin</code> exactly.
+            <p className="type-caption text-muted-foreground">
+              Paste the output of <code className="font-mono">git remote get-url origin</code> from the repository where
+              developers run the CLI. When the CLI runs inside that repo, events are auto-attributed to this project.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -211,7 +249,7 @@ function ProjectGeneralSettingsForm({
       <Separator />
 
       <div>
-        <h2 className="text-lg font-medium text-destructive">Danger Zone</h2>
+        <h2 className="type-h4 text-destructive">Danger Zone</h2>
         <p className="text-sm text-muted-foreground">
           Irreversible and destructive actions
         </p>
@@ -219,7 +257,7 @@ function ProjectGeneralSettingsForm({
 
       <Card className="border-destructive/50">
         <CardHeader>
-          <CardTitle className="text-base">Delete Project</CardTitle>
+          <CardTitle className="type-body-lg">Delete Project</CardTitle>
           <CardDescription>
             Once you delete a project, there is no going back. All data associated with this
             project will be permanently deleted.
@@ -273,36 +311,33 @@ function ProjectGeneralSettings({
     is_active: project.isActive ?? project.is_active,
   };
 
-  return <ProjectGeneralSettingsForm key={project.id} projectId={projectId} defaultValues={defaultValues} />;
-}
+  const serverGitRemoteMissing = isGitRemoteMissing(project);
 
-function ProjectMembersSettings({ projectId }: { projectId: string }) {
-  const { data: members, isLoading } = useProjectMembers(projectId);
-  const { data: commitStats } = useProjectCommitStats(projectId);
-
-  return <ProjectTeamSection members={members} isLoading={isLoading} commitStats={commitStats} projectId={projectId} />;
-}
-
-function ProjectIntegrationsSettings({ projectId }: { projectId: string }) {
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-medium">Integrations</h2>
-        <p className="text-sm text-muted-foreground">
-          Connect AI providers to track usage and costs for this project
-        </p>
-      </div>
-      <ProjectConnectorsTab projectId={projectId} />
-    </div>
+    <ProjectGeneralSettingsForm
+      key={project.id}
+      projectId={projectId}
+      defaultValues={defaultValues}
+      serverGitRemoteMissing={serverGitRemoteMissing}
+    />
   );
 }
-
 
 export function ProjectSettings() {
   const { id } = useParams<{ id: string }>();
   const { data: project, isLoading: isLoadingProject } = useProject(id || "");
+  const { hasRole } = useOrg();
+  const { data: me } = useCurrentUser();
+  const { data: projectMembers = [] } = useProjectMembers(id ?? "");
+
+  const myMembership = projectMembers.find((m: ProjectMember) => m.userId === me?.id);
+  const isProjectOwner = hasRole(["owner"]) || myMembership?.role === "owner";
+  const canManageMembers = hasRole(["owner"]);
+  const isMemberOfProject = isProjectOwner || !!myMembership;
 
   if (!id) return null;
+
+  const orgId = project?.organization_id ?? "";
 
   return (
     <div className="space-y-6">
@@ -316,7 +351,7 @@ export function ProjectSettings() {
           {isLoadingProject ? (
             <Skeleton className="h-7 w-48" />
           ) : (
-            <h1 className="text-2xl font-semibold tracking-tight">
+            <h1 className="type-h2">
               {project ? `${project.name} — Settings` : "Settings"}
             </h1>
           )}
@@ -328,13 +363,52 @@ export function ProjectSettings() {
 
       <div className="flex flex-col gap-8 md:flex-row">
         <aside className="w-full md:w-48 shrink-0">
-          <ProjectSettingsNav projectId={id} />
+          <ProjectSettingsNav
+            projectId={id}
+            isMemberOfProject={isMemberOfProject}
+            isProjectOwner={isProjectOwner}
+          />
         </aside>
         <div className="flex-1 min-w-0">
           <Routes>
             <Route index element={<ProjectGeneralSettings projectId={id} project={project} isLoading={isLoadingProject} />} />
-            <Route path="members" element={<ProjectMembersSettings projectId={id} />} />
-            <Route path="integrations" element={<ProjectIntegrationsSettings projectId={id} />} />
+            <Route
+              path="members"
+              element={
+                isMemberOfProject ? (
+                  <div className="space-y-6">
+                    <div>
+                      <h2 className="type-h4">Members</h2>
+                      <p className="text-sm text-muted-foreground">Manage project member access and roles</p>
+                    </div>
+                    <ProjectMembersTab
+                      projectId={id}
+                      orgId={orgId}
+                      isProjectOwner={isProjectOwner}
+                      canManageMembers={canManageMembers}
+                    />
+                  </div>
+                ) : (
+                  <Navigate to={`/projects/${id}/settings`} replace />
+                )
+              }
+            />
+            <Route
+              path="integrations"
+              element={
+                isProjectOwner ? (
+                  <div className="space-y-6">
+                    <div>
+                      <h2 className="type-h4">Integrations</h2>
+                      <p className="text-sm text-muted-foreground">Connect AI providers and notification services to this project</p>
+                    </div>
+                    <ProjectConnectorsTab projectId={id} orgId={orgId} />
+                  </div>
+                ) : (
+                  <Navigate to={`/projects/${id}/settings`} replace />
+                )
+              }
+            />
             <Route path="security" element={<ProjectSecurityTab projectId={id} />} />
             <Route path="policies" element={<ProjectRetentionPolicySection projectId={id} />} />
             <Route
@@ -342,7 +416,7 @@ export function ProjectSettings() {
               element={
                 <ProjectAlertsSection
                   projectId={id}
-                  orgId={project?.organization_id ?? ""}
+                  orgId={orgId}
                 />
               }
             />

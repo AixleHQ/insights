@@ -7,6 +7,20 @@ class AiUsageSyncJob
 
   SUPPORTED_PROVIDERS = %w[openrouter anthropic openai gemini].freeze
 
+  # OpenRouter Activity API only retains the last 30 completed UTC days.
+  # Use 29 days to stay safely within that window.
+  OPENROUTER_INITIAL_SYNC_DAYS = 29
+  OPENROUTER_RECURRING_SYNC_DAYS = 7
+
+  ANTHROPIC_INITIAL_SYNC_DAYS = 90
+  ANTHROPIC_RECURRING_SYNC_DAYS = 7
+
+  OPENAI_INITIAL_SYNC_DAYS = 90
+  OPENAI_RECURRING_SYNC_DAYS = 7
+
+  OPENROUTER_MGMT_KEY_ERROR_FRAGMENT = "Only management keys can fetch activity for an account"
+  OPENROUTER_DATE_RANGE_ERROR_FRAGMENT = "Date must be within the last 30"
+
   def perform(organization_id = nil, provider = nil)
     Rails.logger.info("[AiUsageSyncJob] Starting AI usage reconciliation...")
 
@@ -41,156 +55,281 @@ class AiUsageSyncJob
     providers = provider_filter ? [ provider_filter ] : SUPPORTED_PROVIDERS
 
     providers.each do |provider|
-      connector = org.organization_connectors.find_by(connector_type: provider, is_active: true)
-      next unless connector
-
-      reconciled = reconcile_provider(org, connector, provider)
-      total_reconciled += reconciled
+      org.organization_connectors.where(connector_type: provider, is_active: true).find_each do |connector|
+        reconciled = reconcile_provider(org, connector, provider)
+        total_reconciled += reconciled
+      end
     end
 
     total_reconciled
   end
 
   def reconcile_provider(org, connector, provider)
-    # Get usage from provider API
-    usage_data = fetch_provider_usage(connector, provider)
+    sync_started_at = Time.current
+
+    # nil means the provider is not yet implemented — skip without touching the connector
+    # so its status doesn't falsely read as "connected / synced".
+    usage_data = fetch_provider_usage(connector, provider, org)
     return 0 unless usage_data
 
-    reconciled = 0
+    # empty array means no new data — still mark synced.
+    if usage_data.empty?
+      connector.mark_synced!(sync_started_at: sync_started_at)
+      return 0
+    end
 
-    # Compare with our recorded events
+    reconciled = if provider == "openrouter"
+      batch_upsert_openrouter_usage(org, connector, usage_data)
+    else
+      upsert_usage_one_by_one(org, connector, provider, usage_data)
+    end
+
+    connector.mark_synced!(sync_started_at: sync_started_at)
+    reconciled
+  rescue Oauth::PermissionDeniedError => e
+    Rails.logger.warn("[AiUsageSyncJob] OpenAI permission denied for org #{org.slug} — #{e.message}")
+    0
+  rescue StandardError => e
+    error_message = normalize_sync_error(provider, e.message)
+    connector.mark_error!(error_message, sync_started_at: sync_started_at)
+    Rails.logger.warn("[AiUsageSyncJob] Failed to reconcile #{provider} for org #{org.slug}: #{error_message}")
+    0
+  end
+
+  # Bulk upsert for OpenRouter daily-aggregate events.
+  #
+  # Uses BatchConnectorUpsert (3 SQL statements regardless of batch size) instead of
+  # the N×1 loop used for other providers. A lazy backfill step seeds
+  # connector_event_dedup from pre-existing tool_events so that events created before
+  # this path was introduced are not duplicated on the first batch run.
+  def batch_upsert_openrouter_usage(org, connector, usage_data)
+    backfill_openrouter_dedup(org, connector, usage_data)
+
+    records = usage_data.map do |usage|
+      tool_event_attributes_for_usage(usage, connector).merge(
+        unique_value: dedup_unique_value(usage[:external_id], connector),
+        organization_id: org.id,
+        tool_name: "openrouter_api"
+      )
+    end
+
+    ToolEvents::BatchConnectorUpsert.call(unique_key: "external_id", records:)
+    records.size
+  end
+
+  # Seeds connector_event_dedup for any openrouter_api tool_events that were created
+  # by the old per-row path and are not yet tracked in the dedup table.
+  # Runs once per batch; subsequent runs are cheap because all rows already exist.
+  def backfill_openrouter_dedup(org, connector, usage_data)
+    external_ids = usage_data.map { |u| u[:external_id].to_s }
+    return if external_ids.empty?
+    dedup_values = external_ids.map { |external_id| dedup_unique_value(external_id, connector) }
+
+    already_tracked = ConnectorEventDedup
+      .where(
+        organization_id: org.id,
+        tool_name: "openrouter_api",
+        event_type: "completion",
+        unique_key: "external_id",
+        unique_value: dedup_values
+      )
+      .pluck(:unique_value)
+      .to_set
+
+    untracked_ids = external_ids.reject do |external_id|
+      already_tracked.include?(dedup_unique_value(external_id, connector))
+    end
+    return if untracked_ids.empty?
+
+    existing_events = org.tool_events
+      .where(tool_name: "openrouter_api")
+      .where("metadata->>'connector_id' = ?", connector.id.to_s)
+      .where("metadata->>'external_id' IN (?)", untracked_ids)
+      .pluck(Arel.sql("metadata->>'external_id'"), :id)
+
+    # Legacy fallback: events created before connector-scoped metadata did not store
+    # connector_id. Only safe when one active openrouter connector exists in the org.
+    if existing_events.empty? &&
+        org.organization_connectors.where(connector_type: "openrouter", is_active: true).count == 1
+      existing_events = org.tool_events
+        .where(tool_name: "openrouter_api")
+        .where("metadata->>'connector_id' IS NULL")
+        .where("metadata->>'external_id' IN (?)", untracked_ids)
+        .pluck(Arel.sql("metadata->>'external_id'"), :id)
+    end
+
+    return if existing_events.empty?
+
+    now = Time.current
+    dedup_rows = existing_events.map do |external_id, event_id|
+      {
+        organization_id: org.id,
+        tool_name: "openrouter_api",
+        event_type: "completion",
+        unique_key: "external_id",
+        unique_value: dedup_unique_value(external_id, connector),
+        tool_event_id: event_id,
+        updated_at: now
+      }
+    end
+
+    upsert_dedup_rows(dedup_rows)
+  end
+
+  def upsert_usage_one_by_one(org, connector, provider, usage_data)
+    reconciled = 0
+    single_connector = org.organization_connectors.where(connector_type: provider, is_active: true).count == 1
     usage_data.each do |usage|
-      event = find_matching_event(org, provider, usage)
+      event = find_matching_event(org, connector, provider, usage, single_connector:)
 
       if event
-        # Update if cost differs
-        if usage[:cost_usd] && event.cost_usd != usage[:cost_usd]
-          event.update!(cost_usd: usage[:cost_usd])
+        attributes = tool_event_attributes_for_usage(usage, connector)
+        metadata = event.metadata.is_a?(Hash) ? event.metadata.deep_stringify_keys : {}
+        next_metadata = metadata.merge(attributes.delete(:metadata))
+
+        if sync_update_needed?(event, attributes, next_metadata)
+          event.update!(attributes.merge(metadata: next_metadata))
           reconciled += 1
         end
       else
-        # Create missing event
-        create_event_from_usage(org, provider, usage)
+        create_event_from_usage(org, connector, provider, usage)
         reconciled += 1
       end
     end
-
     reconciled
   end
 
-  def fetch_provider_usage(connector, provider)
+  def fetch_provider_usage(connector, provider, org)
     case provider
     when "openrouter"
+      # org not passed — OpenRouter returns pre-billed costs; pricing overrides don't apply
       fetch_openrouter_usage(connector)
     when "anthropic"
-      fetch_anthropic_usage(connector)
+      fetch_anthropic_usage(connector, org)
     when "openai"
-      fetch_openai_usage(connector)
+      fetch_openai_usage(connector, org)
+    when "gemini"
+      fetch_gemini_usage(connector)
     else
       nil
     end
-  rescue StandardError => e
-    Rails.logger.warn("[AiUsageSyncJob] Failed to fetch usage from #{provider}: #{e.message}")
-    nil
+  end
+
+  def fetch_gemini_usage(connector)
+    provider = Oauth::GeminiProvider.new(connector)
+    data = provider.fetch_usage
+    return [] if data.nil?
+    data
   end
 
   def fetch_openrouter_usage(connector)
-    # OpenRouter provides usage in the Generation endpoint
-    uri = URI("https://openrouter.ai/api/v1/generation")
-    http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl = true
-
-    request = Net::HTTP::Get.new(uri)
-    request["Authorization"] = "Bearer #{connector.access_token}"
-
-    response = http.request(request)
-    return nil unless response.code.to_i == 200
-
-    data = JSON.parse(response.body)
-    generations = data["data"] || []
-
-    generations.map do |gen|
-      {
-        external_id: gen["id"],
-        model: gen["model"],
-        tokens_in: gen["tokens_prompt"],
-        tokens_out: gen["tokens_completion"],
-        cost_usd: gen["total_cost"].to_f,
-        occurred_at: Time.parse(gen["created_at"])
-      }
+    # When the OpenRouter Broadcast Webhook is active, per-request ToolEvents
+    # are created in real time by OpenrouterTraceJob. Skip Activity API polling
+    # to avoid creating duplicate daily-aggregate events alongside the per-request ones.
+    if connector.webhook_active?
+      Rails.logger.info("[AiUsageSyncJob] Skipping OpenRouter Activity poll for org #{connector.organization.slug} — webhook active")
+      return nil
     end
+
+    days_back = connector.last_sync_at ? OPENROUTER_RECURRING_SYNC_DAYS : OPENROUTER_INITIAL_SYNC_DAYS
+    provider = Oauth::OpenrouterProvider.new(connector)
+    provider.fetch_activity(start_date: days_back.days.ago.to_date, end_date: Date.yesterday)
   end
 
-  # How far back to sync on the first pull vs recurring syncs.
-  ANTHROPIC_INITIAL_SYNC_DAYS = 90
-  ANTHROPIC_RECURRING_SYNC_DAYS = 7
-
-  def fetch_anthropic_usage(connector)
+  def fetch_anthropic_usage(connector, organization)
     # Requires an Admin API key (sk-ant-admin...) stored in connector.access_token
     days_back = connector.last_sync_at ? ANTHROPIC_RECURRING_SYNC_DAYS : ANTHROPIC_INITIAL_SYNC_DAYS
     provider = Oauth::AnthropicProvider.new(connector)
     data = provider.fetch_usage(start_date: days_back.days.ago.to_date, end_date: Date.today)
     return nil unless data
 
-    Rails.logger.info("[Anthropic API] Raw usage data (#{data.size} entries): #{JSON.pretty_generate(data)}")
-
-    enriched = data.map do |entry|
+    data.map do |entry|
       cost = ModelPricingService.calculate_cost(
         tokens_in: entry[:tokens_in],
         tokens_out: entry[:tokens_out],
-        model: entry[:model]
+        model: entry[:model],
+        organization: organization
       )
       entry.merge(cost_usd: cost[:total_cost])
     end
-
-    Rails.logger.info("[Anthropic API] Enriched with cost (#{enriched.size} entries): #{JSON.pretty_generate(enriched)}")
-
-    enriched
   end
 
-  def fetch_openai_usage(connector)
-    # OpenAI usage endpoint
-    uri = URI("https://api.openai.com/v1/usage")
-    uri.query = URI.encode_www_form(date: Date.today.to_s)
+  def fetch_openai_usage(connector, organization)
+    days_back  = connector.last_sync_at ? OPENAI_RECURRING_SYNC_DAYS : OPENAI_INITIAL_SYNC_DAYS
+    date_range = { start_date: days_back.days.ago.to_date, end_date: Date.today }
 
-    http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl = true
+    provider = Oauth::OpenaiProvider.new(connector)
+    data = provider.fetch_usage(**date_range)
+    return nil unless data
+    return [] if data.empty?
 
-    request = Net::HTTP::Get.new(uri)
-    request["Authorization"] = "Bearer #{connector.access_token}"
+    # PermissionDeniedError from fetch_costs propagates to reconcile_provider (warns + skips).
+    # Non-permission failures are rescued inside fetch_costs (returns partial hash);
+    # entries without a match fall back to ModelPricingService.
+    costs = provider.fetch_costs(**date_range)
 
-    response = http.request(request)
-    return nil unless response.code.to_i == 200
+    data.map do |entry|
+      model    = entry[:model]
+      date     = entry[:occurred_at].to_date
+      api_cost = costs[[ model, date ]]
 
-    data = JSON.parse(response.body)
-    # OpenAI returns aggregated usage, not individual requests
-    # This would need to be adapted based on actual API response
-    nil
-  end
+      cost_usd =
+        if !api_cost.nil?
+          api_cost
+        else
+          ModelPricingService.calculate_cost(
+            tokens_in:    entry[:tokens_in],
+            tokens_out:   entry[:tokens_out],
+            model:        model,
+            organization: organization
+          )[:total_cost]
+        end
 
-  def find_matching_event(org, provider, usage)
-    scope = org.tool_events.where(tool_name: "#{provider}_api")
-
-    # Exact match on external_id (handles both old and new format)
-    match = scope.where("metadata->>'external_id' = ?", usage[:external_id]).first
-    return match if match
-
-    # Transition guard: if this entry has a workspace, also check the old
-    # aggregated format (without workspace in the ID) to prevent duplicates
-    # during the first sync after workspace support is deployed.
-    if usage[:workspace_name].present?
-      old_id = [ provider, usage[:model], usage[:occurred_at].to_date ].join("-")
-      scope.where("metadata->>'external_id' = ?", old_id).first
+      entry.merge(cost_usd: cost_usd)
     end
   end
 
-  def create_event_from_usage(org, provider, usage)
-    metadata = { external_id: usage[:external_id], reconciled: true }
-    metadata[:workspace_name] = usage[:workspace_name] if usage[:workspace_name].present?
+  def find_matching_event(org, connector, provider, usage, single_connector: nil)
+    scope = org.tool_events.where(tool_name: "#{provider}_api")
 
+    all_ids = ([ usage[:external_id] ] + Array(usage[:legacy_external_ids])).map(&:to_s)
+
+    match = scope
+      .where("metadata->>'connector_id' = ?", connector.id.to_s)
+      .where("metadata->>'external_id' IN (?)", all_ids)
+      .first
+    return match if match
+
+    # Legacy fallback: events created before connector-scoped dedup did not include connector_id.
+    single_connector = org.organization_connectors.where(connector_type: provider, is_active: true).count == 1 if single_connector.nil?
+    if single_connector
+      legacy_match = scope
+        .where("metadata->>'connector_id' IS NULL")
+        .where("metadata->>'external_id' IN (?)", all_ids)
+        .first
+      return legacy_match if legacy_match
+    end
+
+    nil
+  end
+
+  def create_event_from_usage(org, connector, provider, usage)
     ToolEvent.create!(
-      organization_id: org.id,
-      tool_name: "#{provider}_api",
+      tool_event_attributes_for_usage(usage, connector).merge(
+        organization_id: org.id,
+        tool_name: "#{provider}_api"
+      )
+    )
+  end
+
+  def tool_event_attributes_for_usage(usage, connector)
+    metadata = {
+      external_id: usage[:external_id],
+      connector_id: connector.id,
+      reconciled: true
+    }.merge(usage[:metadata] || {})
+
+    {
       event_type: "completion",
       model: usage[:model],
       tokens_in: usage[:tokens_in],
@@ -198,6 +337,54 @@ class AiUsageSyncJob
       cost_usd: usage[:cost_usd],
       occurred_at: usage[:occurred_at],
       metadata: metadata
-    )
+    }
+  end
+
+  def sync_update_needed?(event, attributes, metadata)
+    comparable_metadata = event.metadata.is_a?(Hash) ? event.metadata.deep_stringify_keys : {}
+
+    event.model != attributes[:model] ||
+      event.tokens_in != attributes[:tokens_in] ||
+      event.tokens_out != attributes[:tokens_out] ||
+      event.cost_usd.to_f != attributes[:cost_usd].to_f ||
+      event.occurred_at != attributes[:occurred_at] ||
+      comparable_metadata != metadata.deep_stringify_keys
+  end
+
+  def normalize_sync_error(provider, error_message)
+    return error_message unless provider == "openrouter"
+
+    if error_message.include?(OPENROUTER_MGMT_KEY_ERROR_FRAGMENT)
+      "OpenRouter usage sync requires a management key. Reconnect this integration with a management key to fetch activity data."
+    elsif error_message.include?(OPENROUTER_DATE_RANGE_ERROR_FRAGMENT)
+      "OpenRouter Activity API only provides data for the last 30 days. Sync window has been adjusted automatically — please retry."
+    else
+      error_message
+    end
+  end
+
+  # Mirrors BatchConnectorUpsert#bulk_upsert_dedup_rows — raw SQL required
+  # because Rails upsert_all sets id = NULL on bigserial columns (Rails 8.1 bug),
+  # triggering NOT NULL violation.
+  def upsert_dedup_rows(rows)
+    return if rows.empty?
+
+    conn = ConnectorEventDedup.connection
+    table = ConnectorEventDedup.quoted_table_name
+    conflict_cols = %w[organization_id tool_name event_type unique_key unique_value]
+                      .map { |c| conn.quote_column_name(c) }.join(", ")
+    col_names = rows.first.keys.map { |k| conn.quote_column_name(k) }.join(", ")
+
+    values_sql = rows.map do |row|
+      vals = row.values.map { |v| v.nil? ? "NULL" : conn.quote(v) }
+      "(#{vals.join(', ')})"
+    end.join(", ")
+
+    sql_template = "INSERT INTO %s (%s) VALUES %s ON CONFLICT (%s) DO UPDATE SET tool_event_id = EXCLUDED.tool_event_id, updated_at = EXCLUDED.updated_at"
+    conn.execute(format(sql_template, table, col_names, values_sql, conflict_cols))
+  end
+
+  def dedup_unique_value(external_id, _connector)
+    external_id.to_s
   end
 end

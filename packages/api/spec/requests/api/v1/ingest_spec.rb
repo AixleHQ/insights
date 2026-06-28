@@ -24,6 +24,16 @@ RSpec.describe 'Api::V1::Ingest', type: :request do
     allow(RawEventStore).to receive(:ensure_bucket_exists!).and_return(nil)
     allow(RawEventStore).to receive(:store).and_return('events/test-key.json')
     allow(Temporal::Client).to receive(:start_workflow).and_return({ workflow_id: 'test-workflow-id' })
+    allow(Temporal::Client).to receive(:workers_polling?).and_return(true)
+
+    # Use a real in-memory cache so Rails.cache.increment works in specs.
+    # The default test environment uses :null_store which returns nil from #increment.
+    @original_cache = Rails.cache
+    Rails.cache = ActiveSupport::Cache::MemoryStore.new
+  end
+
+  after do
+    Rails.cache = @original_cache
   end
 
   def ingest_post(payload: valid_payload, token: raw_token)
@@ -63,6 +73,29 @@ RSpec.describe 'Api::V1::Ingest', type: :request do
         expect(Temporal::Client).to have_received(:start_workflow) do |_workflow, **kwargs|
           expect(kwargs[:args][:event][:event_type]).to eq('other')
         end
+      end
+    end
+
+    context 'with a pending ingest setup token' do
+      before do
+        tool_account.update!(connection_state: 'waiting_for_connection')
+      end
+
+      it 'accepts the first event and activates the account' do
+        ingest_post
+
+        expect(response).to have_http_status(:accepted)
+        expect(tool_account.reload.connection_state).to eq('active')
+      end
+
+      it 'returns accepted even when a concurrent request already activated the account' do
+        # Simulate race: account is already active by the time activate_connection! fires.
+        tool_account.update_column(:connection_state, 'active')
+
+        ingest_post
+
+        expect(response).to have_http_status(:accepted)
+        expect(tool_account.reload.connection_state).to eq('active')
       end
     end
 
@@ -177,8 +210,15 @@ RSpec.describe 'Api::V1::Ingest', type: :request do
         expect(response).to have_http_status(:unauthorized)
       end
 
-      it 'returns 401 when account is inactive' do
-        tool_account.update!(is_active: false)
+      it 'returns 401 when account is inactive after it has already been used' do
+        create(
+          :tool_event,
+          organization: organization,
+          user: user,
+          tool_name: tool_account.tool_name,
+          event_type: 'completion'
+        )
+        tool_account.update!(connection_state: 'inactive')
         ingest_post
         expect(response).to have_http_status(:unauthorized)
       end
@@ -213,6 +253,24 @@ RSpec.describe 'Api::V1::Ingest', type: :request do
       end
     end
 
+    context 'when raw event storage fails before Temporal starts' do
+      before do
+        allow(RawEventStore).to receive(:store).and_raise(StandardError, 'S3 unavailable')
+      end
+
+      it 'falls back directly without starting the workflow' do
+        expect {
+          ingest_post
+        }.to change(ToolEvent, :count).by(1)
+
+        expect(response).to have_http_status(:accepted)
+        expect(json_data[:fallback]).to be true
+        expect(json_data[:workflowId]).to be_nil
+        expect(json_data[:rawEventKey]).to be_nil
+        expect(Temporal::Client).not_to have_received(:start_workflow)
+      end
+    end
+
     context 'with full integration flow' do
       before do
         allow(Temporal::Client).to receive(:start_workflow).and_raise(StandardError, 'skip workflow')
@@ -227,6 +285,265 @@ RSpec.describe 'Api::V1::Ingest', type: :request do
         expect(event.organization_id).to eq(organization.id)
         expect(event.user_id).to eq(user.id)
         expect(event.tool_name).to eq('cursor')
+      end
+    end
+
+    # CUR-V08 — cursor recentCommit payload (Path B) must ingest as event_type commit
+    context 'with a cursor recent_commit payload (CUR-V08)' do
+      let(:cursor_commit_payload) do
+        {
+          event_type: 'commit',
+          model: 'unknown',
+          tokens_in: 507,
+          tokens_out: 36,
+          cost_usd: 0.171,
+          occurred_at: '2026-05-27T17:45:14.899Z',
+          metadata: {
+            cursor_session_id: nil,
+            workspace: '/tmp/globalStorage/state.vscdb',
+            workspace_scope: 'global',
+            cost_model: 'estimated_line_count',
+            source: 'recent_commit',
+            commit_hash: '1080c8e38aa694380e5e5d14c950123e6e1a2942',
+            commit_message: '[AIX-235] Example commit ingest verification',
+            repo_name: 'acme/demo',
+            branch_name: 'feature/example',
+            ai_percentage: 100,
+            scannable: false,
+            risk_level: 'none'
+          }
+        }
+      end
+
+      it 'returns 202 Accepted and passes event_type commit to Temporal' do
+        ingest_post(payload: cursor_commit_payload)
+        expect(response).to have_http_status(:accepted)
+        expect(json_data[:accepted]).to be true
+        expect(Temporal::Client).to have_received(:start_workflow) do |_workflow, **kwargs|
+          expect(kwargs[:args][:event][:event_type]).to eq('commit')
+          expect(kwargs[:args][:event][:metadata]['source']).to eq('recent_commit')
+        end
+      end
+
+      context 'when Temporal workflow fails (fallback direct insert)' do
+        before do
+          allow(Temporal::Client).to receive(:start_workflow).and_raise(StandardError, 'skip workflow')
+        end
+
+        it 'persists ToolEvent with event_type commit and recent_commit metadata' do
+          expect {
+            ingest_post(payload: cursor_commit_payload)
+          }.to change(ToolEvent, :count).by(1)
+
+          event = ToolEvent.last
+          expect(event.tool_name).to eq('cursor')
+          expect(event.event_type).to eq('commit')
+          expect(event.metadata['source']).to eq('recent_commit')
+          expect(event.metadata['commit_hash']).to eq('1080c8e38aa694380e5e5d14c950123e6e1a2942')
+          expect(event.metadata['repo_name']).to eq('acme/demo')
+        end
+      end
+    end
+
+    # AIX-260 — server-side event_type re-tagging for pre-T-02 CLIs.
+    # Temporal is stubbed to fail so the request takes fallback_direct_insert →
+    # ToolEvents::Upsert — a covered production path, persisting synchronously.
+    context 'with a pre-T-02 chat event carrying recent_commit metadata (AIX-260)' do
+      let(:legacy_chat_payload) do
+        {
+          event_type: 'chat',
+          model: 'unknown',
+          tokens_in: 507,
+          tokens_out: 36,
+          cost_usd: 0.171,
+          metadata: {
+            source: 'recent_commit',
+            commit_hash: '1080c8e38aa694380e5e5d14c950123e6e1a2942',
+            repo_name: 'acme/demo'
+          }
+        }
+      end
+
+      before do
+        allow(Temporal::Client).to receive(:start_workflow).and_raise(StandardError, 'skip workflow')
+      end
+
+      it 'persists the event re-tagged as commit with renormalization metadata' do
+        expect {
+          ingest_post(payload: legacy_chat_payload)
+        }.to change(ToolEvent, :count).by(1)
+
+        expect(response).to have_http_status(:accepted)
+        event = ToolEvent.last
+        expect(event.event_type).to eq('commit')
+        expect(event.metadata['renormalized_from']).to eq('chat')
+        expect(event.metadata['renormalized_by']).to eq('server_v1')
+        expect(event.metadata['source']).to eq('recent_commit')
+      end
+
+      context 'when the renormalization flag is off' do
+        before do
+          stub_const('ENV', ENV.to_h.merge('DB90_EVENT_TYPE_RENORMALIZATION' => 'false'))
+        end
+
+        it 'persists the event as chat with no renormalized_* keys' do
+          expect {
+            ingest_post(payload: legacy_chat_payload)
+          }.to change(ToolEvent, :count).by(1)
+
+          event = ToolEvent.last
+          expect(event.event_type).to eq('chat')
+          expect(event.metadata).not_to have_key('renormalized_from')
+          expect(event.metadata).not_to have_key('renormalized_by')
+        end
+      end
+    end
+
+    # AIX-261 — server-side jira_ticket extraction. Same fallback_direct_insert
+    # path as the AIX-260 block above.
+    context 'with a commit event carrying a ticket-bearing branch_name (AIX-261)' do
+      let(:commit_payload) do
+        {
+          event_type: 'commit',
+          model: 'unknown',
+          tokens_in: 10,
+          tokens_out: 5,
+          cost_usd: 0.001,
+          metadata: {
+            source: 'recent_commit',
+            commit_hash: '1080c8e38aa694380e5e5d14c950123e6e1a2942',
+            branch_name: 'feature/AIX-157-foo'
+          }
+        }
+      end
+
+      before do
+        allow(Temporal::Client).to receive(:start_workflow).and_raise(StandardError, 'skip workflow')
+      end
+
+      it 'persists the event with a server-extracted jira_ticket' do
+        expect {
+          ingest_post(payload: commit_payload)
+        }.to change(ToolEvent, :count).by(1)
+
+        expect(response).to have_http_status(:accepted)
+        event = ToolEvent.last
+        expect(event.metadata['jira_ticket']).to eq('AIX-157')
+        expect(event.metadata['branch_name']).to eq('feature/AIX-157-foo')
+      end
+
+      it 'enqueues PrCorrelationJob for the commit' do
+        expect {
+          ingest_post(payload: commit_payload)
+        }.to have_enqueued_job(PrCorrelationJob)
+      end
+
+      it 'exposes the extracted jiraTicket and branch via the events detail endpoint (AC 9 end-to-end)' do
+        ingest_post(payload: commit_payload)
+        event = ToolEvent.last
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/events/#{event.id}",
+                          user: user,
+                          organization: organization
+
+        expect(response).to have_http_status(:ok)
+        expect(json_data[:jiraTicket]).to eq('AIX-157')
+        expect(json_data[:branch]).to eq('feature/AIX-157-foo')
+      end
+
+      it 'strips forged pr_* metadata keys' do
+        forged = commit_payload.deep_merge(
+          metadata: { pr_number: 666, pr_url: 'https://evil.example' }
+        )
+        ingest_post(payload: forged)
+
+        event = ToolEvent.last
+        expect(event.metadata.keys).not_to include('pr_number', 'pr_url')
+      end
+    end
+
+    context 'with rate limiting' do
+      it 'returns 202 when under the per-minute limit' do
+        OrganizationSetting.set(organization, 'ingest_rate_limit_per_minute', '3')
+        2.times { ingest_post }
+        ingest_post
+        expect(response).to have_http_status(:accepted)
+      end
+
+      it 'returns 429 when per-minute limit is exceeded' do
+        OrganizationSetting.set(organization, 'ingest_rate_limit_per_minute', '2')
+        2.times { ingest_post }
+        ingest_post
+        expect(response).to have_http_status(:too_many_requests)
+        expect(response.parsed_body.dig('code')).to eq('rate_limit_exceeded')
+        expect(response.headers['Retry-After']).to eq('60')
+      end
+
+      it 'includes retry_after in the 429 body' do
+        OrganizationSetting.set(organization, 'ingest_rate_limit_per_minute', '1')
+        ingest_post
+        ingest_post
+        expect(response.parsed_body.dig('retry_after')).to eq(60)
+      end
+
+      it 'falls back to ENV default when no org setting exists' do
+        allow(ENV).to receive(:fetch).and_call_original
+        allow(ENV).to receive(:fetch).with("INGEST_RATE_LIMIT_DEFAULT", "1000").and_return("2")
+        2.times { ingest_post }
+        ingest_post
+        expect(response).to have_http_status(:too_many_requests)
+      end
+
+      it 'fails open when Redis returns nil (cache unavailable)' do
+        allow(Rails.cache).to receive(:increment).and_return(nil)
+        ingest_post
+        expect(response).to have_http_status(:accepted)
+      end
+    end
+
+    context 'with monthly quota' do
+      it 'returns 202 when under the monthly quota' do
+        OrganizationSetting.set(organization, 'ingest_monthly_event_quota', '3')
+        2.times { ingest_post }
+        ingest_post
+        expect(response).to have_http_status(:accepted)
+      end
+
+      it 'returns 429 with quota_exceeded when monthly quota is reached' do
+        OrganizationSetting.set(organization, 'ingest_monthly_event_quota', '2')
+        2.times { ingest_post }
+        ingest_post
+        expect(response).to have_http_status(:too_many_requests)
+        expect(response.parsed_body.dig('code')).to eq('quota_exceeded')
+      end
+
+      it 'includes quota_resets_at in the quota_exceeded body' do
+        OrganizationSetting.set(organization, 'ingest_monthly_event_quota', '1')
+        ingest_post
+        ingest_post
+        body = response.parsed_body
+        expect(body['quota_resets_at']).to be_present
+        resets_at = Time.parse(body['quota_resets_at'])
+        expect(resets_at).to be >= Time.current.end_of_month
+      end
+
+      it 'caps Retry-After at 3600 seconds' do
+        OrganizationSetting.set(organization, 'ingest_monthly_event_quota', '1')
+        ingest_post
+        ingest_post
+        expect(response.headers['Retry-After'].to_i).to be <= 3600
+      end
+
+      it 'returns 202 when no quota setting exists (unlimited)' do
+        100.times { ingest_post }
+        expect(response).to have_http_status(:accepted)
+      end
+
+      it 'fails open when Redis returns nil for quota check' do
+        OrganizationSetting.set(organization, 'ingest_monthly_event_quota', '1')
+        allow(Rails.cache).to receive(:increment).and_return(nil)
+        ingest_post
+        expect(response).to have_http_status(:accepted)
       end
     end
 

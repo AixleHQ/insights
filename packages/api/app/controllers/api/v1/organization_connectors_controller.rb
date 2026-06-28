@@ -9,12 +9,13 @@ module Api
       # GET /api/v1/organizations/:organization_id/connectors
       def index
         connectors = current_organization.organization_connectors.order(:connector_type)
+        authorize! connectors.new
 
         # Allow filtering by type
         connectors = connectors.by_type(params[:type]) if params[:type].present?
         connectors = connectors.active if params[:active] == "true"
 
-        render_collection(connectors, OrganizationConnectorSerializer)
+        render_collection(connectors, OrganizationConnectorSerializer, serializer_params: { collection: true })
       end
 
       # GET /api/v1/organizations/:organization_id/connectors/:id
@@ -28,14 +29,14 @@ module Api
         @connector = current_organization.organization_connectors.new(connector_params)
         authorize! @connector
 
-        if @connector.ai_provider? || @connector.slack_webhook?
+        if @connector.ai_provider? || @connector.slack_webhook? || @connector.cursor?
           provider = Oauth::BaseProvider.for(@connector)
           result = provider.test_connection
           unless result[:success]
             return render json: {
               error: "Unprocessable Entity",
               errors: { access_token: [ result[:error] || "Invalid API key" ] }
-            }, status: :unprocessable_entity
+            }, status: :unprocessable_content
           end
         end
 
@@ -53,7 +54,7 @@ module Api
           render json: {
             error: "Unprocessable Entity",
             errors: format_validation_errors(@connector.errors)
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
       end
 
@@ -77,7 +78,7 @@ module Api
           render json: {
             error: "Unprocessable Entity",
             errors: format_validation_errors(@connector.errors)
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
       end
 
@@ -152,7 +153,7 @@ module Api
           per_page: params.fetch(:per_page, 50).to_i
         )
 
-        linked_ids = @connector.repositories.pluck(:external_id).to_set
+        linked_ids = @connector.repositories.linked.pluck(:external_id).to_set
         repos = repos.map do |r|
           r.merge(already_linked: linked_ids.include?(r[:external_id]))
            .transform_keys { |k| k.to_s.camelize(:lower) }
@@ -162,7 +163,7 @@ module Api
       rescue ActionPolicy::Unauthorized
         raise
       rescue StandardError => e
-        render json: { error: e.message }, status: :unprocessable_entity
+        render json: { error: e.message }, status: :unprocessable_content
       end
 
       # GET /api/v1/organizations/:organization_id/connectors/:id/available_projects
@@ -177,16 +178,15 @@ module Api
       rescue ActionPolicy::Unauthorized
         raise
       rescue StandardError => e
-        render json: { error: e.message }, status: :unprocessable_entity
+        render json: { error: e.message }, status: :unprocessable_content
       end
 
       # POST /api/v1/organizations/:organization_id/connectors/:id/sync
       def sync
         authorize! @connector, to: :sync?
 
+        @connector.mark_testing!
         ConnectorSyncService.enqueue(@connector)
-
-        @connector.mark_synced!
         OrganizationAuditLog.log(
           organization: current_organization,
           actor: current_user,
@@ -202,19 +202,49 @@ module Api
       def sync_status
         authorize! @connector, to: :sync_status?
 
-        event_count = if (name = @connector.tool_event_name)
-          current_organization.tool_events.by_tool(name).count
-        else
-          0
-        end
-
         render json: {
           connector_type: @connector.connector_type,
           status:         @connector.status,
           last_sync_at:   @connector.last_sync_at&.iso8601,
           last_error:     @connector.last_error,
-          total_events:   event_count
+          total_events:   @connector.synced_event_count,
+          repository_count: @connector.repositories.count,
+          last_event_at:  @connector.synced_event_last_occurred_at&.iso8601
         }
+      end
+
+      # GET /api/v1/organizations/:organization_id/connectors/health
+      def health
+        authorize! current_organization.organization_connectors.new, to: :health?
+
+        all_connectors    = current_organization.organization_connectors
+        active_connectors = all_connectors.active.order(:connector_type).to_a
+        status_counts     = all_connectors.group(:status).count
+        snapshot_stats    = ConnectorHealthSnapshot.stats_for_org(current_organization.id, since: 7.days.ago)
+
+        summary = {
+          total:        status_counts.values.sum,
+          connected:    status_counts.fetch("connected", 0),
+          testing:      status_counts.fetch("testing", 0),
+          error:        status_counts.fetch("error", 0),
+          disconnected: status_counts.fetch("disconnected", 0)
+        }
+
+        connectors_data = active_connectors.map do |c|
+          st    = snapshot_stats[c.id] || {}
+          total = st[:success_count].to_i + st[:failure_count].to_i
+          {
+            id:                      c.id,
+            connector_type:          c.connector_type,
+            status:                  c.status,
+            last_sync_at:            c.last_sync_at&.iso8601,
+            last_error:              c.last_error,
+            success_rate_7d:         total > 0 ? (st[:success_count].to_f / total).round(4) : nil,
+            avg_sync_duration_ms_7d: st[:avg_duration_ms]&.round(1)
+          }
+        end
+
+        render json: { data: { summary:, connectors: connectors_data } }
       end
 
       # GET /api/v1/organizations/:organization_id/connectors/authorize/:type
@@ -242,27 +272,58 @@ module Api
         provider_class = Oauth::BaseProvider.provider_class(connector_type)
         token_data = provider_class.exchange_code(code, redirect_uri: oauth_callback_url)
 
-        connector = current_organization.organization_connectors
-                                        .find_or_initialize_by(connector_type: connector_type)
+        external_org_id = token_data[:account_id]
+        multi_instance = OrganizationConnector::MULTI_INSTANCE_CONNECTOR_TYPES.include?(connector_type)
+        if multi_instance && external_org_id.blank?
+          return render json: {
+            error: "Unprocessable Entity",
+            errors: { external_org_id: [ "is required for this connector type" ] }
+          }, status: :unprocessable_content
+        end
+
+        connector = if multi_instance
+          current_organization.organization_connectors
+                              .find_or_initialize_by(connector_type: connector_type, external_org_id: external_org_id)
+        else
+          current_organization.organization_connectors
+                              .find_or_initialize_by(connector_type: connector_type)
+        end
+        creating = connector.new_record?
         connector.assign_attributes(
           access_token: token_data[:access_token],
           refresh_token: token_data[:refresh_token],
           token_expires_at: token_data[:expires_at],
-          external_org_id: token_data[:account_id],
+          external_org_id: external_org_id,
           external_org_name: token_data[:account_name],
           is_active: true,
           status: "connected",
           last_error: nil
         )
+        connector.label = params[:label] if params[:label].present?
 
         if connector.save
+          OrganizationAuditLog.log(
+            organization: current_organization,
+            actor: current_user,
+            action: creating ? "connector.create" : "connector.update",
+            resource: connector,
+            tracked_changes: { connector_type: connector.connector_type, via: "oauth_callback" },
+            request: request
+          )
           render_resource(connector, OrganizationConnectorSerializer)
         else
           render json: {
             error: "Unprocessable Entity",
             errors: format_validation_errors(connector.errors)
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
+      rescue ActiveRecord::RecordNotUnique
+        # Two simultaneous OAuth callbacks for the same org + external_org_id raced on
+        # idx_org_connectors_oauth_dedup. The other request already inserted the row —
+        # return it as if this callback succeeded (idempotent reconnect).
+        connector = current_organization.organization_connectors
+                                        .find_by!(connector_type: connector_type, external_org_id: external_org_id)
+        render_resource(connector, OrganizationConnectorSerializer)
       rescue Oauth::MissingCredentialsError => e
         render json: { error: e.message, code: "integration_not_configured" }, status: :service_unavailable
       end
@@ -275,12 +336,12 @@ module Api
 
       def connector_params
         params.permit(:connector_type, :access_token, :refresh_token, :token_expires_at,
-                      :external_account_id, :external_account_name, :webhook_secret, :is_active)
+                      :external_account_id, :external_account_name, :webhook_secret, :is_active, :label)
       end
 
       def connector_update_params
         params.permit(:access_token, :refresh_token, :token_expires_at,
-                      :external_account_id, :external_account_name, :webhook_secret, :is_active)
+                      :external_account_id, :external_account_name, :webhook_secret, :is_active, :label)
       end
 
       def oauth_callback_url

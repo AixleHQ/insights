@@ -4,13 +4,23 @@ import { Link } from "react-router-dom";
 import {
   ArrowLeft,
   Plus,
-  Trash2,
-  Check,
   AlertCircle,
   AlertTriangle,
+  MoreHorizontal,
+  User,
+  CheckCircle2,
+  Clock,
+  Unplug,
 } from "lucide-react";
 import { useOrg } from "@/contexts/OrgContext";
-import { useToolAccounts, useDeleteToolAccount, useCreateToolAccount, useUpdateToolAccount, useUserOrganizations } from "@/hooks/useApi";
+import {
+  useToolAccounts,
+  useDeleteToolAccount,
+  useCreateToolAccount,
+  useUpdateToolAccount,
+  useUserOrganizations,
+  useRegenerateIngestToken,
+} from "@/hooks/useApi";
 import type { ToolAccount } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +37,9 @@ import {
 import {
   Card,
   CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
 } from "@/components/ui/card";
 import {
   Dialog,
@@ -45,12 +58,20 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProviderLogo } from "@/components/icons";
+import { IngestTokenConnectSheet } from "@/components/integrations";
+import type { ProviderInfo } from "@/components/integrations";
 
-type ToolCategory = "ai-editors" | "ai-apis" | "other";
+type ToolCategory = "ai-editors";
 
 interface ToolProvider {
   id: string;
@@ -76,114 +97,81 @@ const toolProviders: ToolProvider[] = [
     category: "ai-editors",
     tokenLabel: "API Key",
   },
-  {
-    id: "windsurf",
-    name: "Windsurf",
-    description: "Link your Windsurf account for AI-assisted coding attribution",
-    category: "ai-editors",
-    tokenLabel: "API Key",
-  },
-  {
-    id: "github_copilot",
-    name: "GitHub Copilot",
-    description: "Link your GitHub account to attribute Copilot events",
-    category: "ai-editors",
-    tokenLabel: "Personal Access Token",
-  },
-  {
-    id: "aider",
-    name: "Aider",
-    description: "Link your Aider account for AI pair programming attribution",
-    category: "ai-editors",
-    tokenLabel: "API Key",
-  },
-  {
-    id: "continue",
-    name: "Continue",
-    description: "Link your Continue account for open-source AI code assistant attribution",
-    category: "ai-editors",
-    tokenLabel: "API Key",
-  },
-  {
-    id: "cody",
-    name: "Cody",
-    description: "Link your Sourcegraph Cody account for AI coding attribution",
-    category: "ai-editors",
-    tokenLabel: "API Key",
-  },
-  {
-    id: "tabnine",
-    name: "Tabnine",
-    description: "Link your Tabnine account for AI code completion attribution",
-    category: "ai-editors",
-    tokenLabel: "API Key",
-  },
-  {
-    id: "amazon_q",
-    name: "Amazon Q",
-    description: "Link your Amazon Q account for AI developer tool attribution",
-    category: "ai-editors",
-    tokenLabel: "API Key",
-  },
-  // AI APIs
-  {
-    id: "openrouter_api",
-    name: "OpenRouter",
-    description: "Link your OpenRouter account for multi-model AI gateway tracking",
-    category: "ai-apis",
-    tokenLabel: "API Key",
-  },
-  {
-    id: "anthropic_api",
-    name: "Anthropic API",
-    description: "Link your Anthropic API account for direct API usage tracking",
-    category: "ai-apis",
-    tokenLabel: "API Key",
-  },
-  {
-    id: "openai_api",
-    name: "OpenAI API",
-    description: "Link your OpenAI account for ChatGPT / Codex tracking",
-    category: "ai-apis",
-    tokenLabel: "API Key",
-  },
-  {
-    id: "gemini_api",
-    name: "Gemini API",
-    description: "Link your Google account for Gemini API usage tracking",
-    category: "ai-apis",
-    tokenLabel: "API Key",
-  },
-  // Other
-  {
-    id: "custom",
-    name: "Custom Tool",
-    description: "Link a custom or internal AI tool for usage attribution",
-    category: "other",
-    tokenLabel: "API Key",
-  },
 ];
 
 const categoryLabels: Record<ToolCategory, string> = {
   "ai-editors": "AI Code Editors",
-  "ai-apis": "AI APIs",
-  "other": "Other",
 };
 
-const categoryOrder: ToolCategory[] = ["ai-editors", "ai-apis", "other"];
+const categoryOrder: ToolCategory[] = ["ai-editors"];
+const INGEST_PROVIDER_IDS = new Set(["claude_code", "cursor"]);
+const INGEST_PROVIDER_INFO: Record<string, ProviderInfo> = {
+  claude_code: {
+    id: "claude-code",
+    name: "Claude Code",
+    description: "Monitor Claude Code CLI usage",
+    category: "ai",
+    scope: "persona",
+    features: [
+      "Session tracking",
+      "Code generation analytics",
+      "Token consumption",
+      "Project-level insights",
+    ],
+    available: true,
+  },
+  cursor: {
+    id: "cursor",
+    name: "Cursor",
+    description: "Monitor Cursor IDE AI usage",
+    category: "ai",
+    scope: "persona",
+    features: [
+      "AI completions tracking",
+      "Chat usage analytics",
+      "Token consumption",
+      "Session insights",
+    ],
+    available: true,
+  },
+};
+
+function ingestProviderInfo(providerId: string): ProviderInfo | null {
+  return INGEST_PROVIDER_INFO[providerId] ?? null;
+}
+
+const toolStatusConfig = {
+  active:                 { label: "Connected",      Icon: CheckCircle2, color: "text-success",          bg: "bg-success/10" },
+  waiting_for_connection: { label: "Setup required", Icon: Clock,        color: "text-warning",          bg: "bg-warning/10" },
+  inactive:               { label: "Disabled",       Icon: Unplug,       color: "text-muted-foreground", bg: "bg-muted" },
+} as const;
+
+function ScopeBadge() {
+  return (
+    <Badge variant="secondary" className="gap-1 text-xs font-normal">
+      <User className="size-3" />
+      Personal
+    </Badge>
+  );
+}
 
 function AccountSkeleton() {
   return (
-    <div className="rounded-lg border p-4 space-y-4">
-      <div className="flex items-center gap-3">
-        <Skeleton className="size-10 rounded-lg" />
-        <div className="space-y-2">
-          <Skeleton className="h-5 w-32" />
-          <Skeleton className="h-4 w-48" />
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-start gap-3">
+          <Skeleton className="size-10 rounded-md shrink-0" />
+          <div className="space-y-2 flex-1">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-3 w-48" />
+          </div>
         </div>
-      </div>
-      <Skeleton className="h-8 w-24 ml-auto" />
-    </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <Skeleton className="h-5 w-24" />
+        <Skeleton className="h-4 w-40" />
+      </CardContent>
+    </Card>
   );
 }
 
@@ -250,7 +238,7 @@ function ConnectDialog({ provider, open, onOpenChange, onSubmit, isSubmitting }:
                 placeholder={`Your ${provider?.name} username or ID`}
                 required
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="type-caption text-muted-foreground">
                 This should match the identifier used in your API requests.
               </p>
             </div>
@@ -272,7 +260,7 @@ function ConnectDialog({ provider, open, onOpenChange, onSubmit, isSubmitting }:
                 onChange={(e) => setToken(e.target.value)}
                 placeholder={`Paste your ${provider?.tokenLabel?.toLowerCase()}`}
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="type-caption text-muted-foreground">
                 Stored encrypted. Used for event attribution.
               </p>
             </div>
@@ -363,6 +351,34 @@ function ReconnectDialog({ provider, open, onOpenChange, onSubmit, isSubmitting 
   );
 }
 
+function AvailableCardFooter({
+  provider,
+  onConnect,
+}: {
+  provider: ToolProvider;
+  onConnect: (provider: ToolProvider) => void;
+}) {
+  const features = INGEST_PROVIDER_INFO[provider.id]?.features.slice(0, 3) ?? [];
+  return (
+    <div className="space-y-4">
+      {features.length > 0 && (
+        <ul className="space-y-1 text-xs text-muted-foreground">
+          {features.map((feature, i) => (
+            <li key={i} className="flex items-center gap-2">
+              <div className="size-1 rounded-full bg-muted-foreground" />
+              {feature}
+            </li>
+          ))}
+        </ul>
+      )}
+      <Button className="w-full" onClick={() => onConnect(provider)}>
+        <Plus className="mr-2 size-4" />
+        Connect
+      </Button>
+    </div>
+  );
+}
+
 function ToolCard({
   provider,
   linkedAccount,
@@ -376,100 +392,136 @@ function ToolCard({
   linkedAccount?: ToolAccount;
   onConnect: (provider: ToolProvider) => void;
   onDisconnect: (accountId: string) => void;
-  onToggleActive?: (accountId: string, newValue: boolean) => void;
+  onToggleActive?: (accountId: string, newValue: "inactive" | "active") => void;
   onReconnect?: (accountId: string) => void;
   isToggling?: boolean;
 }) {
+  const [disconnectTarget, setDisconnectTarget] = useState<string | null>(null);
+
   const isLinked = !!linkedAccount;
+  const connectionState = linkedAccount?.connectionState ?? "inactive";
+  const isInactive = connectionState === "inactive";
+  const requiresSetup = connectionState === "waiting_for_connection";
+  const isActive = connectionState === "active";
+  const statusKey = connectionState in toolStatusConfig ? connectionState : "inactive";
+  const status = toolStatusConfig[statusKey as keyof typeof toolStatusConfig];
+  const StatusIcon = status.Icon;
 
   return (
-    <Card className={cn(isLinked && !linkedAccount.isActive && "opacity-60")}>
-      <CardContent className="flex flex-col gap-4 p-4">
-        <div className="flex items-start gap-3">
-          <ProviderLogo provider={provider.id} showBackground size="md" className="shrink-0" />
-          <div className="min-w-0 flex-1">
+    <>
+      <Card className={cn("group relative transition-all hover:shadow-md", isLinked && isInactive && "opacity-60")}>
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <ProviderLogo provider={provider.id} showBackground size="md" className="shrink-0" />
+              <div>
+                <CardTitle className="type-body-lg">{provider.name}</CardTitle>
+                <CardDescription className="text-xs">{provider.description}</CardDescription>
+                {isLinked && (
+                  <div className="mt-1">
+                    <ScopeBadge />
+                  </div>
+                )}
+              </div>
+            </div>
+            {isLinked ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-8 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                  >
+                    <MoreHorizontal className="size-4" />
+                    <span className="sr-only">Actions</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {!requiresSetup && (
+                    <DropdownMenuItem
+                      onClick={() => onToggleActive?.(linkedAccount.id, isActive ? "inactive" : "active")}
+                      disabled={isToggling}
+                    >
+                      {isActive ? "Disable" : "Enable"}
+                    </DropdownMenuItem>
+                  )}
+                  {linkedAccount.tokenExpired && (
+                    <DropdownMenuItem onClick={() => onReconnect?.(linkedAccount.id)}>
+                      Reconnect
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive"
+                    onClick={() => setDisconnectTarget(linkedAccount.id)}
+                  >
+                    Disconnect
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <ScopeBadge />
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {isLinked && (
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium">{provider.name}</span>
-              {isLinked && (
-                <Badge
-                  variant="outline"
-                  className={linkedAccount.isActive ? "text-success" : "text-muted-foreground"}
-                >
-                  <Check className="mr-1 size-3" />
-                  {linkedAccount.isActive ? "Connected" : "Disabled"}
-                </Badge>
-              )}
-              {isLinked && linkedAccount.tokenExpired && (
+              <Badge variant="outline" className={cn("gap-1", status.bg)}>
+                <StatusIcon className={cn("size-3", status.color)} />
+                <span className={status.color}>{status.label}</span>
+              </Badge>
+              {linkedAccount.tokenExpired && (
                 <Badge variant="outline" className="border-warning/50 text-warning">
                   <AlertTriangle className="mr-1 size-3" />
                   Token expired
                 </Badge>
               )}
             </div>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              {isLinked
-                ? `Linked as ${linkedAccount.externalUsername || linkedAccount.externalUserId}`
-                : provider.description}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-end gap-2">
-          {isLinked ? (
-            <>
-              {linkedAccount.tokenExpired && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-warning/50 text-warning hover:bg-warning/10"
-                  onClick={() => onReconnect?.(linkedAccount.id)}
-                >
-                  Reconnect
-                </Button>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onToggleActive?.(linkedAccount.id, !linkedAccount.isActive)}
-                disabled={isToggling}
-              >
-                {linkedAccount.isActive ? "Disable" : "Enable"}
-              </Button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <Trash2 className="size-4 text-destructive" />
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Disconnect {provider.name}?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will unlink your {provider.name} account. Future events from this tool
-                      may not be attributed to you.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={() => onDisconnect(linkedAccount.id)}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                      Disconnect
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </>
-          ) : (
-            <Button variant="outline" size="sm" onClick={() => onConnect(provider)}>
-              <Plus className="mr-2 size-4" />
-              Connect
-            </Button>
           )}
-        </div>
-      </CardContent>
-    </Card>
+          {isLinked && (
+            <p className="text-sm text-muted-foreground">
+              Linked as {linkedAccount.externalUsername || linkedAccount.externalUserId || "Aixle Insights"}
+            </p>
+          )}
+          {isLinked && requiresSetup && (
+            <p className="type-caption text-muted-foreground">
+              This tool will become active after it sends its first event to Aixle Insights.
+            </p>
+          )}
+          {!isLinked && (
+            <AvailableCardFooter provider={provider} onConnect={onConnect} />
+          )}
+        </CardContent>
+      </Card>
+
+      <AlertDialog
+        open={disconnectTarget !== null}
+        onOpenChange={(open) => !open && setDisconnectTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disconnect {provider.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will unlink your {provider.name} account. Future events from this tool
+              may not be attributed to you.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (disconnectTarget) onDisconnect(disconnectTarget);
+                setDisconnectTarget(null);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Disconnect
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
@@ -480,11 +532,14 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
   const selectedOrgId = userSelectedOrgId ?? currentOrg?.id ?? "";
   const [connectingProvider, setConnectingProvider] = useState<ToolProvider | null>(null);
   const [reconnectingAccountId, setReconnectingAccountId] = useState<string | null>(null);
+  const [ingestProvider, setIngestProvider] = useState<ProviderInfo | null>(null);
+  const [ingestInitialToken, setIngestInitialToken] = useState<string | null>(null);
 
   const { data: accounts, isLoading } = useToolAccounts(selectedOrgId);
   const createAccount = useCreateToolAccount();
   const deleteAccount = useDeleteToolAccount();
   const updateAccount = useUpdateToolAccount();
+  const regenerateIngestToken = useRegenerateIngestToken();
 
   const { linkedProviders, connectedProviders, availableProviders } = useMemo(() => {
     const linkedMap = new Map<string, ToolAccount>();
@@ -501,8 +556,6 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
   const providersByCategory = useMemo(() => {
     const grouped: Record<ToolCategory, ToolProvider[]> = {
       "ai-editors": [],
-      "ai-apis": [],
-      "other": [],
     };
     availableProviders.forEach((p) => {
       grouped[p.category].push(p);
@@ -530,10 +583,13 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
     }
   };
 
-  const handleToggleActive = async (accountId: string, isActive: boolean) => {
+  const handleToggleActive = async (
+    accountId: string,
+    connectionState: "inactive" | "active"
+  ) => {
     if (!selectedOrgId) return;
     try {
-      await updateAccount.mutateAsync({ orgId: selectedOrgId, accountId, isActive });
+      await updateAccount.mutateAsync({ orgId: selectedOrgId, accountId, connectionState });
     } catch (error) {
       console.error("Failed to update account status:", error);
     }
@@ -544,9 +600,39 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
     ? toolProviders.find((p) => p.id === reconnectingAccount.toolName) ?? null
     : null;
 
+  const openIngestSheet = (providerId: string, initialToken?: string | null) => {
+    setIngestProvider(ingestProviderInfo(providerId));
+    setIngestInitialToken(initialToken ?? null);
+  };
+
+  const handleConnect = (provider: ToolProvider) => {
+    if (INGEST_PROVIDER_IDS.has(provider.id)) {
+      openIngestSheet(provider.id);
+      return;
+    }
+    setConnectingProvider(provider);
+  };
+
   const handleReconnect = async (accessToken: string) => {
     if (!selectedOrgId || !reconnectingAccountId) return;
     await updateAccount.mutateAsync({ orgId: selectedOrgId, accountId: reconnectingAccountId, accessToken });
+  };
+
+  const handleReconnectClick = async (accountId: string) => {
+    const account = accounts?.find((item) => item.id === accountId);
+    if (!selectedOrgId || !account) return;
+
+    if (!INGEST_PROVIDER_IDS.has(account.toolName)) {
+      setReconnectingAccountId(accountId);
+      return;
+    }
+
+    try {
+      const result = await regenerateIngestToken.mutateAsync({ orgId: selectedOrgId, accountId });
+      openIngestSheet(account.toolName, result.data.ingestToken ?? null);
+    } catch (error) {
+      console.error("Failed to regenerate ingest token:", error);
+    }
   };
 
   return (
@@ -559,7 +645,7 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
             </Link>
           </Button>
           <div>
-            <h1 className="text-xl font-semibold">Tool Accounts</h1>
+            <h1 className="type-h3">Tool Accounts</h1>
             <p className="text-sm text-muted-foreground">
               Link your AI tool accounts for automatic event attribution
             </p>
@@ -567,23 +653,25 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
         </div>
       )}
 
-      <div className="flex items-center gap-3">
-        <Label htmlFor="org-select" className="shrink-0 text-sm font-medium">
-          Organization
-        </Label>
-        <Select value={selectedOrgId} onValueChange={setUserSelectedOrgId} disabled={orgsLoading}>
-          <SelectTrigger id="org-select" className="w-56">
-            <SelectValue placeholder="Select organisation" />
-          </SelectTrigger>
-          <SelectContent>
-            {(orgs ?? []).map((org) => (
-              <SelectItem key={org.id} value={org.id}>
-                {org.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {!embedded && (
+        <div className="flex items-center gap-3">
+          <Label htmlFor="org-select" className="shrink-0 type-label">
+            Organization
+          </Label>
+          <Select value={selectedOrgId} onValueChange={setUserSelectedOrgId} disabled={orgsLoading}>
+            <SelectTrigger id="org-select" className="w-56">
+              <SelectValue placeholder="Select organisation" />
+            </SelectTrigger>
+            <SelectContent>
+              {(orgs ?? []).map((org) => (
+                <SelectItem key={org.id} value={org.id}>
+                  {org.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -617,10 +705,10 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
                     key={provider.id}
                     provider={provider}
                     linkedAccount={linkedProviders.get(provider.id)}
-                    onConnect={setConnectingProvider}
+                    onConnect={handleConnect}
                     onDisconnect={handleDisconnect}
                     onToggleActive={handleToggleActive}
-                    onReconnect={setReconnectingAccountId}
+                    onReconnect={handleReconnectClick}
                     isToggling={updateAccount.isPending && updateAccount.variables?.accountId === linkedProviders.get(provider.id)?.id && !updateAccount.variables?.accessToken}
                   />
                 ))}
@@ -639,13 +727,13 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
                 if (providers.length === 0) return null;
                 return (
                   <div key={category} className="space-y-4">
-                    <h2 className="text-base font-medium">{categoryLabels[category]}</h2>
+                    <h2 className="type-body-lg font-medium">{categoryLabels[category]}</h2>
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                       {providers.map((provider) => (
                         <ToolCard
                           key={provider.id}
                           provider={provider}
-                          onConnect={setConnectingProvider}
+                          onConnect={handleConnect}
                           onDisconnect={handleDisconnect}
                         />
                       ))}
@@ -664,7 +752,7 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
           <div className="space-y-1 text-sm">
             <p className="font-medium">Privacy Note</p>
             <p className="text-muted-foreground">
-              DB90 only stores your account identifier and, if provided, your API token —
+              Aixle Insights only stores your account identifier and, if provided, your API token —
               encrypted at rest. We use these only for event attribution and do not access
               your tool data directly.
             </p>
@@ -686,6 +774,22 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
         onOpenChange={(open) => !open && setReconnectingAccountId(null)}
         onSubmit={handleReconnect}
         isSubmitting={updateAccount.isPending && updateAccount.variables?.accountId === reconnectingAccountId}
+      />
+
+      <IngestTokenConnectSheet
+        provider={ingestProvider}
+        open={!!ingestProvider}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIngestProvider(null);
+            setIngestInitialToken(null);
+          }
+        }}
+        onSuccess={() => {
+          setIngestProvider(null);
+          setIngestInitialToken(null);
+        }}
+        initialToken={ingestInitialToken ?? undefined}
       />
     </div>
   );

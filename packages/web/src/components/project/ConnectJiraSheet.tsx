@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Search, Layers } from "lucide-react";
 import { useOrg } from "@/contexts/OrgContext";
-import { useConnectors, useAvailableJiraProjects, useLinkJira, useSyncJiraIssues } from "@/hooks/useApi";
+import { useConnectors, useAvailableJiraProjects, useLinkJira, useSyncProjectIssues } from "@/hooks/useApi";
 import {
   Sheet,
   SheetContent,
@@ -44,7 +44,7 @@ export function ConnectJiraSheet({ projectId, open, onOpenChange, onSuccess }: C
   );
 
   const linkJira = useLinkJira(projectId);
-  const syncJira = useSyncJiraIssues(projectId);
+  const syncIssues = useSyncProjectIssues(projectId);
 
   const filteredProjects = (jiraProjects || []).filter((p) =>
     `${p.name} ${p.key}`.toLowerCase().includes(search.toLowerCase())
@@ -71,7 +71,7 @@ export function ConnectJiraSheet({ projectId, open, onOpenChange, onSuccess }: C
       return;
     }
     try {
-      await syncJira.mutateAsync();
+      await syncIssues.mutateAsync();
     } catch {
       // Link succeeded but sync failed — close anyway, user can retry sync manually
     }
@@ -89,7 +89,7 @@ export function ConnectJiraSheet({ projectId, open, onOpenChange, onSuccess }: C
             <SheetTitle>Connect Jira Project</SheetTitle>
           </div>
           <SheetDescription>
-            Select a Jira account and choose a project to link to this db90 project.
+            Select a Jira account and choose a project to link to this Aixle Insights project.
           </SheetDescription>
         </SheetHeader>
 
@@ -161,7 +161,7 @@ export function ConnectJiraSheet({ projectId, open, onOpenChange, onSuccess }: C
                       </div>
                       {connectingKey === project.key && (
                         <span className="text-xs text-muted-foreground shrink-0 ml-2">
-                          {syncJira.isPending ? "Syncing…" : "Linking…"}
+                          {syncIssues.isPending ? "Syncing…" : "Linking…"}
                         </span>
                       )}
                     </button>

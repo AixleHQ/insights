@@ -1,0 +1,262 @@
+name: Release CLI to npm
+
+on:
+  push:
+    tags:
+      - 'cli-mcp-v*'
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Package to publish'
+        required: true
+        type: choice
+        options:
+          - mcp
+      version:
+        description: 'Version to publish (must equal package.json version; no leading v). Required.'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  resolve:
+    name: Resolve target package + version
+    runs-on: self-hosted
+    outputs:
+      package: ${{ steps.target.outputs.package }}
+      working_directory: ${{ steps.target.outputs.working_directory }}
+      tag_version: ${{ steps.target.outputs.tag_version }}
+    steps:
+      - id: target
+        env:
+          REF: ${{ github.ref }}
+          INPUT_PACKAGE: ${{ github.event.inputs.package }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ "$REF" == refs/tags/cli-mcp-v* ]]; then
+            echo "package=mcp" >> "$GITHUB_OUTPUT"
+            echo "working_directory=packages/tools/aixle-insights" >> "$GITHUB_OUTPUT"
+            echo "tag_version=${REF#refs/tags/cli-mcp-v}" >> "$GITHUB_OUTPUT"
+          elif [[ -n "$INPUT_PACKAGE" ]]; then
+            # workflow_dispatch: require an explicit version input so the
+            # package.json-version check below always runs. An empty version
+            # here would bypass the guard and allow publishing any version.
+            if [[ -z "$INPUT_VERSION" ]]; then
+              echo "workflow_dispatch requires a 'version' input." >&2
+              exit 1
+            fi
+            if [[ "$INPUT_PACKAGE" != "mcp" ]]; then
+              echo "Only 'mcp' is a valid workflow_dispatch package (got $INPUT_PACKAGE)." >&2
+              exit 1
+            fi
+            echo "package=mcp" >> "$GITHUB_OUTPUT"
+            echo "working_directory=packages/tools/aixle-insights" >> "$GITHUB_OUTPUT"
+            echo "tag_version=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
+          else
+            echo "Could not resolve target package from ref=$REF / input=$INPUT_PACKAGE" >&2
+            exit 1
+          fi
+
+  publish:
+    name: Publish ${{ needs.resolve.outputs.package }} to npm
+    needs: resolve
+    runs-on: self-hosted
+    environment: npm-publish
+    steps:
+      - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0  # v6.0.3
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: packages/tools/package-lock.json
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Upgrade npm to OIDC-capable version (>= 11.5.1 required for Trusted Publishing)
+        run: npm install -g npm@latest
+
+      - name: Verify version matches package.json
+        env:
+          TAG_VERSION: ${{ needs.resolve.outputs.tag_version }}
+          WORKING_DIRECTORY: ${{ needs.resolve.outputs.working_directory }}
+        run: |
+          set -euo pipefail
+          # Both tag push and workflow_dispatch populate tag_version via the
+          # resolve job, so this guard runs for every publish path. No bypass.
+          PKG_VERSION=$(node -p "require('./${WORKING_DIRECTORY}/package.json').version")
+          if [[ "$PKG_VERSION" != "$TAG_VERSION" ]]; then
+            echo "Version mismatch: requested $TAG_VERSION, package.json has $PKG_VERSION" >&2
+            exit 1
+          fi
+
+      - name: "Reject obsolete-scope placeholders in package source"
+        env:
+          WORKING_DIRECTORY: ${{ needs.resolve.outputs.working_directory }}
+        run: |
+          set -euo pipefail
+          # Reject the original `@<scope>` placeholder (forward-looking trap
+          # for new packages that copy the convention without filling in the
+          # scope) and any leftover legacy `@db90/telemetry-mcp` / `db90-mcp` /
+          # `db90-telemetry-mcp` strings (catches stragglers from the
+          # 2026-06 @db90 → @aixle/insights migration).
+          #
+          # Scope: scan only files that ship in the npm tarball. Tests +
+          # scripts + dev configs are excluded — they intentionally retain
+          # legacy strings for shim-behavior assertions and tmp-dir fixtures.
+          SCAN_TARGETS=("dist" "README.md" "LICENSE" "package.json" "CHANGELOG.md")
+          for needle in '@<scope>' '@db90/telemetry-mcp' 'db90-telemetry-mcp' 'db90-mcp'; do
+            # Use -F (fixed-string) so needles are matched literally and never
+            # interpreted as regex — future-proofs against needles that happen
+            # to contain regex metacharacters.
+            for target in "${SCAN_TARGETS[@]}"; do
+              full="${WORKING_DIRECTORY}/${target}"
+              if [[ -e "$full" ]] && grep -Frn --binary-files=without-match "$needle" "$full"; then
+                echo "Found obsolete-scope reference: $needle in $target — block publish." >&2
+                exit 1
+              fi
+            done
+          done
+
+      - name: "Reject file:/link: dependencies in package.json"
+        env:
+          WORKING_DIRECTORY: ${{ needs.resolve.outputs.working_directory }}
+        run: |
+          set -euo pipefail
+          node <<'EOF'
+          const pkg = require(`./${process.env.WORKING_DIRECTORY}/package.json`);
+          const sections = ['dependencies', 'peerDependencies', 'optionalDependencies'];
+          const offenders = [];
+          for (const section of sections) {
+            for (const [name, spec] of Object.entries(pkg[section] ?? {})) {
+              if (typeof spec === 'string' && (spec.startsWith('file:') || spec.startsWith('link:'))) {
+                offenders.push(`${section}.${name} = ${spec}`);
+              }
+            }
+          }
+          if (offenders.length > 0) {
+            console.error('Local-only dependencies cannot be published:');
+            for (const o of offenders) console.error('  ' + o);
+            process.exit(1);
+          }
+          EOF
+
+      - name: "Reject unauthorized lifecycle scripts (only prepublishOnly allowed)"
+        env:
+          WORKING_DIRECTORY: ${{ needs.resolve.outputs.working_directory }}
+        run: |
+          set -euo pipefail
+          node <<'EOF'
+          const pkg = require(`./${process.env.WORKING_DIRECTORY}/package.json`);
+          const scripts = pkg.scripts || {};
+          const allowedLifecycle = new Set(['prepublishOnly']);
+          const lifecycleHooks = [
+            'preinstall', 'install', 'postinstall',
+            'preuninstall', 'uninstall', 'postuninstall',
+            'preversion', 'version', 'postversion',
+            'prepublish', 'prepare', 'prepack',
+            'postpack', 'publish', 'postpublish',
+          ];
+          const offenders = [];
+          for (const hook of lifecycleHooks) {
+            if (hook in scripts && !allowedLifecycle.has(hook)) {
+              offenders.push(`${hook} = ${scripts[hook]}`);
+            }
+          }
+          if (offenders.length > 0) {
+            console.error('Unauthorized lifecycle script(s) in package.json:');
+            for (const o of offenders) console.error('  ' + o);
+            console.error('Allowed: ' + [...allowedLifecycle].join(', '));
+            console.error('If a new lifecycle script is genuinely required, update plans/npm-org-setup-aixle/tasks/03-package-and-workflow-hardening.md and this guard together.');
+            process.exit(1);
+          }
+          EOF
+
+      - name: "Verify publishConfig.provenance is explicitly false (deferred until repo is public)"
+        env:
+          WORKING_DIRECTORY: ${{ needs.resolve.outputs.working_directory }}
+        run: |
+          set -euo pipefail
+          # npm rejects provenance attestations from private source repos with
+          # HTTP 422 ("Unsupported GitHub Actions source repository visibility:
+          # private"). Until dualboot-partners/db90-rails is public, provenance
+          # MUST be explicitly false — not missing, not true. The explicit-false
+          # form fails fast with this clear message if anyone flips it back to
+          # true without first making the repo public.
+          #
+          # Re-enabling: when the repo goes public, flip this guard to assert
+          # === true and set publishConfig.provenance: true in package.json,
+          # in the same PR.
+          node <<'EOF'
+          const pkg = require(`./${process.env.WORKING_DIRECTORY}/package.json`);
+          if (pkg.publishConfig?.provenance !== false) {
+            console.error('publishConfig.provenance must be explicitly false while the repo is private; got ' + JSON.stringify(pkg.publishConfig));
+            console.error('npm rejects provenance attestations from private source repos. See https://docs.npmjs.com/generating-provenance-statements');
+            process.exit(1);
+          }
+          EOF
+
+      - name: Install workspace (block dep lifecycle scripts — defense vs. Shai-Hulud-class postinstall payloads)
+        run: npm ci --ignore-scripts
+        working-directory: packages/tools
+
+      - name: Verify signatures of installed dependencies
+        run: npm audit signatures
+        working-directory: packages/tools
+
+      # Explicitly allow ONLY better-sqlite3's install script after the
+      # blanket --ignore-scripts above. better-sqlite3 ships a postinstall
+      # that runs prebuild-install to download a native .node binding for
+      # the current Node version + platform. Without it, vitest tests that
+      # touch SQLite crash with "Could not locate the bindings file".
+      #
+      # `npm rebuild <pkg>` runs the install lifecycle for ONLY that
+      # package — every other dep's postinstall stays blocked. Audit
+      # signatures already ran above, so the better-sqlite3 tarball was
+      # validated before we let any of its code execute.
+      - name: Compile better-sqlite3 native binding (surgical allowlist)
+        run: npm rebuild better-sqlite3
+        working-directory: packages/tools
+
+      - name: Build
+        run: npm run build
+        working-directory: ${{ needs.resolve.outputs.working_directory }}
+
+      - name: Test
+        run: npm test
+        working-directory: ${{ needs.resolve.outputs.working_directory }}
+
+      - name: Verify pack contents (dist + README + LICENSE)
+        working-directory: ${{ needs.resolve.outputs.working_directory }}
+        env:
+          PACKAGE: ${{ needs.resolve.outputs.package }}
+        run: |
+          set -euo pipefail
+          npm pack --dry-run --json > /tmp/pack.json
+          node <<'EOF'
+          const out = require('/tmp/pack.json');
+          const allow = new Set(['README.md', 'LICENSE', 'package.json']);
+          const paths = out[0].files.map((f) => f.path);
+          const leaks = paths.filter(
+            (p) => !allow.has(p) && !p.startsWith('dist/'),
+          );
+          if (leaks.length > 0) {
+            console.error("Tarball contains files outside the allowlist (dist/**, README.md, LICENSE, package.json):");
+            for (const p of leaks) console.error('  ' + p);
+            console.error("Fix the 'files' field in package.json.");
+            process.exit(1);
+          }
+          // SDK is now inlined as src/lib/ (no longer a bundledDependency).
+          // The previous fail-closed check for node_modules/@db90/sdk/dist/**
+          // is obsolete — there is no separate SDK package to stage.
+          EOF
+
+      - name: Publish to npm (OIDC Trusted Publishing — no stored token)
+        working-directory: ${{ needs.resolve.outputs.working_directory }}
+        run: npm publish

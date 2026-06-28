@@ -1,0 +1,70 @@
+[
+  {
+    "date": "2024-06-24",
+    "total_active_users": 24,
+    "total_engaged_users": 20,
+    "copilot_ide_code_completions": {
+      "total_engaged_users": 20,
+      "editors": [
+        {
+          "name": "vscode",
+          "total_engaged_users": 13,
+          "models": [
+            {
+              "name": "default",
+              "is_custom_model": false,
+              "languages": [
+                {
+                  "name": "python",
+                  "total_engaged_users": 6,
+                  "total_code_suggestions": 249,
+                  "total_code_acceptances": 123,
+                  "total_code_lines_suggested": 225,
+                  "total_code_lines_accepted": 135
+                },
+                {
+                  "name": "ruby",
+                  "total_engaged_users": 7,
+                  "total_code_suggestions": 100,
+                  "total_code_acceptances": 50,
+                  "total_code_lines_suggested": 90,
+                  "total_code_lines_accepted": 45
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "date": "2024-06-25",
+    "total_active_users": 18,
+    "total_engaged_users": 15,
+    "copilot_ide_code_completions": {
+      "total_engaged_users": 15,
+      "editors": [
+        {
+          "name": "vscode",
+          "total_engaged_users": 15,
+          "models": [
+            {
+              "name": "default",
+              "is_custom_model": false,
+              "languages": [
+                {
+                  "name": "typescript",
+                  "total_engaged_users": 15,
+                  "total_code_suggestions": 300,
+                  "total_code_acceptances": 200,
+                  "total_code_lines_suggested": 280,
+                  "total_code_lines_accepted": 185
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+]

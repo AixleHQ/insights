@@ -153,6 +153,77 @@ RSpec.describe JwtAuth do
       end
     end
 
+    context 'with a valid impersonation token' do
+      let(:admin) { create(:user, :global_admin) }
+      let(:target) { create(:user) }
+      let(:token) { ImpersonationService.generate_token(admin_user: admin, target_user: target) }
+
+      after do
+        jti = JWT.decode(token, nil, false).first['jti']
+        REDIS.del("impersonation:jti:#{jti}") if jti
+      end
+
+      it 'allows the request through' do
+        env = Rack::MockRequest.env_for('/api/v1/users',
+          'HTTP_AUTHORIZATION' => "Bearer #{token}"
+        )
+
+        status, _headers, _body = middleware.call(env)
+
+        expect(status).to eq(200)
+      end
+
+      it 'sets jwt.impersonation to true' do
+        env = Rack::MockRequest.env_for('/api/v1/users',
+          'HTTP_AUTHORIZATION' => "Bearer #{token}"
+        )
+        middleware.call(env)
+
+        expect(env['jwt.impersonation']).to be true
+      end
+
+      it 'sets jwt.claims with the target user email' do
+        env = Rack::MockRequest.env_for('/api/v1/users',
+          'HTTP_AUTHORIZATION' => "Bearer #{token}"
+        )
+        middleware.call(env)
+
+        expect(env['jwt.claims']['email']).to eq(target.email)
+      end
+
+      it 'sets jwt.impersonator_id' do
+        env = Rack::MockRequest.env_for('/api/v1/users',
+          'HTTP_AUTHORIZATION' => "Bearer #{token}"
+        )
+        middleware.call(env)
+
+        expect(env['jwt.impersonator_id']).to eq(admin.id)
+      end
+    end
+
+    context 'with a revoked impersonation token' do
+      let(:admin) { create(:user, :global_admin) }
+      let(:target) { create(:user) }
+      let(:token) { ImpersonationService.generate_token(admin_user: admin, target_user: target) }
+      let(:jti) { JWT.decode(token, nil, false).first['jti'] }
+      let(:exp) { JWT.decode(token, nil, false).first['exp'] }
+
+      before { ImpersonationService.revoke_token(jti, exp) }
+      after  { REDIS.del("impersonation:jti:#{jti}") }
+
+      it 'returns 401' do
+        env = Rack::MockRequest.env_for('/api/v1/users',
+          'HTTP_AUTHORIZATION' => "Bearer #{token}"
+        )
+
+        status, _headers, body = middleware.call(env)
+
+        expect(status).to eq(401)
+        response = JSON.parse(body.first)
+        expect(response['message']).to eq('Impersonation token has been revoked')
+      end
+    end
+
     context 'with expired JWT' do
       let(:private_key) { OpenSSL::PKey::RSA.generate(2048) }
       let(:public_key) { private_key.public_key }

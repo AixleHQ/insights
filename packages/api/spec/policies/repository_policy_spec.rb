@@ -15,7 +15,7 @@ RSpec.describe RepositoryPolicy, type: :policy do
   before do
     create(:organization_membership, user: admin, organization: organization)
     create(:organization_membership, user: member, organization: organization)
-    create(:project_membership, user: admin, project: project, role: 'admin')
+    create(:project_membership, user: admin, project: project, role: "owner")
     create(:project_membership, user: member, project: project, role: 'member')
   end
 

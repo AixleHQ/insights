@@ -102,7 +102,7 @@ RSpec.configure do |config|
             properties: {
               id: { type: :string, format: :uuid },
               organizationId: { type: :string, format: :uuid },
-              role: { type: :string, enum: %w[owner admin member viewer] },
+              role: { type: :string, enum: %w[owner member viewer] },
               user: { '$ref' => '#/components/schemas/UserMinimal' },
               createdAt: { type: :string, format: 'date-time' },
               updatedAt: { type: :string, format: 'date-time' }

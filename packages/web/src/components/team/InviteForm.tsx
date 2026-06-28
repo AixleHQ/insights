@@ -14,7 +14,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import type { MemberRole } from "./MemberRow";
+import type { MemberRole } from "@/contexts/OrgContext";
 
 interface InviteFormProps {
   onSubmit: (invites: Array<{ email: string; role: MemberRole }>) => Promise<void>;
@@ -74,7 +74,7 @@ export function InviteForm({ onSubmit, className }: InviteFormProps) {
     setIsSubmitting(true);
     try {
       await onSubmit(invites);
-      navigate("/team");
+      navigate("/members");
     } catch (error) {
       console.error("Failed to send invites:", error);
       // Extract specific validation error message if available
@@ -106,11 +106,11 @@ export function InviteForm({ onSubmit, className }: InviteFormProps) {
   return (
     <div className={cn("space-y-6", className)}>
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/team")}>
+        <Button variant="ghost" size="icon" onClick={() => navigate("/members")}>
           <ArrowLeft className="size-4" />
         </Button>
         <div>
-          <h1 className="text-xl font-semibold">Invite Team Members</h1>
+          <h1 className="type-h3">Invite Team Members</h1>
           <p className="text-sm text-muted-foreground">
             Send invitations to join your organization
           </p>
@@ -120,7 +120,7 @@ export function InviteForm({ onSubmit, className }: InviteFormProps) {
       <form onSubmit={handleSubmit}>
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Add People</CardTitle>
+            <CardTitle className="type-body-lg">Add People</CardTitle>
             <CardDescription>
               Enter email addresses and select their role
             </CardDescription>
@@ -150,7 +150,7 @@ export function InviteForm({ onSubmit, className }: InviteFormProps) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="owner">Owner</SelectItem>
                     <SelectItem value="member">Member</SelectItem>
                     <SelectItem value="viewer">Viewer</SelectItem>
                   </SelectContent>
@@ -195,12 +195,12 @@ export function InviteForm({ onSubmit, className }: InviteFormProps) {
 
             <div className="rounded-lg bg-muted/50 p-3 text-sm">
               <p className="font-medium">Role Permissions</p>
-              <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+              <ul className="mt-2 space-y-1 type-caption text-muted-foreground">
                 <li>
-                  <strong>Admin:</strong> Full access, can manage team and settings
+                  <strong>Owner:</strong> Full access — manage members, settings, and all projects
                 </li>
                 <li>
-                  <strong>Member:</strong> Can view all data and create projects
+                  <strong>Member:</strong> View dashboards and contribute to projects
                 </li>
                 <li>
                   <strong>Viewer:</strong> Read-only access to events and dashboards
@@ -214,7 +214,7 @@ export function InviteForm({ onSubmit, className }: InviteFormProps) {
           <Button
             type="button"
             variant="outline"
-            onClick={() => navigate("/team")}
+            onClick={() => navigate("/members")}
             disabled={isSubmitting}
           >
             Cancel

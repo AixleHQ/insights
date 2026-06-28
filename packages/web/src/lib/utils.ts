@@ -59,6 +59,9 @@ const TOOL_NAME_MAP: Record<string, string> = {
   "claude-code": "Claude Code",
   "github_copilot": "GitHub Copilot",
   "github-copilot": "GitHub Copilot",
+  "github": "GitHub",
+  "gitlab": "GitLab",
+  "bitbucket": "Bitbucket",
   "cursor": "Cursor",
   "aider": "Aider",
   "codeium": "Codeium",
@@ -76,8 +79,12 @@ const TOOL_NAME_MAP: Record<string, string> = {
   "chatgpt": "ChatGPT",
   "openai": "OpenAI",
   "openai_api": "OpenAI API",
+  "openrouter_api": "OpenRouter API",
+  "gemini_api": "Gemini API",
   "anthropic": "Anthropic",
   "anthropic_api": "Anthropic API",
+  "jira": "Jira",
+  "linear": "Linear",
 };
 
 /**
@@ -93,8 +100,10 @@ export function toEventRow(e: ToolEvent) {
     cost_usd: e.costUsd,
     token_count: (e.inputTokens || 0) + (e.outputTokens || 0),
     created_at: e.occurredAt || e.createdAt,
-    user: e.user ? { email: e.user.email } : undefined,
+    user: e.user ? { email: e.user.email, name: e.user.name, avatarUrl: e.user.avatarUrl } : undefined,
+    suggested_user: e.suggestedUser ? { email: e.suggestedUser.email, name: e.suggestedUser.name, avatarUrl: e.suggestedUser.avatarUrl } : null,
     project: e.project ? { name: e.project.name } : undefined,
+    project_id: e.project?.id,
   };
 }
 
@@ -103,6 +112,15 @@ export function toEventRow(e: ToolEvent) {
  */
 export function getMemberDisplayName(member: { name?: string | null; email: string }): string {
   return member.name ?? member.email.split("@")[0];
+}
+
+/** Resolve user id from an organization membership (API nests id under `user`). */
+export function organizationMemberUserId(member: {
+  userId?: string;
+  user_id?: string;
+  user?: { id?: string };
+}): string | undefined {
+  return member.userId ?? member.user_id ?? member.user?.id;
 }
 
 /**
@@ -123,4 +141,22 @@ export function humanizeToolName(toolName: string | undefined | null): string {
   return toolName
     .replace(/[_-]/g, " ")
     .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+const TOOL_COLOR_MAP: Record<string, string> = {
+  claude_code: "hsl(32 95% 55%)",
+  "claude-code": "hsl(32 95% 55%)",
+  github_copilot: "hsl(211 100% 50%)",
+  "github-copilot": "hsl(211 100% 50%)",
+  cursor: "hsl(271 91% 65%)",
+  aider: "hsl(142 71% 45%)",
+  windsurf: "hsl(199 89% 48%)",
+  cody: "hsl(339 90% 51%)",
+  Other: "hsl(220 9% 46%)",
+};
+
+export function getToolColor(toolName: string | undefined | null): string {
+  if (!toolName) return "hsl(220 9% 46%)";
+  const normalized = toolName.toLowerCase().trim();
+  return TOOL_COLOR_MAP[normalized] ?? "hsl(220 9% 46%)";
 }

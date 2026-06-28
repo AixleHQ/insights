@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
-import { MoreHorizontal, GitBranch, Activity, DollarSign, Calendar } from "lucide-react";
+import { MoreHorizontal, GitBranch, Activity, DollarSign, Calendar, Star, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { formatCost, formatCount } from "@/lib/formatters";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,27 +12,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-
-export interface ProjectData {
-  id: string;
-  name: string;
-  description?: string;
-  repository_url?: string;
-  is_active: boolean;
-  event_count: number;
-  total_cost_usd: number;
-  last_event_at?: string;
-  created_at: string;
-  connectors?: Array<{
-    id: string;
-    provider: string;
-  }>;
-}
+import { isGitRemoteMissing } from "@/lib/project-git-remote";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { type ProjectWithStats } from "@/lib/types";
 
 interface ProjectCardProps {
-  project: ProjectData;
+  project: ProjectWithStats;
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
+  isFavorited?: boolean;
+  onToggleFavorite?: (project: { id: string; name: string }) => void;
   className?: string;
 }
 
@@ -42,16 +32,9 @@ function formatDate(dateStr: string | undefined | null): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(value);
-}
+export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFavorite, className }: ProjectCardProps) {
+  const showUnlinkedRemote = isGitRemoteMissing(project);
 
-export function ProjectCard({ project, onEdit, onDelete, className }: ProjectCardProps) {
   return (
     <Card className={cn("group relative transition-shadow hover:shadow-md", className)}>
       <CardHeader className="pb-3">
@@ -72,9 +55,39 @@ export function ProjectCard({ project, onEdit, onDelete, className }: ProjectCar
             )}
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant={project.is_active ? "default" : "secondary"} className="text-xs">
-              {project.is_active ? "Active" : "Inactive"}
+            {onToggleFavorite && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8 opacity-0 transition-opacity group-hover:opacity-100"
+                aria-label="Toggle favorite"
+                onClick={() => onToggleFavorite({ id: project.id, name: project.name })}
+              >
+                <Star
+                  className={cn("size-4", isFavorited && "fill-current text-warning")}
+                />
+              </Button>
+            )}
+            <Badge variant={project.isActive ? "default" : "secondary"} className="text-xs">
+              {project.isActive ? "Active" : "Inactive"}
             </Badge>
+            {showUnlinkedRemote && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge
+                    variant="outline"
+                    className="cursor-default gap-1 border-warning/40 bg-warning/10 text-xs text-warning-foreground dark:text-warning/80"
+                    aria-label="No git remote configured"
+                  >
+                    <AlertCircle className="size-3 text-warning dark:text-warning" />
+                    Unlinked
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  No git remote configured — CLI events won&apos;t be attributed.
+                </TooltipContent>
+              </Tooltip>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -113,7 +126,7 @@ export function ProjectCard({ project, onEdit, onDelete, className }: ProjectCar
               Events
             </div>
             <p className="font-mono-display text-sm font-medium">
-              {(project.event_count || 0).toLocaleString()}
+              {formatCount(project.eventCount || 0)}
             </p>
           </div>
           <div className="space-y-1">
@@ -122,7 +135,7 @@ export function ProjectCard({ project, onEdit, onDelete, className }: ProjectCar
               Cost
             </div>
             <p className="font-mono-display text-sm font-medium">
-              {formatCurrency(project.total_cost_usd || 0)}
+              {formatCost(project.totalCostUsd || 0)}
             </p>
           </div>
           <div className="space-y-1">
@@ -130,20 +143,20 @@ export function ProjectCard({ project, onEdit, onDelete, className }: ProjectCar
               <Calendar className="size-3" />
               Created
             </div>
-            <p className="text-sm font-medium">{formatDate(project.created_at)}</p>
+            <p className="text-sm font-medium">{formatDate(project.createdAt)}</p>
           </div>
         </div>
 
-        {project.repository_url && (
+        {project.repositoryUrl && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <GitBranch className="size-3" />
             <a
-              href={project.repository_url}
+              href={project.repositoryUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="truncate hover:text-foreground hover:underline"
             >
-              {project.repository_url.replace(/^https?:\/\/(github|gitlab|bitbucket)\.com\//, "")}
+              {project.repositoryUrl.replace(/^https?:\/\/(github|gitlab|bitbucket)\.com\//, "")}
             </a>
           </div>
         )}

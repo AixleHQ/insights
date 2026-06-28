@@ -36,8 +36,7 @@ module Ai
           model: response[:model],
           tokens_in: response[:usage][:prompt_tokens],
           tokens_out: response[:usage][:completion_tokens],
-          duration: duration,
-          cost: response[:usage][:cost]
+          duration: duration
         )
 
         response
@@ -62,8 +61,7 @@ module Ai
           model: response[:model],
           tokens_in: response[:usage][:prompt_tokens],
           tokens_out: response[:usage][:completion_tokens],
-          duration: duration,
-          cost: response[:usage][:cost]
+          duration: duration
         )
 
         response
@@ -80,7 +78,14 @@ module Ai
 
       private
 
-      def track_usage(connector:, provider:, operation:, model:, tokens_in:, tokens_out:, duration:, cost:)
+      def track_usage(connector:, provider:, operation:, model:, tokens_in:, tokens_out:, duration:)
+        cost_usd = ModelPricingService.calculate_cost(
+          tokens_in: tokens_in,
+          tokens_out: tokens_out,
+          model: model,
+          organization: connector.organization
+        )[:total_cost]
+
         ToolEvent.create!(
           organization_id: connector.organization_id,
           user_id: connector.organization.members.first&.id, # Will be replaced by correlation
@@ -89,7 +94,7 @@ module Ai
           model: model,
           tokens_in: tokens_in,
           tokens_out: tokens_out,
-          cost_usd: cost,
+          cost_usd: cost_usd,
           duration_ms: (duration * 1000).round,
           occurred_at: Time.current,
           metadata: {

@@ -86,6 +86,46 @@ paths:
                   meta:
                     $ref: '#/components/schemas/PaginationMeta'
 
+  /api/v1/users/me/tool_accounts:
+    get:
+      summary: List current user's ingest tool account metadata (current org)
+      description: |
+        Returns `claude_code` and `cursor` tool accounts for the authenticated user's membership
+        in the organization named by `X-Organization-ID`. Does not include any persisted token
+        values or hashes. `lastUsedAt` is derived from the latest matching `ToolEvent` in this org
+        for this user and tool.
+      tags:
+        - Users
+      parameters:
+        - $ref: '#/components/parameters/X-Organization-ID'
+      responses:
+        '200':
+          description: Ingest tool account metadata (no token material)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MeToolAccountMetadata'
+        '400':
+          description: Organization context required
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   /api/v1/users/me/settings:
     get:
       summary: Get current user's settings
@@ -153,6 +193,94 @@ paths:
           description: Setting deleted
         '404':
           $ref: '#/components/responses/NotFound'
+
+  /api/v1/users/me/personal_settings:
+    get:
+      summary: Get current user personal alert settings
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Personal settings (defaults returned if no row saved yet)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserPersonalSettings'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      summary: Update current user personal alert settings
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - personal_settings
+              properties:
+                personal_settings:
+                  type: object
+                  properties:
+                    cost_threshold_cents:
+                      type: integer
+                      nullable: true
+                    token_threshold:
+                      type: integer
+                      nullable: true
+                    alert_email:
+                      type: boolean
+                    alert_slack:
+                      type: boolean
+      responses:
+        '200':
+          description: Updated personal settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserPersonalSettings'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/users/me/favorites:
+    get:
+      summary: Get current user's favorited projects
+      tags:
+        - Users
+      responses:
+        '200':
+          description: List of favorited projects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        name:
+                          type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   # ============================================
   # ORGANIZATION ENDPOINTS
@@ -237,7 +365,7 @@ paths:
           $ref: '#/components/responses/NotFound'
     patch:
       summary: Update organization
-      description: Requires admin role in the organization
+      description: Requires owner role in the organization
       tags:
         - Organizations
       parameters:
@@ -338,6 +466,38 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationError'
 
+  /api/v1/organizations/{id}/retention_preview:
+    get:
+      summary: Get retention purge preview for an organization
+      description: >
+        Returns the upcoming purge cutoff date and an estimated count of tool_events
+        that will be deleted at the next scheduled purge run.
+        The count is computed via a COUNT(*) query gated by a 3-second timeout;
+        if the query exceeds the limit, estimatedRecords is null.
+        Requires org owner or global admin role.
+      tags:
+        - Organizations
+        - Retention
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      responses:
+        '200':
+          description: Retention preview
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/RetentionPreview'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   /api/v1/organizations/{id}/settings:
     get:
       summary: Get organization settings
@@ -407,6 +567,142 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /api/v1/organizations/{id}/model_pricing:
+    get:
+      summary: Get model and tool pricing table
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Pricing table (static list prices per million tokens)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  models:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PricingEntry'
+                  tools:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PricingEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ============================================
+  # MODEL PRICING OVERRIDES ENDPOINTS
+  # ============================================
+  /api/v1/organizations/{organization_id}/model_pricing/overrides:
+    get:
+      summary: List per-org model pricing overrides
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      responses:
+        '200':
+          description: List of pricing overrides for the organization
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ModelPricingOverride'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      summary: Create a per-org model pricing override
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelPricingOverrideInput'
+      responses:
+        '201':
+          description: Override created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ModelPricingOverride'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /api/v1/organizations/{organization_id}/model_pricing/overrides/{id}:
+    put:
+      summary: Update a per-org model pricing override
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelPricingOverrideInput'
+      responses:
+        '200':
+          description: Override updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ModelPricingOverride'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    delete:
+      summary: Delete a per-org model pricing override
+      tags:
+        - Organizations
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      responses:
+        '204':
+          description: Override deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   # ============================================
   # ORGANIZATION MEMBERS ENDPOINTS
   # ============================================
@@ -424,7 +720,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [owner, admin, member, viewer]
+            enum: [owner, member, viewer]
       responses:
         '200':
           description: Members list
@@ -436,14 +732,14 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: '#/components/schemas/OrganizationMembership'
+                      $ref: '#/components/schemas/OrganizationMemberListItem'
                   meta:
                     $ref: '#/components/schemas/PaginationMeta'
         '400':
           $ref: '#/components/responses/BadRequest'
     post:
       summary: Add organization member
-      description: Requires admin role. Adds a user as a member of the organization.
+      description: Requires owner role. Adds a user as a member of the organization.
       tags:
         - Organization Members
       parameters:
@@ -461,7 +757,7 @@ paths:
                   format: uuid
                 role:
                   type: string
-                  enum: [owner, admin, member, viewer]
+                  enum: [owner, member, viewer]
               required:
                 - user_id
                 - role
@@ -503,7 +799,7 @@ paths:
           $ref: '#/components/responses/NotFound'
     patch:
       summary: Update organization member role
-      description: Requires admin role. Cannot demote owners unless you are also an owner.
+      description: Requires owner role. Cannot demote owners unless you are also an owner.
       tags:
         - Organization Members
       parameters:
@@ -519,7 +815,7 @@ paths:
               properties:
                 role:
                   type: string
-                  enum: [owner, admin, member, viewer]
+                  enum: [owner, member, viewer]
               required:
                 - role
       responses:
@@ -531,7 +827,7 @@ paths:
           $ref: '#/components/responses/ValidationError'
     delete:
       summary: Remove organization member
-      description: Requires admin role. Cannot remove owners unless you are also an owner.
+      description: Requires owner role. Cannot remove owners unless you are also an owner.
       tags:
         - Organization Members
       parameters:
@@ -543,6 +839,183 @@ paths:
           description: Member removed
         '403':
           $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/members/{id}/dashboard_stats:
+    get:
+      summary: Personal dashboard stats for a member
+      tags:
+        - Organization Members
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: id
+          in: path
+          required: true
+          description: Membership ID or user UUID
+          schema:
+            type: string
+        - name: period
+          in: query
+          required: false
+          description: Time window (7d, 30d, 90d). Default 30d.
+          schema:
+            type: string
+            enum: [7d, 30d, 90d]
+      responses:
+        '200':
+          description: Dashboard stats for the period
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_events:
+                    type: integer
+                  total_cost_usd:
+                    type: number
+                    format: float
+                  total_tokens_in:
+                    type: integer
+                  total_tokens_out:
+                    type: integer
+                  events_change_percent:
+                    type: number
+                    format: float
+                  cost_change_percent:
+                    type: number
+                    format: float
+                  tokens_change_percent:
+                    type: number
+                    format: float
+                  tool_breakdown:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        tool_name:
+                          type: string
+                        event_count:
+                          type: integer
+                        cost_usd:
+                          type: number
+                          format: float
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/organizations/{organization_id}/members/{id}/prompt_insights:
+    get:
+      summary: Prompt quality insights for a member
+      description: Returns a heuristic prompt quality score and dimension breakdown for the selected period. Self-or-admin only (same access policy as dashboard_stats).
+      tags:
+        - Organization Members
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: id
+          in: path
+          required: true
+          description: Membership ID or user UUID
+          schema:
+            type: string
+        - name: period
+          in: query
+          required: false
+          description: Time window (7d, 30d, 90d). Default 30d.
+          schema:
+            type: string
+            enum: [7d, 30d, 90d]
+      responses:
+        '200':
+          description: Prompt insights for the period
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  score:
+                    type: number
+                    format: float
+                    description: Overall quality score 0–10 (1 decimal)
+                  dimensions:
+                    type: object
+                    properties:
+                      structure:
+                        type: number
+                        format: float
+                        description: Structure dimension score 0–10
+                      context:
+                        type: number
+                        format: float
+                        description: Context dimension score 0–10
+                      specificity:
+                        type: number
+                        format: float
+                        description: Specificity dimension score 0–10
+                  callouts:
+                    type: array
+                    description: Empty when no events in period
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                          enum: [strength, tool, opportunity]
+                        label:
+                          type: string
+                        text:
+                          type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/organizations/{organization_id}/members/{id}/stats/heatmap:
+    get:
+      summary: Activity heatmap for a member (last 365 days)
+      tags:
+        - Organization Members
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: id
+          in: path
+          required: true
+          description: Membership ID or user UUID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Daily event counts for heatmap
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    date:
+                      type: string
+                      format: date
+                    count:
+                      type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   # ============================================
   # ORGANIZATION CONNECTORS ENDPOINTS
@@ -584,7 +1057,7 @@ paths:
                     $ref: '#/components/schemas/PaginationMeta'
     post:
       summary: Create organization connector
-      description: Requires admin role. Creates a new connector for the organization.
+      description: Requires owner role. Creates a new connector for the organization.
       tags:
         - Organization Connectors
       parameters:
@@ -599,7 +1072,7 @@ paths:
               properties:
                 connector_type:
                   type: string
-                  enum: [github, gitlab, bitbucket, jira, linear, openrouter, anthropic, openai, gemini]
+                  enum: [github, gitlab, bitbucket, jira, linear, openrouter, anthropic, openai, gemini, slack, github_copilot, cursor]
                 access_token:
                   type: string
                   description: OAuth access token (sensitive)
@@ -618,6 +1091,10 @@ paths:
                 is_active:
                   type: boolean
                   default: true
+                label:
+                  type: string
+                  nullable: true
+                  description: Optional user-supplied label to distinguish multiple connectors of the same provider
               required:
                 - connector_type
       responses:
@@ -686,6 +1163,10 @@ paths:
                   type: string
                 is_active:
                   type: boolean
+                label:
+                  type: string
+                  nullable: true
+                  description: Optional user-supplied label to distinguish multiple connectors of the same provider
       responses:
         '200':
           description: Connector updated
@@ -792,12 +1273,89 @@ paths:
                     nullable: true
                   total_events:
                     type: integer
+                  repository_count:
+                    type: integer
+                    nullable: true
+                  synced_event_count:
+                    type: integer
+                    nullable: true
+                  last_event_at:
+                    type: string
+                    format: date-time
+                    nullable: true
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+
+  /api/v1/organizations/{organization_id}/connectors/health:
+    get:
+      summary: Get connector health rollup
+      description: Returns aggregated 7-day health metrics for all connectors in the organization. Summary counts use all connectors; per-connector list excludes disconnected.
+      tags:
+        - Organization Connectors
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      responses:
+        '200':
+          description: Connector health rollup
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      summary:
+                        type: object
+                        properties:
+                          total:
+                            type: integer
+                          connected:
+                            type: integer
+                          testing:
+                            type: integer
+                          error:
+                            type: integer
+                          disconnected:
+                            type: integer
+                      connectors:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            connector_type:
+                              type: string
+                            status:
+                              type: string
+                              enum: [connected, testing, error]
+                            last_sync_at:
+                              type: string
+                              format: date-time
+                              nullable: true
+                            last_error:
+                              type: string
+                              nullable: true
+                            success_rate_7d:
+                              type: number
+                              format: float
+                              nullable: true
+                              description: Fraction of successful syncs in the last 7 days (0.0–1.0). Null if no snapshots exist.
+                            avg_sync_duration_ms_7d:
+                              type: number
+                              format: float
+                              nullable: true
+                              description: Average sync duration in milliseconds over the last 7 days. Null if no snapshots exist.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /api/v1/organizations/{organization_id}/connectors/authorize/{type}:
     get:
@@ -813,7 +1371,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [github, gitlab, bitbucket, jira, linear]
+            enum: [github, gitlab, bitbucket, jira, linear, github_copilot]
       responses:
         '200':
           description: Authorization URL
@@ -834,7 +1392,12 @@ paths:
   /api/v1/organizations/{organization_id}/connectors/callback:
     post:
       summary: OAuth callback
-      description: Handles the OAuth callback and exchanges the code for tokens
+      description: |
+        Handles the OAuth callback and exchanges the code for tokens.
+        For multi-instance providers (github, gitlab, bitbucket, jira, linear), re-authorizing
+        the same external account (same external_org_id) updates the existing connector; a different
+        external account creates a new connector row. Single-instance providers always upsert by
+        connector_type.
       tags:
         - Organization Connectors
       parameters:
@@ -849,10 +1412,14 @@ paths:
               properties:
                 connector_type:
                   type: string
-                  enum: [github, gitlab, bitbucket, jira, linear]
+                  enum: [github, gitlab, bitbucket, jira, linear, github_copilot]
                 code:
                   type: string
                   description: OAuth authorization code
+                label:
+                  type: string
+                  nullable: true
+                  description: Optional user-supplied label to distinguish multiple connectors of the same provider
               required:
                 - connector_type
                 - code
@@ -931,13 +1498,13 @@ paths:
                 token_expires_at:
                   type: string
                   format: date-time
-                external_account_id:
+                external_user_id:
                   type: string
-                external_account_name:
+                external_username:
                   type: string
-                is_active:
-                  type: boolean
-                  default: true
+                connection_state:
+                  type: string
+                  enum: [inactive, active, waiting_for_connection]
               required:
                 - tool_name
       responses:
@@ -996,15 +1563,23 @@ paths:
                 token_expires_at:
                   type: string
                   format: date-time
-                external_account_id:
+                external_user_id:
                   type: string
-                external_account_name:
+                external_username:
                   type: string
-                is_active:
-                  type: boolean
+                connection_state:
+                  type: string
+                  enum: [inactive, active, waiting_for_connection]
       responses:
         '200':
           description: Tool account updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserToolAccount'
         '422':
           $ref: '#/components/responses/ValidationError'
     delete:
@@ -1025,12 +1600,32 @@ paths:
   /api/v1/organizations/{organization_id}/stats/overview:
     get:
       summary: Organization stats overview
-      description: Returns aggregate event count, cost, active users, and high-risk event count for the current month, with percentage change vs the previous month.
+      description: |
+        Returns aggregate event count, cost, active users, and risk alert count for a reporting period,
+        with percentage change vs the previous period. Default period is the current calendar month.
+        Pass `month` for a specific past month, or `all_time=true` for unbounded totals (change_percent fields will be null).
+        Pass `project_id` to scope all counts to a single project.
       tags:
         - Stats
       parameters:
         - $ref: '#/components/parameters/organization_id'
         - $ref: '#/components/parameters/X-Organization-ID'
+        - name: project_id
+          in: query
+          description: Scope stats to a specific project (must belong to this organization)
+          schema:
+            type: string
+        - name: month
+          in: query
+          description: Exact calendar month to query (YYYY-MM). Overrides the default current-month window.
+          schema:
+            type: string
+            example: '2026-05'
+        - name: all_time
+          in: query
+          description: When true, aggregate over all available events with no date bound. Overrides month. Change-percent fields will be null.
+          schema:
+            type: boolean
       responses:
         '200':
           description: Overview stats
@@ -1044,20 +1639,83 @@ paths:
                   total_cost_usd:
                     type: number
                     format: float
-                  high_risk_events:
+                  risk_alerts:
                     type: integer
+                    description: Count of distinct tool_events with at least one non-none audit log in the reporting period
                   active_users:
                     type: integer
+                    description: Count of distinct users who generated at least one event during the selected period
                   events_change_percent:
                     type: number
                     format: float
+                    nullable: true
+                    description: Null when all_time=true
                   cost_change_percent:
                     type: number
                     format: float
+                    nullable: true
+                    description: Null when all_time=true
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/organizations/{organization_id}/stats/active_users:
+    get:
+      summary: Active users over a rolling window
+      description: |
+        Returns the count of distinct users who generated at least one event over a rolling
+        window (default 7 days). Intentionally decoupled from the dashboard month filter
+        (AIX-446) — the value does not change when a month is selected. Pass `project_id`
+        to scope to a single project.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: project_id
+          in: query
+          description: Scope to a specific project (must belong to this organization)
+          schema:
+            type: string
+        - name: days
+          in: query
+          description: Rolling window size in days. Defaults to 7.
+          schema:
+            type: integer
+            default: 7
+            minimum: 1
+            maximum: 365
+      responses:
+        '200':
+          description: Active users count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  active_users:
+                    type: integer
+                    description: Count of distinct users with at least one event in the window
+                  timeRange:
+                    type: object
+                    properties:
+                      start:
+                        type: string
+                        format: date-time
+                      end:
+                        type: string
+                        format: date-time
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /api/v1/organizations/{organization_id}/stats/hourly:
     get:
@@ -1117,7 +1775,7 @@ paths:
   /api/v1/organizations/{organization_id}/stats/daily:
     get:
       summary: Daily stats
-      description: Returns daily event counts and cost, plus a per-tool breakdown. Defaults to the last 30 days; pass `days` to override.
+      description: Returns event counts and cost bucketed by day/week/month, plus a per-tool breakdown. Defaults to the last 30 days at daily granularity. Pass `month=YYYY-MM` to scope to a specific calendar month. Pass `all_time=true` for unbounded data at the specified granularity (no zero-fill).
       tags:
         - Stats
       parameters:
@@ -1125,10 +1783,34 @@ paths:
         - $ref: '#/components/parameters/X-Organization-ID'
         - name: days
           in: query
-          description: Number of days to look back (default 30)
+          description: Number of days to look back (default 30). Ignored when month or all_time is present.
           schema:
             type: integer
             default: 30
+        - name: month
+          in: query
+          description: Scope to a specific calendar month (YYYY-MM). Ignored when all_time=true.
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}$'
+            example: '2025-03'
+        - name: period
+          in: query
+          description: Bucket granularity (default day). When all_time=true, defaults to month.
+          schema:
+            type: string
+            enum: [day, week, month]
+            default: day
+        - name: all_time
+          in: query
+          description: When true, return unbounded data across all history at the requested granularity. No zero-fill is applied.
+          schema:
+            type: boolean
+        - name: project_id
+          in: query
+          description: Scope to a specific project.
+          schema:
+            type: string
         - $ref: '#/components/parameters/start_date'
         - $ref: '#/components/parameters/end_date'
       responses:
@@ -1172,7 +1854,7 @@ paths:
   /api/v1/organizations/{organization_id}/stats/daily_by_tool:
     get:
       summary: Daily stats by tool
-      description: Returns daily event counts grouped by the top 3 tools plus an "Other" bucket — shaped for stacked bar charts. Defaults to the last 30 days.
+      description: Returns event counts grouped by the top 3 tools plus an "Other" bucket — shaped for stacked bar charts. Granularity is day (default), week, or month. Use month (YYYY-MM) or days to set the window. Pass all_time=true for unbounded data (defaults to monthly granularity; no zero-fill).
       tags:
         - Stats
       parameters:
@@ -1180,15 +1862,38 @@ paths:
         - $ref: '#/components/parameters/X-Organization-ID'
         - name: days
           in: query
-          description: Number of days to look back (default 30)
+          description: Rolling window in days (default 30). Ignored when month or all_time is present.
           schema:
             type: integer
             default: 30
+        - name: period
+          in: query
+          description: Bucket granularity. Defaults to month when all_time=true.
+          schema:
+            type: string
+            enum: [day, week, month]
+            default: day
+        - name: month
+          in: query
+          description: Exact calendar month to query (YYYY-MM). Takes precedence over days.
+          schema:
+            type: string
+            example: '2026-05'
+        - name: all_time
+          in: query
+          description: When true, aggregate over all available events with no date bound. No zero-fill is applied. Defaults granularity to month.
+          schema:
+            type: boolean
+        - name: project_id
+          in: query
+          description: Scope to a specific project (must belong to this organization)
+          schema:
+            type: string
         - $ref: '#/components/parameters/start_date'
         - $ref: '#/components/parameters/end_date'
       responses:
         '200':
-          description: Daily stats by tool
+          description: Stats by tool
           content:
             application/json:
               schema:
@@ -1196,7 +1901,7 @@ paths:
                 properties:
                   data:
                     type: array
-                    description: One entry per day; keys are tool names + "Other"
+                    description: One entry per bucket (day, week, or month start); keys are tool names + "Other"
                     items:
                       type: object
                       properties:
@@ -1210,6 +1915,10 @@ paths:
                     description: Ordered list of tool names present in data (top 3 + "Other")
                     items:
                       type: string
+                  period:
+                    type: string
+                    enum: [day, week, month]
+                    description: Actual bucket granularity used
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1244,6 +1953,176 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /api/v1/organizations/{organization_id}/stats/risk_alerts:
+    get:
+      summary: Risk alerts by tool
+      description: |
+        Returns tool-grouped events that have at least one audit log with risk_level != 'none' in the given window.
+        Uses a subquery to prevent SUM inflation from the ToolEvent has_many :audit_logs relation.
+        The SUM(eventCount) across rows approximates the risk_alerts value in /stats/overview when both use the same window.
+        Pass all_time=true for unbounded history.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: days
+          in: query
+          description: Rolling window in days (default 30). Ignored when month or all_time is present.
+          schema:
+            type: integer
+            default: 30
+        - name: month
+          in: query
+          description: Exact calendar month (YYYY-MM). Takes precedence over days.
+          schema:
+            type: string
+            example: '2026-05'
+        - name: all_time
+          in: query
+          description: When true, aggregate over all available events with no date bound.
+          schema:
+            type: boolean
+        - name: project_id
+          in: query
+          description: Scope to a specific project (must belong to this organization)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Risk alert rows sorted by event count descending
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    toolName:
+                      type: string
+                    eventCount:
+                      type: integer
+                    tokensIn:
+                      type: integer
+                    tokensOut:
+                      type: integer
+                    costUsd:
+                      type: number
+                      format: float
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/organizations/{organization_id}/stats/daily_by_model:
+    get:
+      summary: Daily stats by model
+      description: Returns event counts grouped by the top 3 AI models plus an "Other" bucket. Granularity is day (default), week, or month. Use month (YYYY-MM) or days to set the window. Pass all_time=true for unbounded data (defaults to monthly granularity).
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: days
+          in: query
+          description: Rolling window in days (default 30). Ignored when month or all_time is present.
+          schema:
+            type: integer
+            default: 30
+        - name: period
+          in: query
+          description: Bucket granularity. Defaults to month when all_time=true.
+          schema:
+            type: string
+            enum: [day, week, month]
+            default: day
+        - name: month
+          in: query
+          description: Exact calendar month (YYYY-MM). Takes precedence over days.
+          schema:
+            type: string
+            example: '2026-05'
+        - name: all_time
+          in: query
+          description: When true, aggregate over all available events with no date bound. Defaults granularity to month.
+          schema:
+            type: boolean
+        - name: project_id
+          in: query
+          description: Scope to a specific project (must belong to this organization)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Stats by model
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    description: One entry per bucket (day or week start); keys are model names + "Other"
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                      additionalProperties:
+                        type: integer
+                  models:
+                    type: array
+                    description: Ordered list of model names present in data (top 3 + "Other")
+                    items:
+                      type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/stats/active_tools:
+    get:
+      summary: Active tools
+      description: Returns all tools with events in the last 30 days, ordered by usage. Use to discover which tool insight tabs to render.
+      tags:
+        - Stats
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      responses:
+        '200':
+          description: List of tools with activity
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tools:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        tool_name:
+                          type: string
+                          example: claude_code
+                        total_events:
+                          type: integer
+                          example: 1200
+                        total_cost_usd:
+                          type: number
+                          format: float
+                          example: 45.67
+                        active_users:
+                          type: integer
+                          example: 8
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/overview:
     get:
       summary: Tool overview stats
@@ -1258,7 +2137,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github]
+            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github, gitlab]
         - $ref: '#/components/parameters/start_date'
         - $ref: '#/components/parameters/end_date'
       responses:
@@ -1317,7 +2196,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github]
+            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github, gitlab]
         - name: days
           in: query
           description: Number of days to look back (default 30)
@@ -1395,7 +2274,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github]
+            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github, gitlab]
         - $ref: '#/components/parameters/start_date'
         - $ref: '#/components/parameters/end_date'
         - name: days
@@ -1469,7 +2348,7 @@ paths:
   /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/daily:
     get:
       summary: Tool daily stats
-      description: Returns day-by-day event counts, tokens, and cost for a specific tool. Every day in the range has an entry — days with no events are zero-filled.
+      description: Returns event counts, tokens, and cost bucketed by the requested granularity (day/week/month) for a specific tool. Every bucket in the range has an entry — buckets with no events are zero-filled.
       tags:
         - Stats
       parameters:
@@ -1480,7 +2359,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github]
+            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github, gitlab]
         - $ref: '#/components/parameters/start_date'
         - $ref: '#/components/parameters/end_date'
         - name: days
@@ -1490,9 +2369,17 @@ paths:
           schema:
             type: integer
             default: 30
+        - name: period
+          in: query
+          required: false
+          description: Bucket granularity. Use week for 60–180 day ranges or month for ~1 year ranges to keep charts readable.
+          schema:
+            type: string
+            enum: [day, week, month]
+            default: day
       responses:
         '200':
-          description: Daily trend data with zero-filled gaps
+          description: Bucketed trend data with zero-filled gaps
           content:
             application/json:
               schema:
@@ -1510,8 +2397,13 @@ paths:
                       end:
                         type: string
                         format: date-time
+                  period:
+                    type: string
+                    enum: [day, week, month]
+                    description: Actual bucket granularity used
                   daily:
                     type: array
+                    description: One entry per bucket (day, week-start, or month-start)
                     items:
                       type: object
                       properties:
@@ -1553,7 +2445,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github]
+            enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github, gitlab]
         - $ref: '#/components/parameters/start_date'
         - $ref: '#/components/parameters/end_date'
         - name: days
@@ -1737,6 +2629,368 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationError'
 
+  # ============================================
+  # ORGANIZATION AUDIT LOG ENDPOINTS
+  # ============================================
+  /api/v1/organizations/{organization_id}/audit_logs:
+    get:
+      summary: List organization audit logs
+      description: >
+        Returns paginated audit log entries for the organization.
+        Requires org admin or global admin role. Members receive 403.
+        All fields including `ipAddress` and `trackedChanges` are included.
+      tags:
+        - Organization Audit Logs
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - name: actor_id
+          in: query
+          description: Filter by actor user ID
+          schema:
+            type: string
+            format: uuid
+        - name: log_action
+          in: query
+          description: Filter by action (e.g. settings.update, member.removed)
+          schema:
+            type: string
+        - name: resource_type
+          in: query
+          description: Filter by resource type (e.g. OrganizationConnector)
+          schema:
+            type: string
+        - name: from_date
+          in: query
+          description: Filter entries on or after this ISO 8601 datetime
+          schema:
+            type: string
+            format: date-time
+        - name: to_date
+          in: query
+          description: Filter entries on or before this ISO 8601 datetime
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Paginated audit log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OrganizationAuditLog'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/audit_logs/unified:
+    get:
+      summary: Unified audit log across all three scopes
+      description: >
+        Returns a merged, paginated audit log timeline for the organization, combining
+        organization-level, project-level, and admin audit entries. Results are sorted
+        by `createdAt` DESC across all three source tables (Ruby-level merge, not SQL UNION).
+
+        Each entry includes a `scope` field indicating its source table. Admin logs are
+        filtered to actions directly on this organization (`resource_type=Organization`) or
+        on any project belonging to it (`resource_type=Project`).
+
+        **Performance note:** each source table is capped at 1 000 records per request.
+        Use `scope`, `from`/`to`, `severity`, or `outcome` to narrow results when dealing
+        with high-volume audit trails.
+
+        Requires org owner or global admin role.
+      tags:
+        - Organization Audit Logs
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - name: scope
+          in: query
+          description: Limit results to one source table. Omit to include all three.
+          schema:
+            type: string
+            enum: [organization, project, admin]
+        - name: actor_id
+          in: query
+          description: Filter by actor user ID (maps to actor_id for org/project logs and admin_user_id for admin logs)
+          schema:
+            type: string
+            format: uuid
+        - name: severity
+          in: query
+          description: Filter by severity level
+          schema:
+            type: string
+            enum: [info, warning, critical]
+        - name: outcome
+          in: query
+          description: Filter by outcome
+          schema:
+            type: string
+            enum: [success, failure]
+        - name: from
+          in: query
+          description: Filter entries on or after this ISO 8601 datetime (alias from_date accepted)
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: Filter entries on or before this ISO 8601 datetime (alias to_date accepted)
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Paginated unified audit log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UnifiedAuditLog'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/audit_logs/unified/export:
+    get:
+      summary: Export unified audit log as CSV
+      description: >
+        Exports filtered audit log entries as CSV (up to 50,000 rows per source table).
+        Returns 422 if the result set exceeds that limit — apply date or scope filters to narrow results.
+        Note: tracked_changes and metadata columns are not included in the CSV export.
+        Requires org owner or global admin role.
+      tags:
+        - Organization Audit Logs
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: scope
+          in: query
+          description: Limit results to one source table. Omit to include all three.
+          schema:
+            type: string
+            enum: [organization, project, admin]
+        - name: severity
+          in: query
+          schema:
+            type: string
+            enum: [info, warning, critical]
+        - name: outcome
+          in: query
+          schema:
+            type: string
+            enum: [success, failure]
+        - name: from_date
+          in: query
+          description: Filter entries on or after this ISO 8601 datetime (alias from accepted)
+          schema:
+            type: string
+            format: date-time
+        - name: to_date
+          in: query
+          description: Filter entries on or before this ISO 8601 datetime (alias to accepted)
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: CSV file download
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: Export row limit exceeded (50,000 rows per source table) — apply date or scope filters to narrow results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Export exceeds row limit. Apply date or scope filters to narrow results."
+
+  /api/v1/organizations/{organization_id}/retention_logs:
+    get:
+      summary: List retention purge logs for an organization
+      description: >
+        Returns paginated records of data purge runs for the organization.
+        Each record contains the retention window applied, cutoff timestamp,
+        number of records deleted, and the run status.
+        Requires org owner or global admin role. Other roles receive 403.
+      tags:
+        - Retention
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+      responses:
+        '200':
+          description: Paginated retention purge log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RetentionPurgeLog'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/webhook_deliveries:
+    get:
+      summary: List webhook deliveries
+      description: >
+        Returns paginated webhook delivery history for the organization.
+        Requires org admin or global admin role. Filterable by status, provider, and date range.
+      tags:
+        - Webhook Deliveries
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - name: status
+          in: query
+          description: Filter by delivery status
+          schema:
+            type: string
+            enum: [pending, processing, delivered, failed]
+        - name: provider
+          in: query
+          description: Filter by provider
+          schema:
+            type: string
+            enum: [github, gitlab, bitbucket, jira, linear, slack]
+        - name: date_from
+          in: query
+          description: Filter deliveries created on or after this ISO 8601 datetime
+          schema:
+            type: string
+            format: date-time
+        - name: date_to
+          in: query
+          description: Filter deliveries created on or before this ISO 8601 datetime
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Paginated webhook delivery list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WebhookDelivery'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/webhook_deliveries/{id}/retry:
+    post:
+      summary: Retry a failed webhook delivery
+      description: >
+        Re-enqueues a failed webhook delivery using the stored raw payload from MinIO.
+        Only allowed for deliveries with status "failed". Returns 422 if the delivery
+        is not in a failed state or if the raw payload has expired (MinIO TTL).
+      tags:
+        - Webhook Deliveries
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: id
+          in: path
+          required: true
+          description: Webhook delivery UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '202':
+          description: Delivery re-enqueued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/WebhookDelivery'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Delivery is not retryable (not failed, or payload expired)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
   /api/v1/organizations/{organization_id}/projects:
     get:
       summary: List organization projects
@@ -1866,6 +3120,176 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /api/v1/projects/{id}/link_jira:
+    post:
+      summary: Link a Jira project to this DB90 project
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                connector_id:
+                  type: integer
+                  description: ID of the Jira OrganizationConnector
+                jira_project_key:
+                  type: string
+                  description: Jira project key (e.g. SCRUM)
+              required:
+                - connector_id
+                - jira_project_key
+      responses:
+        '200':
+          description: Jira project linked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      linked:
+                        type: boolean
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/projects/{id}/link_linear:
+    post:
+      summary: Link a Linear project to this DB90 project
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                connector_id:
+                  type: integer
+                  description: ID of the Linear OrganizationConnector
+                linear_project_id:
+                  type: string
+                  description: External Linear project ID (UUID)
+                linear_project_name:
+                  type: string
+                  description: Display name of the Linear project
+              required:
+                - connector_id
+                - linear_project_id
+                - linear_project_name
+      responses:
+        '200':
+          description: Linear project linked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      linked:
+                        type: boolean
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/projects/{id}/sync_issues:
+    post:
+      summary: Trigger synchronous issue sync for Jira or Linear connector
+      description: >
+        Runs the connector sync job inline (perform_now) and returns only after issues
+        are written to the database. Supports both Jira and Linear connectors — whichever
+        is currently linked to the project.
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Sync completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      synced_at:
+                        type: string
+                        format: date-time
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/projects/{id}/favorite:
+    post:
+      summary: Favorite a project
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Project favorited
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      favorited:
+                        type: boolean
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      summary: Unfavorite a project
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Project unfavorited
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      favorited:
+                        type: boolean
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /api/v1/projects/{id}/settings:
     get:
       summary: Get project settings
@@ -1935,6 +3359,191 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /api/v1/projects/{id}/stats:
+    get:
+      summary: Project usage stats
+      description: Returns daily event/cost data plus period totals and a comparison window for delta display.
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 30
+          description: Number of days to look back (default 30)
+      responses:
+        '200':
+          description: Project stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  daily:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                        eventCount:
+                          type: integer
+                        costUsd:
+                          type: number
+                          format: float
+                  totalEvents:
+                    type: integer
+                  totalCost:
+                    type: number
+                    format: float
+                  previousPeriod:
+                    type: object
+                    properties:
+                      totalEvents:
+                        type: integer
+                      totalCost:
+                        type: number
+                        format: float
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/projects/{id}/stats/daily_by_tool:
+    get:
+      summary: Project daily stats by tool
+      description: Returns event counts grouped by the top 3 tools plus an "Other" bucket — shaped for stacked bar charts. Supports day (default) or month granularity. Zero-fills buckets with no activity.
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - name: days
+          in: query
+          description: Rolling window in days (default 30, max 365)
+          schema:
+            type: integer
+            default: 30
+            minimum: 1
+            maximum: 365
+        - name: granularity
+          in: query
+          description: Bucket granularity — day for daily data, month for monthly buckets (days=365 gives 13 buckets: current month + 12 prior)
+          schema:
+            type: string
+            enum: [day, month]
+            default: day
+      responses:
+        '200':
+          description: Daily stats by tool
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    description: One entry per bucket (day or month start); keys are tool names + "Other"
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                      additionalProperties:
+                        type: integer
+                  tools:
+                    type: array
+                    description: Ordered list of tool names present in data (top 3 + "Other")
+                    items:
+                      type: string
+                  granularity:
+                    type: string
+                    enum: [day, month]
+                    description: Granularity used for the response buckets
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================
+  # PROJECT AUDIT LOG ENDPOINTS
+  # ============================================
+  /api/v1/projects/{project_id}/audit_logs:
+    get:
+      summary: List project audit logs
+      description: >
+        Returns paginated audit log entries for the project.
+        Accessible by project admins (owner/admin role on the project), org admins, and global admins.
+        Project members and viewers receive 403.
+
+        **Role-based field visibility:**
+        - Org admins and global admins: all fields including `ipAddress` and `trackedChanges`
+        - Project admins (non-org-admin): `ipAddress` and `trackedChanges` are omitted from the response
+        - Personal project owners: all fields included
+      tags:
+        - Project Audit Logs
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - name: actor_id
+          in: query
+          description: Filter by actor user ID
+          schema:
+            type: string
+            format: uuid
+        - name: log_action
+          in: query
+          description: Filter by action (e.g. settings.update, member.removed)
+          schema:
+            type: string
+        - name: resource_type
+          in: query
+          description: Filter by resource type (e.g. ProjectConnector)
+          schema:
+            type: string
+        - name: from_date
+          in: query
+          description: Filter entries on or after this ISO 8601 datetime
+          schema:
+            type: string
+            format: date-time
+        - name: to_date
+          in: query
+          description: Filter entries on or before this ISO 8601 datetime
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Paginated audit log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProjectAuditLog'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   # ============================================
   # PROJECT MEMBERS ENDPOINTS
   # ============================================
@@ -1951,7 +3560,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [owner, admin, member, viewer]
+            enum: [owner, member, viewer]
       responses:
         '200':
           description: Project members
@@ -1963,12 +3572,12 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: '#/components/schemas/ProjectMembership'
+                      $ref: '#/components/schemas/ProjectMemberListItem'
                   meta:
                     $ref: '#/components/schemas/PaginationMeta'
     post:
       summary: Add project member
-      description: Requires admin role in the project
+      description: Requires organization owner (or personal project owner) for org projects
       tags:
         - Project Members
       parameters:
@@ -1985,7 +3594,7 @@ paths:
                   format: uuid
                 role:
                   type: string
-                  enum: [owner, admin, member, viewer]
+                  enum: [owner, member, viewer]
               required:
                 - user_id
                 - role
@@ -1996,6 +3605,71 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '422':
           $ref: '#/components/responses/ValidationError'
+
+  /api/v1/projects/{project_id}/members/stats:
+    get:
+      summary: Get per-member usage stats for a project
+      description: Returns usage statistics for all project members in the given time window. Restricted to project owners and org owners.
+      tags:
+        - Project Members
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 30
+          description: Number of days to look back (default 30)
+      responses:
+        '200':
+          description: Per-member stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        userId:
+                          type: string
+                          format: uuid
+                        email:
+                          type: string
+                        name:
+                          type: string
+                          nullable: true
+                        role:
+                          type: string
+                          enum: [owner, member, viewer]
+                        eventCount:
+                          type: integer
+                        inputTokens:
+                          type: integer
+                        outputTokens:
+                          type: integer
+                        costUsd:
+                          type: number
+                          format: float
+                        lastEventAt:
+                          type: string
+                          format: date-time
+                          nullable: true
+                        primaryTool:
+                          type: string
+                          nullable: true
+                      required:
+                        - userId
+                        - email
+                        - role
+                        - eventCount
+                        - inputTokens
+                        - outputTokens
+                        - costUsd
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /api/v1/projects/{project_id}/members/{id}:
     get:
@@ -2033,7 +3707,7 @@ paths:
               properties:
                 role:
                   type: string
-                  enum: [owner, admin, member, viewer]
+                  enum: [owner, member, viewer]
               required:
                 - role
       responses:
@@ -2055,6 +3729,34 @@ paths:
           description: Member removed
         '403':
           $ref: '#/components/responses/Forbidden'
+
+  /api/v1/projects/{project_id}/members/{id}/breakdown:
+    get:
+      summary: Project-scoped member activity breakdown
+      description: |
+        Detailed tool and model breakdown for a single project member. All metrics are scoped to `tool_events` for this project only
+        (events from other projects are excluded). Path `id` may be project membership id or member user UUID.
+      tags:
+        - Project Members
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - name: id
+          in: path
+          required: true
+          description: Project membership ID or member user UUID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Member stats for the project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectMemberStats'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   # ============================================
   # REPOSITORY ENDPOINTS
@@ -2201,7 +3903,9 @@ paths:
   /api/v1/projects/{project_id}/repositories/{id}/sync:
     post:
       summary: Trigger repository sync
-      description: Triggers a sync operation for the repository
+      description: >
+        Queues a sync for the repository's organization connector (metadata refresh and,
+        for GitHub/GitLab/Bitbucket, recent activity backfill). Matches POST …/connectors/:id/sync.
       tags:
         - Repositories
       parameters:
@@ -2241,13 +3945,37 @@ paths:
             type: string
         - name: event_type
           in: query
+          style: form
+          explode: false
+          description: Filter by one or more stored event types. Comma-separated (e.g. chat,edit).
           schema:
-            type: string
+            type: array
+            items:
+              type: string
+              enum:
+                - chat
+                - completion
+                - edit
+                - commit
+                - review
+                - test
+                - debug
+                - refactor
+                - documentation
+                - other
+                - issue
+                - comment
+                - sprint
+                - tool_use
         - name: risk_level
           in: query
+          description: |
+            Filter by security classification risk level. `not_none` matches any event with a detected
+            risk (low, medium, high, or critical). Levels are set by the content-scanning classification
+            engine, not by cost.
           schema:
             type: string
-            enum: [critical, high, medium, low, none]
+            enum: [critical, high, medium, low, none, not_none]
         - name: user_id
           in: query
           schema:
@@ -2368,7 +4096,10 @@ paths:
   /api/v1/organizations/{organization_id}/events/unattributed:
     get:
       summary: List unattributed events
-      description: Returns events with no assigned user (user_id is null). Used for the attribution assignment UI.
+      description: >
+        Returns events with no assigned user (user_id is null). Restricted to org admins and above.
+        Each event includes correlation_method and correlation_confidence from metadata (populated by
+        AttributionJob when a candidate was found but below the confidence threshold).
       tags:
         - Events
       parameters:
@@ -2383,8 +4114,36 @@ paths:
             type: string
         - name: event_type
           in: query
+          style: form
+          explode: false
+          description: Filter by one or more stored event types. Comma-separated (e.g. chat,edit).
           schema:
-            type: string
+            type: array
+            items:
+              type: string
+              enum:
+                - chat
+                - completion
+                - edit
+                - commit
+                - review
+                - test
+                - debug
+                - refactor
+                - documentation
+                - other
+                - issue
+                - comment
+                - sprint
+                - tool_use
+        - name: min_confidence
+          in: query
+          description: Filter to events where the best-attempt correlation_confidence is at least this value (0.0–1.0). Events never processed by AttributionJob are excluded when this filter is active.
+          schema:
+            type: number
+            format: float
+            minimum: 0
+            maximum: 1
       responses:
         '200':
           description: Paginated list of unattributed events
@@ -2403,6 +4162,105 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/events/{id}/attribute:
+    post:
+      summary: Manually attribute an event to a user
+      description: >
+        Assigns a user to an unattributed event. Sets correlation_method to "manual" and
+        correlation_confidence to 1.0 in metadata. Restricted to org admins and above.
+        The action is audit-logged.
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - user_id
+              properties:
+                user_id:
+                  type: string
+                  format: uuid
+                  description: ID of the organization member to assign the event to
+      responses:
+        '200':
+          description: Event successfully attributed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ToolEvent'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /api/v1/organizations/{organization_id}/events/attribute_bulk:
+    post:
+      summary: Bulk attribute events to a user
+      description: >
+        Assigns up to 500 events to a single user in one request. All event IDs must belong to
+        the organization. Sets correlation_method to "manual" and correlation_confidence to 1.0
+        for each event. Restricted to org admins and above. The action is audit-logged.
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - event_ids
+                - user_id
+              properties:
+                event_ids:
+                  type: array
+                  maxItems: 500
+                  items:
+                    type: string
+                    format: uuid
+                  description: List of event IDs to attribute (max 500)
+                user_id:
+                  type: string
+                  format: uuid
+                  description: ID of the organization member to assign the events to
+      responses:
+        '200':
+          description: Bulk attribution result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      updated:
+                        type: integer
+                        description: Number of events successfully attributed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
 
   /api/v1/organizations/{organization_id}/events/{id}/audit_trail:
     get:
@@ -2436,6 +4294,155 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+
+  /api/v1/organizations/{organization_id}/events/export:
+    get:
+      summary: Export events as CSV
+      description: >
+        Exports filtered events as a CSV file. When any export query parameters
+        are present, the file begins with an "Applied filters" title row, then one
+        row per active filter, then a blank row, before the column headers. Columns vary by role:
+        members receive base columns only; org admins add user_email;
+        global admins also add model and session_id.
+        If the result set exceeds 100,000 rows the export is queued as a
+        background job and a 202 response is returned with a Link header
+        pointing to the job status endpoint.
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/start_date'
+        - $ref: '#/components/parameters/end_date'
+        - name: tool_name
+          in: query
+          schema:
+            type: string
+        - name: event_type
+          in: query
+          style: form
+          explode: false
+          description: Filter by one or more stored event types. Comma-separated (e.g. chat,edit).
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - chat
+                - completion
+                - edit
+                - commit
+                - review
+                - test
+                - debug
+                - refactor
+                - documentation
+                - other
+                - issue
+                - comment
+                - sprint
+                - tool_use
+        - name: risk_level
+          in: query
+          description: |
+            Filter by security classification risk level. `not_none` matches any event with a detected
+            risk (low, medium, high, or critical). Levels are set by the content-scanning classification
+            engine, not by cost.
+          schema:
+            type: string
+            enum: [critical, high, medium, low, none, not_none]
+        - name: project_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: user_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: model
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: CSV file download
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        '202':
+          description: Export queued — result set exceeds 100,000 rows
+          headers:
+            Link:
+              description: URL of the background job status endpoint
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_id:
+                    type: string
+                  message:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/event_export_jobs/{id}:
+    get:
+      summary: Get export job status
+      description: Returns the status of a background CSV export job.
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Job status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_id:
+                    type: string
+                  status:
+                    type: string
+                    enum: [pending, complete, failed, not_found]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/event_export_jobs/{id}/download:
+    get:
+      summary: Download completed export CSV
+      description: Streams the CSV for a completed export job. Returns 404 if not ready or expired.
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: CSV file download
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   # ============================================
   # AI GATEWAY
@@ -2633,6 +4640,648 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  # ============================================
+  # OPENROUTER WEBHOOK
+  # ============================================
+  /api/v1/webhooks/openrouter_traces:
+    post:
+      summary: Receive OpenRouter Broadcast Webhook OTLP traces
+      description: |
+        Public endpoint that receives per-request telemetry from OpenRouter's
+        Broadcast Webhook feature (Settings > Observability > Webhook).
+
+        OpenRouter sends an OTLP JSON payload after each API call made through a
+        connected account. The connector is resolved via the SHA-256 hash of the
+        API key embedded as a span attribute (`openrouter.api_key_hash`).
+
+        Optional HMAC verification: if `connector.webhook_secret` is set, the
+        request must include a matching `X-Openrouter-Signature` header
+        (HMAC-SHA256 of the raw body).
+
+        Returns 200 for test-connection requests (`X-Test-Connection: true`),
+        202 for accepted payloads, and 200 when the connector is not found
+        (to prevent OpenRouter from retrying unknown-account payloads).
+      tags:
+        - Webhooks
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: OTLP resourceSpans envelope
+              properties:
+                resourceSpans:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      resource:
+                        type: object
+                      scopeSpans:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            spans:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  traceId:
+                                    type: string
+                                  spanId:
+                                    type: string
+                                  name:
+                                    type: string
+                                  startTimeUnixNano:
+                                    type: string
+                                  endTimeUnixNano:
+                                    type: string
+                                  attributes:
+                                    type: array
+                                    items:
+                                      type: object
+                                      properties:
+                                        key:
+                                          type: string
+                                        value:
+                                          type: object
+      responses:
+        '200':
+          description: Test connection acknowledged or connector not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received:
+                    type: boolean
+        '202':
+          description: Trace accepted and queued for processing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received:
+                    type: boolean
+        '400':
+          description: Invalid JSON payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid HMAC signature
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unexpected server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/integrations/mcp/exchange:
+    post:
+      summary: Exchange Keycloak access token for MCP ingest token(s)
+      description: |
+        Mints fresh `UserToolAccount` ingest token(s) for the JWT-authenticated user
+        and the requested ingest tool(s). Accounts are scoped to one of the caller's
+        organization memberships: use optional header **`X-Organization-ID`** to pick a
+        specific org the user belongs to; when that header is omitted, the exchange uses
+        the user's oldest membership (by `organization_memberships.created_at`). Call with
+        `Authorization: Bearer` carrying the Keycloak access token from RFC 8628 device
+        authorization.
+
+        Pass **`tool_name`** for a legacy single-account exchange, **or**
+        **`tools`** to rotate/create multiple connectors in one request (atomic under
+        a membership advisory lock).
+
+        Responses always include **`accounts`** with per-tool `ingestToken` entries.
+        When exactly one tool is provisioned the payload also echoes flat
+        **`ingestToken`** + **`toolName`** for MCP clients expecting the original shape.
+      tags:
+        - Integrations
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/X-Organization-ID-Optional'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  properties:
+                    tool_name:
+                      type: string
+                      enum: [claude_code, cursor]
+                    device_label:
+                      type: string
+                      description: Optional client context (not persisted in this version)
+                  required:
+                    - tool_name
+                - type: object
+                  properties:
+                    tools:
+                      type: array
+                      description: Duplicate tools are stripped server-side via `uniq`
+                      minItems: 1
+                      items:
+                        type: string
+                        enum: [claude_code, cursor]
+                    device_label:
+                      type: string
+                      description: Optional client context (not persisted in this version)
+                  required:
+                    - tools
+            examples:
+              single_legacy:
+                summary: Legacy single-token exchange
+                value:
+                  tool_name: claude_code
+                  device_label: db90-dev
+              multi:
+                summary: Dual-token MCP install
+                value:
+                  tools: [claude_code, cursor]
+                  device_label: db90-mcp
+      responses:
+        '201':
+          description: Ingest token(s) minted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      ingestToken:
+                        type: string
+                        description: Duplicate of the lone tool token — present only when provisioning a single ingest account
+                      toolName:
+                        type: string
+                        enum: [claude_code, cursor]
+                        description: Echoed ingest tool identifier when only one token is rotated
+                      accounts:
+                        type: object
+                        additionalProperties:
+                          type: object
+                          properties:
+                            ingestToken:
+                              type: string
+                          required:
+                            - ingestToken
+                      ingestHost:
+                        type: string
+                        format: uri
+                      organizationId:
+                        type: string
+                    required:
+                      - ingestHost
+                      - organizationId
+                      - accounts
+                required:
+                  - data
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: |
+            Forbidden — no usable organization membership, user is not a member of the
+            organization given in `X-Organization-ID`, or `UserToolAccountPolicy` denied
+            create for the resolved membership.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  # ============================================
+  # INGEST ENDPOINT (ingest token auth)
+  # ============================================
+  /api/v1/ingest/events:
+    post:
+      summary: Ingest a tool event
+      description: |
+        Accepts a single tool-usage event from a CLI connector (`db90-claude`, `db90-cursor`).
+        Authenticated with a per-`UserToolAccount` Bearer ingest token (not a Keycloak JWT).
+
+        The endpoint also accepts raw Claude Code hook payloads (`PostToolUse` and `Stop`),
+        which are mapped to structured events server-side.
+
+        On success the event is stored in MinIO and queued for sanitization via a Temporal
+        workflow. A `202 Accepted` is returned immediately — the event may not be persisted
+        to `tool_events` yet.
+
+        **Rate limiting:** Each organization is limited to 1,000 events/minute by default
+        (configurable per org via `OrganizationSetting`). Excess requests receive `429` with
+        a `Retry-After: 60` header.
+
+        **Monthly quota:** Organizations may have a monthly event quota set. Once the quota
+        is reached, all further requests return `429` with `code: "quota_exceeded"` until the
+        next calendar month.
+      tags:
+        - Ingest
+      security:
+        - ingest_token_auth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: |
+                Standard event payload. Also accepts raw Claude Code hook payloads
+                (`session_id` + `tool_input`/`tool_response` for PostToolUse, or
+                `session_id` + `stop_hook_active` for Stop hooks).
+              properties:
+                event_type:
+                  type: string
+                  example: completion
+                model:
+                  type: string
+                  example: claude-3-5-sonnet
+                tokens_in:
+                  type: integer
+                  example: 1024
+                tokens_out:
+                  type: integer
+                  example: 512
+                tokens_total:
+                  type: integer
+                  example: 1536
+                cost_usd:
+                  type: number
+                  format: float
+                  example: 0.0042
+                duration_ms:
+                  type: integer
+                  example: 1200
+                occurred_at:
+                  type: string
+                  format: date-time
+                  example: "2026-05-11T14:00:00Z"
+                project_id:
+                  type: string
+                  format: uuid
+                  description: Optional. Stripped silently if not accessible to the token's org/user.
+                metadata:
+                  type: object
+                  additionalProperties: true
+      responses:
+        '202':
+          description: Event accepted for processing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      accepted:
+                        type: boolean
+                        example: true
+                      rawEventKey:
+                        type: string
+                        description: MinIO object key for the raw event payload
+                        example: events/2026/05/11/abc123.json
+                      workflowId:
+                        type: string
+                        description: Temporal workflow ID (absent if Temporal unavailable)
+                      fallback:
+                        type: boolean
+                        description: Present and true when Temporal unavailable and event was inserted directly
+                    required:
+                      - accepted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          description: |
+            Rate limit exceeded or monthly quota reached.
+            Check the `code` field to distinguish the two cases.
+            Respect the `Retry-After` header before retrying.
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait before retrying. Capped at 3600 for quota exceeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+
+  /admin/retention_logs:
+    get:
+      summary: List all retention purge logs (platform admin)
+      description: >
+        Returns paginated records of all data purge runs across all organizations.
+        Requires platform admin (global_admin) role.
+      tags:
+        - Admin
+        - Retention
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+      responses:
+        '200':
+          description: Paginated retention purge log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RetentionPurgeLog'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      summary: Create a notification route
+      description: Creates a routing rule for a notification type. Requires owner role.
+      tags:
+        - Notification Routes
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - notification_type
+                - recipient_type
+              properties:
+                notification_type:
+                  type: string
+                  enum: [cost_alert, token_alert, retention_warning, risk_alert]
+                recipient_type:
+                  type: string
+                  enum: [role, user]
+                recipient_role:
+                  type: string
+                  nullable: true
+                  description: Required when recipient_type is 'role'. Must be one of owner, member, viewer.
+                recipient_user_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: Required when recipient_type is 'user'. User must be an org member.
+                enabled:
+                  type: boolean
+                  default: true
+      responses:
+        '201':
+          description: Notification route created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/NotificationRoute'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/notification_routes:
+    get:
+      summary: List notification routes
+      description: Returns all notification routes for the organization. Requires owner role.
+      tags:
+        - Notification Routes
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+      responses:
+        '200':
+          description: Notification routes list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NotificationRoute'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      summary: Create a notification route
+      description: Creates a routing rule for a notification type. Requires owner role.
+      tags:
+        - Notification Routes
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - notification_type
+                - recipient_type
+              properties:
+                notification_type:
+                  type: string
+                  enum: [cost_alert, token_alert, retention_warning, risk_alert]
+                recipient_type:
+                  type: string
+                  enum: [role, user]
+                recipient_role:
+                  type: string
+                  nullable: true
+                  description: Required when recipient_type is 'role'. Must be one of owner, member, viewer.
+                recipient_user_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: Required when recipient_type is 'user'. User must be an org member.
+                enabled:
+                  type: boolean
+                  default: true
+      responses:
+        '201':
+          description: Notification route created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/NotificationRoute'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/notification_routes/{id}:
+    patch:
+      summary: Update a notification route
+      description: Update fields (e.g. enable/disable) on a route. Requires owner role.
+      tags:
+        - Notification Routes
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                notification_type:
+                  type: string
+                  enum: [cost_alert, token_alert, retention_warning, risk_alert]
+                recipient_type:
+                  type: string
+                  enum: [role, user]
+                recipient_role:
+                  type: string
+                  nullable: true
+                recipient_user_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+      responses:
+        '200':
+          description: Notification route updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/NotificationRoute'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      summary: Delete a notification route
+      description: Removes a routing rule. Requires owner role.
+      tags:
+        - Notification Routes
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204':
+          description: No Content
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/organizations/{organization_id}/organization_provider_settings:
+    get:
+      summary: List org provider settings
+      description: Returns persisted enable/disable settings for providers. Missing providers default to enabled. Accessible by all org members.
+      tags:
+        - Organization Provider Settings
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      responses:
+        '200':
+          description: Provider settings list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OrganizationProviderSetting'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/organization_provider_settings/{provider}:
+    patch:
+      summary: Enable or disable a provider for the org
+      description: Upserts the enable/disable setting for a single provider. Requires owner role.
+      tags:
+        - Organization Provider Settings
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: provider
+          in: path
+          required: true
+          description: Provider key (e.g. github, anthropic, slack)
+          schema:
+            type: string
+            enum: [github, gitlab, bitbucket, jira, linear, openrouter, anthropic, openai, gemini, slack, github_copilot, claude, figma, cursor, google]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [organization_provider_setting]
+              properties:
+                organization_provider_setting:
+                  type: object
+                  required: [enabled]
+                  properties:
+                    enabled:
+                      type: boolean
+      responses:
+        '200':
+          description: Updated provider setting
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OrganizationProviderSetting'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
 # ============================================
 # COMPONENTS
 # ============================================
@@ -2675,6 +5324,17 @@ components:
       in: header
       required: true
       description: Organization context for the request
+      schema:
+        type: string
+        format: uuid
+    X-Organization-ID-Optional:
+      name: X-Organization-ID
+      in: header
+      required: false
+      description: |
+        Optional organization selector. On MCP token exchange, when present and the
+        authenticated user belongs to that organization, ingest accounts are scoped to
+        that membership; when omitted, the exchange uses the user's oldest membership.
       schema:
         type: string
         format: uuid
@@ -2743,6 +5403,93 @@ components:
             $ref: '#/components/schemas/ValidationError'
 
   schemas:
+    OrganizationProviderSetting:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        provider:
+          type: string
+          enum: [github, gitlab, bitbucket, jira, linear, openrouter, anthropic, openai, gemini, slack, github_copilot, claude, figma, cursor, google]
+        enabled:
+          type: boolean
+
+    PricingEntry:
+      type: object
+      properties:
+        name:
+          type: string
+          example: gpt-4o
+        input_per_mtok:
+          type: number
+          format: float
+          description: Input price in USD per million tokens
+          example: 2.5
+        output_per_mtok:
+          type: number
+          format: float
+          description: Output price in USD per million tokens
+          example: 10.0
+      required:
+        - name
+        - input_per_mtok
+        - output_per_mtok
+
+    ModelPricingOverride:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        model_pattern:
+          type: string
+          description: Substring pattern matched against the model name (e.g. "gpt-4o-ft-acme")
+          example: gpt-4o-ft-acme
+        input_per_mtok:
+          type: number
+          format: float
+          description: Override input price in USD per million tokens
+          example: 1.5
+        output_per_mtok:
+          type: number
+          format: float
+          description: Override output price in USD per million tokens
+          example: 6.0
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - model_pattern
+        - input_per_mtok
+        - output_per_mtok
+
+    ModelPricingOverrideInput:
+      type: object
+      properties:
+        model_pattern:
+          type: string
+          description: Substring pattern matched against the model name
+          example: gpt-4o-ft-acme
+        input_per_mtok:
+          type: number
+          format: float
+          description: Override input price in USD per million tokens
+          example: 1.5
+        output_per_mtok:
+          type: number
+          format: float
+          description: Override output price in USD per million tokens
+          example: 6.0
+      required:
+        - model_pattern
+        - input_per_mtok
+        - output_per_mtok
+
     Error:
       type: object
       properties:
@@ -2752,6 +5499,34 @@ components:
           type: string
       required:
         - error
+
+    RateLimitError:
+      type: object
+      description: |
+        Returned with HTTP 429. The `code` field distinguishes rate-limit from quota errors.
+        `rate_limit_exceeded` — per-minute request rate exceeded; retry after 60 seconds.
+        `quota_exceeded` — monthly event quota reached; retry after `retry_after` seconds (capped at 3600).
+      properties:
+        error:
+          type: string
+          example: Rate Limited
+        code:
+          type: string
+          enum: [rate_limit_exceeded, quota_exceeded]
+          example: rate_limit_exceeded
+        retry_after:
+          type: integer
+          description: Seconds to wait before retrying. Matches the Retry-After response header.
+          example: 60
+        quota_resets_at:
+          type: string
+          format: date-time
+          description: ISO8601 timestamp of when the monthly quota resets. Present only when code is quota_exceeded.
+          example: "2026-06-01T00:00:00Z"
+      required:
+        - error
+        - code
+        - retry_after
 
     ValidationError:
       type: object
@@ -2784,6 +5559,307 @@ components:
         - totalPages
         - totalCount
         - perPage
+
+    AuditLogActor:
+      type: object
+      nullable: true
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          nullable: true
+      required:
+        - id
+        - email
+
+    WebhookDelivery:
+      type: object
+      description: A single webhook delivery tracking record. Captures lifecycle from receipt through sync job completion.
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationConnectorId:
+          type: string
+          format: uuid
+        provider:
+          type: string
+          enum: [github, gitlab, bitbucket, jira, linear, slack]
+        eventType:
+          type: string
+          description: Webhook event type (e.g. push, pull_request, jira:issue_created)
+        rawEventKey:
+          type: string
+          description: MinIO key for the stored raw payload
+        status:
+          type: string
+          enum: [pending, processing, delivered, failed]
+        attempts:
+          type: integer
+          minimum: 0
+        lastAttemptedAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastError:
+          type: string
+          nullable: true
+          description: Error message from the most recent failed attempt
+        deliveredAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    OrganizationAuditLog:
+      type: object
+      description: Organization-level audit log entry. All fields visible to org admins and global admins.
+      properties:
+        id:
+          type: string
+          format: uuid
+        action:
+          type: string
+          example: settings.update
+        resourceType:
+          type: string
+          nullable: true
+        resourceId:
+          type: string
+          format: uuid
+          nullable: true
+        trackedChanges:
+          type: object
+          description: JSON diff of before/after values for the audited resource
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+        ipAddress:
+          type: string
+          nullable: true
+          description: IP address of the actor at the time of the action
+        userAgent:
+          type: string
+          nullable: true
+          description: Browser or client user-agent string at the time of the action
+        severity:
+          type: string
+          nullable: true
+          enum: [info, warning, critical]
+          description: Severity classification of the action
+        outcome:
+          type: string
+          nullable: true
+          enum: [success, failure]
+          description: Whether the action completed successfully
+        createdAt:
+          type: string
+          format: date-time
+        actor:
+          $ref: '#/components/schemas/AuditLogActor'
+      required:
+        - id
+        - action
+        - trackedChanges
+        - metadata
+        - ipAddress
+        - createdAt
+
+    UnifiedAuditLog:
+      type: object
+      description: >
+        Merged audit log entry sourced from one of three tables: organization audit logs,
+        project audit logs, or admin audit logs. The `scope` field identifies the source.
+        Admin entries are scoped to actions on this organization or its projects.
+      properties:
+        id:
+          type: string
+          format: uuid
+        scope:
+          type: string
+          enum: [organization, project, admin]
+          description: Source table for this entry
+        action:
+          type: string
+          example: settings.update
+        resourceType:
+          type: string
+          nullable: true
+        resourceId:
+          type: string
+          format: uuid
+          nullable: true
+        trackedChanges:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+        ipAddress:
+          type: string
+          nullable: true
+        userAgent:
+          type: string
+          nullable: true
+        severity:
+          type: string
+          nullable: true
+          enum: [info, warning, critical]
+        outcome:
+          type: string
+          nullable: true
+          enum: [success, failure]
+        createdAt:
+          type: string
+          format: date-time
+        actor:
+          $ref: '#/components/schemas/AuditLogActor'
+      required:
+        - id
+        - scope
+        - action
+        - trackedChanges
+        - metadata
+        - createdAt
+
+    RetentionPurgeLog:
+      type: object
+      description: >
+        Tamper-evident record of a data retention purge run.
+        Append-only — records are never updated or deleted.
+      properties:
+        id:
+          type: integer
+        organizationId:
+          type: integer
+          description: ID of the organization whose data was purged
+        projectId:
+          type: integer
+          nullable: true
+          description: ID of the project (null for org-level purge)
+        retentionPolicyType:
+          type: string
+          enum: [org, project]
+          description: Whether the purge was applied at org or project level
+        retentionDaysApplied:
+          type: integer
+          description: Number of retention days used as the window
+        cutoffTimestamp:
+          type: string
+          format: date-time
+          description: Datetime before which records were deleted
+        recordsDeleted:
+          type: integer
+          description: Number of records deleted in this run
+        jobRunAt:
+          type: string
+          format: date-time
+          description: Datetime when the job ran
+        status:
+          type: string
+          enum: [success, partial, failed]
+        errorMessage:
+          type: string
+          nullable: true
+          description: Error details if status is failed or partial
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - organizationId
+        - retentionPolicyType
+        - retentionDaysApplied
+        - cutoffTimestamp
+        - recordsDeleted
+        - jobRunAt
+        - status
+        - createdAt
+
+    RetentionPreview:
+      type: object
+      description: >
+        Upcoming purge cutoff and estimated tool_events row count (Alba camelCase keys).
+      properties:
+        cutoffDate:
+          type: string
+          format: date
+          nullable: true
+          description: ISO 8601 date before which records will be deleted (null if retention is forever)
+        estimatedRecords:
+          type: integer
+          nullable: true
+          description: Estimated number of tool_events to be deleted (null if query timed out)
+      required:
+        - cutoffDate
+        - estimatedRecords
+
+    ProjectAuditLog:
+      type: object
+      description: >
+        Project-level audit log entry.
+        `ipAddress`, `trackedChanges`, and `userAgent` are omitted (key absent, not null) for
+        project-admin callers who are not org admins. Org admins and global admins receive all fields.
+      properties:
+        id:
+          type: string
+          format: uuid
+        action:
+          type: string
+          example: settings.update
+        resourceType:
+          type: string
+          nullable: true
+        resourceId:
+          type: string
+          format: uuid
+          nullable: true
+        trackedChanges:
+          type: object
+          description: JSON diff of before/after values. Omitted for project-admin callers (non-org-admin).
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+        ipAddress:
+          type: string
+          nullable: true
+          description: IP of the actor at action time. Omitted for project-admin callers (non-org-admin).
+        userAgent:
+          type: string
+          nullable: true
+          description: Browser or client user-agent string. Omitted for project-admin callers (non-org-admin).
+        severity:
+          type: string
+          nullable: true
+          enum: [info, warning, critical]
+          description: Severity classification of the action
+        outcome:
+          type: string
+          nullable: true
+          enum: [success, failure]
+          description: Whether the action completed successfully
+        createdAt:
+          type: string
+          format: date-time
+        actor:
+          $ref: '#/components/schemas/AuditLogActor'
+      required:
+        - id
+        - action
+        - metadata
+        - createdAt
 
     User:
       type: object
@@ -2882,7 +5958,7 @@ components:
           properties:
             userRole:
               type: string
-              enum: [owner, admin, member, viewer]
+              enum: [owner, member, viewer]
 
     OrganizationMembership:
       type: object
@@ -2895,7 +5971,7 @@ components:
           format: uuid
         role:
           type: string
-          enum: [owner, admin, member, viewer]
+          enum: [owner, member, viewer]
         user:
           $ref: '#/components/schemas/UserMinimal'
         createdAt:
@@ -2912,6 +5988,30 @@ components:
         - createdAt
         - updatedAt
 
+    OrganizationMemberListItem:
+      allOf:
+        - $ref: '#/components/schemas/OrganizationMembership'
+        - type: object
+          properties:
+            total_tokens:
+              type: integer
+              description: Total tokens consumed by this member in the organization
+            total_events:
+              type: integer
+              description: Total tool events generated by this member in the organization
+            total_cost:
+              type: number
+              format: float
+              description: Total cost (USD) attributed to this member in the organization
+            last_active_at:
+              type: string
+              format: date-time
+              nullable: true
+              description: Most recent tool event time for this member within the organization (MAX(occurred_at)); null if no events
+            cli_connected:
+              type: boolean
+              description: True when the member has at least one active user_tool_account on their organization membership
+
     OrganizationConnector:
       type: object
       description: Connector credentials (tokens are never exposed in responses)
@@ -2924,9 +6024,13 @@ components:
           format: uuid
         connectorType:
           type: string
-          enum: [github, gitlab, bitbucket, jira, linear, openrouter, anthropic, openai, gemini]
+          enum: [github, gitlab, bitbucket, jira, linear, openrouter, anthropic, openai, gemini, slack, github_copilot, cursor]
         isActive:
           type: boolean
+        label:
+          type: string
+          nullable: true
+          description: User-supplied label to distinguish multiple connectors of the same provider
         externalAccountId:
           type: string
           nullable: true
@@ -2952,6 +6056,74 @@ components:
           type: boolean
         aiProvider:
           type: boolean
+        copilotConnector:
+          type: boolean
+        seatCount:
+          type: integer
+          nullable: true
+        overageSpendCents:
+          type: number
+          format: float
+          nullable: true
+          description: Cursor on-demand spend excluding included allowance (overage), in cents. Null for non-Cursor connectors.
+        overallSpendCents:
+          type: number
+          format: float
+          nullable: true
+          description: Cursor total spend including included allowance, in cents. Null for non-Cursor connectors.
+        fastPremiumRequests:
+          type: integer
+          nullable: true
+          description: Cursor fast/premium request count for the current billing cycle. Null for non-Cursor connectors.
+        billingCycleStart:
+          type: string
+          format: date-time
+          nullable: true
+          description: ISO8601 start of the current Cursor billing cycle. Null for non-Cursor connectors.
+        activeUsersCount:
+          type: integer
+        meteredUnitsUsed:
+          type: integer
+          nullable: true
+          description: Total units consumed in the current billing period (Copilot only)
+        includedUnits:
+          type: integer
+          nullable: true
+          description: Units included in plan without overage charge (Copilot only)
+        overageUnits:
+          type: integer
+          nullable: true
+          description: Units consumed above the included allowance (Copilot only)
+        overageCostUsd:
+          type: number
+          format: float
+          nullable: true
+          description: Overage cost in USD for the current billing period (Copilot only)
+        billingModel:
+          type: string
+          nullable: true
+          enum: [ai_credits, premium_requests]
+          description: Which GitHub billing model is active for this org (Copilot only)
+        billingPeriodStart:
+          type: string
+          nullable: true
+          description: ISO 8601 date for start of current billing period (Copilot only)
+        billingPeriodEnd:
+          type: string
+          nullable: true
+          description: ISO 8601 date for end of current billing period (Copilot only)
+        repositoryCount:
+          type: integer
+        syncedEventCount:
+          type: integer
+        lastEventAt:
+          type: string
+          format: date-time
+          nullable: true
+        scope:
+          type: string
+          enum: [org, project, persona]
+          example: org
         createdAt:
           type: string
           format: date-time
@@ -2963,6 +6135,7 @@ components:
         - organizationId
         - connectorType
         - isActive
+        - scope
         - createdAt
         - updatedAt
 
@@ -2975,12 +6148,114 @@ components:
         organizationId:
           type: string
           format: uuid
-        retentionDays:
+        rawEventTtl:
+          type: string
+        toolEventsRetention:
+          type: string
+        hourlyAggregateRetention:
+          type: string
+        dailyAggregateRetention:
+          type: string
+        retentionReason:
+          type: string
+          nullable: true
+        updatedById:
+          type: string
+          format: uuid
+          nullable: true
+        costThresholdCents:
           type: integer
-        autoDeleteEvents:
+          nullable: true
+        tokenThreshold:
+          type: integer
+          nullable: true
+        alertEnabled:
           type: boolean
-        anonymizeAfterRetention:
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ProjectRetentionPolicy:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        rawEventTtl:
+          type: string
+        toolEventsRetention:
+          type: string
+        hourlyAggregateRetention:
+          type: string
+        dailyAggregateRetention:
+          type: string
+        retentionReason:
+          type: string
+          nullable: true
+        updatedById:
+          type: string
+          format: uuid
+          nullable: true
+        costThresholdCents:
+          type: integer
+          nullable: true
+        tokenThreshold:
+          type: integer
+          nullable: true
+        alertEnabled:
           type: boolean
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    UserPersonalSettings:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          nullable: true
+        costThresholdCents:
+          type: integer
+          nullable: true
+        tokenThreshold:
+          type: integer
+          nullable: true
+        alertEmail:
+          type: boolean
+        alertSlack:
+          type: boolean
+
+    MeToolAccountMetadata:
+      type: object
+      description: Ingest tool account row for Settings (no token values)
+      properties:
+        id:
+          type: string
+          format: uuid
+        toolName:
+          type: string
+          enum: [claude_code, cursor]
+        displayName:
+          type: string
+          example: Claude Code
+        isActive:
+          type: boolean
+        lastUsedAt:
+          type: string
+          format: date-time
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -2989,10 +6264,9 @@ components:
           format: date-time
       required:
         - id
-        - organizationId
-        - retentionDays
-        - autoDeleteEvents
-        - anonymizeAfterRetention
+        - toolName
+        - displayName
+        - isActive
         - createdAt
         - updatedAt
 
@@ -3009,12 +6283,16 @@ components:
         toolName:
           type: string
           enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom]
-        isActive:
-          type: boolean
-        externalAccountId:
+        connectionState:
+          type: string
+          enum: [inactive, active, waiting_for_connection]
+        externalUserId:
           type: string
           nullable: true
-        externalAccountName:
+        externalUsername:
+          type: string
+          nullable: true
+        externalEmail:
           type: string
           nullable: true
         tokenExpiresAt:
@@ -3023,6 +6301,14 @@ components:
           nullable: true
         tokenExpired:
           type: boolean
+        lastUsedAt:
+          type: string
+          format: date-time
+          nullable: true
+        scope:
+          type: string
+          enum: [org, project, persona]
+          example: persona
         createdAt:
           type: string
           format: date-time
@@ -3033,7 +6319,8 @@ components:
         - id
         - organizationMembershipId
         - toolName
-        - isActive
+        - connectionState
+        - scope
         - createdAt
         - updatedAt
 
@@ -3077,6 +6364,21 @@ components:
         updatedAt:
           type: string
           format: date-time
+        eventCount:
+          type: integer
+          description: >
+            Lifetime count of attributed tool events for this project (tool_events.project_id).
+        totalCostUsd:
+          type: number
+          format: float
+          description: >
+            Lifetime sum of attributed event costs in USD for this project.
+        lastEventAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: >
+            Timestamp of the most recent attributed tool event, or null when none exist.
       required:
         - id
         - name
@@ -3099,6 +6401,32 @@ components:
               type: integer
             repositoryCount:
               type: integer
+            sourceControlSummary:
+              type: array
+              items:
+                $ref: '#/components/schemas/SourceControlSummary'
+
+    SourceControlSummary:
+      type: object
+      properties:
+        provider:
+          type: string
+        repositoryCount:
+          type: integer
+        commitCount:
+          type: integer
+        reviewCount:
+          type: integer
+        pipelineCount:
+          type: integer
+        lastActivityAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastSyncAt:
+          type: string
+          format: date-time
+          nullable: true
 
     OrganizationMinimal:
       type: object
@@ -3126,9 +6454,27 @@ components:
           format: uuid
         role:
           type: string
-          enum: [owner, admin, member, viewer]
-        user:
-          $ref: '#/components/schemas/UserMinimal'
+          enum: [owner, member, viewer]
+        userId:
+          type: string
+          format: uuid
+        email:
+          type: string
+          nullable: true
+        name:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+        joinedAt:
+          type: string
+          format: date-time
+        createdById:
+          type: string
+          format: uuid
+          nullable: true
+          description: UUID of the user who granted this membership (typically an org owner)
         createdAt:
           type: string
           format: date-time
@@ -3138,10 +6484,71 @@ components:
       required:
         - id
         - projectId
+        - userId
         - role
-        - user
         - createdAt
         - updatedAt
+
+    ProjectMemberListItem:
+      allOf:
+        - $ref: '#/components/schemas/ProjectMembership'
+        - type: object
+          properties:
+            total_tokens:
+              type: integer
+              description: Total tokens (tokens_in + tokens_out) for this member in this project
+            total_events:
+              type: integer
+            total_cost:
+              type: number
+              format: float
+            last_active_at:
+              type: string
+              format: date-time
+              nullable: true
+              description: Most recent tool event for this member in this project; null if none
+            cli_connected:
+              type: boolean
+              description: True when the member has at least one active user_tool_account on their organization membership for this project's organization
+
+    ProjectMemberStats:
+      type: object
+      properties:
+        total_events:
+          type: integer
+        total_cost:
+          type: number
+          format: float
+        events_today:
+          type: integer
+        events_this_week:
+          type: integer
+        events_this_month:
+          type: integer
+        most_used_tool:
+          type: string
+          nullable: true
+        tokens:
+          type: object
+          properties:
+            total_in:
+              type: integer
+            total_out:
+              type: integer
+            total:
+              type: integer
+        tool_breakdown:
+          type: array
+          items:
+            type: object
+        model_breakdown:
+          type: array
+          items:
+            type: object
+        daily_activity:
+          type: array
+          items:
+            type: object
 
     Repository:
       type: object
@@ -3271,6 +6678,50 @@ components:
         attribution:
           type: string
           enum: [user, organization, unknown]
+        correlationMethod:
+          type: string
+          nullable: true
+          description: Method used (or attempted) to correlate the event to a user (e.g. "email", "machine_id", "manual")
+        correlationConfidence:
+          type: number
+          format: float
+          nullable: true
+          description: Confidence score (0.0–1.0) for the best correlation attempt
+        jiraTicket:
+          type: string
+          nullable: true
+          description: Jira ticket key the event relates to — client-supplied or server-extracted from branch/commit metadata (AIX-261)
+        prNumber:
+          type: integer
+          nullable: true
+          description: Pull request number correlated from the event's commit via the GitHub connector
+        prUrl:
+          type: string
+          nullable: true
+          description: HTML URL of the correlated pull request
+        branch:
+          type: string
+          nullable: true
+          description: Git branch from event metadata (branch or branch_name key)
+        suggestedUser:
+          type: object
+          nullable: true
+          description: >
+            Candidate user resolved from metadata.candidate_user_id. Only populated on the
+            unattributed events endpoint when a candidate was identified by AttributionJob.
+          properties:
+            id:
+              type: string
+              format: uuid
+            email:
+              type: string
+              format: email
+            name:
+              type: string
+              nullable: true
+            avatarUrl:
+              type: string
+              nullable: true
         securityFindings:
           type: array
           items:
@@ -3292,6 +6743,9 @@ components:
               type: string
               format: email
             name:
+              type: string
+              nullable: true
+            avatarUrl:
               type: string
               nullable: true
         project:
@@ -3453,3 +6907,36 @@ components:
               type: integer
             totalTokens:
               type: integer
+
+    NotificationRoute:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        notificationType:
+          type: string
+          enum: [cost_alert, token_alert, retention_warning, risk_alert]
+        recipientType:
+          type: string
+          enum: [role, user]
+        recipientRole:
+          type: string
+          nullable: true
+          description: Present when recipientType is 'role'. One of owner, member, viewer.
+        recipientUserId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Present when recipientType is 'user'.
+        enabled:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time

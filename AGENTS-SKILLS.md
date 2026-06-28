@@ -13,28 +13,6 @@ Run `/help-tooling` at any time for a live, filesystem-sourced catalog.
 
 ---
 
-## Executor / Advisor Pattern
-
-This project uses the **Advisor Strategy**: Sonnet executes, Opus advises. This is a standing rule in `CLAUDE.md` — it applies to all sessions automatically, not just specific commands.
-
-**When Sonnet must escalate to Opus before proceeding:**
-- Writing or modifying source files that others depend on (components, controllers, migrations, services, policies)
-- Making an architectural decision (new pattern, new abstraction, data model change, choosing between approaches)
-- A single task touches more than 3 files
-- Genuine uncertainty about which approach is correct
-
-**How escalation works:**
-```
-Agent(model=opus): what you're about to do, key decision points, proposed approach
-→ Execute within the guidance returned. Do not deviate without re-escalating.
-```
-
-**Do not escalate for:** reference lookups, single-file edits following an established pattern, lint fixes, typo corrections, test additions matching existing patterns, or commands explicitly marked as reference-only (no file writes).
-
-The `component-builder` agent is the clearest example of this pattern in action — it has hard-coded tripwires that pause execution and call an Opus advisor before writing any substantive change.
-
----
-
 ## Quick Reference
 
 | Name | Type | Activates when | Purpose |
@@ -49,7 +27,6 @@ The `component-builder` agent is the clearest example of this pattern in action 
 | `/tailwind-v4-shadcn` | Command | `/tailwind-v4-shadcn` | Reference guide for Tailwind v4 + shadcn/ui setup and v4 migration pitfalls |
 | `/review-architecture` | Command | `/review-architecture` | Deep architectural review (Staff Engineer lens): maintainability, security, performance across backend and frontend |
 | `/review-commit` | Command | `/review-commit` | Pre-push gate: Step 0 runs `convention-check.ts` (branch + commit format); then linters, tests, swagger-auditor, ui-visual-reviewer; reports READY TO PUSH or BLOCK |
-| `/review-changes` | Command | `/review-changes` | Risk-scored review via `risk-score.ts`: weighted score per file (tier + 2-hop callers + churn + method coverage) → Opus advisor if HIGH/CRITICAL |
 | `/typescript-react-reviewer` | Command | `/typescript-react-reviewer` | TypeScript + React 19 specific review: critical bugs, anti-patterns, strict TS, React 19 pitfalls |
 | `/debug-issue` | Command | `/debug-issue` | Systematic debugging: grep for symbols → trace call sites → read files → check recent commits → find test coverage |
 | `/explore-codebase` | Command | `/explore-codebase` | Codebase navigation using Glob for file discovery, Grep for symbols, Read for file content |
@@ -66,8 +43,7 @@ The `component-builder` agent is the clearest example of this pattern in action 
 | `swagger-sync` | Skill | Edit `controllers/**` or `routes.rb` | Injects the Swagger hard-rule: update `swagger.yaml` in the same commit |
 | `actionpolicy-check` | Skill | Edit any `*_controller.rb` | Injects the `authorize!` requirement at the top of every controller action |
 | `design-system-guide` | Skill | Edit `packages/web/src/components/ui/**` | Injects token rules (no raw hex), dark mode parity, a11y requirements, Figma MCP hooks |
-| `on-edit-lint` | Hook | Every `Edit` or `Write` tool call | Prints green Haiku banner; runs `bundle exec rubocop` on `.rb` files; `npx eslint` on `.ts/.tsx` files — advisory, always exits 0 |
-| `model-indicator` | Hook | Every `Agent` tool call (PreToolUse) | Prints colored model banner: red = Opus, yellow = Sonnet, green = Haiku. Dual mode: stderr (hook) + stdout (direct Bash) |
+| `on-edit-lint` | Hook | Every `Edit` or `Write` tool call | Runs `bundle exec rubocop` on `.rb` files; `npx eslint` on `.ts/.tsx` files — advisory, always exits 0 |
 
 ---
 
@@ -238,7 +214,7 @@ Commands are invoked manually with `/command-name`. They run in the main convers
 **`/migrate-component <ComponentName>`**  
 Orchestrates the full Figma → code pipeline for a single UI component.  
 **Spawns:** Figma MCP → `component-builder` → `component-reviewer` → `ui-visual-reviewer`  
-**Deliverable:** Updated component files with a final visual review report. Pipeline pauses at `component-builder` tripwires for advisor input before writing.
+**Deliverable:** Updated component files with a final visual review report. Pipeline pauses at `component-builder` tripwires for `component-reviewer` input before writing.
 
 **`/implement-design <figma-url>`**  
 Translates any Figma node into production-ready code with 1:1 visual parity, outside the component library pipeline.  
@@ -263,12 +239,6 @@ Pre-push gate — run this before every `git push`.
 Deep architectural review of all changes since `develop`, through the lens of maintainability, security, and performance.  
 **Spawns:** `backend-reviewer` + `swagger-auditor` on backend diffs; checks React 19 patterns and TypeScript quality on frontend diffs.  
 **Deliverable:** CRITICAL/HIGH/MEDIUM/LOW findings with Verdict. More thorough than `/review-commit` — use before significant PRs.
-
-**`/review-changes`**  
-Deterministic risk-scored review powered by `.claude/scripts/risk-score.ts`.  
-**Steps:** run scorer (tier + 2-hop blast radius + 90d churn + diff-parsed method coverage + volume bonus) → escalate to Opus if HIGH/CRITICAL or hard flag fires → read diff → write report  
-**Hard flags:** migration file, authorize! change, destroy_all/delete_all, policy with no spec — always force HIGH or CRITICAL regardless of score.  
-**Deliverable:** Per-file score breakdown + grouped findings (CRITICAL/HIGH/MEDIUM/LOW) + merge verdict.
 
 **`/typescript-react-reviewer`**  
 TypeScript + React 19 specific review: critical bugs, anti-patterns, strict TS violations.  
@@ -361,14 +331,11 @@ Hooks run silently via the harness events. They are registered in `.claude/setti
 
 | Hook | Event | Trigger | What it runs | Blocking? |
 |------|-------|---------|-------------|-----------|
-| `on-edit-lint` | `PostToolUse` | Any `Edit` or `Write` tool call | Prints green Haiku banner to stderr; then `bundle exec rubocop --parallel <file>` for `.rb`; `npx eslint <file>` for `.ts/.tsx/.js/.jsx`; no-op for other types | No — always exits 0. Errors surface in Claude's context as findings. |
-| `model-indicator` | `PreToolUse` | Any `Agent` tool call | Dual mode: (1) Hook — reads `tool_input.model` from stdin, prints to stderr. (2) Direct — `node model-indicator.ts opus` prints to stdout (visible in execution steps). Colors: `⚑  OPUS ADVISOR` (red), `⚑  SONNET EXECUTOR` (yellow), `⚑  HAIKU EXECUTOR` (green). | No — always exits 0. |
+| `on-edit-lint` | `PostToolUse` | Any `Edit` or `Write` tool call | `bundle exec rubocop --parallel <file>` for `.rb`; `npx eslint <file>` for `.ts/.tsx/.js/.jsx`; no-op for other types | No — always exits 0. Errors surface in Claude's context as findings. |
 
 **Implementation:** All hooks are Node.js 22+ TypeScript (`.claude/hooks/*.ts`), no external dependencies, cross-platform (Windows/macOS/Linux).
 
 **Why `on-edit-lint` matters:** Catches lint errors immediately after each file save, before the full `/review-commit` run — tighter feedback loop with no extra steps.
-
-**Why `model-indicator` matters:** Makes model switches visible. The PreToolUse hook fires automatically (stderr); for guaranteed visibility in the execution steps panel, commands call it directly via Bash (stdout). Each model owns its full color block — header bold, detail dim — in its assigned color (red/yellow/green).
 
 ---
 
@@ -499,7 +466,6 @@ To silence: add `"DB90_COACHING": "false"` to `.claude/settings.local.json` (git
 │   ├── tailwind-v4-shadcn.md    # /tailwind-v4-shadcn
 │   ├── review-architecture.md   # /review-architecture
 │   ├── review-commit.md         # /review-commit
-│   ├── review-changes.md        # /review-changes
 │   ├── typescript-react-reviewer.md  # /typescript-react-reviewer
 │   ├── debug-issue.md           # /debug-issue
 │   ├── explore-codebase.md      # /explore-codebase
@@ -514,10 +480,8 @@ To silence: add `"DB90_COACHING": "false"` to `.claude/settings.local.json` (git
 │   ├── discover-skills.md       # /discover-skills
 │   └── help-tooling.md          # /help-tooling
 ├── hooks/
-│   ├── on-edit-lint.ts           # PostToolUse: Haiku banner + lint on every file save
-│   └── model-indicator.ts        # PreToolUse(Agent) + direct Bash: colored model banner (Opus=red, Sonnet=yellow, Haiku=green)
+│   └── on-edit-lint.ts           # PostToolUse: lint on every file save
 ├── scripts/
-│   ├── risk-score.ts             # Risk scorer: tier + 2-hop callers + churn + method coverage → JSON
 │   └── convention-check.ts       # Branch + commit format checker used by /review-commit (Step 0)
 └── settings.json                 # Hook registration, permissions, DB90_COACHING
 ```

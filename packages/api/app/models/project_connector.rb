@@ -10,6 +10,9 @@ class ProjectConnector < ApplicationRecord
   validates :connector_type, uniqueness: { scope: :project_id, message: "already exists for this project" }
   validates :is_active, inclusion: { in: [ true, false ] }
   validates :status, inclusion: { in: STATUSES }
+  validates :connector_scope, inclusion: { in: %w[project] }
+
+  before_validation :assign_scope, on: :create
 
   encrypts :access_token
   encrypts :refresh_token
@@ -49,5 +52,11 @@ class ProjectConnector < ApplicationRecord
 
   def mark_disconnected!
     update!(status: "disconnected", is_active: false)
+  end
+
+  private
+
+  def assign_scope
+    self.connector_scope = "project"
   end
 end

@@ -6,13 +6,16 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import type { ChartConfig } from "@/components/ui/chart";
-import { Skeleton } from "@/components/ui/skeleton";
+import { ChartSkeleton } from "@/components/ui/skeletons";
+import { ErrorState } from "@/components/ui/error-state";
 import type { ToolModelStat } from "@/lib/types";
 import { formatCost, truncateModelName } from "@/lib/formatters";
 
 interface ToolModelCostChartProps {
   models: ToolModelStat[];
   isLoading: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
 }
 
 const chartConfig = {
@@ -22,12 +25,16 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-export function ToolModelCostChart({ models, isLoading }: ToolModelCostChartProps) {
+function modelLabel(model: ToolModelStat): string {
+  return model.displayName || model.name;
+}
+
+export function ToolModelCostChart({ models, isLoading, isError, onRetry }: ToolModelCostChartProps) {
   const chartData = [...models]
     .sort((a, b) => b.costUsd - a.costUsd)
     .slice(0, 10)
     .map((m) => ({
-      name: truncateModelName(m.name),
+      name: truncateModelName(modelLabel(m)),
       costUsd: m.costUsd,
     }));
 
@@ -41,12 +48,17 @@ export function ToolModelCostChart({ models, isLoading }: ToolModelCostChartProp
         <CardTitle className="text-base font-medium">Cost by Model</CardTitle>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
-          <div className="space-y-2 pt-2">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-5 w-full" />
-            ))}
+        {isError ? (
+          <div className="flex h-[120px] items-center justify-center">
+            <ErrorState
+              compact
+              title="Could not load chart"
+              description="Something went wrong fetching the data."
+              onRetry={onRetry}
+            />
           </div>
+        ) : isLoading ? (
+          <ChartSkeleton variant="bars" barCount={4} />
         ) : chartData.length === 0 ? (
           <div className="flex h-[120px] items-center justify-center text-sm text-muted-foreground">
             No model data for this period.

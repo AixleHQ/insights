@@ -5,9 +5,9 @@
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     <meta name="robots" content="noindex, nofollow">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Welcome to DB90</title>
+    <title>Welcome to Aixle Insights</title>
     <style>
-        /* DB90 Keycloak Login Theme */
+        /* Aixle Insights Keycloak Login Theme */
         /* Using exact OKLCH values from packages/web/src/index.css dark theme */
 
         :root {
@@ -473,7 +473,7 @@
         }
     </style>
 </head>
-<body>
+<body class="db90-custom-login">
     <div class="db90-login-container">
         <!-- Left Panel -->
         <div class="db90-left-panel">
@@ -482,7 +482,7 @@
                     <span class="db90-logo-text">90</span>
                 </div>
                 <div class="db90-brand-text">
-                    <h1 class="db90-brand-title">DB90</h1>
+                    <h1 class="db90-brand-title">Aixle Insights</h1>
                     <p class="db90-brand-subtitle">AI Tool Analytics</p>
                 </div>
             </div>
@@ -541,7 +541,7 @@
                     <div class="db90-mobile-logo">
                         <span class="db90-mobile-logo-text">90</span>
                     </div>
-                    <h2 class="db90-card-title">Welcome to DB90</h2>
+                    <h2 class="db90-card-title">Welcome to Aixle Insights</h2>
                     <p class="db90-card-subtitle">Sign in to access your organization's AI tool analytics</p>
                 </div>
 

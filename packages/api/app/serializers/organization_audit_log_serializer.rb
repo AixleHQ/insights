@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
 class OrganizationAuditLogSerializer < BaseSerializer
-  attributes :id, :action, :resource_type, :resource_id, :tracked_changes, :metadata, :ip_address
+  attributes :id, :action, :resource_type, :resource_id, :tracked_changes,
+             :metadata, :ip_address, :user_agent, :severity, :outcome
 
   datetime_attribute :created_at
 

@@ -15,7 +15,8 @@ class ToolEventDetailSerializer < BaseSerializer
       {
         id: event.user.id,
         name: event.user.name,
-        email: event.user.email
+        email: event.user.email,
+        avatarUrl: event.user.avatar_url
       }
     end
   end

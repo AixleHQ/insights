@@ -1,5 +1,5 @@
 class InvitationMailer < ApplicationMailer
-  default from: ENV.fetch("MAILER_FROM", "noreply@db90.dev")
+  default from: ENV.fetch("MAILER_FROM", "noreply@aixle.ai")
 
   def invite(invitation)
     @invitation = invitation
@@ -10,7 +10,7 @@ class InvitationMailer < ApplicationMailer
 
     mail(
       to: invitation.email,
-      subject: "You've been invited to join #{@organization.name} on DB90"
+      subject: "You've been invited to join #{@organization.name} on Aixle Insights"
     )
   end
 end

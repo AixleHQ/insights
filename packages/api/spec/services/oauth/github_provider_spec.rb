@@ -3,7 +3,14 @@
 require 'rails_helper'
 
 RSpec.describe Oauth::GithubProvider, type: :service do
-  let(:connector) { instance_double('OrganizationConnector', access_token: 'gho_test123') }
+  let(:connector) do
+    instance_double(
+      'OrganizationConnector',
+      access_token: 'gho_test123',
+      token_expired?: false,
+      refresh_token: nil
+    )
+  end
   let(:provider) { described_class.new(connector) }
 
   describe '#test_connection' do
@@ -34,6 +41,52 @@ RSpec.describe Oauth::GithubProvider, type: :service do
 
         expect(result[:success]).to be false
         expect(result[:error]).to include('401')
+      end
+    end
+
+    context 'when the token is expired but can be refreshed' do
+      let(:connector) do
+        instance_double(
+          'OrganizationConnector',
+          access_token: 'gho_new456',
+          token_expired?: true,
+          refresh_token: 'ghr_refresh',
+          mark_error!: nil
+        )
+      end
+
+      it 'refreshes the token and returns success' do
+        allow(provider).to receive(:refresh_token!).and_return(true)
+        allow(provider).to receive(:reset_http_client!).and_call_original
+
+        stub_request(:get, 'https://api.github.com/user')
+          .with(headers: { 'Authorization' => 'Bearer gho_new456' })
+          .to_return(
+            status: 200,
+            body: { login: 'octocat', name: 'The Octocat' }.to_json,
+            headers: { 'Content-Type' => 'application/json' }
+          )
+
+        result = provider.test_connection
+
+        expect(result[:success]).to be true
+        expect(result[:account]).to eq('octocat')
+      end
+    end
+
+    context 'when the token is expired and cannot be refreshed' do
+      let(:connector) do
+        instance_double(
+          'OrganizationConnector',
+          access_token: 'gho_expired',
+          token_expired?: true,
+          refresh_token: nil,
+          mark_error!: nil
+        )
+      end
+
+      it 'raises TokenRefreshError which bubbles up as a connection error' do
+        expect { provider.test_connection }.to raise_error(Oauth::TokenRefreshError)
       end
     end
 
@@ -93,6 +146,83 @@ RSpec.describe Oauth::GithubProvider, type: :service do
         expect(provider.fetch_repositories).to eq([])
       end
     end
+
+    context 'when the token is expired but can be refreshed' do
+      let(:connector) do
+        instance_double(
+          'OrganizationConnector',
+          access_token: 'gho_new456',
+          token_expired?: true,
+          refresh_token: 'ghr_refresh',
+          mark_error!: nil
+        )
+      end
+
+      it 'refreshes the token and returns repositories' do
+        allow(provider).to receive(:refresh_token!).and_return(true)
+        allow(provider).to receive(:reset_http_client!).and_call_original
+
+        stub_request(:get, 'https://api.github.com/user/repos')
+          .with(query: hash_including('page' => '1', 'per_page' => '100', 'sort' => 'updated'))
+          .to_return(
+            status: 200,
+            body: [ { id: 1, name: 'repo', full_name: 'org/repo', description: nil,
+                      default_branch: 'main', clone_url: 'https://github.com/org/repo.git',
+                      html_url: 'https://github.com/org/repo', private: false } ].to_json,
+            headers: { 'Content-Type' => 'application/json' }
+          )
+
+        result = provider.fetch_repositories
+
+        expect(result.length).to eq(1)
+        expect(result.first[:name]).to eq('repo')
+      end
+    end
+  end
+
+  describe '#fetch_commits' do
+    let(:since_time) { 2.days.ago }
+
+    it 'returns commits normalized like webhook push payloads' do
+      stub_request(:get, 'https://api.github.com/repos/octocat/hello-world/commits')
+        .with(
+          headers: { 'Authorization' => 'Bearer gho_test123' },
+          query: hash_including('per_page' => '100', 'page' => '1', 'sha' => 'main')
+        )
+        .to_return(
+          status: 200,
+          body: [ {
+            sha: 'abc123',
+            html_url: 'https://github.com/octocat/hello-world/commit/abc123',
+            commit: {
+              message: 'Fix bug',
+              author: { name: 'Octocat', email: 'octocat@github.com', date: '2024-06-01T12:00:00Z' }
+            }
+          } ].to_json,
+          headers: { 'Content-Type' => 'application/json' }
+        )
+
+      result = provider.fetch_commits('octocat/hello-world', branch: 'main', since: since_time)
+
+      expect(result.size).to eq(1)
+      commit = result.first
+      expect(commit['id']).to eq('abc123')
+      expect(commit['message']).to eq('Fix bug')
+      expect(commit['timestamp']).to eq('2024-06-01T12:00:00Z')
+      expect(commit.dig('author', 'email')).to eq('octocat@github.com')
+      expect(commit['url']).to eq('https://github.com/octocat/hello-world/commit/abc123')
+    end
+
+    it 'returns an empty array when full_name is invalid' do
+      expect(provider.fetch_commits('', branch: 'main', since: since_time)).to eq([])
+    end
+
+    it 'returns an empty array when the request fails' do
+      stub_request(:get, %r{\Ahttps://api\.github\.com/repos/octocat/hello-world/commits})
+        .to_return(status: 404, body: '{}')
+
+      expect(provider.fetch_commits('octocat/hello-world', branch: 'main', since: since_time)).to eq([])
+    end
   end
 
   describe '.fetch_account_info' do
@@ -118,6 +248,87 @@ RSpec.describe Oauth::GithubProvider, type: :service do
           .to_return(status: 401, body: '{}')
 
         expect(described_class.fetch_account_info('bad-token')).to eq({})
+      end
+    end
+  end
+
+  describe '#fetch_pull_requests_for_commit' do
+    let(:sha) { 'abc123def456' }
+
+    context 'when the commit has associated pull requests' do
+      it 'returns the parsed array' do
+        stub_request(:get, "https://api.github.com/repos/octocat/hello-world/commits/#{sha}/pulls")
+          .with(headers: { 'Authorization' => 'Bearer gho_test123' })
+          .to_return(
+            status: 200,
+            body: [ { number: 42, html_url: 'https://github.com/octocat/hello-world/pull/42', state: 'open' } ].to_json,
+            headers: { 'Content-Type' => 'application/json' }
+          )
+
+        result = provider.fetch_pull_requests_for_commit('octocat/hello-world', sha)
+
+        expect(result.size).to eq(1)
+        expect(result.first['number']).to eq(42)
+        expect(result.first['html_url']).to eq('https://github.com/octocat/hello-world/pull/42')
+        expect(result.first['state']).to eq('open')
+      end
+    end
+
+    context 'when the commit has no pull requests' do
+      it 'returns an empty array' do
+        stub_request(:get, "https://api.github.com/repos/octocat/hello-world/commits/#{sha}/pulls")
+          .to_return(status: 200, body: '[]', headers: { 'Content-Type' => 'application/json' })
+
+        expect(provider.fetch_pull_requests_for_commit('octocat/hello-world', sha)).to eq([])
+      end
+    end
+
+    context 'when the API responds with an error' do
+      it 'raises Oauth::GithubApiError so callers can retry' do
+        stub_request(:get, "https://api.github.com/repos/octocat/hello-world/commits/#{sha}/pulls")
+          .to_return(status: 502, body: '{"message":"Bad gateway"}')
+
+        expect {
+          provider.fetch_pull_requests_for_commit('octocat/hello-world', sha)
+        }.to raise_error(Oauth::GithubApiError, /502/)
+      end
+    end
+
+    context 'with a malformed full_name' do
+      it 'raises ArgumentError without an HTTP call' do
+        expect {
+          provider.fetch_pull_requests_for_commit('no-slash', sha)
+        }.to raise_error(ArgumentError)
+      end
+    end
+
+    context 'with a malformed commit sha' do
+      it 'raises ArgumentError without an HTTP call' do
+        expect {
+          provider.fetch_pull_requests_for_commit('octocat/hello-world', 'abc/../evil')
+        }.to raise_error(ArgumentError)
+      end
+    end
+
+    context 'when the API returns a non-array 200 body' do
+      it 'raises Oauth::GithubApiError' do
+        stub_request(:get, "https://api.github.com/repos/octocat/hello-world/commits/#{sha}/pulls")
+          .to_return(status: 200, body: '{"message":"ok"}', headers: { 'Content-Type' => 'application/json' })
+
+        expect {
+          provider.fetch_pull_requests_for_commit('octocat/hello-world', sha)
+        }.to raise_error(Oauth::GithubApiError, /non-array/)
+      end
+    end
+
+    context 'when the API returns an unparseable 200 body' do
+      it 'raises Oauth::GithubApiError' do
+        stub_request(:get, "https://api.github.com/repos/octocat/hello-world/commits/#{sha}/pulls")
+          .to_return(status: 200, body: '<html>oops</html>', headers: { 'Content-Type' => 'text/html' })
+
+        expect {
+          provider.fetch_pull_requests_for_commit('octocat/hello-world', sha)
+        }.to raise_error(Oauth::GithubApiError, /unparseable/)
       end
     end
   end

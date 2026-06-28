@@ -3,29 +3,29 @@
 class InvitationPolicy < ApplicationPolicy
   # List invitations for an organization
   def index?
-    org_admin?(record.organization) || global_admin?
+    org_owner?(record.organization) || global_admin?
   end
 
   # View invitation details
   def show?
-    org_admin?(record.organization) || global_admin?
+    org_owner?(record.organization) || global_admin?
   end
 
   # Create new invitation (send invite)
   def create?
-    org_admin?(record.organization) || global_admin?
+    org_owner?(record.organization) || global_admin?
   end
 
   # Revoke pending invitation
   def destroy?
     return false unless record.pending?
-    org_admin?(record.organization) || global_admin?
+    org_owner?(record.organization) || global_admin?
   end
 
   # Resend invitation email
   def resend?
     return false unless record.pending?
-    org_admin?(record.organization) || global_admin?
+    org_owner?(record.organization) || global_admin?
   end
 
   # Accept invitation (anyone with valid token can accept)

@@ -1,2 +1,2 @@
-export { ProjectCard, type ProjectData } from "./ProjectCard";
+export { ProjectCard } from "./ProjectCard";
 export { ProjectForm, type ProjectFormData } from "./ProjectForm";

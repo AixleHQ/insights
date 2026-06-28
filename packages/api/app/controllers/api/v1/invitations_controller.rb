@@ -37,7 +37,7 @@ module Api
           return render json: {
             error: "Unprocessable Entity",
             errors: { email: [ "is already a member of this organization" ] }
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
 
         if @invitation.save
@@ -49,7 +49,7 @@ module Api
           render json: {
             error: "Unprocessable Entity",
             errors: format_validation_errors(@invitation.errors)
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
       end
 
@@ -63,7 +63,7 @@ module Api
           render json: {
             error: "Unprocessable Entity",
             message: "Cannot revoke this invitation"
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
       end
 
@@ -75,7 +75,7 @@ module Api
           return render json: {
             error: "Unprocessable Entity",
             message: "Can only resend pending invitations"
-          }, status: :unprocessable_entity
+          }, status: :unprocessable_content
         end
 
         # Update expiration

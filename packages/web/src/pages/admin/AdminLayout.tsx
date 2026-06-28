@@ -32,7 +32,7 @@ export function AdminLayout() {
   }
 
   // Check if user is super admin
-  if (!currentUser?.super_admin) {
+  if (!(currentUser?.globalAdmin ?? currentUser?.super_admin)) {
     return <Navigate to="/" replace />;
   }
 

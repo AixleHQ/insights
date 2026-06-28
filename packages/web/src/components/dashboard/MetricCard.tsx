@@ -3,17 +3,21 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
-interface MetricCardProps {
-  title: string;
+type MetricCardBaseProps = {
   value: string | number;
   previousValue?: number;
   format?: "number" | "currency" | "percentage" | "compact";
   icon?: ReactNode;
   trend?: "up" | "down" | "neutral";
+  delta?: string;
+  subtitle?: string;
   trendValue?: string;
   description?: string;
   className?: string;
-}
+};
+
+type MetricCardProps = MetricCardBaseProps &
+  ({ label: string; title?: string } | { label?: string; title: string });
 
 function formatValue(value: string | number, format?: string): string {
   if (typeof value === "string") return value;
@@ -45,15 +49,22 @@ function formatValue(value: string | number, format?: string): string {
 }
 
 export function MetricCard({
+  label,
+  delta,
+  subtitle,
   title,
+  trendValue,
+  description,
   value,
   format = "number",
   icon,
   trend,
-  trendValue,
-  description,
   className,
 }: MetricCardProps) {
+  const resolvedLabel = label ?? title!;
+  const resolvedDelta = delta ?? trendValue;
+  const resolvedSubtitle = subtitle ?? description;
+
   const [isAnimating, setIsAnimating] = useState(false);
   const prevValueRef = useRef(value);
 
@@ -83,28 +94,28 @@ export function MetricCard({
         className
       )}
     >
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between">
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-muted-foreground">{title}</p>
-            <div className="flex items-baseline gap-2">
+      <CardContent className="px-6 py-0">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 space-y-2">
+            <p className="type-label text-muted-foreground">{resolvedLabel}</p>
+            <div className="flex min-w-0 flex-wrap items-baseline gap-2">
               <p
                 className={cn(
-                  "font-mono-display text-3xl font-bold tracking-tight",
+                  "min-w-0 max-w-full break-all font-mono-display type-h1",
                   isAnimating && "animate-metric-update"
                 )}
               >
                 {formatValue(value, format)}
               </p>
-              {trendValue && (
-                <span className={cn("flex items-center gap-0.5 text-xs font-medium", trendColor)}>
+              {resolvedDelta && (
+                <span className={cn("flex items-center gap-0.5 text-caption font-medium", trendColor)}>
                   <TrendIcon className="size-3" />
-                  {trendValue}
+                  {resolvedDelta}
                 </span>
               )}
             </div>
-            {description && (
-              <p className="text-xs text-muted-foreground">{description}</p>
+            {resolvedSubtitle && (
+              <p className="type-caption text-muted-foreground">{resolvedSubtitle}</p>
             )}
           </div>
           {icon && (

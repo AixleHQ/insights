@@ -8,5 +8,7 @@ FactoryBot.define do
     user_agent { Faker::Internet.user_agent }
     tracked_changes { { name: [ 'Old Name', 'New Name' ] } }
     metadata { {} }
+    severity { 'info' }
+    outcome { 'success' }
   end
 end

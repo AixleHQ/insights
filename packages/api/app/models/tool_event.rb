@@ -6,7 +6,7 @@ class ToolEvent < ApplicationRecord
     claude_code cursor windsurf github_copilot
     aider continue cody tabnine amazon_q
     openrouter_api anthropic_api openai_api gemini_api
-    custom jira linear github
+    custom jira linear github gitlab bitbucket
   ].freeze
 
   EVENT_TYPES = %w[chat completion edit commit review test debug refactor documentation other
@@ -34,6 +34,7 @@ class ToolEvent < ApplicationRecord
   scope :for_user, ->(user) { where(user: user) }
   scope :for_organization, ->(org) { where(organization: org) }
   scope :for_project, ->(project) { where(project: project) }
+  scope :before_cutoff, ->(cutoff) { where("occurred_at < ?", cutoff) }
 
   def self.total_tokens_in_range(start_time, end_time)
     in_range(start_time, end_time).sum(:tokens_total)
@@ -46,6 +47,6 @@ class ToolEvent < ApplicationRecord
   private
 
   def calculate_tokens_total
-    self.tokens_total = (tokens_in || 0) + (tokens_out || 0) if tokens_total.blank?
+    self.tokens_total = (tokens_in || 0) + (tokens_out || 0)
   end
 end

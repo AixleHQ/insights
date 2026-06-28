@@ -28,7 +28,7 @@ let currentOrgId: string | null = null;
 /**
  * Get the auth token - uses impersonation token if active, otherwise regular token
  */
-async function getAuthToken(): Promise<string | null> {
+export async function getAuthToken(): Promise<string | null> {
   // Check for impersonation token first
   const impersonationToken = localStorage.getItem(IMPERSONATION_STORAGE_KEY);
   if (impersonationToken) {
@@ -82,6 +82,7 @@ export async function apiRequest<T = unknown>(
   const { skipAuth = false, skipOrgHeader = false, headers = {}, ...fetchOptions } = options;
 
   const url = endpoint.startsWith("http") ? endpoint : `${DEFAULT_BASE_URL}${endpoint}`;
+  const impersonating = isImpersonating();
 
   const buildHeaders = async (): Promise<HeadersInit> => {
     const requestHeaders: HeadersInit = {
@@ -112,7 +113,7 @@ export async function apiRequest<T = unknown>(
   let response = await doFetch();
 
   // Expired access token right after silent renew window: retry once after OIDC refresh.
-  if (response.status === 401 && !skipAuth && !isImpersonating()) {
+  if (response.status === 401 && !skipAuth && !impersonating) {
     const renewed = await silentRenew();
     if (renewed) {
       response = await doFetch();
@@ -164,6 +165,66 @@ export class ApiError extends Error {
     this.status = status;
     this.data = data;
   }
+}
+
+/**
+ * Fetch a binary resource with authentication and trigger a browser download.
+ * Returns { queued: true, jobId } if the server responds 202 (large async export).
+ *
+ * @param organizationId Prefer the org in the URL path; falls back to {@link setCurrentOrganizationId}.
+ */
+export async function downloadBlob(
+  endpoint: string,
+  filename: string,
+  accept = "text/csv",
+  organizationId?: string | null
+): Promise<{ queued: boolean; jobId?: string }> {
+  const url = endpoint.startsWith("http") ? endpoint : `${DEFAULT_BASE_URL}${endpoint}`;
+  const impersonating = isImpersonating();
+  const orgForHeader = organizationId ?? currentOrgId;
+
+  const buildHeaders = async (): Promise<Record<string, string>> => {
+    const token = await getAuthToken();
+    const requestHeaders: Record<string, string> = { Accept: accept };
+    if (token) requestHeaders.Authorization = `Bearer ${token}`;
+    if (orgForHeader) requestHeaders["X-Organization-ID"] = orgForHeader;
+    return requestHeaders;
+  };
+
+  const doFetch = async () => fetch(url, { method: "GET", headers: await buildHeaders() });
+
+  let response = await doFetch();
+
+  if (response.status === 401 && !impersonating) {
+    const renewed = await silentRenew();
+    if (renewed) {
+      response = await doFetch();
+    }
+  }
+
+  if (response.status === 202) {
+    const body = (await response.json()) as { job_id: string };
+    return { queued: true, jobId: body.job_id };
+  }
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new ApiError(
+      (data as { message?: string } | null)?.message ??
+        `Request failed with status ${response.status}`,
+      response.status,
+      data
+    );
+  }
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = objectUrl;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(objectUrl);
+  return { queued: false };
 }
 
 // Convenience methods

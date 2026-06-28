@@ -1,53 +1,54 @@
-import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
-import { render, screen, waitFor } from "@/test/utils";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen } from "@/test/utils";
 import userEvent from "@testing-library/user-event";
 import { ProjectAlertsSection } from "./ProjectAlertsSection";
 
-// Radix UI Select requires these methods in jsdom
-beforeAll(() => {
-  window.Element.prototype.hasPointerCapture = vi.fn(() => false);
-  window.Element.prototype.setPointerCapture = vi.fn();
-  window.Element.prototype.releasePointerCapture = vi.fn();
-  window.Element.prototype.scrollIntoView = vi.fn();
-});
-
-const mockUseProjectSettings = vi.fn();
-const mockUseOrganizationSettings = vi.fn();
-const mockUpdateMutate = vi.fn();
-const mockDeleteMutate = vi.fn();
+const mockUseProjectRetentionPolicy = vi.fn();
+const mockUseRetentionPolicy = vi.fn();
+const mockMutate = vi.fn();
+const mockUseUpdateProjectRetentionPolicy = vi.fn();
 
 vi.mock("@/hooks/useApi", () => ({
-  useProjectSettings: (...args: unknown[]) => mockUseProjectSettings(...args),
-  useOrganizationSettings: (...args: unknown[]) => mockUseOrganizationSettings(...args),
-  useUpdateProjectSetting: () => ({ mutate: mockUpdateMutate }),
-  useDeleteProjectSetting: () => ({ mutate: mockDeleteMutate }),
+  useProjectRetentionPolicy: (...args: unknown[]) => mockUseProjectRetentionPolicy(...args),
+  useRetentionPolicy: (...args: unknown[]) => mockUseRetentionPolicy(...args),
+  useUpdateProjectRetentionPolicy: () => mockUseUpdateProjectRetentionPolicy(),
 }));
 
 const defaultProps = { projectId: "proj-1", orgId: "org-1" };
 
-const emptyProject = { data: { data: [] }, isLoading: false };
-const emptyOrg = { data: { data: [] }, isLoading: false };
+const emptyProjectPolicy = {
+  data: { costThresholdCents: null, tokenThreshold: null, alertEnabled: true },
+  isLoading: false,
+};
+const emptyOrgPolicy = {
+  data: { costThresholdCents: null, tokenThreshold: null, alertEnabled: true },
+  isLoading: false,
+};
 
 describe("ProjectAlertsSection", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseProjectSettings.mockReturnValue(emptyProject);
-    mockUseOrganizationSettings.mockReturnValue(emptyOrg);
+    mockUseProjectRetentionPolicy.mockReturnValue(emptyProjectPolicy);
+    mockUseRetentionPolicy.mockReturnValue(emptyOrgPolicy);
+    mockUseUpdateProjectRetentionPolicy.mockReturnValue({
+      mutate: mockMutate,
+      isPending: false,
+      isError: false,
+    });
   });
 
   // ── Loading ────────────────────────────────────────────────────────────────
 
-  it("shows skeletons while project settings are loading", () => {
-    mockUseProjectSettings.mockReturnValue({ data: undefined, isLoading: true });
+  it("shows skeletons while project policy is loading", () => {
+    mockUseProjectRetentionPolicy.mockReturnValue({ data: undefined, isLoading: true });
 
     render(<ProjectAlertsSection {...defaultProps} />);
 
     expect(screen.queryByText("Alert Settings")).not.toBeInTheDocument();
-    expect(screen.queryByText("Cost Thresholds")).not.toBeInTheDocument();
   });
 
-  it("shows skeletons while org settings are loading", () => {
-    mockUseOrganizationSettings.mockReturnValue({ data: undefined, isLoading: true });
+  it("shows skeletons while org policy is loading", () => {
+    mockUseRetentionPolicy.mockReturnValue({ data: undefined, isLoading: true });
 
     render(<ProjectAlertsSection {...defaultProps} />);
 
@@ -56,263 +57,195 @@ describe("ProjectAlertsSection", () => {
 
   // ── Rendering ──────────────────────────────────────────────────────────────
 
-  it("renders section headings and cards", () => {
+  it("renders section heading and card title", () => {
     render(<ProjectAlertsSection {...defaultProps} />);
 
     expect(screen.getByText("Alert Settings")).toBeInTheDocument();
-    expect(screen.getByText("Cost Thresholds")).toBeInTheDocument();
-    expect(screen.getByText("Notification Channels")).toBeInTheDocument();
-    expect(screen.getByLabelText("Daily Cost Limit (USD)")).toBeInTheDocument();
-    expect(screen.getByLabelText("Monthly Cost Limit (USD)")).toBeInTheDocument();
-    expect(screen.getByLabelText("Email Alerts")).toBeInTheDocument();
+    expect(screen.getByText("Cost & Token Thresholds")).toBeInTheDocument();
   });
 
-  // ── Cost threshold — initial state ─────────────────────────────────────────
+  it("renders cost and token inputs", () => {
+    render(<ProjectAlertsSection {...defaultProps} />);
 
-  it("populates cost inputs from saved project settings", () => {
-    mockUseProjectSettings.mockReturnValue({
+    expect(screen.getByLabelText("Cost Threshold (USD)")).toBeInTheDocument();
+    expect(screen.getByLabelText("Token Threshold")).toBeInTheDocument();
+  });
+
+  it("renders alert enabled switch", () => {
+    render(<ProjectAlertsSection {...defaultProps} />);
+
+    expect(screen.getByLabelText("Enable alerts")).toBeInTheDocument();
+    expect(screen.getByRole("switch")).toBeInTheDocument();
+  });
+
+  // ── Initial values from project policy ────────────────────────────────────
+
+  it("populates cost input from project policy (cents to dollars)", () => {
+    mockUseProjectRetentionPolicy.mockReturnValue({
+      data: { costThresholdCents: 1500, tokenThreshold: null, alertEnabled: true },
+      isLoading: false,
+    });
+
+    render(<ProjectAlertsSection {...defaultProps} />);
+
+    expect(screen.getByLabelText("Cost Threshold (USD)")).toHaveValue(15);
+  });
+
+  it("populates token input from project policy", () => {
+    mockUseProjectRetentionPolicy.mockReturnValue({
+      data: { costThresholdCents: null, tokenThreshold: 50000, alertEnabled: true },
+      isLoading: false,
+    });
+
+    render(<ProjectAlertsSection {...defaultProps} />);
+
+    expect(screen.getByLabelText("Token Threshold")).toHaveValue(50000);
+  });
+
+  it("reflects alertEnabled=false from project policy in switch", () => {
+    mockUseProjectRetentionPolicy.mockReturnValue({
+      data: { costThresholdCents: null, tokenThreshold: null, alertEnabled: false },
+      isLoading: false,
+    });
+
+    render(<ProjectAlertsSection {...defaultProps} />);
+
+    expect(screen.getByRole("switch")).not.toBeChecked();
+  });
+
+  it("reflects alertEnabled=true from project policy in switch", () => {
+    mockUseProjectRetentionPolicy.mockReturnValue({
+      data: { costThresholdCents: null, tokenThreshold: null, alertEnabled: true },
+      isLoading: false,
+    });
+
+    render(<ProjectAlertsSection {...defaultProps} />);
+
+    expect(screen.getByRole("switch")).toBeChecked();
+  });
+
+  // ── Org ceiling hints ──────────────────────────────────────────────────────
+
+  it("shows org cost ceiling when org policy has a value", () => {
+    mockUseRetentionPolicy.mockReturnValue({
+      data: { costThresholdCents: 2000, tokenThreshold: null, alertEnabled: true },
+      isLoading: false,
+    });
+
+    render(<ProjectAlertsSection {...defaultProps} />);
+
+    expect(screen.getByText(/Org ceiling:/)).toBeInTheDocument();
+  });
+
+  it("shows org token ceiling when org policy has a value", () => {
+    mockUseRetentionPolicy.mockReturnValue({
+      data: { costThresholdCents: null, tokenThreshold: 100000, alertEnabled: true },
+      isLoading: false,
+    });
+
+    render(<ProjectAlertsSection {...defaultProps} />);
+
+    expect(screen.getAllByText(/Org ceiling:/).length).toBeGreaterThan(0);
+  });
+
+  // ── Validation ─────────────────────────────────────────────────────────────
+
+  it("shows error and highlights input when cost exceeds org ceiling", async () => {
+    const user = userEvent.setup();
+    mockUseRetentionPolicy.mockReturnValue({
+      data: { costThresholdCents: 1000, tokenThreshold: null, alertEnabled: true },
+      isLoading: false,
+    });
+
+    render(<ProjectAlertsSection {...defaultProps} />);
+
+    await user.type(screen.getByLabelText("Cost Threshold (USD)"), "20");
+
+    expect(screen.getByText(/Must not exceed org ceiling/)).toBeInTheDocument();
+  });
+
+  it("shows error when token exceeds org ceiling", async () => {
+    const user = userEvent.setup();
+    mockUseRetentionPolicy.mockReturnValue({
+      data: { costThresholdCents: null, tokenThreshold: 50000, alertEnabled: true },
+      isLoading: false,
+    });
+
+    render(<ProjectAlertsSection {...defaultProps} />);
+
+    await user.type(screen.getByLabelText("Token Threshold"), "99999");
+
+    expect(screen.getByText(/Must not exceed org ceiling/)).toBeInTheDocument();
+  });
+
+  // ── Save button state ──────────────────────────────────────────────────────
+
+  it("save button is disabled when form is not dirty", () => {
+    render(<ProjectAlertsSection {...defaultProps} />);
+
+    expect(screen.getByRole("button", { name: /save thresholds/i })).toBeDisabled();
+  });
+
+  it("save button is enabled after changing cost input", async () => {
+    const user = userEvent.setup();
+    render(<ProjectAlertsSection {...defaultProps} />);
+
+    await user.type(screen.getByLabelText("Cost Threshold (USD)"), "5");
+
+    expect(screen.getByRole("button", { name: /save thresholds/i })).not.toBeDisabled();
+  });
+
+  it("save button is disabled when cost exceeds org ceiling even if dirty", async () => {
+    const user = userEvent.setup();
+    mockUseRetentionPolicy.mockReturnValue({
+      data: { costThresholdCents: 500, tokenThreshold: null, alertEnabled: true },
+      isLoading: false,
+    });
+
+    render(<ProjectAlertsSection {...defaultProps} />);
+
+    await user.type(screen.getByLabelText("Cost Threshold (USD)"), "20");
+
+    expect(screen.getByRole("button", { name: /save thresholds/i })).toBeDisabled();
+  });
+
+  it("save button is enabled after toggling alert enabled switch", async () => {
+    const user = userEvent.setup();
+    render(<ProjectAlertsSection {...defaultProps} />);
+
+    await user.click(screen.getByRole("switch"));
+
+    expect(screen.getByRole("button", { name: /save thresholds/i })).not.toBeDisabled();
+  });
+
+  // ── Mutation ───────────────────────────────────────────────────────────────
+
+  it("calls mutation with correct payload including alert_enabled on save", async () => {
+    const user = userEvent.setup();
+    render(<ProjectAlertsSection {...defaultProps} />);
+
+    await user.type(screen.getByLabelText("Cost Threshold (USD)"), "10");
+    await user.click(screen.getByRole("button", { name: /save thresholds/i }));
+
+    expect(mockMutate).toHaveBeenCalledWith({
+      projectId: "proj-1",
       data: {
-        data: [
-          { key: "alert_cost_daily", value: "200" },
-          { key: "alert_cost_monthly", value: "3000" },
-        ],
+        cost_threshold_cents: 1000,
+        token_threshold: null,
+        alert_enabled: true,
       },
-      isLoading: false,
+    });
+  });
+
+  it("shows error message when mutation fails", () => {
+    mockUseUpdateProjectRetentionPolicy.mockReturnValue({
+      mutate: mockMutate,
+      isPending: false,
+      isError: true,
     });
 
     render(<ProjectAlertsSection {...defaultProps} />);
 
-    expect(screen.getByLabelText("Daily Cost Limit (USD)")).toHaveValue(200);
-    expect(screen.getByLabelText("Monthly Cost Limit (USD)")).toHaveValue(3000);
-  });
-
-  it("shows org default as placeholder when no project cost is set", () => {
-    mockUseOrganizationSettings.mockReturnValue({
-      data: {
-        data: [
-          { key: "alert_cost_daily", value: "500" },
-          { key: "alert_cost_monthly", value: "5000" },
-        ],
-      },
-      isLoading: false,
-    });
-
-    render(<ProjectAlertsSection {...defaultProps} />);
-
-    expect(screen.getByPlaceholderText(/Org default:.*day/)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/Org default:.*month/)).toBeInTheDocument();
-  });
-
-  it("shows inherit helper text when no project cost is set and org default exists", () => {
-    mockUseOrganizationSettings.mockReturnValue({
-      data: { data: [{ key: "alert_cost_daily", value: "500" }] },
-      isLoading: false,
-    });
-
-    render(<ProjectAlertsSection {...defaultProps} />);
-
-    expect(screen.getByText(/Inheriting org default:.*day/)).toBeInTheDocument();
-  });
-
-  it('shows "No organisation default set" when neither project nor org value exists', () => {
-    render(<ProjectAlertsSection {...defaultProps} />);
-
-    expect(screen.getAllByText("No organisation default set")).toHaveLength(2);
-  });
-
-  it('shows "Overriding organisation default" when project value is set', () => {
-    mockUseProjectSettings.mockReturnValue({
-      data: { data: [{ key: "alert_cost_daily", value: "100" }] },
-      isLoading: false,
-    });
-
-    render(<ProjectAlertsSection {...defaultProps} />);
-
-    expect(screen.getByText("Overriding organisation default")).toBeInTheDocument();
-  });
-
-  // ── Cost threshold — mutations ─────────────────────────────────────────────
-
-  it("calls update mutation on blur when a new valid daily value is entered", async () => {
-    const user = userEvent.setup();
-    render(<ProjectAlertsSection {...defaultProps} />);
-
-    const input = screen.getByLabelText("Daily Cost Limit (USD)");
-    await user.type(input, "250");
-    await user.tab();
-
-    await waitFor(() => {
-      expect(mockUpdateMutate).toHaveBeenCalledWith(
-        { projectId: "proj-1", key: "alert_cost_daily", value: "250" },
-        expect.objectContaining({ onError: expect.any(Function) })
-      );
-    });
-  });
-
-  it("calls update mutation on blur when a new valid monthly value is entered", async () => {
-    const user = userEvent.setup();
-    render(<ProjectAlertsSection {...defaultProps} />);
-
-    const input = screen.getByLabelText("Monthly Cost Limit (USD)");
-    await user.type(input, "4000");
-    await user.tab();
-
-    await waitFor(() => {
-      expect(mockUpdateMutate).toHaveBeenCalledWith(
-        { projectId: "proj-1", key: "alert_cost_monthly", value: "4000" },
-        expect.objectContaining({ onError: expect.any(Function) })
-      );
-    });
-  });
-
-  it("calls delete mutation when daily input is cleared and project value was set", async () => {
-    mockUseProjectSettings.mockReturnValue({
-      data: { data: [{ key: "alert_cost_daily", value: "200" }] },
-      isLoading: false,
-    });
-    const user = userEvent.setup();
-    render(<ProjectAlertsSection {...defaultProps} />);
-
-    const input = screen.getByLabelText("Daily Cost Limit (USD)");
-    await user.clear(input);
-    await user.tab();
-
-    await waitFor(() => {
-      expect(mockDeleteMutate).toHaveBeenCalledWith(
-        { projectId: "proj-1", key: "alert_cost_daily" },
-        expect.objectContaining({ onError: expect.any(Function) })
-      );
-    });
-  });
-
-  it("does not call any mutation when input is cleared but no project value was set", async () => {
-    const user = userEvent.setup();
-    render(<ProjectAlertsSection {...defaultProps} />);
-
-    const input = screen.getByLabelText("Daily Cost Limit (USD)");
-    await user.click(input);
-    await user.tab();
-
-    expect(mockUpdateMutate).not.toHaveBeenCalled();
-    expect(mockDeleteMutate).not.toHaveBeenCalled();
-  });
-
-  it("does not call mutation when blurring with the same value as already saved", async () => {
-    mockUseProjectSettings.mockReturnValue({
-      data: { data: [{ key: "alert_cost_daily", value: "200" }] },
-      isLoading: false,
-    });
-    const user = userEvent.setup();
-    render(<ProjectAlertsSection {...defaultProps} />);
-
-    const input = screen.getByLabelText("Daily Cost Limit (USD)");
-    await user.click(input);
-    await user.tab();
-
-    expect(mockUpdateMutate).not.toHaveBeenCalled();
-    expect(mockDeleteMutate).not.toHaveBeenCalled();
-  });
-
-  // ── Email alerts ───────────────────────────────────────────────────────────
-
-  it('shows "inherit" selected by default when no project email setting', () => {
-    render(<ProjectAlertsSection {...defaultProps} />);
-
-    expect(screen.getByText(/Inherit from organisation/)).toBeInTheDocument();
-    expect(screen.getByText(/Using organisation default:/)).toBeInTheDocument();
-  });
-
-  it('shows org email default label as "Enabled" when org has no explicit setting', () => {
-    render(<ProjectAlertsSection {...defaultProps} />);
-
-    expect(screen.getByText(/Using organisation default: Enabled/)).toBeInTheDocument();
-  });
-
-  it('shows org email default label as "Disabled" when org sets alert_email to false', () => {
-    mockUseOrganizationSettings.mockReturnValue({
-      data: { data: [{ key: "alert_email", value: "false" }] },
-      isLoading: false,
-    });
-
-    render(<ProjectAlertsSection {...defaultProps} />);
-
-    expect(screen.getByText(/Using organisation default: Disabled/)).toBeInTheDocument();
-  });
-
-  it('calls update mutation with "true" when Enabled is selected', async () => {
-    const user = userEvent.setup();
-    render(<ProjectAlertsSection {...defaultProps} />);
-
-    await user.click(screen.getByRole("combobox"));
-    await user.click(await screen.findByRole("option", { name: "Enabled" }));
-
-    expect(mockUpdateMutate).toHaveBeenCalledWith({
-      projectId: "proj-1",
-      key: "alert_email",
-      value: "true",
-    });
-  });
-
-  it('calls update mutation with "false" when Disabled is selected', async () => {
-    const user = userEvent.setup();
-    render(<ProjectAlertsSection {...defaultProps} />);
-
-    await user.click(screen.getByRole("combobox"));
-    await user.click(await screen.findByRole("option", { name: "Disabled" }));
-
-    expect(mockUpdateMutate).toHaveBeenCalledWith({
-      projectId: "proj-1",
-      key: "alert_email",
-      value: "false",
-    });
-  });
-
-  it("calls delete mutation when Inherit is selected and project value was set", async () => {
-    mockUseProjectSettings.mockReturnValue({
-      data: { data: [{ key: "alert_email", value: "false" }] },
-      isLoading: false,
-    });
-    const user = userEvent.setup();
-    render(<ProjectAlertsSection {...defaultProps} />);
-
-    await user.click(screen.getByRole("combobox"));
-    await user.click(await screen.findByRole("option", { name: /Inherit from organisation/ }));
-
-    expect(mockDeleteMutate).toHaveBeenCalledWith({
-      projectId: "proj-1",
-      key: "alert_email",
-    });
-  });
-
-  it("does not call delete mutation when Inherit is selected and no project value was set", async () => {
-    const user = userEvent.setup();
-    render(<ProjectAlertsSection {...defaultProps} />);
-
-    await user.click(screen.getByRole("combobox"));
-    await user.click(await screen.findByRole("option", { name: /Inherit from organisation/ }));
-
-    expect(mockDeleteMutate).not.toHaveBeenCalled();
-  });
-
-  it('shows override helper text when project email setting is "true"', () => {
-    mockUseProjectSettings.mockReturnValue({
-      data: { data: [{ key: "alert_email", value: "true" }] },
-      isLoading: false,
-    });
-
-    render(<ProjectAlertsSection {...defaultProps} />);
-
-    expect(screen.getByText("Overriding: email alerts enabled for this project")).toBeInTheDocument();
-  });
-
-  it('shows override helper text when project email setting is "false"', () => {
-    mockUseProjectSettings.mockReturnValue({
-      data: { data: [{ key: "alert_email", value: "false" }] },
-      isLoading: false,
-    });
-
-    render(<ProjectAlertsSection {...defaultProps} />);
-
-    expect(screen.getByText("Overriding: email alerts disabled for this project")).toBeInTheDocument();
+    expect(screen.getByText("Failed to save. Please try again.")).toBeInTheDocument();
   });
 });

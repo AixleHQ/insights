@@ -39,18 +39,75 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Hide all default Keycloak elements */
-#kc-header,
-#kc-header-wrapper,
-#kc-content,
-#kc-content-wrapper,
-.kc-logo-text,
-#kc-locale,
-#kc-page-title,
-.login-pf-page,
-.card-pf {
-  all: unset;
-  display: contents;
+/* Stock Keycloak flows (device code, OAuth consent, success/info) — class is on
+   <html class="login-pf">, not on <body>. login.ftl is standalone + inline CSS. */
+html.login-pf .login-pf-page {
+  display: block;
+  min-height: 100vh;
+  background-color: var(--db90-bg);
+}
+
+html.login-pf #kc-header,
+html.login-pf .login-pf-page-header,
+html.login-pf #kc-header-wrapper {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: var(--db90-muted) !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+html.login-pf .login-pf-header {
+  background: transparent !important;
+  border: none !important;
+  margin-bottom: 0.5rem;
+}
+
+html.login-pf .card-pf {
+  display: block;
+  max-width: 32rem;
+  margin: 2rem auto;
+  padding: 2rem;
+  background-color: var(--db90-card) !important;
+  border-radius: var(--db90-radius-lg);
+  border: 1px solid var(--db90-border);
+  color: var(--db90-text);
+  box-shadow: none !important;
+}
+
+html.login-pf #kc-page-title {
+  color: var(--db90-text) !important;
+  margin-bottom: 1rem;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+html.login-pf #kc-content,
+html.login-pf #kc-content-wrapper,
+html.login-pf #kc-info-message,
+html.login-pf #kc-info-message .instruction {
+  color: var(--db90-muted) !important;
+}
+
+html.login-pf .pf-c-form-control,
+html.login-pf input[type="text"],
+html.login-pf input[type="password"] {
+  background-color: var(--db90-input-bg);
+  border: 1px solid var(--db90-border);
+  color: var(--db90-text);
+}
+
+html.login-pf .pf-c-button.pf-m-primary,
+html.login-pf input.pf-c-button.pf-m-primary,
+html.login-pf input[type="submit"].pf-c-button {
+  background-color: var(--db90-primary) !important;
+  color: var(--db90-primary-foreground) !important;
+  border: none !important;
+}
+
+html.login-pf label.pf-c-form__label,
+html.login-pf .pf-c-form__label-text {
+  color: var(--db90-text) !important;
 }
 
 /* Main container - full viewport split layout */
@@ -467,13 +524,13 @@ a:hover {
   text-decoration: underline;
 }
 
-/* Hide default Keycloak elements that might leak through */
-.login-pf-page .card-pf,
-.login-pf-page #kc-header,
-.login-pf-page #kc-header-wrapper,
-#kc-info-wrapper,
-#kc-form-options,
-#kc-registration {
+/* Hide default Keycloak elements only on the custom DB90 login screen. */
+body.db90-custom-login .login-pf-page .card-pf,
+body.db90-custom-login .login-pf-page #kc-header,
+body.db90-custom-login .login-pf-page #kc-header-wrapper,
+body.db90-custom-login #kc-info-wrapper,
+body.db90-custom-login #kc-form-options,
+body.db90-custom-login #kc-registration {
   display: none !important;
 }
 

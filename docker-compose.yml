@@ -121,6 +121,7 @@ services:
       - "3000:3000"
     volumes:
       - ./packages/api:/app
+      - ./temporal:/temporal
       - api-bundle:/usr/local/bundle
     environment:
       RAILS_ENV: development
@@ -146,6 +147,7 @@ services:
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
+      RAW_EVENTS_BUCKET: raw-events
     depends_on:
       postgres:
         condition: service_healthy
@@ -210,10 +212,27 @@ services:
       TEMPORAL_HOST: temporal:7233
       TEMPORAL_NAMESPACE: default
       TEMPORAL_TASK_QUEUE: db90-tasks
+      RAILS_API_URL: http://api:3000
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: raw-events
+      RAW_EVENTS_BUCKET: raw-events
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
     depends_on:
-      - temporal
-    profiles:
-      - worker
+      temporal:
+        condition: service_started
+      api:
+        condition: service_started
+      minio:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "ruby", "-e", "require 'net/http'; Net::HTTP.get_response(URI('http://localhost:7234/health')).is_a?(Net::HTTPSuccess) || exit(1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
 
   remote:
     build:
@@ -232,7 +251,7 @@ services:
       - AWS_SESSION_TOKEN
       - AWS_SECURITY_TOKEN
       - AWS_SESSION_EXPIRATION
-      - PROJECT=db90
+      - PROJECT=${PROJECT:-db90}
       - USE_IMAGE_TAG_ENV_PREFIX=true
       - CI_COMMIT_SHA
       - CI_COMMIT_BRANCH
@@ -251,11 +270,13 @@ services:
       - AWS_SESSION_TOKEN
       - AWS_SECURITY_TOKEN
       - AWS_SESSION_EXPIRATION
-      - PROJECT=db90
+      - PROJECT=${PROJECT:-db90}
       - USE_IMAGE_TAG_ENV_PREFIX=true
       - CI_COMMIT_SHA
       - CI_COMMIT_BRANCH
       - DOCKER_DEFAULT_PLATFORM=linux/amd64
+      - GHCR_TOKEN
+      - GHCR_USER
     volumes:
       - .:/app:cached
       - /var/run/docker.sock:/var/run/docker.sock

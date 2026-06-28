@@ -15,6 +15,7 @@ const mockUseMemberStats = vi.fn();
 const mockUseMemberEvents = vi.fn();
 const mockUseProject = vi.fn();
 const mockUseEvents = vi.fn();
+const mockUseEvent = vi.fn();
 
 vi.mock("@/hooks/useApi", () => ({
   useMember: (...args: unknown[]) => mockUseMember(...args),
@@ -22,6 +23,7 @@ vi.mock("@/hooks/useApi", () => ({
   useMemberEvents: (...args: unknown[]) => mockUseMemberEvents(...args),
   useProject: (...args: unknown[]) => mockUseProject(...args),
   useEvents: (...args: unknown[]) => mockUseEvents(...args),
+  useEvent: (...args: unknown[]) => mockUseEvent(...args),
 }));
 
 const mockMember = {
@@ -70,6 +72,7 @@ function setupDefaultMocks() {
   mockUseMemberEvents.mockReturnValue({ data: emptyEventsResponse, isLoading: false });
   mockUseProject.mockReturnValue({ data: mockProject, isLoading: false });
   mockUseEvents.mockReturnValue({ data: emptyEventsResponse, isLoading: false });
+  mockUseEvent.mockReturnValue({ data: null, isLoading: false });
 }
 
 describe("MemberProfileView", () => {
@@ -84,9 +87,34 @@ describe("MemberProfileView", () => {
       expect(screen.getByText("Alice Johnson")).toBeInTheDocument();
     });
 
+    it("displays join date from camelCase createdAt field (API response format)", () => {
+      mockUseMember.mockReturnValue({
+        data: { ...mockMember, createdAt: "2024-03-15T12:00:00Z" },
+        isLoading: false,
+      });
+      render(<MemberProfileView memberId="mem-1" />);
+      expect(screen.getByText(/Joined Mar 15, 2024/)).toBeInTheDocument();
+    });
+
+    it("shows Unknown when createdAt is absent", () => {
+      mockUseMember.mockReturnValue({
+        data: { ...mockMember, createdAt: undefined },
+        isLoading: false,
+      });
+      render(<MemberProfileView memberId="mem-1" />);
+      expect(screen.getByText(/Joined Unknown/)).toBeInTheDocument();
+    });
+
     it("does not render project commits section", () => {
       render(<MemberProfileView memberId="mem-1" />);
       expect(screen.queryByText(/Commits in/)).not.toBeInTheDocument();
+    });
+
+    it("links back to /members", () => {
+      render(<MemberProfileView memberId="mem-1" />);
+
+      const backLinks = screen.getAllByRole("link").filter((link) => link.getAttribute("href") === "/members");
+      expect(backLinks.length).toBeGreaterThan(0);
     });
   });
 

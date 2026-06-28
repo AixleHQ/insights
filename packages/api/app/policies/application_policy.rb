@@ -13,11 +13,6 @@ class ApplicationPolicy < ActionPolicy::Base
     user.member_of?(org)
   end
 
-  def org_admin?(org = organization)
-    return false unless user && org
-    user.admin_of?(org)
-  end
-
   def org_owner?(org = organization)
     return false unless user && org
     user.role_in(org) == "owner"
@@ -39,14 +34,15 @@ class ApplicationPolicy < ActionPolicy::Base
   end
 
   def project_admin?(project)
-    return false unless user && project
-    membership = project.project_memberships.find_by(user: user)
-    membership&.admin?
+    project_owner?(project) # post-AIX-202: admin == owner; delegate to project_owner?
   end
 
   def project_owner?(project)
     return false unless user && project
     return true if project.personal? && project.owner_id == user.id
+    # Org owners are implicit project owners — no project_memberships row required (AIX-202)
+    return true if project.organization_project? && org_owner?(project.organization)
+
     membership = project.project_memberships.find_by(user: user)
     membership&.owner?
   end
@@ -60,6 +56,18 @@ class ApplicationPolicy < ActionPolicy::Base
 
   def same_user?(target_user)
     user && target_user && user.id == target_user.id
+  end
+
+  def org_alert_policy(org = organization)
+    org&.retention_policy
+  end
+
+  def project_alert_policy(project)
+    project&.retention_policy
+  end
+
+  def personal_alert_setting
+    user&.personal_setting
   end
 
   alias_rule :edit?, :update?, :destroy?, to: :manage?

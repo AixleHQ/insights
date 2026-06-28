@@ -14,8 +14,7 @@ class Project < ApplicationRecord
   validates :name, presence: true
   validates :slug, presence: true, format: { with: /\A[a-z0-9]+(?:-[a-z0-9]+)*\z/, message: "must be lowercase alphanumeric with hyphens" }
   validates :is_active, inclusion: { in: [ true, false ] }
-  validates :git_remote_url, uniqueness: { scope: :organization_id, allow_nil: true }, if: -> { organization_id.present? }
-  validates :git_remote_url, uniqueness: { scope: :owner_id, allow_nil: true }, if: -> { owner_id.present? }
+  validate :git_remote_url_unique_within_scope
   validate :must_belong_to_org_or_owner
 
   after_create :create_default_retention_policy
@@ -38,9 +37,37 @@ class Project < ApplicationRecord
     organization_id.present?
   end
 
+  # Canonicalizes a git remote to `https://<host>/<owner>/<repo>` so that the
+  # many shapes git emits (scp, ssh://, embedded credentials, ports, trailing
+  # slashes, `.git`) collapse to a single comparable identity. Note: the host
+  # is preserved as-is — SSH host aliases (e.g. `git@github-work:...`) cannot be
+  # resolved server-side (the mapping lives in the client's ~/.ssh/config), so
+  # they are handled by the host-agnostic path fallback in the lookup controller
+  # and by client-side `canonicalizeGitRemote`.
   def self.normalize_git_remote(url)
     return nil if url.blank?
-    url.strip.downcase.delete_suffix(".git")
+
+    normalized = url.strip
+    if (match = normalized.match(%r{\A[\w.-]+@([^:/]+):(.+)\z}))
+      # scp-like: [user@]host:path
+      normalized = "https://#{match[1]}/#{match[2]}"
+    elsif (match = normalized.match(%r{\A[a-z][a-z0-9+.\-]*://(.+)\z}i))
+      # explicit scheme (ssh://, git://, http(s)://): drop scheme, userinfo, port
+      rest = match[1].sub(%r{\A[^/@]+@}, "")
+      host, _, path = rest.partition("/")
+      host = host.sub(/:\d+\z/, "")
+      normalized = "https://#{host}/#{path}"
+    end
+
+    normalized = normalized.downcase.sub(%r{/+\z}, "")
+    normalized.delete_suffix(".git").sub(%r{/+\z}, "")
+  end
+
+  # Path identity (`<owner>/<repo>`) of a normalized remote, host-agnostic.
+  # Used as a fallback so SSH host aliases / host variants still resolve.
+  def self.git_remote_path(normalized)
+    return nil if normalized.blank?
+    normalized.sub(%r{\Ahttps://[^/]+/}, "").presence
   end
 
   private
@@ -60,6 +87,27 @@ class Project < ApplicationRecord
   def generate_slug
     return if slug.present?
     self.slug = name.to_s.parameterize
+  end
+
+  # Runs after normalize_git_remote_url_field, so git_remote_url is already canonical.
+  def git_remote_url_unique_within_scope
+    return if git_remote_url.blank?
+
+    if organization_id.present?
+      conflict = Project.where(organization_id: organization_id, git_remote_url: git_remote_url)
+                        .where.not(id: id).first
+      return unless conflict
+
+      errors.add(:git_remote_url,
+                 "is already linked to project \"#{conflict.name}\" in this organization")
+    elsif owner_id.present?
+      conflict = Project.where(owner_id: owner_id, git_remote_url: git_remote_url)
+                        .where.not(id: id).first
+      return unless conflict
+
+      errors.add(:git_remote_url,
+                 "is already linked to project \"#{conflict.name}\" on your account")
+    end
   end
 
   def must_belong_to_org_or_owner

@@ -44,6 +44,8 @@ interface ProviderConfig {
   scopes: { name: string; description: string }[];
   requiresWebhook: boolean;
   requiresOAuth: boolean;
+  docUrl?: string;
+  multiInstance?: boolean;
 }
 
 const providers: Record<string, ProviderConfig> = {
@@ -65,6 +67,8 @@ const providers: Record<string, ProviderConfig> = {
     ],
     requiresWebhook: true,
     requiresOAuth: true,
+    docUrl: "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/authorizing-oauth-apps",
+    multiInstance: true,
   },
   gitlab: {
     id: "gitlab",
@@ -83,6 +87,8 @@ const providers: Record<string, ProviderConfig> = {
     ],
     requiresWebhook: true,
     requiresOAuth: true,
+    docUrl: "https://docs.gitlab.com/ee/api/oauth2.html",
+    multiInstance: true,
   },
   bitbucket: {
     id: "bitbucket",
@@ -101,6 +107,8 @@ const providers: Record<string, ProviderConfig> = {
     ],
     requiresWebhook: true,
     requiresOAuth: true,
+    docUrl: "https://support.atlassian.com/bitbucket-cloud/docs/use-oauth-on-bitbucket-cloud/",
+    multiInstance: true,
   },
   jira: {
     id: "jira",
@@ -119,6 +127,8 @@ const providers: Record<string, ProviderConfig> = {
     ],
     requiresWebhook: false,
     requiresOAuth: true,
+    docUrl: "https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/",
+    multiInstance: true,
   },
   linear: {
     id: "linear",
@@ -137,6 +147,27 @@ const providers: Record<string, ProviderConfig> = {
     ],
     requiresWebhook: true,
     requiresOAuth: true,
+    docUrl: "https://developers.linear.app/docs/oauth/authentication",
+    multiInstance: true,
+  },
+  github_copilot: {
+    id: "github_copilot",
+    name: "github_copilot",
+    displayName: "GitHub Copilot",
+    description: "Connect GitHub Copilot to track real seat counts, acceptance rates, and daily active users via the GitHub Copilot Metrics API.",
+    features: [
+      "Daily usage sync from GitHub API",
+      "Acceptance rate analytics",
+      "Seat count tracking",
+      "Active user breakdown",
+    ],
+    scopes: [
+      { name: "manage_billing:copilot", description: "Access Copilot billing and usage data" },
+      { name: "read:org", description: "Read organization membership to resolve your GitHub org" },
+    ],
+    requiresWebhook: false,
+    requiresOAuth: true,
+    docUrl: "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/authorizing-oauth-apps",
   },
   "claude-code": {
     id: "claude-code",
@@ -166,6 +197,7 @@ export function IntegrationSetup() {
   const { data: projects } = useProjects(currentOrg?.id || "");
   const { mutateAsync: createConnector } = useCreateConnector();
   const isProcessingCallback = useRef(false);
+  const oauthPopupPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [step, setStep] = useState<SetupStep>("overview");
   const [isAuthorizing, setIsAuthorizing] = useState(false);
@@ -173,6 +205,7 @@ export function IntegrationSetup() {
   const [error, setError] = useState<string | null>(null);
   const [config, setConfig] = useState({
     name: "",
+    label: "",
     syncRepos: true,
     syncPRs: true,
     webhookEnabled: true,
@@ -181,11 +214,24 @@ export function IntegrationSetup() {
 
   const provider = providerKey ? providers[providerKey] : null;
 
+  // Clear popup poll on unmount to avoid state updates after component is gone
+  useEffect(() => {
+    return () => {
+      if (oauthPopupPollRef.current) clearInterval(oauthPopupPollRef.current);
+    };
+  }, []);
+
   // Listen for OAuth callback messages
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
       if (event.data?.type !== "integration_oauth_callback") return;
+
+      // Popup completed (success or error) — stop polling for manual close
+      if (oauthPopupPollRef.current) {
+        clearInterval(oauthPopupPollRef.current);
+        oauthPopupPollRef.current = null;
+      }
 
       const { code, error: oauthError } = event.data;
 
@@ -200,7 +246,12 @@ export function IntegrationSetup() {
         isProcessingCallback.current = true;
 
         try {
-          await createConnector({ orgId: currentOrg.id, code, connectorType: provider.name });
+          await createConnector({
+            orgId: currentOrg.id,
+            code,
+            connectorType: provider.name,
+            ...(config.label.trim() ? { label: config.label.trim() } : {}),
+          });
           setError(null);
           setIsAuthorizing(false);
           setStep("configure");
@@ -214,7 +265,7 @@ export function IntegrationSetup() {
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [currentOrg, provider, createConnector]);
+  }, [currentOrg, provider, createConnector, config.label]);
 
   if (!provider) {
     return (
@@ -236,6 +287,31 @@ export function IntegrationSetup() {
     setIsAuthorizing(true);
     setError(null);
 
+    // Clear any previous popup poll
+    if (oauthPopupPollRef.current) {
+      clearInterval(oauthPopupPollRef.current);
+      oauthPopupPollRef.current = null;
+    }
+
+    // Open popup synchronously within the user gesture context.
+    // Browsers block window.open() called after an await, so we open
+    // a blank popup first and navigate it to the auth URL once obtained.
+    const width = 600;
+    const height = 700;
+    const left = window.screenX + (window.innerWidth - width) / 2;
+    const top = window.screenY + (window.innerHeight - height) / 2;
+    const popup = window.open(
+      "about:blank",
+      "oauth_popup",
+      `width=${width},height=${height},left=${left},top=${top}`
+    );
+
+    if (!popup) {
+      setError("A popup window was blocked. Please allow popups for this site and try again.");
+      setIsAuthorizing(false);
+      return;
+    }
+
     try {
       // Get authorization URL from API
       const response = await api.get<{ data: { authorize_url: string } }>(
@@ -243,21 +319,19 @@ export function IntegrationSetup() {
       );
       const authUrl = response.data.authorize_url;
 
-      // Open popup for OAuth
-      const width = 600;
-      const height = 700;
-      const left = window.screenX + (window.innerWidth - width) / 2;
-      const top = window.screenY + (window.innerHeight - height) / 2;
+      // Navigate the already-open popup to the authorization URL
+      popup.location.href = authUrl;
 
-      window.open(
-        authUrl,
-        "oauth_popup",
-        `width=${width},height=${height},left=${left},top=${top}`
-      );
-
-      // The popup will post a message back when authorization is complete
-      // We listen for this in the useEffect above
+      // Poll so that closing the popup without completing OAuth resets the button
+      oauthPopupPollRef.current = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(oauthPopupPollRef.current!);
+          oauthPopupPollRef.current = null;
+          setIsAuthorizing(false);
+        }
+      }, 500);
     } catch (err) {
+      popup.close();
       const isNotConfigured =
         err instanceof ApiError &&
         (err.data as { code?: string })?.code === "integration_not_configured";
@@ -308,7 +382,7 @@ export function IntegrationSetup() {
         <div className="flex items-center gap-3">
           <ProviderLogo provider={provider.id} size="lg" showBackground />
           <div>
-            <h1 className="text-xl font-semibold">Connect {provider.displayName}</h1>
+            <h1 className="type-h3">Connect {provider.displayName}</h1>
             <p className="text-sm text-muted-foreground">Step-by-step setup wizard</p>
           </div>
         </div>
@@ -319,7 +393,7 @@ export function IntegrationSetup() {
         {(["overview", "authorize", "configure", "complete"] as SetupStep[]).map((s, i) => (
           <div key={s} className="flex items-center">
             <div
-              className={`flex size-8 items-center justify-center rounded-full text-xs font-medium transition-colors ${
+              className={`flex size-8 items-center justify-center rounded-full text-caption font-medium transition-colors ${
                 step === s
                   ? "bg-primary text-primary-foreground"
                   : ["overview", "authorize", "configure", "complete"].indexOf(step) > i
@@ -362,7 +436,7 @@ export function IntegrationSetup() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div>
-              <h3 className="mb-3 text-sm font-medium">Features</h3>
+              <h3 className="mb-3 type-label">Features</h3>
               <div className="grid gap-2">
                 {provider.features.map((feature) => (
                   <div key={feature} className="flex items-center gap-2 text-sm">
@@ -377,7 +451,7 @@ export function IntegrationSetup() {
               <>
                 <Separator />
                 <div>
-                  <h3 className="mb-3 flex items-center gap-2 text-sm font-medium">
+                  <h3 className="mb-3 flex items-center gap-2 type-label">
                     <Shield className="size-4" />
                     Required Permissions
                   </h3>
@@ -427,9 +501,24 @@ export function IntegrationSetup() {
                     <ProviderLogo provider={provider.id} size="lg" showBackground />
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    DB90 will request read-only access to monitor AI tool activity.
+                    Aixle Insights will request read-only access to monitor AI tool activity.
                     <br />
                     We never store your credentials.
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="oauth-label">Label <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <Input
+                    id="oauth-label"
+                    type="text"
+                    placeholder="e.g. Work org, Personal account"
+                    value={config.label}
+                    onChange={(e) => setConfig({ ...config, label: e.target.value })}
+                    autoComplete="off"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Optional display name for this connection.
                   </p>
                 </div>
 
@@ -438,13 +527,17 @@ export function IntegrationSetup() {
                     <Shield className="size-4 text-primary" />
                     <span className="text-sm">Secure OAuth 2.0 authorization</span>
                   </div>
-                  <a
-                    href="#"
-                    className="flex items-center gap-1 text-sm text-primary hover:underline"
-                  >
-                    Learn more
-                    <ExternalLink className="size-3" />
-                  </a>
+                  {provider.docUrl && (
+                    <a
+                      href={provider.docUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-sm text-primary hover:underline"
+                    >
+                      Learn more
+                      <ExternalLink className="size-3" />
+                    </a>
+                  )}
                 </div>
               </>
             ) : (
@@ -491,7 +584,7 @@ export function IntegrationSetup() {
           <CardHeader>
             <CardTitle className="text-lg">Configure Integration</CardTitle>
             <CardDescription>
-              Customize how DB90 syncs with {provider.displayName}.
+              Customize how Aixle Insights syncs with {provider.displayName}.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -503,7 +596,7 @@ export function IntegrationSetup() {
                 value={config.name}
                 onChange={(e) => setConfig({ ...config, name: e.target.value })}
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="type-caption text-muted-foreground">
                 A friendly name to identify this connection
               </p>
             </div>
@@ -511,12 +604,12 @@ export function IntegrationSetup() {
             <Separator />
 
             <div className="space-y-4">
-              <h3 className="text-sm font-medium">Sync Options</h3>
+              <h3 className="type-label">Sync Options</h3>
 
               <div className="flex items-center justify-between">
                 <div>
                   <Label>Sync Repositories</Label>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="type-caption text-muted-foreground">
                     Import repository metadata and activity
                   </p>
                 </div>
@@ -531,7 +624,7 @@ export function IntegrationSetup() {
               <div className="flex items-center justify-between">
                 <div>
                   <Label>Sync Pull Requests / MRs</Label>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="type-caption text-muted-foreground">
                     Track AI-assisted code changes
                   </p>
                 </div>
@@ -547,7 +640,7 @@ export function IntegrationSetup() {
                 <div className="flex items-center justify-between">
                   <div>
                     <Label>Enable Webhooks</Label>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="type-caption text-muted-foreground">
                       Receive real-time updates (recommended)
                     </p>
                   </div>
@@ -580,7 +673,7 @@ export function IntegrationSetup() {
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
+              <p className="type-caption text-muted-foreground">
                 Optionally link this integration to a specific project
               </p>
             </div>
@@ -614,9 +707,9 @@ export function IntegrationSetup() {
             <div className="mx-auto mb-6 flex size-16 items-center justify-center rounded-full bg-primary/10">
               <Check className="size-8 text-primary" />
             </div>
-            <h2 className="text-xl font-semibold">Connection Successful!</h2>
+            <h2 className="type-h3">Connection Successful!</h2>
             <p className="mt-2 text-muted-foreground">
-              Your {provider.displayName} account is now connected to DB90.
+              Your {provider.displayName} account is now connected to Aixle Insights.
             </p>
             <div className="mt-6 rounded-lg bg-muted/50 p-4">
               <p className="text-sm">

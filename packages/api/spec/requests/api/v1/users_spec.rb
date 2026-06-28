@@ -85,6 +85,105 @@ RSpec.describe 'Api::V1::Users', type: :request do
     end
   end
 
+  describe 'GET /api/v1/users/me/tool_accounts' do
+    let(:organization) { create(:organization) }
+    let!(:membership) { create(:organization_membership, user: user, organization: organization) }
+
+    it 'returns bad request without organization header' do
+      authenticated_get '/api/v1/users/me/tool_accounts', user: user
+
+      expect_bad_request
+    end
+
+    it 'returns forbidden when organization is not accessible' do
+      other_org = create(:organization)
+
+      authenticated_get '/api/v1/users/me/tool_accounts', user: user, organization: other_org
+
+      expect_forbidden
+    end
+
+    it 'returns unauthorized without authentication' do
+      get '/api/v1/users/me/tool_accounts', headers: { 'X-Organization-ID' => organization.id }
+
+      expect_unauthorized
+    end
+
+    context 'with organization header' do
+      before do
+        create(:user_tool_account, organization_membership: membership, tool_name: 'claude_code')
+        create(:user_tool_account, :cursor, organization_membership: membership)
+        create(:user_tool_account, :github_copilot, organization_membership: membership)
+      end
+
+      it 'returns only ingest-capable tool accounts for the current membership' do
+        authenticated_get '/api/v1/users/me/tool_accounts', user: user, organization: organization
+
+        expect_success
+        names = json_data.map { |row| row[:toolName] }
+        expect(names).to contain_exactly('claude_code', 'cursor')
+      end
+
+      it 'does not return another user ingest account in the same organization' do
+        other_membership = create(:organization_membership, user: other_user, organization: organization)
+        create(:user_tool_account, organization_membership: other_membership, tool_name: 'claude_code')
+
+        authenticated_get '/api/v1/users/me/tool_accounts', user: user, organization: organization
+
+        expect_success
+        account_ids = json_data.map { |row| row[:id] }
+        expect(account_ids).to match_array(membership.user_tool_accounts.where(tool_name: UserToolAccount::INGEST_TOOLS).pluck(:id))
+      end
+
+      it 'does not expose token fields in list payload' do
+        authenticated_get '/api/v1/users/me/tool_accounts', user: user, organization: organization
+
+        expect_success
+        forbidden_keys = %i[ingestToken accessToken refreshToken tokenHash access_token]
+        json_data.each do |row|
+          expect(row.keys & forbidden_keys).to be_empty
+        end
+      end
+
+      it 'returns lastUsedAt from the latest matching tool event' do
+        create(:tool_event, user: user, organization: organization, tool_name: 'claude_code', occurred_at: 3.days.ago)
+        create(:tool_event, user: user, organization: organization, tool_name: 'claude_code', occurred_at: 1.day.ago)
+
+        authenticated_get '/api/v1/users/me/tool_accounts', user: user, organization: organization
+
+        expect_success
+        claude = json_data.find { |r| r[:toolName] == 'claude_code' }
+        expect(Time.zone.parse(claude[:lastUsedAt])).to be_within(2.seconds).of(1.day.ago)
+      end
+
+      it 'does not attribute another user tool events to lastUsedAt' do
+        other = create(:user)
+        create(:organization_membership, user: other, organization: organization)
+        create(:tool_event, user: other, organization: organization, tool_name: 'claude_code', occurred_at: Time.current)
+
+        authenticated_get '/api/v1/users/me/tool_accounts', user: user, organization: organization
+
+        expect_success
+        claude = json_data.find { |r| r[:toolName] == 'claude_code' }
+        expect(claude[:lastUsedAt]).to be_nil
+      end
+
+      it 'scopes lastUsedAt to the current organization' do
+        create(:tool_event, user: user, organization: organization, tool_name: 'claude_code', occurred_at: 1.hour.ago)
+
+        other_org = create(:organization)
+        create(:organization_membership, user: user, organization: other_org)
+        create(:tool_event, user: user, organization: other_org, tool_name: 'claude_code', occurred_at: 10.seconds.ago)
+
+        authenticated_get '/api/v1/users/me/tool_accounts', user: user, organization: organization
+
+        expect_success
+        claude = json_data.find { |r| r[:toolName] == 'claude_code' }
+        expect(Time.zone.parse(claude[:lastUsedAt])).to be_within(2.seconds).of(1.hour.ago)
+      end
+    end
+  end
+
   describe 'GET /api/v1/users/me/settings' do
     let!(:setting) { create(:user_setting, user: user, key: 'theme', value: 'dark') }
 
@@ -257,6 +356,37 @@ RSpec.describe 'Api::V1::Users', type: :request do
 
         expect_bad_request
         expect(json_response[:error]).to eq('Not in impersonation mode')
+      end
+    end
+
+    context 'token revocation' do
+      let(:jti) { SecureRandom.uuid }
+
+      after { REDIS.del("impersonation:jti:#{jti}") }
+
+      it 'adds the jti to the Redis blocklist' do
+        impersonated_post_with_jti '/api/v1/users/me/stop_impersonation',
+                                   user: user,
+                                   impersonator: admin,
+                                   jti: jti
+
+        expect_success
+        expect(ImpersonationService.revoked?(jti)).to be true
+      end
+    end
+
+    context 'when claims are missing jti' do
+      it 'returns unprocessable_content' do
+        # Uses the special test-impersonation-nojti- token which the TestJwtAuthMiddleware
+        # sets jwt.impersonation = true but omits the jti claim.
+        headers = {
+          'Authorization' => "Bearer test-impersonation-nojti-#{user.id}-by-#{admin.id}",
+          'Content-Type' => 'application/json'
+        }
+        post '/api/v1/users/me/stop_impersonation', headers: headers
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(json_response[:error]).to eq('Token missing jti claim')
       end
     end
   end

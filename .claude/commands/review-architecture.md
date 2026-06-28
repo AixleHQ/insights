@@ -86,7 +86,7 @@ When evaluating solutions, follow this hierarchy:
 - [ ] Mass assignment without strong parameters
 - [ ] JWT token handling and session management correctness
 - [ ] Multi-tenancy isolation — every query scoped to the correct organization
-- [ ] Sensitive data exposure in logs, serializers, or API responses
+- [ ] Sensitive data exposure in logs, serializers, or API responses — Rails logger and any debug/verbose output must not interpolate tokens, session IDs, or PII; log event type or sanitized identifiers only
 - [ ] Unsafe redirects or user-controlled URLs
 
 #### Performance
@@ -112,6 +112,7 @@ When evaluating solutions, follow this hierarchy:
 - [ ] Memory allocation hotspots — large object creation in loops
 - [ ] ActiveRecord misuse — callbacks with side effects, inappropriate `after_commit`
 - [ ] Connection pool awareness for Sidekiq jobs and Temporal workers
+- [ ] **State machine logic in controllers** — AASM transition calls (`mark_x!`, `activate_x!`) in controller actions duplicate logic that belongs in a `before_validation` model callback. Bang methods raise `AASM::InvalidTransition` on failure, turning a recoverable validation error into an unhandled 500. Flag any controller that drives state transitions directly instead of delegating to the model.
 
 ### Backend Red Flags — Always CRITICAL
 
@@ -144,6 +145,7 @@ When evaluating solutions, follow this hierarchy:
 - [ ] Sensitive data (tokens, PII) stored in `localStorage` or exposed in component state
 - [ ] User-controlled data rendered without sanitization
 - [ ] Auth state assumptions — components that render sensitive UI without checking auth context
+- [ ] Sensitive identifiers in log output — `console.log`/`console.warn` in verbose/debug paths must never interpolate session IDs, tokens, API keys, or user-identifying values; log the event type or a count instead
 
 #### Performance & Rendering
 - [ ] Unnecessary re-renders — missing `useMemo`, `useCallback`, or `React.memo` where warranted

@@ -1,6 +1,74 @@
 require 'rails_helper'
 
 RSpec.describe Project, type: :model do
+  describe '.normalize_git_remote' do
+    it 'returns nil for blank input' do
+      expect(described_class.normalize_git_remote(nil)).to be_nil
+      expect(described_class.normalize_git_remote('')).to be_nil
+      expect(described_class.normalize_git_remote('   ')).to be_nil
+    end
+
+    it 'normalizes GitHub SCP-style SSH to canonical HTTPS without .git suffix' do
+      expect(described_class.normalize_git_remote('git@github.com:owner/repo.git')).to eq('https://github.com/owner/repo')
+    end
+
+    it 'normalizes SCP-style SSH case-insensitively for the git@ prefix' do
+      expect(described_class.normalize_git_remote('GIT@github.com:owner/repo.git')).to eq('https://github.com/owner/repo')
+    end
+
+    it 'normalizes HTTPS with .git suffix to the same canonical form as SSH' do
+      ssh = 'git@github.com:owner/repo.git'
+      https = 'https://github.com/owner/repo.git'
+      expect(described_class.normalize_git_remote(ssh)).to eq(described_class.normalize_git_remote(https))
+      expect(described_class.normalize_git_remote(https)).to eq('https://github.com/owner/repo')
+    end
+
+    it 'normalizes GitLab SCP-style SSH to canonical HTTPS' do
+      expect(described_class.normalize_git_remote('git@gitlab.com:group/project.git')).to eq('https://gitlab.com/group/project')
+    end
+
+    it 'strips whitespace before matching and normalizing' do
+      expect(described_class.normalize_git_remote("  git@github.com:owner/repo.git  \n")).to eq('https://github.com/owner/repo')
+    end
+
+    it 'preserves non-SSH URLs with strip, downcase, and .git removal only' do
+      expect(described_class.normalize_git_remote('HTTPS://Example.COM/foo/bar.GIT')).to eq('https://example.com/foo/bar')
+    end
+
+    it 'normalizes ssh:// scheme URLs to canonical HTTPS' do
+      expect(described_class.normalize_git_remote('ssh://git@github.com/owner/repo.git')).to eq('https://github.com/owner/repo')
+    end
+
+    it 'strips embedded credentials' do
+      expect(described_class.normalize_git_remote('https://x-access-token:SECRET@github.com/owner/repo.git')).to eq('https://github.com/owner/repo')
+    end
+
+    it 'strips ports' do
+      expect(described_class.normalize_git_remote('ssh://git@github.com:22/owner/repo.git')).to eq('https://github.com/owner/repo')
+    end
+
+    it 'strips trailing slashes, including after a .git suffix' do
+      expect(described_class.normalize_git_remote('https://github.com/owner/repo/')).to eq('https://github.com/owner/repo')
+      expect(described_class.normalize_git_remote('https://github.com/owner/repo.git/')).to eq('https://github.com/owner/repo')
+    end
+
+    it 'preserves the host for SSH aliases (path fallback handles them, not normalization)' do
+      expect(described_class.normalize_git_remote('git@github-work:owner/repo.git')).to eq('https://github-work/owner/repo')
+    end
+  end
+
+  describe '.git_remote_path' do
+    it 'returns the host-agnostic owner/repo path' do
+      expect(described_class.git_remote_path('https://github.com/owner/repo')).to eq('owner/repo')
+      expect(described_class.git_remote_path('https://github-work/owner/repo')).to eq('owner/repo')
+    end
+
+    it 'returns nil for blank input' do
+      expect(described_class.git_remote_path(nil)).to be_nil
+      expect(described_class.git_remote_path('')).to be_nil
+    end
+  end
+
   describe 'associations' do
     it { should belong_to(:organization).optional }
     it { should belong_to(:owner).class_name('User').optional }
@@ -44,18 +112,18 @@ RSpec.describe Project, type: :model do
 
       it 'rejects duplicate git_remote_url within the same organization' do
         org = create(:organization)
-        create(:project, organization: org, git_remote_url: 'git@github.com:org/repo.git')
+        existing = create(:project, organization: org, git_remote_url: 'git@github.com:org/repo.git')
         duplicate = build(:project, organization: org, git_remote_url: 'git@github.com:org/repo.git')
         expect(duplicate).not_to be_valid
-        expect(duplicate.errors[:git_remote_url]).to be_present
+        expect(duplicate.errors[:git_remote_url].first).to include(existing.name)
       end
 
       it 'rejects duplicate git_remote_url for the same personal owner' do
         user = create(:user)
-        create(:project, :personal, owner: user, git_remote_url: 'git@github.com:user/repo.git')
+        existing = create(:project, :personal, owner: user, git_remote_url: 'git@github.com:user/repo.git')
         duplicate = build(:project, :personal, owner: user, git_remote_url: 'git@github.com:user/repo.git')
         expect(duplicate).not_to be_valid
-        expect(duplicate.errors[:git_remote_url]).to be_present
+        expect(duplicate.errors[:git_remote_url].first).to include(existing.name)
       end
 
       it 'allows nil git_remote_url in the same organization' do

@@ -22,9 +22,13 @@ Rails.application.routes.draw do
       get "users/me", to: "users#me"
       patch "users/me", to: "users#update"
       get "users/me/organizations", to: "users#organizations"
+      get "users/me/favorites", to: "users#favorites"
       get "users/me/settings", to: "users#settings"
+      get "users/me/tool_accounts", to: "users#tool_accounts"
       put "users/me/settings/:key", to: "users#update_setting"
       delete "users/me/settings/:key", to: "users#destroy_setting"
+      get   "users/me/personal_settings", to: "user_personal_settings#show"
+      patch "users/me/personal_settings", to: "user_personal_settings#update"
       post "users/me/stop_impersonation", to: "users#stop_impersonation"
 
       # Organization routes
@@ -32,16 +36,26 @@ Rails.application.routes.draw do
         member do
           get :retention_policy
           patch :retention_policy, action: :update_retention_policy
+          get :retention_preview
           get :settings
           put "settings/:key", action: :update_setting
           delete "settings/:key", action: :destroy_setting
+          get :model_pricing, to: "model_pricing#index"
         end
+
+        # Pricing overrides (CRUD)
+        resources :model_pricing_overrides,
+          path: "model_pricing/overrides",
+          only: %i[index create update destroy]
 
         # Organization members
         resources :members, controller: "organization_members" do
           member do
             get :stats
             get :events
+            get :dashboard_stats
+            get :prompt_insights
+            get "stats/heatmap", action: :member_heatmap
           end
         end
 
@@ -52,8 +66,23 @@ Rails.application.routes.draw do
           end
         end
 
-        # Organization audit logs
+        # Notification routing configuration
+        resources :notification_routes, only: %i[index create update destroy]
+
+        # Organization audit logs (export + unified must precede the resource to avoid capture by :index)
+        get "audit_logs/unified/export", to: "unified_audit_logs#export"
+        get "audit_logs/unified",        to: "unified_audit_logs#index"
         resources :audit_logs, controller: "organization_audit_logs", only: [ :index ]
+
+        # Retention purge logs (compliance evidence)
+        resources :retention_logs, controller: "retention_purge_logs", only: [ :index ]
+
+        # Webhook delivery history and retry
+        resources :webhook_deliveries, only: [ :index ] do
+          member do
+            post :retry, action: :retry_action
+          end
+        end
 
         # Organization connectors
         resources :connectors, controller: "organization_connectors" do
@@ -65,10 +94,14 @@ Rails.application.routes.draw do
             get  :sync_status
           end
           collection do
+            get :health
             get "authorize/:type", action: :authorize_url
             post :callback
           end
         end
+
+        # Org-level provider enable/disable settings (Admin manage catalog)
+        resources :organization_provider_settings, only: [ :index, :update ], param: :provider
 
         # User tool accounts (scoped to current user's membership)
         resources :tool_accounts, controller: "user_tool_accounts" do
@@ -83,11 +116,21 @@ Rails.application.routes.draw do
         # Events
         resources :events, only: [ :index, :show ] do
           collection do
-            get :summary
-            get :unattributed
+            get  :summary
+            get  :unattributed
+            get  :export
+            post :attribute_bulk
           end
           member do
-            get :audit_trail
+            get  :audit_trail
+            post :attribute
+          end
+        end
+
+        # Async export job status (> 100k row exports)
+        resources :event_export_jobs, only: [ :show ] do
+          member do
+            get :download
           end
         end
 
@@ -97,10 +140,14 @@ Rails.application.routes.draw do
 
         # Stats
         get "stats/overview", to: "stats#overview"
+        get "stats/active_users", to: "stats#active_users"
         get "stats/hourly", to: "stats#hourly"
         get "stats/daily", to: "stats#daily"
         get "stats/daily_by_tool", to: "stats#daily_by_tool"
         get "stats/heatmap", to: "stats#heatmap"
+        get "stats/risk_alerts",    to: "stats#risk_alerts"
+        get "stats/daily_by_model", to: "stats#daily_by_model"
+        get "stats/active_tools",  to: "stats#active_tools"
 
         # Tool-scoped stats
         get "stats/tools/:tool_name/overview",    to: "stats#tool_overview"
@@ -117,11 +164,24 @@ Rails.application.routes.draw do
         end
       end
 
+      # OpenRouter Broadcast Webhook — receives OTLP per-request traces.
+      # Each connector gets a unique webhook_token embedded in the URL for routing.
+      # Public endpoint: no Keycloak JWT required.
+      # Must be declared before the wildcard webhooks route.
+      post "webhooks/openrouter_traces/:webhook_token", to: "openrouter_traces#receive"
+
       # Webhooks (outside organization scope, uses connector_id)
       post "webhooks/:provider/:connector_id", to: "webhooks#receive"
 
       # Public ingest endpoint — Bearer token auth, no JWT/org context
       post "ingest/events", to: "ingest#create"
+
+      # MCP integration: exchanges an authenticated OIDC session for a fresh
+      # UserToolAccount ingest token. Called once by the MCP client after a
+      # successful Keycloak device-flow login (see plan/tasks/07-mcp-auth.md).
+      namespace :integrations do
+        post "mcp/exchange", to: "mcp#exchange"
+      end
 
       # Project lookup by git remote — Bearer ingest token auth, no JWT.
       # Must be declared before `resources :projects` so "lookup" isn't matched as an :id.
@@ -136,17 +196,22 @@ Rails.application.routes.draw do
           get :stats
           get "stats/daily_by_tool", action: :daily_by_tool
           get "stats/commits_by_user", action: :commits_by_user
-          get :members
           get :retention_policy
           patch :retention_policy, action: :update_retention_policy
           post :link_jira
+          post :link_linear
           post :sync_issues
+          post :favorite
+          delete :favorite, action: :unfavorite
         end
 
         resources :issues, only: [ :index, :show ]
 
         # Project members
-        resources :members, controller: "project_members"
+        resources :members, controller: "project_members" do
+          collection { get :stats }
+          member { get :breakdown }
+        end
 
         # Project repositories
         resources :repositories do

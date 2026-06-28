@@ -10,8 +10,11 @@ export interface User {
   email: string;
   name: string | null;
   avatarUrl: string | null;
-  role: "admin" | "member" | "viewer";
-  super_admin: boolean;
+  role: "owner" | "member" | "viewer";
+  /** Platform-wide admin (API key `global_admin`, Alba camelCase `globalAdmin`). */
+  globalAdmin?: boolean;
+  /** Alternate naming used in some mocks / legacy code paths. */
+  super_admin?: boolean;
   created_at: string;
   updated_at: string;
   lastSignInAt: string | null;
@@ -44,14 +47,19 @@ export interface OrganizationWithStats extends Organization {
 // Organization member types
 export interface OrganizationMember {
   id: string;
-  user_id: string;
+  /** API JSON uses camelCase (`userId`). */
+  userId?: string;
+  user_id?: string;
   organization_id: string;
-  role: "owner" | "admin" | "member" | "viewer";
+  role: "owner" | "member" | "viewer";
   user: User;
-  created_at: string;
-  updated_at: string;
+  createdAt?: string;
+  updatedAt?: string;
   total_tokens?: number;
+  total_events?: number;
+  total_cost?: number;
   last_active_at?: string | null;
+  cli_connected?: boolean;
 }
 
 // Project types
@@ -83,11 +91,37 @@ export interface ProjectWithStats extends Project {
   connectors: { id: string; provider: string }[];
   jiraProjectKey?: string | null;
   jiraConnectorId?: string | null;
+  linearProjectId?: string | null;
+  linearProjectName?: string | null;
+  linearConnectorId?: string | null;
+  sourceControlSummary?: SourceControlSummary[];
+  issueThroughputSummary?: IssueThroughputSummary[];
+}
+
+export interface SourceControlSummary {
+  provider: string;
+  repositoryCount: number;
+  commitCount: number;
+  reviewCount: number;
+  pipelineCount: number;
+  lastActivityAt: string | null;
+  lastSyncAt: string | null;
+}
+
+export interface IssueThroughputSummary {
+  provider: string;
+  issueCount: number;
+  completedCount: number;
+  stateChangeCount: number;
+  cycleCount: number;
+  lastActivityAt: string | null;
+  lastSyncAt: string | null;
 }
 
 // Connector types
-export type ConnectorProvider = "github" | "gitlab" | "bitbucket" | "jira" | "linear" | "anthropic" | "openai" | "openrouter" | "gemini" | "slack";
+export type ConnectorProvider = "github" | "gitlab" | "bitbucket" | "jira" | "linear" | "anthropic" | "openai" | "openrouter" | "gemini" | "slack" | "github_copilot";
 export type ConnectorStatus = "connected" | "testing" | "error" | "disconnected";
+export type ConnectorScope = "org" | "project" | "persona";
 
 export interface Connector {
   id: string;
@@ -98,6 +132,8 @@ export interface Connector {
   isActive: boolean;
   is_active?: boolean;
   status: ConnectorStatus;
+  scope: ConnectorScope;
+  label?: string | null;
   externalAccountId?: string | null;
   external_account_id?: string | null;
   externalAccountName?: string | null;
@@ -106,12 +142,27 @@ export interface Connector {
   last_sync_at?: string | null;
   lastError?: string | null;
   last_error?: string | null;
+  repositoryCount?: number;
+  repository_count?: number;
+  syncedEventCount?: number;
+  synced_event_count?: number;
+  lastEventAt?: string | null;
+  last_event_at?: string | null;
   tokenExpired?: boolean;
   token_expired?: boolean;
   createdAt?: string;
   created_at?: string;
   updatedAt?: string;
   updated_at?: string;
+  // GitHub Copilot-specific fields (camelCase only — serialized by Alba with transform_keys :lower_camel)
+  seatCount?: number | null;
+  activeUsersCount?: number | null;
+  copilotConnector?: boolean;
+  config?: Record<string, unknown>;
+  // Webhook fields (OpenRouter-specific)
+  webhookActive?: boolean;
+  webhookToken?: string;
+  webhookSecretSet?: boolean;
 }
 
 // Project connector types
@@ -126,6 +177,7 @@ export interface ProjectConnector {
   isActive: boolean;
   is_active?: boolean;
   status: ConnectorStatus;
+  scope: ConnectorScope;
   externalAccountId?: string | null;
   external_account_id?: string | null;
   externalAccountName?: string | null;
@@ -146,7 +198,7 @@ export interface ProjectConnector {
 export interface ToolAccount {
   id: string;
   toolName: string;
-  isActive: boolean;
+  connectionState: "inactive" | "active" | "waiting_for_connection";
   externalUserId: string | null;
   externalUsername: string | null;
   externalEmail: string | null;
@@ -155,12 +207,49 @@ export interface ToolAccount {
   tokenExpiresAt: string | null;
   createdAt: string;
   updatedAt: string;
+  lastUsedAt?: string | null;
+  scope: ConnectorScope;
   ingestToken?: string; // one-time, only present immediately after create/regenerate
 }
 
+/** Current user's ingest tool rows from GET /users/me/tool_accounts (no persisted token). */
+export interface MyToolAccountMetadata {
+  id: string;
+  toolName: string;
+  displayName: string;
+  connectionState: "inactive" | "active" | "waiting_for_connection";
+  createdAt: string;
+  updatedAt: string;
+  lastUsedAt: string | null;
+}
+
+/** Response body `data` from POST /integrations/mcp/exchange (subset used by Settings). */
+export interface McpIngestExchangeData {
+  ingestHost: string;
+  organizationId: string;
+  ingestToken?: string;
+  toolName?: string;
+  accounts?: Record<string, { ingestToken: string }>;
+}
+
 // Event types
-export type RiskLevel = "none" | "low" | "medium" | "high" | "critical";
-export type EventType = "completion" | "prompt" | "chat" | "edit" | "generation";
+export const RISK_LEVELS = ["none", "low", "medium", "high", "critical"] as const;
+export type RiskLevel = (typeof RISK_LEVELS)[number];
+export type EventType =
+  | "chat"
+  | "completion"
+  | "edit"
+  | "commit"
+  | "review"
+  | "test"
+  | "debug"
+  | "refactor"
+  | "documentation"
+  | "other"
+  | "issue"
+  | "comment"
+  | "sprint"
+  | "tool_use";
 
 export interface ToolEvent {
   id: string;
@@ -177,10 +266,13 @@ export interface ToolEvent {
   tokensTotal?: number | null;
   model: string | null;
   securityFindings: SecurityFinding[];
-  user: { id: string; email: string; name: string | null } | null;
+  user: { id: string; email: string; name: string | null; avatarUrl?: string | null } | null;
   project: { id: string; name: string } | null;
   createdAt: string;
   occurredAt: string;
+  correlationMethod?: string | null;
+  correlationConfidence?: number | null;
+  suggestedUser?: { id: string; email: string; name: string | null; avatarUrl?: string | null } | null;
   // Detail-only fields (returned by the show endpoint, not the list endpoint)
   sanitizedContent?: string | null;
   metadata?: Record<string, unknown> | null;
@@ -210,15 +302,22 @@ export interface OverviewStats {
   events_today: number;
   cost_today_usd: number;
   active_users: number;
-  high_risk_events: number;
-  events_change_percent: number;
-  cost_change_percent: number;
+  risk_alerts: number;
+  events_change_percent: number | null;
+  cost_change_percent: number | null;
   // Token metrics
   total_tokens_in?: number;
   total_tokens_out?: number;
   total_tokens?: number;
   tokens_today?: number;
 }
+
+// Discriminated union for the dashboard period selector.
+// type: "month" = a specific calendar month (value = "YYYY-MM")
+// type: "all_time" = unbounded, all available history
+export type DashboardPeriod =
+  | { type: "month"; value: string }
+  | { type: "all_time" };
 
 export interface DailyStats {
   date: string;
@@ -252,6 +351,11 @@ export interface Alert {
   message: string;
   is_read: boolean;
   created_at: string;
+  triggered_by?: string;
+  project_name?: string;
+  project_id?: string;
+  event_id?: string;
+  notification_status?: "sent" | "failed" | "pending";
 }
 
 // Audit log types (shared shape — both serializers output identical JSON)
@@ -260,15 +364,32 @@ export interface AuditLog {
   action: string;
   resourceType: string | null;
   resourceId: string | null;
-  trackedChanges: Record<string, unknown>;
+  /** Absent for project-admin callers (non-org-admin); present for org admins and global admins */
+  trackedChanges?: Record<string, unknown>;
   metadata: Record<string, unknown>;
-  ipAddress: string | null;
+  /** Absent for project-admin callers (non-org-admin); present for org admins and global admins */
+  ipAddress?: string | null;
   createdAt: string;
   actor: { id: string; email: string; name: string | null } | null;
 }
 
 export type OrganizationAuditLog = AuditLog;
 export type ProjectAuditLog = AuditLog;
+
+export interface UnifiedAuditLog extends AuditLog {
+  scope: "organization" | "project" | "admin";
+  severity: "info" | "warning" | "critical" | null;
+  outcome: "success" | "failure" | null;
+  userAgent?: string | null;
+}
+
+export interface UnifiedPaginatedMeta {
+  current_page: number;
+  total_pages: number;
+  total_count: number;
+  per_page: number;
+  truncated: boolean;
+}
 
 // Pagination types
 export interface PaginatedResponse<T> {
@@ -292,6 +413,9 @@ export interface RetentionPolicy {
   toolEventsRetention: ToolEventsRetention;
   hourlyAggregateRetention: HourlyAggregateRetention;
   dailyAggregateRetention: DailyAggregateRetention;
+  costThresholdCents: number | null;
+  tokenThreshold: number | null;
+  alertEnabled: boolean;
 }
 
 export interface ProjectRetentionPolicy {
@@ -303,13 +427,58 @@ export interface ProjectRetentionPolicy {
   dailyAggregateRetention: DailyAggregateRetention;
   retentionReason?: string;
   updatedById?: string;
+  costThresholdCents: number | null;
+  tokenThreshold: number | null;
+  alertEnabled: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
+export interface UserPersonalSettings {
+  id: string | null;
+  costThresholdCents: number | null;
+  tokenThreshold: number | null;
+  alertEmail: boolean;
+  alertSlack: boolean;
+}
+
+export interface NotificationRoute {
+  id: string;
+  organizationId: string;
+  notificationType: "cost_alert" | "token_alert" | "retention_warning" | "risk_alert";
+  recipientType: "role" | "user";
+  recipientRole: MemberRole | null;
+  recipientUserId: string | null;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RetentionPreview {
+  cutoffDate: string | null;
+  estimatedRecords: number | null;
+}
+
+export type RetentionPurgeStatus = "success" | "partial" | "failed";
+export type RetentionPolicyType = "org" | "project";
+
+export interface RetentionPurgeLog {
+  id: number;
+  organizationId: string;
+  projectId: string | null;
+  retentionPolicyType: RetentionPolicyType;
+  retentionDaysApplied: number;
+  cutoffTimestamp: string;
+  recordsDeleted: number;
+  jobRunAt: string;
+  status: RetentionPurgeStatus;
+  errorMessage: string | null;
+  createdAt: string;
+}
+
 // Invitation types
 export type InvitationStatus = "pending" | "accepted" | "revoked" | "expired";
-export type MemberRole = "owner" | "admin" | "member" | "viewer";
+export type MemberRole = "owner" | "member" | "viewer";
 
 export interface Invitation {
   id: string;
@@ -374,6 +543,14 @@ export interface JiraProject {
   avatarUrl?: string;
 }
 
+export interface IssueProviderProject {
+  externalId: string;
+  key?: string;
+  name: string;
+  avatarUrl?: string;
+  state?: string;
+}
+
 // Tool analytics types (shared by Cursor & OpenRouter pages)
 export interface ToolOverviewStats {
   tool: string;
@@ -388,6 +565,9 @@ export interface ToolOverviewStats {
 
 export interface ToolModelStat {
   name: string;
+  provider?: string | null;
+  model?: string | null;
+  displayName?: string;
   eventCount: number;
   tokensIn: number;
   tokensOut: number;
@@ -433,9 +613,15 @@ export interface ToolUsersResponse {
   users: ToolUserStat[];
 }
 
+export interface ActiveUsersResponse {
+  active_users: number;
+  timeRange: { start: string; end: string };
+}
+
 export interface ToolDailyResponse {
   tool: string;
   timeRange: { start: string; end: string };
+  period: "day" | "week" | "month";
   daily: ToolDailyPoint[];
 }
 
@@ -451,4 +637,57 @@ export interface ConnectorSyncStatus {
   last_sync_at: string | null;
   last_error: string | null;
   total_events: number;
+}
+
+export interface ConnectorHealthStats {
+  id: string;
+  connector_type: string;
+  status: ConnectorStatus;
+  last_sync_at: string | null;
+  last_error: string | null;
+  success_rate_7d: number | null;
+  avg_sync_duration_ms_7d: number | null;
+}
+
+export interface ConnectorHealthSummary {
+  total: number;
+  connected: number;
+  testing: number;
+  error: number;
+  disconnected: number;
+}
+
+export interface ConnectorHealthRollup {
+  summary: ConnectorHealthSummary;
+  connectors: ConnectorHealthStats[];
+}
+
+export interface PricingEntry {
+  name: string;
+  input_per_mtok: number;
+  output_per_mtok: number;
+}
+
+export interface ModelPricingResponse {
+  models: PricingEntry[];
+  tools: PricingEntry[];
+}
+
+export interface ModelPricingOverride {
+  id: string;
+  modelPattern: string;
+  inputPerMtok: number;
+  outputPerMtok: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ModelPricingOverrideInput {
+  modelPattern: string;
+  inputPerMtok: number;
+  outputPerMtok: number;
+}
+
+export interface ModelPricingOverridesResponse {
+  data: ModelPricingOverride[];
 }

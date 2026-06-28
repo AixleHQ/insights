@@ -1,0 +1,949 @@
+import type { TelemetryToolId, StoredCredentials } from "./auth/credentials.js";
+import { join } from "node:path";
+import { existsSync } from "node:fs";
+import { processHooksQueue } from "./hooks/cursor-hooks-reader.js";
+import {
+  readState,
+  writeState,
+  markSessionSent,
+  getAppDir,
+  stateKey as credentialStateKey,
+  migrateLegacyState,
+  withMcpOperator,
+  type McpOperatorState,
+  type SyncResultSnapshot,
+} from "./state.js";
+import {
+  findTranscriptFiles,
+  parseTranscriptFile,
+  mapTranscriptTurn as mapClaudeTranscriptTurn,
+  isClaudeNoiseTranscriptTurn,
+  type ClaudeTranscriptTurn,
+} from "./readers/claude.js";
+import { prepareCursorSliceGroups } from "./collect-cursor-payloads.js";
+import {
+  CURSOR_DAILY_STATS_WATERMARK_KEY,
+  CURSOR_RECENT_COMMIT_WATERMARK_KEY,
+  cursorTranscriptTurnStateKey,
+} from "./cursor-checkpoints.js";
+import { printCursorDryRunValidationReport } from "./cursor-payload-contract.js";
+import { resolveCursorPricing } from "./cursor-config.js";
+import { postEvent, postEvents } from "./client.js";
+import { type PricingTable, getCostWarning } from "./pricing.js";
+import type { PricingConfig } from "./readers/cursor.js";
+import { acquireSyncLock } from "./lock.js";
+import {
+  getGitRemoteForPath,
+  lookupProjectByRemote,
+  type ProjectResolution,
+} from "./lib/index.js";
+import type { CursorDb90Payload } from "./readers/cursor.js";
+import { mcpLog } from "./log.js";
+
+/** Prefix for Claude Code session keys in shared MCP state. */
+export const CLAUDE_STATE_PREFIX = "claude_code:" as const;
+
+export {
+  CURSOR_WATERMARK_KEY,
+  CURSOR_EVENTS_WATERMARK_KEY,
+  CURSOR_DAILY_STATS_WATERMARK_KEY,
+  CURSOR_RECENT_COMMIT_WATERMARK_KEY,
+  CURSOR_TRANSCRIPT_TURN_PREFIX,
+  cursorTranscriptTurnStateKey,
+  filterRecentCommitsByHashDedup,
+} from "./cursor-checkpoints.js";
+
+export function sessionStateKey(sessionId: string): string {
+  return `${CLAUDE_STATE_PREFIX}${sessionId}`;
+}
+
+export interface SyncResult {
+  sent: number;
+  failed: number;
+  skipped: number;
+  locked?: boolean;
+  errors?: string[];
+  rateLimitedUntil?: string | null;
+  validationFailed?: boolean;
+}
+
+/** Legacy Claude-only sync options (backward compatible with existing tests/tooling). */
+export interface SyncOptions {
+  token: string;
+  host: string;
+  dryRun: boolean;
+  verbose: boolean;
+  projectId: string | null;
+  projectIdSource?: ProjectResolution["source"];
+  pricing: PricingTable;
+  appDir?: string;
+  transcriptBaseDirs?: string[];
+  /**
+   * When set, only Claude turns whose `cwd` matches this directory (exact or
+   * subdirectory) are synced. All matching turns use `projectId` directly
+   * — no per-turn remote lookup. Turns from other directories are skipped.
+   * Typically set to `process.cwd()` so each MCP instance is scoped to the
+   * repo it was launched from.
+   */
+  scopeDir?: string;
+}
+
+export interface MultiSyncOptions {
+  credentials: StoredCredentials;
+  dryRun: boolean;
+  verbose: boolean;
+  projectId: string | null;
+  projectIdSource?: ProjectResolution["source"];
+  /** Token for GET /projects/lookup (defaults to cursor ingest token in cursor slice). */
+  projectLookupToken?: string | null;
+  pricing: PricingTable;
+  /** Cursor line-cost rates (defaults + optional ~/.aixle-insights/config.json overrides). */
+  cursorPricing?: PricingConfig;
+  appDir?: string;
+  transcriptBaseDirs?: string[];
+  /** Synthetic Cursor paths for Vitest isolation. Omit for real installs. */
+  cursorBaseDir?: string;
+  cursorTranscriptProjectDirs?: string[];
+  tools?: TelemetryToolId[];
+  /** See SyncOptions.scopeDir. */
+  scopeDir?: string;
+  /** Ignore watermarks and commit hash dedupe (pairs with `--dry-run` on CLI). */
+  fullScan?: boolean;
+}
+
+const backoffUntilByCredential = new Map<string, Date>();
+
+/** Clears in-memory rate-limit backoff (test hook). */
+export function resetBackoffStateForTests(): void {
+  backoffUntilByCredential.clear();
+}
+
+let lastSyncAt: string | null = null;
+let lastSyncResult: SyncResult | null = null;
+let recentErrors: string[] = [];
+
+function syncResultToSnapshot(r: SyncResult): SyncResultSnapshot {
+  return {
+    sent: r.sent,
+    failed: r.failed,
+    skipped: r.skipped,
+    locked: r.locked,
+    rate_limited_until: r.rateLimitedUntil ?? null,
+    errors: r.errors,
+  };
+}
+
+function persistOperatorState(
+  appDir: string,
+  host: string,
+  credentials: StoredCredentials,
+  result: SyncResult,
+  errors: string[],
+  syncTimestamp: string
+): void {
+  const seen = new Set<string>();
+  for (const tok of Object.values(credentials.accounts)) {
+    if (typeof tok !== "string" || !tok.length || seen.has(tok)) continue;
+    seen.add(tok);
+    const st = readState(appDir, host, tok);
+    let nextOp: McpOperatorState;
+    if (result.locked) {
+      const prev = st.mcp_operator;
+      const lockMsg = "Sync skipped — another process holds the lock";
+      nextOp = {
+        last_sync_at: prev?.last_sync_at ?? null,
+        last_result: prev?.last_result ?? null,
+        recent_errors: [...(prev?.recent_errors ?? []), lockMsg].slice(-20),
+      };
+    } else {
+      nextOp = {
+        last_sync_at: syncTimestamp,
+        last_result: syncResultToSnapshot(result),
+        recent_errors:
+          errors.length > 0 || result.failed > 0 ? errors.slice(-20) : [],
+      };
+    }
+    writeState(withMcpOperator(st, nextOp), appDir, host, tok);
+  }
+}
+
+export function getSyncTelemetry(): {
+  lastSyncAt: string | null;
+  lastResult: SyncResult | null;
+  recentErrors: string[];
+} {
+  return { lastSyncAt, lastResult: lastSyncResult, recentErrors };
+}
+
+function recordTelemetry(
+  result: SyncResult,
+  errors: string[],
+  persistCtx?: { appDir: string; host: string; credentials: StoredCredentials }
+): void {
+  const syncTimestamp = new Date().toISOString();
+  if (!result.locked) {
+    lastSyncAt = syncTimestamp;
+    lastSyncResult = result;
+  }
+  if (result.locked) {
+    recentErrors = [...recentErrors, "Sync skipped — another process holds the lock"].slice(-20);
+  } else if (errors.length > 0 || result.failed > 0) {
+    recentErrors = errors.slice(-20);
+  } else {
+    recentErrors = [];
+  }
+
+  if (persistCtx) {
+    persistOperatorState(
+      persistCtx.appDir,
+      persistCtx.host,
+      persistCtx.credentials,
+      result,
+      errors,
+      syncTimestamp
+    );
+  }
+}
+
+function mergeCredentialRateLimit(backoffKeys: Set<string>): string | null {
+  let furthest: Date | null = null;
+  for (const bk of backoffKeys) {
+    const u = backoffUntilByCredential.get(bk);
+    if (u && new Date() < u && (!furthest || u > furthest)) furthest = u;
+  }
+  return furthest?.toISOString() ?? null;
+}
+
+function dedupeTools(tools: readonly TelemetryToolId[]): TelemetryToolId[] {
+  return [...new Set(tools)];
+}
+
+function explicitProjectId(
+  projectId: string | null,
+  projectIdSource?: ProjectResolution["source"]
+): string | undefined {
+  return projectId && (projectIdSource === "flag" || projectIdSource === "config")
+    ? projectId
+    : undefined;
+}
+
+async function resolveProjectIdForRepoPathCached(
+  repoPath: string | undefined,
+  host: string,
+  token: string,
+  verbose: boolean,
+  cache: Map<string, string | null>
+): Promise<string | null> {
+  const normalized = repoPath?.trim();
+  if (!normalized) return null;
+  if (cache.has(normalized)) return cache.get(normalized) ?? null;
+
+  const canonicalRemote = getGitRemoteForPath(normalized, verbose);
+  if (!canonicalRemote) {
+    cache.set(normalized, null);
+    return null;
+  }
+
+  const result = await lookupProjectByRemote(canonicalRemote, host, token, verbose);
+  const projectId = result && typeof result === "object" && "project_id" in result ? result.project_id : null;
+  cache.set(normalized, projectId);
+  return projectId;
+}
+
+export function cursorRepoPathFromPayload(payload: CursorDb90Payload): string | undefined {
+  const metadata = payload.metadata as Record<string, unknown> | undefined;
+  if (!metadata) return undefined;
+
+  if (typeof metadata.workspace_folder === "string" && metadata.workspace_folder.length > 0) {
+    return metadata.workspace_folder;
+  }
+
+  if (typeof metadata.workspace === "string" && metadata.workspace.length > 0) {
+    return metadata.workspace;
+  }
+
+  return undefined;
+}
+
+async function runClaudeSlice(options: SyncOptions): Promise<SyncResult> {
+  const { token, host, dryRun, verbose, projectId, pricing } = options;
+  const appDir = options.appDir ?? getAppDir();
+  const backoffKey = credentialStateKey(host, token);
+  const errors: string[] = [];
+
+  // Read state first so we can restore a persisted rate-limit backoff from a prior process.
+  let state = readState(appDir, host, token);
+  const persistedRateLimit = state.rate_limited_until ? new Date(state.rate_limited_until) : null;
+  if (persistedRateLimit && !Number.isNaN(persistedRateLimit.getTime())) {
+    const existing = backoffUntilByCredential.get(backoffKey);
+    if (!existing || persistedRateLimit > existing) {
+      backoffUntilByCredential.set(backoffKey, persistedRateLimit);
+    }
+  }
+
+  const backoffUntil = backoffUntilByCredential.get(backoffKey) ?? null;
+
+  if (backoffUntil && new Date() < backoffUntil) {
+    const until = backoffUntil.toISOString();
+    mcpLog.info("sync_rate_limit_skip", { tool: "claude_code", until }, verbose);
+    if (verbose) {
+      console.log(`[verbose] Rate limited — skipping until ${until}`);
+    } else {
+      console.warn(`[aixle-insights] Rate limited — skipping until ${until}`);
+    }
+    return {
+      sent: 0,
+      failed: 0,
+      skipped: 0,
+      rateLimitedUntil: until,
+    };
+  }
+
+  const files = findTranscriptFiles(options.transcriptBaseDirs);
+
+  if (verbose) {
+    console.log(`[verbose] Found ${files.length} transcript file(s)`);
+    mcpLog.info("sync_claude_transcripts", { files_found: files.length }, false);
+  }
+
+  const allFileTurns = await Promise.all(files.map((f) => parseTranscriptFile(f, verbose)));
+  const bestTurns = new Map<string, ClaudeTranscriptTurn>();
+  for (const fileTurns of allFileTurns) {
+    for (const turn of fileTurns) {
+      const existing = bestTurns.get(turn.turnId);
+      if (!existing || turn.fileSize > existing.fileSize) {
+        bestTurns.set(turn.turnId, turn);
+      }
+    }
+  }
+
+  const { scopeDir } = options;
+
+  let totalSent = 0;
+  let totalFailed = 0;
+  let totalSkipped = 0;
+  let shouldStopForBackoff = false;
+  const explicitProject = explicitProjectId(projectId, options.projectIdSource);
+  const projectLookupCache = new Map<string, string | null>();
+
+  for (const turn of bestTurns.values()) {
+    // Defense-in-depth: parseTranscriptFile already drops noise turns before returning.
+    // This guard only fires if the parser's filter is weakened in a future change.
+    if (isClaudeNoiseTranscriptTurn(turn)) {
+      totalSkipped++;
+      if (verbose) {
+        console.log(`[verbose] Skipping Claude noise turn ${turn.turnId} — local-command/meta`);
+      }
+      mcpLog.info(
+        "sync_noise_skip",
+        { tool: "claude_code", reason: "local_command_noise" },
+        false
+      );
+      continue;
+    }
+
+    // When scopeDir is set, skip turns from other directories.
+    if (scopeDir) {
+      const cwd = turn.cwd?.trim();
+      const inScope = cwd && (cwd === scopeDir || cwd.startsWith(scopeDir + "/"));
+      if (!inScope) {
+        totalSkipped++;
+        if (verbose) {
+          console.log(`[verbose] Skipping Claude turn ${turn.turnId} — cwd=${cwd ?? "(none)"} not under scopeDir=${scopeDir}`);
+        }
+        continue;
+      }
+    }
+
+    const sKey = sessionStateKey(turn.turnId);
+    const known = state.sessions[sKey];
+
+    if (known) {
+      totalSkipped++;
+      if (verbose) {
+        console.log(`[verbose] Skipping already-synced Claude turn ${turn.turnId}`);
+      }
+      mcpLog.info(
+        "sync_checkpoint_skip",
+        { tool: "claude_code", reason: "existing_turn_checkpoint", session_id: turn.turnId },
+        false
+      );
+      continue;
+    }
+
+    // When scoped to a directory, prefer the pre-resolved projectId. If it's null
+    // (e.g. MCP server launched from a non-git cwd, or stuck null in module cache),
+    // fall back to per-turn cwd lookup. The lookup cache dedupes by path so this is
+    // effectively one network call per unique cwd per sync.
+    const resolvedProjectId = scopeDir
+      ? (projectId ??
+         (await resolveProjectIdForRepoPathCached(turn.cwd, host, token, verbose, projectLookupCache)) ??
+         undefined)
+      : (explicitProject ??
+         (await resolveProjectIdForRepoPathCached(turn.cwd, host, token, verbose, projectLookupCache)) ??
+         undefined);
+    const payload = mapClaudeTranscriptTurn(turn, { projectId: resolvedProjectId, pricing });
+
+    if (verbose && payload.cost_usd === null) {
+      if (!turn.model) {
+        if (turn.tokensIn > 0 || turn.tokensOut > 0) {
+          console.warn(`[warn] Claude turn ${turn.turnId} has usage but no model — cost_usd will be null`);
+        }
+      } else {
+        const warning = getCostWarning(turn.model, pricing);
+        if (warning) console.warn(`[warn] ${warning}`);
+      }
+    }
+
+    if (dryRun) {
+      console.log(`[dry-run] Would send Claude turn ${turn.turnId}:`);
+      console.log(JSON.stringify(payload, null, 2));
+      totalSent++;
+      continue;
+    }
+
+    if (verbose) {
+      console.log(`[verbose] Sending Claude turn ${turn.turnId} (${turn.tokensIn + turn.tokensOut} tokens)`);
+    }
+
+    const ok = await postEvent(payload, host, token, {
+      on429: (retryAfter, quotaExceeded) => {
+        const currentBackoff = backoffUntilByCredential.get(backoffKey);
+        const nextBackoff = new Date(Math.max(currentBackoff?.getTime() ?? 0, Date.now() + retryAfter * 1000));
+        backoffUntilByCredential.set(backoffKey, nextBackoff);
+        shouldStopForBackoff = true;
+        const reason = quotaExceeded ? "Monthly quota exceeded" : "Rate limited";
+        mcpLog.warn(
+          "sync_rate_limit_pause",
+          {
+            tool: "claude_code",
+            retry_until: nextBackoff.toISOString(),
+            quota_exceeded: quotaExceeded,
+          },
+          true
+        );
+        console.warn(`[aixle-insights] ${reason}. Pausing until ${nextBackoff.toISOString()}.`);
+        // Persist backoff to state so it survives process restarts
+        state = { ...state, rate_limited_until: nextBackoff.toISOString() };
+        writeState(state, appDir, host, token);
+      },
+    });
+    if (ok) {
+      state = markSessionSent(state, sKey, turn.fileSize);
+      writeState(state, appDir, host, token);
+      totalSent++;
+    } else {
+      totalFailed++;
+      errors.push(`Failed to post Claude turn ${turn.turnId}`);
+      mcpLog.error("sync_ingest_final_failure", { tool: "claude_code", session_id: turn.turnId }, true);
+      if (shouldStopForBackoff) {
+        break;
+      }
+    }
+  }
+
+  const result: SyncResult = { sent: totalSent, failed: totalFailed, skipped: totalSkipped };
+  const currentBackoff = backoffUntilByCredential.get(backoffKey);
+  if (currentBackoff && new Date() < currentBackoff) result.rateLimitedUntil = currentBackoff.toISOString();
+  if (errors.length > 0) result.errors = errors;
+  return result;
+}
+
+async function runCursorSlice(params: {
+  token: string;
+  host: string;
+  dryRun: boolean;
+  verbose: boolean;
+  projectId: string | null;
+  projectIdSource?: ProjectResolution["source"];
+  projectLookupToken?: string | null;
+  appDir: string;
+  cursorBaseDir?: string;
+  cursorTranscriptProjectDirs?: string[];
+  scopeDir?: string;
+  cursorPricing?: PricingConfig;
+  fullScan?: boolean;
+}): Promise<SyncResult> {
+  const {
+    token,
+    host,
+    dryRun,
+    verbose,
+    projectId,
+    projectIdSource,
+    projectLookupToken,
+    appDir,
+    cursorBaseDir,
+    cursorTranscriptProjectDirs,
+    scopeDir,
+    fullScan = false,
+    cursorPricing = resolveCursorPricing(undefined, appDir),
+  } = params;
+  const backoffKey = credentialStateKey(host, token);
+
+  // Read state first so we can restore a persisted rate-limit backoff from a prior process.
+  const stateBefore = readState(appDir, host, token);
+  const persistedRateLimit = stateBefore.rate_limited_until
+    ? new Date(stateBefore.rate_limited_until)
+    : null;
+  if (persistedRateLimit && !Number.isNaN(persistedRateLimit.getTime())) {
+    const existing = backoffUntilByCredential.get(backoffKey);
+    if (!existing || persistedRateLimit > existing) {
+      backoffUntilByCredential.set(backoffKey, persistedRateLimit);
+    }
+  }
+
+  const backoffUntil = backoffUntilByCredential.get(backoffKey) ?? null;
+
+  if (backoffUntil && new Date() < backoffUntil) {
+    const until = backoffUntil.toISOString();
+    mcpLog.info("sync_rate_limit_skip", { tool: "cursor", until }, verbose);
+    if (verbose) {
+      console.log(`[verbose][cursor] Rate limited — skipping until ${until}`);
+    } else {
+      console.warn(`[aixle-insights][cursor] Rate limited — skipping until ${until}`);
+    }
+    return {
+      sent: 0,
+      failed: 0,
+      skipped: 0,
+      rateLimitedUntil: until,
+    };
+  }
+  const explicitProject = explicitProjectId(projectId, projectIdSource);
+  const projectLookupCache = new Map<string, string | null>();
+  const lookupToken = projectLookupToken ?? token;
+  let { groups, skippedTranscriptCount, transcriptTurnsById, counts } =
+    await prepareCursorSliceGroups({
+      stateBefore,
+      fullScan,
+      projectId: explicitProject ?? projectId,
+      projectIdSource,
+      host,
+      token,
+      projectLookupToken: lookupToken,
+      verbose,
+      cursorBaseDir,
+      cursorTranscriptProjectDirs,
+      cursorPricing,
+    });
+
+  if (scopeDir) {
+    for (const group of groups) {
+      const inScope: CursorDb90Payload[] = [];
+      for (const payload of group.payloads) {
+        const ws = cursorRepoPathFromPayload(payload);
+        if (ws && (ws === scopeDir || ws.startsWith(scopeDir + "/"))) {
+          // Same fallback as Claude: when the pre-resolved projectId is null, do a
+          // per-payload lookup from the payload's workspace. Cache dedupes by path.
+          const resolved =
+            projectId ??
+            (await resolveProjectIdForRepoPathCached(ws, host, lookupToken, verbose, projectLookupCache));
+          if (resolved) payload.project_id = resolved;
+          else delete payload.project_id;
+          inScope.push(payload);
+        } else if (verbose) {
+          console.log(
+            `[verbose][cursor] Skipping payload — workspace=${ws ?? "(none)"} not under scopeDir=${scopeDir}`
+          );
+        }
+      }
+      group.payloads = inScope;
+    }
+  } else if (!explicitProject) {
+    for (const group of groups) {
+      if (group.key === CURSOR_RECENT_COMMIT_WATERMARK_KEY) continue;
+      for (const payload of group.payloads) {
+        const repoPath = cursorRepoPathFromPayload(payload);
+        const resolvedProjectId = await resolveProjectIdForRepoPathCached(
+          repoPath,
+          host,
+          lookupToken,
+          verbose,
+          projectLookupCache
+        );
+        if (resolvedProjectId) payload.project_id = resolvedProjectId;
+        else delete payload.project_id;
+      }
+    }
+  }
+
+  const totalPayloadCount = groups.reduce((sum, group) => sum + group.payloads.length, 0);
+  if (totalPayloadCount === 0 && !existsSync(join(appDir, "hooks-queue.ndjson"))) {
+    return { sent: 0, failed: 0, skipped: 0 };
+  }
+
+  if (dryRun) {
+    console.log(`[dry-run][cursor] Would send ${totalPayloadCount} event(s)`);
+    console.log(
+      `[dry-run][cursor] Note: cost_usd values are estimates (see cost_model in metadata).`
+    );
+    for (const group of groups) {
+      for (const ev of group.payloads) {
+        console.log(JSON.stringify(ev, null, 2));
+      }
+    }
+    const allPayloads = groups.flatMap((group) => group.payloads);
+    const contractOk = printCursorDryRunValidationReport(allPayloads);
+    return {
+      sent: totalPayloadCount,
+      failed: 0,
+      skipped: 0,
+      validationFailed: !contractOk,
+    };
+  }
+
+  if (skippedTranscriptCount > 0 && verbose) {
+    mcpLog.info("cursor_transcript_dedupe_skip", { count: skippedTranscriptCount }, false);
+  }
+
+  if (counts.suppressedComposer > 0) {
+    mcpLog.info(
+      "cursor_composer_suppressed",
+      { reason: "transcript_mode", count: counts.suppressedComposer },
+      verbose
+    );
+    if (verbose) {
+      console.log(
+        `[verbose][cursor] ${counts.suppressedComposer} daily_composer event(s) suppressed — transcripts take precedence`
+      );
+    }
+  }
+
+  let shouldStopForBackoff = false;
+  let stateMut = stateBefore;
+  let totalSent = 0;
+  let totalFailed = 0;
+  let totalSkipped = skippedTranscriptCount;
+  const errors: string[] = [];
+
+  const on429 = (retryAfter: number, quotaExceeded: boolean) => {
+    const currentBackoff = backoffUntilByCredential.get(backoffKey);
+    const nextBackoff = new Date(Math.max(currentBackoff?.getTime() ?? 0, Date.now() + retryAfter * 1000));
+    backoffUntilByCredential.set(backoffKey, nextBackoff);
+    shouldStopForBackoff = true;
+    const reason = quotaExceeded ? "Monthly quota exceeded" : "Rate limited";
+    mcpLog.warn(
+      "sync_rate_limit_pause",
+      {
+        tool: "cursor",
+        retry_until: nextBackoff.toISOString(),
+        quota_exceeded: quotaExceeded,
+      },
+      true
+    );
+    console.warn(`[aixle-insights][cursor] ${reason}. Pausing until ${nextBackoff.toISOString()}.`);
+    // Persist backoff to state so it survives process restarts
+    stateMut = { ...stateMut, rate_limited_until: nextBackoff.toISOString() };
+    writeState(stateMut, appDir, host, token);
+  };
+
+  for (const group of groups) {
+    if (group.payloads.length === 0) continue;
+    if (shouldStopForBackoff) {
+      totalSkipped += group.payloads.length;
+      continue;
+    }
+
+    if (group.label === "transcripts") {
+      for (const payload of group.payloads) {
+        if (shouldStopForBackoff) {
+          totalSkipped++;
+          continue;
+        }
+
+        const ok = await postEvent(payload, host, token, { on429 });
+        if (ok) {
+          totalSent++;
+          const turnId = payload.metadata.session_id;
+          const sourceTurn =
+            typeof turnId === "string" ? transcriptTurnsById.get(turnId) : undefined;
+          if (sourceTurn) {
+            stateMut = markSessionSent(
+              stateMut,
+              cursorTranscriptTurnStateKey(sourceTurn.turnId),
+              sourceTurn.fileSize,
+              sourceTurn.contentHash
+            );
+            writeState(stateMut, appDir, host, token);
+          }
+          continue;
+        }
+
+        totalFailed++;
+        errors.push(`Cursor sync (${group.label}): failed to post ${payload.occurred_at}`);
+        mcpLog.error(
+          "sync_ingest_final_failure",
+          { tool: "cursor", group: group.label, occurred_at: payload.occurred_at },
+          true
+        );
+      }
+      continue;
+    }
+
+    const batchResult = await postEvents(group.payloads, host, token, { on429 });
+    totalSent += batchResult.sent;
+    totalFailed += batchResult.failed;
+
+    if (batchResult.failed > 0) {
+      errors.push(
+        `Cursor sync (${group.label}): ${batchResult.failed} event(s) failed to post`
+      );
+      mcpLog.error(
+        "sync_ingest_batch_failures",
+        { tool: "cursor", group: group.label, failed: batchResult.failed, sent: batchResult.sent },
+        true
+      );
+      if (batchResult.sent > 0) {
+        // Partial failure: watermark advances past the succeeded events; failed events are not retried.
+        // This is best-effort delivery — events are sent in timestamp order so the window is bounded.
+        mcpLog.warn(
+          "sync_batch_partial_failure_events_dropped",
+          { tool: "cursor", group: group.label, sent: batchResult.sent, failed: batchResult.failed },
+          true
+        );
+        console.warn(
+          `[aixle-insights][cursor] Partial batch failure in ${group.label}: ` +
+          `${batchResult.sent} sent, ${batchResult.failed} dropped (watermark advances past sent events).`
+        );
+      }
+    }
+
+    if (batchResult.lastSentAt !== null) {
+      stateMut = {
+        ...stateMut,
+        sessions: {
+          ...stateMut.sessions,
+          [group.key]: { fileSize: 0, sentAt: batchResult.lastSentAt },
+        },
+      };
+      // Only persist hashes when the entire batch succeeded. On partial failure,
+      // failed commits must remain retryable — saving their hashes here would
+      // prevent filterRecentCommitsByHashDedup from re-sending them on the next sync.
+      if (group.key === CURSOR_RECENT_COMMIT_WATERMARK_KEY && batchResult.sent > 0 && batchResult.failed === 0) {
+        const sentHashes = group.payloads
+          .map((payload) => payload.metadata.commit_hash)
+          .filter((hash): hash is string => typeof hash === "string" && hash.length > 0);
+        if (sentHashes.length > 0) {
+          stateMut = { ...stateMut, lastRecentCommitHashes: sentHashes };
+        }
+      }
+      writeState(stateMut, appDir, host, token);
+    }
+  }
+
+  // Process cursor hooks queue if present (opt-in; no-op when hooks not installed)
+  if (!shouldStopForBackoff) {
+    const hooksQueuePath = join(appDir, "hooks-queue.ndjson");
+    try {
+      const hooksResult = await processHooksQueue({
+        queuePath: hooksQueuePath,
+        scopeDir,
+        state: stateMut,
+        host,
+        token,
+        on429,
+        resolveProjectId: explicitProject
+          ? undefined
+          : (workspace) =>
+              resolveProjectIdForRepoPathCached(workspace, host, lookupToken, verbose, projectLookupCache),
+        verbose,
+      });
+      totalSent += hooksResult.sent;
+      totalFailed += hooksResult.failed;
+      totalSkipped += hooksResult.skipped;
+      stateMut = hooksResult.state;
+      if (hooksResult.sent > 0 || hooksResult.failed > 0) {
+        writeState(stateMut, appDir, host, token);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push(`cursor-hooks queue processing failed: ${msg}`);
+      mcpLog.error("sync_hooks_queue_error", { error: msg }, true);
+    }
+  }
+
+  const slice: SyncResult = {
+    sent: totalSent,
+    failed: totalFailed,
+    skipped: totalSkipped,
+  };
+
+  const currentBackoff = backoffUntilByCredential.get(backoffKey);
+  if (currentBackoff && new Date() < currentBackoff) {
+    slice.rateLimitedUntil = currentBackoff.toISOString();
+  }
+  if (errors.length > 0 || shouldStopForBackoff) {
+    if (shouldStopForBackoff) {
+      errors.push("Cursor sync paused due to rate limiting");
+    }
+    slice.errors = errors;
+  }
+
+  return slice;
+}
+
+/**
+ * Parallel multi-tool cycle under the global advisory ingest lock (`state.lock`).
+ */
+export async function syncTelemetryTools(options: MultiSyncOptions): Promise<SyncResult> {
+  const appDir = options.appDir ?? getAppDir();
+  const lock = acquireSyncLock(appDir);
+  if (!lock.acquired) {
+    const lockedResult: SyncResult = { sent: 0, failed: 0, skipped: 0, locked: true };
+    recordTelemetry(lockedResult, []);
+    mcpLog.warn("sync_lock_skip", { reason: "advisory_lock_held", app_dir: appDir }, true);
+    return lockedResult;
+  }
+
+  try {
+    const { credentials, dryRun, verbose, projectId, projectIdSource, projectLookupToken, pricing, scopeDir } =
+      options;
+    const host = credentials.host;
+    const appDirResolved = options.appDir ?? getAppDir();
+    const cursorPricing = options.cursorPricing ?? resolveCursorPricing(undefined, appDirResolved);
+
+    const requested: TelemetryToolId[] = dedupeTools(options.tools ?? ["claude_code", "cursor"]);
+    const missingRequested = requested.filter((t) => !credentials.accounts[t]);
+    if (missingRequested.length > 0) {
+      const errors = [`Missing credentials for requested tool(s): ${missingRequested.join(", ")}`];
+      const failedResult: SyncResult = { sent: 0, failed: missingRequested.length, skipped: 0, errors };
+      mcpLog.warn(
+        "sync_tool_validation_failed",
+        { missing_tools: missingRequested, requested_tools: requested },
+        true
+      );
+      recordTelemetry(failedResult, errors, dryRun ? undefined : { appDir, host, credentials });
+      return failedResult;
+    }
+    const withToken = requested.filter((t) => !!credentials.accounts[t]);
+
+    if (withToken.length === 0) {
+      const zero: SyncResult = { sent: 0, failed: 0, skipped: 0 };
+      recordTelemetry(zero, [], dryRun ? undefined : { appDir, host, credentials });
+      return zero;
+    }
+
+    mcpLog.info(
+      "sync_cycle_start",
+      { ingest_tools: withToken, requested_tools: requested, dry_run: dryRun },
+      false
+    );
+
+    const uniqueTokens = new Set<string>();
+    for (const t of withToken) {
+      const tok = credentials.accounts[t];
+      if (tok && uniqueTokens.has(tok)) continue;
+      if (tok) migrateLegacyState(appDir, host, tok);
+      if (tok) uniqueTokens.add(tok);
+    }
+
+    const tasks: Array<() => Promise<SyncResult & { tag: TelemetryToolId }>> = [];
+    const sharedCredentialToken = uniqueTokens.size < withToken.length;
+
+    if (withToken.includes("claude_code")) {
+      const task = () =>
+        runClaudeSlice({
+          token: credentials.accounts.claude_code!,
+          host,
+          dryRun,
+          verbose,
+          projectId,
+          pricing,
+          appDir,
+          transcriptBaseDirs: options.transcriptBaseDirs,
+          scopeDir,
+        }).then((r) => ({ ...r, tag: "claude_code" as const }));
+      tasks.push(task);
+    }
+
+    if (withToken.includes("cursor")) {
+      const task = () =>
+        runCursorSlice({
+          token: credentials.accounts.cursor!,
+          host,
+          dryRun,
+          verbose,
+          projectId,
+          projectIdSource,
+          projectLookupToken,
+          appDir,
+          cursorBaseDir: options.cursorBaseDir,
+          cursorTranscriptProjectDirs: options.cursorTranscriptProjectDirs,
+          scopeDir,
+          fullScan: options.fullScan,
+          cursorPricing,
+        }).then((r) => ({ ...r, tag: "cursor" as const }));
+      tasks.push(task);
+    }
+
+    type Tagged = SyncResult & { tag: TelemetryToolId };
+
+    const wrappedTasks = tasks.map((runTask) => () =>
+      runTask().catch((err: unknown): Error => (err instanceof Error ? err : new Error(String(err))))
+    );
+    const outcomes: Array<Tagged | Error> = sharedCredentialToken
+      ? await (async () => {
+          const sequential: Array<Tagged | Error> = [];
+          for (const task of wrappedTasks) {
+            sequential.push(await task());
+          }
+          return sequential;
+        })()
+      : await Promise.all(wrappedTasks.map((task) => task()));
+
+    let sent = 0;
+    let failed = 0;
+    let skipped = 0;
+    let validationFailed = false;
+    const errorsAcc: string[] = [];
+    const backoffKeysForMerge = new Set<string>();
+
+    for (const outcome of outcomes) {
+      if (outcome instanceof Error) {
+        failed++;
+        errorsAcc.push(outcome.message);
+        continue;
+      }
+      sent += outcome.sent;
+      failed += outcome.failed;
+      skipped += outcome.skipped;
+      if (outcome.validationFailed) validationFailed = true;
+      const tok =
+        outcome.tag === "cursor" ? credentials.accounts.cursor : credentials.accounts.claude_code;
+      if (tok) backoffKeysForMerge.add(credentialStateKey(host, tok));
+
+      if (outcome.errors) errorsAcc.push(...outcome.errors);
+    }
+
+    const merged: SyncResult = { sent, failed, skipped };
+    if (validationFailed) merged.validationFailed = true;
+    const rl = mergeCredentialRateLimit(backoffKeysForMerge);
+    if (rl) merged.rateLimitedUntil = rl;
+    if (errorsAcc.length > 0) merged.errors = errorsAcc;
+
+    recordTelemetry(merged, errorsAcc, dryRun ? undefined : { appDir, host, credentials });
+    mcpLog.info(
+      "sync_cycle_end",
+      { sent: merged.sent, failed: merged.failed, skipped: merged.skipped },
+      false
+    );
+    return merged;
+  } finally {
+    lock.release();
+  }
+}
+
+/** Claude-only sync helper (delegates into `syncTelemetryTools`). */
+export async function syncOnce(options: SyncOptions): Promise<SyncResult> {
+  return syncTelemetryTools({
+    credentials: { host: options.host, accounts: { claude_code: options.token } },
+    dryRun: options.dryRun,
+    verbose: options.verbose,
+    projectId: options.projectId,
+    pricing: options.pricing,
+    appDir: options.appDir,
+    transcriptBaseDirs: options.transcriptBaseDirs,
+    tools: ["claude_code"],
+  });
+}

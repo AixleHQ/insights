@@ -1,6 +1,9 @@
 export { MetricCard, MetricGrid } from "./MetricCard";
 export { CostTrendChart, type DailyCostData } from "./CostTrendChart";
-export { ActivityFeed, RiskBadge, type ActivityEvent } from "./ActivityFeed";
+export { ActivityFeed, type ActivityEvent } from "./ActivityFeed";
+export { RiskBadge, type RiskBadgeProps } from "@/components/ui/risk-badge";
+export type { RiskLevel } from "@/lib/types";
+export { normalizeRiskLevel } from "@/lib/riskLevel";
 export { TopToolsChart, type ToolUsageData } from "./TopToolsChart";
 export { AlertsPanel, type Alert } from "./AlertsPanel";
 export { ActivityHeatmap } from "./ActivityHeatmap";
@@ -10,3 +13,6 @@ export { ToolModelCostChart } from "./ToolModelCostChart";
 export { ToolModelTable } from "./ToolModelTable";
 export { ToolUsersTable } from "./ToolUsersTable";
 export { ToolEventTypesTable } from "./ToolEventTypesTable";
+export { WeeklyToolUsageChart } from "./WeeklyToolUsageChart";
+export { RiskAlertsTable } from "./RiskAlertsTable";
+export { PromptInsightsSection } from "./PromptInsightsSection";

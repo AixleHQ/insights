@@ -93,8 +93,11 @@ module Api
           }, status: :bad_request
         end
 
+        # TODO (R2 AIX-347): With multiple connectors per provider, selecting by connector_id would
+        # allow callers to target a specific key. For now, use the oldest active connector.
         @connector = current_organization.organization_connectors
                                          .where(connector_type: provider, is_active: true)
+                                         .order(:created_at)
                                          .first
 
         unless @connector

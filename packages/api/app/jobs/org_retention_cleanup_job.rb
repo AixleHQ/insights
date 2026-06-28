@@ -28,8 +28,13 @@ class OrgRetentionCleanupJob
   def cleanup_organization(org)
     total_deleted = 0
 
-    # Clean up tool_events
-    total_deleted += cleanup_tool_events(org)
+    # tool_events retention is enforced by DataRetentionPurgeJob (org + project policies, batched).
+
+    # Clean up webhook deliveries older than the retention window
+    total_deleted += cleanup_webhook_deliveries(org)
+
+    # Clean up connector health snapshots older than 90 days
+    total_deleted += cleanup_connector_health_snapshots(org)
 
     # Clean up hourly aggregates (if we had direct access - normally handled by TimescaleDB)
     # total_deleted += cleanup_hourly_aggregates(org)
@@ -37,17 +42,29 @@ class OrgRetentionCleanupJob
     total_deleted
   end
 
-  def cleanup_tool_events(org)
-    cutoff = RetentionService.retention_cutoff(org, :tool_events_retention)
-    return 0 unless cutoff
-
-    deleted = ToolEvent
-      .where(organization_id: org.id)
-      .where("occurred_at < ?", cutoff)
+  def cleanup_webhook_deliveries(org)
+    deleted = WebhookDelivery
+      .joins(:organization_connector)
+      .where(organization_connectors: { organization: org })
+      .where("webhook_deliveries.created_at < ?", WebhookDelivery::RETENTION_WINDOW.ago)
       .delete_all
 
     if deleted > 0
-      Rails.logger.info("[OrgRetentionCleanupJob] Org #{org.slug}: deleted #{deleted} tool_events older than #{cutoff}")
+      Rails.logger.info("[OrgRetentionCleanupJob] Org #{org.slug}: deleted #{deleted} webhook_deliveries older than #{WebhookDelivery::RETENTION_WINDOW}")
+    end
+
+    deleted
+  end
+
+  def cleanup_connector_health_snapshots(org)
+    deleted = ConnectorHealthSnapshot
+      .joins(:organization_connector)
+      .where(organization_connectors: { organization: org })
+      .where("snapshotted_at < ?", ConnectorHealthSnapshot::RETENTION_WINDOW.ago)
+      .delete_all
+
+    if deleted > 0
+      Rails.logger.info("[OrgRetentionCleanupJob] Org #{org.slug}: deleted #{deleted} connector_health_snapshots older than #{ConnectorHealthSnapshot::RETENTION_WINDOW}")
     end
 
     deleted

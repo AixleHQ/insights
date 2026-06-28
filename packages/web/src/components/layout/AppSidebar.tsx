@@ -5,26 +5,32 @@ import {
   Activity,
   FolderKanban,
   Plug,
+  OctagonAlert,
   Settings,
   ChevronDown,
   LogOut,
   ChevronsUpDown,
   Plus,
   Check,
-  Shield,
-  Crown,
-  Eye,
   User,
+  Users,
+  BookOpen,
+  MessageSquare,
+  Star,
+  type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrg, type MemberRole } from "@/contexts/OrgContext";
+import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useCreateOrganization, useCurrentUser } from "@/hooks/useApi";
+import { useFavorites } from "@/hooks/useFavorites";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -52,29 +58,26 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { roleIcons, roleColors } from "@/lib/role-display";
 
-const navItems = [
-  { title: "Profile", icon: User, href: "/profile" },
-  { title: "Dashboard", icon: LayoutDashboard, href: "/" },
-  { title: "Events", icon: Activity, href: "/events" },
-  { title: "Projects", icon: FolderKanban, href: "/projects" },
-  { title: "Integrations", icon: Plug, href: "/integrations" },
-  { title: "Settings", icon: Settings, href: "/settings" },
+type NavItem = {
+  title: string;
+  icon: LucideIcon;
+  href: string;
+  roles: MemberRole[];
+};
+
+const navItems: NavItem[] = [
+  { title: "Dashboard",    icon: LayoutDashboard, href: "/",                 roles: ["owner", "member", "viewer"] },
+  { title: "Events",       icon: Activity,        href: "/events",           roles: ["owner", "member", "viewer"] },
+  { title: "Projects",     icon: FolderKanban,    href: "/projects",         roles: ["owner", "member", "viewer"] },
+  { title: "Members",      icon: Users,           href: "/members",          roles: ["owner"] },
+  { title: "Integrations", icon: Plug,            href: "/integrations",     roles: ["owner"] },
+  { title: "Alerts",       icon: OctagonAlert,    href: "/alerts",           roles: ["owner"] },
+  { title: "Settings",     icon: Settings,        href: "/settings",         roles: ["owner"] },
+  { title: "Library",      icon: BookOpen,        href: "/library",          roles: ["owner", "member", "viewer"] },
+  { title: "Feedback",     icon: MessageSquare,   href: "/feedback",         roles: ["owner", "member", "viewer"] },
 ];
-
-const roleIcons: Record<MemberRole, typeof Crown> = {
-  owner: Crown,
-  admin: Shield,
-  member: User,
-  viewer: Eye,
-};
-
-const roleColors: Record<MemberRole, string> = {
-  owner: "text-amber-500",
-  admin: "text-blue-500",
-  member: "text-emerald-500",
-  viewer: "text-muted-foreground",
-};
 
 function getOrgInitials(name: string | undefined | null) {
   if (!name) return "??";
@@ -204,7 +207,7 @@ function OrgSwitcher() {
                 {getOrgInitials(currentOrg.name)}
               </span>
               {/* Active indicator dot */}
-              <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-emerald-500 ring-2 ring-sidebar" />
+              <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-success ring-2 ring-sidebar" />
             </div>
 
             {/* Org Details - hidden when collapsed */}
@@ -321,10 +324,14 @@ function OrgSwitcher() {
 function UserMenu() {
   const { profile, logout } = useAuth();
   const { data: currentUser } = useCurrentUser();
+  const { currentRole } = useOrg();
   const { state } = useSidebar();
+  const { isImpersonating } = useImpersonation();
 
   const displayName = currentUser?.name || profile?.name || "User";
-  const avatarSrc = currentUser?.avatarUrl || profile?.picture;
+  const displayEmail = currentUser?.email || profile?.email;
+  // During impersonation, don't fall back to the admin's Keycloak picture
+  const avatarSrc = currentUser?.avatarUrl || (isImpersonating ? undefined : profile?.picture);
 
   const getInitials = (name?: string, email?: string) => {
     if (name) {
@@ -354,7 +361,7 @@ function UserMenu() {
           <div className="grid flex-1 text-left text-sm leading-tight">
             <span className="truncate font-semibold">{displayName}</span>
             <span className="truncate text-xs text-sidebar-foreground/60">
-              {profile?.email}
+              {displayEmail}
             </span>
           </div>
           <ChevronDown className="ml-auto size-4" />
@@ -369,7 +376,7 @@ function UserMenu() {
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium">{displayName}</p>
-            <p className="text-xs text-muted-foreground">{profile?.email}</p>
+            <p className="text-xs text-muted-foreground">{displayEmail}</p>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
@@ -379,12 +386,14 @@ function UserMenu() {
             My Profile
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link to="/settings">
-            <Settings className="mr-2 size-4" />
-            Settings
-          </Link>
-        </DropdownMenuItem>
+        {currentRole === "owner" && (
+          <DropdownMenuItem asChild>
+            <Link to="/settings">
+              <Settings className="mr-2 size-4" />
+              Settings
+            </Link>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={logout} className="text-destructive">
           <LogOut className="mr-2 size-4" />
@@ -398,26 +407,16 @@ function UserMenu() {
 export function AppSidebar() {
   const location = useLocation();
   const { currentRole } = useOrg();
+  const { favorites } = useFavorites();
 
-  // Filter nav items based on role - hide Dashboard for members/viewers
-  const visibleNavItems = navItems.filter((item) => {
-    // Dashboard (href: '/') is only visible to owners and admins
-    if (item.href === "/") {
-      return currentRole === "owner" || currentRole === "admin";
-    }
-    return true;
-  });
+  const visibleNavItems = navItems.filter(
+    (item) => currentRole && item.roles.includes(currentRole),
+  );
 
   const isActive = (href: string) => {
-    if (href === "/") {
-      return location.pathname === "/";
-    }
-    return location.pathname.startsWith(href);
+    if (href === "/") return location.pathname === "/";
+    return location.pathname === href || location.pathname.startsWith(href + "/");
   };
-
-  // Determine home link based on role
-  const homeLink =
-    currentRole === "owner" || currentRole === "admin" ? "/" : "/profile";
 
   return (
     <Sidebar collapsible="icon" variant="sidebar">
@@ -425,15 +424,15 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link to={homeLink} className="flex items-center gap-2">
+              <Link to="/" className="flex items-center gap-2">
                 <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70">
                   <span className="font-mono-display text-sm font-bold text-primary-foreground">
-                    90
+                    AI
                   </span>
                 </div>
                 <div className="grid flex-1 text-left leading-tight">
                   <span className="truncate font-semibold tracking-tight">
-                    DB90
+                    Aixle Insights
                   </span>
                   <span className="truncate text-xs text-sidebar-foreground/60">
                     AI Tool Analytics
@@ -479,6 +478,32 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
+        {favorites.length > 0 && (
+          <>
+            <SidebarGroup>
+              <SidebarGroupLabel>Favorites</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {favorites.map((p) => (
+                    <SidebarMenuItem key={p.id}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive(`/projects/${p.id}`)}
+                        tooltip={p.name}
+                      >
+                        <Link to={`/projects/${p.id}`}>
+                          <Star className="size-4" />
+                          <span>{p.name}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+            <SidebarSeparator />
+          </>
+        )}
         <SidebarMenu>
           <SidebarMenuItem>
             <UserMenu />

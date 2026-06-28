@@ -16,40 +16,45 @@ class OrganizationMembershipPolicy < ApplicationPolicy
     org_member?(record.organization) || global_admin?
   end
 
+  # Personal dashboard endpoints are self-or-admin only — stricter than stats?
+  # which allows any org member to view any other member's aggregate stats.
+  def dashboard_stats?
+    global_admin? ||
+      org_owner?(record.organization) ||
+      (org_member?(record.organization) && record.user_id == user.id)
+  end
+
+  alias_method :member_heatmap?,   :dashboard_stats?
+  alias_method :prompt_insights?,  :dashboard_stats?
+
   # Members can view events of other members
   def events?
     org_member?(record.organization) || global_admin?
   end
 
-  # Only admins can add members
+  # Only owners can add members (post-AIX-201: admin org role removed)
   def create?
-    org_admin?(record.organization) || global_admin?
+    org_owner?(record.organization) || global_admin?
   end
 
-  # Admins can update memberships, but can't demote owners unless they're also an owner
+  # Owners can update memberships, but cannot change their own role.
+  # The last-owner downgrade guard is enforced at the model layer.
   def update?
     return true if global_admin?
-    return false unless org_admin?(record.organization)
+    return false unless org_owner?(record.organization)
+    return false if record.user_id == user.id
 
-    # Can't demote an owner unless you're also an owner
-    if record.owner?
-      org_owner?(record.organization)
-    else
-      true
-    end
+    true
   end
 
-  # Only admins can remove members, but can't remove owners unless they're also an owner
+  # Only owners can remove members. Owners cannot remove themselves.
+  # The last-owner removal guard is enforced at the model layer.
   def destroy?
     return true if global_admin?
-    return false unless org_admin?(record.organization)
+    return false unless org_owner?(record.organization)
+    return false if record.user_id == user.id
 
-    # Can't remove an owner unless you're also an owner
-    if record.owner?
-      org_owner?(record.organization)
-    else
-      true
-    end
+    true
   end
 
   relation_scope do |scope|

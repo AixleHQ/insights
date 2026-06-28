@@ -15,10 +15,51 @@ RSpec.describe GithubSyncJob, type: :job do
       provider = instance_double(Oauth::GithubProvider)
       allow(Oauth::BaseProvider).to receive(:for).with(connector).and_return(provider)
       allow(provider).to receive(:fetch_repositories).and_return([])
+      allow(provider).to receive(:fetch_commits).and_return([])
 
       described_class.new.perform(connector.id, "sync")
 
       expect(provider).to have_received(:fetch_repositories)
+    end
+
+    it "backfills recent commits for repositories linked to a project" do
+      provider = instance_double(Oauth::GithubProvider)
+      allow(Oauth::BaseProvider).to receive(:for).with(connector).and_return(provider)
+      allow(provider).to receive(:fetch_repositories).and_return([])
+      allow(provider).to receive(:fetch_commits).with(
+        repository.full_name,
+        branch: repository.default_branch,
+        since: anything
+      ).and_return([
+        {
+          "id" => "abc123def",
+          "timestamp" => Time.current.iso8601,
+          "message" => "Backfill commit",
+          "author" => { "name" => "Dev User", "email" => "dev@example.com" },
+          "url" => "https://github.com/org/repo/commit/abc123def"
+        }
+      ])
+
+      expect {
+        described_class.new.perform(connector.id, "sync")
+      }.to change(ToolEvent, :count).by(1)
+
+      event = ToolEvent.last
+      expect(event.metadata["sha"]).to eq("abc123def")
+      expect(event.project_id).to eq(project.id)
+    end
+
+    it "does not call fetch_commits for repositories not linked to a project" do
+      repository.update!(project_id: nil)
+
+      provider = instance_double(Oauth::GithubProvider)
+      allow(Oauth::BaseProvider).to receive(:for).with(connector).and_return(provider)
+      allow(provider).to receive(:fetch_repositories).and_return([])
+      allow(provider).to receive(:fetch_commits)
+
+      described_class.new.perform(connector.id, "sync")
+
+      expect(provider).not_to have_received(:fetch_commits)
     end
   end
 

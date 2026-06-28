@@ -21,6 +21,7 @@ export default defineConfig([
     },
     rules: {
       quotes: ['error', 'double', { avoidEscape: true }],
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },
   },
 ])

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import {
   Bar,
   BarChart,
@@ -22,39 +22,21 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import type { ChartConfig } from "@/components/ui/chart";
-import { cn, humanizeToolName } from "@/lib/utils";
+import { cn, getToolColor, humanizeToolName } from "@/lib/utils";
+import { formatCount } from "@/lib/formatters";
+import { ErrorState } from "@/components/ui/error-state";
 import type { DailyToolData } from "@/hooks/useApi";
+import { type TimeRange, TIME_RANGE_OPTIONS } from "@/lib/chartUtils";
 
 interface ToolUsageByDayChartProps {
   data: DailyToolData[];
   tools: string[];
   isLoading?: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
   className?: string;
-}
-
-type TimeRange = "7d" | "30d" | "60d" | "90d" | "1y";
-
-const TIME_RANGE_OPTIONS: { value: TimeRange; label: string; days: number }[] = [
-  { value: "7d", label: "7 days", days: 7 },
-  { value: "30d", label: "30 days", days: 30 },
-  { value: "60d", label: "60 days", days: 60 },
-  { value: "90d", label: "90 days", days: 90 },
-  { value: "1y", label: "1 year", days: 365 },
-];
-
-// Chart colors for tools (keys match API snake_case names)
-const TOOL_COLORS: Record<string, string> = {
-  claude_code: "hsl(32 95% 55%)",       // amber
-  github_copilot: "hsl(211 100% 50%)",  // blue
-  cursor: "hsl(271 91% 65%)",           // purple
-  aider: "hsl(142 71% 45%)",            // green
-  windsurf: "hsl(199 89% 48%)",         // cyan
-  cody: "hsl(339 90% 51%)",             // pink
-  Other: "hsl(220 9% 46%)",             // gray
-};
-
-function getToolColor(tool: string): string {
-  return TOOL_COLORS[tool] || TOOL_COLORS["Other"];
+  timeRange: TimeRange;
+  onTimeRangeChange: (range: TimeRange) => void;
 }
 
 function getToolDisplayName(tool: string): string {
@@ -72,21 +54,13 @@ function formatDate(dateStr: string, range: TimeRange): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function getDaysForRange(range: TimeRange): number {
-  return TIME_RANGE_OPTIONS.find((opt) => opt.value === range)?.days || 30;
-}
-
 function getRangeLabel(range: TimeRange): string {
   return TIME_RANGE_OPTIONS.find((opt) => opt.value === range)?.label || "30 days";
 }
 
-export function ToolUsageByDayChart({ data, tools, isLoading, className }: ToolUsageByDayChartProps) {
-  const [timeRange, setTimeRange] = useState<TimeRange>("7d");
-
+export function ToolUsageByDayChart({ data, tools, isLoading, isError, onRetry, className, timeRange, onTimeRangeChange }: ToolUsageByDayChartProps) {
   const filteredData = useMemo(() => {
-    const days = getDaysForRange(timeRange);
-    const sliced = data.slice(-days);
-    return sliced.map((item) => ({
+    return data.map((item) => ({
       ...item,
       dateLabel: formatDate(item.date, timeRange),
     })) as (DailyToolData & { dateLabel: string })[];
@@ -115,10 +89,10 @@ export function ToolUsageByDayChart({ data, tools, isLoading, className }: ToolU
         <div>
           <CardTitle className="text-base font-medium">Usage by Tool</CardTitle>
           <CardDescription className="text-xs">
-            {totalEvents.toLocaleString()} events in the last {getRangeLabel(timeRange)}
+            {formatCount(totalEvents)} events in the last {getRangeLabel(timeRange)}
           </CardDescription>
         </div>
-        <Select value={timeRange} onValueChange={(value) => setTimeRange(value as TimeRange)}>
+        <Select value={timeRange} onValueChange={(value) => onTimeRangeChange(value as TimeRange)}>
           <SelectTrigger className="h-8 w-[100px] text-xs">
             <SelectValue />
           </SelectTrigger>
@@ -132,7 +106,16 @@ export function ToolUsageByDayChart({ data, tools, isLoading, className }: ToolU
         </Select>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {isError ? (
+          <div className="flex h-[280px] items-center justify-center">
+            <ErrorState
+              compact
+              title="Could not load chart"
+              description="Something went wrong fetching the data."
+              onRetry={onRetry}
+            />
+          </div>
+        ) : isLoading ? (
           <div className="flex h-[280px] items-center justify-center">
             <div className="size-8 animate-spin rounded-full border-2 border-muted border-t-primary" />
           </div>

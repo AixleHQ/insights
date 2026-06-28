@@ -1,5 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { formatCost, formatTokens, getEventActorLabel, EventAttribution } from "./formatters";
+import {
+  formatCost,
+  formatTokens,
+  formatDateTime,
+  formatEventDate,
+  formatLongUsDate,
+  getEventActorLabel,
+  isDayGranularityEvent,
+  EventAttribution,
+} from "./formatters";
 
 describe("formatCost", () => {
   it("returns $0.00 for zero", () => {
@@ -17,6 +26,10 @@ describe("formatCost", () => {
   it("returns US locale currency for normal amounts", () => {
     expect(formatCost(1234.56)).toBe("$1,234.56");
   });
+
+  it("coerces string amounts from JSON", () => {
+    expect(formatCost("12.34")).toBe("$12.34");
+  });
 });
 
 describe("formatTokens", () => {
@@ -30,6 +43,65 @@ describe("formatTokens", () => {
 
   it("returns M suffix for millions", () => {
     expect(formatTokens(1200000)).toBe("1.2M");
+  });
+});
+
+describe("formatDateTime", () => {
+  it("returns em dash for null, undefined, empty, and invalid", () => {
+    expect(formatDateTime(null)).toBe("—");
+    expect(formatDateTime(undefined)).toBe("—");
+    expect(formatDateTime("")).toBe("—");
+    expect(formatDateTime("   ")).toBe("—");
+    expect(formatDateTime("not-a-date")).toBe("—");
+  });
+
+  it("returns a non-empty en-US datetime for valid ISO", () => {
+    const s = formatDateTime("2024-06-15T14:30:00.000Z");
+    expect(s).not.toBe("—");
+    expect(s.length).toBeGreaterThan(4);
+    expect(s).toMatch(/2024/);
+  });
+});
+
+describe("isDayGranularityEvent", () => {
+  it("returns true for github_copilot regardless of timestamp", () => {
+    expect(isDayGranularityEvent("github_copilot", "2026-06-22T14:30:00Z")).toBe(true);
+  });
+
+  it("returns false for precise-time connectors with non-midnight timestamps", () => {
+    expect(isDayGranularityEvent("cursor", "2026-06-22T14:30:00Z")).toBe(false);
+  });
+
+  it("returns false for connectors not in the allowlist regardless of timestamp", () => {
+    expect(isDayGranularityEvent("openrouter_api", "2026-06-22T00:00:00.000Z")).toBe(false);
+    expect(isDayGranularityEvent("openrouter_api", "2026-06-22T14:00:00Z")).toBe(false);
+  });
+
+  it("returns false when toolName is missing", () => {
+    expect(isDayGranularityEvent(undefined)).toBe(false);
+  });
+});
+
+describe("formatEventDate", () => {
+  it("returns em dash for null, undefined, empty, and invalid", () => {
+    expect(formatEventDate(null)).toBe("—");
+    expect(formatEventDate(undefined)).toBe("—");
+    expect(formatEventDate("")).toBe("—");
+    expect(formatEventDate("not-a-date")).toBe("—");
+  });
+
+  it("formats UTC midnight as medium en-US date", () => {
+    expect(formatEventDate("2026-06-22T00:00:00Z")).toBe("Jun 22, 2026");
+  });
+});
+
+describe("formatLongUsDate", () => {
+  it("returns em dash for invalid Date", () => {
+    expect(formatLongUsDate(new Date(Number.NaN))).toBe("—");
+  });
+
+  it("formats June 15, 2024 in en-US long form", () => {
+    expect(formatLongUsDate(new Date(2024, 5, 15))).toMatch(/June\s+15,\s+2024/);
   });
 });
 
