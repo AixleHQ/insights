@@ -145,6 +145,25 @@ RSpec.describe ToolEvents::Upsert do
         expect(result[:tool_event].tokens_out).to be_nil
       end
     end
+
+    context "when cost_model is provided with a symbol metadata key" do
+      let(:symbol_key_attrs) do
+        base_attributes.merge(
+          cost_usd: 0,
+          tokens_in: 100,
+          tokens_out: 10,
+          metadata: { cost_model: "estimated_line_count" }
+        )
+      end
+
+      it "resolves the symbol-keyed cost_model and skips token re-estimation" do
+        result = described_class.call(symbol_key_attrs)
+        expect(result[:tool_event].cost_usd.to_f).to eq(0)
+        expect(result[:tool_event].metadata["cost_source"]).to eq("client")
+        expect(result[:tool_event].tokens_in).to be_nil
+        expect(result[:tool_event].tokens_out).to be_nil
+      end
+    end
   end
 
   describe ".call — model promotion from metadata" do

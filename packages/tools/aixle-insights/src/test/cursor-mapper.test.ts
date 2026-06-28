@@ -300,7 +300,7 @@ describe("mapDailyStats", () => {
     expect(results[0].cost_usd).toBeCloseTo(0.00072, 10);
   });
 
-  it("computes composer chat cost from line count using default pricing", () => {
+  it("computes composer chat cost from accepted line count using default pricing", () => {
     const entry: DailyStatsEntry = {
       date: "2026-04-01",
       dbPath,
@@ -309,7 +309,9 @@ describe("mapDailyStats", () => {
     const results = mapDailyStats(entry);
     expect(results).toHaveLength(1);
     expect(results[0].event_type).toBe("chat");
-    expect(results[0].cost_usd).toBeCloseTo(0.0315, 10);
+    // Cost is based on composerAccepted (60), not composerSuggested:
+    // (60 * 15 * (15.0 + 3.0 * 2)) / 1_000_000 = 0.0189
+    expect(results[0].cost_usd).toBeCloseTo(0.0189, 10);
   });
 
   it("uses custom PricingConfig rates when provided", () => {

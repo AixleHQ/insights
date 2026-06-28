@@ -1059,7 +1059,7 @@ export function mapDailyStats(
         eventType: "chat",
         tokensIn: composerSuggested,
         tokensOut: composerAccepted,
-        costUsd: computeLineCost("chat", composerSuggested, pricing),
+        costUsd: computeLineCost("chat", composerAccepted, pricing),
         occurredAt,
         dbPath,
         date,
