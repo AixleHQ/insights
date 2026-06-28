@@ -1,6 +1,9 @@
 # syntax=docker/dockerfile:1
 ARG NODE_VERSION=24.13.0
-FROM ghcr.io/dualboot-partners/db90-rails/node:${NODE_VERSION}-slim AS base
+ARG NODE_REGISTRY=ghcr.io/dualboot-partners/db90-rails/node
+ARG NGINX_REGISTRY=ghcr.io/dualboot-partners/db90-rails/nginx
+
+FROM ${NODE_REGISTRY}:${NODE_VERSION}-slim AS base
 
 WORKDIR /app
 
@@ -25,7 +28,7 @@ COPY packages/web/ .
 CMD ["npm", "run", "test:run"]
 
 # Production stage
-FROM ghcr.io/dualboot-partners/db90-rails/nginx:alpine AS production
+FROM ${NGINX_REGISTRY}:alpine AS production
 
 COPY --from=build /app/dist /usr/share/nginx/html
 

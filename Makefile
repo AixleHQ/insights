@@ -228,6 +228,21 @@ export CI_COMMIT_BRANCH ?= $(shell git rev-parse --abbrev-ref HEAD)
 REMOTE_EXEC = docker compose --profile remote run --rm --entrypoint make remote
 REMOTE_RUN  = docker compose --profile remote run --rm remote
 TOOLBOX_RUN = docker compose --profile remote run --rm toolbox
+PROD_TOOLBOX_RUN = PROJECT=aixle-db90 docker compose --profile remote run --rm toolbox
+
+export GHCR_USER ?= $(shell gh api user -q .login 2>/dev/null)
+export GHCR_TOKEN ?= $(shell gh auth token 2>/dev/null)
+
+-include .base-build-args.mk
+BASE_BUILD_ARGS ?=
+WEB_BASE_BUILD_ARGS ?=
+WEB_NGINX_BUILD_ARGS ?=
+
+ensure-base-images:
+	@scripts/ensure-base-images.sh
+
+# Optional in-container login when GHCR_TOKEN is set (gh auth token / PAT with read:packages).
+TOOLBOX_GHCR_LOGIN = if [ -n "$$GHCR_TOKEN" ]; then echo "$$GHCR_TOKEN" | docker login ghcr.io -u "$${GHCR_USER:-token}" --password-stdin; fi;
 
 remote-build:
 	docker compose --profile remote build remote
@@ -329,33 +344,41 @@ watch-prod-logs-sidekiq:
 # ECS Build & Push (via ecs_helper in toolbox container)
 # ============================================================================
 
-staging-build: staging-build-api staging-build-web staging-build-temporal-worker staging-build-keycloak
+staging-build:
+	@$(MAKE) ensure-base-images
+	@$(MAKE) _staging-build
+
+_staging-build: staging-build-api staging-build-web staging-build-temporal-worker staging-build-keycloak
 
 staging-build-api:
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=staging APPLICATION=api ecs_helper build_and_push --image=api --file=./Dockerfile.api'
+	$(TOOLBOX_RUN) sh -c '$(TOOLBOX_GHCR_LOGIN) ENVIRONMENT=staging APPLICATION=api ecs_helper build_and_push --image=api --file=./Dockerfile.api $(BASE_BUILD_ARGS)'
 
 staging-build-web:
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=staging APPLICATION=web ecs_helper build_and_push --image=web --file=./Dockerfile.web'
+	$(TOOLBOX_RUN) sh -c '$(TOOLBOX_GHCR_LOGIN) ENVIRONMENT=staging APPLICATION=web ecs_helper build_and_push --image=web --file=./Dockerfile.web $(WEB_BASE_BUILD_ARGS) $(WEB_NGINX_BUILD_ARGS)'
 
 staging-build-temporal-worker:
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=staging APPLICATION=temporal-worker ecs_helper build_and_push --image=temporal-worker --file=./Dockerfile.temporal-worker'
+	$(TOOLBOX_RUN) sh -c '$(TOOLBOX_GHCR_LOGIN) ENVIRONMENT=staging APPLICATION=temporal-worker ecs_helper build_and_push --image=temporal-worker --file=./Dockerfile.temporal-worker $(BASE_BUILD_ARGS)'
 
 staging-build-keycloak:
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=staging APPLICATION=keycloak ecs_helper build_and_push --image=keycloak --file=./Dockerfile.keycloak'
+	$(TOOLBOX_RUN) sh -c '$(TOOLBOX_GHCR_LOGIN) ENVIRONMENT=staging APPLICATION=keycloak ecs_helper build_and_push --image=keycloak --file=./Dockerfile.keycloak'
 
-prod-build: prod-build-api prod-build-web prod-build-temporal-worker prod-build-keycloak
+prod-build:
+	@$(MAKE) ensure-base-images
+	@$(MAKE) _prod-build
+
+_prod-build: prod-build-api prod-build-web prod-build-temporal-worker prod-build-keycloak
 
 prod-build-api:
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=api ecs_helper build_and_push --image=api --file=./Dockerfile.api'
+	$(PROD_TOOLBOX_RUN) sh -c '$(TOOLBOX_GHCR_LOGIN) ENVIRONMENT=production APPLICATION=api ecs_helper build_and_push --image=api --file=./Dockerfile.api $(BASE_BUILD_ARGS)'
 
 prod-build-web:
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=web ecs_helper build_and_push --image=web --file=./Dockerfile.web'
+	$(PROD_TOOLBOX_RUN) sh -c '$(TOOLBOX_GHCR_LOGIN) ENVIRONMENT=production APPLICATION=web ecs_helper build_and_push --image=web --file=./Dockerfile.web $(WEB_BASE_BUILD_ARGS) $(WEB_NGINX_BUILD_ARGS)'
 
 prod-build-temporal-worker:
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=temporal-worker ecs_helper build_and_push --image=temporal-worker --file=./Dockerfile.temporal-worker'
+	$(PROD_TOOLBOX_RUN) sh -c '$(TOOLBOX_GHCR_LOGIN) ENVIRONMENT=production APPLICATION=temporal-worker ecs_helper build_and_push --image=temporal-worker --file=./Dockerfile.temporal-worker $(BASE_BUILD_ARGS)'
 
 prod-build-keycloak:
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=keycloak ecs_helper build_and_push --image=keycloak --file=./Dockerfile.keycloak'
+	$(PROD_TOOLBOX_RUN) sh -c '$(TOOLBOX_GHCR_LOGIN) ENVIRONMENT=production APPLICATION=keycloak ecs_helper build_and_push --image=keycloak --file=./Dockerfile.keycloak'
 
 # ============================================================================
 # ECS Deploy (via ecs_helper in toolbox container)
@@ -381,16 +404,16 @@ staging-deploy-temporal-worker:
 prod-deploy: prod-deploy-api prod-deploy-web prod-deploy-sidekiq prod-deploy-keycloak prod-deploy-temporal-worker
 
 prod-deploy-api:
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=api ecs_helper deploy --timeout 3600'
+	$(PROD_TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=api ecs_helper deploy --timeout 3600'
 
 prod-deploy-web:
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=web ecs_helper deploy --timeout 3600'
+	$(PROD_TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=web ecs_helper deploy --timeout 3600'
 
 prod-deploy-sidekiq:
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=sidekiq ecs_helper deploy --timeout 3600'
+	$(PROD_TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=sidekiq ecs_helper deploy --timeout 3600'
 
 prod-deploy-keycloak:
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=keycloak ecs_helper deploy --timeout 3600'
+	$(PROD_TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=keycloak ecs_helper deploy --timeout 3600'
 
 prod-deploy-temporal-worker:
-	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=temporal-worker ecs_helper deploy --timeout 3600'
+	$(PROD_TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=temporal-worker ecs_helper deploy --timeout 3600'
