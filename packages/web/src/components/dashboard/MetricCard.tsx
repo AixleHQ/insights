@@ -2,6 +2,7 @@ import { type ReactNode, useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { formatCost, formatPercent, formatTokens, formatCount } from "@/lib/formatters";
 
 type MetricCardBaseProps = {
   value: string | number;
@@ -24,27 +25,14 @@ function formatValue(value: string | number, format?: string): string {
 
   switch (format) {
     case "currency":
-      return new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-      }).format(value);
+      return formatCost(value);
     case "percentage":
-      return `${value.toFixed(1)}%`;
+      return formatPercent(value);
     case "compact":
-      // Format large numbers with K, M, B suffixes
-      if (value >= 1_000_000_000) {
-        return `${(value / 1_000_000_000).toFixed(1)}B`;
-      } else if (value >= 1_000_000) {
-        return `${(value / 1_000_000).toFixed(1)}M`;
-      } else if (value >= 1_000) {
-        return `${(value / 1_000).toFixed(1)}K`;
-      }
-      return new Intl.NumberFormat("en-US").format(value);
+      return formatTokens(value);
     case "number":
     default:
-      return new Intl.NumberFormat("en-US").format(value);
+      return formatCount(value);
   }
 }
 

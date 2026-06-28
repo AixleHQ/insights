@@ -1442,4 +1442,103 @@ RSpec.describe 'Api::V1::Stats', type: :request do
       expect(tool_names).not_to include('cursor')
     end
   end
+
+  describe 'timezone-aware bucketing' do
+    let(:fresh_org)  { create(:organization) }
+    let(:fresh_user) { create(:user) }
+    let!(:fresh_membership) { create(:organization_membership, user: fresh_user, organization: fresh_org, role: 'member') }
+
+    it 'buckets daily data using the provided tz param' do
+      # Event at 2026-06-15 23:30 UTC = 2026-06-15 in UTC but 2026-06-15 in America/New_York (19:30 EDT)
+      # Event at 2026-06-16 03:30 UTC = 2026-06-16 in UTC but 2026-06-15 in America/New_York (23:30 EDT)
+      create(:tool_event, organization: fresh_org, user: fresh_user,
+             tool_name: 'claude_code', cost_usd: 0.01,
+             occurred_at: Time.utc(2026, 6, 16, 3, 30))
+
+      authenticated_get "/api/v1/organizations/#{fresh_org.id}/stats/daily",
+                        user: fresh_user,
+                        organization: fresh_org,
+                        params: { start_date: '2026-06-15', end_date: '2026-06-16', tz: 'America/New_York' }
+
+      expect_success
+      dates_with_events = json_response[:data].select { |d| d[:event_count] > 0 }.map { |d| d[:date] }
+      expect(dates_with_events).to include('2026-06-15')
+      expect(dates_with_events).not_to include('2026-06-16')
+    end
+
+    it 'defaults to UTC when tz param is absent' do
+      create(:tool_event, organization: fresh_org, user: fresh_user,
+             tool_name: 'claude_code', cost_usd: 0.01,
+             occurred_at: Time.utc(2026, 6, 16, 3, 30))
+
+      authenticated_get "/api/v1/organizations/#{fresh_org.id}/stats/daily",
+                        user: fresh_user,
+                        organization: fresh_org,
+                        params: { start_date: '2026-06-15', end_date: '2026-06-16' }
+
+      expect_success
+      dates_with_events = json_response[:data].select { |d| d[:event_count] > 0 }.map { |d| d[:date] }
+      expect(dates_with_events).to include('2026-06-16')
+    end
+
+    it 'falls back to UTC for invalid tz param' do
+      create(:tool_event, organization: fresh_org, user: fresh_user,
+             tool_name: 'claude_code', cost_usd: 0.01,
+             occurred_at: Time.utc(2026, 6, 16, 3, 30))
+
+      authenticated_get "/api/v1/organizations/#{fresh_org.id}/stats/daily",
+                        user: fresh_user,
+                        organization: fresh_org,
+                        params: { start_date: '2026-06-15', end_date: '2026-06-16', tz: 'Invalid/Zone' }
+
+      expect_success
+      dates_with_events = json_response[:data].select { |d| d[:event_count] > 0 }.map { |d| d[:date] }
+      expect(dates_with_events).to include('2026-06-16')
+    end
+
+    it 'applies tz to heatmap endpoint' do
+      create(:tool_event, organization: fresh_org, user: fresh_user,
+             tool_name: 'claude_code', cost_usd: 0.01,
+             occurred_at: Time.utc(2026, 6, 16, 3, 30))
+
+      authenticated_get "/api/v1/organizations/#{fresh_org.id}/stats/heatmap",
+                        user: fresh_user,
+                        organization: fresh_org,
+                        params: { tz: 'America/New_York' }
+
+      expect_success
+      dates = json_response.map { |d| d[:date] }
+      expect(dates).to include('2026-06-15')
+    end
+  end
+
+  describe 'month_or_days_time_range validation' do
+    it 'returns 400 for malformed month param' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/daily_by_tool",
+                        user: user,
+                        organization: organization,
+                        params: { month: 'garbage' }
+
+      expect(response).to have_http_status(:bad_request)
+      expect(json_response[:message]).to include('Invalid month format')
+    end
+
+    it 'returns 400 for partially malformed month param' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/daily_by_model",
+                        user: user,
+                        organization: organization,
+                        params: { month: '2026-13' }
+
+      expect(response).to have_http_status(:bad_request)
+    end
+
+    it 'accepts valid month param' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/daily_by_tool",
+                        user: user,
+                        organization: organization,
+                        params: { month: '2026-06' }
+
+      expect_success
+    end
+  end
 end

@@ -220,6 +220,12 @@ export function OrgDashboard() {
 
       {activeTab === "personal" ? (
         <MemberDashboard hideHeader />
+      ) : selectedProjectId &&
+        !isLoadingStats &&
+        !stats?.total_events ? (
+        <div className="flex h-64 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
+          No data for the selected project in this period.
+        </div>
       ) : (
         <>
           <WeeklyToolUsageChart orgId={orgId} projectId={selectedProjectId} externalPeriod={selectedPeriod} />

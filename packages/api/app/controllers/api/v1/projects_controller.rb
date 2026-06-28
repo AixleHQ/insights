@@ -3,6 +3,8 @@
 module Api
   module V1
     class ProjectsController < BaseController
+      include TimezoneBucketing
+
       before_action :set_project, only: %i[show update destroy settings update_setting destroy_setting stats daily_by_tool commits_by_user retention_policy update_retention_policy link_jira link_linear sync_issues favorite unfavorite]
 
       # GET /api/v1/projects
@@ -185,9 +187,9 @@ module Api
         events = @project.tool_events.where(occurred_at: time_range_start..time_range_end)
 
         daily_data = events
-          .group("DATE_TRUNC('day', occurred_at)")
+          .group(day_trunc_sql)
           .select(
-            "DATE_TRUNC('day', occurred_at) as day",
+            "#{day_trunc_sql} as day",
             "COUNT(*) as event_count",
             "SUM(cost_usd) as cost_usd"
           )
@@ -240,12 +242,12 @@ module Api
           .pluck(:tool_name)
 
         trunc = granularity == "month" ? "month" : "day"
+        bucket_expr = period_trunc_sql(trunc)
 
-        # Get data grouped by bucket and tool
         bucketed_tool_data = events
-          .group("DATE_TRUNC('#{trunc}', occurred_at)", :tool_name)
+          .group(bucket_expr, :tool_name)
           .select(
-            "DATE_TRUNC('#{trunc}', occurred_at) as bucket",
+            "#{bucket_expr} as bucket",
             "tool_name",
             "COUNT(*) as event_count"
           )

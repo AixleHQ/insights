@@ -3,6 +3,8 @@
 module Api
   module V1
     class OrganizationMembersController < BaseController
+      include TimezoneBucketing
+
       before_action :require_organization!
       before_action :set_membership, only: %i[show update destroy stats events dashboard_stats member_heatmap prompt_insights]
 
@@ -148,10 +150,6 @@ module Api
         authorize! @membership
         user = @membership.user
 
-        Rails.logger.info "[MemberStats] User: #{user.id}/#{user.email}, Org: #{current_organization.id}/#{current_organization.slug}"
-        Rails.logger.info "[MemberStats] All events for user: #{ToolEvent.where(user_id: user.id).count}"
-        Rails.logger.info "[MemberStats] Events in org: #{current_organization.tool_events.where(user_id: user.id).count}"
-
         events = current_organization.tool_events.where(user_id: user.id)
 
         # Basic counts
@@ -224,9 +222,9 @@ module Api
         # Daily activity for last 30 days
         daily_activity = events
           .where("occurred_at >= ?", 30.days.ago)
-          .group("DATE(occurred_at)")
+          .group(date_sql)
           .select(
-            "DATE(occurred_at) as date",
+            "#{date_sql} as date",
             "COUNT(*) as count",
             "SUM(tokens_total) as tokens"
           )
@@ -473,12 +471,10 @@ module Api
       def member_heatmap
         authorize! @membership
 
-        # Dates are bucketed in DB server timezone (UTC). Events near midnight
-        # for users in non-UTC zones may bucket into adjacent calendar days.
         data = current_organization.tool_events
           .where(user_id: @membership.user_id, occurred_at: 1.year.ago..Time.current)
-          .group("DATE(occurred_at)")
-          .select("DATE(occurred_at) as date, COUNT(*) as count")
+          .group(date_sql)
+          .select("#{date_sql} as date, COUNT(*) as count")
           .order("date ASC")
           .map { |r| { date: r.date.to_s, count: r.count.to_i } }
 

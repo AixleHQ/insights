@@ -50,6 +50,11 @@ export function periodLabel(p: DashboardPeriod): string {
   });
 }
 
+export function formatPerMillion(n: number | null): string {
+  if (n === null || n === undefined) return "—";
+  return `$${n.toFixed(2)}`;
+}
+
 export function truncateModelName(name: string): string {
   return name.length > 30 ? `${name.slice(0, 30)}…` : name;
 }
