@@ -1,6 +1,7 @@
 # Dependencies
 node_modules/
 vendor/bundle/
+.base-build-args.mk
 
 .playwright-mcp/
 settings.local.json

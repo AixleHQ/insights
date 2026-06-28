@@ -59,48 +59,48 @@ watch_staging_sidekiq_logs:
 # --- Exec (production — matches Terraform var.environment = "production") ---
 
 exec_prod_api:
-	@aws ecs execute-command --cluster db90-production-cluster --task $(call get_task,db90-production-cluster,db90-production-api) --container api --command /bin/bash --interactive --region $(REGION)
+	@aws ecs execute-command --cluster aixle-db90-production-cluster --task $(call get_task,aixle-db90-production-cluster,aixle-db90-production-api) --container api --command /bin/bash --interactive --region $(REGION)
 
 exec_prod_web:
-	@aws ecs execute-command --cluster db90-production-cluster --task $(call get_task,db90-production-cluster,db90-production-web) --container web --command /bin/bash --interactive --region $(REGION)
+	@aws ecs execute-command --cluster aixle-db90-production-cluster --task $(call get_task,aixle-db90-production-cluster,aixle-db90-production-web) --container web --command /bin/bash --interactive --region $(REGION)
 
 exec_prod_keycloak:
-	@aws ecs execute-command --cluster db90-production-cluster --task $(call get_task,db90-production-cluster,db90-production-keycloak) --container keycloak --command /bin/bash --interactive --region $(REGION)
+	@aws ecs execute-command --cluster aixle-db90-production-cluster --task $(call get_task,aixle-db90-production-cluster,aixle-db90-production-keycloak) --container keycloak --command /bin/bash --interactive --region $(REGION)
 
 exec_prod_temporal:
-	@aws ecs execute-command --cluster db90-production-cluster --task $(call get_task,db90-production-cluster,db90-production-temporal) --container temporal --command /bin/bash --interactive --region $(REGION)
+	@aws ecs execute-command --cluster aixle-db90-production-cluster --task $(call get_task,aixle-db90-production-cluster,aixle-db90-production-temporal) --container temporal --command /bin/bash --interactive --region $(REGION)
 
 # --- Logs (production) ---
 
 prod_api_logs:
-	aws logs tail db90-production-api --since $(LOG_PERIOD) --region $(REGION)
+	aws logs tail aixle-db90-production-api --since $(LOG_PERIOD) --region $(REGION)
 
 prod_web_logs:
-	aws logs tail db90-production-web --since $(LOG_PERIOD) --region $(REGION)
+	aws logs tail aixle-db90-production-web --since $(LOG_PERIOD) --region $(REGION)
 
 prod_keycloak_logs:
-	aws logs tail db90-production-keycloak --since $(LOG_PERIOD) --region $(REGION)
+	aws logs tail aixle-db90-production-keycloak --since $(LOG_PERIOD) --region $(REGION)
 
 prod_temporal_logs:
-	aws logs tail db90-production-temporal --since $(LOG_PERIOD) --region $(REGION)
+	aws logs tail aixle-db90-production-temporal --since $(LOG_PERIOD) --region $(REGION)
 
 prod_sidekiq_logs:
-	aws logs tail db90-production-sidekiq --since $(LOG_PERIOD) --region $(REGION)
+	aws logs tail aixle-db90-production-sidekiq --since $(LOG_PERIOD) --region $(REGION)
 
 watch_prod_api_logs:
-	aws logs tail db90-production-api --follow --region $(REGION)
+	aws logs tail aixle-db90-production-api --follow --region $(REGION)
 
 watch_prod_web_logs:
-	aws logs tail db90-production-web --follow --region $(REGION)
+	aws logs tail aixle-db90-production-web --follow --region $(REGION)
 
 watch_prod_keycloak_logs:
-	aws logs tail db90-production-keycloak --follow --region $(REGION)
+	aws logs tail aixle-db90-production-keycloak --follow --region $(REGION)
 
 watch_prod_temporal_logs:
-	aws logs tail db90-production-temporal --follow --region $(REGION)
+	aws logs tail aixle-db90-production-temporal --follow --region $(REGION)
 
 watch_prod_sidekiq_logs:
-	aws logs tail db90-production-sidekiq --follow --region $(REGION)
+	aws logs tail aixle-db90-production-sidekiq --follow --region $(REGION)
 
 # --- Deploy (staging) ---
 
