@@ -273,6 +273,21 @@ RSpec.describe ModelPricingService do
         expect(result[:input_cost]).to eq(2.50)
         expect(result[:output_cost]).to eq(10.00)
       end
+
+      it 'prices cache tokens from the override input rate (AIX-350, no $0 regression)' do
+        result = described_class.calculate_cost(
+          tokens_in: 0,
+          tokens_out: 0,
+          cache_read_tokens: 1_000_000,
+          cache_write_tokens: 1_000_000,
+          model: "gpt-4o-ft-acme",
+          organization: organization
+        )
+        # override input = $1/M → cache_read = $0.10/M, cache_write = $1.25/M
+        expect(result[:cache_read_cost]).to eq(0.10)
+        expect(result[:cache_write_cost]).to eq(1.25)
+        expect(result[:total_cost]).to eq(1.35)
+      end
     end
 
     context 'without model or tool' do

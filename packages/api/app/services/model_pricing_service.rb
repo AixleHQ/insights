@@ -4,7 +4,9 @@
 # Prices are per million tokens, verified 2026-06-17
 class ModelPricingService
   # Pricing in USD per million tokens
-  # Format: { model_pattern => { input: price, output: price } }
+  # Format: { model_pattern => { input:, output:, cache_write?:, cache_read?: } }
+  # cache_write / cache_read are optional (Anthropic prompt caching); when absent,
+  # cache tokens are not priced separately and fall back to 0.
   MODEL_PRICING = {
     # OpenAI models (longer/specific patterns before shorter/generic ones)
     "gpt-4o-mini" => { input: 0.15, output: 0.60 },
@@ -73,10 +75,21 @@ class ModelPricingService
 
       normalized = model_name.to_s.downcase
 
-      # Check per-org overrides before falling back to hardcoded rates
+      # Check per-org overrides before falling back to hardcoded rates.
+      # Overrides only carry input/output rates, so derive cache rates from the
+      # overridden input using Anthropic's standard ratios (write 1.25x, read 0.10x)
+      # — otherwise cache tokens would be billed at $0 for orgs with overrides.
       override = pricing_override_for_model(normalized, organization: organization)
 
-      return { input: override.input_per_mtok.to_f, output: override.output_per_mtok.to_f } if override.present?
+      if override.present?
+        input = override.input_per_mtok.to_f
+        return {
+          input:       input,
+          output:      override.output_per_mtok.to_f,
+          cache_write: (input * 1.25).round(6),
+          cache_read:  (input * 0.10).round(6)
+        }
+      end
 
       # Try exact match first
       return MODEL_PRICING[normalized] if MODEL_PRICING.key?(normalized)

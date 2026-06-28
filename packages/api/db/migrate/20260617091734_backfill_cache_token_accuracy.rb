@@ -6,6 +6,12 @@
 # reports all three as part of usage.input_tokens). This migration recalculates
 # tokens_in = metadata->>'base_input_tokens' for rows that have the breakdown.
 #
+# Scope: only rows carrying metadata->>'base_input_tokens' (written by the
+# aixle-insights transcript reader). Claude Code Stop-hook rows created before this
+# PR stored the raw input in tokens_in without any cache breakdown in metadata, so
+# the original cache split is unrecoverable — those rows are intentionally skipped.
+# Hook rows created after this PR already store the corrected base tokens_in.
+#
 # Safety:
 # - Batched to avoid WAL pressure and long locks on TimescaleDB hypertable.
 # - Guards against non-integer metadata values with regex filter.
