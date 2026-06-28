@@ -296,10 +296,11 @@ describe("mapDailyStats", () => {
     const results = mapDailyStats(entry);
     expect(results).toHaveLength(1);
     expect(results[0].event_type).toBe("completion");
-    expect(results[0].cost_usd).toBeCloseTo(0.0009, 10);
+    // Cost is based on tabAccepted (80), not tabSuggested: (80 * 15 * 0.6) / 1_000_000 = 0.00072
+    expect(results[0].cost_usd).toBeCloseTo(0.00072, 10);
   });
 
-  it("computes composer chat cost from line count using default pricing", () => {
+  it("computes composer chat cost from accepted line count using default pricing", () => {
     const entry: DailyStatsEntry = {
       date: "2026-04-01",
       dbPath,
@@ -308,7 +309,9 @@ describe("mapDailyStats", () => {
     const results = mapDailyStats(entry);
     expect(results).toHaveLength(1);
     expect(results[0].event_type).toBe("chat");
-    expect(results[0].cost_usd).toBeCloseTo(0.0315, 10);
+    // Cost is based on composerAccepted (60), not composerSuggested:
+    // (60 * 15 * (15.0 + 3.0 * 2)) / 1_000_000 = 0.0189
+    expect(results[0].cost_usd).toBeCloseTo(0.0189, 10);
   });
 
   it("uses custom PricingConfig rates when provided", () => {
@@ -325,7 +328,8 @@ describe("mapDailyStats", () => {
     };
     const results = mapDailyStats(entry, undefined, customPricing);
     expect(results).toHaveLength(1);
-    expect(results[0].cost_usd).toBeCloseTo(0.0005, 10);
+    // Cost is based on tabAccepted (40) with custom rates: (40 * 10 * 1.0) / 1_000_000 = 0.0004
+    expect(results[0].cost_usd).toBeCloseTo(0.0004, 10);
     const defaultResults = mapDailyStats(entry);
     expect(results[0].cost_usd).not.toBe(defaultResults[0].cost_usd);
   });

@@ -72,9 +72,25 @@ module ToolEvents
     end
 
     def enrich_cost!
-      cost  = @attributes[:cost_usd]
-      t_in  = @attributes[:tokens_in]
-      t_out = @attributes[:tokens_out]
+      cost       = @attributes[:cost_usd]
+      t_in       = @attributes[:tokens_in]
+      t_out      = @attributes[:tokens_out]
+      cost_model = @attributes.dig(:metadata, "cost_model") ||
+                   @attributes.dig(:metadata, :cost_model)
+
+      # Line-count events store line counts in tokens_in/tokens_out, not real tokens.
+      # Move the line counts into metadata so they don't inflate token aggregations,
+      # and never re-price these events with token-based pricing.
+      if cost_model == "estimated_line_count"
+        @attributes[:metadata] = (@attributes[:metadata] || {}).merge(
+          "cost_source"     => "client",
+          "lines_suggested" => @attributes[:tokens_in],
+          "lines_accepted"  => @attributes[:tokens_out]
+        )
+        @attributes[:tokens_in]  = nil
+        @attributes[:tokens_out] = nil
+        return
+      end
 
       if (cost.nil? || cost.to_f.zero?) && (t_in.present? || t_out.present?)
         result = ModelPricingService.calculate_cost(
