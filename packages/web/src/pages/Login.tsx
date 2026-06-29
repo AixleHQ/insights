@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { AppRoutes } from "@/lib/routes";
 import { Loader2, Mail, Fingerprint } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -215,16 +216,16 @@ export function Login() {
         </p>
         <p className="mt-4 text-center text-xs text-muted-foreground/60">
           <Link
-            to="/legal/terms"
-            state={{ from: "/login" }}
+            to={AppRoutes.legal.terms}
+            state={{ from: AppRoutes.login }}
             className="hover:text-muted-foreground underline-offset-4 hover:underline"
           >
             Terms of Service
           </Link>
           {" · "}
           <Link
-            to="/legal/privacy"
-            state={{ from: "/login" }}
+            to={AppRoutes.legal.privacy}
+            state={{ from: AppRoutes.login }}
             className="hover:text-muted-foreground underline-offset-4 hover:underline"
           >
             Privacy Policy

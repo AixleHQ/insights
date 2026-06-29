@@ -46,6 +46,7 @@ import { ComingSoon } from "./components/ui/ComingSoon";
 import { NotFound } from "./pages/NotFound";
 import { TermsOfService } from "./pages/TermsOfService";
 import { PrivacyPolicy } from "./pages/PrivacyPolicy";
+import { AppRoutes } from "./lib/routes";
 
 function TeamIdRedirect() {
   const { id } = useParams<{ id: string }>();
@@ -87,8 +88,8 @@ function App() {
                 <Route path="/auth/popup-callback" element={<AuthPopupCallback />} />
 
                 {/* Legal pages - public, no auth required */}
-                <Route path="/legal/terms" element={<TermsOfService />} />
-                <Route path="/legal/privacy" element={<PrivacyPolicy />} />
+                <Route path={AppRoutes.legal.terms} element={<TermsOfService />} />
+                <Route path={AppRoutes.legal.privacy} element={<PrivacyPolicy />} />
 
                 {/* OAuth callback for integrations (outside protected routes for popup) */}
                 <Route path="/integrations/callback" element={<IntegrationOAuthCallback />} />

@@ -1,11 +1,12 @@
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { AppRoutes } from "@/lib/routes";
 
 export function PrivacyPolicy() {
   const location = useLocation();
   const { isAuthenticated } = useAuth();
   const from = (location.state as { from?: string } | null)?.from;
-  const backTo = from ?? (isAuthenticated ? "/" : "/login");
+  const backTo = from ?? (isAuthenticated ? AppRoutes.dashboard : AppRoutes.login);
   const backLabel = from
     ? "← Back"
     : isAuthenticated

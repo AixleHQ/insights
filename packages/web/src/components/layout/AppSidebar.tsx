@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { AppRoutes } from "@/lib/routes";
 import {
   LayoutDashboard,
   Activity,
@@ -509,7 +510,7 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Terms of Service">
-              <Link to="/legal/terms" state={{ from: location.pathname }}>
+              <Link to={AppRoutes.legal.terms} state={{ from: location.pathname }}>
                 <FileText className="size-4" />
                 <span>Terms</span>
               </Link>
@@ -517,7 +518,7 @@ export function AppSidebar() {
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Privacy Policy">
-              <Link to="/legal/privacy" state={{ from: location.pathname }}>
+              <Link to={AppRoutes.legal.privacy} state={{ from: location.pathname }}>
                 <Shield className="size-4" />
                 <span>Privacy</span>
               </Link>
