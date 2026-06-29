@@ -74,6 +74,7 @@ export function CostTrendChart({
   const totalCost = filteredData.reduce((sum, item) => sum + item.cost, 0);
   const avgCost = filteredData.length > 0 ? totalCost / filteredData.length : 0;
   const avgLabel = allTime ? `${formatCost(avgCost)}/mo` : `${formatCost(avgCost)}/day`;
+  const showEveryTick = formattedData.length <= 31;
 
   return (
     <Card className={cn("col-span-full lg:col-span-2", className)}>
@@ -120,7 +121,7 @@ export function CostTrendChart({
         ) : (
           <ChartContainer config={chartConfig} className="h-[200px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={formattedData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <AreaChart data={formattedData} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="costGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.3} />
@@ -133,6 +134,8 @@ export function CostTrendChart({
                   tickLine={false}
                   axisLine={false}
                   tickMargin={8}
+                  interval={showEveryTick ? 0 : "preserveStartEnd"}
+                  padding={showEveryTick ? { left: 0, right: 12 } : undefined}
                   className="text-xs text-muted-foreground"
                   tick={{ fill: "currentColor", fontSize: 11 }}
                 />
