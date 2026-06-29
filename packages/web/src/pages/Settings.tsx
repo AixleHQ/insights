@@ -1074,7 +1074,6 @@ export function AlertSettings() {
   );
 }
 
-
 export function SecuritySettings() {
   const { currentOrg, hasRole } = useOrg();
   const { data: me } = useCurrentUser();

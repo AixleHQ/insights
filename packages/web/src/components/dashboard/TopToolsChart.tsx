@@ -9,6 +9,7 @@ import type { ChartConfig } from "@/components/ui/chart";
 import { ChartSkeleton } from "@/components/ui/skeletons";
 import { ErrorState } from "@/components/ui/error-state";
 import { getToolColor, humanizeToolName } from "@/lib/utils";
+import { formatCost, formatCount } from "@/lib/formatters";
 
 export interface ToolUsageData {
   tool_name: string;
@@ -95,9 +96,9 @@ export function TopToolsChart({ data, isLoading, isError, onRetry, periodDesc, c
                     <ChartTooltipContent
                       formatter={(value, name) => {
                         if (name === "total_cost") {
-                          return `$${(value as number).toFixed(2)}`;
+                          return formatCost(value as number);
                         }
-                        return new Intl.NumberFormat("en-US").format(value as number);
+                        return formatCount(value as number);
                       }}
                     />
                   }

@@ -840,6 +840,170 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /api/v1/organizations/{organization_id}/members/{id}/stats:
+    get:
+      summary: Detailed statistics for a member
+      description: Full member profile stats — totals, token metrics, per-tool and per-model breakdowns, daily activity (timezone-aware), and related projects/organizations/tool accounts.
+      tags:
+        - Organization Members
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: id
+          in: path
+          required: true
+          description: Membership ID or user UUID
+          schema:
+            type: string
+        - $ref: '#/components/parameters/tz'
+      responses:
+        '200':
+          description: Member statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_events:
+                    type: integer
+                  total_cost:
+                    type: number
+                    format: float
+                  events_today:
+                    type: integer
+                  events_this_week:
+                    type: integer
+                  events_this_month:
+                    type: integer
+                  most_used_tool:
+                    type: string
+                    nullable: true
+                  tokens:
+                    type: object
+                    properties:
+                      total_in:
+                        type: integer
+                      total_out:
+                        type: integer
+                      total:
+                        type: integer
+                  tool_breakdown:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        tool:
+                          type: string
+                        count:
+                          type: integer
+                        cost:
+                          type: number
+                          format: float
+                        tokens_in:
+                          type: integer
+                        tokens_out:
+                          type: integer
+                        tokens_total:
+                          type: integer
+                        price_per_million_input:
+                          type: number
+                          format: float
+                          nullable: true
+                        price_per_million_output:
+                          type: number
+                          format: float
+                          nullable: true
+                  model_breakdown:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        model:
+                          type: string
+                        count:
+                          type: integer
+                        cost:
+                          type: number
+                          format: float
+                        tokens_in:
+                          type: integer
+                        tokens_out:
+                          type: integer
+                        tokens_total:
+                          type: integer
+                        price_per_million_input:
+                          type: number
+                          format: float
+                          nullable: true
+                        price_per_million_output:
+                          type: number
+                          format: float
+                          nullable: true
+                  daily_activity:
+                    type: array
+                    description: Per-day activity for the last 30 days, bucketed in the client timezone (tz param).
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                        count:
+                          type: integer
+                        tokens:
+                          type: integer
+                  projects:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        slug:
+                          type: string
+                        from_events:
+                          type: boolean
+                          description: Present and true when the user has events on the project but is not an explicit member.
+                  organizations:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        slug:
+                          type: string
+                        role:
+                          type: string
+                        is_current:
+                          type: boolean
+                  tool_accounts:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        tool_name:
+                          type: string
+                        external_username:
+                          type: string
+                          nullable: true
+                        connection_state:
+                          type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /api/v1/organizations/{organization_id}/members/{id}/dashboard_stats:
     get:
       summary: Personal dashboard stats for a member
@@ -995,6 +1159,7 @@ paths:
           description: Membership ID or user UUID
           schema:
             type: string
+        - $ref: '#/components/parameters/tz'
       responses:
         '200':
           description: Daily event counts for heatmap
@@ -1626,6 +1791,7 @@ paths:
           description: When true, aggregate over all available events with no date bound. Overrides month. Change-percent fields will be null.
           schema:
             type: boolean
+        - $ref: '#/components/parameters/tz'
       responses:
         '200':
           description: Overview stats
@@ -1813,6 +1979,7 @@ paths:
             type: string
         - $ref: '#/components/parameters/start_date'
         - $ref: '#/components/parameters/end_date'
+        - $ref: '#/components/parameters/tz'
       responses:
         '200':
           description: Daily stats
@@ -1891,6 +2058,7 @@ paths:
             type: string
         - $ref: '#/components/parameters/start_date'
         - $ref: '#/components/parameters/end_date'
+        - $ref: '#/components/parameters/tz'
       responses:
         '200':
           description: Stats by tool
@@ -1933,6 +2101,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/organization_id'
         - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/tz'
       responses:
         '200':
           description: Heatmap data
@@ -1988,6 +2157,7 @@ paths:
           description: Scope to a specific project (must belong to this organization)
           schema:
             type: string
+        - $ref: '#/components/parameters/tz'
       responses:
         '200':
           description: Risk alert rows sorted by event count descending
@@ -2054,6 +2224,7 @@ paths:
           description: Scope to a specific project (must belong to this organization)
           schema:
             type: string
+        - $ref: '#/components/parameters/tz'
       responses:
         '200':
           description: Stats by model
@@ -2377,6 +2548,7 @@ paths:
             type: string
             enum: [day, week, month]
             default: day
+        - $ref: '#/components/parameters/tz'
       responses:
         '200':
           description: Bucketed trend data with zero-filled gaps
@@ -3373,6 +3545,7 @@ paths:
             type: integer
             default: 30
           description: Number of days to look back (default 30)
+        - $ref: '#/components/parameters/tz'
       responses:
         '200':
           description: Project stats
@@ -3430,11 +3603,12 @@ paths:
             maximum: 365
         - name: granularity
           in: query
-          description: Bucket granularity — day for daily data, month for monthly buckets (days=365 gives 13 buckets: current month + 12 prior)
+          description: 'Bucket granularity — day for daily data, month for monthly buckets (days=365 gives 13 buckets: current month + 12 prior)'
           schema:
             type: string
             enum: [day, month]
             default: day
+        - $ref: '#/components/parameters/tz'
       responses:
         '200':
           description: Daily stats by tool
@@ -3746,6 +3920,7 @@ paths:
           description: Project membership ID or member user UUID
           schema:
             type: string
+        - $ref: '#/components/parameters/tz'
       responses:
         '200':
           description: Member stats for the project
@@ -4902,6 +5077,13 @@ paths:
                 Standard event payload. Also accepts raw Claude Code hook payloads
                 (`session_id` + `tool_input`/`tool_response` for PostToolUse, or
                 `session_id` + `stop_hook_active` for Stop hooks).
+
+                Stop-hook payloads may also include `model` and a `usage` object with
+                `input_tokens`, `output_tokens`, `cache_read_input_tokens` and
+                `cache_creation_input_tokens`. The cache counts are subtracted from
+                `usage.input_tokens` so the stored `tokens_in` reflects only non-cached
+                base input, and are preserved in `metadata` as `cache_read_tokens` /
+                `cache_write_tokens` for separate pricing.
               properties:
                 event_type:
                   type: string
@@ -5369,6 +5551,13 @@ components:
       schema:
         type: string
         format: date
+    tz:
+      name: tz
+      in: query
+      description: IANA timezone for day/week bucketing (e.g. America/New_York). Defaults to UTC if absent or invalid.
+      schema:
+        type: string
+        example: America/New_York
 
   responses:
     Unauthorized:

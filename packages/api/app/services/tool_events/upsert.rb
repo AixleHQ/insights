@@ -32,6 +32,19 @@ module ToolEvents
       pr_number pr_url pr_state pr_lookup_status
     ].freeze
 
+    # Events tagged with these cost_model values store non-real-token metrics in
+    # tokens_in/tokens_out. Moving them out under semantic metadata keys prevents
+    # inflation of token aggregations while preserving the raw measurements.
+    #
+    # +fabricated_cost+ flags models whose client cost_usd is itself derived from
+    # those unreliable inputs (char/4 token estimates), so it must be nilled too —
+    # otherwise the fabricated cost keeps inflating cost aggregations. Line-count
+    # events keep their cost: it is a legitimate line-based estimate, not char/4.
+    ESTIMATED_METRICS_KEYS = {
+      "estimated_line_count"      => { in_key: "lines_suggested",     out_key: "lines_accepted",      fabricated_cost: false },
+      "estimated_transcript_text" => { in_key: "tokens_estimated_in", out_key: "tokens_estimated_out", fabricated_cost: true }
+    }.freeze
+
     # @return [Hash] { tool_event: ToolEvent, created: Boolean }
     def self.call(attributes)
       new(attributes).call
@@ -72,17 +85,25 @@ module ToolEvents
     end
 
     def enrich_cost!
+      return if relocate_estimated_metrics!
+
       cost  = @attributes[:cost_usd]
       t_in  = @attributes[:tokens_in]
       t_out = @attributes[:tokens_out]
 
       if (cost.nil? || cost.to_f.zero?) && (t_in.present? || t_out.present?)
+        metadata = @attributes[:metadata] || {}
+        cache_read = metadata["cache_read_tokens"] || metadata[:cache_read_tokens]
+        cache_write = metadata["cache_write_tokens"] || metadata[:cache_write_tokens]
+
         result = ModelPricingService.calculate_cost(
-          tokens_in:    t_in.to_i,
-          tokens_out:   t_out.to_i,
-          model:        @attributes[:model],
-          tool:         @attributes[:tool_name],
-          organization: organization
+          tokens_in:          t_in.to_i,
+          tokens_out:         t_out.to_i,
+          cache_read_tokens:  cache_read.to_i,
+          cache_write_tokens: cache_write.to_i,
+          model:              @attributes[:model],
+          tool:               @attributes[:tool_name],
+          organization:       organization
         )
         @attributes[:cost_usd] = result[:total_cost]
 
@@ -90,6 +111,31 @@ module ToolEvents
       else
         set_cost_source("client")
       end
+    end
+
+    # Relocates estimated-metric events out of the real-token columns and returns
+    # true when one was handled (so +enrich_cost!+ skips re-pricing).
+    #
+    # These events store line counts or char/4 text estimates in tokens_in/out;
+    # we move them to metadata under semantic keys so they never inflate token
+    # aggregations. When the cost was also derived from those estimates
+    # (+fabricated_cost+), the cost is nilled so it cannot inflate cost
+    # aggregations either.
+    def relocate_estimated_metrics!
+      cost_model = @attributes.dig(:metadata, "cost_model") ||
+                   @attributes.dig(:metadata, :cost_model)
+      keys = ESTIMATED_METRICS_KEYS[cost_model]
+      return false unless keys
+
+      @attributes[:metadata] = (@attributes[:metadata] || {}).merge(
+        "cost_source"  => "client",
+        keys[:in_key]  => @attributes[:tokens_in],
+        keys[:out_key] => @attributes[:tokens_out]
+      )
+      @attributes[:tokens_in]  = nil
+      @attributes[:tokens_out] = nil
+      @attributes[:cost_usd]   = nil if keys[:fabricated_cost]
+      true
     end
 
     def set_cost_source(source)

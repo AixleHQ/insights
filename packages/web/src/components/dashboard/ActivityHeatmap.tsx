@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect, useRef } from "react";
 import { Activity, Calendar, Zap } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { formatCount, formatTokens } from "@/lib/formatters";
 
 interface ToolBreakdown {
   name: string;
@@ -59,15 +60,6 @@ function formatDateLong(dateStr: string): string {
   });
 }
 
-function formatNumber(num: number): string {
-  if (num >= 1000000) {
-    return `${(num / 1000000).toFixed(1)}M`;
-  }
-  if (num >= 1000) {
-    return `${(num / 1000).toFixed(1)}K`;
-  }
-  return num.toLocaleString();
-}
 
 interface DayData {
   date: string;
@@ -95,12 +87,12 @@ function DayTooltip({ day }: { day: DayData }) {
           <div className="flex items-center gap-4 mb-3">
             <div className="flex items-center gap-1.5">
               <Activity className="size-4 text-muted-foreground" />
-              <span>{formatNumber(day.count)} events</span>
+              <span>{formatCount(day.count)} events</span>
             </div>
             {day.tokens !== undefined && day.tokens > 0 && (
               <div className="flex items-center gap-1.5">
                 <Zap className="size-4 text-muted-foreground" />
-                <span>{formatNumber(day.tokens)} tokens</span>
+                <span>{formatTokens(day.tokens)} tokens</span>
               </div>
             )}
           </div>
@@ -119,7 +111,7 @@ function DayTooltip({ day }: { day: DayData }) {
                       <span>{tool.name}</span>
                     </div>
                     <span className="text-muted-foreground">
-                      {formatNumber(tool.events)} / {formatNumber(tool.tokens)}
+                      {formatCount(tool.events)} / {formatTokens(tool.tokens)}
                     </span>
                   </div>
                 ))}
@@ -137,7 +129,7 @@ function DayTooltip({ day }: { day: DayData }) {
                 {day.models.map((model) => (
                   <div key={model.name} className="flex items-center justify-between text-sm">
                     <span className="font-mono text-xs truncate max-w-[140px]">{model.name}</span>
-                    <span className="text-muted-foreground">{formatNumber(model.tokens)}</span>
+                    <span className="text-muted-foreground">{formatTokens(model.tokens)}</span>
                   </div>
                 ))}
               </div>
@@ -278,11 +270,11 @@ export function ActivityHeatmap({ data, className }: ActivityHeatmapProps) {
         </div>
         <div className="flex flex-wrap items-center gap-3 sm:gap-6 text-xs sm:text-sm text-muted-foreground">
           <span>
-            <span className="text-foreground font-medium">{formatNumber(totalEvents)}</span> events
+            <span className="text-foreground font-medium">{formatCount(totalEvents)}</span> events
           </span>
           {totalTokens > 0 && (
             <span>
-              <span className="text-foreground font-medium">{formatNumber(totalTokens)}</span> tokens
+              <span className="text-foreground font-medium">{formatTokens(totalTokens)}</span> tokens
             </span>
           )}
           <span>

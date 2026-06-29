@@ -60,6 +60,16 @@ import type {
 } from "@/lib/types";
 import type { IntegrationProvider } from "@/lib/providers";
 
+// Client IANA timezone, resolved once per session. Sent to date-bucketed stats
+// endpoints (?tz=) so day/week/month boundaries match the viewer's local day.
+const clientTimezone =
+  typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC";
+
+function appendTz(url: string): string {
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}tz=${encodeURIComponent(clientTimezone)}`;
+}
+
 // Query keys factory
 export const queryKeys = {
   user: {
@@ -81,7 +91,7 @@ export const queryKeys = {
     dashboardStats: (orgId: string, userId: string, period: string) =>
       ["organizations", orgId, "members", userId, "dashboard_stats", period] as const,
     heatmap: (orgId: string, userId: string) =>
-      ["organizations", orgId, "members", userId, "heatmap"] as const,
+      ["organizations", orgId, "members", userId, "heatmap", clientTimezone] as const,
     promptInsights: (orgId: string, userId: string, period: string) =>
       ["organizations", orgId, "members", userId, "prompt_insights", period] as const,
   },
@@ -127,27 +137,27 @@ export const queryKeys = {
   },
   stats: {
     overview: (orgId: string, projectId?: string, period?: DashboardPeriod) =>
-      ["organizations", orgId, "stats", "overview", { projectId, period }] as const,
+      ["organizations", orgId, "stats", "overview", { projectId, period, tz: clientTimezone }] as const,
     activeUsers: (orgId: string, projectId?: string, days?: number) =>
       ["organizations", orgId, "stats", "active_users", { projectId, days }] as const,
     daily: (orgId: string, period?: DashboardPeriod, days?: number, granularity?: string, projectId?: string) =>
-      ["organizations", orgId, "stats", "daily", { period, days, granularity, projectId }] as const,
+      ["organizations", orgId, "stats", "daily", { period, days, granularity, projectId, tz: clientTimezone }] as const,
     hourly: (orgId: string, hours?: number) =>
       ["organizations", orgId, "stats", "hourly", hours] as const,
     riskAlerts: (orgId: string, projectId?: string, period?: DashboardPeriod) =>
-      ["organizations", orgId, "stats", "risk_alerts", { projectId, period }] as const,
+      ["organizations", orgId, "stats", "risk_alerts", { projectId, period, tz: clientTimezone }] as const,
     dailyByModel: (orgId: string, opts: DailyByToolOpts) =>
-      ["organizations", orgId, "stats", "daily_by_model", opts] as const,
+      ["organizations", orgId, "stats", "daily_by_model", { ...opts, tz: clientTimezone }] as const,
     toolOverview: (orgId: string, tool: string) =>
-      ["organizations", orgId, "stats", "tools", tool, "overview"] as const,
+      ["organizations", orgId, "stats", "tools", tool, "overview", clientTimezone] as const,
     toolModels: (orgId: string, tool: string, days?: number) =>
-      ["organizations", orgId, "stats", "tools", tool, "models", days] as const,
+      ["organizations", orgId, "stats", "tools", tool, "models", days, clientTimezone] as const,
     toolUsers: (orgId: string, tool: string, days?: number) =>
-      ["organizations", orgId, "stats", "tools", tool, "users", days] as const,
+      ["organizations", orgId, "stats", "tools", tool, "users", days, clientTimezone] as const,
     toolDaily: (orgId: string, tool: string, days?: number, period?: string) =>
-      ["organizations", orgId, "stats", "tools", tool, "daily", days, period] as const,
+      ["organizations", orgId, "stats", "tools", tool, "daily", days, period, clientTimezone] as const,
     toolEventTypes: (orgId: string, tool: string, days?: number) =>
-      ["organizations", orgId, "stats", "tools", tool, "event_types", days] as const,
+      ["organizations", orgId, "stats", "tools", tool, "event_types", days, clientTimezone] as const,
     activeTools: (orgId: string) =>
       ["organizations", orgId, "stats", "active_tools"] as const,
   },
@@ -652,7 +662,7 @@ export function useMemberHeatmap(orgId: string, userId: string) {
     queryKey: queryKeys.members.heatmap(orgId, userId),
     queryFn: async () => {
       const response = await api.get<MemberHeatmapEntry[]>(
-        `/organizations/${orgId}/members/${userId}/stats/heatmap`
+        appendTz(`/organizations/${orgId}/members/${userId}/stats/heatmap`)
       );
       return response;
     },
@@ -829,8 +839,8 @@ export interface ProjectStatsResponse {
 
 export function useProjectStats(projectId: string, days = 30) {
   return useQuery({
-    queryKey: ["projects", projectId, "stats", days],
-    queryFn: () => api.get<ProjectStatsResponse>(`/projects/${projectId}/stats?days=${days}`),
+    queryKey: ["projects", projectId, "stats", days, clientTimezone],
+    queryFn: () => api.get<ProjectStatsResponse>(appendTz(`/projects/${projectId}/stats?days=${days}`)),
     enabled: !!projectId,
   });
 }
@@ -842,10 +852,10 @@ export function useProjectDailyByTool(
   granularity: "day" | "month" = "day"
 ) {
   return useQuery({
-    queryKey: ["projects", projectId, "stats", "daily_by_tool", days, granularity],
+    queryKey: ["projects", projectId, "stats", "daily_by_tool", days, granularity, clientTimezone],
     queryFn: () => {
       const p = new URLSearchParams({ days: String(days), granularity });
-      return api.get<DailyByToolResponse>(`/projects/${projectId}/stats/daily_by_tool?${p}`);
+      return api.get<DailyByToolResponse>(appendTz(`/projects/${projectId}/stats/daily_by_tool?${p}`));
     },
     enabled: !!projectId,
   });
@@ -1739,7 +1749,7 @@ export function useOverviewStats(orgId: string, projectId?: string, period?: Das
         p.set("month", period.value);
       }
       const qs = p.toString();
-      return api.get<OverviewStats>(`/organizations/${orgId}/stats/overview${qs ? `?${qs}` : ""}`);
+      return api.get<OverviewStats>(appendTz(`/organizations/${orgId}/stats/overview${qs ? `?${qs}` : ""}`));
     },
     enabled: !!orgId,
     refetchInterval: 30000,
@@ -1787,7 +1797,7 @@ export function useDailyStats(
       }
       if (projectId) p.set("project_id", projectId);
       return api.get<{ data: DailyStats[]; tool_breakdown: ToolUsageStats[] }>(
-        `/organizations/${orgId}/stats/daily?${p}`
+        appendTz(`/organizations/${orgId}/stats/daily?${p}`)
       );
     },
     enabled: !!orgId,
@@ -1809,8 +1819,8 @@ interface ActivityHeatmapData {
 
 export function useActivityHeatmap(orgId: string) {
   return useQuery({
-    queryKey: ["organizations", orgId, "stats", "heatmap"],
-    queryFn: () => api.get<ActivityHeatmapData[]>(`/organizations/${orgId}/stats/heatmap`),
+    queryKey: ["organizations", orgId, "stats", "heatmap", clientTimezone],
+    queryFn: () => api.get<ActivityHeatmapData[]>(appendTz(`/organizations/${orgId}/stats/heatmap`)),
     enabled: !!orgId,
   });
 }
@@ -1840,7 +1850,7 @@ export function useDailyByTool(orgId: string, opts: DailyByToolOpts | number = {
   const { days = 30, period, month, projectId, allTime } = normalized;
 
   return useQuery({
-    queryKey: ["organizations", orgId, "stats", "daily_by_tool", normalized],
+    queryKey: ["organizations", orgId, "stats", "daily_by_tool", normalized, clientTimezone],
     queryFn: () => {
       const p = new URLSearchParams();
       if (allTime) {
@@ -1852,7 +1862,7 @@ export function useDailyByTool(orgId: string, opts: DailyByToolOpts | number = {
         if (month) p.set("month", month);
       }
       if (projectId) p.set("project_id", projectId);
-      return api.get<DailyByToolResponse>(`/organizations/${orgId}/stats/daily_by_tool?${p}`);
+      return api.get<DailyByToolResponse>(appendTz(`/organizations/${orgId}/stats/daily_by_tool?${p}`));
     },
     enabled: !!orgId,
   });
@@ -1878,7 +1888,7 @@ export function useOrgRiskAlerts(orgId: string, projectId?: string, period?: Das
         p.set("month", period.value);
       }
       const qs = p.toString();
-      return api.get<RiskAlertRow[]>(`/organizations/${orgId}/stats/risk_alerts${qs ? `?${qs}` : ""}`);
+      return api.get<RiskAlertRow[]>(appendTz(`/organizations/${orgId}/stats/risk_alerts${qs ? `?${qs}` : ""}`));
     },
     enabled: !!orgId,
     staleTime: 60_000,
@@ -1912,7 +1922,7 @@ export function useDailyByModel(orgId: string, opts: DailyByToolOpts | number = 
         if (month) p.set("month", month);
       }
       if (projectId) p.set("project_id", projectId);
-      return api.get<DailyByModelResponse>(`/organizations/${orgId}/stats/daily_by_model?${p}`);
+      return api.get<DailyByModelResponse>(appendTz(`/organizations/${orgId}/stats/daily_by_model?${p}`));
     },
     enabled: !!orgId,
   });
@@ -1938,7 +1948,7 @@ export function useToolOverview(orgId: string, tool: string) {
   return useQuery({
     queryKey: queryKeys.stats.toolOverview(orgId, tool),
     queryFn: () =>
-      api.get<ToolOverviewStats>(`/organizations/${orgId}/stats/tools/${tool}/overview`),
+      api.get<ToolOverviewStats>(appendTz(`/organizations/${orgId}/stats/tools/${tool}/overview`)),
     enabled: !!orgId && !!tool,
     refetchInterval: 30000,
   });
@@ -1948,7 +1958,7 @@ export function useToolModels(orgId: string, tool: string, days = 30) {
   return useQuery({
     queryKey: queryKeys.stats.toolModels(orgId, tool, days),
     queryFn: () =>
-      api.get<ToolModelsResponse>(`/organizations/${orgId}/stats/tools/${tool}/models?days=${days}`),
+      api.get<ToolModelsResponse>(appendTz(`/organizations/${orgId}/stats/tools/${tool}/models?days=${days}`)),
     enabled: !!orgId && !!tool,
   });
 }
@@ -1957,7 +1967,7 @@ export function useToolUsers(orgId: string, tool: string, days = 30) {
   return useQuery({
     queryKey: queryKeys.stats.toolUsers(orgId, tool, days),
     queryFn: () =>
-      api.get<ToolUsersResponse>(`/organizations/${orgId}/stats/tools/${tool}/users?days=${days}`),
+      api.get<ToolUsersResponse>(appendTz(`/organizations/${orgId}/stats/tools/${tool}/users?days=${days}`)),
     enabled: !!orgId && !!tool,
   });
 }
@@ -1968,7 +1978,7 @@ export function useToolDaily(orgId: string, tool: string, days = 30, period?: "d
     queryFn: () => {
       const p = new URLSearchParams({ days: String(days) });
       if (period) p.set("period", period);
-      return api.get<ToolDailyResponse>(`/organizations/${orgId}/stats/tools/${tool}/daily?${p}`);
+      return api.get<ToolDailyResponse>(appendTz(`/organizations/${orgId}/stats/tools/${tool}/daily?${p}`));
     },
     enabled: !!orgId && !!tool,
   });
@@ -1979,7 +1989,7 @@ export function useToolEventTypes(orgId: string, tool: string, days = 30) {
     queryKey: queryKeys.stats.toolEventTypes(orgId, tool, days),
     queryFn: () =>
       api.get<ToolEventTypesResponse>(
-        `/organizations/${orgId}/stats/tools/${tool}/event_types?days=${days}`
+        appendTz(`/organizations/${orgId}/stats/tools/${tool}/event_types?days=${days}`)
       ),
     enabled: !!orgId && !!tool,
   });

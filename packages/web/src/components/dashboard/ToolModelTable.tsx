@@ -12,7 +12,7 @@ import { ErrorState } from "@/components/ui/error-state";
 import { Button } from "@/components/ui/button";
 import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import type { ToolModelStat } from "@/lib/types";
-import { formatCost, formatTokens } from "@/lib/formatters";
+import { formatCost, formatTokens, formatPerMillion, formatCount } from "@/lib/formatters";
 
 interface ToolModelTableProps {
   models: ToolModelStat[];
@@ -23,11 +23,6 @@ interface ToolModelTableProps {
 
 type SortKey = "eventCount" | "costUsd";
 type SortDir = "asc" | "desc";
-
-function formatPerMillion(n: number | null): string {
-  if (n === null || n === undefined) return "—";
-  return `$${n.toFixed(2)}`;
-}
 
 function modelLabel(model: ToolModelStat): string {
   return model.displayName || model.name;
@@ -155,7 +150,7 @@ export function ToolModelTable({ models, isLoading, isError, onRetry }: ToolMode
               <TableRow key={row.name}>
                 <TableCell className="font-medium font-mono text-sm">{modelLabel(row)}</TableCell>
                 <TableCell className="text-right font-mono text-sm">
-                  {row.eventCount.toLocaleString()}
+                  {formatCount(row.eventCount)}
                 </TableCell>
                 <TableCell className="hidden md:table-cell text-right font-mono text-sm text-muted-foreground">
                   {formatTokens(row.tokensIn)}

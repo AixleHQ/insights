@@ -84,8 +84,38 @@
       "file": "app/services/tool_events/upsert.rb",
       "line": 52,
       "note": "False positive: Integer(Zlib.crc32(...)) always produces a numeric literal, SQL injection is impossible."
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "38bf977250664892daaf88d0a7f1f142ba35f0ecbcc265b03b93105b43eef6dc",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/controllers/concerns/timezone_bucketing.rb",
+      "line": 20,
+      "note": "False positive: interpolated tz comes from client_timezone, which only ever returns a value from the VALID_TIMEZONES whitelist (TZInfo::Timezone.all_identifiers) or the literal 'UTC'. No user input reaches the SQL."
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "b6a32502ade568c962a3ccb2a46b96a677f597e4048d7e0ed49a69241dfc0805",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/controllers/concerns/timezone_bucketing.rb",
+      "line": 27,
+      "note": "False positive: trunc is whitelisted to day/week/month and tz comes from client_timezone, which only ever returns a value from the VALID_TIMEZONES whitelist or the literal 'UTC'. No user input reaches the SQL."
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "1bbe03c4a69bea1ea4930613f98af1f659edd1b9c401ce20fc9e3b56e0d1ca8b",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/controllers/concerns/timezone_bucketing.rb",
+      "line": 33,
+      "note": "False positive: interpolated tz comes from client_timezone, which only ever returns a value from the VALID_TIMEZONES whitelist (TZInfo::Timezone.all_identifiers) or the literal 'UTC'. No user input reaches the SQL."
     }
   ],
-  "updated": "2026-06-10 22:00:00 +0000",
+  "updated": "2026-06-29 08:00:00 +0000",
   "brakeman_version": "7.1.2"
 }
