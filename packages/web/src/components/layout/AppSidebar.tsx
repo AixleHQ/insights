@@ -504,6 +504,20 @@ export function AppSidebar() {
             <SidebarSeparator />
           </>
         )}
+        <div className="px-3 pb-1 flex gap-3 text-xs text-muted-foreground/50">
+          <Link
+            to="/legal/terms"
+            className="hover:text-muted-foreground hover:underline underline-offset-2"
+          >
+            Terms
+          </Link>
+          <Link
+            to="/legal/privacy"
+            className="hover:text-muted-foreground hover:underline underline-offset-2"
+          >
+            Privacy
+          </Link>
+        </div>
         <SidebarMenu>
           <SidebarMenuItem>
             <UserMenu />

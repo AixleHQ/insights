@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Loader2, Mail, Fingerprint } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -212,6 +212,21 @@ export function Login() {
           >
             Sign Up
           </button>
+        </p>
+        <p className="mt-4 text-center text-xs text-muted-foreground/60">
+          <Link
+            to="/legal/terms"
+            className="hover:text-muted-foreground underline-offset-4 hover:underline"
+          >
+            Terms of Service
+          </Link>
+          {" · "}
+          <Link
+            to="/legal/privacy"
+            className="hover:text-muted-foreground underline-offset-4 hover:underline"
+          >
+            Privacy Policy
+          </Link>
         </p>
       </div>
     </div>
