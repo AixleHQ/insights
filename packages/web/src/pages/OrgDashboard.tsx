@@ -31,7 +31,7 @@ import { MemberDashboard } from "@/pages/MemberDashboard";
 import { StatCardSkeleton } from "@/components/ui/skeletons";
 import { formatPercent, periodLabel } from "@/lib/formatters";
 import { type DashboardPeriod } from "@/lib/types";
-import { currentMonth, getLast12Months } from "@/lib/dashboardUtils";
+import { currentMonth, getLast12Months, fillDateGaps } from "@/lib/dashboardUtils";
 
 // Active Members intentionally uses a fixed rolling window, not the month filter,
 // so the number stays stable while users explore historical months.
@@ -129,11 +129,14 @@ export function OrgDashboard() {
   );
   const { data: eventsResponse, isLoading: isLoadingEvents, isError: isErrorEvents, refetch: refetchEvents } = useEvents(orgId, { per_page: 10 });
 
-  const chartData: DailyCostData[] = dailyData?.data?.map((d) => ({
-    date: d.date,
-    cost: d.cost_usd,
-    events: d.event_count,
-  })) || [];
+  const chartData: DailyCostData[] = fillDateGaps(
+    dailyData?.data?.map((d) => ({
+      date: d.date,
+      cost: d.cost_usd,
+      events: d.event_count,
+    })) || [],
+    (date) => ({ date, cost: 0, events: 0 })
+  );
 
   const toolUsage: ToolUsageData[] = dailyData?.tool_breakdown?.map((t) => ({
     tool_name: t.tool_name,
