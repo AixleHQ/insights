@@ -52,7 +52,7 @@ function TeamIdRedirect() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const projectId = searchParams.get("projectId");
-  const to = projectId ? `/members/${id}?projectId=${projectId}` : `/members/${id}`;
+  const to = projectId ? `${AppRoutes.members.detail(id!)}?projectId=${projectId}` : AppRoutes.members.detail(id!);
   return <Navigate to={to} replace />;
 }
 
@@ -60,13 +60,13 @@ function SettingsMembersIdRedirect() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const projectId = searchParams.get("projectId");
-  const to = projectId ? `/members/${id}?projectId=${projectId}` : `/members/${id}`;
+  const to = projectId ? `${AppRoutes.members.detail(id!)}?projectId=${projectId}` : AppRoutes.members.detail(id!);
   return <Navigate to={to} replace />;
 }
 
 function EditProjectRedirect() {
   const { id } = useParams<{ id: string }>();
-  return <Navigate to={`/projects/${id}/settings`} replace />;
+  return <Navigate to={AppRoutes.projects.settings(id!)} replace />;
 }
 
 function App() {
@@ -81,18 +81,18 @@ function App() {
               <ImpersonationBar />
               <Routes>
                 {/* Public routes */}
-                <Route path="/login" element={<Login />} />
-                <Route path="/auth/callback" element={<AuthCallback />} />
-                <Route path="/auth/silent-callback" element={<AuthSilentCallback />} />
-                <Route path="/auth/iframe-callback" element={<AuthIframeCallback />} />
-                <Route path="/auth/popup-callback" element={<AuthPopupCallback />} />
+                <Route path={AppRoutes.login} element={<Login />} />
+                <Route path={AppRoutes.authCallback} element={<AuthCallback />} />
+                <Route path={AppRoutes.authSilentCallback} element={<AuthSilentCallback />} />
+                <Route path={AppRoutes.authIframeCallback} element={<AuthIframeCallback />} />
+                <Route path={AppRoutes.authPopupCallback} element={<AuthPopupCallback />} />
 
                 {/* Legal pages - public, no auth required */}
                 <Route path={AppRoutes.legal.terms} element={<TermsOfService />} />
                 <Route path={AppRoutes.legal.privacy} element={<PrivacyPolicy />} />
 
                 {/* OAuth callback for integrations (outside protected routes for popup) */}
-                <Route path="/integrations/callback" element={<IntegrationOAuthCallback />} />
+                <Route path={AppRoutes.integrations.callback} element={<IntegrationOAuthCallback />} />
 
                 {/* Invitation accept page - requires auth but not org */}
                 <Route
@@ -106,7 +106,7 @@ function App() {
 
                 {/* Onboarding page - for users without organizations */}
                 <Route
-                  path="/onboarding"
+                  path={AppRoutes.onboarding}
                   element={
                     <ProtectedRoute allowNoOrg>
                       <Onboarding />
@@ -122,13 +122,13 @@ function App() {
                     </ProtectedRoute>
                   }
                 >
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/profile/*" element={<UserSettings />} />
-                  <Route path="/events" element={<Events />} />
+                  <Route path={AppRoutes.dashboard} element={<Dashboard />} />
+                  <Route path={`${AppRoutes.profile.root}/*`} element={<UserSettings />} />
+                  <Route path={AppRoutes.events.root} element={<Events />} />
                   <Route path="/events/:id" element={<EventDetailPage />} />
-                  <Route path="/projects" element={<Projects />} />
+                  <Route path={AppRoutes.projects.root} element={<Projects />} />
                   <Route
-                    path="/projects/new"
+                    path={AppRoutes.projects.new}
                     element={
                       <ProtectedRoute requireRoles={["owner"]}>
                         <NewProject />
@@ -138,10 +138,10 @@ function App() {
                   <Route path="/projects/:id" element={<ProjectDetail />} />
                   <Route path="/projects/:id/settings/*" element={<ProjectSettings />} />
                   <Route path="/projects/:id/edit" element={<EditProjectRedirect />} />
-                  <Route path="/integrations" element={<Navigate to="/integrations/connected" replace />} />
+                  <Route path={AppRoutes.integrations.root} element={<Navigate to={AppRoutes.integrations.connected} replace />} />
                   <Route path="/integrations/new/:provider" element={<IntegrationSetup />} />
                   <Route
-                    path="/integrations/manage"
+                    path={AppRoutes.integrations.manage}
                     element={
                       <ProtectedRoute requireRoles={["owner"]}>
                         <IntegrationsManage />
@@ -150,37 +150,37 @@ function App() {
                   />
                   <Route path="/integrations/:status" element={<Integrations />} />
                   {/* /members — top-level members routes */}
-                  <Route path="/members" element={<Members />} />
-                  <Route path="/members/invite" element={<TeamInvite />} />
-                  <Route path="/members/invitations" element={<InvitationsManagement />} />
+                  <Route path={AppRoutes.members.root} element={<Members />} />
+                  <Route path={AppRoutes.members.invite} element={<TeamInvite />} />
+                  <Route path={AppRoutes.members.invitations} element={<InvitationsManagement />} />
                   <Route path="/members/:id" element={<MemberProfile />} />
                   {/* /team/* redirects to /members/* for backwards compatibility */}
-                  <Route path="/team" element={<Navigate to="/members" replace />} />
-                  <Route path="/team/invite" element={<Navigate to="/members/invite" replace />} />
-                  <Route path="/team/invitations" element={<Navigate to="/members/invitations" replace />} />
+                  <Route path="/team" element={<Navigate to={AppRoutes.members.root} replace />} />
+                  <Route path="/team/invite" element={<Navigate to={AppRoutes.members.invite} replace />} />
+                  <Route path="/team/invitations" element={<Navigate to={AppRoutes.members.invitations} replace />} />
                   <Route path="/team/:id" element={<TeamIdRedirect />} />
                   {/* /settings/members/* redirects to /members/* for backwards compatibility */}
-                  <Route path="/settings/members" element={<Navigate to="/members" replace />} />
-                  <Route path="/settings/members/invite" element={<Navigate to="/members/invite" replace />} />
-                  <Route path="/settings/members/invitations" element={<Navigate to="/members/invitations" replace />} />
+                  <Route path="/settings/members" element={<Navigate to={AppRoutes.members.root} replace />} />
+                  <Route path="/settings/members/invite" element={<Navigate to={AppRoutes.members.invite} replace />} />
+                  <Route path="/settings/members/invitations" element={<Navigate to={AppRoutes.members.invitations} replace />} />
                   <Route path="/settings/members/:id" element={<SettingsMembersIdRedirect />} />
                   <Route
-                    path="/alerts"
+                    path={AppRoutes.alerts}
                     element={
                       <ProtectedRoute requireRoles={["owner"]}>
                         <OrgAlerts />
                       </ProtectedRoute>
                     }
                   />
-                  <Route path="/settings/*" element={<Settings />} />
-                  <Route path="/settings/tool-accounts" element={<Navigate to="/profile/tools" replace />} />
-                  <Route path="/events/unattributed" element={<UnattributedEvents />} />
-                  <Route path="/notifications" element={<Notifications />} />
-                  <Route path="/library" element={<ComingSoon title="Library" />} />
-                  <Route path="/feedback" element={<ComingSoon title="Feedback" />} />
+                  <Route path={`${AppRoutes.settings.root}/*`} element={<Settings />} />
+                  <Route path="/settings/tool-accounts" element={<Navigate to={AppRoutes.profile.tools} replace />} />
+                  <Route path={AppRoutes.events.unattributed} element={<UnattributedEvents />} />
+                  <Route path={AppRoutes.notifications} element={<Notifications />} />
+                  <Route path={AppRoutes.library} element={<ComingSoon title="Library" />} />
+                  <Route path={AppRoutes.feedback} element={<ComingSoon title="Feedback" />} />
 
                   {/* Admin routes */}
-                  <Route path="/admin" element={<AdminLayout />}>
+                  <Route path={AppRoutes.admin.root} element={<AdminLayout />}>
                     <Route index element={<AdminOverview />} />
                     <Route path="users" element={<AdminUsers />} />
                     <Route path="organizations" element={<AdminOrganizations />} />

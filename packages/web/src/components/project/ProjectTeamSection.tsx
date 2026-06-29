@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Trophy } from "lucide-react";
+import { AppRoutes } from "@/lib/routes";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -83,8 +84,8 @@ export function ProjectTeamSection({
                   key={member.id}
                   to={
                     projectId
-                      ? `/members/${member.userId}?projectId=${projectId}`
-                      : `/members/${member.userId}`
+                      ? `${AppRoutes.members.detail(member.userId)}?projectId=${projectId}`
+                      : AppRoutes.members.detail(member.userId)
                   }
                   className="flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-muted/50"
                 >

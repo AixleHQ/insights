@@ -40,7 +40,7 @@ export function Login() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate("/", { replace: true });
+      navigate(AppRoutes.dashboard, { replace: true });
     }
   }, [isAuthenticated, navigate]);
 
@@ -50,7 +50,7 @@ export function Login() {
     setIsSubmitting(true);
     try {
       await directLogin(email, password);
-      navigate("/", { replace: true });
+      navigate(AppRoutes.dashboard, { replace: true });
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Login failed");
     } finally {

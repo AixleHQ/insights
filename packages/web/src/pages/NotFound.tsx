@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { FullPageError } from "@/components/FullPageError";
+import { AppRoutes } from "@/lib/routes";
 import illustration from "@/assets/illustrations/404.svg";
 
 export function NotFound() {
@@ -11,7 +12,7 @@ export function NotFound() {
       title="We couldn't find that page"
       description="The page you're looking for doesn't exist or has been moved."
       actions={[
-        { label: "Back to dashboard", href: "/" },
+        { label: "Back to dashboard", href: AppRoutes.dashboard },
         { label: "Go back", variant: "outline", onClick: () => navigate(-1) },
       ]}
     />

@@ -10,6 +10,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/error-state";
 import { formatCost, formatTokens, formatCount } from "@/lib/formatters";
+import { AppRoutes } from "@/lib/routes";
 import type { ToolUserStat } from "@/lib/types";
 
 interface ToolUsersTableProps {
@@ -72,7 +73,7 @@ export function ToolUsersTable({ users, isLoading, isError, onRetry }: ToolUsers
               <TableRow key={user.userId}>
                 <TableCell>
                   <Link
-                    to={`/members/${user.userId}`}
+                    to={AppRoutes.members.detail(user.userId)}
                     className="font-medium hover:underline"
                   >
                     {user.name}

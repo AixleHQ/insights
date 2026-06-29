@@ -15,6 +15,7 @@ import { useOrgRiskAlerts } from "@/hooks/useApi";
 import { humanizeToolName } from "@/lib/utils";
 import { formatCost, formatTokens, formatCount } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
+import { AppRoutes } from "@/lib/routes";
 import type { DashboardPeriod } from "@/lib/types";
 
 interface RiskAlertsTableProps {
@@ -41,7 +42,7 @@ export function RiskAlertsTable({ orgId, projectId, period, className }: RiskAle
   const { data: rows, isLoading, isError, refetch } = useOrgRiskAlerts(orgId, projectId, period);
 
   const handleRowClick = (toolName: string) => {
-    navigate(`/events?tool_name=${encodeURIComponent(toolName)}&risk_level=not_none`);
+    navigate(`${AppRoutes.events.root}?tool_name=${encodeURIComponent(toolName)}&risk_level=not_none`);
   };
 
   return (

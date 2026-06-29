@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { AppRoutes } from "@/lib/routes";
 import {
   AlertTriangle,
   DollarSign,
@@ -150,7 +151,7 @@ export function AlertsPanel({ alerts, isLoading, onDismiss, className }: AlertsP
         </div>
         {hasAlerts && (
           <Link
-            to="/settings/alerts"
+            to={AppRoutes.settings.alerts}
             className="text-xs font-medium text-primary hover:underline"
           >
             Manage

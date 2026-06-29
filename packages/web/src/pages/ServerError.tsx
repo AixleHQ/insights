@@ -1,4 +1,5 @@
 import { FullPageError } from "@/components/FullPageError";
+import { AppRoutes } from "@/lib/routes";
 import illustration from "@/assets/illustrations/500.svg";
 
 interface ServerErrorProps {
@@ -13,7 +14,7 @@ export function ServerError({ onRetry }: ServerErrorProps) {
       description="An unexpected error occurred. You can try again, or head back to the dashboard."
       actions={[
         ...(onRetry ? [{ label: "Try again", onClick: onRetry }] : []),
-        { label: "Back to dashboard", href: "/", variant: "outline" as const },
+        { label: "Back to dashboard", href: AppRoutes.dashboard, variant: "outline" as const },
       ]}
     />
   );

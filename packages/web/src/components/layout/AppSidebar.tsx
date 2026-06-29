@@ -71,15 +71,15 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
-  { title: "Dashboard",    icon: LayoutDashboard, href: "/",                 roles: ["owner", "member", "viewer"] },
-  { title: "Events",       icon: Activity,        href: "/events",           roles: ["owner", "member", "viewer"] },
-  { title: "Projects",     icon: FolderKanban,    href: "/projects",         roles: ["owner", "member", "viewer"] },
-  { title: "Members",      icon: Users,           href: "/members",          roles: ["owner"] },
-  { title: "Integrations", icon: Plug,            href: "/integrations",     roles: ["owner"] },
-  { title: "Alerts",       icon: OctagonAlert,    href: "/alerts",           roles: ["owner"] },
-  { title: "Settings",     icon: Settings,        href: "/settings",         roles: ["owner"] },
-  { title: "Library",      icon: BookOpen,        href: "/library",          roles: ["owner", "member", "viewer"] },
-  { title: "Feedback",     icon: MessageSquare,   href: "/feedback",         roles: ["owner", "member", "viewer"] },
+  { title: "Dashboard",    icon: LayoutDashboard, href: AppRoutes.dashboard,         roles: ["owner", "member", "viewer"] },
+  { title: "Events",       icon: Activity,        href: AppRoutes.events.root,       roles: ["owner", "member", "viewer"] },
+  { title: "Projects",     icon: FolderKanban,    href: AppRoutes.projects.root,     roles: ["owner", "member", "viewer"] },
+  { title: "Members",      icon: Users,           href: AppRoutes.members.root,      roles: ["owner"] },
+  { title: "Integrations", icon: Plug,            href: AppRoutes.integrations.root, roles: ["owner"] },
+  { title: "Alerts",       icon: OctagonAlert,    href: AppRoutes.alerts,            roles: ["owner"] },
+  { title: "Settings",     icon: Settings,        href: AppRoutes.settings.root,     roles: ["owner"] },
+  { title: "Library",      icon: BookOpen,        href: AppRoutes.library,           roles: ["owner", "member", "viewer"] },
+  { title: "Feedback",     icon: MessageSquare,   href: AppRoutes.feedback,          roles: ["owner", "member", "viewer"] },
 ];
 
 function getOrgInitials(name: string | undefined | null) {
@@ -384,14 +384,14 @@ function UserMenu() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link to="/profile">
+          <Link to={AppRoutes.profile.root}>
             <User className="mr-2 size-4" />
             My Profile
           </Link>
         </DropdownMenuItem>
         {currentRole === "owner" && (
           <DropdownMenuItem asChild>
-            <Link to="/settings">
+            <Link to={AppRoutes.settings.root}>
               <Settings className="mr-2 size-4" />
               Settings
             </Link>
@@ -427,7 +427,7 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link to="/" className="flex items-center gap-2">
+              <Link to={AppRoutes.dashboard} className="flex items-center gap-2">
                 <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70">
                   <span className="font-mono-display text-sm font-bold text-primary-foreground">
                     AI
@@ -491,10 +491,10 @@ export function AppSidebar() {
                     <SidebarMenuItem key={p.id}>
                       <SidebarMenuButton
                         asChild
-                        isActive={isActive(`/projects/${p.id}`)}
+                        isActive={isActive(AppRoutes.projects.detail(p.id))}
                         tooltip={p.name}
                       >
-                        <Link to={`/projects/${p.id}`}>
+                        <Link to={AppRoutes.projects.detail(p.id)}>
                           <Star className="size-4" />
                           <span>{p.name}</span>
                         </Link>

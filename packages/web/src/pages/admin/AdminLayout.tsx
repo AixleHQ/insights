@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useCurrentUser } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
+import { AppRoutes } from "@/lib/routes";
 
 const adminNavItems = [
   { to: "/admin", label: "Overview", icon: LayoutDashboard, end: true },
@@ -33,7 +34,7 @@ export function AdminLayout() {
 
   // Check if user is super admin
   if (!(currentUser?.globalAdmin ?? currentUser?.super_admin)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={AppRoutes.dashboard} replace />;
   }
 
   return (

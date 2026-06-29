@@ -2,6 +2,7 @@ import { type ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useOrg } from "../contexts/OrgContext";
+import { AppRoutes } from "@/lib/routes";
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -37,18 +38,18 @@ export function ProtectedRoute({
 
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to={AppRoutes.login} state={{ from: location }} replace />;
   }
 
   // Redirect to onboarding if user has no organizations (unless allowNoOrg is set)
   // Don't redirect if we're already on the onboarding page
-  if (!allowNoOrg && organizations.length === 0 && location.pathname !== "/onboarding") {
-    return <Navigate to="/onboarding" state={{ from: location }} replace />;
+  if (!allowNoOrg && organizations.length === 0 && location.pathname !== AppRoutes.onboarding) {
+    return <Navigate to={AppRoutes.onboarding} state={{ from: location }} replace />;
   }
 
   // Check if organization is required
   if (requireOrg && !currentOrg) {
-    return <Navigate to="/onboarding" state={{ from: location }} replace />;
+    return <Navigate to={AppRoutes.onboarding} state={{ from: location }} replace />;
   }
 
   // Check role requirements
