@@ -27,9 +27,9 @@ describe("MetricCard", () => {
       expect(screen.getByText("1,234,567")).toBeInTheDocument();
     });
 
-    it("formats currency values with $ sign and 0 decimal places", () => {
+    it("formats currency values with $ sign and 2 decimal places", () => {
       render(<MetricCard label="Cost" value={4200} format="currency" />);
-      expect(screen.getByText("$4,200")).toBeInTheDocument();
+      expect(screen.getByText("$4,200.00")).toBeInTheDocument();
     });
 
     it("formats compact values with K suffix", () => {

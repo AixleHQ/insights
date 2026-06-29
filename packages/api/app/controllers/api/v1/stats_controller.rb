@@ -3,6 +3,8 @@
 module Api
   module V1
     class StatsController < BaseController
+      include TimezoneBucketing
+
       TOOL_SCOPED_ACTIONS = %i[tool_overview tool_models tool_users tool_daily tool_event_types].freeze
       ALLOWED_PERIODS = %w[day week month].freeze
       MAX_ACTIVE_USERS_DAYS = 365
@@ -146,7 +148,7 @@ module Api
 
         all_time    = ActiveModel::Type::Boolean.new.cast(params[:all_time])
         granularity = %w[week month].include?(params[:period]) ? params[:period] : "day"
-        trunc_sql   = "DATE_TRUNC('#{granularity}', occurred_at)"
+        trunc_sql   = period_trunc_sql(granularity)
 
         if all_time
           events = scoped_events_base
@@ -237,10 +239,11 @@ module Api
           .limit(3)
           .pluck(:tool_name)
 
+        bucket_expr = period_trunc_sql(trunc)
         daily_tool_data = events
-          .group("DATE_TRUNC('#{trunc}', occurred_at)", :tool_name)
+          .group(bucket_expr, :tool_name)
           .select(
-            "DATE_TRUNC('#{trunc}', occurred_at) as bucket",
+            "#{bucket_expr} as bucket",
             "tool_name",
             "COUNT(*) as event_count"
           )
@@ -308,7 +311,7 @@ module Api
 
         daily_counts = current_organization.tool_events
           .where(occurred_at: start_date..end_date)
-          .group("DATE(occurred_at)")
+          .group(date_sql)
           .count
 
         # Convert to array format expected by frontend
@@ -381,11 +384,12 @@ module Api
           .limit(3)
           .pluck(:model)
 
+        bucket_expr = period_trunc_sql(trunc)
         data = events
           .where.not(model: [ nil, "" ])
-          .group("DATE_TRUNC('#{trunc}', occurred_at)", :model)
+          .group(bucket_expr, :model)
           .select(
-            "DATE_TRUNC('#{trunc}', occurred_at) as bucket",
+            "#{bucket_expr} as bucket",
             "model",
             "COUNT(*) as event_count"
           )
@@ -486,12 +490,11 @@ module Api
         trunc      = ALLOWED_PERIODS.include?(params[:period]) ? params[:period] : "day"
         time_range = parse_time_range(default_days: days)
         events     = @tool_events.where(occurred_at: time_range[:start]..time_range[:end])
-        bucket_expr = Arel.sql("DATE_TRUNC('#{trunc}', occurred_at)")
 
         rows = events
-          .group(bucket_expr)
+          .group(period_trunc_sql(trunc))
           .select(
-            Arel.sql("DATE_TRUNC('#{trunc}', occurred_at) as bucket"),
+            "#{period_trunc_sql(trunc)} as bucket",
             "COUNT(*) as event_count",
             "SUM(tokens_in) as tokens_in",
             "SUM(tokens_out) as tokens_out",
@@ -687,6 +690,8 @@ module Api
         else
           parse_time_range(default_days: (params[:days] || 30).to_i)
         end
+      rescue Date::Error, ArgumentError
+        nil
       end
 
       def render_invalid_month_format

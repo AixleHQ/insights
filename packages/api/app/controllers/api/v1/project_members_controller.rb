@@ -3,6 +3,8 @@
 module Api
   module V1
     class ProjectMembersController < BaseController
+      include TimezoneBucketing
+
       before_action :set_project
       before_action :set_membership, only: %i[show update destroy breakdown]
 
@@ -276,9 +278,9 @@ module Api
 
         daily_activity = events
           .where("occurred_at >= ?", 30.days.ago)
-          .group("DATE(occurred_at)")
+          .group(date_sql)
           .select(
-            "DATE(occurred_at) as date",
+            "#{date_sql} as date",
             "COUNT(*) as count",
             "SUM(tokens_total) as tokens"
           )

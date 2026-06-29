@@ -48,7 +48,7 @@ import { ActivityHeatmap } from "@/components/dashboard";
 import { SortButton, type SortDirection } from "@/components/ui/sort-button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn, humanizeToolName, toEventRow } from "@/lib/utils";
-import { formatTokens } from "@/lib/formatters";
+import { formatTokens, formatCost, formatCount } from "@/lib/formatters";
 
 type MemberRole = "owner" | "member" | "viewer";
 
@@ -432,13 +432,13 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Events"
-          value={stats.total_events.toLocaleString()}
+          value={formatCount(stats.total_events)}
           subtitle={`${stats.events_this_week} this week`}
           icon={Activity}
         />
         <StatCard
           title="Total Cost"
-          value={`$${Number(stats.total_cost || 0).toFixed(2)}`}
+          value={formatCost(stats.total_cost)}
           subtitle="All time"
           icon={DollarSign}
         />
@@ -566,7 +566,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
                         </div>
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm">
-                        ${Number(tool.cost || 0).toFixed(2)}
+                        {formatCost(tool.cost)}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -637,7 +637,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
                         <div>${model.price_per_million_output} out</div>
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm">
-                        ${Number(model.cost || 0).toFixed(2)}
+                        {formatCost(model.cost)}
                       </TableCell>
                     </TableRow>
                   ))}
