@@ -25,8 +25,18 @@ import { humanizeToolName, toEventRow } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { showEventsUserColumn, type SortField, type SortDirection, riskLevelOrder } from "@/lib/eventAccess";
 import { UnattributedEvents } from "./UnattributedEvents";
+import type { EventSortBy } from "@/hooks/useApi";
 
 type EventsTab = "all" | "not_assigned";
+
+// tokens_in is intentionally absent: the table shows a combined in+out token
+// count, so sorting by tokens_in alone would not match what the user sees.
+const SORT_FIELD_API_MAP: Record<SortField, EventSortBy> = {
+  created_at: "occurred_at",
+  tool_name: "tool_name",
+  risk_level: "risk_level",
+  cost_usd: "cost_usd",
+};
 
 export function Events() {
   const { currentOrg, hasRole, currentRole } = useOrg();
@@ -86,7 +96,9 @@ export function Events() {
     project_id: filters.projectIds,
     start_date: filters.dateFrom,
     end_date: filters.dateTo,
-  }), [page, pageSize, filters.tools, filters.riskLevels, filters.eventTypes, filters.projectIds, filters.dateFrom, filters.dateTo]);
+    sort_by: SORT_FIELD_API_MAP[sortField],
+    direction: sortDirection,
+  }), [page, pageSize, filters.tools, filters.riskLevels, filters.eventTypes, filters.projectIds, filters.dateFrom, filters.dateTo, sortField, sortDirection]);
 
   const { data: eventsResponse, isLoading, isFetching, isError, refetch } = useEvents(
     currentOrg?.id || "",
@@ -119,9 +131,13 @@ export function Events() {
       setSortField(field);
       setSortDirection("desc");
     }
+    setPage(1);
   };
 
-  // Client-side: text search only (tool/risk/type/project are server-side)
+  // Client-side: text search only. Risk/tool/type/project filters (including the
+  // not_none sentinel from Risk Alerts drill-down) are server-side — do not
+  // re-filter risk levels here; staging previously compared against "not_none"
+  // literally and hid every row.
   const filteredAndSortedEvents = useMemo(() => {
     let result = [...events];
 
@@ -134,28 +150,8 @@ export function Events() {
       );
     }
 
-    // Apply sorting
-    result.sort((a, b) => {
-      let comparison = 0;
-      switch (sortField) {
-        case "created_at":
-          comparison = new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
-          break;
-        case "tool_name":
-          comparison = (a.tool_name || "").localeCompare(b.tool_name || "");
-          break;
-        case "risk_level":
-          comparison = (riskLevelOrder[a.risk_level as keyof typeof riskLevelOrder] || 0) - (riskLevelOrder[b.risk_level as keyof typeof riskLevelOrder] || 0);
-          break;
-        case "cost_usd":
-          comparison = (a.cost_usd || 0) - (b.cost_usd || 0);
-          break;
-      }
-      return sortDirection === "asc" ? comparison : -comparison;
-    });
-
     return result;
-  }, [events, filters.search, sortField, sortDirection]);
+  }, [events, filters.search]);
 
   const handleExport = async () => {
     setExportQueued(false);
@@ -172,6 +168,8 @@ export function Events() {
         start_date: filters.dateFrom,
         end_date: filters.dateTo,
         project_id: filters.projectIds,
+        sort_by: SORT_FIELD_API_MAP[sortField],
+        direction: sortDirection,
         filename,
       });
 

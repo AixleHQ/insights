@@ -130,6 +130,28 @@ RSpec.describe 'Api::V1::Events', type: :request do
       expect(ids).not_to include(meta_low.id)
     end
 
+    # Risk Alerts drill-down: tool_name + not_none must return the same risky subset
+    it 'filters by tool_name and risk_level=not_none together' do
+      risky_cursor = create(:tool_event, organization: organization, user: user, tool_name: 'cursor')
+      create(:audit_log, organization: organization, tool_event: risky_cursor, risk_level: 'high')
+
+      safe_cursor = create(:tool_event, organization: organization, user: user, tool_name: 'cursor')
+      create(:audit_log, organization: organization, tool_event: safe_cursor, risk_level: 'none')
+
+      risky_windsurf = create(:tool_event, organization: organization, user: user, tool_name: 'windsurf')
+      create(:audit_log, organization: organization, tool_event: risky_windsurf, risk_level: 'medium')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                        user: user,
+                        organization: organization,
+                        params: { tool_name: 'cursor', risk_level: 'not_none' }
+
+      expect_success
+      ids = json_data.map { |e| e[:id] }
+      expect(ids).to eq([ risky_cursor.id ])
+      expect(json_response[:meta][:total_count]).to eq(1)
+    end
+
     it 'filters by multiple comma-separated event_types' do
       chat_event = create(:tool_event, organization: organization, user: user, event_type: 'chat')
       edit_event = create(:tool_event, organization: organization, user: user, event_type: 'edit')
