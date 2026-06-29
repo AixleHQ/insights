@@ -23,7 +23,7 @@ export function PrivacyPolicy() {
           >
             {backLabel}
           </Link>
-          <span className="text-sm font-medium">DB90</span>
+          <span className="text-sm font-medium">Aixle Insights</span>
         </div>
       </header>
 
@@ -39,7 +39,7 @@ export function PrivacyPolicy() {
           <section>
             <h2 className="mb-2 text-base font-semibold">1. Introduction</h2>
             <p>
-              This Privacy Policy explains how DB90 collects, uses, and protects your information
+              This Privacy Policy explains how Aixle Insights collects, uses, and protects your information
               when you use our Service.
             </p>
           </section>

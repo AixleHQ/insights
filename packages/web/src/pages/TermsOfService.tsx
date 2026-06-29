@@ -23,7 +23,7 @@ export function TermsOfService() {
           >
             {backLabel}
           </Link>
-          <span className="text-sm font-medium">DB90</span>
+          <span className="text-sm font-medium">Aixle Insights</span>
         </div>
       </header>
 
@@ -39,7 +39,7 @@ export function TermsOfService() {
           <section>
             <h2 className="mb-2 text-base font-semibold">1. Acceptance of Terms</h2>
             <p>
-              Governs access to the DB90 platform, operated by Acme Corp / [legal entity TBD].
+              Governs access to the Aixle Insights platform, operated by Acme Corp / [legal entity TBD].
               By using the Service you agree to these Terms.
             </p>
           </section>
