@@ -49,6 +49,7 @@ class Invitation < ApplicationRecord
     # UserSyncService domain mapping on login). In that case we still mark the
     # invitation accepted and return the existing membership instead of failing,
     # so the record never gets stranded in "pending" (AIX-289).
+    retries = 0
     transaction do
       membership = organization.organization_memberships.find_or_create_by!(user: user) do |m|
         m.role = role
@@ -62,7 +63,7 @@ class Invitation < ApplicationRecord
       membership
     end
   rescue ActiveRecord::RecordNotUnique => e
-    retries = retries.to_i + 1
+    retries += 1
     retry if retries < 3
     raise e
   end
