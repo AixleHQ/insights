@@ -1,35 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fillDateGaps, formatDateLabel, formatLocalDate, sliceCostTrendWindow } from "./dashboardUtils";
-
-describe("fillDateGaps", () => {
-  const make = (date: string) => ({ date, cost: 0, events: 0 });
-
-  it("fills a single missing day", () => {
-    const data = [
-      { date: "2026-04-27", cost: 1, events: 1 },
-      { date: "2026-04-28", cost: 2, events: 1 },
-      // Apr 29 missing
-      { date: "2026-04-30", cost: 3, events: 1 },
-    ];
-    const result = fillDateGaps(data, make);
-    expect(result.map((d) => d.date)).toEqual(["2026-04-27", "2026-04-28", "2026-04-29", "2026-04-30"]);
-    expect(result[2]).toEqual({ date: "2026-04-29", cost: 0, events: 0 });
-  });
-
-  it("returns data unchanged when no gaps exist", () => {
-    const data = [
-      { date: "2026-04-28", cost: 1, events: 1 },
-      { date: "2026-04-29", cost: 2, events: 2 },
-      { date: "2026-04-30", cost: 3, events: 3 },
-    ];
-    expect(fillDateGaps(data, make)).toEqual(data);
-  });
-
-  it("returns single-element array unchanged", () => {
-    const data = [{ date: "2026-04-30", cost: 5, events: 1 }];
-    expect(fillDateGaps(data, make)).toEqual(data);
-  });
-});
+import { formatDateLabel, formatLocalDate, sliceCostTrendWindow } from "./dashboardUtils";
 
 describe("formatDateLabel", () => {
   it("returns month+day for day granularity", () => {

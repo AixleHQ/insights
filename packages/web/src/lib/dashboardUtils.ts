@@ -1,19 +1,3 @@
-export function fillDateGaps<T extends { date: string }>(
-  data: T[],
-  makeDefault: (date: string) => T
-): T[] {
-  if (data.length < 2) return data;
-  const byDate = new Map(data.map((d) => [d.date, d]));
-  const first = new Date(data[0].date + "T00:00:00");
-  const last = new Date(data[data.length - 1].date + "T00:00:00");
-  const result: T[] = [];
-  for (let d = new Date(first); d <= last; d.setDate(d.getDate() + 1)) {
-    const key = formatLocalDate(d);
-    result.push(byDate.get(key) ?? makeDefault(key));
-  }
-  return result;
-}
-
 export function formatDateLabel(dateStr: string, granularity: "month" | "day"): string {
   const date = new Date(dateStr + "T00:00:00");
   if (granularity === "month") {
