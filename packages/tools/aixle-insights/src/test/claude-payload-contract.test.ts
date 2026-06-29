@@ -161,6 +161,29 @@ describe("Claude MCP payload contract (AIX-192)", () => {
       );
       expect(payload.metadata.base_input_tokens).toBe(0);
     });
+
+    it("tokens_in excludes cache tokens — reports only base input (AIX-350)", () => {
+      const payload = mapTranscriptTurn(
+        makeTurn({ tokensIn: 1000, cacheWriteTokens: 200, cacheReadTokens: 500 })
+      );
+      // tokens_in should be baseInputTokens = 1000 - 200 - 500 = 300
+      expect(payload.tokens_in).toBe(300);
+    });
+
+    it("tokens_total excludes cache tokens from input side (AIX-350)", () => {
+      const payload = mapTranscriptTurn(
+        makeTurn({ tokensIn: 1000, tokensOut: 400, cacheWriteTokens: 200, cacheReadTokens: 500 })
+      );
+      // tokens_total = baseInputTokens + tokensOut = 300 + 400 = 700
+      expect(payload.tokens_total).toBe(700);
+    });
+
+    it("tokens_in equals tokensIn when no cache is used (no regression)", () => {
+      const payload = mapTranscriptTurn(
+        makeTurn({ tokensIn: 1000, cacheWriteTokens: 0, cacheReadTokens: 0 })
+      );
+      expect(payload.tokens_in).toBe(1000);
+    });
   });
 
   describe("regression scenarios from the 2026-06-07 staging investigation", () => {

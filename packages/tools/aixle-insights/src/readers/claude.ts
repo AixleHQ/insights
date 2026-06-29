@@ -415,10 +415,10 @@ export function mapTranscriptTurn(turn: ClaudeTranscriptTurn, options?: ToDb90Pa
   };
 
   if (turn.model) payload.model = turn.model;
-  if (turn.tokensIn > 0) payload.tokens_in = turn.tokensIn;
+  if (baseInputTokens > 0) payload.tokens_in = baseInputTokens;
   if (turn.tokensOut > 0) payload.tokens_out = turn.tokensOut;
-  if (turn.tokensIn > 0 || turn.tokensOut > 0) {
-    payload.tokens_total = turn.tokensIn + turn.tokensOut;
+  if (baseInputTokens > 0 || turn.tokensOut > 0) {
+    payload.tokens_total = baseInputTokens + turn.tokensOut;
   }
   if (projectId) payload.project_id = projectId;
 

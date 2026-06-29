@@ -375,6 +375,71 @@ RSpec.describe ToolEvents::Upsert do
     end
   end
 
+  describe ".call — cache-aware cost enrichment (AIX-350)" do
+    let(:organization) { create(:organization) }
+    let(:user) { create(:user) }
+
+    let(:cache_attributes) do
+      {
+        organization_id: organization.id,
+        user_id: user.id,
+        tool_name: "claude_code",
+        event_type: "chat",
+        model: "claude-sonnet-4",
+        tokens_in: 100_000,
+        tokens_out: 200_000,
+        cost_usd: nil,
+        occurred_at: Time.current,
+        metadata: {
+          "session_id" => SecureRandom.uuid,
+          "base_input_tokens" => 100_000,
+          "cache_read_tokens" => 900_000,
+          "cache_write_tokens" => 0
+        }
+      }
+    end
+
+    it "uses cache_read_tokens from metadata for cost calculation instead of full input rate" do
+      result = described_class.call(cache_attributes)
+      event = result[:tool_event]
+
+      # With cache-aware pricing:
+      # base input: 0.1M * $3.00/M = $0.30
+      # output: 0.2M * $15.00/M = $3.00
+      # cache_read: 0.9M * $0.30/M = $0.27
+      # total = $3.57
+      expect(event.cost_usd.to_f).to be_within(0.01).of(3.57)
+    end
+
+    it "does not overcharge when cache_read_tokens are present in metadata" do
+      # Without cache awareness, all tokens_in would be priced at $3/M input rate
+      # tokens_in=100K at $3/M = $0.30. But cache_read_tokens=900K exist in metadata.
+      # Naive would price 1M at $3/M = $3.00 input cost (if tokens_in were inflated).
+      # Correct is $0.30 input + $0.27 cache = $0.57 for the input side.
+      result = described_class.call(cache_attributes)
+      event = result[:tool_event]
+
+      naive_input_cost = 1_000_000.0 / 1_000_000 * 3.00  # $3.00
+      actual_cost = event.cost_usd.to_f
+      expect(actual_cost).to be < naive_input_cost + 3.00  # + output cost
+    end
+
+    it "falls back to standard pricing when metadata has no cache breakdown" do
+      attrs = cache_attributes.merge(
+        metadata: { "session_id" => SecureRandom.uuid }
+      )
+      result = described_class.call(attrs)
+      event = result[:tool_event]
+
+      expected = ModelPricingService.calculate_cost(
+        tokens_in: 100_000,
+        tokens_out: 200_000,
+        model: "claude-sonnet-4"
+      )[:total_cost]
+      expect(event.cost_usd.to_f).to eq(expected)
+    end
+  end
+
   # Regression guard — AIX-192 validation 2026-06-07
   #
   # Claude Code's MCP transcript-sync path is the *only* ingestion path that can
