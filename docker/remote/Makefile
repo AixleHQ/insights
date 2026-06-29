@@ -122,20 +122,22 @@ deploy_staging_temporal_worker:
 deploy_staging_all: deploy_staging_api deploy_staging_web deploy_staging_sidekiq deploy_staging_keycloak deploy_staging_temporal_worker
 
 # --- Deploy (production; ENVIRONMENT must match CI / ECR tags: production-latest) ---
+# Production lives in the separate aixle-db90 AWS account, so PROJECT is pinned here
+# regardless of the value the remote container was started with.
 
 deploy_prod_api:
-	ENVIRONMENT=production APPLICATION=api ecs_helper deploy --timeout 3600
+	PROJECT=aixle-db90 ENVIRONMENT=production APPLICATION=api ecs_helper deploy --timeout 3600
 
 deploy_prod_web:
-	ENVIRONMENT=production APPLICATION=web ecs_helper deploy --timeout 3600
+	PROJECT=aixle-db90 ENVIRONMENT=production APPLICATION=web ecs_helper deploy --timeout 3600
 
 deploy_prod_sidekiq:
-	ENVIRONMENT=production APPLICATION=sidekiq ecs_helper deploy --timeout 3600
+	PROJECT=aixle-db90 ENVIRONMENT=production APPLICATION=sidekiq ecs_helper deploy --timeout 3600
 
 deploy_prod_keycloak:
-	ENVIRONMENT=production APPLICATION=keycloak ecs_helper deploy --timeout 3600
+	PROJECT=aixle-db90 ENVIRONMENT=production APPLICATION=keycloak ecs_helper deploy --timeout 3600
 
 deploy_prod_temporal_worker:
-	ENVIRONMENT=production APPLICATION=temporal-worker ecs_helper deploy --timeout 3600
+	PROJECT=aixle-db90 ENVIRONMENT=production APPLICATION=temporal-worker ecs_helper deploy --timeout 3600
 
 deploy_prod_all: deploy_prod_api deploy_prod_web deploy_prod_sidekiq deploy_prod_keycloak deploy_prod_temporal_worker

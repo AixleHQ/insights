@@ -230,8 +230,10 @@ REMOTE_RUN  = docker compose --profile remote run --rm remote
 TOOLBOX_RUN = docker compose --profile remote run --rm toolbox
 PROD_TOOLBOX_RUN = PROJECT=aixle-db90 docker compose --profile remote run --rm toolbox
 
-export GHCR_USER ?= $(shell gh api user -q .login 2>/dev/null)
-export GHCR_TOKEN ?= $(shell gh auth token 2>/dev/null)
+# GHCR credentials are resolved lazily for build/push targets only (see the
+# target-specific exports in the build section), so plain `make test` / `make up`
+# never shell out to `gh`. They reach the toolbox container via docker-compose,
+# which forwards GHCR_USER / GHCR_TOKEN from this process's environment.
 
 -include .base-build-args.mk
 BASE_BUILD_ARGS ?=
@@ -343,6 +345,16 @@ watch-prod-logs-sidekiq:
 # ============================================================================
 # ECS Build & Push (via ecs_helper in toolbox container)
 # ============================================================================
+
+# Export GHCR creds only for build/push targets. Recursive `=` keeps the
+# `gh` shell-out lazy (runs when the target executes, not at parse time), so
+# plain `make test` / `make up` never touch `gh`. Listed on every build target
+# (not just the umbrellas) so direct `make staging-build-api` also gets creds.
+GHCR_BUILD_TARGETS = staging-build _staging-build prod-build _prod-build \
+	staging-build-api staging-build-web staging-build-temporal-worker staging-build-keycloak \
+	prod-build-api prod-build-web prod-build-temporal-worker prod-build-keycloak
+$(GHCR_BUILD_TARGETS): export GHCR_USER = $(shell gh api user -q .login 2>/dev/null)
+$(GHCR_BUILD_TARGETS): export GHCR_TOKEN = $(shell gh auth token 2>/dev/null)
 
 staging-build:
 	@$(MAKE) ensure-base-images
