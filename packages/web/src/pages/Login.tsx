@@ -216,6 +216,7 @@ export function Login() {
         <p className="mt-4 text-center text-xs text-muted-foreground/60">
           <Link
             to="/legal/terms"
+            state={{ from: "/login" }}
             className="hover:text-muted-foreground underline-offset-4 hover:underline"
           >
             Terms of Service
@@ -223,6 +224,7 @@ export function Login() {
           {" · "}
           <Link
             to="/legal/privacy"
+            state={{ from: "/login" }}
             className="hover:text-muted-foreground underline-offset-4 hover:underline"
           >
             Privacy Policy

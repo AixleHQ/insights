@@ -1,15 +1,26 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 
 export function PrivacyPolicy() {
+  const location = useLocation();
+  const { isAuthenticated } = useAuth();
+  const from = (location.state as { from?: string } | null)?.from;
+  const backTo = from ?? (isAuthenticated ? "/" : "/login");
+  const backLabel = from
+    ? "← Back"
+    : isAuthenticated
+      ? "← Back to App"
+      : "← Back to Login";
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
           <Link
-            to="/login"
+            to={backTo}
             className="text-sm text-muted-foreground hover:text-foreground hover:underline underline-offset-4"
           >
-            ← Back to Login
+            {backLabel}
           </Link>
           <span className="text-sm font-medium">DB90</span>
         </div>

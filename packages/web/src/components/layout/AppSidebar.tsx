@@ -17,6 +17,8 @@ import {
   BookOpen,
   MessageSquare,
   Star,
+  FileText,
+  Shield,
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -504,20 +506,24 @@ export function AppSidebar() {
             <SidebarSeparator />
           </>
         )}
-        <div className="px-3 pb-1 flex gap-3 text-xs text-muted-foreground/50">
-          <Link
-            to="/legal/terms"
-            className="hover:text-muted-foreground hover:underline underline-offset-2"
-          >
-            Terms
-          </Link>
-          <Link
-            to="/legal/privacy"
-            className="hover:text-muted-foreground hover:underline underline-offset-2"
-          >
-            Privacy
-          </Link>
-        </div>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Terms of Service">
+              <Link to="/legal/terms" state={{ from: location.pathname }}>
+                <FileText className="size-4" />
+                <span>Terms</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Privacy Policy">
+              <Link to="/legal/privacy" state={{ from: location.pathname }}>
+                <Shield className="size-4" />
+                <span>Privacy</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
         <SidebarMenu>
           <SidebarMenuItem>
             <UserMenu />
