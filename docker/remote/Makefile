@@ -59,48 +59,48 @@ watch_staging_sidekiq_logs:
 # --- Exec (production — matches Terraform var.environment = "production") ---
 
 exec_prod_api:
-	@aws ecs execute-command --cluster db90-production-cluster --task $(call get_task,db90-production-cluster,db90-production-api) --container api --command /bin/bash --interactive --region $(REGION)
+	@aws ecs execute-command --cluster aixle-db90-production-cluster --task $(call get_task,aixle-db90-production-cluster,aixle-db90-production-api) --container api --command /bin/bash --interactive --region $(REGION)
 
 exec_prod_web:
-	@aws ecs execute-command --cluster db90-production-cluster --task $(call get_task,db90-production-cluster,db90-production-web) --container web --command /bin/bash --interactive --region $(REGION)
+	@aws ecs execute-command --cluster aixle-db90-production-cluster --task $(call get_task,aixle-db90-production-cluster,aixle-db90-production-web) --container web --command /bin/bash --interactive --region $(REGION)
 
 exec_prod_keycloak:
-	@aws ecs execute-command --cluster db90-production-cluster --task $(call get_task,db90-production-cluster,db90-production-keycloak) --container keycloak --command /bin/bash --interactive --region $(REGION)
+	@aws ecs execute-command --cluster aixle-db90-production-cluster --task $(call get_task,aixle-db90-production-cluster,aixle-db90-production-keycloak) --container keycloak --command /bin/bash --interactive --region $(REGION)
 
 exec_prod_temporal:
-	@aws ecs execute-command --cluster db90-production-cluster --task $(call get_task,db90-production-cluster,db90-production-temporal) --container temporal --command /bin/bash --interactive --region $(REGION)
+	@aws ecs execute-command --cluster aixle-db90-production-cluster --task $(call get_task,aixle-db90-production-cluster,aixle-db90-production-temporal) --container temporal --command /bin/bash --interactive --region $(REGION)
 
 # --- Logs (production) ---
 
 prod_api_logs:
-	aws logs tail db90-production-api --since $(LOG_PERIOD) --region $(REGION)
+	aws logs tail aixle-db90-production-api --since $(LOG_PERIOD) --region $(REGION)
 
 prod_web_logs:
-	aws logs tail db90-production-web --since $(LOG_PERIOD) --region $(REGION)
+	aws logs tail aixle-db90-production-web --since $(LOG_PERIOD) --region $(REGION)
 
 prod_keycloak_logs:
-	aws logs tail db90-production-keycloak --since $(LOG_PERIOD) --region $(REGION)
+	aws logs tail aixle-db90-production-keycloak --since $(LOG_PERIOD) --region $(REGION)
 
 prod_temporal_logs:
-	aws logs tail db90-production-temporal --since $(LOG_PERIOD) --region $(REGION)
+	aws logs tail aixle-db90-production-temporal --since $(LOG_PERIOD) --region $(REGION)
 
 prod_sidekiq_logs:
-	aws logs tail db90-production-sidekiq --since $(LOG_PERIOD) --region $(REGION)
+	aws logs tail aixle-db90-production-sidekiq --since $(LOG_PERIOD) --region $(REGION)
 
 watch_prod_api_logs:
-	aws logs tail db90-production-api --follow --region $(REGION)
+	aws logs tail aixle-db90-production-api --follow --region $(REGION)
 
 watch_prod_web_logs:
-	aws logs tail db90-production-web --follow --region $(REGION)
+	aws logs tail aixle-db90-production-web --follow --region $(REGION)
 
 watch_prod_keycloak_logs:
-	aws logs tail db90-production-keycloak --follow --region $(REGION)
+	aws logs tail aixle-db90-production-keycloak --follow --region $(REGION)
 
 watch_prod_temporal_logs:
-	aws logs tail db90-production-temporal --follow --region $(REGION)
+	aws logs tail aixle-db90-production-temporal --follow --region $(REGION)
 
 watch_prod_sidekiq_logs:
-	aws logs tail db90-production-sidekiq --follow --region $(REGION)
+	aws logs tail aixle-db90-production-sidekiq --follow --region $(REGION)
 
 # --- Deploy (staging) ---
 
@@ -122,20 +122,22 @@ deploy_staging_temporal_worker:
 deploy_staging_all: deploy_staging_api deploy_staging_web deploy_staging_sidekiq deploy_staging_keycloak deploy_staging_temporal_worker
 
 # --- Deploy (production; ENVIRONMENT must match CI / ECR tags: production-latest) ---
+# Production lives in the separate aixle-db90 AWS account, so PROJECT is pinned here
+# regardless of the value the remote container was started with.
 
 deploy_prod_api:
-	ENVIRONMENT=production APPLICATION=api ecs_helper deploy --timeout 3600
+	PROJECT=aixle-db90 ENVIRONMENT=production APPLICATION=api ecs_helper deploy --timeout 3600
 
 deploy_prod_web:
-	ENVIRONMENT=production APPLICATION=web ecs_helper deploy --timeout 3600
+	PROJECT=aixle-db90 ENVIRONMENT=production APPLICATION=web ecs_helper deploy --timeout 3600
 
 deploy_prod_sidekiq:
-	ENVIRONMENT=production APPLICATION=sidekiq ecs_helper deploy --timeout 3600
+	PROJECT=aixle-db90 ENVIRONMENT=production APPLICATION=sidekiq ecs_helper deploy --timeout 3600
 
 deploy_prod_keycloak:
-	ENVIRONMENT=production APPLICATION=keycloak ecs_helper deploy --timeout 3600
+	PROJECT=aixle-db90 ENVIRONMENT=production APPLICATION=keycloak ecs_helper deploy --timeout 3600
 
 deploy_prod_temporal_worker:
-	ENVIRONMENT=production APPLICATION=temporal-worker ecs_helper deploy --timeout 3600
+	PROJECT=aixle-db90 ENVIRONMENT=production APPLICATION=temporal-worker ecs_helper deploy --timeout 3600
 
 deploy_prod_all: deploy_prod_api deploy_prod_web deploy_prod_sidekiq deploy_prod_keycloak deploy_prod_temporal_worker

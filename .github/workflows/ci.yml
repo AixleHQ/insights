@@ -21,6 +21,7 @@ jobs:
     container: ghcr.io/artempartos/ecs_toolbox:latest
     env:
       ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+      PROJECT: ${{ github.ref_name == 'main' && 'aixle-db90' || 'db90' }}
     strategy:
       matrix:
         image:
@@ -42,7 +43,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-to-assume: ${{ github.ref_name == 'main' && secrets.AWS_PRODUCTION_DEPLOY_ROLE_ARN || secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Build and push ${{ matrix.image }}
@@ -171,12 +172,13 @@ jobs:
     if: github.ref_name == 'staging' || github.ref_name == 'main'
     env:
       ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+      PROJECT: ${{ github.ref_name == 'main' && 'aixle-db90' || 'db90' }}
       APPLICATION: api
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-to-assume: ${{ github.ref_name == 'main' && secrets.AWS_PRODUCTION_DEPLOY_ROLE_ARN || secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Run db:migrate
@@ -191,6 +193,7 @@ jobs:
     if: github.ref_name == 'staging' || github.ref_name == 'main'
     env:
       ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+      PROJECT: ${{ github.ref_name == 'main' && 'aixle-db90' || 'db90' }}
     strategy:
       matrix:
         service:
@@ -204,7 +207,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-to-assume: ${{ github.ref_name == 'main' && secrets.AWS_PRODUCTION_DEPLOY_ROLE_ARN || secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Deploy ${{ matrix.service }}
@@ -217,13 +220,14 @@ jobs:
     if: github.ref_name == 'staging' || github.ref_name == 'main'
     env:
       ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+      PROJECT: ${{ github.ref_name == 'main' && 'aixle-db90' || 'db90' }}
       APPLICATION: api
     needs: [deploy]
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-to-assume: ${{ github.ref_name == 'main' && secrets.AWS_PRODUCTION_DEPLOY_ROLE_ARN || secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
       - name: Notify Rollbar of deploy
         run: |
