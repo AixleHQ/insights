@@ -66,6 +66,7 @@ export function ProjectMembersTab({
   const [addUserId, setAddUserId] = useState("");
   const [addRole, setAddRole] = useState("member");
   const [addError, setAddError] = useState<string | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
 
   const { data: members = [] } = useProjectMembers(projectId);
   const { data: stats } = useProjectMemberStats(projectId, 30, isProjectOwner);
@@ -280,6 +281,12 @@ export function ProjectMembersTab({
         </div>
       )}
 
+      {removeError && (
+        <p className="text-sm text-destructive" role="alert">
+          {removeError}
+        </p>
+      )}
+
       <Table>
         <TableHeader>
           <TableRow className="border-b border-border/50">
@@ -371,7 +378,24 @@ export function ProjectMembersTab({
                       {canManageMembers && (
                         <DropdownMenuItem
                           className="text-destructive"
-                          onClick={() => removeMember.mutate(m.id)}
+                          onClick={() => {
+                            setRemoveError(null);
+                            removeMember.mutate(m.id, {
+                              onError: (err) => {
+                                if (err instanceof ApiError && err.status === 422 && err.data) {
+                                  const data = err.data as { errors?: Record<string, string[]>; message?: string };
+                                  const messages = data.errors
+                                    ? Object.values(data.errors).flat()
+                                    : data.message
+                                      ? [data.message]
+                                      : [];
+                                  setRemoveError(messages.join(" ") || "Could not remove member.");
+                                } else {
+                                  setRemoveError(err instanceof Error ? err.message : "Could not remove member.");
+                                }
+                              },
+                            });
+                          }}
                         >
                           Remove from project
                         </DropdownMenuItem>
