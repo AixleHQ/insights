@@ -1,9 +1,4 @@
 import { useState, useMemo, useCallback } from "react";
-
-const clientTimezone =
-  typeof Intl !== "undefined"
-    ? Intl.DateTimeFormat().resolvedOptions().timeZone
-    : "UTC";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useEvents,
@@ -16,6 +11,11 @@ import { showEventsUserColumn, type SortField, type SortDirection, riskLevelOrde
 import { humanizeToolName, toEventRow } from "@/lib/utils";
 import type { EventFiltersState, EventRow } from "@/components/events";
 import type { EventsToolFilterOption } from "@/lib/eventsToolFilters";
+
+const clientTimezone =
+  typeof Intl !== "undefined"
+    ? Intl.DateTimeFormat().resolvedOptions().timeZone
+    : "UTC";
 
 export interface ProjectEventsTab {
   filters: EventFiltersState;

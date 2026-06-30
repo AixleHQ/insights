@@ -225,7 +225,9 @@ export function OrgDashboard() {
         !isLoadingStats &&
         !stats?.total_events ? (
         <div className="flex h-64 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
-          No data for the selected project in this period.
+          {selectedProjectId === "none"
+            ? "No unattributed events in this period."
+            : "No data for the selected project in this period."}
         </div>
       ) : (
         <>
