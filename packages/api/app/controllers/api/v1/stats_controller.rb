@@ -715,10 +715,13 @@ module Api
       # Returns a ToolEvent relation scoped to the org (and optionally a project).
       # project_id is validated through the org to prevent cross-org data access.
       def scoped_events_base
-        if params[:project_id].present?
-          current_organization.projects.find(params[:project_id]).tool_events
-        else
+        case params[:project_id]
+        when "none"
+          current_organization.tool_events.where(project_id: nil)
+        when nil, ""
           current_organization.tool_events
+        else
+          current_organization.projects.find(params[:project_id]).tool_events
         end
       end
 

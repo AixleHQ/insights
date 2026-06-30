@@ -72,6 +72,21 @@ RSpec.describe 'Api::V1::Stats', type: :request do
       expect(response).to have_http_status(:not_found)
     end
 
+    it 'filters to events with no project when project_id=none' do
+      project = create(:project, organization: organization)
+      create(:tool_event, organization: organization, project: project, user: user,
+             tool_name: 'claude_code', cost_usd: 99.0, occurred_at: Time.current)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/overview",
+                        user: user,
+                        organization: organization,
+                        params: { project_id: 'none' }
+
+      expect_success
+      # The 2 events from before-block have no project; the project-scoped event above must not appear
+      expect(json_response[:total_events]).to eq(2)
+    end
+
     it 'returns 403 for non-members' do
       non_member = create(:user)
 

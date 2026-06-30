@@ -54,10 +54,11 @@ function ProjectFilterDropdown({
       onValueChange={(v) => onChange(v === "all" ? undefined : v)}
     >
       <SelectTrigger className="w-48">
-        <SelectValue placeholder="All Projects" />
+        <SelectValue placeholder="All Activity" />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="all">All Projects</SelectItem>
+        <SelectItem value="all">All Activity</SelectItem>
+        <SelectItem value="none">No Project</SelectItem>
         {projects?.map((p) => (
           <SelectItem key={p.id} value={p.id}>
             {p.name}
