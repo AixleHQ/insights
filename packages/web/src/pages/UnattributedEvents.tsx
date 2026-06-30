@@ -66,6 +66,7 @@ import {
 import { RiskBadge } from "@/components/dashboard";
 import { normalizeRiskLevel } from "@/lib/riskLevel";
 import { formatCost } from "@/lib/formatters";
+import { AppRoutes } from "@/lib/routes";
 import { humanizeToolName } from "@/lib/utils";
 import { formatDistanceToNow } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -438,7 +439,7 @@ export function UnattributedEvents({
         {!embedded && (
           <div className="flex items-center gap-4">
             <Button asChild variant="ghost" size="icon">
-              <Link to="/events">
+              <Link to={AppRoutes.events.root}>
                 <ArrowLeft className="size-4" />
               </Link>
             </Button>
@@ -459,7 +460,7 @@ export function UnattributedEvents({
   }
 
   if (accessDenied && !embedded) {
-    return <Navigate to="/events" replace />;
+    return <Navigate to={AppRoutes.events.root} replace />;
   }
 
   return (
@@ -469,7 +470,7 @@ export function UnattributedEvents({
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
             <div className="flex items-center gap-4 flex-1">
               <Button asChild variant="ghost" size="icon">
-                <Link to="/events">
+                <Link to={AppRoutes.events.root}>
                   <ArrowLeft className="size-4" />
                 </Link>
               </Button>

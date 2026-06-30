@@ -43,6 +43,7 @@ import {
   organizationMemberUserId,
 } from "@/lib/utils";
 import { ApiError } from "@/lib/api";
+import { AppRoutes } from "@/lib/routes";
 import type { OrganizationMember } from "@/lib/types";
 
 const ROLES = ["member", "owner", "viewer"];
@@ -167,7 +168,7 @@ export function ProjectMembersTab({
                 key={m.id}
                 className="cursor-pointer"
                 onClick={() =>
-                  navigate(`/members/${m.userId}?projectId=${projectId}`)
+                  navigate(`${AppRoutes.members.detail(m.userId)}?projectId=${projectId}`)
                 }
               >
                 <TableCell>
@@ -336,7 +337,7 @@ export function ProjectMembersTab({
                 <TableRow
                   key={m.id}
                   className="cursor-pointer"
-                  onClick={() => navigate(`/members/${m.userId}?projectId=${projectId}`)}
+                  onClick={() => navigate(`${AppRoutes.members.detail(m.userId)}?projectId=${projectId}`)}
                 >
                   <TableCell>
                     <div className="flex items-center gap-2">

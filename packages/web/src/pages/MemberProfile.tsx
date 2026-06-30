@@ -48,6 +48,7 @@ import { ActivityHeatmap } from "@/components/dashboard";
 import { SortButton, type SortDirection } from "@/components/ui/sort-button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn, humanizeToolName, toEventRow } from "@/lib/utils";
+import { AppRoutes } from "@/lib/routes";
 import { formatTokens, formatCost, formatCount } from "@/lib/formatters";
 
 type MemberRole = "owner" | "member" | "viewer";
@@ -355,7 +356,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
       <div className="flex flex-col items-center justify-center py-12">
         <p className="text-muted-foreground">Member not found</p>
         <Button asChild variant="link" className="mt-2">
-          <Link to="/members">
+          <Link to={AppRoutes.members.root}>
             <ArrowLeft className="mr-2 size-4" />
             Back to team
           </Link>
@@ -383,7 +384,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-3 sm:gap-4">
             <Button asChild variant="ghost" size="icon" className="shrink-0">
-              <Link to="/members">
+              <Link to={AppRoutes.members.root}>
                 <ArrowLeft className="size-4" />
               </Link>
             </Button>
@@ -667,7 +668,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
                 {stats.projects.map((project) => (
                   <Link
                     key={project.id}
-                    to={`/projects/${project.id}`}
+                    to={AppRoutes.projects.detail(project.id)}
                     className="flex items-center justify-between rounded-md border p-2 transition-colors hover:bg-muted/50"
                   >
                     <span className="font-medium text-sm">{project.name}</span>
@@ -765,7 +766,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
             <CardDescription>Latest events from this team member</CardDescription>
           </div>
           <Button asChild variant="outline" size="sm">
-            <Link to={`/events?user_id=${member.user.id}`}>View all</Link>
+            <Link to={`${AppRoutes.events.root}?user_id=${member.user.id}`}>View all</Link>
           </Button>
         </CardHeader>
         <CardContent className="px-0 pb-0">

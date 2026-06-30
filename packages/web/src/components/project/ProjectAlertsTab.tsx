@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { formatDateTime } from "@/lib/formatters";
 import { type AlertSeverity } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { AppRoutes } from "@/lib/routes";
 
 export interface ProjectAlertsTabProps {
   projectId: string;
@@ -202,7 +203,7 @@ function AlertHistoryTable({ alerts }: { alerts: ProjectAlert[] }) {
                           <p className="text-sm">{alert.message}</p>
                           {alert.event_id && (
                             <Link
-                              to={`/events/${alert.event_id}`}
+                              to={AppRoutes.events.detail(alert.event_id)}
                               className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
                               onClick={(e) => e.stopPropagation()}
                             >

@@ -47,14 +47,15 @@ import {
 } from "@/components/project";
 import { cn } from "@/lib/utils";
 import { isGitRemoteMissing } from "@/lib/project-git-remote";
+import { AppRoutes } from "@/lib/routes";
 
 const getNavItems = (id: string, isMemberOfProject: boolean, isProjectOwner: boolean) => [
-  { title: "General",          href: `/projects/${id}/settings`,              icon: Building2  },
-  ...(isMemberOfProject ? [{ title: "Members",      href: `/projects/${id}/settings/members`,      icon: Users      }] : []),
-  ...(isProjectOwner    ? [{ title: "Integrations", href: `/projects/${id}/settings/integrations`, icon: Plug       }] : []),
-  { title: "Security & Audit", href: `/projects/${id}/settings/security`,     icon: FileSearch },
-  { title: "Policies",         href: `/projects/${id}/settings/policies`,     icon: Shield     },
-  { title: "Alerts",           href: `/projects/${id}/settings/alerts`,       icon: Bell       },
+  { title: "General",          href: AppRoutes.projects.settings(id),                     icon: Building2  },
+  ...(isMemberOfProject ? [{ title: "Members",      href: AppRoutes.projects.settingsTab(id, "members"),      icon: Users      }] : []),
+  ...(isProjectOwner    ? [{ title: "Integrations", href: AppRoutes.projects.settingsTab(id, "integrations"), icon: Plug       }] : []),
+  { title: "Security & Audit", href: AppRoutes.projects.settingsTab(id, "security"),     icon: FileSearch },
+  { title: "Policies",         href: AppRoutes.projects.settingsTab(id, "policies"),     icon: Shield     },
+  { title: "Alerts",           href: AppRoutes.projects.settingsTab(id, "alerts"),       icon: Bell       },
 ];
 
 function ProjectSettingsNav({
@@ -72,7 +73,7 @@ function ProjectSettingsNav({
   return (
     <nav className="flex flex-col gap-1">
       {navItems.map((item) => {
-        const isActive = item.href === `/projects/${projectId}/settings`
+        const isActive = item.href === AppRoutes.projects.settings(projectId)
           ? location.pathname === item.href
           : location.pathname.startsWith(item.href);
         return (
@@ -141,7 +142,7 @@ function ProjectGeneralSettingsForm({
       setDeleteError(null);
       try {
         await deleteProject.mutateAsync(projectId);
-        navigate("/projects");
+        navigate(AppRoutes.projects.root);
       } catch {
         setDeleteError("Failed to delete project. Please try again.");
       }
@@ -343,7 +344,7 @@ export function ProjectSettings() {
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Button asChild variant="ghost" size="icon">
-          <Link to={`/projects/${id}`}>
+          <Link to={AppRoutes.projects.detail(id)}>
             <ArrowLeft className="size-4" />
           </Link>
         </Button>
@@ -389,7 +390,7 @@ export function ProjectSettings() {
                     />
                   </div>
                 ) : (
-                  <Navigate to={`/projects/${id}/settings`} replace />
+                  <Navigate to={AppRoutes.projects.settings(id)} replace />
                 )
               }
             />
@@ -405,7 +406,7 @@ export function ProjectSettings() {
                     <ProjectConnectorsTab projectId={id} orgId={orgId} />
                   </div>
                 ) : (
-                  <Navigate to={`/projects/${id}/settings`} replace />
+                  <Navigate to={AppRoutes.projects.settings(id)} replace />
                 )
               }
             />
@@ -420,7 +421,7 @@ export function ProjectSettings() {
                 />
               }
             />
-            <Route path="*" element={<Navigate to={`/projects/${id}/settings`} replace />} />
+            <Route path="*" element={<Navigate to={AppRoutes.projects.settings(id)} replace />} />
           </Routes>
         </div>
       </div>

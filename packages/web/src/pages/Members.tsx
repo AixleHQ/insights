@@ -26,6 +26,7 @@ import {
   useDeleteNotificationRoute,
 } from "@/hooks/useApi";
 import type { Invitation, NotificationRoute, OrganizationMember } from "@/lib/types";
+import { AppRoutes } from "@/lib/routes";
 import { formatCost, formatCount } from "@/lib/formatters";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -194,7 +195,7 @@ export function Members() {
 
   // Owner-only guard — after all hooks
   if (currentRole !== "owner") {
-    return <Navigate to="/profile" replace />;
+    return <Navigate to={AppRoutes.profile.root} replace />;
   }
 
   const handleRoleChange = async (id: string, newRole: MemberRole) => {
@@ -244,7 +245,7 @@ export function Members() {
           </p>
         </div>
         <Button asChild>
-          <Link to="/members/invite">
+          <Link to={AppRoutes.members.invite}>
             <UserPlus className="mr-2 size-4" />
             Add Member
           </Link>
@@ -357,7 +358,7 @@ export function Members() {
                   onRoleChange={handleRoleChange}
                   onRemove={handleRemove}
                   isRemoving={removeMember.isPending}
-                  onRowClick={() => navigate(`/members/${member.id}`)}
+                  onRowClick={() => navigate(AppRoutes.members.detail(member.id))}
                 />
               ))
             )}
@@ -383,7 +384,7 @@ export function Members() {
           if (remaining.length > 0) {
             setCurrentOrg(remaining[0]);
           } else {
-            navigate("/");
+            navigate(AppRoutes.dashboard);
           }
         }}
         isLeaving={leaveOrganization.isPending}

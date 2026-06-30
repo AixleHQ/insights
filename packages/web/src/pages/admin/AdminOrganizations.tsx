@@ -32,6 +32,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { formatDistanceToNow, formatCurrency } from "@/lib/utils";
+import { AppRoutes } from "@/lib/routes";
 
 type OrgSortField = "name" | "members_count" | "events_count" | "total_cost_usd" | "created_at";
 
@@ -305,7 +306,7 @@ export function AdminOrganizations() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem asChild>
-                          <Link to={`/admin/organizations/${org.id}/webhook-deliveries`}>
+                          <Link to={AppRoutes.admin.orgWebhookDeliveries(org.id)}>
                             Webhook deliveries
                           </Link>
                         </DropdownMenuItem>

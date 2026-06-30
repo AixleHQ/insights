@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency, formatNumber, formatDistanceToNow } from "@/lib/utils";
+import { AppRoutes } from "@/lib/routes";
 
 interface PlatformStats {
   total_users: number;
@@ -131,14 +132,14 @@ export function AdminOverview() {
           </CardHeader>
           <CardContent className="grid gap-2">
             <Button variant="outline" className="justify-start" asChild>
-              <Link to="/admin/users">
+              <Link to={AppRoutes.admin.users}>
                 <Users className="mr-2 size-4" />
                 Manage Users
                 <ArrowRight className="ml-auto size-4" />
               </Link>
             </Button>
             <Button variant="outline" className="justify-start" asChild>
-              <Link to="/admin/organizations">
+              <Link to={AppRoutes.admin.organizations}>
                 <Building2 className="mr-2 size-4" />
                 Manage Organizations
                 <ArrowRight className="ml-auto size-4" />

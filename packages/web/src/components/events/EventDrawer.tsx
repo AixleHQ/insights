@@ -31,6 +31,7 @@ import { useOrg } from "@/contexts/OrgContext";
 import { useEvent } from "@/hooks/useApi";
 import { EventTypeBadge } from "@/components/ui/event-type-badge";
 import { cn, humanizeToolName } from "@/lib/utils";
+import { AppRoutes } from "@/lib/routes";
 import { formatCost, formatTokens } from "@/lib/formatters";
 import { canViewEventPrompt } from "@/lib/eventAccess";
 import { parseRecentCommitFields } from "@/lib/recentCommitEvent";
@@ -189,7 +190,7 @@ export function EventDrawer({
                     </>
                   )}
                   <Button variant="ghost" size="icon" className="size-8" asChild>
-                    <Link to={`/events/${event.id}`}>
+                    <Link to={AppRoutes.events.detail(event.id)}>
                       <ExternalLink className="size-4" />
                       <span className="sr-only">Open in full page</span>
                     </Link>
@@ -229,7 +230,7 @@ export function EventDrawer({
                       value={
                         event.project ? (
                           <Link
-                            to={`/projects/${event.project.id}`}
+                            to={AppRoutes.projects.detail(event.project.id)}
                             className="text-primary hover:underline"
                             onClick={() => onOpenChange(false)}
                           >

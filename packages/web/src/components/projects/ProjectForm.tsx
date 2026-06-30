@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { ApiError } from "@/lib/api";
+import { AppRoutes } from "@/lib/routes";
 
 export interface ProjectFormData {
   name: string;
@@ -123,7 +124,7 @@ export function ProjectForm({
   return (
     <div className={cn("space-y-6", className)}>
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/projects")} aria-label="Back to projects">
+        <Button variant="ghost" size="icon" onClick={() => navigate(AppRoutes.projects.root)} aria-label="Back to projects">
           <ArrowLeft className="size-4" />
         </Button>
         <div>
@@ -234,7 +235,7 @@ export function ProjectForm({
           <Button
             type="button"
             variant="outline"
-            onClick={() => navigate("/projects")}
+            onClick={() => navigate(AppRoutes.projects.root)}
             disabled={isSubmitting}
           >
             Cancel

@@ -34,6 +34,7 @@ import { useProjects, useCreateConnector } from "@/hooks/useApi";
 import { api, ApiError } from "@/lib/api";
 import { ProviderLogo } from "@/components/icons";
 import type { IntegrationProvider } from "@/components/integrations";
+import { AppRoutes } from "@/lib/routes";
 
 interface ProviderConfig {
   id: IntegrationProvider;
@@ -272,7 +273,7 @@ export function IntegrationSetup() {
       <div className="flex flex-col items-center justify-center py-12">
         <p className="text-muted-foreground">Unknown integration</p>
         <Button asChild variant="link" className="mt-2">
-          <Link to="/integrations">
+          <Link to={AppRoutes.integrations.root}>
             <ArrowLeft className="mr-2 size-4" />
             Back to integrations
           </Link>
@@ -367,7 +368,7 @@ export function IntegrationSetup() {
   };
 
   const handleFinish = () => {
-    navigate("/integrations");
+    navigate(AppRoutes.integrations.root);
   };
 
   return (
@@ -375,7 +376,7 @@ export function IntegrationSetup() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <Button asChild variant="ghost" size="icon">
-          <Link to="/integrations">
+          <Link to={AppRoutes.integrations.root}>
             <ArrowLeft className="size-4" />
           </Link>
         </Button>
@@ -719,7 +720,7 @@ export function IntegrationSetup() {
             </div>
             <div className="mt-8 flex justify-center gap-4">
               <Button variant="outline" asChild>
-                <Link to="/integrations">View All Integrations</Link>
+                <Link to={AppRoutes.integrations.root}>View All Integrations</Link>
               </Button>
               <Button onClick={handleFinish}>
                 Go to Dashboard

@@ -14,6 +14,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { AppRoutes } from "@/lib/routes";
 import type { MemberRole } from "@/contexts/OrgContext";
 
 interface InviteFormProps {
@@ -74,7 +75,7 @@ export function InviteForm({ onSubmit, className }: InviteFormProps) {
     setIsSubmitting(true);
     try {
       await onSubmit(invites);
-      navigate("/members");
+      navigate(AppRoutes.members.root);
     } catch (error) {
       console.error("Failed to send invites:", error);
       // Extract specific validation error message if available
@@ -106,7 +107,7 @@ export function InviteForm({ onSubmit, className }: InviteFormProps) {
   return (
     <div className={cn("space-y-6", className)}>
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/members")}>
+        <Button variant="ghost" size="icon" onClick={() => navigate(AppRoutes.members.root)}>
           <ArrowLeft className="size-4" />
         </Button>
         <div>
@@ -214,7 +215,7 @@ export function InviteForm({ onSubmit, className }: InviteFormProps) {
           <Button
             type="button"
             variant="outline"
-            onClick={() => navigate("/members")}
+            onClick={() => navigate(AppRoutes.members.root)}
             disabled={isSubmitting}
           >
             Cancel
