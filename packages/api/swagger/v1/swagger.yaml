@@ -4362,6 +4362,7 @@ paths:
         - $ref: '#/components/parameters/per_page'
         - $ref: '#/components/parameters/start_date'
         - $ref: '#/components/parameters/end_date'
+        - $ref: '#/components/parameters/tz'
         - name: tool_name
           in: query
           schema:
@@ -4736,6 +4737,7 @@ paths:
         - $ref: '#/components/parameters/organization_id'
         - $ref: '#/components/parameters/start_date'
         - $ref: '#/components/parameters/end_date'
+        - $ref: '#/components/parameters/tz'
         - name: tool_name
           in: query
           schema:

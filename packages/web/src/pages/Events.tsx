@@ -38,6 +38,11 @@ const SORT_FIELD_API_MAP: Record<SortField, EventSortBy> = {
   cost_usd: "cost_usd",
 };
 
+const clientTimezone =
+  typeof Intl !== "undefined"
+    ? Intl.DateTimeFormat().resolvedOptions().timeZone
+    : "UTC";
+
 export function Events() {
   const { currentOrg, hasRole, currentRole } = useOrg();
   const { data: me, isLoading: isLoadingMe } = useCurrentUser();
@@ -98,6 +103,7 @@ export function Events() {
     end_date: filters.dateTo,
     sort_by: SORT_FIELD_API_MAP[sortField],
     direction: sortDirection,
+    tz: clientTimezone,
   }), [page, pageSize, filters.tools, filters.riskLevels, filters.eventTypes, filters.projectIds, filters.dateFrom, filters.dateTo, sortField, sortDirection]);
 
   const { data: eventsResponse, isLoading, isFetching, isError, refetch } = useEvents(
@@ -170,6 +176,7 @@ export function Events() {
         project_id: filters.projectIds,
         sort_by: SORT_FIELD_API_MAP[sortField],
         direction: sortDirection,
+        tz: clientTimezone,
         filename,
       });
 
