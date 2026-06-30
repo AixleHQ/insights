@@ -138,6 +138,9 @@ Rails.application.routes.draw do
         post "telemetry/ingest", to: "telemetry#ingest"
         post "telemetry/batch", to: "telemetry#batch"
 
+        # Aggregated report exports
+        get "reports/export", to: "reports#export"
+
         # Stats
         get "stats/overview", to: "stats#overview"
         get "stats/active_users", to: "stats#active_users"
