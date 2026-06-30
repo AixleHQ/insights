@@ -5,7 +5,11 @@ class ScheduledExportMailer < ApplicationMailer
     @export       = export
     @organization = export.organization
 
-    filename = "#{export.organization.name.parameterize}-report-#{export.report_type}-#{Date.current.iso8601}.#{export.format}"
+    filename = ExportReportFilename.build(
+      organization: export.organization,
+      report_type:  export.report_type,
+      format:       export.format
+    )
     content  = if export.format == "csv"
       AggregatedReportCsvExporter.generate(report.rows, report.columns)
     else
