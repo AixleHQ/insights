@@ -8,6 +8,7 @@ class ScheduledExportJob
     ScheduledExport
       .where(active: true)
       .where("next_run_at <= ?", Time.current)
+      .lock("FOR UPDATE SKIP LOCKED")
       .find_each do |export|
         generate_and_deliver(export)
         export.advance_next_run_at!
