@@ -225,7 +225,7 @@ export function ProjectDetail() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => navigate(AppRoutes.projects.settings(id))}>
+            <DropdownMenuItem onClick={() => navigate(AppRoutes.projects.settings(id || ""))}>
               <Settings className="mr-2 size-4" />
               Settings
             </DropdownMenuItem>
@@ -258,7 +258,7 @@ export function ProjectDetail() {
               value in project settings.
             </p>
             <Button asChild variant="link" className="mt-2 h-auto p-0 text-warning-foreground underline dark:text-warning/70">
-              <Link to={AppRoutes.projects.settings(id)}>Open project settings</Link>
+              <Link to={AppRoutes.projects.settings(id || "")}>Open project settings</Link>
             </Button>
           </AlertDescription>
         </Alert>
