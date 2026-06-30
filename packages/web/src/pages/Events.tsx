@@ -23,7 +23,7 @@ import {
 import type { EventsToolFilterOption } from "@/lib/eventsToolFilters";
 import { humanizeToolName, toEventRow } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { showEventsUserColumn, type SortField, type SortDirection, riskLevelOrder } from "@/lib/eventAccess";
+import { showEventsUserColumn, type SortField, type SortDirection } from "@/lib/eventAccess";
 import { UnattributedEvents } from "./UnattributedEvents";
 import type { EventSortBy } from "@/hooks/useApi";
 
