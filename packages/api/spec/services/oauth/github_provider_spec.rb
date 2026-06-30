@@ -92,12 +92,12 @@ RSpec.describe Oauth::GithubProvider, type: :service do
     end
 
     context 'when the request fails' do
-      it 'returns an empty array' do
+      it 'raises GithubApiError so sync jobs can mark the connector in error' do
         stub_request(:get, 'https://api.github.com/user/repos')
           .with(query: hash_including('page' => '1', 'per_page' => '100', 'sort' => 'updated'))
           .to_return(status: 401, body: '{}')
 
-        expect(provider.fetch_repositories).to eq([])
+        expect { provider.fetch_repositories }.to raise_error(Oauth::GithubApiError, /401/)
       end
     end
   end

@@ -28,7 +28,9 @@ module Oauth
         req.params["sort"] = "updated"
       end
 
-      return [] unless response.success?
+      unless response.success?
+        raise Oauth::GithubApiError, "GitHub repos lookup failed (#{response.status})"
+      end
 
       JSON.parse(response.body).map do |repo|
         {

@@ -217,6 +217,11 @@ module Api
       def health
         authorize! current_organization.organization_connectors.new, to: :health?
 
+        active_connectors = current_organization.organization_connectors.active.order(:connector_type)
+        active_connectors.select { |c| c.status == "connected" }.each do |connector|
+          ConnectorConnectionProbe.call(connector)
+        end
+
         all_connectors    = current_organization.organization_connectors
         active_connectors = all_connectors.active.order(:connector_type).to_a
         status_counts     = all_connectors.group(:status).count

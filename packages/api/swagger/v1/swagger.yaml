@@ -1293,7 +1293,7 @@ paths:
   /api/v1/organizations/{organization_id}/connectors/health:
     get:
       summary: Get connector health rollup
-      description: Returns aggregated 7-day health metrics for all connectors in the organization. Summary counts use all connectors; per-connector list excludes disconnected.
+      description: Returns aggregated 7-day health metrics for all connectors in the organization. Probes each connected connector via test_connection before building the response so revoked credentials are detected on page load. Summary counts use all connectors; per-connector list excludes disconnected.
       tags:
         - Organization Connectors
       parameters:

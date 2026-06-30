@@ -61,6 +61,21 @@ RSpec.describe GithubSyncJob, type: :job do
 
       expect(provider).not_to have_received(:fetch_commits)
     end
+
+    it "marks the connector in error when fetch_repositories raises GithubApiError" do
+      provider = instance_double(Oauth::GithubProvider)
+      allow(Oauth::BaseProvider).to receive(:for).with(connector).and_return(provider)
+      allow(provider).to receive(:fetch_repositories)
+        .and_raise(Oauth::GithubApiError, "GitHub repos lookup failed (401)")
+
+      expect {
+        described_class.new.perform(connector.id, "sync")
+      }.to raise_error(Oauth::GithubApiError)
+
+      connector.reload
+      expect(connector.status).to eq("error")
+      expect(connector.last_error).to include("401")
+    end
   end
 
   describe "#perform — webhook push action" do

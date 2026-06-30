@@ -1156,17 +1156,24 @@ export function useConnectors(orgId: string) {
   });
 }
 
-export function useConnectorHealth(orgId: string, options?: { enabled?: boolean }) {
+export function useConnectorHealth(
+  orgId: string,
+  options?: { enabled?: boolean; refetchInterval?: number | false }
+) {
+  const queryClient = useQueryClient();
+
   return useQuery({
     queryKey: queryKeys.connectors.health(orgId),
     queryFn: async () => {
       const response = await api.get<{ data: ConnectorHealthRollup }>(
         `/organizations/${orgId}/connectors/health`
       );
+      void queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
       return response.data;
     },
     enabled: !!orgId && (options?.enabled ?? true),
     staleTime: 60_000,
+    refetchInterval: options?.refetchInterval || false,
   });
 }
 
@@ -1244,10 +1251,11 @@ export function useSyncConnector() {
   return useMutation({
     mutationFn: ({ orgId, connectorId }: { orgId: string; connectorId: string }) =>
       api.post(`/organizations/${orgId}/connectors/${connectorId}/sync`),
-    onSuccess: (_, { orgId }) => {
+    onSettled: (_, __, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.projects.all(orgId) });
       queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.connectors.health(orgId) });
     },
   });
 }
