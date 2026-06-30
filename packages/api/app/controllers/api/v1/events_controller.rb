@@ -223,7 +223,8 @@ module Api
 
       def export_filename
         start_str = params[:start_date].presence || "all"
-        end_str   = params[:end_date].presence || Date.current.iso8601
+        zone      = ActiveSupport::TimeZone[params[:tz].to_s] || Time.zone
+        end_str   = params[:end_date].presence || zone.today.iso8601
         "db90-events-#{start_str}-#{end_str}.csv"
       end
 

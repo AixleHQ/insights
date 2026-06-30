@@ -2,17 +2,16 @@
 
 require "rails_helper"
 
-# Dummy host class to test the concern in isolation.
-class FilterableHost
-  include ToolEventFilterable
-  public :apply_tool_event_time_filter
-end
-
 RSpec.describe ToolEventFilterable, type: :model do
-  let(:host) { FilterableHost.new }
+  let(:host) do
+    Class.new do
+      include ToolEventFilterable
+      public :apply_tool_event_time_filter
+    end.new
+  end
   let(:org)  { create(:organization) }
 
-  # 00:30 UTC on 2024-06-15 = 2024-06-14 20:30 in EST
+  # 00:30 UTC on 2024-06-15 = 2024-06-14 20:30 EDT (America/New_York in summer, UTC-4)
   let!(:event_midnight_utc) do
     create(:tool_event, organization: org, occurred_at: Time.parse("2024-06-15 00:30:00 UTC"))
   end
@@ -34,8 +33,8 @@ RSpec.describe ToolEventFilterable, type: :model do
       end
     end
 
-    context "with tz=America/New_York (UTC-4 in June)" do
-      it "excludes 00:30 UTC (which is 2024-06-14 in EST) when filtering for 2024-06-15" do
+    context "with tz=America/New_York (EDT, UTC-4 in June)" do
+      it "excludes 00:30 UTC (which is 2024-06-14 EDT) when filtering for 2024-06-15" do
         scope = host.apply_tool_event_time_filter(
           org.tool_events,
           { "start_date" => "2024-06-15", "end_date" => "2024-06-15", "tz" => "America/New_York" }
