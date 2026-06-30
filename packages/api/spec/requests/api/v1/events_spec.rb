@@ -130,6 +130,48 @@ RSpec.describe 'Api::V1::Events', type: :request do
       expect(ids).not_to include(meta_low.id)
     end
 
+    # AIX-414: none must check audit_logs (Temporal-classified) before metadata fallback
+    it 'filters by risk_level=none using audit_log association' do
+      none_event = create(:tool_event, organization: organization, user: user, tool_name: 'cursor')
+      create(:audit_log, organization: organization, tool_event: none_event, risk_level: 'none')
+
+      high_event = create(:tool_event, organization: organization, user: user, tool_name: 'windsurf')
+      create(:audit_log, organization: organization, tool_event: high_event, risk_level: 'high')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                        user: user,
+                        organization: organization,
+                        params: { risk_level: 'none' }
+
+      expect_success
+      ids = json_data.map { |e| e[:id] }
+      expect(ids).to include(none_event.id)
+      expect(ids).not_to include(high_event.id)
+    end
+
+    # AIX-414: combined none + explicit level must exercise the .or() path
+    it 'filters by combined risk_level=high,none returning both high-classified and none-classified events' do
+      high_event = create(:tool_event, organization: organization, user: user, tool_name: 'cursor')
+      create(:audit_log, organization: organization, tool_event: high_event, risk_level: 'high')
+
+      none_event = create(:tool_event, organization: organization, user: user, tool_name: 'windsurf')
+      create(:audit_log, organization: organization, tool_event: none_event, risk_level: 'none')
+
+      medium_event = create(:tool_event, organization: organization, user: user, tool_name: 'github_copilot')
+      create(:audit_log, organization: organization, tool_event: medium_event, risk_level: 'medium')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                        user: user,
+                        organization: organization,
+                        params: { risk_level: 'high,none' }
+
+      expect_success
+      ids = json_data.map { |e| e[:id] }
+      expect(ids).to include(high_event.id)
+      expect(ids).to include(none_event.id)
+      expect(ids).not_to include(medium_event.id)
+    end
+
     # Risk Alerts drill-down: tool_name + not_none must return the same risky subset
     it 'filters by tool_name and risk_level=not_none together' do
       risky_cursor = create(:tool_event, organization: organization, user: user, tool_name: 'cursor')
