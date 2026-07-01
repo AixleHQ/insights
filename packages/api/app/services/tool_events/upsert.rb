@@ -59,6 +59,7 @@ module ToolEvents
     def call
       strip_reserved_metadata!
       promote_model_from_metadata!
+      normalize_model!
       enrich_cost!
 
       if @session_id.present?
@@ -73,6 +74,10 @@ module ToolEvents
     end
 
     private
+
+    def normalize_model!
+      @attributes[:model] = ModelStringNormalizer.normalize(@attributes[:model])
+    end
 
     def promote_model_from_metadata!
       return if @attributes[:model].present?
