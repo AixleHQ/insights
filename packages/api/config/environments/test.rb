@@ -53,6 +53,9 @@ Rails.application.configure do
 
   # Allow the default RSpec request spec host — HostAuthorization blocks www.example.com otherwise
   config.hosts << "www.example.com"
+  # Mirror production/staging: exclude /up from host authorization so the health check
+  # remains reachable with any Host header (load-balancer probe behavior).
+  config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
 
   # Configure Active Record encryption for tests
   config.active_record.encryption.primary_key = "test_primary_key_32_characters_x"
