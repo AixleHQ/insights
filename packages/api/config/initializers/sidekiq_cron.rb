@@ -38,6 +38,12 @@ Sidekiq.configure_server do |config|
         "cron" => "0 2 * * *",
         "queue" => "maintenance",
         "description" => "Daily purge of expired tool_events per org/project retention policies"
+      },
+      "scheduled_export" => {
+        "class" => "ScheduledExportJob",
+        "cron" => "0 * * * *",
+        "queue" => "default",
+        "description" => "Deliver scheduled report exports to recipients"
       }
     })
   end

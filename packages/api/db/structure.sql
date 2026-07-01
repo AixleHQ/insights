@@ -850,6 +850,28 @@ CREATE TABLE public.sanitization_policies (
 );
 
 --
+-- Name: scheduled_exports; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.scheduled_exports (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    created_by_id uuid NOT NULL,
+    report_type character varying NOT NULL,
+    format character varying DEFAULT 'csv'::character varying NOT NULL,
+    frequency character varying NOT NULL,
+    day_of_week integer,
+    day_of_month integer,
+    recipients jsonb DEFAULT '[]'::jsonb NOT NULL,
+    group_by character varying,
+    active boolean DEFAULT true NOT NULL,
+    last_run_at timestamp(6) without time zone,
+    next_run_at timestamp(6) without time zone NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+--
 -- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1185,6 +1207,13 @@ ALTER TABLE ONLY public.retention_purge_logs
 
 ALTER TABLE ONLY public.sanitization_policies
     ADD CONSTRAINT sanitization_policies_pkey PRIMARY KEY (id);
+
+--
+-- Name: scheduled_exports scheduled_exports_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.scheduled_exports
+    ADD CONSTRAINT scheduled_exports_pkey PRIMARY KEY (id);
 
 --
 -- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1877,6 +1906,30 @@ CREATE INDEX index_sanitization_policies_on_is_active ON public.sanitization_pol
 CREATE UNIQUE INDEX index_sanitization_policies_on_version ON public.sanitization_policies USING btree (version);
 
 --
+-- Name: index_scheduled_exports_on_created_by_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_scheduled_exports_on_created_by_id ON public.scheduled_exports USING btree (created_by_id);
+
+--
+-- Name: index_scheduled_exports_on_next_run_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_scheduled_exports_on_next_run_at ON public.scheduled_exports USING btree (next_run_at);
+
+--
+-- Name: index_scheduled_exports_on_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_scheduled_exports_on_organization_id ON public.scheduled_exports USING btree (organization_id);
+
+--
+-- Name: index_scheduled_exports_on_organization_id_and_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_scheduled_exports_on_organization_id_and_active ON public.scheduled_exports USING btree (organization_id, active);
+
+--
 -- Name: index_user_personal_settings_on_user_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2069,6 +2122,13 @@ ALTER TABLE ONLY public.organization_retention_policies
 
 ALTER TABLE ONLY public.repositories
     ADD CONSTRAINT fk_rails_36d1823ddd FOREIGN KEY (project_id) REFERENCES public.projects(id);
+
+--
+-- Name: scheduled_exports fk_rails_39444c0724; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.scheduled_exports
+    ADD CONSTRAINT fk_rails_39444c0724 FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
 
 --
 -- Name: notifications fk_rails_394d9847aa; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2274,6 +2334,13 @@ ALTER TABLE ONLY public.project_settings
     ADD CONSTRAINT fk_rails_c6df6e6328 FOREIGN KEY (project_id) REFERENCES public.projects(id);
 
 --
+-- Name: scheduled_exports fk_rails_c968f09aee; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.scheduled_exports
+    ADD CONSTRAINT fk_rails_c968f09aee FOREIGN KEY (created_by_id) REFERENCES public.users(id);
+
+--
 -- Name: issues fk_rails_ccc5514bad; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2362,6 +2429,7 @@ INSERT INTO "schema_migrations" (version) VALUES
 ('20260616120937'),
 ('20260609191045'),
 ('20260608000001'),
+('20260605120000'),
 ('20260527113000'),
 ('20260527100000'),
 ('20260525234350'),
