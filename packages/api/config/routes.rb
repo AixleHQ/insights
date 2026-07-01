@@ -2,6 +2,10 @@ require "sidekiq/web"
 require_relative "../lib/admin_constraint"
 
 Rails.application.routes.draw do
+  if Rails.env.development?
+    mount LetterOpenerWeb::Engine, at: "admin/letter_opener"
+  end
+
   # Health check endpoint
   get "health", to: "health#show"
   get "up" => "rails/health#show", as: :rails_health_check

@@ -195,4 +195,22 @@ describe("OrgProvider — org selection priority", () => {
 
     expect(setItemSpy).toHaveBeenCalledWith(ORG_STORAGE_KEY, ORG_B.id);
   });
+
+  it("selects preferOrgId over default_org_id and localStorage", async () => {
+    localStorage.setItem(ORG_STORAGE_KEY, ORG_A.id);
+
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(makeOrgsResponse([ORG_A, ORG_B, ORG_C]) as never)
+      .mockResolvedValueOnce(makeUserResponse(ORG_B.id) as never)
+      .mockResolvedValueOnce(makeOrgsResponse([ORG_A, ORG_B, ORG_C]) as never)
+      .mockResolvedValueOnce(makeUserResponse(ORG_B.id) as never);
+
+    const { result } = renderHook(() => useOrg(), { wrapper });
+
+    await waitFor(() => expect(result.current.isInitialized).toBe(true));
+
+    await result.current.refreshOrganizations(ORG_C.id);
+
+    await waitFor(() => expect(result.current.currentOrg?.id).toBe(ORG_C.id));
+  });
 });

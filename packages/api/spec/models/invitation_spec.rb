@@ -218,13 +218,15 @@ RSpec.describe Invitation, type: :model do
       expect(user.organizations).not_to include(organization)
     end
 
-    it 'returns false if user is already a member' do
-      create(:organization_membership, user: user, organization: organization)
+    it 'is idempotent when the user is already a member' do
+      existing = create(:organization_membership, user: user, organization: organization)
 
       result = invitation.accept!(user)
 
-      expect(result).to be false
-      expect(invitation.reload.status).to eq('pending')
+      expect(result).to eq(existing)
+      expect(organization.organization_memberships.where(user: user).count).to eq(1)
+      expect(invitation.reload.status).to eq('accepted')
+      expect(invitation.accepted_at).to be_present
     end
 
     it 'assigns the correct role from the invitation' do

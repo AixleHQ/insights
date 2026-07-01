@@ -482,6 +482,7 @@ export type MemberRole = "owner" | "member" | "viewer";
 
 export interface Invitation {
   id: string;
+  token: string;
   email: string;
   role: MemberRole;
   status: InvitationStatus;
@@ -503,6 +504,7 @@ export interface Invitation {
 
 export interface InvitationPublic {
   id: string;
+  token: string;
   role: MemberRole;
   status: InvitationStatus;
   organization: {

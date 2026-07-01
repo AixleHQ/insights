@@ -75,7 +75,7 @@ export function InvitationAccept() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
   const { isAuthenticated, profile } = useAuth();
-  const { refreshOrganizations, setCurrentOrg } = useOrg();
+  const { refreshOrganizations } = useOrg();
   const acceptedInvitationStorageKey = token ? getAcceptedInvitationStorageKey(token) : null;
 
   const [isAccepting, setIsAccepting] = useState(false);
@@ -116,21 +116,8 @@ export function InvitationAccept() {
       }
       setAcceptSuccess(true);
 
-      if (acceptedOrganization) {
-        try {
-          setCurrentOrg({
-            id: acceptedOrganization.id,
-            name: acceptedOrganization.name,
-            slug: acceptedOrganization.slug,
-            is_active: true,
-          });
-        } catch (orgError) {
-          console.error("Failed to set accepted organization:", orgError);
-        }
-      }
-
-      // Refresh the org list in the background so the success card is not blocked by it.
-      void refreshOrganizations().catch((refreshError) => {
+      // Refresh org list and keep the accepted organization as current context.
+      void refreshOrganizations(acceptedOrganization?.id).catch((refreshError) => {
         console.error("Failed to refresh organizations after invitation accept:", refreshError);
       });
     } catch (err) {

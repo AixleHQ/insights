@@ -44,13 +44,16 @@ class Invitation < ApplicationRecord
 
   def accept!(user)
     return false unless active?
-    return false if organization.members.include?(user)
 
+    # Idempotent: the user may already be a member (e.g. auto-assigned by
+    # UserSyncService domain mapping on login). In that case we still mark the
+    # invitation accepted and return the existing membership instead of failing,
+    # so the record never gets stranded in "pending" (AIX-289).
+    retries = 0
     transaction do
-      membership = organization.organization_memberships.create!(
-        user: user,
-        role: role
-      )
+      membership = organization.organization_memberships.find_or_create_by!(user: user) do |m|
+        m.role = role
+      end
 
       update!(
         status: "accepted",
@@ -59,6 +62,10 @@ class Invitation < ApplicationRecord
 
       membership
     end
+  rescue ActiveRecord::RecordNotUnique => e
+    retries += 1
+    retry if retries < 3
+    raise e
   end
 
   def revoke!

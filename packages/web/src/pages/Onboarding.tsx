@@ -165,14 +165,8 @@ export function Onboarding() {
   const handleAcceptInvitation = async (invitation: InvitationPublic) => {
     setAcceptingId(invitation.id);
     try {
-      // We need to use the token, but the public serializer doesn't include it
-      // The invitation ID is the token in this case since we're using the check endpoint
-      // Actually, we need to get the token - let me check the API
-      // For the check endpoint, we receive InvitationPublic which has the ID
-      // We need to accept by navigating to the accept page with the token
-      // But the token isn't exposed in InvitationPublic for security
-      // Instead, let's navigate to the invitation accept page
-      const result = await acceptInvitation.mutateAsync(invitation.id);
+      // The accept endpoint is keyed by the invitation token, not its id.
+      const result = await acceptInvitation.mutateAsync(invitation.token);
 
       // Refresh organizations and set the new one as current
       await refreshOrganizations();

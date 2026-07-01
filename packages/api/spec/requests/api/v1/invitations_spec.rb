@@ -24,6 +24,15 @@ RSpec.describe 'Api::V1::Invitations', type: :request do
       expect(json_data.length).to eq(2)
     end
 
+    it 'includes token in invitation responses' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/invitations",
+                        user: owner,
+                        organization: organization
+
+      expect_success
+      expect(json_data.first[:token]).to be_present
+    end
+
     it 'filters by status' do
       authenticated_get "/api/v1/organizations/#{organization.id}/invitations",
                         user: owner,
@@ -305,14 +314,16 @@ RSpec.describe 'Api::V1::PublicInvitations', type: :request do
       expect(json_response[:message]).to include('expired')
     end
 
-    it 'returns error if user is already a member' do
+    it 'accepts idempotently when the user is already a member' do
       create(:organization_membership, user: accepting_user, organization: organization)
 
       authenticated_post "/api/v1/invitations/#{invitation.token}/accept",
                          user: accepting_user
 
-      expect_unprocessable
-      expect(json_response[:message]).to include('already a member')
+      expect_success
+      expect(json_response[:message]).to include('accepted')
+      expect(invitation.reload.status).to eq('accepted')
+      expect(organization.organization_memberships.where(user: accepting_user).count).to eq(1)
     end
   end
 
@@ -327,6 +338,13 @@ RSpec.describe 'Api::V1::PublicInvitations', type: :request do
       expect_success
       expect(json_data.length).to eq(1)
       expect(json_data.first[:organization][:name]).to eq(organization.name)
+    end
+
+    it 'exposes the token so the recipient can accept the invitation' do
+      authenticated_get '/api/v1/invitations/check', user: user
+
+      expect_success
+      expect(json_data.first[:token]).to eq(pending_invitation.token)
     end
 
     it 'does not include expired invitations' do
