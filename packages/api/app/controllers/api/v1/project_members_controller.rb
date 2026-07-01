@@ -76,7 +76,7 @@ module Api
 
       # GET /api/v1/projects/:project_id/members
       def index
-        authorize! @project.project_memberships.new, to: :index?
+        authorize! @project, to: :show?
 
         memberships = @project.project_memberships.includes(:user).order("users.name")
 
@@ -310,7 +310,7 @@ module Api
       private
 
       def set_project
-        @project = Project.find(params[:project_id])
+        @project = authorized_scope(Project.all).find(params[:project_id])
       end
 
       def set_membership

@@ -190,7 +190,7 @@ module Api
       private
 
       def set_project
-        @project = Project.find(params[:project_id])
+        @project = authorized_scope(Project.all).find(params[:project_id])
       end
 
       def set_connector
