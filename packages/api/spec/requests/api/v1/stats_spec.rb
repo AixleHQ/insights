@@ -500,17 +500,21 @@ RSpec.describe 'Api::V1::Stats', type: :request do
       end
 
       it 'filters to unattributed events when project_id=none' do
-        project = create(:project, organization: organization)
-        create(:tool_event, organization: organization, user: user,
+        fresh_org = create(:organization)
+        fresh_user = create(:user)
+        create(:organization_membership, user: fresh_user, organization: fresh_org, role: "member")
+
+        project = create(:project, organization: fresh_org)
+        create(:tool_event, organization: fresh_org, user: fresh_user,
                project: project, cost_usd: 11.0,
                occurred_at: Date.current.beginning_of_month + 1.day)
-        create(:tool_event, organization: organization, user: user,
+        create(:tool_event, organization: fresh_org, user: fresh_user,
                project: nil, cost_usd: 2.5,
                occurred_at: Date.current.beginning_of_month + 2.days)
 
-        authenticated_get "/api/v1/organizations/#{organization.id}/stats/daily",
-                          user: user,
-                          organization: organization,
+        authenticated_get "/api/v1/organizations/#{fresh_org.id}/stats/daily",
+                          user: fresh_user,
+                          organization: fresh_org,
                           params: { month: Date.current.strftime("%Y-%m"), project_id: "none" }
 
         expect_success
@@ -659,15 +663,19 @@ RSpec.describe 'Api::V1::Stats', type: :request do
     end
 
     it 'filters by project_id=none' do
-      project = create(:project, organization: organization)
-      create(:tool_event, organization: organization, project: project, user: user,
+      fresh_org = create(:organization)
+      fresh_user = create(:user)
+      create(:organization_membership, user: fresh_user, organization: fresh_org, role: "member")
+
+      project = create(:project, organization: fresh_org)
+      create(:tool_event, organization: fresh_org, project: project, user: fresh_user,
              tool_name: 'cursor', occurred_at: Time.current)
-      create(:tool_event, organization: organization, project: nil, user: user,
+      create(:tool_event, organization: fresh_org, project: nil, user: fresh_user,
              tool_name: 'claude_code', occurred_at: Time.current)
 
-      authenticated_get "/api/v1/organizations/#{organization.id}/stats/daily_by_tool",
-                        user: user,
-                        organization: organization,
+      authenticated_get "/api/v1/organizations/#{fresh_org.id}/stats/daily_by_tool",
+                        user: fresh_user,
+                        organization: fresh_org,
                         params: { project_id: "none" }
 
       expect_success
@@ -1594,13 +1602,19 @@ RSpec.describe 'Api::V1::Stats', type: :request do
     end
 
     it 'filters by project_id=none' do
-      project = create(:project, organization: organization)
-      create(:tool_event, organization: organization, project: project, user: user,
+      fresh_org = create(:organization)
+      fresh_user = create(:user)
+      create(:organization_membership, user: fresh_user, organization: fresh_org, role: "member")
+
+      project = create(:project, organization: fresh_org)
+      create(:tool_event, organization: fresh_org, project: project, user: fresh_user,
              model: 'project-model', occurred_at: Time.current)
-      create(:tool_event, organization: organization, project: nil, user: user,
+      create(:tool_event, organization: fresh_org, project: nil, user: fresh_user,
              model: 'nil-model', occurred_at: Time.current)
 
-      authenticated_get path, user: user, organization: organization,
+      authenticated_get "/api/v1/organizations/#{fresh_org.id}/stats/daily_by_model",
+                        user: fresh_user,
+                        organization: fresh_org,
                         params: { project_id: "none" }
 
       expect_success
