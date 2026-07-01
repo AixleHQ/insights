@@ -1,0 +1,16 @@
+# Build context is repo root; packages/web/.dockerignore is not applied here.
+# Host node_modules (e.g. darwin-arm64 esbuild) breaks Linux container builds.
+**/node_modules
+
+packages/web/dist
+packages/api/tmp
+packages/api/log
+packages/api/storage
+packages/api/vendor/bundle
+.git
+.github
+.idea
+.vscode
+.env
+.env.*
+.env.local

@@ -251,7 +251,7 @@ services:
       - AWS_SESSION_TOKEN
       - AWS_SECURITY_TOKEN
       - AWS_SESSION_EXPIRATION
-      - PROJECT=${PROJECT:-db90}
+      - PROJECT=${PROJECT:-aixle-db90}
       - USE_IMAGE_TAG_ENV_PREFIX=true
       - CI_COMMIT_SHA
       - CI_COMMIT_BRANCH
@@ -270,7 +270,7 @@ services:
       - AWS_SESSION_TOKEN
       - AWS_SECURITY_TOKEN
       - AWS_SESSION_EXPIRATION
-      - PROJECT=${PROJECT:-db90}
+      - PROJECT=${PROJECT:-aixle-db90}
       - USE_IMAGE_TAG_ENV_PREFIX=true
       - CI_COMMIT_SHA
       - CI_COMMIT_BRANCH

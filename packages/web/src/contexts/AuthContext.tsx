@@ -37,6 +37,13 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+/** OIDC callback routes handle their own token exchange; skip silent renew to avoid races. */
+function isOidcCallbackRoute(): boolean {
+  return /^\/auth\/(callback|silent-callback|iframe-callback|popup-callback)(\/|$)/.test(
+    window.location.pathname
+  );
+}
+
 interface AuthProviderProps {
   children: ReactNode;
 }
@@ -107,6 +114,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const initAuth = async () => {
       try {
+        if (isOidcCallbackRoute()) {
+          // AuthCallback / AuthSilentCallback pages exchange the code themselves.
+          setState((prev) => ({ ...prev, isLoading: false }));
+          return;
+        }
+
         let user = await getUser();
 
         // If no user in storage, or stored token is expired, attempt silent renew.
