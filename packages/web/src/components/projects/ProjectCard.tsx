@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { isGitRemoteMissing } from "@/lib/project-git-remote";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { type ProjectWithStats } from "@/lib/types";
+import { AppRoutes } from "@/lib/routes";
 
 interface ProjectCardProps {
   project: ProjectWithStats;
@@ -41,7 +42,7 @@ export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFa
         <div className="flex items-start justify-between">
           <div className="space-y-1">
             <Link
-              to={`/projects/${project.id}`}
+              to={AppRoutes.projects.detail(project.id)}
               className="inline-block"
             >
               <CardTitle className="text-base font-semibold hover:text-primary hover:underline">
@@ -101,7 +102,7 @@ export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFa
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem asChild>
-                  <Link to={`/projects/${project.id}`}>View details</Link>
+                  <Link to={AppRoutes.projects.detail(project.id)}>View details</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onEdit?.(project.id)}>
                   Edit project

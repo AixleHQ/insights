@@ -38,6 +38,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import type { InvitationPublic } from "@/lib/types";
+import { AppRoutes } from "@/lib/routes";
 
 function InvitationCard({
   invitation,
@@ -148,7 +149,7 @@ export function Onboarding() {
   // Redirect to dashboard if user already has organizations
   useEffect(() => {
     if (isInitialized && organizations.length > 0) {
-      navigate("/", { replace: true });
+      navigate(AppRoutes.dashboard, { replace: true });
     }
   }, [isInitialized, organizations, navigate]);
 
@@ -178,7 +179,7 @@ export function Onboarding() {
 
       // Navigate to dashboard
       if (result.data?.organization) {
-        navigate("/");
+        navigate(AppRoutes.dashboard);
       }
     } catch (err) {
       console.error("Failed to accept invitation:", err);
@@ -215,7 +216,7 @@ export function Onboarding() {
       }
 
       setCreateDialogOpen(false);
-      navigate("/");
+      navigate(AppRoutes.dashboard);
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : "Failed to create organization");
     } finally {

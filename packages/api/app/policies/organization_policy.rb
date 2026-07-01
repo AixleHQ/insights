@@ -64,6 +64,11 @@ class OrganizationPolicy < ApplicationPolicy
     org_owner?(record) || global_admin?
   end
 
+  # Only owners can export aggregated reports
+  def export_report?
+    org_owner?(record) || global_admin?
+  end
+
   relation_scope do |scope|
     if global_admin?
       scope.all

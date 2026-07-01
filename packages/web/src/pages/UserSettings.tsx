@@ -19,6 +19,7 @@ import { formatRetentionLabel, retentionOrder } from "@/lib/retention-utils";
 import type { UserPersonalSettings } from "@/lib/types";
 import { MemberProfileView } from "./MemberProfile";
 import { cn } from "@/lib/utils";
+import { AppRoutes } from "@/lib/routes";
 import {
   Card,
   CardContent,
@@ -42,11 +43,11 @@ import {
 import { SettingsToolsSection } from "./SettingsToolsSection";
 
 const navItems = [
-  { title: "Profile", href: "/profile", icon: User },
-  { title: "Preferences", href: "/profile/settings", icon: Settings2 },
-  { title: "Notifications", href: "/profile/settings/notifications", icon: Bell },
-  { title: "Security", href: "/profile/settings/security", icon: Shield },
-  { title: "Tools", href: "/profile/tools", icon: Wrench },
+  { title: "Profile", href: AppRoutes.profile.root, icon: User },
+  { title: "Preferences", href: AppRoutes.profile.settings, icon: Settings2 },
+  { title: "Notifications", href: AppRoutes.profile.settingsNotifications, icon: Bell },
+  { title: "Security", href: AppRoutes.profile.settingsSecurity, icon: Shield },
+  { title: "Tools", href: AppRoutes.profile.tools, icon: Wrench },
 ];
 
 function UserSettingsNav() {
@@ -643,7 +644,7 @@ export function UserSettings() {
             <Route path="settings/notifications" element={<NotificationsSection />} />
             <Route path="settings/security" element={<SecuritySection />} />
             <Route path="tools" element={<SettingsToolsSection />} />
-            <Route path="*" element={<Navigate to="/profile" replace />} />
+            <Route path="*" element={<Navigate to={AppRoutes.profile.root} replace />} />
           </Routes>
         </div>
       </div>

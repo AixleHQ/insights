@@ -70,6 +70,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProviderLogo } from "@/components/icons";
 import { IngestTokenConnectSheet } from "@/components/integrations";
 import type { ProviderInfo } from "@/components/integrations";
+import { AppRoutes } from "@/lib/routes";
 
 type ToolCategory = "ai-editors";
 
@@ -640,7 +641,7 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
       {!embedded && (
         <div className="flex items-center gap-4">
           <Button asChild variant="ghost" size="icon" aria-label="Back to settings">
-            <Link to="/settings">
+            <Link to={AppRoutes.settings.root}>
               <ArrowLeft className="size-4" />
             </Link>
           </Button>

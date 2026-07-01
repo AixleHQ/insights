@@ -1,0 +1,12 @@
+Scheduled Report: <%= @export.report_type.humanize %>
+
+Hi,
+
+Your scheduled <%= @export.report_type.humanize %> report for <%= @organization.name %> is attached.
+
+  Format:       <%= @export.format.upcase %>
+  Frequency:    <%= @export.frequency.capitalize %>
+  Generated at: <%= Time.current.strftime("%Y-%m-%d %H:%M UTC") %>
+
+This is an automated report from DB90. You are receiving it because you are listed as a
+recipient for this scheduled export.

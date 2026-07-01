@@ -73,16 +73,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { AppRoutes } from "@/lib/routes";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UnifiedAuditTimelineTab } from "@/components/audit/UnifiedAuditTimelineTab";
 
 const navItems = [
-  { title: "General", href: "/settings", icon: Building2 },
-  { title: "Policies", href: "/settings/policies", icon: Shield },
-  { title: "Data & Retention", href: "/settings/retention", icon: Database },
-  { title: "Alerts", href: "/settings/alerts", icon: Bell },
-  { title: "Model Pricing", href: "/settings/pricing", icon: DollarSign },
-  { title: "Security & Audit", href: "/settings/security", icon: FileSearch },
+  { title: "General", href: AppRoutes.settings.root, icon: Building2 },
+  { title: "Policies", href: AppRoutes.settings.policies, icon: Shield },
+  { title: "Data & Retention", href: AppRoutes.settings.retention, icon: Database },
+  { title: "Alerts", href: AppRoutes.settings.alerts, icon: Bell },
+  { title: "Model Pricing", href: AppRoutes.settings.pricing, icon: DollarSign },
+  { title: "Security & Audit", href: AppRoutes.settings.security, icon: FileSearch },
 ];
 
 function SettingsNav() {
@@ -741,7 +742,7 @@ function DataRetentionSettings() {
           )}
           <div>
             <Link
-              to="/settings/policies"
+              to={AppRoutes.settings.policies}
               className="text-sm text-primary hover:underline"
             >
               Edit policy →
@@ -1337,7 +1338,7 @@ export function Settings() {
             <Route path="alerts" element={<AlertSettings />} />
             <Route path="pricing" element={<ModelPricingSettings />} />
             <Route path="security" element={<SecuritySettings />} />
-            <Route path="*" element={<Navigate to="/settings" replace />} />
+            <Route path="*" element={<Navigate to={AppRoutes.settings.root} replace />} />
           </Routes>
         </div>
       </div>

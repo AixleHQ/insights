@@ -29,11 +29,11 @@ RSpec.describe "Api::V1::ProjectFavorites", type: :request do
       expect(UserProjectFavorite.where(user: user, project: project).count).to eq(1)
     end
 
-    it "returns 403 when user cannot see the project" do
+    it "returns 404 when user cannot see the project (not visible via authorized_scope)" do
       outsider = create(:user)
       authenticated_post "/api/v1/projects/#{project.id}/favorite", user: outsider
 
-      expect_forbidden
+      expect_not_found
     end
   end
 
@@ -55,11 +55,11 @@ RSpec.describe "Api::V1::ProjectFavorites", type: :request do
       expect(json_data[:favorited]).to be false
     end
 
-    it "returns 403 when user cannot see the project" do
+    it "returns 404 when user cannot see the project (not visible via authorized_scope)" do
       outsider = create(:user)
       authenticated_delete "/api/v1/projects/#{project.id}/favorite", user: outsider
 
-      expect_forbidden
+      expect_not_found
     end
   end
 

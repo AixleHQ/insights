@@ -10,6 +10,7 @@ import { ProviderLogo } from "@/components/icons/ProviderLogo";
 import { RiskBadge } from "@/components/ui/risk-badge";
 import { normalizeRiskLevel } from "@/lib/riskLevel";
 import { ArrowRight } from "lucide-react";
+import { AppRoutes } from "@/lib/routes";
 
 export interface ActivityEvent {
   id: string;
@@ -94,7 +95,7 @@ function ActivityItem({
   }
 
   return (
-    <Link to={`/events/${event.id}`} className={className}>
+    <Link to={AppRoutes.events.detail(event.id)} className={className}>
       {content}
     </Link>
   );
@@ -134,7 +135,7 @@ export function ActivityFeed({
           </CardDescription>
         </div>
         <Link
-          to="/events"
+          to={AppRoutes.events.root}
           className="text-xs font-medium text-primary hover:underline"
         >
           View all

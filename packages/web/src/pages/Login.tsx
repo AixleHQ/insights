@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import { AppRoutes } from "@/lib/routes";
 import { Loader2, Mail, Fingerprint } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -39,7 +40,7 @@ export function Login() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate("/", { replace: true });
+      navigate(AppRoutes.dashboard, { replace: true });
     }
   }, [isAuthenticated, navigate]);
 
@@ -49,7 +50,7 @@ export function Login() {
     setIsSubmitting(true);
     try {
       await directLogin(email, password);
-      navigate("/", { replace: true });
+      navigate(AppRoutes.dashboard, { replace: true });
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -212,6 +213,23 @@ export function Login() {
           >
             Sign Up
           </button>
+        </p>
+        <p className="mt-4 text-center text-xs text-muted-foreground/60">
+          <Link
+            to={AppRoutes.legal.terms}
+            state={{ from: AppRoutes.login }}
+            className="hover:text-muted-foreground underline-offset-4 hover:underline"
+          >
+            Terms of Service
+          </Link>
+          {" · "}
+          <Link
+            to={AppRoutes.legal.privacy}
+            state={{ from: AppRoutes.login }}
+            className="hover:text-muted-foreground underline-offset-4 hover:underline"
+          >
+            Privacy Policy
+          </Link>
         </p>
       </div>
     </div>

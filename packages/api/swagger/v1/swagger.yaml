@@ -4568,6 +4568,81 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /api/v1/organizations/{organization_id}/reports/export:
+    get:
+      summary: Export aggregated usage report
+      description: >
+        Returns an aggregated usage report for the organization in CSV or JSON format.
+        Five report types are supported: cost_by_user, cost_by_project, cost_by_tool,
+        token_by_user, and token_by_tool. When group_by is specified each row includes
+        a period column (ISO 8601 timestamp of the bucket start).
+        Requires org owner or global admin role.
+        If from/to are omitted the endpoint defaults to the last 30 days.
+      tags:
+        - Reports
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - name: report_type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [cost_by_user, cost_by_project, cost_by_tool, token_by_user, token_by_tool]
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [csv, json]
+            default: json
+        - name: from
+          in: query
+          description: Start of date range (ISO 8601). Defaults to 30 days ago.
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: End of date range (ISO 8601). Defaults to now.
+          schema:
+            type: string
+            format: date-time
+        - name: group_by
+          in: query
+          description: Time bucket size. When set, each row includes a period column.
+          schema:
+            type: string
+            enum: [day, week, month]
+        - name: project_id
+          in: query
+          description: Scope results to a specific project (optional).
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Report data as CSV download or JSON array
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
   /api/v1/organizations/{organization_id}/event_export_jobs/{id}:
     get:
       summary: Get export job status
@@ -5463,6 +5538,190 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '422':
           $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/scheduled_exports:
+    get:
+      summary: List scheduled exports
+      description: Returns all scheduled report exports for the organization. Requires owner role.
+      tags:
+        - Scheduled Exports
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+      responses:
+        '200':
+          description: Scheduled exports list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ScheduledExport'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      summary: Create a scheduled export
+      description: Creates a new scheduled report export configuration. Requires owner role.
+      tags:
+        - Scheduled Exports
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - report_type
+                - frequency
+                - recipients
+              properties:
+                report_type:
+                  type: string
+                  enum: [cost_by_user, cost_by_project, cost_by_tool, token_by_user, token_by_tool]
+                format:
+                  type: string
+                  enum: [csv, json]
+                  default: csv
+                frequency:
+                  type: string
+                  enum: [daily, weekly, monthly]
+                day_of_week:
+                  type: integer
+                  minimum: 0
+                  maximum: 6
+                  nullable: true
+                  description: Required when frequency is weekly. 0 = Sunday, 6 = Saturday.
+                day_of_month:
+                  type: integer
+                  minimum: 1
+                  maximum: 28
+                  nullable: true
+                  description: Required when frequency is monthly.
+                group_by:
+                  type: string
+                  enum: [day, week, month]
+                  nullable: true
+                active:
+                  type: boolean
+                  default: true
+                recipients:
+                  type: array
+                  items:
+                    type: string
+                    format: email
+                  minItems: 1
+      responses:
+        '201':
+          description: Scheduled export created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ScheduledExport'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/scheduled_exports/{id}:
+    patch:
+      summary: Update a scheduled export
+      description: Update fields on a scheduled export configuration. Requires owner role.
+      tags:
+        - Scheduled Exports
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                report_type:
+                  type: string
+                  enum: [cost_by_user, cost_by_project, cost_by_tool, token_by_user, token_by_tool]
+                format:
+                  type: string
+                  enum: [csv, json]
+                frequency:
+                  type: string
+                  enum: [daily, weekly, monthly]
+                day_of_week:
+                  type: integer
+                  minimum: 0
+                  maximum: 6
+                  nullable: true
+                day_of_month:
+                  type: integer
+                  minimum: 1
+                  maximum: 28
+                  nullable: true
+                group_by:
+                  type: string
+                  enum: [day, week, month]
+                  nullable: true
+                active:
+                  type: boolean
+                recipients:
+                  type: array
+                  items:
+                    type: string
+                    format: email
+      responses:
+        '200':
+          description: Scheduled export updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ScheduledExport'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      summary: Delete a scheduled export
+      description: Removes a scheduled export configuration. Requires owner role.
+      tags:
+        - Scheduled Exports
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204':
+          description: No Content
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
 # ============================================
 # COMPONENTS
@@ -7123,6 +7382,58 @@ components:
           description: Present when recipientType is 'user'.
         enabled:
           type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ScheduledExport:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        reportType:
+          type: string
+          enum: [cost_by_user, cost_by_project, cost_by_tool, token_by_user, token_by_tool]
+        format:
+          type: string
+          enum: [csv, json]
+        frequency:
+          type: string
+          enum: [daily, weekly, monthly]
+        dayOfWeek:
+          type: integer
+          nullable: true
+          minimum: 0
+          maximum: 6
+        dayOfMonth:
+          type: integer
+          nullable: true
+          minimum: 1
+          maximum: 28
+        recipients:
+          type: array
+          items:
+            type: string
+            format: email
+        groupBy:
+          type: string
+          nullable: true
+          enum: [day, week, month]
+        active:
+          type: boolean
+        lastRunAt:
+          type: string
+          format: date-time
+          nullable: true
+        nextRunAt:
+          type: string
+          format: date-time
         createdAt:
           type: string
           format: date-time

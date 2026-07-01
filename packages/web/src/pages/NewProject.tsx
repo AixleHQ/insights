@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useOrg } from "@/contexts/OrgContext";
 import { useCreateProject } from "@/hooks/useApi";
 import { ProjectForm, type ProjectFormData } from "@/components/projects";
+import { AppRoutes } from "@/lib/routes";
 
 export function NewProject() {
   const navigate = useNavigate();
@@ -23,7 +24,7 @@ export function NewProject() {
     });
 
     // Navigate to the new project
-    navigate(`/projects/${project.id}`);
+    navigate(AppRoutes.projects.detail(project.id));
   };
 
   return <ProjectForm onSubmit={handleSubmit} />;

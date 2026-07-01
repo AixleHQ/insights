@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { useOrganization } from "@/hooks/useApi";
 import { ApiError } from "@/lib/api";
+import { AppRoutes } from "@/lib/routes";
 
 function parsePage(raw: string | null): number {
   const n = Number(raw || "1");
@@ -102,7 +103,7 @@ export function WebhookDeliveriesPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
         <Button variant="ghost" size="sm" className="w-fit gap-1 px-0 text-muted-foreground" asChild>
-          <Link to="/admin/organizations">
+          <Link to={AppRoutes.admin.organizations}>
             <ChevronLeft className="size-4" />
             Organizations
           </Link>
