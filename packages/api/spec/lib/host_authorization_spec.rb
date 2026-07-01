@@ -2,7 +2,7 @@
 
 require_relative "../../config/host_authorization"
 
-RSpec.describe Db90::HostAuthorization do
+RSpec.describe Aixle::HostAuthorization do
   def with_env(**vars)
     original = vars.keys.to_h { |key| [ key.to_s, ENV.key?(key.to_s) ? ENV[key.to_s] : :missing ] }
     vars.each { |key, value| value.nil? ? ENV.delete(key.to_s) : ENV[key.to_s] = value }

@@ -5,7 +5,7 @@ require "uri"
 # Host allow-list for Action Dispatch::HostAuthorization in deployed environments.
 # API requests reach Rails through the web/nginx proxy, so the Host header matches
 # the public app hostname (e.g. staging.insights.example.com), not an internal service name.
-module Db90
+module Aixle
   module HostAuthorization
     module_function
 

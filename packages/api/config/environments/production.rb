@@ -74,7 +74,7 @@ Rails.application.configure do
   # Only use :id for inspections in production.
   config.active_record.attributes_for_inspect = [ :id ]
 
-  config.hosts = Db90::HostAuthorization.allowed_hosts
+  config.hosts = Aixle::HostAuthorization.allowed_hosts
   config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
 
   config.active_record.encryption.primary_key = ENV.fetch("ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY")
