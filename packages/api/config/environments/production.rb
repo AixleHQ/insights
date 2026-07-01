@@ -1,4 +1,5 @@
 require "active_support/core_ext/integer/time"
+require_relative "../host_authorization"
 
 Rails.application.configure do
   # Settings specified here will take precedence over those in config/application.rb.
@@ -73,10 +74,7 @@ Rails.application.configure do
   # Only use :id for inspections in production.
   config.active_record.attributes_for_inspect = [ :id ]
 
-  config.hosts = [
-    ENV.fetch("API_HOST"),
-    /\A.*\.#{Regexp.escape(ENV.fetch("BASE_DOMAIN"))}\z/
-  ]
+  config.hosts = Db90::HostAuthorization.allowed_hosts
   config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
 
   config.active_record.encryption.primary_key = ENV.fetch("ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY")
