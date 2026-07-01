@@ -26,7 +26,7 @@ COMMENT ON EXTENSION timescaledb IS 'Enables scalable inserts and complex querie
 -- Name: timeseries; Type: SCHEMA; Schema: -; Owner: -
 --
 
-CREATE SCHEMA timeseries;
+CREATE SCHEMA IF NOT EXISTS timeseries;
 
 --
 -- Name: pgcrypto; Type: EXTENSION; Schema: -; Owner: -
