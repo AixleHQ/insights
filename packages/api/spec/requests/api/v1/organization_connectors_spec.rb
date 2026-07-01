@@ -681,8 +681,9 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
       allow(Oauth::BaseProvider).to receive(:provider_class).with('github').and_return(fake_provider)
     end
 
-    it 'creates a connector and returns it with connected status' do
+    it 'creates a connector and returns it with testing status' do
       connector.destroy!
+      allow(GithubSyncJob).to receive(:perform_later)
 
       authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
                          user: admin,
@@ -691,12 +692,28 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
 
       expect_success
       expect(json_data[:connectorType]).to eq('github')
-      expect(json_data[:status]).to eq('connected')
+      expect(json_data[:status]).to eq('testing')
       expect(json_data[:externalAccountName]).to eq('octocat')
+    end
+
+    it 'enqueues a sync job and returns testing status on first-time connect' do
+      connector.destroy!
+      allow(GithubSyncJob).to receive(:perform_later)
+
+      authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
+                         user: admin,
+                         organization: organization,
+                         params: { connector_type: 'github', code: 'oauth_code_abc' }
+
+      expect_success
+      new_connector = OrganizationConnector.last
+      expect(new_connector.status).to eq('testing')
+      expect(GithubSyncJob).to have_received(:perform_later).with(new_connector.id)
     end
 
     it 'creates a connector.create audit log on OAuth callback' do
       connector.destroy!
+      allow(GithubSyncJob).to receive(:perform_later)
 
       expect {
         authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",

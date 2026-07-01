@@ -310,6 +310,10 @@ module Api
             tracked_changes: { connector_type: connector.connector_type, via: "oauth_callback" },
             request: request
           )
+          if creating
+            connector.mark_testing!
+            ConnectorSyncService.enqueue(connector)
+          end
           render_resource(connector, OrganizationConnectorSerializer)
         else
           render json: {
