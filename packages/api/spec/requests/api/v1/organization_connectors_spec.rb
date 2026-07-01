@@ -762,6 +762,8 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
       before { connector.update!(external_org_id: 'gh-old') }
 
       it 'creates a new connector (count +1)' do
+        allow(GithubSyncJob).to receive(:perform_later)
+
         expect {
           authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
                              user: admin,
@@ -777,6 +779,7 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
 
     it 'persists a label when provided' do
       connector.destroy!
+      allow(GithubSyncJob).to receive(:perform_later)
 
       authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
                          user: admin,
