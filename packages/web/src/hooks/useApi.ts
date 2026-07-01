@@ -1168,7 +1168,10 @@ export function useConnectorHealth(
       const response = await api.get<{ data: ConnectorHealthRollup }>(
         `/organizations/${orgId}/connectors/health`
       );
-      void queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.connectors.all(orgId),
+        exact: true,
+      });
       return response.data;
     },
     enabled: !!orgId && (options?.enabled ?? true),
