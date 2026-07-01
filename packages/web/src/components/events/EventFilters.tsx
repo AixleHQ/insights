@@ -226,7 +226,7 @@ export function EventFilters({
 
   if (filters.riskLevels?.length) {
     const labels = filters.riskLevels.map(
-      (l) => riskLevelOptions.find((r) => r.value === l)?.label ?? l
+      (l) => l === "not_none" ? "Has Risk" : (riskLevelOptions.find((r) => r.value === l)?.label ?? l)
     );
     chips.push({
       key: "risk",

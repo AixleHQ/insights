@@ -1575,7 +1575,11 @@ export interface EventsParams {
   end_date?: string;
   user_id?: string;
   project_id?: string | string[];
+  sort_by?: EventSortBy;
+  direction?: "asc" | "desc";
 }
+
+export type EventSortBy = "occurred_at" | "cost_usd" | "tokens_in" | "tool_name" | "risk_level";
 
 /** Serializes query values; arrays become comma-separated. */
 export function appendQueryParam(
