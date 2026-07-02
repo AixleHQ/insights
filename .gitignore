@@ -70,3 +70,6 @@ coverage/
 
 # Personal Spanish copy of telemetry-mcp local guide (committed doc: LOCAL-DEV.md)
 packages/tools/db90-telemetry-mcp/LOCAL-DEV.es.md
+
+# Repo-local AWS SSO config (never commit credentials)
+.aws/
