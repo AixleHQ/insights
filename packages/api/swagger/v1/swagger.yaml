@@ -3560,6 +3560,10 @@ paths:
   /api/v1/projects/{id}/link_jira:
     post:
       summary: Link a Jira project to this DB90 project
+      description: >-
+        Links (or re-links) a Jira project. Any previously synced issues are
+        deleted and issuesSyncedAt is reset, so the next sync repopulates the
+        list from the newly linked project only.
       tags:
         - Projects
       parameters:
@@ -3603,6 +3607,10 @@ paths:
   /api/v1/projects/{id}/link_linear:
     post:
       summary: Link a Linear project to this DB90 project
+      description: >-
+        Links (or re-links) a Linear project. Any previously synced issues are
+        deleted and issuesSyncedAt is reset, so the next sync repopulates the
+        list from the newly linked project only.
       tags:
         - Projects
       parameters:

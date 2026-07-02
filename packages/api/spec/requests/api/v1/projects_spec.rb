@@ -821,6 +821,20 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       expect(project.reload.project_settings.find_by(key: 'jira_project_key')&.value).to eq('NEW')
     end
 
+    it 'deletes issues from the previously linked project on re-link' do
+      project.project_settings.create!(key: 'jira_connector_id', value: connector.id.to_s)
+      project.project_settings.create!(key: 'jira_project_key', value: 'OLD')
+      create_list(:issue, 2, project: project, organization: organization,
+                             organization_connector: connector, provider_project_key: 'OLD')
+
+      authenticated_post "/api/v1/projects/#{project.id}/link_jira",
+                         user: user,
+                         params: { connector_id: connector.id, jira_project_key: 'NEW' }
+
+      expect_success
+      expect(project.issues.count).to eq(0)
+    end
+
     it 'returns 404 when connector belongs to another org' do
       other_org = create(:organization)
       other_connector = create(:organization_connector, :jira, organization: other_org)
@@ -889,6 +903,21 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       expect_success
       expect(project.reload.project_settings.find_by(key: 'jira_connector_id')).to be_nil
       expect(project.project_settings.find_by(key: 'jira_project_key')).to be_nil
+    end
+
+    it 'deletes issues from the previously linked provider when switching' do
+      jira_connector = create(:organization_connector, :jira, organization: organization)
+      project.project_settings.create!(key: 'jira_connector_id', value: jira_connector.id.to_s)
+      project.project_settings.create!(key: 'jira_project_key', value: 'SCRUM')
+      create_list(:issue, 2, project: project, organization: organization,
+                             organization_connector: jira_connector, provider_project_key: 'SCRUM')
+
+      authenticated_post "/api/v1/projects/#{project.id}/link_linear",
+                         user: user,
+                         params: { connector_id: connector.id, linear_project_id: 'project-1', linear_project_name: 'Platform' }
+
+      expect_success
+      expect(project.issues.count).to eq(0)
     end
 
     it 'returns 403 for project members without admin permission' do
