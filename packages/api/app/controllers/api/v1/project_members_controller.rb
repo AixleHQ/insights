@@ -13,7 +13,7 @@ module Api
         authorize! @project.project_memberships.new, to: :stats?
 
         days = (params[:days] || 30).to_i
-        since = (client_time_zone.now - days.days).beginning_of_day
+        since = (client_zone.now - days.days).beginning_of_day
 
         # Single scan: group by user+tool, aggregate in Ruby
         per_tool_rows = @project.tool_events
@@ -215,7 +215,7 @@ module Api
 
         total_events = events.count
         total_cost = events.sum(:cost_usd)
-        events_today = events.where("occurred_at >= ?", client_time_zone.now.beginning_of_day).count
+        events_today = events.where("occurred_at >= ?", client_zone.now.beginning_of_day).count
         events_this_week = events.where("occurred_at >= ?", 1.week.ago).count
         events_this_month = events.where("occurred_at >= ?", 1.month.ago).count
 

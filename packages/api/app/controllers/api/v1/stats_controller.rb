@@ -45,7 +45,7 @@ module Api
         parsed_month = parse_month_param!
         return if performed?
 
-        zone   = client_time_zone
+        zone   = client_zone
         anchor = parsed_month || zone.today.beginning_of_month
 
         current_start  = anchor.beginning_of_month.in_time_zone(zone)
@@ -180,8 +180,8 @@ module Api
         return if performed?
 
         time_range = if parsed_month
-          { start: parsed_month.beginning_of_month.in_time_zone(client_time_zone),
-            end:   parsed_month.end_of_month.in_time_zone(client_time_zone).end_of_day }
+          { start: parsed_month.beginning_of_month.in_time_zone(client_zone),
+            end:   parsed_month.end_of_month.in_time_zone(client_zone).end_of_day }
         else
           days = (params[:days] || 30).to_i
           parse_time_range(default_days: days)
@@ -284,7 +284,7 @@ module Api
         authorize! current_organization, to: :show?
 
         rows = current_organization.tool_events
-          .where(occurred_at: (client_time_zone.now - 30.days).beginning_of_day..Time.current)
+          .where(occurred_at: (client_zone.now - 30.days).beginning_of_day..Time.current)
           .group(:tool_name)
           .select(
             "tool_name",
@@ -307,7 +307,7 @@ module Api
         authorize! current_organization, to: :show?
 
         # Get past year of data
-        start_date = (client_time_zone.now - 1.year).beginning_of_day
+        start_date = (client_zone.now - 1.year).beginning_of_day
         end_date = Time.current
 
         daily_counts = current_organization.tool_events
@@ -416,7 +416,7 @@ module Api
       def tool_overview
         authorize! current_organization, to: :show?
 
-        zone          = client_time_zone
+        zone          = client_zone
         current_start = zone.now.beginning_of_month
         prev_start    = (zone.now - 1.month).beginning_of_month
         prev_end      = (zone.now - 1.month).end_of_month
@@ -585,7 +585,7 @@ module Api
       end
 
       def parse_time_range(default_days: 7, default_hours: nil)
-        zone = client_time_zone
+        zone = client_zone
         if params[:start_date].present? && params[:end_date].present?
           {
             start: zone.parse(params[:start_date]).beginning_of_day,
@@ -686,8 +686,8 @@ module Api
         if ActiveModel::Type::Boolean.new.cast(params[:all_time])
           nil
         elsif (month = parse_month_param!)
-          { start: month.beginning_of_month.in_time_zone(client_time_zone),
-            end:   month.end_of_month.in_time_zone(client_time_zone).end_of_day }
+          { start: month.beginning_of_month.in_time_zone(client_zone),
+            end:   month.end_of_month.in_time_zone(client_zone).end_of_day }
         elsif performed?
           nil  # parse_month_param! rendered a 422; callers check performed? after this
         else

@@ -14,10 +14,11 @@ module TimezoneBucketing
     end
   end
 
-  # ActiveSupport::TimeZone for the validated ?tz identifier. Use for range
-  # boundaries (beginning_of_day etc.) so they match the SQL bucketing above.
-  def client_time_zone
-    @client_time_zone ||= ActiveSupport::TimeZone[client_timezone]
+  # ActiveSupport::TimeZone for the validated ?tz identifier (cf. Time.zone).
+  # Use for range boundaries (beginning_of_day etc.) so they match the SQL
+  # bucketing below, which interpolates the client_timezone string.
+  def client_zone
+    @client_zone ||= ActiveSupport::TimeZone[client_timezone]
   end
 
   def day_trunc_sql

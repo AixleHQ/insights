@@ -181,7 +181,7 @@ module Api
         authorize! @project, to: :show?
 
         days = (params[:days] || 30).to_i
-        time_range_start = (client_time_zone.now - days.days).beginning_of_day
+        time_range_start = (client_zone.now - days.days).beginning_of_day
         time_range_end = Time.current
 
         events = @project.tool_events.where(occurred_at: time_range_start..time_range_end)
@@ -202,7 +202,7 @@ module Api
             }
           end
 
-        prev_start = (client_time_zone.now - (2 * days).days).beginning_of_day
+        prev_start = (client_zone.now - (2 * days).days).beginning_of_day
         prev_end   = time_range_start
 
         curr_count, curr_cost = events.pick(
@@ -229,8 +229,8 @@ module Api
 
         granularity = params[:granularity].presence_in(%w[day month]) || "day"
         days = (params[:days] || 30).to_i.clamp(1, 365)
-        time_range_start = (client_time_zone.now - days.days).beginning_of_day
-        time_range_end = client_time_zone.now
+        time_range_start = (client_zone.now - days.days).beginning_of_day
+        time_range_end = client_zone.now
 
         events = @project.tool_events.where(occurred_at: time_range_start..time_range_end)
 
@@ -284,7 +284,7 @@ module Api
         authorize! @project, to: :show?
 
         days = (params[:days] || 30).to_i
-        since = (client_time_zone.now - days.days).beginning_of_day
+        since = (client_zone.now - days.days).beginning_of_day
 
         rows = @project.tool_events
           .where(event_type: "commit")
