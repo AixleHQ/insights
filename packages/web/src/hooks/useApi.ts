@@ -620,7 +620,7 @@ export function useMemberStats(orgId: string, memberId: string) {
   return useQuery({
     queryKey: queryKeys.members.stats(orgId, memberId),
     queryFn: async () => {
-      const response = await api.get<MemberStats>(`/organizations/${orgId}/members/${memberId}/stats`);
+      const response = await api.get<MemberStats>(appendTz(`/organizations/${orgId}/members/${memberId}/stats`));
       return response;
     },
     enabled: !!orgId && !!memberId,
@@ -648,7 +648,7 @@ export function useMemberDashboardStats(orgId: string, userId: string, period = 
     queryKey: queryKeys.members.dashboardStats(orgId, userId, period),
     queryFn: async () => {
       const response = await api.get<MemberDashboardStats>(
-        `/organizations/${orgId}/members/${userId}/dashboard_stats?period=${period}`
+        appendTz(`/organizations/${orgId}/members/${userId}/dashboard_stats?period=${period}`)
       );
       return response;
     },
@@ -692,7 +692,7 @@ export function usePromptInsights(orgId: string, userId: string, period = "30d")
     queryKey: queryKeys.members.promptInsights(orgId, userId, period),
     queryFn: async () => {
       const response = await api.get<PromptInsights>(
-        `/organizations/${orgId}/members/${userId}/prompt_insights?period=${period}`
+        appendTz(`/organizations/${orgId}/members/${userId}/prompt_insights?period=${period}`)
       );
       return response;
     },
@@ -975,7 +975,7 @@ export function useProjectMemberStats(projectId: string, days = 30, enabled = tr
     queryKey: ["projects", projectId, "members", "stats", days],
     queryFn: async () => {
       const res = await api.get<{ data: ProjectMemberStat[] }>(
-        `/projects/${projectId}/members/stats?days=${days}`
+        appendTz(`/projects/${projectId}/members/stats?days=${days}`)
       );
       return res.data;
     },
@@ -1769,7 +1769,7 @@ export function useActiveUsers(orgId: string, projectId?: string, days = 7) {
       const p = new URLSearchParams();
       p.set("days", String(days));
       if (projectId) p.set("project_id", projectId);
-      return api.get<ActiveUsersResponse>(`/organizations/${orgId}/stats/active_users?${p.toString()}`);
+      return api.get<ActiveUsersResponse>(appendTz(`/organizations/${orgId}/stats/active_users?${p.toString()}`));
     },
     enabled: !!orgId,
     staleTime: 5 * 60 * 1000,
@@ -1941,7 +1941,7 @@ export function useActiveTools(orgId: string) {
     queryKey: queryKeys.stats.activeTools(orgId),
     queryFn: () =>
       api.get<{ tools: Array<{ tool_name: string; total_events: number; total_cost_usd: number; active_users: number }> }>(
-        `/organizations/${orgId}/stats/active_tools`
+        appendTz(`/organizations/${orgId}/stats/active_tools`)
       ),
     enabled: !!orgId,
     refetchInterval: 30000,

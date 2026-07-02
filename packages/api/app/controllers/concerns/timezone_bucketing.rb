@@ -14,6 +14,12 @@ module TimezoneBucketing
     end
   end
 
+  # ActiveSupport::TimeZone for the validated ?tz identifier. Use for range
+  # boundaries (beginning_of_day etc.) so they match the SQL bucketing above.
+  def client_time_zone
+    @client_time_zone ||= ActiveSupport::TimeZone[client_timezone]
+  end
+
   def day_trunc_sql
     tz = client_timezone
     expr = tz == "UTC" ? "DATE_TRUNC('day', occurred_at)" : "DATE_TRUNC('day', occurred_at AT TIME ZONE '#{tz}')"
