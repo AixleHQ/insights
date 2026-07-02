@@ -31,6 +31,8 @@ import type { ConnectorStatus } from "@/lib/types";
 import { ApiKeyConnectSheet } from "@/components/integrations/ApiKeyConnectSheet";
 import { SlackConnectSheet } from "@/components/integrations/SlackConnectSheet";
 
+const MULTI_INSTANCE_PROVIDER_IDS = new Set<string>(["slack"]);
+
 const PROVIDERS: ProviderInfo[] = [
   {
     id: "anthropic",
@@ -148,7 +150,7 @@ export function ProjectConnectorsTab({ projectId, orgId = "" }: ProjectConnector
       return {
         id: c.id,
         provider: connectorType as IntegrationProvider,
-        name: externalAccountName || providerInfo?.name || connectorType,
+        name: c.label || externalAccountName || providerInfo?.name || connectorType,
         status,
         last_sync_at: lastSyncAt || undefined,
         sync_error: syncError,
@@ -161,9 +163,13 @@ export function ProjectConnectorsTab({ projectId, orgId = "" }: ProjectConnector
     });
   }, [connectorsData]);
 
-  const connectedProviderIds = new Set(integrations.map((c) => c.provider));
+  const connectedSingleInstanceIds = new Set(
+    integrations
+      .filter((i) => !MULTI_INSTANCE_PROVIDER_IDS.has(i.provider))
+      .map((i) => i.provider),
+  );
   const availableProviders = PROVIDERS.filter(
-    (p) => !connectedProviderIds.has(p.id) && enabledMap[p.id] !== false,
+    (p) => !connectedSingleInstanceIds.has(p.id) && enabledMap[p.id] !== false,
   );
 
   const handleConnect = (providerId: string) => {

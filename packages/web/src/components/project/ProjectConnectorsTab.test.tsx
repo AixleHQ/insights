@@ -185,7 +185,12 @@ describe("ProjectConnectorsTab", () => {
       expect(screen.getByText("Anthropic API")).toBeInTheDocument();
     });
 
-    it("shows empty state when all providers are connected", async () => {
+    it("shows empty state when all single-instance providers are connected and Slack is disabled", async () => {
+      mockOrgProviderSettings.mockReturnValue({
+        enabledMap: { slack: false },
+        isLoading: false,
+        isError: false,
+      });
       const allConnected: ProjectConnector[] = [
         { ...connectedAnthropicConnector, id: "1", connectorType: "anthropic" },
         { ...connectedAnthropicConnector, id: "2", connectorType: "openai" },
@@ -200,6 +205,32 @@ describe("ProjectConnectorsTab", () => {
       await user.click(screen.getByRole("tab", { name: /available \(0\)/i }));
 
       expect(screen.getByText("All providers are connected")).toBeInTheDocument();
+    });
+
+    it("keeps Slack available when one Slack connector is already connected", async () => {
+      const slackConnector: ProjectConnector = {
+        id: "conn-slack-1",
+        connectorType: "slack",
+        isActive: true,
+        status: "connected",
+        scope: "project",
+        label: "#general",
+        externalAccountName: "#general",
+      };
+
+      mockProjectConnectors.mockReturnValue({
+        data: [slackConnector],
+        isLoading: false,
+      });
+
+      const user = userEvent.setup();
+      renderComponent();
+
+      // Switch to Available tab
+      await user.click(screen.getByRole("tab", { name: /available/i }));
+
+      // Slack must still appear in Available even though it's connected
+      expect(screen.getByText("Slack")).toBeInTheDocument();
     });
   });
 
@@ -325,8 +356,8 @@ describe("ProjectConnectorsTab", () => {
         expect(screen.getByRole("tab", { name: /connected \(1\)/i })).toBeInTheDocument();
       });
 
-      // Slack no longer in Available
-      expect(screen.getByRole("tab", { name: /available \(4\)/i })).toBeInTheDocument();
+      // Slack is multi-instance so it stays in Available even after connecting
+      expect(screen.getByRole("tab", { name: /available \(5\)/i })).toBeInTheDocument();
     });
 
     it("shows inline error when Slack webhook URL is invalid", async () => {
