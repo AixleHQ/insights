@@ -13,6 +13,7 @@ const mockConnectWithSlack = vi.fn();
 const mockConnectWithWebhook = vi.fn();
 const mockDeleteConnector = vi.fn();
 const mockTestConnector = vi.fn();
+const mockUpdateConnector = vi.fn();
 const mockOrgProviderSettings = vi.fn();
 
 vi.mock("@/contexts/OrgContext", () => ({
@@ -28,6 +29,7 @@ vi.mock("@/hooks/useApi", () => ({
   useProjectConnectWithSlack: () => ({ mutateAsync: mockConnectWithSlack }),
   useProjectDeleteConnector: () => ({ mutateAsync: mockDeleteConnector }),
   useProjectTestConnector: () => ({ mutateAsync: mockTestConnector }),
+  useProjectUpdateConnector: () => ({ mutateAsync: mockUpdateConnector }),
   useConnectWithApiKey: () => ({ mutateAsync: vi.fn() }),
   useOrgProviderSettings: () => mockOrgProviderSettings(),
 }));
@@ -401,6 +403,36 @@ describe("ProjectConnectorsTab", () => {
 
       await waitFor(() => {
         expect(screen.getByText("Invalid API key")).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("Rename flow", () => {
+    it("calls updateConnector with projectId, connectorId, and label on rename confirm", async () => {
+      const slackConnector: ProjectConnector = {
+        id: "conn-slack-1",
+        connectorType: "slack",
+        isActive: true,
+        status: "connected",
+        scope: "project",
+        label: "#alerts",
+      };
+      mockProjectConnectors.mockReturnValue({ data: [slackConnector], isLoading: false });
+      const user = userEvent.setup();
+      renderComponent();
+
+      await user.click(screen.getByRole("button", { name: /actions/i }));
+      await user.click(screen.getByRole("menuitem", { name: /rename/i }));
+      await user.clear(screen.getByLabelText(/^label$/i));
+      await user.type(screen.getByLabelText(/^label$/i), "#engineering");
+      await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+      await waitFor(() => {
+        expect(mockUpdateConnector).toHaveBeenCalledWith({
+          projectId: PROJECT_ID,
+          connectorId: slackConnector.id,
+          data: { label: "#engineering" },
+        });
       });
     });
   });

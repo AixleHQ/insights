@@ -5,6 +5,7 @@ import {
   useProjectConnectWithApiKey,
   useProjectDeleteConnector,
   useProjectTestConnector,
+  useProjectUpdateConnector,
   useOrgProviderSettings,
 } from "@/hooks/useApi";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -120,6 +121,7 @@ export function ProjectConnectorsTab({ projectId, orgId = "" }: ProjectConnector
   const connectWithApiKey = useProjectConnectWithApiKey();
   const deleteConnector = useProjectDeleteConnector();
   const testConnector = useProjectTestConnector();
+  const updateConnector = useProjectUpdateConnector();
 
   const [activeTab, setActiveTab] = useState("connected");
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -150,7 +152,8 @@ export function ProjectConnectorsTab({ projectId, orgId = "" }: ProjectConnector
       return {
         id: c.id,
         provider: connectorType as IntegrationProvider,
-        name: c.label || externalAccountName || providerInfo?.name || connectorType,
+        name: externalAccountName || providerInfo?.name || connectorType,
+        label: c.label,
         status,
         last_sync_at: lastSyncAt || undefined,
         sync_error: syncError,
@@ -221,6 +224,14 @@ export function ProjectConnectorsTab({ projectId, orgId = "" }: ProjectConnector
     }
   };
 
+  const handleRename = async (id: string, newLabel: string) => {
+    await updateConnector.mutateAsync({
+      projectId,
+      connectorId: id,
+      data: { label: newLabel },
+    });
+  };
+
   return (
     <>
       {actionError && (
@@ -266,6 +277,7 @@ export function ProjectConnectorsTab({ projectId, orgId = "" }: ProjectConnector
                   key={integration.id}
                   integration={integration}
                   onTest={handleTest}
+                  onRename={handleRename}
                   onDisconnect={handleDisconnect}
                   isTesting={testingConnectorId === integration.id}
                 />

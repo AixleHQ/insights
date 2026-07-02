@@ -4518,8 +4518,22 @@ paths:
               properties:
                 access_token:
                   type: string
+                refresh_token:
+                  type: string
+                token_expires_at:
+                  type: string
+                  format: date-time
+                external_org_id:
+                  type: string
+                external_org_name:
+                  type: string
+                  nullable: true
                 is_active:
                   type: boolean
+                label:
+                  type: string
+                  nullable: true
+                  description: User-supplied label to distinguish multiple Slack connectors (e.g. "#alerts")
       responses:
         '200':
           description: Updated connector

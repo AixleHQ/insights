@@ -1449,6 +1449,25 @@ export function useProjectTestConnector() {
   });
 }
 
+export function useProjectUpdateConnector() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      projectId,
+      connectorId,
+      data,
+    }: {
+      projectId: string;
+      connectorId: string;
+      data: Record<string, unknown>;
+    }) => api.patch<ProjectConnector>(`/projects/${projectId}/connectors/${connectorId}`, data),
+    onSuccess: (_, { projectId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.projectConnectors.all(projectId) });
+    },
+  });
+}
+
 // ============================================================================
 // Tool Accounts Hooks
 // ============================================================================
