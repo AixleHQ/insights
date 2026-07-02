@@ -4581,6 +4581,34 @@ paths:
                         type: string
                         nullable: true
 
+  /api/v1/projects/{project_id}/connectors/{id}/sync:
+    post:
+      summary: Sync project connector
+      tags:
+        - Project Connectors
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Synced connector
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ProjectConnector'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   # ============================================
   # EVENTS
   # ============================================
