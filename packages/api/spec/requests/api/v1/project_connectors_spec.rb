@@ -296,6 +296,57 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
       expect(log.actor).to eq(org_admin)
       expect(log.tracked_changes['connector_type']).to eq('anthropic')
     end
+
+    context 'with multiple Slack connectors' do
+      let(:valid_webhook_url)  { 'https://hooks.slack.com/services/T00000000/B00000000/EXAMPLE-WEBHOOK-SECRET' }
+      let(:valid_webhook_url2) { 'https://hooks.slack.com/services/T00000001/B00000001/EXAMPLE-WEBHOOK-SECRET-2' }
+
+      before do
+        allow_any_instance_of(Oauth::SlackProvider)
+          .to receive(:test_connection).and_return({ success: true })
+      end
+
+      it 'allows a second Slack connector on the same project' do
+        create(:project_connector, :slack, project: fresh_project)
+
+        expect {
+          authenticated_post "/api/v1/projects/#{fresh_project.id}/connectors",
+                             user: org_admin,
+                             organization: organization,
+                             params: { connector_type: 'slack', access_token: valid_webhook_url2,
+                                       label: '#engineering' }
+        }.to change(ProjectConnector, :count).by(1)
+
+        expect_created
+        expect(json_data[:connectorType]).to eq('slack')
+      end
+
+      it 'stores label on a Slack connector' do
+        authenticated_post "/api/v1/projects/#{fresh_project.id}/connectors",
+                           user: org_admin,
+                           organization: organization,
+                           params: { connector_type: 'slack', access_token: valid_webhook_url,
+                                     label: '#alerts' }
+
+        expect_created
+        expect(json_data[:label]).to eq('#alerts')
+      end
+
+      it 'still blocks a second anthropic connector' do
+        create(:project_connector, :anthropic, project: fresh_project)
+
+        allow_any_instance_of(Oauth::AnthropicProvider)
+          .to receive(:test_connection).and_return({ success: true })
+
+        authenticated_post "/api/v1/projects/#{fresh_project.id}/connectors",
+                           user: org_admin,
+                           organization: organization,
+                           params: { connector_type: 'anthropic', access_token: 'key' }
+
+        expect_unprocessable
+        expect(json_response[:errors][:connector_type]).to include("already exists for this project")
+      end
+    end
   end
 
   describe 'PATCH /api/v1/projects/:project_id/connectors/:id' do

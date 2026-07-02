@@ -4393,6 +4393,194 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /api/v1/projects/{project_id}/connectors:
+    get:
+      summary: List project connectors
+      description: Returns AI provider and Slack connectors for the project. Slack supports multiple connectors per project.
+      tags:
+        - Project Connectors
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [anthropic, openai, openrouter, gemini, slack]
+        - name: active
+          in: query
+          schema:
+            type: string
+            enum: ['true', 'false']
+      responses:
+        '200':
+          description: Connector list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProjectConnector'
+    post:
+      summary: Create project connector
+      description: >
+        Creates a connector for the project. AI provider types (anthropic, openai, openrouter, gemini)
+        allow only one connector per project. Slack is multi-instance: multiple webhook connectors
+        can be connected simultaneously.
+      tags:
+        - Project Connectors
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                connector_type:
+                  type: string
+                  enum: [anthropic, openai, openrouter, gemini, slack]
+                access_token:
+                  type: string
+                  description: API key (AI providers) or Slack webhook URL
+                label:
+                  type: string
+                  nullable: true
+                  description: Optional label to distinguish multiple Slack connectors (e.g. "#alerts")
+                external_org_name:
+                  type: string
+                  nullable: true
+                is_active:
+                  type: boolean
+                  default: true
+              required:
+                - connector_type
+                - access_token
+      responses:
+        '201':
+          description: Connector created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ProjectConnector'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/projects/{project_id}/connectors/{id}:
+    get:
+      summary: Get project connector
+      tags:
+        - Project Connectors
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Connector
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ProjectConnector'
+    patch:
+      summary: Update project connector
+      tags:
+        - Project Connectors
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                access_token:
+                  type: string
+                is_active:
+                  type: boolean
+      responses:
+        '200':
+          description: Updated connector
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ProjectConnector'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      summary: Delete project connector
+      tags:
+        - Project Connectors
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Connector deleted
+
+  /api/v1/projects/{project_id}/connectors/{id}/test:
+    post:
+      summary: Test project connector
+      tags:
+        - Project Connectors
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Test result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      success:
+                        type: boolean
+                      message:
+                        type: string
+                        nullable: true
+                      error:
+                        type: string
+                        nullable: true
+
   # ============================================
   # EVENTS
   # ============================================
@@ -7010,6 +7198,69 @@ components:
         - connectorType
         - isActive
         - scope
+        - createdAt
+        - updatedAt
+
+    ProjectConnector:
+      type: object
+      description: Project-level connector (AI provider or Slack webhook). Tokens are never exposed.
+      properties:
+        id:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        connectorType:
+          type: string
+          enum: [anthropic, openai, openrouter, gemini, slack]
+        isActive:
+          type: boolean
+        status:
+          type: string
+          enum: [connected, testing, error, disconnected]
+        scope:
+          type: string
+          enum: [project]
+        label:
+          type: string
+          nullable: true
+          description: User-supplied label to distinguish multiple connectors of the same provider
+        externalAccountId:
+          type: string
+          nullable: true
+        externalAccountName:
+          type: string
+          nullable: true
+        lastSyncAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastError:
+          type: string
+          nullable: true
+        tokenExpiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        tokenExpired:
+          type: boolean
+        aiProvider:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - projectId
+        - connectorType
+        - isActive
+        - status
+        - scope
+        - aiProvider
         - createdAt
         - updatedAt
 

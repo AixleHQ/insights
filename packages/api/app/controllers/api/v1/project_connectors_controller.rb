@@ -23,20 +23,26 @@ module Api
 
       # POST /api/v1/projects/:project_id/connectors
       def create
-        # Support retrying a failed connector of the same type
-        @connector = @project.project_connectors.find_or_initialize_by(
-          connector_type: params[:connector_type]
-        )
+        multi_instance = ProjectConnector::MULTI_INSTANCE_CONNECTOR_TYPES.include?(params[:connector_type].to_s)
 
-        # Reject if an active connector of this type already exists
-        if @connector.persisted? && @connector.is_active?
-          return render json: {
-            error: "Unprocessable Entity",
-            errors: { connector_type: [ "already exists for this project" ] }
-          }, status: :unprocessable_content
+        if multi_instance
+          @connector = @project.project_connectors.new(connector_params)
+        else
+          # Support retrying a failed connector of the same type
+          @connector = @project.project_connectors.find_or_initialize_by(
+            connector_type: params[:connector_type]
+          )
+
+          if @connector.persisted? && @connector.is_active?
+            return render json: {
+              error: "Unprocessable Entity",
+              errors: { connector_type: [ "already exists for this project" ] }
+            }, status: :unprocessable_content
+          end
+
+          @connector.assign_attributes(connector_params)
         end
 
-        @connector.assign_attributes(connector_params)
         authorize! @connector
 
         # Validate API key / webhook URL for AI providers and Slack webhooks
@@ -199,7 +205,7 @@ module Api
 
       def connector_params
         params.permit(:connector_type, :access_token, :refresh_token, :token_expires_at,
-                      :external_org_id, :external_org_name, :is_active)
+                      :external_org_id, :external_org_name, :is_active, :label)
       end
 
       def connector_update_params
