@@ -1,4 +1,16 @@
 {
+  "_comment": "DBP AI routing (Aixle Insights) — common, committed. Claude Code calls AWS Bedrock. Per-developer SSO. DO NOT PUT YOUR SECRETS HERE.",
+  "env": {
+    "CLAUDE_CODE_USE_BEDROCK": "1",
+    "AWS_PROFILE": "<AWS_PROFILE>",
+    "AWS_REGION": "us-east-1",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "arn:aws:bedrock:us-east-1:<AWS_ACCOUNT_ID>:application-inference-profile/<PROFILE_ID>",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "arn:aws:bedrock:us-east-1:<AWS_ACCOUNT_ID>:application-inference-profile/<PROFILE_ID>",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "arn:aws:bedrock:us-east-1:<AWS_ACCOUNT_ID>:application-inference-profile/<PROFILE_ID>",
+    "ANTHROPIC_CUSTOM_HEADERS": "X-Amzn-Bedrock-GuardrailIdentifier: <GUARDRAIL_ID>\nX-Amzn-Bedrock-GuardrailVersion: 1"
+  },
+  "availableModels": ["opus", "sonnet", "haiku"],
+  "awsAuthRefresh": "aws sso login --profile <AWS_PROFILE>",
   "permissions": {
     "allow": [
       "Bash(make lint-api)",
