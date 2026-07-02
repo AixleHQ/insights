@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
-require "rails_helper"
+require "spec_helper"
+require_relative "../../lib/host_authorization"
 
 RSpec.describe Aixle::HostAuthorization do
   def with_env(**vars)
