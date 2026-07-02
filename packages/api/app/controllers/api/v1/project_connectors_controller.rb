@@ -23,27 +23,27 @@ module Api
 
       # POST /api/v1/projects/:project_id/connectors
       def create
+        # Build minimal unsaved connector just for the policy check so authorize!
+        # fires before any information-disclosing early returns.
+        @connector = @project.project_connectors.new(connector_type: params[:connector_type])
+        authorize! @connector
+
         multi_instance = ProjectConnector::MULTI_INSTANCE_CONNECTOR_TYPES.include?(params[:connector_type].to_s)
 
         if multi_instance
-          @connector = @project.project_connectors.new(connector_params)
+          @connector.assign_attributes(connector_params)
         else
-          # Support retrying a failed connector of the same type
-          @connector = @project.project_connectors.find_or_initialize_by(
-            connector_type: params[:connector_type]
-          )
-
-          if @connector.persisted? && @connector.is_active?
+          existing = @project.project_connectors.find_by(connector_type: params[:connector_type])
+          if existing&.is_active?
             return render json: {
               error: "Unprocessable Entity",
               errors: { connector_type: [ "already exists for this project" ] }
             }, status: :unprocessable_content
           end
-
+          # Reuse existing record for retry-on-error UX, or keep the new one
+          @connector = existing || @connector
           @connector.assign_attributes(connector_params)
         end
-
-        authorize! @connector
 
         # Validate API key / webhook URL for AI providers and Slack webhooks
         provider = Oauth::BaseProvider.for(@connector) if @connector.ai_provider? || @connector.slack_webhook?

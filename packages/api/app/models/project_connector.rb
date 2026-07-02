@@ -1,7 +1,7 @@
 class ProjectConnector < ApplicationRecord
   AI_PROVIDER_TYPES = %w[openrouter anthropic openai gemini].freeze
   SLACK_TYPES = %w[slack].freeze
-  MULTI_INSTANCE_CONNECTOR_TYPES = SLACK_TYPES
+  MULTI_INSTANCE_CONNECTOR_TYPES = SLACK_TYPES.freeze
   CONNECTOR_TYPES = (AI_PROVIDER_TYPES + SLACK_TYPES).freeze
   STATUSES = %w[connected testing error disconnected].freeze
 
