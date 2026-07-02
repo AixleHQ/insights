@@ -192,7 +192,7 @@ export function OrgDashboard() {
         <div>
           <h1 className="type-h2">Dashboard</h1>
           <p className="text-sm text-muted-foreground">
-            AI tool usage and cost overview for {currentOrg?.name || "your organization"}
+            Tool usage and cost overview for {currentOrg?.name || "your organization"}
           </p>
         </div>
         <div className="flex items-center gap-3">
