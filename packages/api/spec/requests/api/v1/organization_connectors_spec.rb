@@ -243,6 +243,74 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
       expect(json_data[:label]).to eq('My GitHub account')
       expect(connector.reload.label).to eq('My GitHub account')
     end
+
+    context 'config persistence (source-control)' do
+      it 'persists sync_repositories and sync_pull_requests' do
+        authenticated_patch "/api/v1/organizations/#{organization.id}/connectors/#{connector.id}",
+                            user: admin,
+                            organization: organization,
+                            params: { config: { sync_repositories: false, sync_pull_requests: false } }
+
+        expect_success
+        reloaded = connector.reload
+        expect(reloaded.config['sync_repositories']).to be false
+        expect(reloaded.config['sync_pull_requests']).to be false
+        expect(json_data[:syncRepositories]).to be false
+        expect(json_data[:syncPullRequests]).to be false
+      end
+
+      it 'merges config without clobbering existing keys' do
+        connector.update!(config: { 'existing_key' => 'value', 'sync_repositories' => true })
+
+        authenticated_patch "/api/v1/organizations/#{organization.id}/connectors/#{connector.id}",
+                            user: admin,
+                            organization: organization,
+                            params: { config: { sync_pull_requests: false } }
+
+        expect_success
+        reloaded = connector.reload
+        expect(reloaded.config['existing_key']).to eq('value')
+        expect(reloaded.config['sync_repositories']).to be true
+        expect(reloaded.config['sync_pull_requests']).to be false
+      end
+
+      it 'does not permit arbitrary config keys' do
+        authenticated_patch "/api/v1/organizations/#{organization.id}/connectors/#{connector.id}",
+                            user: admin,
+                            organization: organization,
+                            params: { config: { arbitrary_key: 'bad', sync_repositories: true } }
+
+        expect_success
+        expect(connector.reload.config).not_to have_key('arbitrary_key')
+        expect(connector.reload.config['sync_repositories']).to be true
+      end
+
+      it 'does not touch config for non-source-control connectors' do
+        ai_connector = create(:organization_connector,
+                              organization: organization,
+                              connector_type: 'anthropic',
+                              config: { 'seat_count' => 10 })
+
+        authenticated_patch "/api/v1/organizations/#{organization.id}/connectors/#{ai_connector.id}",
+                            user: admin,
+                            organization: organization,
+                            params: { config: { sync_repositories: false } }
+
+        expect_success
+        reloaded = ai_connector.reload
+        expect(reloaded.config['seat_count']).to eq(10)
+        expect(reloaded.config).not_to have_key('sync_repositories')
+      end
+
+      it 'enforces authorize! (non-owner gets 403)' do
+        authenticated_patch "/api/v1/organizations/#{organization.id}/connectors/#{connector.id}",
+                            user: member,
+                            organization: organization,
+                            params: { config: { sync_repositories: false } }
+
+        expect_forbidden
+      end
+    end
   end
 
   describe 'POST /api/v1/organizations/:organization_id/connectors (multi-instance)' do

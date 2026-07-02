@@ -96,6 +96,8 @@ class BitbucketRepositoryActivitySyncJob < ApplicationJob
   end
 
   def persist_pull_requests(connector, repository, pull_requests)
+    return unless connector.sync_pull_requests?
+
     pull_requests.each do |pr|
       ToolEvents::ConnectorUpsert.call(
         unique_key: "pullrequest_id",

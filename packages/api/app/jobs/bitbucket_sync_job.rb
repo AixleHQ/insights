@@ -54,6 +54,8 @@ class BitbucketSyncJob < ApplicationJob
   # In fan-out mode, one BitbucketRepositoryActivitySyncJob is enqueued per repo;
   # mark_synced! is deferred to the last child via a counter on the connector.
   def sync_repositories
+    return unless @connector.sync_repositories?
+
     provider = Oauth::BaseProvider.for(@connector)
     repos = provider.fetch_repositories(all_pages: true)
 
@@ -188,6 +190,8 @@ class BitbucketSyncJob < ApplicationJob
   end
 
   def process_pull_request_event(payload, event_type)
+    return unless @connector.sync_pull_requests?
+
     repository = find_repository(payload.dig("repository", "uuid"))
     return unless repository
 
@@ -276,7 +280,7 @@ class BitbucketSyncJob < ApplicationJob
   end
 
   def sync_pull_requests_data(repository, pull_requests)
-    return if pull_requests.empty?
+    return if pull_requests.empty? || !@connector.sync_pull_requests?
 
     records = pull_requests.map do |pull_request|
       {

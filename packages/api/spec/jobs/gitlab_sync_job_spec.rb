@@ -195,6 +195,33 @@ RSpec.describe GitlabSyncJob, type: :job do
     end
   end
 
+  describe "#perform — webhook merge request gating" do
+    let(:mr_payload) do
+      {
+        "project" => { "id" => 42 },
+        "object_attributes" => {
+          "iid" => 11,
+          "title" => "MR title",
+          "state" => "opened",
+          "updated_at" => Time.current.iso8601,
+          "url" => "https://gitlab.com/group/repo/-/merge_requests/11"
+        },
+        "user" => { "username" => "devuser" }
+      }
+    end
+
+    it "skips merge request events when sync_pull_requests is false" do
+      connector.update!(config: { "sync_pull_requests" => false })
+
+      expect {
+        described_class.new.perform(connector.id, "webhook", {
+          "event_type" => "Merge Request Hook",
+          "payload" => mr_payload
+        })
+      }.not_to change(ToolEvent, :count)
+    end
+  end
+
   describe "#perform — health snapshot error handling" do
     it "records a failure snapshot when sync raises StandardError" do
       allow(Oauth::BaseProvider).to receive(:for).with(connector).and_raise(RuntimeError, "API down")

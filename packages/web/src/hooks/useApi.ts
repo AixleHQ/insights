@@ -1211,7 +1211,7 @@ export function useCreateConnector() {
       connectorType: string;
       label?: string;
     }) =>
-      api.post<Connector>(`/organizations/${orgId}/connectors/callback`, {
+      api.post<{ data: Connector }>(`/organizations/${orgId}/connectors/callback`, {
         code,
         connector_type: connectorType,
         ...(label ? { label } : {}),

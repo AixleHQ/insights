@@ -1580,9 +1580,26 @@ paths:
                   type: string
                   nullable: true
                   description: Optional user-supplied label to distinguish multiple connectors of the same provider
+                config:
+                  type: object
+                  description: Source-control configuration settings (merged into existing config — keys not sent are preserved)
+                  properties:
+                    sync_repositories:
+                      type: boolean
+                      description: When false, polling sync skips repository and commit ingestion (source-control only)
+                    sync_pull_requests:
+                      type: boolean
+                      description: When false, PR/MR ingestion is skipped (source-control only)
       responses:
         '200':
           description: Connector updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OrganizationConnector'
         '403':
           $ref: '#/components/responses/Forbidden'
         '422':
@@ -6927,6 +6944,17 @@ components:
           type: string
           nullable: true
           description: ISO 8601 date for end of current billing period (Copilot only)
+        webhookActive:
+          type: boolean
+          description: Whether a webhook is actively delivering events to this connector
+        syncRepositories:
+          type: boolean
+          nullable: true
+          description: Whether repository/commit polling sync is enabled (source-control only; null for other types)
+        syncPullRequests:
+          type: boolean
+          nullable: true
+          description: Whether PR/MR ingestion is enabled (source-control only; null for other types)
         repositoryCount:
           type: integer
         syncedEventCount:

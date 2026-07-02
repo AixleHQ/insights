@@ -20,17 +20,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { useOrg } from "@/contexts/OrgContext";
-import { useProjects, useCreateConnector } from "@/hooks/useApi";
+import { useCreateConnector, useUpdateConnector } from "@/hooks/useApi";
 import { api, ApiError } from "@/lib/api";
 import { ProviderLogo } from "@/components/icons";
 import type { IntegrationProvider } from "@/components/integrations";
@@ -45,7 +38,6 @@ interface ProviderConfig {
   scopes: { name: string; description: string }[];
   requiresWebhook: boolean;
   requiresOAuth: boolean;
-  docUrl?: string;
   multiInstance?: boolean;
 }
 
@@ -68,7 +60,6 @@ const providers: Record<string, ProviderConfig> = {
     ],
     requiresWebhook: true,
     requiresOAuth: true,
-    docUrl: "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/authorizing-oauth-apps",
     multiInstance: true,
   },
   gitlab: {
@@ -88,7 +79,6 @@ const providers: Record<string, ProviderConfig> = {
     ],
     requiresWebhook: true,
     requiresOAuth: true,
-    docUrl: "https://docs.gitlab.com/ee/api/oauth2.html",
     multiInstance: true,
   },
   bitbucket: {
@@ -108,7 +98,6 @@ const providers: Record<string, ProviderConfig> = {
     ],
     requiresWebhook: true,
     requiresOAuth: true,
-    docUrl: "https://support.atlassian.com/bitbucket-cloud/docs/use-oauth-on-bitbucket-cloud/",
     multiInstance: true,
   },
   jira: {
@@ -128,7 +117,6 @@ const providers: Record<string, ProviderConfig> = {
     ],
     requiresWebhook: false,
     requiresOAuth: true,
-    docUrl: "https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/",
     multiInstance: true,
   },
   linear: {
@@ -148,7 +136,6 @@ const providers: Record<string, ProviderConfig> = {
     ],
     requiresWebhook: true,
     requiresOAuth: true,
-    docUrl: "https://developers.linear.app/docs/oauth/authentication",
     multiInstance: true,
   },
   github_copilot: {
@@ -168,7 +155,6 @@ const providers: Record<string, ProviderConfig> = {
     ],
     requiresWebhook: false,
     requiresOAuth: true,
-    docUrl: "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/authorizing-oauth-apps",
   },
   "claude-code": {
     id: "claude-code",
@@ -195,8 +181,8 @@ export function IntegrationSetup() {
   const { provider: providerKey } = useParams<{ provider: string }>();
   const navigate = useNavigate();
   const { currentOrg } = useOrg();
-  const { data: projects } = useProjects(currentOrg?.id || "");
   const { mutateAsync: createConnector } = useCreateConnector();
+  const { mutateAsync: updateConnector } = useUpdateConnector();
   const isProcessingCallback = useRef(false);
   const oauthPopupPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -204,16 +190,15 @@ export function IntegrationSetup() {
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [connectorId, setConnectorId] = useState<string | null>(null);
   const [config, setConfig] = useState({
-    name: "",
     label: "",
     syncRepos: true,
     syncPRs: true,
-    webhookEnabled: true,
-    selectedProject: "",
   });
 
   const provider = providerKey ? providers[providerKey] : null;
+  const isSourceControl = provider ? ["github", "gitlab", "bitbucket"].includes(provider.name) : false;
 
   // Clear popup poll on unmount to avoid state updates after component is gone
   useEffect(() => {
@@ -247,12 +232,21 @@ export function IntegrationSetup() {
         isProcessingCallback.current = true;
 
         try {
-          await createConnector({
+          const result = await createConnector({
             orgId: currentOrg.id,
             code,
             connectorType: provider.name,
             ...(config.label.trim() ? { label: config.label.trim() } : {}),
           });
+          const created = result.data;
+          setConnectorId(created.id);
+          if (created.syncRepositories !== undefined) {
+            setConfig((prev) => ({
+              ...prev,
+              syncRepos: created.syncRepositories ?? true,
+              syncPRs: created.syncPullRequests ?? true,
+            }));
+          }
           setError(null);
           setIsAuthorizing(false);
           setStep("configure");
@@ -351,18 +345,32 @@ export function IntegrationSetup() {
   };
 
   const handleConnect = async () => {
+    if (!currentOrg) return;
     setIsConnecting(true);
     setError(null);
 
     try {
-      // The connector was already created during OAuth callback
-      // Here we just finalize the configuration
-      // In a real implementation, you might update the connector with additional config
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      setIsConnecting(false);
+      if (isSourceControl) {
+        if (!connectorId) {
+          setError("Failed to complete setup. Missing connector identifier.");
+          return;
+        }
+
+        await updateConnector({
+          orgId: currentOrg.id,
+          connectorId,
+          data: {
+            config: {
+              sync_repositories: config.syncRepos,
+              sync_pull_requests: config.syncPRs,
+            },
+          },
+        });
+      }
       setStep("complete");
     } catch {
       setError("Failed to complete setup. Please try again.");
+    } finally {
       setIsConnecting(false);
     }
   };
@@ -383,7 +391,7 @@ export function IntegrationSetup() {
         <div className="flex items-center gap-3">
           <ProviderLogo provider={provider.id} size="lg" showBackground />
           <div>
-            <h1 className="type-h3">Connect {provider.displayName}</h1>
+            <h1 className="text-xl font-semibold">Connect {provider.displayName}</h1>
             <p className="text-sm text-muted-foreground">Step-by-step setup wizard</p>
           </div>
         </div>
@@ -394,7 +402,7 @@ export function IntegrationSetup() {
         {(["overview", "authorize", "configure", "complete"] as SetupStep[]).map((s, i) => (
           <div key={s} className="flex items-center">
             <div
-              className={`flex size-8 items-center justify-center rounded-full text-caption font-medium transition-colors ${
+              className={`flex size-8 items-center justify-center rounded-full text-xs font-medium transition-colors ${
                 step === s
                   ? "bg-primary text-primary-foreground"
                   : ["overview", "authorize", "configure", "complete"].indexOf(step) > i
@@ -437,7 +445,7 @@ export function IntegrationSetup() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div>
-              <h3 className="mb-3 type-label">Features</h3>
+              <h3 className="mb-3 text-sm font-medium">Features</h3>
               <div className="grid gap-2">
                 {provider.features.map((feature) => (
                   <div key={feature} className="flex items-center gap-2 text-sm">
@@ -452,7 +460,7 @@ export function IntegrationSetup() {
               <>
                 <Separator />
                 <div>
-                  <h3 className="mb-3 flex items-center gap-2 type-label">
+                  <h3 className="mb-3 flex items-center gap-2 text-sm font-medium">
                     <Shield className="size-4" />
                     Required Permissions
                   </h3>
@@ -502,7 +510,7 @@ export function IntegrationSetup() {
                     <ProviderLogo provider={provider.id} size="lg" showBackground />
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Aixle Insights will request read-only access to monitor AI tool activity.
+                    DB90 will request read-only access to monitor AI tool activity.
                     <br />
                     We never store your credentials.
                   </p>
@@ -528,17 +536,13 @@ export function IntegrationSetup() {
                     <Shield className="size-4 text-primary" />
                     <span className="text-sm">Secure OAuth 2.0 authorization</span>
                   </div>
-                  {provider.docUrl && (
-                    <a
-                      href={provider.docUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-sm text-primary hover:underline"
-                    >
-                      Learn more
-                      <ExternalLink className="size-3" />
-                    </a>
-                  )}
+                  <a
+                    href="#"
+                    className="flex items-center gap-1 text-sm text-primary hover:underline"
+                  >
+                    Learn more
+                    <ExternalLink className="size-3" />
+                  </a>
                 </div>
               </>
             ) : (
@@ -585,118 +589,81 @@ export function IntegrationSetup() {
           <CardHeader>
             <CardTitle className="text-lg">Configure Integration</CardTitle>
             <CardDescription>
-              Customize how Aixle Insights syncs with {provider.displayName}.
+              Customize how DB90 syncs with {provider.displayName}.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="name">Connection Name</Label>
-              <Input
-                id="name"
-                placeholder={`My ${provider.displayName} Connection`}
-                value={config.name}
-                onChange={(e) => setConfig({ ...config, name: e.target.value })}
-              />
-              <p className="type-caption text-muted-foreground">
-                A friendly name to identify this connection
-              </p>
-            </div>
+            {isSourceControl ? (
+              <>
+                <div className="space-y-4">
+                  <h3 className="text-sm font-medium">Sync Options</h3>
 
-            <Separator />
-
-            <div className="space-y-4">
-              <h3 className="type-label">Sync Options</h3>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Sync Repositories</Label>
-                  <p className="type-caption text-muted-foreground">
-                    Import repository metadata and activity
-                  </p>
-                </div>
-                <Switch
-                  checked={config.syncRepos}
-                  onCheckedChange={(checked) =>
-                    setConfig({ ...config, syncRepos: checked })
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Sync Pull Requests / MRs</Label>
-                  <p className="type-caption text-muted-foreground">
-                    Track AI-assisted code changes
-                  </p>
-                </div>
-                <Switch
-                  checked={config.syncPRs}
-                  onCheckedChange={(checked) =>
-                    setConfig({ ...config, syncPRs: checked })
-                  }
-                />
-              </div>
-
-              {provider.requiresWebhook && (
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Enable Webhooks</Label>
-                    <p className="type-caption text-muted-foreground">
-                      Receive real-time updates (recommended)
-                    </p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Sync Repositories</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Import repository metadata and activity
+                      </p>
+                    </div>
+                    <Switch
+                      checked={config.syncRepos}
+                      onCheckedChange={(checked) =>
+                        setConfig({ ...config, syncRepos: checked })
+                      }
+                    />
                   </div>
-                  <Switch
-                    checked={config.webhookEnabled}
-                    onCheckedChange={(checked) =>
-                      setConfig({ ...config, webhookEnabled: checked })
-                    }
-                  />
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Sync Pull Requests / MRs</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Track AI-assisted code changes
+                      </p>
+                    </div>
+                    <Switch
+                      checked={config.syncPRs}
+                      onCheckedChange={(checked) =>
+                        setConfig({ ...config, syncPRs: checked })
+                      }
+                    />
+                  </div>
+
                 </div>
-              )}
-            </div>
-
-            <Separator />
-
-            <div className="space-y-2">
-              <Label>Link to Project</Label>
-              <Select
-                value={config.selectedProject}
-                onValueChange={(value) => setConfig({ ...config, selectedProject: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a project (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects?.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="type-caption text-muted-foreground">
-                Optionally link this integration to a specific project
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Your {provider.displayName} integration is ready to activate. Click Connect to complete the setup.
               </p>
-            </div>
+            )}
 
-            <div className="flex justify-between">
+            <div className="flex items-center justify-between">
               <Button variant="outline" onClick={() => setStep("authorize")}>
                 <ArrowLeft className="mr-2 size-4" />
                 Back
               </Button>
-              <Button onClick={handleConnect} disabled={isConnecting}>
-                {isConnecting ? (
-                  <>
-                    <Loader2 className="mr-2 size-4 animate-spin" />
-                    Connecting...
-                  </>
-                ) : (
-                  <>
-                    Connect
-                    <ArrowRight className="ml-2 size-4" />
-                  </>
+              <div className="flex flex-col items-end gap-1">
+                {isSourceControl && !config.syncRepos && !config.syncPRs && (
+                  <p className="text-xs text-muted-foreground">
+                    Enable at least one sync option
+                  </p>
                 )}
-              </Button>
+                <Button
+                  onClick={handleConnect}
+                  disabled={isConnecting || (isSourceControl && !config.syncRepos && !config.syncPRs)}
+                >
+                  {isConnecting ? (
+                    <>
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                      Connecting...
+                    </>
+                  ) : (
+                    <>
+                      Connect
+                      <ArrowRight className="ml-2 size-4" />
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -708,9 +675,9 @@ export function IntegrationSetup() {
             <div className="mx-auto mb-6 flex size-16 items-center justify-center rounded-full bg-primary/10">
               <Check className="size-8 text-primary" />
             </div>
-            <h2 className="type-h3">Connection Successful!</h2>
+            <h2 className="text-xl font-semibold">Connection Successful!</h2>
             <p className="mt-2 text-muted-foreground">
-              Your {provider.displayName} account is now connected to Aixle Insights.
+              Your {provider.displayName} account is now connected to DB90.
             </p>
             <div className="mt-6 rounded-lg bg-muted/50 p-4">
               <p className="text-sm">

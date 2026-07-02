@@ -64,7 +64,13 @@ module Api
 
         changes_before = @connector.slice(:is_active, :status, :external_account_name)
 
-        if @connector.update(connector_update_params)
+        attrs = connector_update_params.to_h.stringify_keys
+
+        if (incoming_config = attrs.delete("config")).present?
+          attrs["config"] = merge_connector_config(incoming_config) if @connector.source_control?
+        end
+
+        if @connector.update(attrs)
           OrganizationAuditLog.log(
             organization: current_organization,
             actor: current_user,
@@ -341,7 +347,15 @@ module Api
 
       def connector_update_params
         params.permit(:access_token, :refresh_token, :token_expires_at,
-                      :external_account_id, :external_account_name, :webhook_secret, :is_active, :label)
+                      :external_account_id, :external_account_name, :webhook_secret, :is_active, :label,
+                      config: [ :sync_repositories, :sync_pull_requests ])
+      end
+
+      def merge_connector_config(incoming_config)
+        existing = (@connector.config || {}).stringify_keys
+        to_set = incoming_config.reject { |_, v| v.nil? }
+        to_delete = incoming_config.select { |_, v| v.nil? }.keys
+        existing.merge(to_set).except(*to_delete)
       end
 
       def oauth_callback_url
