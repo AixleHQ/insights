@@ -12,7 +12,14 @@ module Aixle
     def allowed_hosts
       api_host = resolved_api_host
       base_domain = resolved_base_domain(api_host)
-      [ api_host, /\A.*\.#{Regexp.escape(base_domain)}\z/ ]
+      hosts = [ api_host, /\A.*\.#{Regexp.escape(base_domain)}\z/ ]
+
+      # Allow Cloud Map / service-discovery hostnames (e.g. api.staging-aixle-db90.local).
+      # These are internal-only and protected by INTERNAL_API_KEY — not reachable publicly.
+      internal = fetch_env("INTERNAL_API_HOST")
+      hosts << internal if internal
+
+      hosts
     end
 
     def resolved_api_host

@@ -48,8 +48,21 @@ RSpec.describe Aixle::HostAuthorization do
       with_env("API_HOST" => "staging.insights.example.com", "BASE_DOMAIN" => "insights.example.com") do
         hosts = described_class.allowed_hosts
         expect(hosts.first).to eq("staging.insights.example.com")
-        expect(hosts.last).to match("auth.insights.example.com")
-        expect(hosts.last).not_to match("malicious.evil.com")
+        expect(hosts[1]).to match("auth.insights.example.com")
+        expect(hosts[1]).not_to match("malicious.evil.com")
+      end
+    end
+
+    it "includes INTERNAL_API_HOST when set" do
+      with_env("APP_HOST" => "staging.insights.example.com", "INTERNAL_API_HOST" => "api.staging-aixle-db90.local") do
+        hosts = described_class.allowed_hosts
+        expect(hosts).to include("api.staging-aixle-db90.local")
+      end
+    end
+
+    it "omits INTERNAL_API_HOST when not set" do
+      with_env("APP_HOST" => "staging.insights.example.com", "INTERNAL_API_HOST" => nil) do
+        expect(described_class.allowed_hosts.length).to eq(2)
       end
     end
   end
