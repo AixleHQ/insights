@@ -1,5 +1,5 @@
 require "active_support/core_ext/integer/time"
-require_relative "../host_authorization"
+require_relative "../../lib/host_authorization"
 
 Rails.application.configure do
   # Settings specified here will take precedence over those in config/application.rb.
