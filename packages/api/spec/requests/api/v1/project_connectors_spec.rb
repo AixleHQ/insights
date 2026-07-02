@@ -375,6 +375,18 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
       expect(log.tracked_changes['after']).to include('is_active' => false)
     end
 
+    it 'updates the label on a Slack connector' do
+      slack = create(:project_connector, :slack, project: project, label: '#alerts')
+
+      authenticated_patch "/api/v1/projects/#{project.id}/connectors/#{slack.id}",
+                          user: org_admin,
+                          organization: organization,
+                          params: { label: '#engineering' }
+
+      expect_success
+      expect(json_data[:label]).to eq('#engineering')
+    end
+
     it 'returns 403 for regular project members' do
       authenticated_patch "/api/v1/projects/#{project.id}/connectors/#{connector.id}",
                           user: project_member,

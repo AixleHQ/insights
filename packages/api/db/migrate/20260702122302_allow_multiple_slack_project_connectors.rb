@@ -7,10 +7,11 @@ class AllowMultipleSlackProjectConnectors < ActiveRecord::Migration[8.1]
     remove_index :project_connectors,
                  name: "index_project_connectors_on_project_id_and_connector_type"
 
+    quoted = MULTI_INSTANCE_TYPES.map { |t| connection.quote(t) }.join(", ")
     execute <<~SQL
       CREATE UNIQUE INDEX idx_project_connectors_single_instance
         ON project_connectors (project_id, connector_type)
-        WHERE connector_type NOT IN (#{MULTI_INSTANCE_TYPES.map { |t| "'#{t}'" }.join(", ")})
+        WHERE connector_type NOT IN (#{quoted})
     SQL
 
     add_column :project_connectors, :label, :string

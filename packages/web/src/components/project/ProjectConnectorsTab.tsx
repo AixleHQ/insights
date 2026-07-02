@@ -163,14 +163,16 @@ export function ProjectConnectorsTab({ projectId, orgId = "" }: ProjectConnector
     });
   }, [connectorsData]);
 
-  const connectedSingleInstanceIds = new Set(
-    integrations
-      .filter((i) => !MULTI_INSTANCE_PROVIDER_IDS.has(i.provider))
-      .map((i) => i.provider),
-  );
-  const availableProviders = PROVIDERS.filter(
-    (p) => !connectedSingleInstanceIds.has(p.id) && enabledMap[p.id] !== false,
-  );
+  const availableProviders = useMemo(() => {
+    const connectedSingleInstanceIds = new Set(
+      integrations
+        .filter((i) => !MULTI_INSTANCE_PROVIDER_IDS.has(i.provider))
+        .map((i) => i.provider),
+    );
+    return PROVIDERS.filter(
+      (p) => !connectedSingleInstanceIds.has(p.id) && enabledMap[p.id] !== false,
+    );
+  }, [integrations, enabledMap]);
 
   const handleConnect = (providerId: string) => {
     const provider = PROVIDERS.find((p) => p.id === providerId) ?? null;

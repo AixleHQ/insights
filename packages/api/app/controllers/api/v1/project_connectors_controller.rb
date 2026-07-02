@@ -86,10 +86,10 @@ module Api
         authorize! @connector
 
         # Track only non-sensitive fields; token fields are intentionally excluded from audit logs.
-        changes_before = @connector.slice(:is_active, :status, :external_org_name)
+        changes_before = @connector.slice(:is_active, :status, :external_org_name, :label)
 
         if @connector.update(connector_update_params)
-          changes_after = @connector.slice(:is_active, :status, :external_org_name)
+          changes_after = @connector.slice(:is_active, :status, :external_org_name, :label)
           ProjectAuditLog.log(
             project: @project,
             actor: current_user,
@@ -210,7 +210,7 @@ module Api
 
       def connector_update_params
         params.permit(:access_token, :refresh_token, :token_expires_at,
-                      :external_org_id, :external_org_name, :is_active)
+                      :external_org_id, :external_org_name, :is_active, :label)
       end
     end
   end
