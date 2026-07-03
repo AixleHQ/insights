@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Layers, Bug, BookOpen, CheckSquare, Zap, Circle, RefreshCw } from "lucide-react";
-import { useProjectIssues, useSyncProjectIssues } from "@/hooks/useApi";
+import { useProject, useProjectIssues, useSyncProjectIssues } from "@/hooks/useApi";
 import type { ProjectWithStats } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -79,8 +80,6 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
 
   const linkedProvider = project.linearProjectId ? "linear" : project.jiraProjectKey ? "jira" : null;
   const isLinked = !!linkedProvider;
-  const syncIssues = useSyncProjectIssues(projectId);
-  const linkedProjectLabel = project.linearProjectName || project.jiraProjectKey || undefined;
 
   const { data: issuesResponse, isLoading } = useProjectIssues(
     projectId,
@@ -93,6 +92,29 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
   );
 
   const allIssues = useMemo(() => issuesResponse?.data ?? [], [issuesResponse]);
+
+  // Projects linked before issues_synced_at existed have it as null even though issues
+  // are already loaded — only treat as syncing when there's genuinely nothing loaded yet.
+  // allIssues is server-filtered by statusFilter/typeFilter, so an active filter matching
+  // zero issues must not be mistaken for "nothing synced yet".
+  const isSyncing = isLinked && !project.issuesSyncedAt && !statusFilter && !typeFilter && allIssues.length === 0;
+
+  // Poll project until issuesSyncedAt is set — deduped with the parent's useProject call.
+  useProject(projectId, { refetchInterval: isSyncing ? 5000 : false });
+
+  // The issues query is fetched (empty) while the sync job is still running, so once
+  // isSyncing flips false the cached list is stale — refetch it to show the synced issues.
+  const queryClient = useQueryClient();
+  const wasSyncingRef = useRef(isSyncing);
+  useEffect(() => {
+    if (wasSyncingRef.current && !isSyncing) {
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "issues"] });
+    }
+    wasSyncingRef.current = isSyncing;
+  }, [isSyncing, projectId, queryClient]);
+
+  const syncIssues = useSyncProjectIssues(projectId);
+  const linkedProjectLabel = project.linearProjectName || project.jiraProjectKey || undefined;
 
   const uniqueAssignees = useMemo(
     () =>
@@ -217,6 +239,10 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
                   </div>
                 ))}
               </div>
+            ) : isSyncing ? (
+              <p className="text-sm text-muted-foreground text-center py-8 px-6">
+                Syncing issues… This may take a moment. The list will update automatically.
+              </p>
             ) : issues.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8 px-6">
                 No issues found{statusFilter || typeFilter || assigneeFilter ? " matching the selected filters" : ""}.

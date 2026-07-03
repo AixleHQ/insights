@@ -771,7 +771,8 @@ CREATE TABLE public.projects (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     repository_url character varying,
-    git_remote_url character varying
+    git_remote_url character varying,
+    issues_synced_at timestamp(6) without time zone
 );
 
 --
@@ -2434,6 +2435,7 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260626120000'),
 ('20260624105300'),
 ('20260617091734'),
 ('20260616120937'),

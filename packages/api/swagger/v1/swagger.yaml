@@ -3580,6 +3580,10 @@ paths:
   /api/v1/projects/{id}/link_jira:
     post:
       summary: Link a Jira project to this DB90 project
+      description: >-
+        Links (or re-links) a Jira project. Any previously synced issues are
+        deleted and issuesSyncedAt is reset, so the next sync repopulates the
+        list from the newly linked project only.
       tags:
         - Projects
       parameters:
@@ -3623,6 +3627,10 @@ paths:
   /api/v1/projects/{id}/link_linear:
     post:
       summary: Link a Linear project to this DB90 project
+      description: >-
+        Links (or re-links) a Linear project. Any previously synced issues are
+        deleted and issuesSyncedAt is reset, so the next sync repopulates the
+        list from the newly linked project only.
       tags:
         - Projects
       parameters:
@@ -7267,6 +7275,26 @@ components:
               type: integer
             repositoryCount:
               type: integer
+            jiraProjectKey:
+              type: string
+              nullable: true
+            jiraConnectorId:
+              type: string
+              nullable: true
+            linearProjectId:
+              type: string
+              nullable: true
+            linearProjectName:
+              type: string
+              nullable: true
+            linearConnectorId:
+              type: string
+              nullable: true
+            issuesSyncedAt:
+              type: string
+              format: date-time
+              nullable: true
+              description: "Timestamp of the last successful issue sync. Null if issues have never been synced."
             sourceControlSummary:
               type: array
               items:

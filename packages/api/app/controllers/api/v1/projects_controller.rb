@@ -330,6 +330,10 @@ module Api
           @project.project_settings.find_or_initialize_by(key: "jira_connector_id").update!(value: connector.id.to_s)
           @project.project_settings.find_or_initialize_by(key: "jira_project_key").update!(value: jira_project_key)
           @project.project_settings.where(key: %w[linear_connector_id linear_project_id linear_project_name]).destroy_all
+          # Sync jobs only upsert — issues from a previously linked provider project
+          # would otherwise linger alongside the newly synced ones.
+          @project.issues.delete_all
+          @project.update_column(:issues_synced_at, nil)
         end
 
         render json: { data: { linked: true } }
@@ -353,6 +357,10 @@ module Api
           @project.project_settings.find_or_initialize_by(key: "linear_project_id").update!(value: linear_project_id)
           @project.project_settings.find_or_initialize_by(key: "linear_project_name").update!(value: linear_project_name)
           @project.project_settings.where(key: %w[jira_connector_id jira_project_key]).destroy_all
+          # Sync jobs only upsert — issues from a previously linked provider project
+          # would otherwise linger alongside the newly synced ones.
+          @project.issues.delete_all
+          @project.update_column(:issues_synced_at, nil)
         end
 
         render json: { data: { linked: true } }

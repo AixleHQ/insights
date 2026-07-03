@@ -716,7 +716,7 @@ export function useProjects(orgId: string) {
   });
 }
 
-export function useProject(id: string) {
+export function useProject(id: string, options?: { refetchInterval?: number | false }) {
   return useQuery({
     queryKey: queryKeys.projects.detail(id),
     queryFn: async () => {
@@ -724,6 +724,7 @@ export function useProject(id: string) {
       return response.data;
     },
     enabled: !!id,
+    refetchInterval: options?.refetchInterval,
   });
 }
 
