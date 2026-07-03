@@ -1782,7 +1782,7 @@ CREATE INDEX index_project_connectors_on_project_id ON public.project_connectors
 -- Name: idx_project_connectors_single_instance; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX idx_project_connectors_single_instance ON public.project_connectors USING btree (project_id, connector_type) WHERE ((connector_type)::text <> ALL (ARRAY['slack'::text]));
+CREATE UNIQUE INDEX idx_project_connectors_single_instance ON public.project_connectors USING btree (project_id, connector_type) WHERE (connector_type <> ALL (ARRAY['slack'::public.connector_type]));
 
 --
 -- Name: index_project_memberships_on_created_by_id; Type: INDEX; Schema: public; Owner: -
