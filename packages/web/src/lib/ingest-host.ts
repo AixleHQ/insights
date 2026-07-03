@@ -1,5 +1,5 @@
 /**
- * Host origin for DB90 standalone CLIs (`--host`) and MCP `init --host`.
+ * Host origin for Aixle Insights standalone CLIs (`--host`) and MCP `init --host`.
  * Matches the logic previously inlined in IngestTokenConnectSheet: shell tools
  * need a real API base when the web app is served from a different origin than the API.
  */

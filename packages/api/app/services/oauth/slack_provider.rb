@@ -3,7 +3,7 @@
 module Oauth
   class SlackProvider < BaseProvider
     WEBHOOK_URL_PATTERN = %r{\Ahttps://hooks\.slack\.com/services/[A-Z0-9]+/[A-Z0-9]+/\S+\z}
-    TEST_MESSAGE = { text: "Test message from DB90 — your Slack integration is working!" }.freeze
+    TEST_MESSAGE = { text: "Test message from Aixle Insights — your Slack integration is working!" }.freeze
 
     def test_connection
       webhook_url = connector.access_token

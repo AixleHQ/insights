@@ -1,15 +1,15 @@
 ---
 openapi: 3.0.1
 info:
-  title: DB90 API V1
+  title: Aixle Insights API V1
   version: v1
-  description: API for DB90 - Developer Tooling Platform
+  description: API for Aixle Insights - Developer Tooling Platform
   contact:
-    name: DB90 Team
+    name: Aixle Insights Team
 servers:
   - url: http://localhost:3001
     description: Development server
-  - url: https://api.db90.io
+  - url: https://insights.example.com
     description: Production server
 security:
   - bearer_auth: []
@@ -3579,7 +3579,7 @@ paths:
 
   /api/v1/projects/{id}/link_jira:
     post:
-      summary: Link a Jira project to this DB90 project
+      summary: Link a Jira project to this project
       description: >-
         Links (or re-links) a Jira project. Any previously synced issues are
         deleted and issuesSyncedAt is reset, so the next sync repopulates the
@@ -3626,7 +3626,7 @@ paths:
 
   /api/v1/projects/{id}/link_linear:
     post:
-      summary: Link a Linear project to this DB90 project
+      summary: Link a Linear project to this project
       description: >-
         Links (or re-links) a Linear project. Any previously synced issues are
         deleted and issuesSyncedAt is reset, so the next sync repopulates the
