@@ -26,24 +26,5 @@ module Slack
     def resource_identifier
       "project #{@project.slug}"
     end
-
-    def deliver_to(connector, alert_data)
-      response = Faraday.post(connector.access_token) do |req|
-        req.headers["Content-Type"] = "application/json"
-        req.body = format_message(alert_data).to_json
-      end
-
-      return if response.success?
-
-      Rails.logger.error(
-        "[Slack::ProjectNotificationService] Failed to deliver alert for project #{@project.slug} " \
-        "connector #{connector.id}: HTTP #{response.status}"
-      )
-    rescue Faraday::Error => e
-      Rails.logger.error(
-        "[Slack::ProjectNotificationService] Connection error for project #{@project.slug} " \
-        "connector #{connector.id}: #{e.message}"
-      )
-    end
   end
 end
