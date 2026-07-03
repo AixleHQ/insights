@@ -46,7 +46,9 @@ class AggregatedReportQueryBuilder
     else
       @organization.tool_events
     end
-    scope.where(occurred_at: @from..@to)
+    scope = scope.where("occurred_at >= ?", @from) if @from
+    scope = scope.where("occurred_at <= ?", @to) if @to
+    scope
   end
 
   # DATE_TRUNC select fragment when group_by is set
@@ -154,11 +156,11 @@ class AggregatedReportQueryBuilder
   end
 
   def parse_date(val, end_of_day: false)
-    return end_of_day ? Time.current : 30.days.ago.beginning_of_day if val.blank?
+    return nil if val.blank?
 
     parsed = Time.zone.parse(val.to_s)
     end_of_day ? parsed.end_of_day : parsed.beginning_of_day
   rescue ArgumentError, TypeError
-    end_of_day ? Time.current : 30.days.ago.beginning_of_day
+    nil
   end
 end
