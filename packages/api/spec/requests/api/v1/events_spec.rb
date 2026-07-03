@@ -54,6 +54,38 @@ RSpec.describe 'Api::V1::Events', type: :request do
       expect(json_data.first[:eventType]).to eq('chat')
     end
 
+    it 'filters by project_id=none' do
+      project = create(:project, organization: organization)
+      project_event = create(:tool_event, organization: organization, user: user, project: project)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                        user: user,
+                        organization: organization,
+                        params: { project_id: 'none' }
+
+      expect_success
+      ids = json_data.map { |e| e[:id] }
+      expect(ids).to include(tool_event.id)
+      expect(ids).not_to include(project_event.id)
+    end
+
+    # AIX-445: array-form/whitespace "none" must match the same normalization as
+    # StatsController#scoped_events_base, not fall through to a literal UUID lookup.
+    it 'filters by project_id=none when sent as an array or with whitespace' do
+      project = create(:project, organization: organization)
+      project_event = create(:tool_event, organization: organization, user: user, project: project)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                        user: user,
+                        organization: organization,
+                        params: { project_id: [ ' none ' ] }
+
+      expect_success
+      ids = json_data.map { |e| e[:id] }
+      expect(ids).to include(tool_event.id)
+      expect(ids).not_to include(project_event.id)
+    end
+
     # AIX-414: not_none must check audit_logs (Temporal-classified) before metadata fallback
     it 'filters by risk_level=not_none using audit_log association' do
       risky_event = create(:tool_event, organization: organization, user: user, tool_name: 'cursor')

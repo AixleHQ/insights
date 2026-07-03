@@ -15,7 +15,7 @@ module ToolEventFilterable
       scope = scope.where(event_type: types)
     end
     scope = scope.where(user_id: fp["user_id"])       if fp["user_id"].present?
-    if fp["project_id"] == "none"
+    if normalize_project_filter(fp["project_id"]) == "none"
       scope = scope.where(project_id: nil)
     elsif (project_ids = normalize_string_array(fp["project_id"])).any?
       scope = scope.where(project_id: project_ids)
@@ -116,6 +116,13 @@ module ToolEventFilterable
   end
 
   private
+
+  # Mirrors StatsController#scoped_events_base's normalization so array-form values
+  # (e.g. project_id[]=none) and stray whitespace match the "none" sentinel the same
+  # way on both endpoints.
+  def normalize_project_filter(value)
+    Array.wrap(value).first.to_s.strip.presence
+  end
 
   def normalize_string_array(value)
     case value
