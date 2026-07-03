@@ -95,3 +95,13 @@ export const AppRoutes = {
       `/admin/organizations/${orgId}/webhook-deliveries`,
   },
 } as const;
+
+/**
+ * Guards against open-redirect: only same-origin relative paths (e.g. a
+ * `?redirect=` query param, or an OIDC `state` round-tripped through login)
+ * are safe to navigate to. Rejects absolute URLs and protocol-relative paths
+ * (`//evil.com`).
+ */
+export function isSafeRedirectPath(value: unknown): value is string {
+  return typeof value === "string" && value.startsWith("/") && !value.startsWith("//");
+}
