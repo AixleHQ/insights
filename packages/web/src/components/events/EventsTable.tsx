@@ -34,6 +34,7 @@ export interface EventRow {
   project?: { name: string };
   project_id?: string;
   token_count?: number;
+  model?: string | null;
 }
 
 type SortField = "created_at" | "tool_name" | "risk_level" | "cost_usd";
@@ -77,7 +78,7 @@ export function EventsTable({
   showUserColumn = false,
   className,
 }: EventsTableProps) {
-  const columnCount = showUserColumn ? 8 : 7;
+  const columnCount = showUserColumn ? 9 : 8;
 
   return (
     <div className={cn("rounded-md border overflow-x-auto", className)}>
@@ -95,6 +96,7 @@ export function EventsTable({
               </SortButton>
             </TableHead>
             <TableHead className="hidden sm:table-cell w-[120px]">Type</TableHead>
+            <TableHead className="hidden sm:table-cell w-[140px]">Model</TableHead>
             {showUserColumn && <TableHead className="w-[160px]">User</TableHead>}
             <TableHead className="w-[160px]">Project</TableHead>
             <TableHead className="w-[90px]">
@@ -169,6 +171,11 @@ export function EventsTable({
                 </TableCell>
                 <TableCell className="hidden sm:table-cell">
                   <EventTypeBadge type={event.event_type} />
+                </TableCell>
+                <TableCell className="hidden sm:table-cell">
+                  <span className="font-mono text-sm">
+                    {event.model && event.model !== "unknown" ? event.model : "—"}
+                  </span>
                 </TableCell>
                 {showUserColumn && (
                   <TableCell>
