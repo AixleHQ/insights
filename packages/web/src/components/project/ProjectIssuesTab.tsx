@@ -80,7 +80,22 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
 
   const linkedProvider = project.linearProjectId ? "linear" : project.jiraProjectKey ? "jira" : null;
   const isLinked = !!linkedProvider;
-  const isSyncing = isLinked && !project.issuesSyncedAt;
+
+  const { data: issuesResponse, isLoading } = useProjectIssues(
+    projectId,
+    isLinked
+      ? {
+          status_category: statusFilter || undefined,
+          type: typeFilter || undefined,
+        }
+      : undefined
+  );
+
+  const allIssues = useMemo(() => issuesResponse?.data ?? [], [issuesResponse]);
+
+  // Projects linked before issues_synced_at existed have it as null even though issues
+  // are already loaded — only treat as syncing when there's genuinely nothing loaded yet.
+  const isSyncing = isLinked && !project.issuesSyncedAt && allIssues.length === 0;
 
   // Poll project until issuesSyncedAt is set — deduped with the parent's useProject call.
   useProject(projectId, { refetchInterval: isSyncing ? 5000 : false });
@@ -98,18 +113,6 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
 
   const syncIssues = useSyncProjectIssues(projectId);
   const linkedProjectLabel = project.linearProjectName || project.jiraProjectKey || undefined;
-
-  const { data: issuesResponse, isLoading } = useProjectIssues(
-    projectId,
-    isLinked
-      ? {
-          status_category: statusFilter || undefined,
-          type: typeFilter || undefined,
-        }
-      : undefined
-  );
-
-  const allIssues = useMemo(() => issuesResponse?.data ?? [], [issuesResponse]);
 
   const uniqueAssignees = useMemo(
     () =>
