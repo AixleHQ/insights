@@ -296,6 +296,93 @@ RSpec.describe 'Api::V1::Stats', type: :request do
     end
   end
 
+  describe 'timezone-aware date ranges (AIX-447)' do
+    let(:org)    { create(:organization) }
+    let(:member) { create(:user) }
+
+    before { create(:organization_membership, user: member, organization: org, role: 'member') }
+
+    it 'anchors the rolling window to local midnight for the tz param' do
+      travel_to(Time.utc(2026, 7, 2, 8, 24)) do
+        # 00:30 on Jun 3 in Brussels (UTC+2) == 22:30 on Jun 2 UTC — inside a
+        # 30-day window anchored to Brussels midnight, outside one anchored to UTC.
+        create(:tool_event, organization: org, user: member,
+               occurred_at: Time.utc(2026, 6, 2, 22, 30))
+
+        authenticated_get "/api/v1/organizations/#{org.id}/stats/active_users",
+                          user: member,
+                          organization: org,
+                          params: { days: 30, tz: "Europe/Brussels" }
+
+        expect_success
+        expect(json_response[:active_users]).to eq(1)
+        expect(json_response[:timeRange][:start]).to eq("2026-06-03T00:00:00+02:00")
+      end
+    end
+
+    it 'keeps UTC midnight when tz is absent' do
+      travel_to(Time.utc(2026, 7, 2, 8, 24)) do
+        create(:tool_event, organization: org, user: member,
+               occurred_at: Time.utc(2026, 6, 2, 22, 30))
+
+        authenticated_get "/api/v1/organizations/#{org.id}/stats/active_users",
+                          user: member,
+                          organization: org,
+                          params: { days: 30 }
+
+        expect_success
+        expect(json_response[:active_users]).to eq(0)
+        expect(json_response[:timeRange][:start]).to eq("2026-06-03T00:00:00Z")
+      end
+    end
+
+    it 'falls back to UTC for an unknown tz identifier' do
+      travel_to(Time.utc(2026, 7, 2, 8, 24)) do
+        authenticated_get "/api/v1/organizations/#{org.id}/stats/active_users",
+                          user: member,
+                          organization: org,
+                          params: { days: 30, tz: "Not/AZone" }
+
+        expect_success
+        expect(json_response[:timeRange][:start]).to eq("2026-06-03T00:00:00Z")
+      end
+    end
+
+    it 'buckets daily stats by local calendar day and starts the window at local midnight' do
+      travel_to(Time.utc(2026, 7, 2, 8, 24)) do
+        create(:tool_event, organization: org, user: member,
+               occurred_at: Time.utc(2026, 6, 2, 22, 30), cost_usd: 1.0)
+
+        authenticated_get "/api/v1/organizations/#{org.id}/stats/daily",
+                          user: member,
+                          organization: org,
+                          params: { days: 30, tz: "Europe/Brussels" }
+
+        expect_success
+        dates = json_response[:data].map { |d| d[:date] }
+        expect(dates.first).to eq("2026-06-03")
+        row = json_response[:data].find { |d| d[:date] == "2026-06-03" }
+        expect(row[:event_count]).to eq(1)
+      end
+    end
+
+    it 'scopes the overview month to the client timezone' do
+      travel_to(Time.utc(2026, 7, 2, 8, 24)) do
+        # 00:30 on Jun 1 in Brussels == 22:30 on May 31 UTC — belongs to June locally.
+        create(:tool_event, organization: org, user: member,
+               occurred_at: Time.utc(2026, 5, 31, 22, 30))
+
+        authenticated_get "/api/v1/organizations/#{org.id}/stats/overview",
+                          user: member,
+                          organization: org,
+                          params: { month: "2026-06", tz: "Europe/Brussels" }
+
+        expect_success
+        expect(json_response[:total_events]).to eq(1)
+      end
+    end
+  end
+
   describe 'GET /api/v1/organizations/:organization_id/stats/hourly' do
     it 'returns hourly aggregated statistics' do
       authenticated_get "/api/v1/organizations/#{organization.id}/stats/hourly",

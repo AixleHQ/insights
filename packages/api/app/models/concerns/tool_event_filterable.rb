@@ -25,12 +25,13 @@ module ToolEventFilterable
 
   def apply_tool_event_time_filter(scope, fp)
     fp = fp.transform_keys(&:to_s)
+    zone = ActiveSupport::TimeZone[fp["tz"].to_s] || Time.zone
     if fp["start_date"].present?
-      scope = scope.where("occurred_at >= ?", Time.zone.parse(fp["start_date"]).beginning_of_day)
+      scope = scope.where("occurred_at >= ?", zone.parse(fp["start_date"]).beginning_of_day)
     end
     if fp["end_date"].present?
       # Inclusive calendar end date (UI sends YYYY-MM-DD from <input type="date">).
-      scope = scope.where("occurred_at <= ?", Time.zone.parse(fp["end_date"]).end_of_day)
+      scope = scope.where("occurred_at <= ?", zone.parse(fp["end_date"]).end_of_day)
     end
     scope
   end

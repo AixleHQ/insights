@@ -1260,6 +1260,7 @@ paths:
       security:
         - bearer_auth: []
       parameters:
+        - $ref: '#/components/parameters/tz'
         - $ref: '#/components/parameters/organization_id'
         - $ref: '#/components/parameters/X-Organization-ID'
         - name: id
@@ -1329,6 +1330,7 @@ paths:
       security:
         - bearer_auth: []
       parameters:
+        - $ref: '#/components/parameters/tz'
         - $ref: '#/components/parameters/organization_id'
         - $ref: '#/components/parameters/X-Organization-ID'
         - name: id
@@ -2104,6 +2106,7 @@ paths:
       tags:
         - Stats
       parameters:
+        - $ref: '#/components/parameters/tz'
         - $ref: '#/components/parameters/organization_id'
         - $ref: '#/components/parameters/X-Organization-ID'
         - name: project_id
@@ -2526,6 +2529,7 @@ paths:
       tags:
         - Stats
       parameters:
+        - $ref: '#/components/parameters/tz'
         - $ref: '#/components/parameters/organization_id'
         - $ref: '#/components/parameters/X-Organization-ID'
       responses:
@@ -2566,6 +2570,7 @@ paths:
       tags:
         - Stats
       parameters:
+        - $ref: '#/components/parameters/tz'
         - $ref: '#/components/parameters/organization_id'
         - $ref: '#/components/parameters/X-Organization-ID'
         - name: tool_name
@@ -2625,6 +2630,7 @@ paths:
       tags:
         - Stats
       parameters:
+        - $ref: '#/components/parameters/tz'
         - $ref: '#/components/parameters/organization_id'
         - $ref: '#/components/parameters/X-Organization-ID'
         - name: tool_name
@@ -2703,6 +2709,7 @@ paths:
       tags:
         - Stats
       parameters:
+        - $ref: '#/components/parameters/tz'
         - $ref: '#/components/parameters/organization_id'
         - $ref: '#/components/parameters/X-Organization-ID'
         - name: tool_name
@@ -2875,6 +2882,7 @@ paths:
       tags:
         - Stats
       parameters:
+        - $ref: '#/components/parameters/tz'
         - $ref: '#/components/parameters/organization_id'
         - $ref: '#/components/parameters/X-Organization-ID'
         - name: tool_name
@@ -4052,6 +4060,7 @@ paths:
       tags:
         - Project Members
       parameters:
+        - $ref: '#/components/parameters/tz'
         - $ref: '#/components/parameters/project_id'
         - name: days
           in: query
@@ -4379,6 +4388,7 @@ paths:
         - $ref: '#/components/parameters/per_page'
         - $ref: '#/components/parameters/start_date'
         - $ref: '#/components/parameters/end_date'
+        - $ref: '#/components/parameters/tz'
         - name: tool_name
           in: query
           schema:
@@ -4753,6 +4763,7 @@ paths:
         - $ref: '#/components/parameters/organization_id'
         - $ref: '#/components/parameters/start_date'
         - $ref: '#/components/parameters/end_date'
+        - $ref: '#/components/parameters/tz'
         - name: tool_name
           in: query
           schema:
