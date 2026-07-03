@@ -2482,7 +2482,9 @@ paths:
             type: boolean
         - name: project_id
           in: query
-          description: Scope to a specific project (must belong to this organization)
+          description: >
+            UUID of a specific project, or "none" to filter for events with no project assigned.
+            Omit or leave blank for all activity (org-wide total).
           schema:
             type: string
         - $ref: '#/components/parameters/tz'
