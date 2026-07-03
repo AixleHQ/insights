@@ -152,7 +152,7 @@ export function ProjectConnectorsTab({ projectId, orgId = "" }: ProjectConnector
       return {
         id: c.id,
         provider: connectorType as IntegrationProvider,
-        name: externalAccountName || providerInfo?.name || connectorType,
+        name: c.label || externalAccountName || providerInfo?.name || connectorType,
         label: c.label,
         status,
         last_sync_at: lastSyncAt || undefined,

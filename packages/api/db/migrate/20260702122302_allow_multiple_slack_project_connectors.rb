@@ -18,10 +18,7 @@ class AllowMultipleSlackProjectConnectors < ActiveRecord::Migration[8.1]
   end
 
   def down
-    if multi_instance_duplicates_exist?
-      raise ActiveRecord::IrreversibleMigration,
-            "Cannot rollback: multiple Slack connectors exist for at least one project."
-    end
+    delete_multi_instance_duplicates
 
     remove_column :project_connectors, :label
 
@@ -33,16 +30,18 @@ class AllowMultipleSlackProjectConnectors < ActiveRecord::Migration[8.1]
 
   private
 
-  def multi_instance_duplicates_exist?
+  # Keep the oldest connector per (project_id, connector_type) pair and delete the rest.
+  def delete_multi_instance_duplicates
     values = MULTI_INSTANCE_TYPES.map { |type| connection.quote(type) }.join(", ")
-    sql = <<~SQL.squish
-      SELECT 1
-      FROM project_connectors
+    execute <<~SQL
+      DELETE FROM project_connectors
       WHERE connector_type IN (#{values})
-      GROUP BY project_id, connector_type
-      HAVING COUNT(*) > 1
-      LIMIT 1
+        AND id NOT IN (
+          SELECT DISTINCT ON (project_id, connector_type) id
+          FROM project_connectors
+          WHERE connector_type IN (#{values})
+          ORDER BY project_id, connector_type, created_at ASC
+        )
     SQL
-    connection.select_value(sql).present?
   end
 end
