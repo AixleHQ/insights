@@ -321,6 +321,10 @@ module Api
             tracked_changes: { connector_type: connector.connector_type, via: "oauth_callback" },
             request: request
           )
+          if creating
+            connector.mark_testing!
+            ConnectorSyncService.enqueue(connector)
+          end
           render_resource(connector, OrganizationConnectorSerializer)
         else
           render json: {
@@ -332,6 +336,7 @@ module Api
         # Two simultaneous OAuth callbacks for the same org + external_org_id raced on
         # idx_org_connectors_oauth_dedup. The other request already inserted the row —
         # return it as if this callback succeeded (idempotent reconnect).
+        # The winning request already called mark_testing! and enqueued the sync — no re-enqueue needed.
         connector = current_organization.organization_connectors
                                         .find_by!(connector_type: connector_type, external_org_id: external_org_id)
         render_resource(connector, OrganizationConnectorSerializer)
