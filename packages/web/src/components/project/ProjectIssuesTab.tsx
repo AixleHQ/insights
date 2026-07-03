@@ -95,7 +95,9 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
 
   // Projects linked before issues_synced_at existed have it as null even though issues
   // are already loaded — only treat as syncing when there's genuinely nothing loaded yet.
-  const isSyncing = isLinked && !project.issuesSyncedAt && allIssues.length === 0;
+  // allIssues is server-filtered by statusFilter/typeFilter, so an active filter matching
+  // zero issues must not be mistaken for "nothing synced yet".
+  const isSyncing = isLinked && !project.issuesSyncedAt && !statusFilter && !typeFilter && allIssues.length === 0;
 
   // Poll project until issuesSyncedAt is set — deduped with the parent's useProject call.
   useProject(projectId, { refetchInterval: isSyncing ? 5000 : false });
