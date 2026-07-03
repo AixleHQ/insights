@@ -1,5 +1,17 @@
 import { describe, it, expect } from "vitest";
-import { formatLocalDate, sliceCostTrendWindow } from "./dashboardUtils";
+import { formatDateLabel, formatLocalDate, sliceCostTrendWindow } from "./dashboardUtils";
+
+describe("formatDateLabel", () => {
+  it("returns month+day for day granularity", () => {
+    // Jun 17 2026 is a Wednesday — previously the 7d branch returned "Wed"
+    expect(formatDateLabel("2026-06-17", "day")).toBe("Jun 17");
+    expect(formatDateLabel("2026-06-01", "day")).toBe("Jun 1");
+  });
+
+  it("returns month+year for month granularity", () => {
+    expect(formatDateLabel("2026-06-01", "month")).toBe("Jun 2026");
+  });
+});
 
 describe("formatLocalDate", () => {
   it("formats a local calendar date as YYYY-MM-DD", () => {
