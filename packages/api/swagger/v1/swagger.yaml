@@ -2044,7 +2044,9 @@ paths:
         - $ref: '#/components/parameters/X-Organization-ID'
         - name: project_id
           in: query
-          description: Scope stats to a specific project (must belong to this organization)
+          description: >
+            UUID of a specific project, or "none" to filter for events with no project assigned.
+            Omit or leave blank for all activity (org-wide total).
           schema:
             type: string
         - name: month
@@ -2111,7 +2113,9 @@ paths:
         - $ref: '#/components/parameters/X-Organization-ID'
         - name: project_id
           in: query
-          description: Scope to a specific project (must belong to this organization)
+          description: >
+            UUID of a specific project, or "none" to filter for events with no project assigned.
+            Omit or leave blank for all activity (org-wide total).
           schema:
             type: string
         - name: days
@@ -2242,7 +2246,9 @@ paths:
             type: boolean
         - name: project_id
           in: query
-          description: Scope to a specific project.
+          description: >
+            UUID of a specific project, or "none" to filter for events with no project assigned.
+            Omit or leave blank for all activity (org-wide total).
           schema:
             type: string
         - $ref: '#/components/parameters/start_date'
@@ -2321,7 +2327,9 @@ paths:
             type: boolean
         - name: project_id
           in: query
-          description: Scope to a specific project (must belong to this organization)
+          description: >
+            UUID of a specific project, or "none" to filter for events with no project assigned.
+            Omit or leave blank for all activity (org-wide total).
           schema:
             type: string
         - $ref: '#/components/parameters/start_date'
@@ -2422,7 +2430,9 @@ paths:
             type: boolean
         - name: project_id
           in: query
-          description: Scope to a specific project (must belong to this organization)
+          description: >
+            UUID of a specific project, or "none" to filter for events with no project assigned.
+            Omit or leave blank for all activity (org-wide total).
           schema:
             type: string
         - $ref: '#/components/parameters/tz'
@@ -2489,7 +2499,9 @@ paths:
             type: boolean
         - name: project_id
           in: query
-          description: Scope to a specific project (must belong to this organization)
+          description: >
+            UUID of a specific project, or "none" to filter for events with no project assigned.
+            Omit or leave blank for all activity (org-wide total).
           schema:
             type: string
         - $ref: '#/components/parameters/tz'
