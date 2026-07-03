@@ -1156,6 +1156,24 @@ export function useDisconnectRepo(projectId: string) {
 // Connectors Hooks
 // ============================================================================
 
+function invalidateConnectorsList(
+  queryClient: ReturnType<typeof useQueryClient>,
+  orgId: string,
+) {
+  return queryClient.invalidateQueries({
+    queryKey: queryKeys.connectors.all(orgId),
+    exact: true,
+  });
+}
+
+function invalidateConnectorsListAndHealth(
+  queryClient: ReturnType<typeof useQueryClient>,
+  orgId: string,
+) {
+  void invalidateConnectorsList(queryClient, orgId);
+  void queryClient.invalidateQueries({ queryKey: queryKeys.connectors.health(orgId) });
+}
+
 export function useConnectors(orgId: string) {
   return useQuery({
     queryKey: queryKeys.connectors.all(orgId),
@@ -1174,7 +1192,10 @@ export function useConnectors(orgId: string) {
   });
 }
 
-export function useConnectorHealth(orgId: string, options?: { enabled?: boolean }) {
+export function useConnectorHealth(
+  orgId: string,
+  options?: { enabled?: boolean; refetchInterval?: number | false }
+) {
   return useQuery({
     queryKey: queryKeys.connectors.health(orgId),
     queryFn: async () => {
@@ -1185,6 +1206,7 @@ export function useConnectorHealth(orgId: string, options?: { enabled?: boolean 
     },
     enabled: !!orgId && (options?.enabled ?? true),
     staleTime: 60_000,
+    refetchInterval: options?.refetchInterval || false,
   });
 }
 
@@ -1225,7 +1247,7 @@ export function useCreateConnector() {
         },
       }),
     onSuccess: (_, { orgId }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
+      void invalidateConnectorsList(queryClient, orgId);
     },
   });
 }
@@ -1251,7 +1273,7 @@ export function useConnectWithApiKey() {
         ...(label ? { label } : {}),
       }),
     onSuccess: (_, { orgId }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
+      void invalidateConnectorsList(queryClient, orgId);
     },
   });
 }
@@ -1262,8 +1284,8 @@ export function useSyncConnector() {
   return useMutation({
     mutationFn: ({ orgId, connectorId }: { orgId: string; connectorId: string }) =>
       api.post(`/organizations/${orgId}/connectors/${connectorId}/sync`),
-    onSuccess: (_, { orgId }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
+    onSettled: (_, __, { orgId }) => {
+      void invalidateConnectorsListAndHealth(queryClient, orgId);
       queryClient.invalidateQueries({ queryKey: queryKeys.projects.all(orgId) });
       queryClient.invalidateQueries({ queryKey: ["projects"] });
     },
@@ -1277,7 +1299,7 @@ export function useDeleteConnector() {
     mutationFn: ({ orgId, connectorId }: { orgId: string; connectorId: string }) =>
       api.delete(`/organizations/${orgId}/connectors/${connectorId}`),
     onSuccess: (_, { orgId }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
+      void invalidateConnectorsList(queryClient, orgId);
     },
   });
 }
@@ -1296,7 +1318,7 @@ export function useUpdateConnector() {
       data: Record<string, unknown>;
     }) => api.patch(`/organizations/${orgId}/connectors/${connectorId}`, data),
     onSuccess: (_, { orgId }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
+      void invalidateConnectorsList(queryClient, orgId);
     },
   });
 }
@@ -1320,7 +1342,7 @@ export function useConnectWithWebhook() {
         ...(channelLabel ? { external_account_name: channelLabel } : {}),
       }),
     onSuccess: (_, { orgId }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
+      void invalidateConnectorsList(queryClient, orgId);
     },
   });
 }
@@ -1334,7 +1356,7 @@ export function useTestConnector() {
         `/organizations/${orgId}/connectors/${connectorId}/test`
       ),
     onSettled: (_, __, { orgId }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
+      void invalidateConnectorsListAndHealth(queryClient, orgId);
     },
   });
 }

@@ -1086,6 +1086,10 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
              status: 'disconnected')
     end
 
+    before do
+      allow_any_instance_of(Oauth::GithubProvider).to receive(:test_connection).and_return({ success: true })
+    end
+
     it 'returns summary counts for org admin' do
       authenticated_get "/api/v1/organizations/#{organization.id}/connectors/health",
                         user: admin,
@@ -1153,6 +1157,24 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
       expect_success
       github_data = json_response.dig(:data, :connectors).find { |c| c[:connector_type] == 'github' }
       expect(github_data[:success_rate_7d]).to be_nil
+    end
+
+    it 'probes connected connectors and reflects authorization failures' do
+      allow_any_instance_of(Oauth::GithubProvider).to receive(:test_connection)
+        .and_return({ success: false, error: 'GitHub API error: 401' })
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/health",
+                        user: admin,
+                        organization: organization
+
+      expect_success
+      github_data = json_response.dig(:data, :connectors).find { |c| c[:connector_type] == 'github' }
+      expect(github_data[:status]).to eq('error')
+      expect(github_data[:last_error]).to include('401')
+
+      summary = json_response.dig(:data, :summary)
+      expect(summary[:connected]).to eq(0)
+      expect(summary[:error]).to eq(2)
     end
 
     it 'returns 403 for non-admin members' do
