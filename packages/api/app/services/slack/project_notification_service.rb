@@ -19,12 +19,6 @@ module Slack
 
     private
 
-    # Kept to satisfy BaseNotificationService's abstract contract; delivery is handled
-    # by deliver_alert which fans out to all active connectors directly.
-    def find_connector
-      @project.project_connectors.by_type("slack").active.first
-    end
-
     def display_name
       @project.organization&.name || "Unknown"
     end
