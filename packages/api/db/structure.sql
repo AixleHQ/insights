@@ -210,13 +210,6 @@ CREATE TABLE _timescaledb_internal._compressed_hypertable_2 (
 );
 
 --
--- Name: _compressed_hypertable_4; Type: TABLE; Schema: _timescaledb_internal; Owner: -
---
-
-CREATE TABLE _timescaledb_internal._compressed_hypertable_4 (
-);
-
---
 -- Name: tool_events; Type: TABLE; Schema: timeseries; Owner: -
 --
 
@@ -352,96 +345,6 @@ CREATE VIEW _timescaledb_internal._partial_view_4 AS
   GROUP BY (public.time_bucket('1 day'::interval, occurred_at)), organization_id, user_id, project_id, tool_name, event_type;
 
 --
--- Name: active_storage_attachments; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.active_storage_attachments (
-    id bigint NOT NULL,
-    name character varying NOT NULL,
-    record_type character varying NOT NULL,
-    record_id uuid NOT NULL,
-    blob_id bigint NOT NULL,
-    created_at timestamp(6) without time zone NOT NULL
-);
-
---
--- Name: active_storage_attachments_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.active_storage_attachments_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
---
--- Name: active_storage_attachments_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.active_storage_attachments_id_seq OWNED BY public.active_storage_attachments.id;
-
---
--- Name: active_storage_blobs; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.active_storage_blobs (
-    id bigint NOT NULL,
-    key character varying NOT NULL,
-    filename character varying NOT NULL,
-    content_type character varying,
-    metadata text,
-    service_name character varying NOT NULL,
-    byte_size bigint NOT NULL,
-    checksum character varying,
-    created_at timestamp(6) without time zone NOT NULL
-);
-
---
--- Name: active_storage_blobs_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.active_storage_blobs_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
---
--- Name: active_storage_blobs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.active_storage_blobs_id_seq OWNED BY public.active_storage_blobs.id;
-
---
--- Name: active_storage_variant_records; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.active_storage_variant_records (
-    id bigint NOT NULL,
-    blob_id bigint NOT NULL,
-    variation_digest character varying NOT NULL
-);
-
---
--- Name: active_storage_variant_records_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.active_storage_variant_records_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
---
--- Name: active_storage_variant_records_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.active_storage_variant_records_id_seq OWNED BY public.active_storage_variant_records.id;
-
---
 -- Name: admin_audit_logs; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -459,41 +362,6 @@ CREATE TABLE public.admin_audit_logs (
     severity character varying,
     outcome character varying
 );
-
---
--- Name: alert_states; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.alert_states (
-    id bigint NOT NULL,
-    scope_type character varying NOT NULL,
-    scope_id uuid NOT NULL,
-    alert_type character varying NOT NULL,
-    status character varying DEFAULT 'active'::character varying NOT NULL,
-    triggered_at timestamp(6) without time zone NOT NULL,
-    resolved_at timestamp(6) without time zone,
-    last_value numeric(12,4) NOT NULL,
-    threshold_value numeric(12,4) NOT NULL,
-    created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
-);
-
---
--- Name: alert_states_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.alert_states_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
---
--- Name: alert_states_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.alert_states_id_seq OWNED BY public.alert_states.id;
 
 --
 -- Name: ar_internal_metadata; Type: TABLE; Schema: public; Owner: -
@@ -570,26 +438,7 @@ CREATE TABLE public.connector_health_snapshots (
     snapshotted_at timestamp(6) without time zone NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT connector_health_snapshots_status_check CHECK (((status)::text = ANY (ARRAY[('success'::character varying)::text, ('failure'::character varying)::text])))
-);
-
---
--- Name: export_records; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.export_records (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    organization_id uuid NOT NULL,
-    created_by_id uuid NOT NULL,
-    report_type character varying NOT NULL,
-    format character varying DEFAULT 'csv'::character varying NOT NULL,
-    frequency character varying,
-    status character varying DEFAULT 'pending'::character varying NOT NULL,
-    row_count integer,
-    file_size_bytes integer,
-    expires_at timestamp(6) without time zone,
-    created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    CONSTRAINT connector_health_snapshots_status_check CHECK (((status)::text = ANY ((ARRAY['success'::character varying, 'failure'::character varying])::text[])))
 );
 
 --
@@ -1092,6 +941,7 @@ CREATE TABLE public.user_tool_accounts (
     access_token text,
     refresh_token text,
     token_expires_at timestamp(6) without time zone,
+    is_active boolean DEFAULT true NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     external_account_id character varying,
@@ -1156,20 +1006,6 @@ CREATE VIEW timeseries.daily_token_usage AS
    FROM _timescaledb_internal._materialized_hypertable_4;
 
 --
--- Name: event_texts; Type: TABLE; Schema: timeseries; Owner: -
---
-
-CREATE TABLE timeseries.event_texts (
-    tool_event_id uuid NOT NULL,
-    occurred_at timestamp with time zone NOT NULL,
-    user_text text,
-    assistant_text text,
-    sanitized_at timestamp with time zone,
-    sanitizer_version character varying(16),
-    created_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
---
 -- Name: hourly_token_usage; Type: VIEW; Schema: timeseries; Owner: -
 --
 
@@ -1188,30 +1024,6 @@ CREATE VIEW timeseries.hourly_token_usage AS
    FROM _timescaledb_internal._materialized_hypertable_3;
 
 --
--- Name: active_storage_attachments id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.active_storage_attachments ALTER COLUMN id SET DEFAULT nextval('public.active_storage_attachments_id_seq'::regclass);
-
---
--- Name: active_storage_blobs id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.active_storage_blobs ALTER COLUMN id SET DEFAULT nextval('public.active_storage_blobs_id_seq'::regclass);
-
---
--- Name: active_storage_variant_records id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.active_storage_variant_records ALTER COLUMN id SET DEFAULT nextval('public.active_storage_variant_records_id_seq'::regclass);
-
---
--- Name: alert_states id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.alert_states ALTER COLUMN id SET DEFAULT nextval('public.alert_states_id_seq'::regclass);
-
---
 -- Name: connector_event_dedup id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1224,39 +1036,11 @@ ALTER TABLE ONLY public.connector_event_dedup ALTER COLUMN id SET DEFAULT nextva
 ALTER TABLE ONLY public.retention_purge_logs ALTER COLUMN id SET DEFAULT nextval('public.retention_purge_logs_id_seq'::regclass);
 
 --
--- Name: active_storage_attachments active_storage_attachments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.active_storage_attachments
-    ADD CONSTRAINT active_storage_attachments_pkey PRIMARY KEY (id);
-
---
--- Name: active_storage_blobs active_storage_blobs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.active_storage_blobs
-    ADD CONSTRAINT active_storage_blobs_pkey PRIMARY KEY (id);
-
---
--- Name: active_storage_variant_records active_storage_variant_records_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.active_storage_variant_records
-    ADD CONSTRAINT active_storage_variant_records_pkey PRIMARY KEY (id);
-
---
 -- Name: admin_audit_logs admin_audit_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.admin_audit_logs
     ADD CONSTRAINT admin_audit_logs_pkey PRIMARY KEY (id);
-
---
--- Name: alert_states alert_states_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.alert_states
-    ADD CONSTRAINT alert_states_pkey PRIMARY KEY (id);
 
 --
 -- Name: ar_internal_metadata ar_internal_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1285,13 +1069,6 @@ ALTER TABLE ONLY public.connector_event_dedup
 
 ALTER TABLE ONLY public.connector_health_snapshots
     ADD CONSTRAINT connector_health_snapshots_pkey PRIMARY KEY (id);
-
---
--- Name: export_records export_records_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.export_records
-    ADD CONSTRAINT export_records_pkey PRIMARY KEY (id);
 
 --
 -- Name: invitations invitations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1497,13 +1274,6 @@ ALTER TABLE ONLY public.webhook_deliveries
     ADD CONSTRAINT webhook_deliveries_pkey PRIMARY KEY (id);
 
 --
--- Name: event_texts event_texts_pkey; Type: CONSTRAINT; Schema: timeseries; Owner: -
---
-
-ALTER TABLE ONLY timeseries.event_texts
-    ADD CONSTRAINT event_texts_pkey PRIMARY KEY (tool_event_id, occurred_at);
-
---
 -- Name: tool_events tool_events_pkey; Type: CONSTRAINT; Schema: timeseries; Owner: -
 --
 
@@ -1649,12 +1419,6 @@ CREATE INDEX idx_organization_connectors_key_hash ON public.organization_connect
 CREATE UNIQUE INDEX idx_organization_connectors_webhook_token ON public.organization_connectors USING btree (webhook_token) WHERE (webhook_token IS NOT NULL);
 
 --
--- Name: idx_project_connectors_single_instance; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_project_connectors_single_instance ON public.project_connectors USING btree (project_id, connector_type) WHERE (connector_type <> 'slack'::public.connector_type);
-
---
 -- Name: idx_repositories_connector_external; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1665,30 +1429,6 @@ CREATE UNIQUE INDEX idx_repositories_connector_external ON public.repositories U
 --
 
 CREATE UNIQUE INDEX idx_user_tool_accounts_membership_tool ON public.user_tool_accounts USING btree (organization_membership_id, tool_name);
-
---
--- Name: index_active_storage_attachments_on_blob_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX index_active_storage_attachments_on_blob_id ON public.active_storage_attachments USING btree (blob_id);
-
---
--- Name: index_active_storage_attachments_uniqueness; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX index_active_storage_attachments_uniqueness ON public.active_storage_attachments USING btree (record_type, record_id, name, blob_id);
-
---
--- Name: index_active_storage_blobs_on_key; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX index_active_storage_blobs_on_key ON public.active_storage_blobs USING btree (key);
-
---
--- Name: index_active_storage_variant_records_uniqueness; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX index_active_storage_variant_records_uniqueness ON public.active_storage_variant_records USING btree (blob_id, variation_digest);
 
 --
 -- Name: index_admin_audit_logs_on_admin_user_id; Type: INDEX; Schema: public; Owner: -
@@ -1713,18 +1453,6 @@ CREATE INDEX index_admin_audit_logs_on_created_at_desc ON public.admin_audit_log
 --
 
 CREATE INDEX index_admin_audit_logs_on_resource_type_and_resource_id ON public.admin_audit_logs USING btree (resource_type, resource_id);
-
---
--- Name: index_alert_states_on_scope_and_type_active; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX index_alert_states_on_scope_and_type_active ON public.alert_states USING btree (scope_type, scope_id, alert_type) WHERE ((status)::text = 'active'::text);
-
---
--- Name: index_alert_states_on_scope_type_resolved_at; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX index_alert_states_on_scope_type_resolved_at ON public.alert_states USING btree (scope_type, scope_id, alert_type, resolved_at);
 
 --
 -- Name: index_audit_logs_on_organization_id; Type: INDEX; Schema: public; Owner: -
@@ -1773,30 +1501,6 @@ CREATE INDEX index_connector_health_snapshots_on_organization_connector_id ON pu
 --
 
 CREATE INDEX index_connector_health_snapshots_on_snapshotted_at ON public.connector_health_snapshots USING btree (snapshotted_at);
-
---
--- Name: index_export_records_on_created_by_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX index_export_records_on_created_by_id ON public.export_records USING btree (created_by_id);
-
---
--- Name: index_export_records_on_organization_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX index_export_records_on_organization_id ON public.export_records USING btree (organization_id);
-
---
--- Name: index_export_records_on_organization_id_and_created_at; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX index_export_records_on_organization_id_and_created_at ON public.export_records USING btree (organization_id, created_at);
-
---
--- Name: index_export_records_on_status; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX index_export_records_on_status ON public.export_records USING btree (status);
 
 --
 -- Name: index_invitations_on_invited_by_id; Type: INDEX; Schema: public; Owner: -
@@ -2075,6 +1779,12 @@ CREATE INDEX index_project_audit_logs_on_resource_type_and_resource_id ON public
 CREATE INDEX index_project_connectors_on_project_id ON public.project_connectors USING btree (project_id);
 
 --
+-- Name: idx_project_connectors_single_instance; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_project_connectors_single_instance ON public.project_connectors USING btree (project_id, connector_type) WHERE ((connector_type)::text <> ALL (ARRAY['slack'::text]));
+
+--
 -- Name: index_project_memberships_on_created_by_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2303,28 +2013,10 @@ CREATE UNIQUE INDEX index_users_on_keycloak_sub ON public.users USING btree (key
 CREATE INDEX index_webhook_deliveries_on_organization_connector_id ON public.webhook_deliveries USING btree (organization_connector_id);
 
 --
--- Name: event_texts_occurred_at_idx; Type: INDEX; Schema: timeseries; Owner: -
---
-
-CREATE INDEX event_texts_occurred_at_idx ON timeseries.event_texts USING btree (occurred_at DESC);
-
---
--- Name: idx_event_texts_tool_event_id; Type: INDEX; Schema: timeseries; Owner: -
---
-
-CREATE INDEX idx_event_texts_tool_event_id ON timeseries.event_texts USING btree (tool_event_id);
-
---
 -- Name: idx_tool_events_external_id; Type: INDEX; Schema: timeseries; Owner: -
 --
 
 CREATE INDEX idx_tool_events_external_id ON timeseries.tool_events USING btree (organization_id, ((metadata ->> 'external_id'::text))) WHERE ((metadata ->> 'external_id'::text) IS NOT NULL);
-
---
--- Name: idx_tool_events_org_cost_occurred; Type: INDEX; Schema: timeseries; Owner: -
---
-
-CREATE INDEX idx_tool_events_org_cost_occurred ON timeseries.tool_events USING btree (organization_id, cost_usd DESC, occurred_at DESC, id DESC);
 
 --
 -- Name: idx_tool_events_org_occurred; Type: INDEX; Schema: timeseries; Owner: -
@@ -2333,22 +2025,10 @@ CREATE INDEX idx_tool_events_org_cost_occurred ON timeseries.tool_events USING b
 CREATE INDEX idx_tool_events_org_occurred ON timeseries.tool_events USING btree (organization_id, occurred_at DESC);
 
 --
--- Name: idx_tool_events_org_tokens_in_occurred; Type: INDEX; Schema: timeseries; Owner: -
---
-
-CREATE INDEX idx_tool_events_org_tokens_in_occurred ON timeseries.tool_events USING btree (organization_id, tokens_in DESC, occurred_at DESC, id DESC);
-
---
 -- Name: idx_tool_events_org_tool_occurred; Type: INDEX; Schema: timeseries; Owner: -
 --
 
 CREATE INDEX idx_tool_events_org_tool_occurred ON timeseries.tool_events USING btree (organization_id, tool_name, occurred_at DESC);
-
---
--- Name: idx_tool_events_org_user_occurred; Type: INDEX; Schema: timeseries; Owner: -
---
-
-CREATE INDEX idx_tool_events_org_user_occurred ON timeseries.tool_events USING btree (organization_id, user_id, occurred_at DESC);
 
 --
 -- Name: idx_tool_events_project_occurred; Type: INDEX; Schema: timeseries; Owner: -
@@ -2561,13 +2241,6 @@ ALTER TABLE ONLY public.organization_connectors
     ADD CONSTRAINT fk_rails_7f3b48aa2e FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
 
 --
--- Name: export_records fk_rails_7fd704e6a9; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.export_records
-    ADD CONSTRAINT fk_rails_7fd704e6a9 FOREIGN KEY (created_by_id) REFERENCES public.users(id);
-
---
 -- Name: project_retention_policies fk_rails_81cdd6d032; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2624,13 +2297,6 @@ ALTER TABLE ONLY public.repositories
     ADD CONSTRAINT fk_rails_92dbde9f4f FOREIGN KEY (organization_connector_id) REFERENCES public.organization_connectors(id);
 
 --
--- Name: active_storage_variant_records fk_rails_993965df05; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.active_storage_variant_records
-    ADD CONSTRAINT fk_rails_993965df05 FOREIGN KEY (blob_id) REFERENCES public.active_storage_blobs(id);
-
---
 -- Name: projects fk_rails_9aee26923d; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2664,20 +2330,6 @@ ALTER TABLE ONLY public.project_retention_policies
 
 ALTER TABLE ONLY public.model_pricing_overrides
     ADD CONSTRAINT fk_rails_bb19157c26 FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
-
---
--- Name: export_records fk_rails_c3348ca21e; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.export_records
-    ADD CONSTRAINT fk_rails_c3348ca21e FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
-
---
--- Name: active_storage_attachments fk_rails_c3b3935057; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.active_storage_attachments
-    ADD CONSTRAINT fk_rails_c3b3935057 FOREIGN KEY (blob_id) REFERENCES public.active_storage_blobs(id);
 
 --
 -- Name: organization_settings fk_rails_c56e4690c0; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2789,16 +2441,9 @@ INSERT INTO "schema_migrations" (version) VALUES
 ('20260624105300'),
 ('20260617091734'),
 ('20260616120937'),
-('20260615174550'),
-('20260615015906'),
-('20260612000001'),
-('20260609192734'),
 ('20260609191045'),
-('20260609170000'),
-('20260609120000'),
 ('20260608000001'),
 ('20260605120000'),
-('20260605100843'),
 ('20260527113000'),
 ('20260527100000'),
 ('20260525234350'),
