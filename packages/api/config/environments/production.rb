@@ -1,4 +1,5 @@
 require "active_support/core_ext/integer/time"
+require "uri"
 
 Rails.application.configure do
   # Settings specified here will take precedence over those in config/application.rb.
@@ -73,10 +74,13 @@ Rails.application.configure do
   # Only use :id for inspections in production.
   config.active_record.attributes_for_inspect = [ :id ]
 
-  config.hosts = [
-    ENV.fetch("API_HOST"),
-    /\A.*\.#{Regexp.escape(ENV.fetch("BASE_DOMAIN"))}\z/
-  ]
+  # APP_HOST is the public app domain (ALB host). The Temporal worker and nginx
+  # reach the API directly via the internal Cloud Map host (api.<env>-db90.local),
+  # bypassing the public ALB, so that host must be allowed too. Reuse RAILS_API_URL
+  # (set in the shared ECS env) as the single source of truth for that hostname.
+  config.hosts = [ ENV.fetch("APP_HOST") ]
+  internal_api = ENV["RAILS_API_URL"]
+  config.hosts << URI(internal_api).host if internal_api.present?
   config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
 
   config.active_record.encryption.primary_key = ENV.fetch("ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY")

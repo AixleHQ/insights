@@ -71,7 +71,7 @@ module Activities
       response = http.request(request)
 
       unless response.code.to_i == 201
-        raise "Failed to create tool event: #{response.body}"
+        raise "Failed to create tool event (HTTP #{response.code}): #{response.body}"
       end
 
       JSON.parse(response.body)["data"]
@@ -157,7 +157,7 @@ module Activities
       response = http.request(request)
 
       unless response.code.to_i == 201
-        raise "Failed to create audit log: #{response.body}"
+        raise "Failed to create audit log (HTTP #{response.code}): #{response.body}"
       end
 
       JSON.parse(response.body)["data"]
