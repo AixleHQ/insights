@@ -1,9 +1,8 @@
 # frozen_string_literal: true
 
-require "spec_helper"
-require_relative "../../lib/host_authorization"
+require "rails_helper"
 
-RSpec.describe Aixle::HostAuthorization do
+RSpec.describe HostAuthorization do
   def with_env(**vars)
     original = vars.keys.to_h { |key| [ key.to_s, ENV.key?(key.to_s) ? ENV[key.to_s] : :missing ] }
     vars.each { |key, value| value.nil? ? ENV.delete(key.to_s) : ENV[key.to_s] = value }
