@@ -47,7 +47,7 @@ Rails.application.configure do
   config.active_job.queue_adapter = :sidekiq
 
   # Set host to be used by links generated in mailer templates.
-  config.action_mailer.default_url_options = { host: ENV.fetch("APP_HOST", "insights.example.com"), protocol: "https" }
+  config.action_mailer.default_url_options = { host: ENV.fetch("APP_HOST", "staging.insights.example.com"), protocol: "https" }
 
   config.action_mailer.delivery_method = :smtp
   config.action_mailer.raise_delivery_errors = true
