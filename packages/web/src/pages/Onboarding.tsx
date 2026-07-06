@@ -38,6 +38,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import type { InvitationPublic } from "@/lib/types";
+import { AppRoutes } from "@/lib/routes";
 
 function InvitationCard({
   invitation,
@@ -148,7 +149,7 @@ export function Onboarding() {
   // Redirect to dashboard if user already has organizations
   useEffect(() => {
     if (isInitialized && organizations.length > 0) {
-      navigate("/", { replace: true });
+      navigate(AppRoutes.dashboard, { replace: true });
     }
   }, [isInitialized, organizations, navigate]);
 
@@ -164,21 +165,15 @@ export function Onboarding() {
   const handleAcceptInvitation = async (invitation: InvitationPublic) => {
     setAcceptingId(invitation.id);
     try {
-      // We need to use the token, but the public serializer doesn't include it
-      // The invitation ID is the token in this case since we're using the check endpoint
-      // Actually, we need to get the token - let me check the API
-      // For the check endpoint, we receive InvitationPublic which has the ID
-      // We need to accept by navigating to the accept page with the token
-      // But the token isn't exposed in InvitationPublic for security
-      // Instead, let's navigate to the invitation accept page
-      const result = await acceptInvitation.mutateAsync(invitation.id);
+      // The accept endpoint is keyed by the invitation token, not its id.
+      const result = await acceptInvitation.mutateAsync(invitation.token);
 
       // Refresh organizations and set the new one as current
       await refreshOrganizations();
 
       // Navigate to dashboard
       if (result.data?.organization) {
-        navigate("/");
+        navigate(AppRoutes.dashboard);
       }
     } catch (err) {
       console.error("Failed to accept invitation:", err);
@@ -215,7 +210,7 @@ export function Onboarding() {
       }
 
       setCreateDialogOpen(false);
-      navigate("/");
+      navigate(AppRoutes.dashboard);
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : "Failed to create organization");
     } finally {

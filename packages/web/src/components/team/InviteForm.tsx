@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Loader2, Plus, X } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Loader2, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,10 +14,11 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { AppRoutes } from "@/lib/routes";
 import type { MemberRole } from "@/contexts/OrgContext";
 
 interface InviteFormProps {
-  onSubmit: (invites: Array<{ email: string; role: MemberRole }>) => Promise<void>;
+  onSubmit: (invites: Array<{ email: string; role: MemberRole }>) => Promise<Record<string, string | null>>;
   className?: string;
 }
 
@@ -37,6 +38,8 @@ export function InviteForm({ onSubmit, className }: InviteFormProps) {
   const [role, setRole] = useState<MemberRole>("member");
   const [invites, setInvites] = useState<InviteEntry[]>([]);
   const [error, setError] = useState("");
+  const [inviteErrors, setInviteErrors] = useState<Record<string, string>>({});
+  const [sentEmails, setSentEmails] = useState<string[]>([]);
 
   const handleAddInvite = () => {
     if (!email.trim()) {
@@ -61,36 +64,69 @@ export function InviteForm({ onSubmit, className }: InviteFormProps) {
 
   const handleRemoveInvite = (emailToRemove: string) => {
     setInvites((prev) => prev.filter((inv) => inv.email !== emailToRemove));
+    setInviteErrors((prev) => {
+      const next = { ...prev };
+      delete next[emailToRemove];
+      return next;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (invites.length === 0) {
+    let effectiveInvites = invites;
+
+    if (email.trim()) {
+      if (!isValidEmail(email)) {
+        setError("Please enter a valid email address");
+        return;
+      }
+      const duplicate = invites.find((inv) => inv.email.toLowerCase() === email.toLowerCase());
+      if (duplicate) {
+        setError("This email is already in the invite list");
+        return;
+      }
+      const newEntry = { email: email.trim(), role };
+      effectiveInvites = [...invites, newEntry];
+      setInvites(effectiveInvites);
+      setEmail("");
+    }
+
+    if (effectiveInvites.length === 0) {
       setError("Please add at least one email address");
       return;
     }
 
     setIsSubmitting(true);
+    setError("");
+    setInviteErrors({});
+    setSentEmails([]);
     try {
-      await onSubmit(invites);
-      navigate("/members");
-    } catch (error) {
-      console.error("Failed to send invites:", error);
-      // Extract specific validation error message if available
-      let errorMessage = "Failed to send invites. Please try again.";
-      if (error && typeof error === "object" && "data" in error) {
-        const apiError = error as { data?: { errors?: Record<string, string[]> } };
-        if (apiError.data?.errors) {
-          const messages = Object.entries(apiError.data.errors)
-            .map(([field, msgs]) => `${field} ${(msgs as string[]).join(", ")}`)
-            .join(". ");
-          if (messages) {
-            errorMessage = messages;
-          }
+      const results = await onSubmit(effectiveInvites);
+
+      const errors: Record<string, string> = {};
+      const sent: string[] = [];
+
+      for (const [inviteEmail, errMsg] of Object.entries(results)) {
+        if (errMsg !== null) {
+          errors[inviteEmail] = errMsg;
+        } else {
+          sent.push(inviteEmail);
         }
       }
-      setError(errorMessage);
+
+      const hasErrors = Object.keys(errors).length > 0;
+
+      if (hasErrors) {
+        setInviteErrors(errors);
+        setInvites((prev) => prev.filter((inv) => errors[inv.email] !== undefined));
+        setSentEmails(sent);
+      } else {
+        navigate("/members");
+      }
+    } catch (err) {
+      console.error("Failed to send invites:", err);
+      setError("Failed to send invites. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -103,10 +139,17 @@ export function InviteForm({ onSubmit, className }: InviteFormProps) {
     }
   };
 
+  const pendingEmailIsNew =
+    email.trim().length > 0 &&
+    isValidEmail(email) &&
+    !invites.some((inv) => inv.email.toLowerCase() === email.trim().toLowerCase());
+  const hasInvites = invites.length > 0 || pendingEmailIsNew;
+  const effectiveCount = invites.length + (pendingEmailIsNew ? 1 : 0);
+
   return (
     <div className={cn("space-y-6", className)}>
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/members")}>
+        <Button variant="ghost" size="icon" onClick={() => navigate(AppRoutes.members.root)}>
           <ArrowLeft className="size-4" />
         </Button>
         <div>
@@ -157,7 +200,7 @@ export function InviteForm({ onSubmit, className }: InviteFormProps) {
                 </Select>
               </div>
               <div className="pt-8">
-                <Button type="button" variant="secondary" onClick={handleAddInvite}>
+                <Button type="button" variant="secondary" onClick={handleAddInvite} disabled={isSubmitting}>
                   <Plus className="size-4" />
                 </Button>
               </div>
@@ -168,25 +211,51 @@ export function InviteForm({ onSubmit, className }: InviteFormProps) {
                 <Label>Pending Invites</Label>
                 <div className="rounded-md border p-3 space-y-2">
                   {invites.map((invite) => (
-                    <div
-                      key={invite.email}
-                      className="flex items-center justify-between rounded-md bg-muted/50 px-3 py-2"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">{invite.email}</span>
-                        <Badge variant="outline" className="text-xs capitalize">
-                          {invite.role}
-                        </Badge>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="size-6"
-                        onClick={() => handleRemoveInvite(invite.email)}
+                    <div key={invite.email} className="space-y-1">
+                      <div
+                        className={cn(
+                          "flex items-center justify-between rounded-md px-3 py-2",
+                          inviteErrors[invite.email]
+                            ? "bg-destructive/10 border border-destructive/30"
+                            : "bg-muted/50"
+                        )}
                       >
-                        <X className="size-3" />
-                      </Button>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm">{invite.email}</span>
+                          <Badge variant="outline" className="text-xs capitalize">
+                            {invite.role}
+                          </Badge>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-6"
+                          disabled={isSubmitting}
+                          onClick={() => handleRemoveInvite(invite.email)}
+                        >
+                          <X className="size-3" />
+                        </Button>
+                      </div>
+                      {inviteErrors[invite.email] && (
+                        <p className="text-xs text-destructive px-1">
+                          {inviteErrors[invite.email]}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {sentEmails.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-green-600 dark:text-green-500">Sent Successfully</Label>
+                <div className="rounded-md border border-green-200 dark:border-green-800 p-3 space-y-1">
+                  {sentEmails.map((sentEmail) => (
+                    <div key={sentEmail} className="flex items-center gap-2 rounded-md bg-green-50 dark:bg-green-950/30 px-3 py-2">
+                      <CheckCircle2 className="size-3.5 shrink-0 text-green-600 dark:text-green-500" />
+                      <span className="text-sm">{sentEmail}</span>
                     </div>
                   ))}
                 </div>
@@ -214,15 +283,15 @@ export function InviteForm({ onSubmit, className }: InviteFormProps) {
           <Button
             type="button"
             variant="outline"
-            onClick={() => navigate("/members")}
+            onClick={() => navigate(AppRoutes.members.root)}
             disabled={isSubmitting}
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting || invites.length === 0}>
+          <Button type="submit" disabled={isSubmitting || !hasInvites}>
             {isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
-            Send {invites.length > 0 && `(${invites.length})`} Invite
-            {invites.length !== 1 && "s"}
+            Send {effectiveCount > 0 && `(${effectiveCount})`} Invite
+            {effectiveCount !== 1 && "s"}
           </Button>
         </div>
       </form>

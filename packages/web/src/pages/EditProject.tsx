@@ -2,6 +2,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useProject, useUpdateProject } from "@/hooks/useApi";
 import { ProjectForm, type ProjectFormData } from "@/components/projects";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AppRoutes } from "@/lib/routes";
 
 export function EditProject() {
   const { id } = useParams<{ id: string }>();
@@ -23,7 +24,7 @@ export function EditProject() {
       },
     });
 
-    navigate(`/projects/${id}`);
+    navigate(AppRoutes.projects.detail(id));
   };
 
   if (isLoading) {

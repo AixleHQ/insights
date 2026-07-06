@@ -31,6 +31,7 @@ import { useOrg } from "@/contexts/OrgContext";
 import { useEvent } from "@/hooks/useApi";
 import { EventTypeBadge } from "@/components/ui/event-type-badge";
 import { cn, humanizeToolName } from "@/lib/utils";
+import { AppRoutes } from "@/lib/routes";
 import { formatCost, formatTokens } from "@/lib/formatters";
 import { canViewEventPrompt } from "@/lib/eventAccess";
 import { parseRecentCommitFields } from "@/lib/recentCommitEvent";
@@ -124,9 +125,6 @@ export function EventDrawer({
       })
     : "";
 
-  const tokenCount =
-    event?.tokensTotal ??
-    (event?.inputTokens || 0) + (event?.outputTokens || 0);
 
   const recentCommit = event
     ? parseRecentCommitFields(event.metadata, event.eventType)
@@ -189,7 +187,7 @@ export function EventDrawer({
                     </>
                   )}
                   <Button variant="ghost" size="icon" className="size-8" asChild>
-                    <Link to={`/events/${event.id}`}>
+                    <Link to={AppRoutes.events.detail(event.id)}>
                       <ExternalLink className="size-4" />
                       <span className="sr-only">Open in full page</span>
                     </Link>
@@ -229,7 +227,7 @@ export function EventDrawer({
                       value={
                         event.project ? (
                           <Link
-                            to={`/projects/${event.project.id}`}
+                            to={AppRoutes.projects.detail(event.project.id)}
                             className="text-primary hover:underline"
                             onClick={() => onOpenChange(false)}
                           >
@@ -260,11 +258,24 @@ export function EventDrawer({
                     />
                     <DetailRow
                       icon={FileText}
-                      label="Tokens"
+                      label="Tokens In"
                       value={
-                        tokenCount > 0 ? (
+                        (event.inputTokens ?? 0) > 0 ? (
                           <span className="text-sm">
-                            {formatTokens(tokenCount)}
+                            {formatTokens(event.inputTokens!)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )
+                      }
+                    />
+                    <DetailRow
+                      icon={FileText}
+                      label="Tokens Out"
+                      value={
+                        (event.outputTokens ?? 0) > 0 ? (
+                          <span className="text-sm">
+                            {formatTokens(event.outputTokens!)}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">-</span>

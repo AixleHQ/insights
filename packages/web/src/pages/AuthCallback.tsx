@@ -1,10 +1,10 @@
 import { useEffect, useState, useRef } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { loginCallback } from "../lib/auth";
+import { AppRoutes, isSafeRedirectPath } from "@/lib/routes";
 
 export function AuthCallback() {
   const navigate = useNavigate();
-  const location = useLocation();
   const [error, setError] = useState<string | null>(null);
   const hasProcessed = useRef(false);
 
@@ -17,11 +17,13 @@ export function AuthCallback() {
 
     const handleCallback = async () => {
       try {
-        await loginCallback();
+        const user = await loginCallback();
 
-        // Get the original destination from state, or default to home
-        const state = location.state as { from?: { pathname: string } } | null;
-        const destination = state?.from?.pathname || "/";
+        // Restore the destination the user was trying to reach before being
+        // sent to log in (e.g. an invitation link) — carried through the OIDC
+        // `state` param, since React Router's location.state cannot survive
+        // the external Keycloak redirect round-trip.
+        const destination = isSafeRedirectPath(user.state) ? user.state : AppRoutes.dashboard;
 
         navigate(destination, { replace: true });
       } catch (err) {
@@ -31,7 +33,7 @@ export function AuthCallback() {
     };
 
     handleCallback();
-  }, [navigate, location]);
+  }, [navigate]);
 
   if (error) {
     return (
@@ -42,7 +44,7 @@ export function AuthCallback() {
           </h1>
           <p className="text-red-600 mb-4">{error}</p>
           <button
-            onClick={() => navigate("/login")}
+            onClick={() => navigate(AppRoutes.login)}
             className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
           >
             Try Again

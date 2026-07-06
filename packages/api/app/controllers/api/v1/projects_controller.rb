@@ -181,7 +181,7 @@ module Api
         authorize! @project, to: :show?
 
         days = (params[:days] || 30).to_i
-        time_range_start = days.days.ago.beginning_of_day
+        time_range_start = (client_zone.now - days.days).beginning_of_day
         time_range_end = Time.current
 
         events = @project.tool_events.where(occurred_at: time_range_start..time_range_end)
@@ -202,7 +202,7 @@ module Api
             }
           end
 
-        prev_start = (2 * days).days.ago.beginning_of_day
+        prev_start = (client_zone.now - (2 * days).days).beginning_of_day
         prev_end   = time_range_start
 
         curr_count, curr_cost = events.pick(
@@ -229,8 +229,8 @@ module Api
 
         granularity = params[:granularity].presence_in(%w[day month]) || "day"
         days = (params[:days] || 30).to_i.clamp(1, 365)
-        time_range_start = days.days.ago.beginning_of_day
-        time_range_end = Time.current
+        time_range_start = (client_zone.now - days.days).beginning_of_day
+        time_range_end = client_zone.now
 
         events = @project.tool_events.where(occurred_at: time_range_start..time_range_end)
 
@@ -284,7 +284,7 @@ module Api
         authorize! @project, to: :show?
 
         days = (params[:days] || 30).to_i
-        since = days.days.ago.beginning_of_day
+        since = (client_zone.now - days.days).beginning_of_day
 
         rows = @project.tool_events
           .where(event_type: "commit")
@@ -330,6 +330,10 @@ module Api
           @project.project_settings.find_or_initialize_by(key: "jira_connector_id").update!(value: connector.id.to_s)
           @project.project_settings.find_or_initialize_by(key: "jira_project_key").update!(value: jira_project_key)
           @project.project_settings.where(key: %w[linear_connector_id linear_project_id linear_project_name]).destroy_all
+          # Sync jobs only upsert — issues from a previously linked provider project
+          # would otherwise linger alongside the newly synced ones.
+          @project.issues.delete_all
+          @project.update_column(:issues_synced_at, nil)
         end
 
         render json: { data: { linked: true } }
@@ -353,6 +357,10 @@ module Api
           @project.project_settings.find_or_initialize_by(key: "linear_project_id").update!(value: linear_project_id)
           @project.project_settings.find_or_initialize_by(key: "linear_project_name").update!(value: linear_project_name)
           @project.project_settings.where(key: %w[jira_connector_id jira_project_key]).destroy_all
+          # Sync jobs only upsert — issues from a previously linked provider project
+          # would otherwise linger alongside the newly synced ones.
+          @project.issues.delete_all
+          @project.update_column(:issues_synced_at, nil)
         end
 
         render json: { data: { linked: true } }
@@ -455,7 +463,8 @@ module Api
 
       def set_project
         includes = PROJECT_INCLUDES_BY_ACTION[action_name] || []
-        scope = includes.any? ? Project.includes(*includes) : Project
+        scope = authorized_scope(Project.all)
+        scope = scope.includes(*includes) if includes.any?
         @project = scope.find(params[:id])
       end
 

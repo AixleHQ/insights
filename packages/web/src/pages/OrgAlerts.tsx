@@ -26,6 +26,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { AppRoutes } from "@/lib/routes";
 
 const severityColors: Record<AlertSeverity, { bg: string; text: string; border: string }> = {
   critical: { bg: "bg-risk-critical/10", text: "text-risk-critical", border: "border-risk-critical/30" },
@@ -269,7 +270,7 @@ export function OrgAlerts() {
                         {alert.project_name ? (
                           alert.project_id ? (
                             <Link
-                              to={`/projects/${alert.project_id}`}
+                              to={AppRoutes.projects.detail(alert.project_id)}
                               className="hover:underline hover:text-foreground"
                               onClick={(e) => e.stopPropagation()}
                             >
@@ -305,7 +306,7 @@ export function OrgAlerts() {
                             <p className="text-sm">{alert.message}</p>
                             {alert.event_id && (
                               <Link
-                                to={`/events/${alert.event_id}`}
+                                to={AppRoutes.events.detail(alert.event_id)}
                                 className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
                                 onClick={(e) => e.stopPropagation()}
                               >

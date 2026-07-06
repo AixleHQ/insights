@@ -12,6 +12,7 @@ import { normalizeRiskLevel } from "@/lib/riskLevel";
 import { useOrg } from "@/contexts/OrgContext";
 import { EventTypeBadge } from "@/components/ui/event-type-badge";
 import { cn, humanizeToolName } from "@/lib/utils";
+import { AppRoutes } from "@/lib/routes";
 import { formatCost, formatTokens, isDayGranularityEvent, formatEventDate, formatDateTime } from "@/lib/formatters";
 import { canViewEventPrompt } from "@/lib/eventAccess";
 import { parseRecentCommitFields } from "@/lib/recentCommitEvent";
@@ -116,7 +117,7 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
       <div className={cn("flex flex-col items-center justify-center py-12", className)}>
         <p className="text-muted-foreground">Event not found</p>
         <Button asChild variant="link" className="mt-2">
-          <Link to="/events">
+          <Link to={AppRoutes.events.root}>
             <ArrowLeft className="mr-2 size-4" />
             Back to events
           </Link>
@@ -136,7 +137,7 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-4">
           <Button asChild variant="ghost" size="icon" aria-label="Back to events">
-            <Link to="/events">
+            <Link to={AppRoutes.events.root}>
               <ArrowLeft className="size-4" />
             </Link>
           </Button>
@@ -181,7 +182,7 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
               value={
                 event.project ? (
                   <Link
-                    to={`/projects/${event.project.id}`}
+                    to={AppRoutes.projects.detail(event.project.id)}
                     className="text-primary hover:underline"
                   >
                     {event.project.name}

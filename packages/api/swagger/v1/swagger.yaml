@@ -1,15 +1,15 @@
 ---
 openapi: 3.0.1
 info:
-  title: DB90 API V1
+  title: Aixle Insights API V1
   version: v1
-  description: API for DB90 - Developer Tooling Platform
+  description: API for Aixle Insights - Developer Tooling Platform
   contact:
-    name: DB90 Team
+    name: Aixle Insights Team
 servers:
   - url: http://localhost:3001
     description: Development server
-  - url: https://api.db90.io
+  - url: https://insights.example.com
     description: Production server
 security:
   - bearer_auth: []
@@ -1004,6 +1004,254 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  # ============================================
+  # ORGANIZATION INVITATIONS ENDPOINTS
+  # ============================================
+  /api/v1/organizations/{organization_id}/invitations:
+    get:
+      summary: List organization invitations
+      description: Requires owner role.
+      tags:
+        - Organization Invitations
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, accepted, revoked, expired]
+      responses:
+        '200':
+          description: Invitations list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Invitation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      summary: Create organization invitation
+      description: Requires owner role. Sends an invitation email to the recipient.
+      tags:
+        - Organization Invitations
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                role:
+                  type: string
+                  enum: [owner, member, viewer]
+              required:
+                - email
+                - role
+      responses:
+        '201':
+          description: Invitation created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Invitation'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/invitations/{id}:
+    get:
+      summary: Get organization invitation
+      description: Requires owner role.
+      tags:
+        - Organization Invitations
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Invitation details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Invitation'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      summary: Revoke organization invitation
+      description: Requires owner role.
+      tags:
+        - Organization Invitations
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204':
+          description: Invitation revoked
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/invitations/{id}/resend:
+    post:
+      summary: Resend organization invitation email
+      description: Requires owner role. Only pending invitations can be resent.
+      tags:
+        - Organization Invitations
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Invitation resent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Invitation'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/invitations/{token}:
+    get:
+      summary: View an invitation by token
+      description: Public endpoint. Does not require authentication.
+      tags:
+        - Public Invitations
+      security: []
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Public invitation token
+      responses:
+        '200':
+          description: Invitation details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicInvitation'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/invitations/{token}/accept:
+    post:
+      summary: Accept an invitation
+      description: >
+        Requires authentication — the logged-in user accepts the invitation
+        identified by the token. Idempotent: if the user is already a member of
+        the organization (for example, auto-assigned by domain mapping on login),
+        the invitation is still marked accepted and the existing membership is
+        returned.
+      tags:
+        - Public Invitations
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Public invitation token
+      responses:
+        '200':
+          description: Invitation accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      organization:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+                          name:
+                            type: string
+                          slug:
+                            type: string
+                      role:
+                        type: string
+                        enum: [owner, member, viewer]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Invitation is no longer active (revoked or expired) or could not be accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+
+  /api/v1/invitations/check:
+    get:
+      summary: List pending invitations for the current user
+      description: >
+        Requires authentication. Returns the pending, non-expired invitations
+        addressed to the authenticated user's email.
+      tags:
+        - Public Invitations
+      responses:
+        '200':
+          description: Pending invitations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PublicInvitation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /api/v1/organizations/{organization_id}/members/{id}/dashboard_stats:
     get:
       summary: Personal dashboard stats for a member
@@ -1012,6 +1260,7 @@ paths:
       security:
         - bearer_auth: []
       parameters:
+        - $ref: '#/components/parameters/tz'
         - $ref: '#/components/parameters/organization_id'
         - $ref: '#/components/parameters/X-Organization-ID'
         - name: id
@@ -1081,6 +1330,7 @@ paths:
       security:
         - bearer_auth: []
       parameters:
+        - $ref: '#/components/parameters/tz'
         - $ref: '#/components/parameters/organization_id'
         - $ref: '#/components/parameters/X-Organization-ID'
         - name: id
@@ -1332,9 +1582,26 @@ paths:
                   type: string
                   nullable: true
                   description: Optional user-supplied label to distinguish multiple connectors of the same provider
+                config:
+                  type: object
+                  description: Source-control configuration settings (merged into existing config — keys not sent are preserved)
+                  properties:
+                    sync_repositories:
+                      type: boolean
+                      description: When false, polling sync skips repository and commit ingestion (source-control only)
+                    sync_pull_requests:
+                      type: boolean
+                      description: When false, PR/MR ingestion is skipped (source-control only)
       responses:
         '200':
           description: Connector updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OrganizationConnector'
         '403':
           $ref: '#/components/responses/Forbidden'
         '422':
@@ -1458,7 +1725,7 @@ paths:
   /api/v1/organizations/{organization_id}/connectors/health:
     get:
       summary: Get connector health rollup
-      description: Returns aggregated 7-day health metrics for all connectors in the organization. Summary counts use all connectors; per-connector list excludes disconnected.
+      description: Returns aggregated 7-day health metrics for all connectors in the organization. Probes each connected connector via test_connection before building the response so revoked credentials are detected on page load. Summary counts use all connectors; per-connector list excludes disconnected.
       tags:
         - Organization Connectors
       parameters:
@@ -1777,7 +2044,9 @@ paths:
         - $ref: '#/components/parameters/X-Organization-ID'
         - name: project_id
           in: query
-          description: Scope stats to a specific project (must belong to this organization)
+          description: >
+            UUID of a specific project, or "none" to filter for events with no project assigned.
+            Omit or leave blank for all activity (org-wide total).
           schema:
             type: string
         - name: month
@@ -1839,11 +2108,14 @@ paths:
       tags:
         - Stats
       parameters:
+        - $ref: '#/components/parameters/tz'
         - $ref: '#/components/parameters/organization_id'
         - $ref: '#/components/parameters/X-Organization-ID'
         - name: project_id
           in: query
-          description: Scope to a specific project (must belong to this organization)
+          description: >
+            UUID of a specific project, or "none" to filter for events with no project assigned.
+            Omit or leave blank for all activity (org-wide total).
           schema:
             type: string
         - name: days
@@ -1974,7 +2246,9 @@ paths:
             type: boolean
         - name: project_id
           in: query
-          description: Scope to a specific project.
+          description: >
+            UUID of a specific project, or "none" to filter for events with no project assigned.
+            Omit or leave blank for all activity (org-wide total).
           schema:
             type: string
         - $ref: '#/components/parameters/start_date'
@@ -2053,7 +2327,9 @@ paths:
             type: boolean
         - name: project_id
           in: query
-          description: Scope to a specific project (must belong to this organization)
+          description: >
+            UUID of a specific project, or "none" to filter for events with no project assigned.
+            Omit or leave blank for all activity (org-wide total).
           schema:
             type: string
         - $ref: '#/components/parameters/start_date'
@@ -2154,7 +2430,9 @@ paths:
             type: boolean
         - name: project_id
           in: query
-          description: Scope to a specific project (must belong to this organization)
+          description: >
+            UUID of a specific project, or "none" to filter for events with no project assigned.
+            Omit or leave blank for all activity (org-wide total).
           schema:
             type: string
         - $ref: '#/components/parameters/tz'
@@ -2221,7 +2499,9 @@ paths:
             type: boolean
         - name: project_id
           in: query
-          description: Scope to a specific project (must belong to this organization)
+          description: >
+            UUID of a specific project, or "none" to filter for events with no project assigned.
+            Omit or leave blank for all activity (org-wide total).
           schema:
             type: string
         - $ref: '#/components/parameters/tz'
@@ -2261,6 +2541,7 @@ paths:
       tags:
         - Stats
       parameters:
+        - $ref: '#/components/parameters/tz'
         - $ref: '#/components/parameters/organization_id'
         - $ref: '#/components/parameters/X-Organization-ID'
       responses:
@@ -2301,6 +2582,7 @@ paths:
       tags:
         - Stats
       parameters:
+        - $ref: '#/components/parameters/tz'
         - $ref: '#/components/parameters/organization_id'
         - $ref: '#/components/parameters/X-Organization-ID'
         - name: tool_name
@@ -2360,6 +2642,7 @@ paths:
       tags:
         - Stats
       parameters:
+        - $ref: '#/components/parameters/tz'
         - $ref: '#/components/parameters/organization_id'
         - $ref: '#/components/parameters/X-Organization-ID'
         - name: tool_name
@@ -2438,6 +2721,7 @@ paths:
       tags:
         - Stats
       parameters:
+        - $ref: '#/components/parameters/tz'
         - $ref: '#/components/parameters/organization_id'
         - $ref: '#/components/parameters/X-Organization-ID'
         - name: tool_name
@@ -2610,6 +2894,7 @@ paths:
       tags:
         - Stats
       parameters:
+        - $ref: '#/components/parameters/tz'
         - $ref: '#/components/parameters/organization_id'
         - $ref: '#/components/parameters/X-Organization-ID'
         - name: tool_name
@@ -3294,7 +3579,11 @@ paths:
 
   /api/v1/projects/{id}/link_jira:
     post:
-      summary: Link a Jira project to this DB90 project
+      summary: Link a Jira project to this project
+      description: >-
+        Links (or re-links) a Jira project. Any previously synced issues are
+        deleted and issuesSyncedAt is reset, so the next sync repopulates the
+        list from the newly linked project only.
       tags:
         - Projects
       parameters:
@@ -3337,7 +3626,11 @@ paths:
 
   /api/v1/projects/{id}/link_linear:
     post:
-      summary: Link a Linear project to this DB90 project
+      summary: Link a Linear project to this project
+      description: >-
+        Links (or re-links) a Linear project. Any previously synced issues are
+        deleted and issuesSyncedAt is reset, so the next sync repopulates the
+        list from the newly linked project only.
       tags:
         - Projects
       parameters:
@@ -3787,6 +4080,7 @@ paths:
       tags:
         - Project Members
       parameters:
+        - $ref: '#/components/parameters/tz'
         - $ref: '#/components/parameters/project_id'
         - name: days
           in: query
@@ -4114,6 +4408,7 @@ paths:
         - $ref: '#/components/parameters/per_page'
         - $ref: '#/components/parameters/start_date'
         - $ref: '#/components/parameters/end_date'
+        - $ref: '#/components/parameters/tz'
         - name: tool_name
           in: query
           schema:
@@ -4488,6 +4783,7 @@ paths:
         - $ref: '#/components/parameters/organization_id'
         - $ref: '#/components/parameters/start_date'
         - $ref: '#/components/parameters/end_date'
+        - $ref: '#/components/parameters/tz'
         - name: tool_name
           in: query
           schema:
@@ -4567,6 +4863,81 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+
+  /api/v1/organizations/{organization_id}/reports/export:
+    get:
+      summary: Export aggregated usage report
+      description: >
+        Returns an aggregated usage report for the organization in CSV or JSON format.
+        Five report types are supported: cost_by_user, cost_by_project, cost_by_tool,
+        token_by_user, and token_by_tool. When group_by is specified each row includes
+        a period column (ISO 8601 timestamp of the bucket start).
+        Requires org owner or global admin role.
+        If from/to are omitted the endpoint defaults to the last 30 days.
+      tags:
+        - Reports
+      security:
+        - bearer_auth: []
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - name: report_type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [cost_by_user, cost_by_project, cost_by_tool, token_by_user, token_by_tool]
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [csv, json]
+            default: json
+        - name: from
+          in: query
+          description: Start of date range (ISO 8601). Defaults to 30 days ago.
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: End of date range (ISO 8601). Defaults to now.
+          schema:
+            type: string
+            format: date-time
+        - name: group_by
+          in: query
+          description: Time bucket size. When set, each row includes a period column.
+          schema:
+            type: string
+            enum: [day, week, month]
+        - name: project_id
+          in: query
+          description: Scope results to a specific project (optional).
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Report data as CSV download or JSON array
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
 
   /api/v1/organizations/{organization_id}/event_export_jobs/{id}:
     get:
@@ -5464,6 +5835,190 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationError'
 
+  /api/v1/organizations/{organization_id}/scheduled_exports:
+    get:
+      summary: List scheduled exports
+      description: Returns all scheduled report exports for the organization. Requires owner role.
+      tags:
+        - Scheduled Exports
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+      responses:
+        '200':
+          description: Scheduled exports list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ScheduledExport'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      summary: Create a scheduled export
+      description: Creates a new scheduled report export configuration. Requires owner role.
+      tags:
+        - Scheduled Exports
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - report_type
+                - frequency
+                - recipients
+              properties:
+                report_type:
+                  type: string
+                  enum: [cost_by_user, cost_by_project, cost_by_tool, token_by_user, token_by_tool]
+                format:
+                  type: string
+                  enum: [csv, json]
+                  default: csv
+                frequency:
+                  type: string
+                  enum: [daily, weekly, monthly]
+                day_of_week:
+                  type: integer
+                  minimum: 0
+                  maximum: 6
+                  nullable: true
+                  description: Required when frequency is weekly. 0 = Sunday, 6 = Saturday.
+                day_of_month:
+                  type: integer
+                  minimum: 1
+                  maximum: 28
+                  nullable: true
+                  description: Required when frequency is monthly.
+                group_by:
+                  type: string
+                  enum: [day, week, month]
+                  nullable: true
+                active:
+                  type: boolean
+                  default: true
+                recipients:
+                  type: array
+                  items:
+                    type: string
+                    format: email
+                  minItems: 1
+      responses:
+        '201':
+          description: Scheduled export created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ScheduledExport'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/scheduled_exports/{id}:
+    patch:
+      summary: Update a scheduled export
+      description: Update fields on a scheduled export configuration. Requires owner role.
+      tags:
+        - Scheduled Exports
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                report_type:
+                  type: string
+                  enum: [cost_by_user, cost_by_project, cost_by_tool, token_by_user, token_by_tool]
+                format:
+                  type: string
+                  enum: [csv, json]
+                frequency:
+                  type: string
+                  enum: [daily, weekly, monthly]
+                day_of_week:
+                  type: integer
+                  minimum: 0
+                  maximum: 6
+                  nullable: true
+                day_of_month:
+                  type: integer
+                  minimum: 1
+                  maximum: 28
+                  nullable: true
+                group_by:
+                  type: string
+                  enum: [day, week, month]
+                  nullable: true
+                active:
+                  type: boolean
+                recipients:
+                  type: array
+                  items:
+                    type: string
+                    format: email
+      responses:
+        '200':
+          description: Scheduled export updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ScheduledExport'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      summary: Delete a scheduled export
+      description: Removes a scheduled export configuration. Requires owner role.
+      tags:
+        - Scheduled Exports
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204':
+          description: No Content
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
 # ============================================
 # COMPONENTS
 # ============================================
@@ -6177,6 +6732,125 @@ components:
         - createdAt
         - updatedAt
 
+    Invitation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        token:
+          type: string
+          description: Public token used in invitation accept URLs
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [owner, member, viewer]
+        status:
+          type: string
+          enum: [pending, accepted, revoked, expired]
+        organization:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            slug:
+              type: string
+          required:
+            - id
+            - name
+            - slug
+        invitedBy:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            email:
+              type: string
+              format: email
+          required:
+            - id
+            - name
+            - email
+        expiresAt:
+          type: string
+          format: date-time
+        acceptedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - token
+        - email
+        - role
+        - status
+        - organization
+        - invitedBy
+        - expiresAt
+        - createdAt
+        - updatedAt
+
+    PublicInvitation:
+      type: object
+      description: Invitation details exposed via the public token endpoints.
+      properties:
+        id:
+          type: string
+          format: uuid
+        token:
+          type: string
+          description: Public token used to accept the invitation
+        role:
+          type: string
+          enum: [owner, member, viewer]
+        status:
+          type: string
+          enum: [pending, accepted, revoked, expired]
+        organization:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            slug:
+              type: string
+          required:
+            - id
+            - name
+            - slug
+        invitedByName:
+          type: string
+        expired:
+          type: boolean
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - token
+        - role
+        - status
+        - organization
+        - invitedByName
+        - expired
+        - expiresAt
+
     OrganizationMemberListItem:
       allOf:
         - $ref: '#/components/schemas/OrganizationMembership'
@@ -6301,6 +6975,17 @@ components:
           type: string
           nullable: true
           description: ISO 8601 date for end of current billing period (Copilot only)
+        webhookActive:
+          type: boolean
+          description: Whether a webhook is actively delivering events to this connector
+        syncRepositories:
+          type: boolean
+          nullable: true
+          description: Whether repository/commit polling sync is enabled (source-control only; null for other types)
+        syncPullRequests:
+          type: boolean
+          nullable: true
+          description: Whether PR/MR ingestion is enabled (source-control only; null for other types)
         repositoryCount:
           type: integer
         syncedEventCount:
@@ -6590,6 +7275,26 @@ components:
               type: integer
             repositoryCount:
               type: integer
+            jiraProjectKey:
+              type: string
+              nullable: true
+            jiraConnectorId:
+              type: string
+              nullable: true
+            linearProjectId:
+              type: string
+              nullable: true
+            linearProjectName:
+              type: string
+              nullable: true
+            linearConnectorId:
+              type: string
+              nullable: true
+            issuesSyncedAt:
+              type: string
+              format: date-time
+              nullable: true
+              description: "Timestamp of the last successful issue sync. Null if issues have never been synced."
             sourceControlSummary:
               type: array
               items:
@@ -7123,6 +7828,58 @@ components:
           description: Present when recipientType is 'user'.
         enabled:
           type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ScheduledExport:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        reportType:
+          type: string
+          enum: [cost_by_user, cost_by_project, cost_by_tool, token_by_user, token_by_tool]
+        format:
+          type: string
+          enum: [csv, json]
+        frequency:
+          type: string
+          enum: [daily, weekly, monthly]
+        dayOfWeek:
+          type: integer
+          nullable: true
+          minimum: 0
+          maximum: 6
+        dayOfMonth:
+          type: integer
+          nullable: true
+          minimum: 1
+          maximum: 28
+        recipients:
+          type: array
+          items:
+            type: string
+            format: email
+        groupBy:
+          type: string
+          nullable: true
+          enum: [day, week, month]
+        active:
+          type: boolean
+        lastRunAt:
+          type: string
+          format: date-time
+          nullable: true
+        nextRunAt:
+          type: string
+          format: date-time
         createdAt:
           type: string
           format: date-time

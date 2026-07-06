@@ -79,7 +79,10 @@ class LinearSyncJob < ApplicationJob
   def sync_single_project_issues(project_id)
     project = Project.find(project_id)
     linear_project_id = project.project_settings.find_by(key: "linear_project_id")&.value
-    sync_project_issues(project, linear_project_id) if linear_project_id.present?
+    if linear_project_id.present?
+      sync_project_issues(project, linear_project_id)
+      project.update_column(:issues_synced_at, Time.current)
+    end
   end
 
   def sync_all_linked_project_issues
@@ -87,7 +90,10 @@ class LinearSyncJob < ApplicationJob
     ProjectSetting.where(key: "linear_project_id", project_id: linked_connector_project_ids)
                   .includes(:project)
                   .each do |setting|
-      sync_project_issues(setting.project, setting.value) if setting.value.present?
+      next unless setting.value.present?
+
+      sync_project_issues(setting.project, setting.value)
+      setting.project.update_column(:issues_synced_at, Time.current)
     end
   end
 

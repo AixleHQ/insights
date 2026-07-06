@@ -77,6 +77,14 @@ class OrganizationConnector < ApplicationRecord
     connector_type == "slack"
   end
 
+  def sync_repositories?
+    config&.fetch("sync_repositories", true) != false
+  end
+
+  def sync_pull_requests?
+    config&.fetch("sync_pull_requests", true) != false
+  end
+
   def mark_testing!
     update!(status: "testing", last_error: nil)
   end

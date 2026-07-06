@@ -1,7 +1,7 @@
 .PHONY: help setup up down logs api web worker sidekiq db-create db-migrate db-structure-clean db-seed db-reset test test-api test-web test-cursor test-claude lint lint-api lint-web generate-types clean build build-cursor build-claude console remote-build remote-shell toolbox-shell staging-exec-api staging-exec-web staging-exec-keycloak staging-exec-temporal staging-exec-sidekiq staging-logs-api staging-logs-web staging-logs-keycloak staging-logs-temporal staging-logs-sidekiq watch-staging-logs-api watch-staging-logs-web watch-staging-logs-keycloak watch-staging-logs-temporal watch-staging-logs-sidekiq staging-build staging-build-api staging-build-keycloak staging-deploy staging-deploy-api staging-deploy-web staging-deploy-sidekiq staging-deploy-keycloak staging-deploy-temporal-worker prod-exec-api prod-exec-web prod-exec-keycloak prod-logs-api prod-logs-web prod-logs-keycloak prod-logs-temporal prod-logs-sidekiq watch-prod-logs-api watch-prod-logs-web watch-prod-logs-keycloak watch-prod-logs-temporal watch-prod-logs-sidekiq prod-build prod-deploy prod-deploy-api prod-deploy-web prod-deploy-sidekiq prod-deploy-keycloak prod-deploy-temporal-worker
 
 help:
-	@echo "DB90 Development Commands"
+	@echo "Aixle Insights Development Commands"
 	@echo ""
 	@echo "Docker:"
 	@echo "  make up             - Start all services (infra + app)"
@@ -166,25 +166,13 @@ db-reset:
 # Testing
 # ============================================================================
 
-test: test-api test-web test-cursor test-claude
+test: test-api test-web
 
 test-api:
 	docker compose exec api bundle exec rspec
 
 test-web:
 	docker compose exec web npm run test:run
-
-test-cursor:
-	cd packages/tools/db90-cursor && npm test
-
-test-claude:
-	cd packages/tools/db90-claude && npm test
-
-build-cursor:
-	cd packages/tools/db90-cursor && npm run build
-
-build-claude:
-	cd packages/tools/db90-claude && npm run build
 
 # ============================================================================
 # Linting
@@ -227,8 +215,7 @@ export CI_COMMIT_BRANCH ?= $(shell git rev-parse --abbrev-ref HEAD)
 
 REMOTE_EXEC = docker compose --profile remote run --rm --entrypoint make remote
 REMOTE_RUN  = docker compose --profile remote run --rm remote
-TOOLBOX_RUN = docker compose --profile remote run --rm toolbox
-PROD_TOOLBOX_RUN = PROJECT=aixle-db90 docker compose --profile remote run --rm toolbox
+TOOLBOX_RUN = PROJECT=aixle-db90 docker compose --profile remote run --rm toolbox
 
 # GHCR credentials are resolved lazily for build/push targets only (see the
 # target-specific exports in the build section), so plain `make test` / `make up`
@@ -381,16 +368,16 @@ prod-build:
 _prod-build: prod-build-api prod-build-web prod-build-temporal-worker prod-build-keycloak
 
 prod-build-api:
-	$(PROD_TOOLBOX_RUN) sh -c '$(TOOLBOX_GHCR_LOGIN) ENVIRONMENT=production APPLICATION=api ecs_helper build_and_push --image=api --file=./Dockerfile.api $(BASE_BUILD_ARGS)'
+	$(TOOLBOX_RUN) sh -c '$(TOOLBOX_GHCR_LOGIN) ENVIRONMENT=production APPLICATION=api ecs_helper build_and_push --image=api --file=./Dockerfile.api $(BASE_BUILD_ARGS)'
 
 prod-build-web:
-	$(PROD_TOOLBOX_RUN) sh -c '$(TOOLBOX_GHCR_LOGIN) ENVIRONMENT=production APPLICATION=web ecs_helper build_and_push --image=web --file=./Dockerfile.web $(WEB_BASE_BUILD_ARGS) $(WEB_NGINX_BUILD_ARGS)'
+	$(TOOLBOX_RUN) sh -c '$(TOOLBOX_GHCR_LOGIN) ENVIRONMENT=production APPLICATION=web ecs_helper build_and_push --image=web --file=./Dockerfile.web $(WEB_BASE_BUILD_ARGS) $(WEB_NGINX_BUILD_ARGS)'
 
 prod-build-temporal-worker:
-	$(PROD_TOOLBOX_RUN) sh -c '$(TOOLBOX_GHCR_LOGIN) ENVIRONMENT=production APPLICATION=temporal-worker ecs_helper build_and_push --image=temporal-worker --file=./Dockerfile.temporal-worker $(BASE_BUILD_ARGS)'
+	$(TOOLBOX_RUN) sh -c '$(TOOLBOX_GHCR_LOGIN) ENVIRONMENT=production APPLICATION=temporal-worker ecs_helper build_and_push --image=temporal-worker --file=./Dockerfile.temporal-worker $(BASE_BUILD_ARGS)'
 
 prod-build-keycloak:
-	$(PROD_TOOLBOX_RUN) sh -c '$(TOOLBOX_GHCR_LOGIN) ENVIRONMENT=production APPLICATION=keycloak ecs_helper build_and_push --image=keycloak --file=./Dockerfile.keycloak'
+	$(TOOLBOX_RUN) sh -c '$(TOOLBOX_GHCR_LOGIN) ENVIRONMENT=production APPLICATION=keycloak ecs_helper build_and_push --image=keycloak --file=./Dockerfile.keycloak'
 
 # ============================================================================
 # ECS Deploy (via ecs_helper in toolbox container)
@@ -416,16 +403,16 @@ staging-deploy-temporal-worker:
 prod-deploy: prod-deploy-api prod-deploy-web prod-deploy-sidekiq prod-deploy-keycloak prod-deploy-temporal-worker
 
 prod-deploy-api:
-	$(PROD_TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=api ecs_helper deploy --timeout 3600'
+	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=api ecs_helper deploy --timeout 3600'
 
 prod-deploy-web:
-	$(PROD_TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=web ecs_helper deploy --timeout 3600'
+	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=web ecs_helper deploy --timeout 3600'
 
 prod-deploy-sidekiq:
-	$(PROD_TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=sidekiq ecs_helper deploy --timeout 3600'
+	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=sidekiq ecs_helper deploy --timeout 3600'
 
 prod-deploy-keycloak:
-	$(PROD_TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=keycloak ecs_helper deploy --timeout 3600'
+	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=keycloak ecs_helper deploy --timeout 3600'
 
 prod-deploy-temporal-worker:
-	$(PROD_TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=temporal-worker ecs_helper deploy --timeout 3600'
+	$(TOOLBOX_RUN) sh -c 'ENVIRONMENT=production APPLICATION=temporal-worker ecs_helper deploy --timeout 3600'

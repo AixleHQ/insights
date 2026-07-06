@@ -126,6 +126,20 @@ RSpec.describe BitbucketRepositoryActivitySyncJob, type: :job do
       end
     end
 
+    context "when sync_pull_requests is disabled" do
+      before { connector.update_column(:config, { "sync_pull_requests" => false }) }
+
+      it "skips PR ingestion but still creates commit and pipeline events" do
+        expect {
+          described_class.new.perform(connector.id, repository.id)
+        }.to change(ToolEvent, :count).by(2)
+
+        expect(ToolEvent.where(tool_name: "bitbucket", event_type: "review").count).to eq(0)
+        expect(ToolEvent.where(tool_name: "bitbucket", event_type: "commit").count).to eq(1)
+        expect(ToolEvent.where(tool_name: "bitbucket", event_type: "other").count).to eq(1)
+      end
+    end
+
     context "when repository full_name is invalid" do
       before { repository.update_column(:full_name, "invalid-no-slash") }
 

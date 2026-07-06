@@ -54,10 +54,11 @@ function ProjectFilterDropdown({
       onValueChange={(v) => onChange(v === "all" ? undefined : v)}
     >
       <SelectTrigger className="w-48">
-        <SelectValue placeholder="All Projects" />
+        <SelectValue placeholder="All Activity" />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="all">All Projects</SelectItem>
+        <SelectItem value="all">All Activity</SelectItem>
+        <SelectItem value="none">No Project</SelectItem>
         {projects?.map((p) => (
           <SelectItem key={p.id} value={p.id}>
             {p.name}
@@ -192,7 +193,7 @@ export function OrgDashboard() {
         <div>
           <h1 className="type-h2">Dashboard</h1>
           <p className="text-sm text-muted-foreground">
-            AI tool usage and cost overview for {currentOrg?.name || "your organization"}
+            Tool usage and cost overview for {currentOrg?.name || "your organization"}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -224,7 +225,9 @@ export function OrgDashboard() {
         !isLoadingStats &&
         !stats?.total_events ? (
         <div className="flex h-64 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
-          No data for the selected project in this period.
+          {selectedProjectId === "none"
+            ? "No unattributed events in this period."
+            : "No data for the selected project in this period."}
         </div>
       ) : (
         <>

@@ -243,6 +243,74 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
       expect(json_data[:label]).to eq('My GitHub account')
       expect(connector.reload.label).to eq('My GitHub account')
     end
+
+    context 'config persistence (source-control)' do
+      it 'persists sync_repositories and sync_pull_requests' do
+        authenticated_patch "/api/v1/organizations/#{organization.id}/connectors/#{connector.id}",
+                            user: admin,
+                            organization: organization,
+                            params: { config: { sync_repositories: false, sync_pull_requests: false } }
+
+        expect_success
+        reloaded = connector.reload
+        expect(reloaded.config['sync_repositories']).to be false
+        expect(reloaded.config['sync_pull_requests']).to be false
+        expect(json_data[:syncRepositories]).to be false
+        expect(json_data[:syncPullRequests]).to be false
+      end
+
+      it 'merges config without clobbering existing keys' do
+        connector.update!(config: { 'existing_key' => 'value', 'sync_repositories' => true })
+
+        authenticated_patch "/api/v1/organizations/#{organization.id}/connectors/#{connector.id}",
+                            user: admin,
+                            organization: organization,
+                            params: { config: { sync_pull_requests: false } }
+
+        expect_success
+        reloaded = connector.reload
+        expect(reloaded.config['existing_key']).to eq('value')
+        expect(reloaded.config['sync_repositories']).to be true
+        expect(reloaded.config['sync_pull_requests']).to be false
+      end
+
+      it 'does not permit arbitrary config keys' do
+        authenticated_patch "/api/v1/organizations/#{organization.id}/connectors/#{connector.id}",
+                            user: admin,
+                            organization: organization,
+                            params: { config: { arbitrary_key: 'bad', sync_repositories: true } }
+
+        expect_success
+        expect(connector.reload.config).not_to have_key('arbitrary_key')
+        expect(connector.reload.config['sync_repositories']).to be true
+      end
+
+      it 'does not touch config for non-source-control connectors' do
+        ai_connector = create(:organization_connector,
+                              organization: organization,
+                              connector_type: 'anthropic',
+                              config: { 'seat_count' => 10 })
+
+        authenticated_patch "/api/v1/organizations/#{organization.id}/connectors/#{ai_connector.id}",
+                            user: admin,
+                            organization: organization,
+                            params: { config: { sync_repositories: false } }
+
+        expect_success
+        reloaded = ai_connector.reload
+        expect(reloaded.config['seat_count']).to eq(10)
+        expect(reloaded.config).not_to have_key('sync_repositories')
+      end
+
+      it 'enforces authorize! (non-owner gets 403)' do
+        authenticated_patch "/api/v1/organizations/#{organization.id}/connectors/#{connector.id}",
+                            user: member,
+                            organization: organization,
+                            params: { config: { sync_repositories: false } }
+
+        expect_forbidden
+      end
+    end
   end
 
   describe 'POST /api/v1/organizations/:organization_id/connectors (multi-instance)' do
@@ -681,8 +749,9 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
       allow(Oauth::BaseProvider).to receive(:provider_class).with('github').and_return(fake_provider)
     end
 
-    it 'creates a connector and returns it with connected status' do
+    it 'creates a connector and returns it with testing status' do
       connector.destroy!
+      allow(GithubSyncJob).to receive(:perform_later)
 
       authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
                          user: admin,
@@ -691,12 +760,28 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
 
       expect_success
       expect(json_data[:connectorType]).to eq('github')
-      expect(json_data[:status]).to eq('connected')
+      expect(json_data[:status]).to eq('testing')
       expect(json_data[:externalAccountName]).to eq('octocat')
+    end
+
+    it 'enqueues a sync job and returns testing status on first-time connect' do
+      connector.destroy!
+      allow(GithubSyncJob).to receive(:perform_later)
+
+      authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
+                         user: admin,
+                         organization: organization,
+                         params: { connector_type: 'github', code: 'oauth_code_abc' }
+
+      expect_success
+      new_connector = OrganizationConnector.last
+      expect(new_connector.status).to eq('testing')
+      expect(GithubSyncJob).to have_received(:perform_later).with(new_connector.id)
     end
 
     it 'creates a connector.create audit log on OAuth callback' do
       connector.destroy!
+      allow(GithubSyncJob).to receive(:perform_later)
 
       expect {
         authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
@@ -745,6 +830,8 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
       before { connector.update!(external_org_id: 'gh-old') }
 
       it 'creates a new connector (count +1)' do
+        allow(GithubSyncJob).to receive(:perform_later)
+
         expect {
           authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
                              user: admin,
@@ -760,6 +847,7 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
 
     it 'persists a label when provided' do
       connector.destroy!
+      allow(GithubSyncJob).to receive(:perform_later)
 
       authenticated_post "/api/v1/organizations/#{organization.id}/connectors/callback",
                          user: admin,
@@ -1018,6 +1106,10 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
              status: 'disconnected')
     end
 
+    before do
+      allow_any_instance_of(Oauth::GithubProvider).to receive(:test_connection).and_return({ success: true })
+    end
+
     it 'returns summary counts for org admin' do
       authenticated_get "/api/v1/organizations/#{organization.id}/connectors/health",
                         user: admin,
@@ -1085,6 +1177,24 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
       expect_success
       github_data = json_response.dig(:data, :connectors).find { |c| c[:connector_type] == 'github' }
       expect(github_data[:success_rate_7d]).to be_nil
+    end
+
+    it 'probes connected connectors and reflects authorization failures' do
+      allow_any_instance_of(Oauth::GithubProvider).to receive(:test_connection)
+        .and_return({ success: false, error: 'GitHub API error: 401' })
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/connectors/health",
+                        user: admin,
+                        organization: organization
+
+      expect_success
+      github_data = json_response.dig(:data, :connectors).find { |c| c[:connector_type] == 'github' }
+      expect(github_data[:status]).to eq('error')
+      expect(github_data[:last_error]).to include('401')
+
+      summary = json_response.dig(:data, :summary)
+      expect(summary[:connected]).to eq(0)
+      expect(summary[:error]).to eq(2)
     end
 
     it 'returns 403 for non-admin members' do

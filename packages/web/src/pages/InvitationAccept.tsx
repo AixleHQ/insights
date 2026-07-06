@@ -20,6 +20,7 @@ import {
   buildDb90CursorIngestExampleCommand,
 } from "@/lib/db90-cli";
 import { formatLongUsDate } from "@/lib/formatters";
+import { AppRoutes } from "@/lib/routes";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -74,7 +75,7 @@ export function InvitationAccept() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
   const { isAuthenticated, profile } = useAuth();
-  const { refreshOrganizations, setCurrentOrg } = useOrg();
+  const { refreshOrganizations } = useOrg();
   const acceptedInvitationStorageKey = token ? getAcceptedInvitationStorageKey(token) : null;
 
   const [isAccepting, setIsAccepting] = useState(false);
@@ -115,21 +116,8 @@ export function InvitationAccept() {
       }
       setAcceptSuccess(true);
 
-      if (acceptedOrganization) {
-        try {
-          setCurrentOrg({
-            id: acceptedOrganization.id,
-            name: acceptedOrganization.name,
-            slug: acceptedOrganization.slug,
-            is_active: true,
-          });
-        } catch (orgError) {
-          console.error("Failed to set accepted organization:", orgError);
-        }
-      }
-
-      // Refresh the org list in the background so the success card is not blocked by it.
-      void refreshOrganizations().catch((refreshError) => {
+      // Refresh org list and keep the accepted organization as current context.
+      void refreshOrganizations(acceptedOrganization?.id).catch((refreshError) => {
         console.error("Failed to refresh organizations after invitation accept:", refreshError);
       });
     } catch (err) {
@@ -151,7 +139,7 @@ export function InvitationAccept() {
     if (acceptedInvitationStorageKey) {
       window.sessionStorage.removeItem(acceptedInvitationStorageKey);
     }
-    navigate("/");
+    navigate(AppRoutes.dashboard);
   };
 
   return (
@@ -165,7 +153,7 @@ export function InvitationAccept() {
       {/* Header */}
       <header className="relative z-10 border-b bg-background/80 backdrop-blur-sm">
         <div className="mx-auto flex h-16 max-w-4xl items-center justify-between px-6">
-          <Link to="/" className="flex items-center gap-3">
+          <Link to={AppRoutes.dashboard} className="flex items-center gap-3">
             <div className="flex size-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70">
               <span className="font-mono text-sm font-bold text-primary-foreground">
                 AI
@@ -218,7 +206,7 @@ export function InvitationAccept() {
                   </CardDescription>
                 </div>
                 <Button variant="outline" asChild>
-                  <Link to="/">
+                  <Link to={AppRoutes.dashboard}>
                     Go to Home
                     <ArrowRight className="ml-2 size-4" />
                   </Link>
@@ -251,7 +239,7 @@ export function InvitationAccept() {
                   </CardDescription>
                 </div>
                 <Button variant="outline" asChild>
-                  <Link to="/">
+                  <Link to={AppRoutes.dashboard}>
                     Go to Home
                     <ArrowRight className="ml-2 size-4" />
                   </Link>
@@ -281,7 +269,7 @@ export function InvitationAccept() {
                   </CardDescription>
                 </div>
                 <Button variant="outline" asChild>
-                  <Link to="/">
+                  <Link to={AppRoutes.dashboard}>
                     Go to Home
                     <ArrowRight className="ml-2 size-4" />
                   </Link>
@@ -310,7 +298,7 @@ export function InvitationAccept() {
                   </CardDescription>
                 </div>
                 <Button asChild>
-                  <Link to="/">
+                  <Link to={AppRoutes.dashboard}>
                     Go to Dashboard
                     <ArrowRight className="ml-2 size-4" />
                   </Link>
@@ -509,14 +497,14 @@ export function InvitationAccept() {
                       </Button>
                     ) : (
                       <Button size="lg" asChild className="w-full">
-                        <Link to={`/login?redirect=/invitations/${token}`}>
+                        <Link to={`${AppRoutes.login}?redirect=${AppRoutes.invitation(token ?? "")}`}>
                           Sign In to Accept
                           <ArrowRight className="ml-2 size-4" />
                         </Link>
                       </Button>
                     )}
                     <Button variant="ghost" asChild>
-                      <Link to="/">Maybe Later</Link>
+                      <Link to={AppRoutes.dashboard}>Maybe Later</Link>
                     </Button>
                   </div>
                 </CardContent>

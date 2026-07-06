@@ -48,6 +48,8 @@ class GithubSyncJob < ApplicationJob
   private
 
   def sync_repositories
+    return unless @connector.sync_repositories?
+
     provider = Oauth::BaseProvider.for(@connector)
     repos = provider.fetch_repositories
 
@@ -114,6 +116,8 @@ class GithubSyncJob < ApplicationJob
   end
 
   def process_pull_request_event(payload)
+    return unless @connector.sync_pull_requests?
+
     repository = find_repository(payload.dig("repository", "id"))
     return unless repository
 

@@ -2,6 +2,10 @@ require "sidekiq/web"
 require_relative "../lib/admin_constraint"
 
 Rails.application.routes.draw do
+  if Rails.env.development?
+    mount LetterOpenerWeb::Engine, at: "admin/letter_opener"
+  end
+
   # Health check endpoint
   get "health", to: "health#show"
   get "up" => "rails/health#show", as: :rails_health_check
@@ -68,6 +72,9 @@ Rails.application.routes.draw do
 
         # Notification routing configuration
         resources :notification_routes, only: %i[index create update destroy]
+
+        # Scheduled report exports
+        resources :scheduled_exports, only: %i[index create update destroy]
 
         # Organization audit logs (export + unified must precede the resource to avoid capture by :index)
         get "audit_logs/unified/export", to: "unified_audit_logs#export"
@@ -137,6 +144,9 @@ Rails.application.routes.draw do
         # Telemetry ingestion
         post "telemetry/ingest", to: "telemetry#ingest"
         post "telemetry/batch", to: "telemetry#batch"
+
+        # Aggregated report exports
+        get "reports/export", to: "reports#export"
 
         # Stats
         get "stats/overview", to: "stats#overview"

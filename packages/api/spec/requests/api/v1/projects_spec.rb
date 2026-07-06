@@ -267,10 +267,10 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       expect(json_data[:name]).to eq('Updated')
     end
 
-    it 'returns 403 for non-owners of personal projects' do
+    it 'returns 404 for non-owners of personal projects (project not visible via authorized_scope)' do
       authenticated_patch "/api/v1/projects/#{project.id}", user: other_user, params: { name: 'Hacked' }
 
-      expect_forbidden
+      expect_not_found
     end
   end
 
@@ -438,10 +438,10 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       end
     end
 
-    it 'returns 403 for unauthorized users' do
+    it 'returns 404 for unauthorized users (project not visible via authorized_scope)' do
       authenticated_get "/api/v1/projects/#{project.id}/stats", user: other_user
 
-      expect_forbidden
+      expect_not_found
     end
   end
 
@@ -618,10 +618,10 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       end
     end
 
-    it 'returns 403 for unauthorized users' do
+    it 'returns 404 for unauthorized users (project not visible via authorized_scope)' do
       authenticated_get "/api/v1/projects/#{project.id}/members", user: other_user
 
-      expect_forbidden
+      expect_not_found
     end
   end
 
@@ -640,12 +640,12 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       expect(json_data[:projectId]).to eq(project.id)
     end
 
-    it 'returns 403 for non-admin members' do
+    it 'returns 404 for non-admin members (not a project member — project not visible via authorized_scope)' do
       non_admin = create(:user)
       create(:organization_membership, user: non_admin, organization: organization, role: 'member')
       authenticated_get "/api/v1/projects/#{project.id}/retention_policy", user: non_admin
 
-      expect_forbidden
+      expect_not_found
     end
 
     it 'returns 401 for unauthenticated requests' do
@@ -720,10 +720,10 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       end
     end
 
-    it 'returns 403 for unauthorized users' do
+    it 'returns 404 for unauthorized users (project not visible via authorized_scope)' do
       authenticated_get "/api/v1/projects/#{project.id}/stats/commits_by_user", user: other_user
 
-      expect_forbidden
+      expect_not_found
     end
   end
 
@@ -771,14 +771,14 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       expect(json_response[:errors]).to be_present
     end
 
-    it 'returns 403 for non-admin members' do
+    it 'returns 404 for non-admin members (not a project member — project not visible via authorized_scope)' do
       non_admin = create(:user)
       create(:organization_membership, user: non_admin, organization: organization, role: 'member')
       authenticated_patch "/api/v1/projects/#{project.id}/retention_policy",
                           user: non_admin,
                           params: { raw_event_ttl: '48_hours' }
 
-      expect_forbidden
+      expect_not_found
     end
 
     it 'persists cost_threshold_cents and token_threshold alert fields' do
@@ -819,6 +819,20 @@ RSpec.describe 'Api::V1::Projects', type: :request do
 
       expect_success
       expect(project.reload.project_settings.find_by(key: 'jira_project_key')&.value).to eq('NEW')
+    end
+
+    it 'deletes issues from the previously linked project on re-link' do
+      project.project_settings.create!(key: 'jira_connector_id', value: connector.id.to_s)
+      project.project_settings.create!(key: 'jira_project_key', value: 'OLD')
+      create_list(:issue, 2, project: project, organization: organization,
+                             organization_connector: connector, provider_project_key: 'OLD')
+
+      authenticated_post "/api/v1/projects/#{project.id}/link_jira",
+                         user: user,
+                         params: { connector_id: connector.id, jira_project_key: 'NEW' }
+
+      expect_success
+      expect(project.issues.count).to eq(0)
     end
 
     it 'returns 404 when connector belongs to another org' do
@@ -889,6 +903,21 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       expect_success
       expect(project.reload.project_settings.find_by(key: 'jira_connector_id')).to be_nil
       expect(project.project_settings.find_by(key: 'jira_project_key')).to be_nil
+    end
+
+    it 'deletes issues from the previously linked provider when switching' do
+      jira_connector = create(:organization_connector, :jira, organization: organization)
+      project.project_settings.create!(key: 'jira_connector_id', value: jira_connector.id.to_s)
+      project.project_settings.create!(key: 'jira_project_key', value: 'SCRUM')
+      create_list(:issue, 2, project: project, organization: organization,
+                             organization_connector: jira_connector, provider_project_key: 'SCRUM')
+
+      authenticated_post "/api/v1/projects/#{project.id}/link_linear",
+                         user: user,
+                         params: { connector_id: connector.id, linear_project_id: 'project-1', linear_project_name: 'Platform' }
+
+      expect_success
+      expect(project.issues.count).to eq(0)
     end
 
     it 'returns 403 for project members without admin permission' do

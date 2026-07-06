@@ -155,7 +155,7 @@ module Api
         # Basic counts
         total_events = events.count
         total_cost = events.sum(:cost_usd)
-        events_today = events.where("occurred_at >= ?", Time.current.beginning_of_day).count
+        events_today = events.where("occurred_at >= ?", client_zone.now.beginning_of_day).count
         events_this_week = events.where("occurred_at >= ?", 1.week.ago).count
         events_this_month = events.where("occurred_at >= ?", 1.month.ago).count
 
@@ -334,8 +334,8 @@ module Api
 
         days = period_days(params[:period])
 
-        current_start = days.days.ago.beginning_of_day
-        prev_start    = (days * 2).days.ago.beginning_of_day
+        current_start = (client_zone.now - days.days).beginning_of_day
+        prev_start    = (client_zone.now - (days * 2).days).beginning_of_day
         quoted        = ActiveRecord::Base.connection.quote(current_start)
 
         # Single aggregate query covering both windows using PostgreSQL FILTER.
@@ -399,7 +399,7 @@ module Api
         # prompt quality alone is not measurable from token counts. Document in follow-up scope.
         days = period_days(params[:period])
 
-        current_start = days.days.ago.beginning_of_day
+        current_start = (client_zone.now - days.days).beginning_of_day
         events = current_organization.tool_events
           .where(user_id: @membership.user_id, occurred_at: current_start..Time.current)
 

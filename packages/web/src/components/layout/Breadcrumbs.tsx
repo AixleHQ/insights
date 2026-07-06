@@ -9,6 +9,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { AppRoutes } from "@/lib/routes";
 
 interface BreadcrumbConfig {
   label: string;
@@ -39,7 +40,7 @@ function useBreadcrumbs(): BreadcrumbConfig[] {
     return [{ label: "Dashboard" }];
   }
 
-  const crumbs: BreadcrumbConfig[] = [{ label: "Dashboard", href: "/" }];
+  const crumbs: BreadcrumbConfig[] = [{ label: "Dashboard", href: AppRoutes.dashboard }];
 
   let currentPath = "";
   pathSegments.forEach((segment, index) => {

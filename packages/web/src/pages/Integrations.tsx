@@ -33,6 +33,7 @@ import { ApiKeyConnectSheet } from "@/components/integrations/ApiKeyConnectSheet
 import { OrgSlackConnectSheet } from "@/components/integrations/OrgSlackConnectSheet";
 import { OpenrouterWebhookSheet } from "@/components/integrations/OpenrouterWebhookSheet";
 import { availableProviders, categoryLabels } from "@/lib/providers";
+import { AppRoutes } from "@/lib/routes";
 
 const AI_PROVIDERS = new Set(["anthropic", "openai", "openrouter", "gemini"]);
 const SLACK_PROVIDERS = new Set(["slack"]);
@@ -49,7 +50,14 @@ export function Integrations() {
   const { data: connectorsData, isLoading: connectorsLoading } = useConnectors(
     currentOrg?.id || "",
   );
-  const { data: healthData } = useConnectorHealth(currentOrg?.id || "", { enabled: isOwner });
+  const isAnyConnectorSyncing = useMemo(
+    () => (connectorsData ?? []).some((c) => c.status === "testing"),
+    [connectorsData],
+  );
+  const { data: healthData } = useConnectorHealth(currentOrg?.id || "", {
+    enabled: isOwner,
+    refetchInterval: isAnyConnectorSyncing ? 3_000 : false,
+  });
   const isLoading = connectorsLoading;
 
   const healthStatsById = useMemo(() => {
@@ -79,7 +87,7 @@ export function Integrations() {
     webhookSecretSet?: boolean;
   } | null>(null);
 
-  const handleConnectSuccess = () => navigate("/integrations/connected");
+  const handleConnectSuccess = () => navigate(AppRoutes.integrations.connected);
 
   // Transform API response to component format
   const integrations = useMemo(() => {
@@ -120,7 +128,7 @@ export function Integrations() {
     } else if (SLACK_PROVIDERS.has(providerId)) {
       setSlackSheetOpen(true);
     } else {
-      navigate(`/integrations/new/${providerId}`);
+      navigate(AppRoutes.integrations.setup(providerId));
     }
   };
 
@@ -234,7 +242,7 @@ export function Integrations() {
           </p>
         </div>
         {isOwner && (
-          <Button variant="outline" size="sm" onClick={() => navigate("/integrations/manage")}>
+          <Button variant="outline" size="sm" onClick={() => navigate(AppRoutes.integrations.manage)}>
             Manage Catalog
           </Button>
         )}
@@ -242,7 +250,7 @@ export function Integrations() {
 
       <Tabs
         value={activeTab}
-        onValueChange={(value) => navigate(`/integrations/${value}`)}
+        onValueChange={(value) => navigate(AppRoutes.integrations.byStatus(value))}
         className="space-y-4"
       >
         <TabsList>

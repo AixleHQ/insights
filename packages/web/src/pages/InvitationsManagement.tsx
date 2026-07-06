@@ -154,7 +154,7 @@ function InvitationRow({
 }) {
   const [copied, setCopied] = useState(false);
   const isPending = invitation.status === "pending";
-  const inviteUrl = `${window.location.origin}/invitations/${invitation.id}`;
+  const inviteUrl = `${window.location.origin}/invitations/${invitation.token}`;
 
   const handleCopyLink = async () => {
     await navigator.clipboard.writeText(inviteUrl);

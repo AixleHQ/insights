@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { ProjectCardSkeleton } from "@/components/ui/skeletons";
 import { ProjectCard } from "@/components/projects";
 import { cn } from "@/lib/utils";
+import { AppRoutes } from "@/lib/routes";
 
 type ViewMode = "grid" | "list";
 
@@ -34,7 +35,7 @@ export function Projects() {
   }, [projects, search]);
 
   const handleEdit = (id: string) => {
-    navigate(`/projects/${id}/edit`);
+    navigate(AppRoutes.projects.edit(id));
   };
 
   const handleDelete = async (id: string) => {
@@ -58,7 +59,7 @@ export function Projects() {
         </div>
         {currentRole === "owner" && (
           <Button asChild className="w-full sm:w-auto">
-            <Link to="/projects/new">
+            <Link to={AppRoutes.projects.new}>
               <Plus className="mr-2 size-4" />
               New Project
             </Link>
@@ -126,7 +127,7 @@ export function Projects() {
             </Button>
           ) : currentRole === "owner" ? (
             <Button asChild variant="link" className="mt-2">
-              <Link to="/projects/new">Create your first project</Link>
+              <Link to={AppRoutes.projects.new}>Create your first project</Link>
             </Button>
           ) : null}
         </div>

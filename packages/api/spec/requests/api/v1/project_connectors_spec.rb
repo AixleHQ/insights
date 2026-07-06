@@ -37,11 +37,11 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
       expect(json_data.length).to eq(1)
     end
 
-    it 'returns 403 for non-members' do
+    it 'returns 404 for non-members (project not visible via authorized_scope)' do
       authenticated_get "/api/v1/projects/#{project.id}/connectors",
                         user: non_member
 
-      expect_forbidden
+      expect_not_found
     end
 
     it 'filters by type' do
@@ -104,11 +104,11 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
       expect(json_data).not_to have_key(:refreshToken)
     end
 
-    it 'returns 403 for non-members' do
+    it 'returns 404 for non-members (project not visible via authorized_scope)' do
       authenticated_get "/api/v1/projects/#{project.id}/connectors/#{connector.id}",
                         user: non_member
 
-      expect_forbidden
+      expect_not_found
     end
   end
 
@@ -230,21 +230,21 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
       end
     end
 
-    it 'returns 403 for regular project members' do
+    it 'returns 404 for regular project members without fresh_project membership (project not visible via authorized_scope)' do
       authenticated_post "/api/v1/projects/#{fresh_project.id}/connectors",
                          user: project_member,
                          organization: organization,
                          params: { connector_type: 'openai', access_token: 'key' }
 
-      expect_forbidden
+      expect_not_found
     end
 
-    it 'returns 403 for non-members' do
+    it 'returns 404 for non-members (project not visible via authorized_scope)' do
       authenticated_post "/api/v1/projects/#{fresh_project.id}/connectors",
                          user: non_member,
                          params: { connector_type: 'openai', access_token: 'key' }
 
-      expect_forbidden
+      expect_not_found
     end
 
     it 'returns 422 when a connector of the same type already exists and is active' do
@@ -612,6 +612,28 @@ RSpec.describe 'Api::V1::ProjectConnectors', type: :request do
                          organization: organization
 
       expect_forbidden
+    end
+  end
+
+  # SECURITY: AIX-368 — BOLA cross-tenant access prevention
+  context "when accessing another organization's project" do
+    let(:org_b) { create(:organization) }
+    let(:org_b_project) { create(:project, organization: org_b, owner: nil) }
+    let!(:org_b_connector_resource) do
+      create(:project_connector, project: org_b_project, connector_type: "openai")
+    end
+
+    it "returns 404 when listing connectors of another org's project" do
+      authenticated_get "/api/v1/projects/#{org_b_project.id}/connectors", user: project_member
+
+      expect_not_found
+    end
+
+    it "returns 404 when showing a connector from another org's project" do
+      authenticated_get "/api/v1/projects/#{org_b_project.id}/connectors/#{org_b_connector_resource.id}",
+                        user: project_member
+
+      expect_not_found
     end
   end
 end

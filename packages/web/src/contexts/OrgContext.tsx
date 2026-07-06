@@ -39,7 +39,7 @@ interface OrgState {
 
 interface OrgContextValue extends OrgState {
   setCurrentOrg: (org: Organization | null) => void;
-  refreshOrganizations: () => Promise<void>;
+  refreshOrganizations: (orgId?: string) => Promise<void>;
   hasRole: (role: string | string[]) => boolean;
   currentMembership: OrganizationMembership | null;
   currentRole: MemberRole | null;
@@ -68,7 +68,7 @@ export function OrgProvider({ children, apiBaseUrl = "/api/v1" }: OrgProviderPro
   });
 
   // Fetch organizations when authenticated
-  const refreshOrganizations = useCallback(async () => {
+  const refreshOrganizations = useCallback(async (orgId?: string) => {
     if (!isAuthenticated) {
       setState((prev) => ({
         ...prev,
@@ -125,6 +125,9 @@ export function OrgProvider({ children, apiBaseUrl = "/api/v1" }: OrgProviderPro
       // Select org: last used (localStorage) > default_org_id preference > first org
       // localStorage represents the user's explicit selection and takes highest priority.
       // default_org_id is only used as a fallback when the user has never switched orgs.
+      if (orgId) {
+        localStorage.setItem(ORG_STORAGE_KEY, orgId);
+      }
       const storedOrgId = localStorage.getItem(ORG_STORAGE_KEY);
 
       let currentOrg: Organization | null = null;

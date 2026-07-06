@@ -41,12 +41,12 @@ RSpec.describe 'Api::V1::Organizations', type: :request do
       expect(json_data[:name]).to eq(organization.name)
     end
 
-    it 'returns 403 for non-members' do
+    it 'returns 404 for non-members (organization not visible via authorized_scope)' do
       non_member = create(:user)
 
       authenticated_get "/api/v1/organizations/#{organization.id}", user: non_member
 
-      expect_forbidden
+      expect_not_found
     end
   end
 
@@ -275,12 +275,12 @@ RSpec.describe 'Api::V1::Organizations', type: :request do
       expect_forbidden
     end
 
-    it 'returns 403 for users not in the organization' do
+    it 'returns 404 for users not in the organization (organization not visible via authorized_scope)' do
       outsider = create(:user)
 
       authenticated_get "/api/v1/organizations/#{organization.id}/retention_preview", user: outsider
 
-      expect_forbidden
+      expect_not_found
     end
 
     it 'returns estimated_records as nil when COUNT query times out' do

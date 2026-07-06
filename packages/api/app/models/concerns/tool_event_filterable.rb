@@ -15,7 +15,9 @@ module ToolEventFilterable
       scope = scope.where(event_type: types)
     end
     scope = scope.where(user_id: fp["user_id"])       if fp["user_id"].present?
-    if (project_ids = normalize_string_array(fp["project_id"])).any?
+    if normalize_project_filter(fp["project_id"]) == "none"
+      scope = scope.where(project_id: nil)
+    elsif (project_ids = normalize_string_array(fp["project_id"])).any?
       scope = scope.where(project_id: project_ids)
     end
     scope = scope.where(model: fp["model"])            if fp["model"].present?
@@ -25,12 +27,15 @@ module ToolEventFilterable
 
   def apply_tool_event_time_filter(scope, fp)
     fp = fp.transform_keys(&:to_s)
+    zone = ActiveSupport::TimeZone[fp["tz"].to_s] || Time.zone
     if fp["start_date"].present?
-      scope = scope.where("occurred_at >= ?", Time.zone.parse(fp["start_date"]).beginning_of_day)
+      parsed = begin; zone.parse(fp["start_date"]); rescue ArgumentError; nil; end
+      scope = scope.where("occurred_at >= ?", parsed.beginning_of_day) if parsed
     end
     if fp["end_date"].present?
       # Inclusive calendar end date (UI sends YYYY-MM-DD from <input type="date">).
-      scope = scope.where("occurred_at <= ?", Time.zone.parse(fp["end_date"]).end_of_day)
+      parsed = begin; zone.parse(fp["end_date"]); rescue ArgumentError; nil; end
+      scope = scope.where("occurred_at <= ?", parsed.end_of_day) if parsed
     end
     scope
   end
@@ -41,27 +46,83 @@ module ToolEventFilterable
     levels = normalize_string_array(risk_level)
     return scope if levels.empty?
 
-    # Special sentinel values cannot be mixed with explicit levels.
+    # All risk-level conditions prefer the canonical audit_log classification (written
+    # by the Temporal workflow) and fall back to tool_events.metadata for events that
+    # bypassed Temporal. This mirrors risky_event_condition in StatsController so that
+    # the Events filter and the Risk Alerts dashboard count the same events.
     if levels.include?("not_none")
-      return scope.where("metadata->>'risk_level' IS NOT NULL AND metadata->>'risk_level' NOT IN ('none', '')")
+      return scope.where(<<~SQL)
+        (
+          EXISTS (
+            SELECT 1 FROM audit_logs
+            WHERE audit_logs.tool_event_id = tool_events.id
+              AND audit_logs.risk_level NOT IN ('none')
+          )
+          OR (
+            NOT EXISTS (SELECT 1 FROM audit_logs WHERE audit_logs.tool_event_id = tool_events.id)
+            AND tool_events.metadata->>'risk_level' IS NOT NULL
+            AND tool_events.metadata->>'risk_level' NOT IN ('none', '')
+          )
+        )
+      SQL
     end
 
     none_selected = levels.include?("none")
-    explicit = levels.reject { |l| l == "none" }
+    explicit      = levels.reject { |l| l == "none" }
 
-    if none_selected && explicit.any?
-      scope.where(
-        "metadata->>'risk_level' IS NULL OR metadata->>'risk_level' IN (?)",
-        explicit + [ "none", "" ]
-      )
-    elsif none_selected
-      scope.where("metadata->>'risk_level' IS NULL OR metadata->>'risk_level' IN ('none', '')")
-    else
-      scope.where("metadata->>'risk_level' IN (?)", explicit)
+    result = nil
+
+    if explicit.any?
+      result = scope.where(<<~SQL, explicit, explicit)
+        (
+          EXISTS (
+            SELECT 1 FROM audit_logs
+            WHERE audit_logs.tool_event_id = tool_events.id
+              AND audit_logs.risk_level IN (?)
+          )
+          OR (
+            NOT EXISTS (SELECT 1 FROM audit_logs WHERE audit_logs.tool_event_id = tool_events.id)
+            AND tool_events.metadata->>'risk_level' IN (?)
+          )
+        )
+      SQL
     end
+
+    if none_selected
+      none_scope = scope.where(<<~SQL)
+        (
+          EXISTS (
+            SELECT 1 FROM audit_logs
+            WHERE audit_logs.tool_event_id = tool_events.id
+              AND audit_logs.risk_level = 'none'
+          )
+          OR (
+            NOT EXISTS (
+              SELECT 1 FROM audit_logs
+              WHERE audit_logs.tool_event_id = tool_events.id
+                AND audit_logs.risk_level NOT IN ('none')
+            )
+            AND (
+              tool_events.metadata->>'risk_level' IS NULL
+              OR tool_events.metadata->>'risk_level' IN ('none', '')
+            )
+          )
+        )
+      SQL
+      result = result ? result.or(none_scope) : none_scope
+    end
+
+    result || scope
   end
 
   private
+
+  # Mirrors StatsController#scoped_events_base's normalization so array-form values
+  # (e.g. project_id[]=none) and stray whitespace match the "none" sentinel the same
+  # way on both endpoints.
+  def normalize_project_filter(value)
+    Array.wrap(value).first.to_s.strip.presence
+  end
 
   def normalize_string_array(value)
     case value

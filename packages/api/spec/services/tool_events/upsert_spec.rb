@@ -440,6 +440,55 @@ RSpec.describe ToolEvents::Upsert do
     end
   end
 
+  # AIX-364 — model string normalisation at ingest
+  describe ".call — model normalisation" do
+    let(:organization) { create(:organization) }
+    let(:user)         { create(:user) }
+
+    def base_attrs(model:)
+      {
+        organization_id: organization.id,
+        user_id:         user.id,
+        tool_name:       "claude_code",
+        event_type:      "chat",
+        model:           model,
+        tokens_in:       100,
+        tokens_out:      50,
+        cost_usd:        0.001,
+        occurred_at:     Time.current,
+        metadata:        {}
+      }
+    end
+
+    it "normalises an XSS payload to 'unknown'" do
+      result = described_class.call(base_attrs(model: "<script>alert(1)</script>"))
+      expect(result[:tool_event].model).to eq("unknown")
+    end
+
+    it "normalises a formula injection string to 'unknown'" do
+      result = described_class.call(base_attrs(model: "=cmd|' /C calc'!A0"))
+      expect(result[:tool_event].model).to eq("unknown")
+    end
+
+    it "preserves a legitimate model name unchanged" do
+      result = described_class.call(base_attrs(model: "claude-sonnet-4-6"))
+      expect(result[:tool_event].model).to eq("claude-sonnet-4-6")
+    end
+
+    it "normalises an XSS payload promoted from metadata to 'unknown'" do
+      attrs = base_attrs(model: nil).merge(
+        metadata: { "model" => "<script>x</script>", "session_id" => SecureRandom.uuid }
+      )
+      result = described_class.call(attrs)
+      expect(result[:tool_event].model).to eq("unknown")
+    end
+
+    it "stores nil when model is absent from both top-level and metadata" do
+      result = described_class.call(base_attrs(model: nil))
+      expect(result[:tool_event].model).to be_nil
+    end
+  end
+
   # Regression guard — AIX-192 validation 2026-06-07
   #
   # Claude Code's MCP transcript-sync path is the *only* ingestion path that can

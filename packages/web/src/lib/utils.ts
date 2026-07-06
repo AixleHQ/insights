@@ -104,6 +104,7 @@ export function toEventRow(e: ToolEvent) {
     suggested_user: e.suggestedUser ? { email: e.suggestedUser.email, name: e.suggestedUser.name, avatarUrl: e.suggestedUser.avatarUrl } : null,
     project: e.project ? { name: e.project.name } : undefined,
     project_id: e.project?.id,
+    model: e.model,
   };
 }
 

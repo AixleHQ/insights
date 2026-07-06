@@ -1,0 +1,15 @@
+<h2>Scheduled Report: <%= @export.report_type.humanize %></h2>
+
+<p>Hi,</p>
+
+<p>Your scheduled <strong><%= @export.report_type.humanize %></strong> report for
+<strong><%= @organization.name %></strong> is attached.</p>
+
+<ul>
+  <li><strong>Format:</strong> <%= @export.format.upcase %></li>
+  <li><strong>Frequency:</strong> <%= @export.frequency.capitalize %></li>
+  <li><strong>Generated at:</strong> <%= Time.current.strftime("%Y-%m-%d %H:%M UTC") %></li>
+</ul>
+
+<p>This is an automated report from Aixle Insights. You are receiving it because you are listed as a
+recipient for this scheduled export.</p>

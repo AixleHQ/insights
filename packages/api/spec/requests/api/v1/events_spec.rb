@@ -54,6 +54,178 @@ RSpec.describe 'Api::V1::Events', type: :request do
       expect(json_data.first[:eventType]).to eq('chat')
     end
 
+    it 'filters by project_id=none' do
+      project = create(:project, organization: organization)
+      project_event = create(:tool_event, organization: organization, user: user, project: project)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                        user: user,
+                        organization: organization,
+                        params: { project_id: 'none' }
+
+      expect_success
+      ids = json_data.map { |e| e[:id] }
+      expect(ids).to include(tool_event.id)
+      expect(ids).not_to include(project_event.id)
+    end
+
+    # AIX-445: array-form/whitespace "none" must match the same normalization as
+    # StatsController#scoped_events_base, not fall through to a literal UUID lookup.
+    it 'filters by project_id=none when sent as an array or with whitespace' do
+      project = create(:project, organization: organization)
+      project_event = create(:tool_event, organization: organization, user: user, project: project)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                        user: user,
+                        organization: organization,
+                        params: { project_id: [ ' none ' ] }
+
+      expect_success
+      ids = json_data.map { |e| e[:id] }
+      expect(ids).to include(tool_event.id)
+      expect(ids).not_to include(project_event.id)
+    end
+
+    # AIX-414: not_none must check audit_logs (Temporal-classified) before metadata fallback
+    it 'filters by risk_level=not_none using audit_log association' do
+      risky_event = create(:tool_event, organization: organization, user: user, tool_name: 'cursor')
+      create(:audit_log, organization: organization, tool_event: risky_event, risk_level: 'high')
+
+      safe_event = create(:tool_event, organization: organization, user: user, tool_name: 'windsurf')
+      create(:audit_log, organization: organization, tool_event: safe_event, risk_level: 'none')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                        user: user,
+                        organization: organization,
+                        params: { risk_level: 'not_none' }
+
+      expect_success
+      ids = json_data.map { |e| e[:id] }
+      expect(ids).to include(risky_event.id)
+      expect(ids).not_to include(safe_event.id)
+      expect(ids).not_to include(tool_event.id)
+    end
+
+    # AIX-414: events with no audit_log fall back to metadata->>'risk_level'
+    it 'filters by risk_level=not_none using metadata fallback when no audit_log exists' do
+      risky_event = create(:tool_event, organization: organization, user: user,
+                           tool_name: 'cursor', metadata: { 'risk_level' => 'medium' })
+      clean_event = create(:tool_event, organization: organization, user: user, tool_name: 'windsurf')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                        user: user,
+                        organization: organization,
+                        params: { risk_level: 'not_none' }
+
+      expect_success
+      ids = json_data.map { |e| e[:id] }
+      expect(ids).to include(risky_event.id)
+      expect(ids).not_to include(clean_event.id)
+      expect(ids).not_to include(tool_event.id)
+    end
+
+    # AIX-414: explicit levels (high/medium/low) must also check audit_logs first
+    it 'filters by explicit risk_level using audit_log when available' do
+      high_event = create(:tool_event, organization: organization, user: user, tool_name: 'cursor')
+      create(:audit_log, organization: organization, tool_event: high_event, risk_level: 'high')
+
+      medium_event = create(:tool_event, organization: organization, user: user, tool_name: 'windsurf')
+      create(:audit_log, organization: organization, tool_event: medium_event, risk_level: 'medium')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                        user: user,
+                        organization: organization,
+                        params: { risk_level: 'high' }
+
+      expect_success
+      ids = json_data.map { |e| e[:id] }
+      expect(ids).to include(high_event.id)
+      expect(ids).not_to include(medium_event.id)
+      expect(ids).not_to include(tool_event.id)
+    end
+
+    # AIX-414: explicit level falls back to metadata when no audit_log exists
+    it 'filters by explicit risk_level using metadata fallback when no audit_log exists' do
+      meta_high = create(:tool_event, organization: organization, user: user,
+                         tool_name: 'cursor', metadata: { 'risk_level' => 'high' })
+      meta_low  = create(:tool_event, organization: organization, user: user,
+                         tool_name: 'windsurf', metadata: { 'risk_level' => 'low' })
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                        user: user,
+                        organization: organization,
+                        params: { risk_level: 'high' }
+
+      expect_success
+      ids = json_data.map { |e| e[:id] }
+      expect(ids).to include(meta_high.id)
+      expect(ids).not_to include(meta_low.id)
+    end
+
+    # AIX-414: none must check audit_logs (Temporal-classified) before metadata fallback
+    it 'filters by risk_level=none using audit_log association' do
+      none_event = create(:tool_event, organization: organization, user: user, tool_name: 'cursor')
+      create(:audit_log, organization: organization, tool_event: none_event, risk_level: 'none')
+
+      high_event = create(:tool_event, organization: organization, user: user, tool_name: 'windsurf')
+      create(:audit_log, organization: organization, tool_event: high_event, risk_level: 'high')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                        user: user,
+                        organization: organization,
+                        params: { risk_level: 'none' }
+
+      expect_success
+      ids = json_data.map { |e| e[:id] }
+      expect(ids).to include(none_event.id)
+      expect(ids).not_to include(high_event.id)
+    end
+
+    # AIX-414: combined none + explicit level must exercise the .or() path
+    it 'filters by combined risk_level=high,none returning both high-classified and none-classified events' do
+      high_event = create(:tool_event, organization: organization, user: user, tool_name: 'cursor')
+      create(:audit_log, organization: organization, tool_event: high_event, risk_level: 'high')
+
+      none_event = create(:tool_event, organization: organization, user: user, tool_name: 'windsurf')
+      create(:audit_log, organization: organization, tool_event: none_event, risk_level: 'none')
+
+      medium_event = create(:tool_event, organization: organization, user: user, tool_name: 'github_copilot')
+      create(:audit_log, organization: organization, tool_event: medium_event, risk_level: 'medium')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                        user: user,
+                        organization: organization,
+                        params: { risk_level: 'high,none' }
+
+      expect_success
+      ids = json_data.map { |e| e[:id] }
+      expect(ids).to include(high_event.id)
+      expect(ids).to include(none_event.id)
+      expect(ids).not_to include(medium_event.id)
+    end
+
+    # Risk Alerts drill-down: tool_name + not_none must return the same risky subset
+    it 'filters by tool_name and risk_level=not_none together' do
+      risky_cursor = create(:tool_event, organization: organization, user: user, tool_name: 'cursor')
+      create(:audit_log, organization: organization, tool_event: risky_cursor, risk_level: 'high')
+
+      safe_cursor = create(:tool_event, organization: organization, user: user, tool_name: 'cursor')
+      create(:audit_log, organization: organization, tool_event: safe_cursor, risk_level: 'none')
+
+      risky_windsurf = create(:tool_event, organization: organization, user: user, tool_name: 'windsurf')
+      create(:audit_log, organization: organization, tool_event: risky_windsurf, risk_level: 'medium')
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                        user: user,
+                        organization: organization,
+                        params: { tool_name: 'cursor', risk_level: 'not_none' }
+
+      expect_success
+      ids = json_data.map { |e| e[:id] }
+      expect(ids).to eq([ risky_cursor.id ])
+      expect(json_response[:meta][:total_count]).to eq(1)
+    end
+
     it 'filters by multiple comma-separated event_types' do
       chat_event = create(:tool_event, organization: organization, user: user, event_type: 'chat')
       edit_event = create(:tool_event, organization: organization, user: user, event_type: 'edit')
@@ -80,7 +252,8 @@ RSpec.describe 'Api::V1::Events', type: :request do
       expect_forbidden
     end
 
-    it 'returns all organization events to a plain member (AIX-381)' do
+    # AIX-381: plain members can see all org events (not just their own)
+    it 'returns all organization events to a plain member' do
       other_user = create(:user)
       create(:organization_membership, user: other_user, organization: organization, role: 'member')
       other_event = create(:tool_event, organization: organization, user: other_user, tool_name: 'cursor')

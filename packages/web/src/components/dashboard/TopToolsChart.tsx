@@ -52,7 +52,7 @@ export function TopToolsChart({ data, isLoading, isError, onRetry, periodDesc, c
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-medium">Top Tools</CardTitle>
         <CardDescription className="text-xs">
-          {periodDesc ? `Most used AI tools — ${periodDesc}` : "Most used AI tools by event count"}
+          {periodDesc ? `Most used tools — ${periodDesc}` : "Most used tools by event count"}
         </CardDescription>
       </CardHeader>
       <CardContent>

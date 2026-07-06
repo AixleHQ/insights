@@ -1,0 +1,10 @@
+[sso-session dbp]
+sso_start_url = https://CHANGE-ME.awsapps.com/start
+sso_region = us-west-2
+sso_registration_scopes = sso:account:access
+
+[profile <AWS_PROFILE>]
+sso_session = dbp
+sso_account_id = <AWS_ACCOUNT_ID>
+sso_role_name = DBP-AI-<AWS_PROFILE>
+region = us-east-1

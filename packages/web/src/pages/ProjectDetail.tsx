@@ -72,6 +72,7 @@ import { TabNav } from "@/components/ui/tab-nav";
 import { TabsContent } from "@/components/ui/tabs";
 import { formatDistanceToNow } from "@/lib/utils";
 import { isGitRemoteMissing } from "@/lib/project-git-remote";
+import { AppRoutes } from "@/lib/routes";
 
 function StatCard({
   icon: Icon,
@@ -159,7 +160,7 @@ export function ProjectDetail() {
     if (window.confirm("Are you sure you want to delete this project?")) {
       try {
         await deleteProject.mutateAsync(id);
-        navigate("/projects");
+        navigate(AppRoutes.projects.root);
       } catch (error) {
         console.error("Failed to delete project:", error);
       }
@@ -203,7 +204,7 @@ export function ProjectDetail() {
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-4">
           <Button asChild variant="ghost" size="icon">
-            <Link to="/projects">
+            <Link to={AppRoutes.projects.root}>
               <ArrowLeft className="size-4" />
             </Link>
           </Button>
@@ -224,7 +225,7 @@ export function ProjectDetail() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => navigate(`/projects/${id}/settings`)}>
+            <DropdownMenuItem onClick={() => navigate(AppRoutes.projects.settings(id || ""))}>
               <Settings className="mr-2 size-4" />
               Settings
             </DropdownMenuItem>
@@ -257,7 +258,7 @@ export function ProjectDetail() {
               value in project settings.
             </p>
             <Button asChild variant="link" className="mt-2 h-auto p-0 text-warning-foreground underline dark:text-warning/70">
-              <Link to={`/projects/${id}/settings`}>Open project settings</Link>
+              <Link to={AppRoutes.projects.settings(id || "")}>Open project settings</Link>
             </Button>
           </AlertDescription>
         </Alert>

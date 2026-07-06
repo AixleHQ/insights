@@ -76,11 +76,16 @@ export function getUserManager(): UserManager {
 }
 
 // Auth helper functions
-export async function login(): Promise<void> {
+export async function login(returnUrl?: string): Promise<void> {
   const manager = getUserManager();
   // kc_idp_hint must match the IDP alias in Keycloak Admin → Identity Providers
+  // returnUrl round-trips through the OIDC `state` param so AuthCallback can
+  // restore the page the user was trying to reach (e.g. an invitation link)
+  // after the Keycloak redirect — React Router's own location.state cannot
+  // survive that external round-trip.
   await manager.signinRedirect({
     extraQueryParams: { kc_idp_hint: "google-dbp" },
+    state: returnUrl,
   });
 }
 

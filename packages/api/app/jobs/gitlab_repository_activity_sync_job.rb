@@ -81,6 +81,8 @@ class GitlabRepositoryActivitySyncJob < ApplicationJob
   end
 
   def persist_merge_requests(connector, repository, merge_requests)
+    return unless connector.sync_pull_requests?
+
     merge_requests.each do |mr|
       ToolEvents::ConnectorUpsert.call(
         unique_key: "mr_iid",

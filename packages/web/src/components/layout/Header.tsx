@@ -31,6 +31,7 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import { useNotifications } from "@/contexts/NotificationsContext";
+import { AppRoutes } from "@/lib/routes";
 
 function CommandPalette({
   open,
@@ -58,37 +59,37 @@ function CommandPalette({
           <CommandList>
             <CommandEmpty>No results found.</CommandEmpty>
             <CommandGroup heading="Quick Actions">
-              <CommandItem onSelect={() => runCommand(() => onNavigate("/events"))}>
+              <CommandItem onSelect={() => runCommand(() => onNavigate(AppRoutes.events.root))}>
                 <Search className="mr-2 size-4" />
                 <span>Search events...</span>
               </CommandItem>
-              <CommandItem onSelect={() => runCommand(() => onNavigate("/projects/new"))}>
+              <CommandItem onSelect={() => runCommand(() => onNavigate(AppRoutes.projects.new))}>
                 <span className="mr-2">+</span>
                 <span>New project</span>
               </CommandItem>
-              <CommandItem onSelect={() => runCommand(() => onNavigate("/integrations"))}>
+              <CommandItem onSelect={() => runCommand(() => onNavigate(AppRoutes.integrations.root))}>
                 <span className="mr-2">+</span>
                 <span>Add integration</span>
               </CommandItem>
             </CommandGroup>
             <CommandSeparator />
             <CommandGroup heading="Navigation">
-              <CommandItem onSelect={() => runCommand(() => onNavigate("/"))}>
+              <CommandItem onSelect={() => runCommand(() => onNavigate(AppRoutes.dashboard))}>
                 Dashboard
               </CommandItem>
-              <CommandItem onSelect={() => runCommand(() => onNavigate("/events"))}>
+              <CommandItem onSelect={() => runCommand(() => onNavigate(AppRoutes.events.root))}>
                 Events
               </CommandItem>
-              <CommandItem onSelect={() => runCommand(() => onNavigate("/projects"))}>
+              <CommandItem onSelect={() => runCommand(() => onNavigate(AppRoutes.projects.root))}>
                 Projects
               </CommandItem>
-              <CommandItem onSelect={() => runCommand(() => onNavigate("/integrations"))}>
+              <CommandItem onSelect={() => runCommand(() => onNavigate(AppRoutes.integrations.root))}>
                 Integrations
               </CommandItem>
-              <CommandItem onSelect={() => runCommand(() => onNavigate("/members"))}>
+              <CommandItem onSelect={() => runCommand(() => onNavigate(AppRoutes.members.root))}>
                 Members
               </CommandItem>
-              <CommandItem onSelect={() => runCommand(() => onNavigate("/settings"))}>
+              <CommandItem onSelect={() => runCommand(() => onNavigate(AppRoutes.settings.root))}>
                 Settings
               </CommandItem>
             </CommandGroup>
@@ -173,7 +174,7 @@ function Notifications() {
         )}
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild className="justify-center">
-          <Link to="/notifications" className="w-full text-center text-sm">
+          <Link to={AppRoutes.notifications} className="w-full text-center text-sm">
             View all notifications
           </Link>
         </DropdownMenuItem>

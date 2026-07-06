@@ -64,7 +64,13 @@ module Api
 
         changes_before = @connector.slice(:is_active, :status, :external_account_name)
 
-        if @connector.update(connector_update_params)
+        attrs = connector_update_params.to_h.stringify_keys
+
+        if (incoming_config = attrs.delete("config")).present?
+          attrs["config"] = merge_connector_config(incoming_config) if @connector.source_control?
+        end
+
+        if @connector.update(attrs)
           OrganizationAuditLog.log(
             organization: current_organization,
             actor: current_user,
@@ -217,6 +223,11 @@ module Api
       def health
         authorize! current_organization.organization_connectors.new, to: :health?
 
+        active_connectors = current_organization.organization_connectors.active.order(:connector_type)
+        active_connectors.select { |c| c.status == "connected" }.each do |connector|
+          ConnectorConnectionProbe.call(connector)
+        end
+
         all_connectors    = current_organization.organization_connectors
         active_connectors = all_connectors.active.order(:connector_type).to_a
         status_counts     = all_connectors.group(:status).count
@@ -310,6 +321,10 @@ module Api
             tracked_changes: { connector_type: connector.connector_type, via: "oauth_callback" },
             request: request
           )
+          if creating
+            connector.mark_testing!
+            ConnectorSyncService.enqueue(connector)
+          end
           render_resource(connector, OrganizationConnectorSerializer)
         else
           render json: {
@@ -321,6 +336,7 @@ module Api
         # Two simultaneous OAuth callbacks for the same org + external_org_id raced on
         # idx_org_connectors_oauth_dedup. The other request already inserted the row —
         # return it as if this callback succeeded (idempotent reconnect).
+        # The winning request already called mark_testing! and enqueued the sync — no re-enqueue needed.
         connector = current_organization.organization_connectors
                                         .find_by!(connector_type: connector_type, external_org_id: external_org_id)
         render_resource(connector, OrganizationConnectorSerializer)
@@ -341,7 +357,15 @@ module Api
 
       def connector_update_params
         params.permit(:access_token, :refresh_token, :token_expires_at,
-                      :external_account_id, :external_account_name, :webhook_secret, :is_active, :label)
+                      :external_account_id, :external_account_name, :webhook_secret, :is_active, :label,
+                      config: [ :sync_repositories, :sync_pull_requests ])
+      end
+
+      def merge_connector_config(incoming_config)
+        existing = (@connector.config || {}).stringify_keys
+        to_set = incoming_config.reject { |_, v| v.nil? }
+        to_delete = incoming_config.select { |_, v| v.nil? }.keys
+        existing.merge(to_set).except(*to_delete)
       end
 
       def oauth_callback_url

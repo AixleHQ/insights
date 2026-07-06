@@ -12,6 +12,11 @@ import { humanizeToolName, toEventRow } from "@/lib/utils";
 import type { EventFiltersState, EventRow } from "@/components/events";
 import type { EventsToolFilterOption } from "@/lib/eventsToolFilters";
 
+const clientTimezone =
+  typeof Intl !== "undefined"
+    ? Intl.DateTimeFormat().resolvedOptions().timeZone
+    : "UTC";
+
 export interface ProjectEventsTab {
   filters: EventFiltersState;
   sort: SortField;
@@ -78,6 +83,7 @@ export function useProjectEventsTab({
       event_type: filters.eventTypes,
       start_date: filters.dateFrom,
       end_date: filters.dateTo,
+      tz: clientTimezone,
     }),
     [projectId, page, pageSize, filters.tools, filters.riskLevels, filters.eventTypes, filters.dateFrom, filters.dateTo]
   );
@@ -198,6 +204,7 @@ export function useProjectEventsTab({
         start_date: filters.dateFrom,
         end_date: filters.dateTo,
         project_id: projectId,
+        tz: clientTimezone,
         filename: `aixle-insights-events-${startStr}-${endStr}.csv`,
       });
       if (result?.queued) setExportQueued(true);
