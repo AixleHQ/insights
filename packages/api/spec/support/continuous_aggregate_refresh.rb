@@ -1,18 +1,24 @@
 # frozen_string_literal: true
 
 module ContinuousAggregateRefresh
+  REFRESH_MUTEX = Mutex.new
+
   def refresh_hourly_token_usage!
-    ensure_continuous_aggregates! unless continuous_aggregates_ready?
-    ActiveRecord::Base.connection.execute(
-      "CALL refresh_continuous_aggregate('timeseries.hourly_token_usage', NULL, NULL);"
-    )
+    REFRESH_MUTEX.synchronize do
+      ensure_continuous_aggregates! unless continuous_aggregates_ready?
+      ActiveRecord::Base.connection.execute(
+        "CALL refresh_continuous_aggregate('timeseries.hourly_token_usage', NULL, NULL);"
+      )
+    end
   end
 
   def refresh_daily_token_usage!
-    ensure_continuous_aggregates! unless continuous_aggregates_ready?
-    ActiveRecord::Base.connection.execute(
-      "CALL refresh_continuous_aggregate('timeseries.daily_token_usage', NULL, NULL);"
-    )
+    REFRESH_MUTEX.synchronize do
+      ensure_continuous_aggregates! unless continuous_aggregates_ready?
+      ActiveRecord::Base.connection.execute(
+        "CALL refresh_continuous_aggregate('timeseries.daily_token_usage', NULL, NULL);"
+      )
+    end
   end
 
   def refresh_all_token_usage_aggregates!
@@ -83,6 +89,8 @@ module ContinuousAggregateRefresh
     File.basename(filename, ".rb").sub(/\A\d+_/, "").camelize.constantize
   end
 end
+
+STATS_CAGG_SPEC = %r{stats_spec\.rb|stats_time_series_query_spec\.rb}.freeze
 
 RSpec.configure do |config|
   config.include ContinuousAggregateRefresh

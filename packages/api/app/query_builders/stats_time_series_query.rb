@@ -3,41 +3,67 @@
 # Hybrid reader: TimescaleDB continuous aggregates for historical ranges,
 # raw tool_events for the live window (end_offset lag) and for dimensions
 # CAGGs cannot represent (risk flags, non-UTC day boundaries).
+#
+# Split rule (avoids double-counting partial buckets at the CAGG/raw boundary):
+#   CAGG  — bucket < live_cutoff.beginning_of_(day|hour)
+#   Raw   — occurred_at >= that same boundary through finish
 class StatsTimeSeriesQuery
   HOURLY_LIVE_WINDOW = 1.hour
   DAILY_LIVE_WINDOW  = 1.day
 
-  def initialize(organization:, project_id: nil, tool_name: nil)
+  class << self
+    def enable_cagg_reads!
+      Thread.current[:stats_time_series_cagg_reads] = true
+    end
+
+    def disable_cagg_reads!
+      Thread.current[:stats_time_series_cagg_reads] = false
+    end
+
+    def cagg_reads_enabled?
+      return true unless Rails.env.test?
+
+      Thread.current[:stats_time_series_cagg_reads] == true
+    end
+  end
+
+  def initialize(organization:, project_id: nil, unassigned_project_only: false, tool_name: nil)
     @organization = organization
     @project_id   = project_id
+    @unassigned_project_only = unassigned_project_only
     @tool_name    = tool_name
   end
 
-  def totals(start:, finish:)
+  def totals(start:, finish:, timezone: "UTC")
+    return raw_totals(start, finish) unless cagg_eligible?(timezone)
+
     merge_totals(
-      daily_aggregate_totals(start, finish),
-      raw_totals(live_daily_start(start), finish)
+      daily_aggregate_totals(start, cagg_finish(start, finish, daily_cagg_exclusive_end)),
+      raw_totals(raw_start(start, daily_cagg_exclusive_end), finish)
     )
   end
 
-  def distinct_user_count(start:, finish:)
-    historical_end = [ finish, daily_live_cutoff ].min
-    user_ids = Set.new
+  def distinct_user_count(start:, finish:, timezone: "UTC")
+    return raw_distinct_user_count(start, finish) unless cagg_eligible?(timezone)
 
-    if start < historical_end
+    user_ids = Set.new
+    cagg_end = cagg_finish(start, finish, daily_cagg_exclusive_end)
+
+    if start < cagg_end
       user_ids.merge(
         scoped_daily
-          .where(bucket: start...historical_end)
+          .where(bucket: start...cagg_end)
           .where.not(user_id: nil)
           .distinct
           .pluck(:user_id)
       )
     end
 
-    if finish > daily_live_cutoff
+    raw_from = raw_start(start, daily_cagg_exclusive_end)
+    if finish >= raw_from
       user_ids.merge(
         scoped_raw
-          .where(occurred_at: daily_live_cutoff..finish)
+          .where(occurred_at: raw_from..finish)
           .where.not(user_id: nil)
           .distinct
           .pluck(:user_id)
@@ -48,12 +74,13 @@ class StatsTimeSeriesQuery
   end
 
   def hourly_buckets(start:, finish:)
-    historical_end = [ finish, hourly_live_cutoff ].min
+    return raw_hourly_buckets(start, finish) unless self.class.cagg_reads_enabled?
+    cagg_end = cagg_finish(start, finish, hourly_cagg_exclusive_end)
     buckets = {}
 
-    if start < historical_end
+    if start < cagg_end
       scoped_hourly
-        .where(bucket: start...historical_end)
+        .where(bucket: start...cagg_end)
         .group(:bucket)
         .select(
           "bucket as hour",
@@ -66,10 +93,10 @@ class StatsTimeSeriesQuery
         .each { |row| buckets[row.hour] = row_to_hourly(row) }
     end
 
-    if finish > hourly_live_cutoff
-      live_start = [ start, hourly_live_cutoff ].max
+    raw_from = raw_start(start, hourly_cagg_exclusive_end)
+    if finish >= raw_from
       scoped_raw
-        .where(occurred_at: live_start..finish)
+        .where(occurred_at: raw_from..finish)
         .group("DATE_TRUNC('hour', occurred_at)")
         .select(
           "DATE_TRUNC('hour', occurred_at) as hour",
@@ -79,24 +106,22 @@ class StatsTimeSeriesQuery
           "SUM(cost_usd) as cost_usd",
           "COUNT(DISTINCT user_id) as unique_users"
         )
-        .each do |row|
-          merge_hourly!(buckets, row.hour, row)
-        end
+        .each { |row| merge_hourly!(buckets, row.hour, row) }
     end
 
     buckets.sort_by { |hour, _| hour }.map { |_, v| v }
   end
 
   def period_buckets(start:, finish:, granularity: "day", timezone: "UTC")
-    return raw_period_buckets(start, finish, granularity, timezone) unless timezone == "UTC"
+    return raw_period_buckets(start, finish, granularity, timezone) unless cagg_eligible?(timezone)
 
-    historical_end = [ finish, daily_live_cutoff ].min
-    bucket_expr    = DailyTokenUsage.bucket_expr(granularity)
-    buckets        = {}
+    cagg_end = cagg_finish(start, finish, daily_cagg_exclusive_end)
+    bucket_expr = DailyTokenUsage.bucket_expr(granularity)
+    buckets = {}
 
-    if start < historical_end
+    if start < cagg_end
       scoped_daily
-        .where(bucket: start...historical_end)
+        .where(bucket: start...cagg_end)
         .group(bucket_expr)
         .select(
           "#{bucket_expr} as day",
@@ -106,9 +131,9 @@ class StatsTimeSeriesQuery
         .each { |row| merge_period!(buckets, row.day, row.event_count, row.cost_usd) }
     end
 
-    if finish > daily_live_cutoff
-      live_start = [ start, daily_live_cutoff ].max
-      raw_period_rows(live_start, finish, granularity, timezone).each do |row|
+    raw_from = raw_start(start, daily_cagg_exclusive_end)
+    if finish >= raw_from
+      raw_period_rows(raw_from, finish, granularity, timezone).each do |row|
         merge_period!(buckets, row.day, row.event_count, row.cost_usd)
       end
     end
@@ -118,22 +143,63 @@ class StatsTimeSeriesQuery
     end
   end
 
+  def tool_period_buckets(start:, finish:, granularity: "day", timezone: "UTC")
+    return raw_tool_period_buckets(start, finish, granularity, timezone) unless cagg_eligible?(timezone)
+
+    cagg_end = cagg_finish(start, finish, daily_cagg_exclusive_end)
+    bucket_expr = DailyTokenUsage.bucket_expr(granularity)
+    buckets = {}
+
+    if start < cagg_end
+      scoped_daily
+        .where(bucket: start...cagg_end)
+        .group(bucket_expr)
+        .select(
+          "#{bucket_expr} as day",
+          "SUM(event_count) as event_count",
+          "SUM(total_tokens_in) as tokens_in",
+          "SUM(total_tokens_out) as tokens_out",
+          "SUM(total_cost) as cost_usd"
+        )
+        .each do |row|
+          merge_tool_period!(buckets, row.day, row.event_count, row.tokens_in, row.tokens_out, row.cost_usd)
+        end
+    end
+
+    raw_from = raw_start(start, daily_cagg_exclusive_end)
+    if finish >= raw_from
+      raw_tool_period_rows(raw_from, finish, granularity, timezone).each do |row|
+        merge_tool_period!(buckets, row.day, row.event_count, row.tokens_in, row.tokens_out, row.cost_usd)
+      end
+    end
+
+    buckets.transform_values do |v|
+      {
+        date: v[:date],
+        event_count: v[:event_count],
+        tokens_in: v[:tokens_in],
+        tokens_out: v[:tokens_out],
+        cost_usd: v[:cost_usd].to_f
+      }
+    end
+  end
+
   def heatmap_counts(start:, finish:, timezone: "UTC")
-    return raw_heatmap_counts(start, finish, timezone) unless timezone == "UTC"
+    return raw_heatmap_counts(start, finish, timezone) unless cagg_eligible?(timezone)
 
     period_buckets(start: start, finish: finish, granularity: "day", timezone: timezone)
       .transform_values { |v| v[:event_count] }
   end
 
   def tool_breakdown(start:, finish:, timezone: "UTC")
-    return raw_tool_breakdown(start, finish, timezone) unless timezone == "UTC"
+    return raw_tool_breakdown(start, finish, timezone) unless cagg_eligible?(timezone)
 
-    historical_end = [ finish, daily_live_cutoff ].min
+    cagg_end = cagg_finish(start, finish, daily_cagg_exclusive_end)
     totals_by_tool = Hash.new { |h, k| h[k] = { event_count: 0, cost_usd: 0.0 } }
 
-    if start < historical_end
+    if start < cagg_end
       scoped_daily
-        .where(bucket: start...historical_end)
+        .where(bucket: start...cagg_end)
         .group(:tool_name)
         .select("tool_name, SUM(event_count) as event_count, SUM(total_cost) as cost_usd")
         .each do |row|
@@ -142,10 +208,10 @@ class StatsTimeSeriesQuery
         end
     end
 
-    if finish > daily_live_cutoff
-      live_start = [ start, daily_live_cutoff ].max
+    raw_from = raw_start(start, daily_cagg_exclusive_end)
+    if finish >= raw_from
       scoped_raw
-        .where(occurred_at: live_start..finish)
+        .where(occurred_at: raw_from..finish)
         .group(:tool_name)
         .select("tool_name, COUNT(*) as event_count, SUM(cost_usd) as cost_usd")
         .each do |row|
@@ -161,49 +227,82 @@ class StatsTimeSeriesQuery
 
   private
 
-  attr_reader :organization, :project_id, :tool_name
+  attr_reader :organization, :project_id, :unassigned_project_only, :tool_name
+
+  def cagg_eligible?(timezone)
+    timezone == "UTC" && self.class.cagg_reads_enabled?
+  end
 
   def hourly_live_cutoff = Time.current - HOURLY_LIVE_WINDOW
   def daily_live_cutoff  = Time.current - DAILY_LIVE_WINDOW
+  def hourly_cagg_exclusive_end = hourly_live_cutoff.beginning_of_hour
+  def daily_cagg_exclusive_end  = daily_live_cutoff.beginning_of_day
 
-  def live_daily_start(request_start)
-    [ request_start, daily_live_cutoff ].max
+  def cagg_finish(start, finish, exclusive_end)
+    [ finish, exclusive_end ].min
+  end
+
+  def raw_start(request_start, exclusive_end)
+    [ request_start, exclusive_end ].max
   end
 
   def scoped_hourly
     scope = HourlyTokenUsage.for_organization(organization)
-    scope = scope.for_project_id(project_id) if project_id.present?
+    scope = apply_project_scope(scope)
     scope = scope.for_tool(tool_name) if tool_name.present?
     scope
   end
 
   def scoped_daily
     scope = DailyTokenUsage.for_organization(organization)
-    scope = scope.for_project_id(project_id) if project_id.present?
+    scope = apply_project_scope(scope)
     scope = scope.for_tool(tool_name) if tool_name.present?
     scope
   end
 
   def scoped_raw
     scope = organization.tool_events
-    scope = scope.where(project_id: project_id) if project_id.present?
+    scope = apply_project_scope(scope)
     scope = scope.where(tool_name: tool_name) if tool_name.present?
     scope
   end
 
-  def daily_aggregate_totals(start, finish)
-    historical_end = [ finish, daily_live_cutoff ].min
-    agg = { event_count: 0, cost_usd: 0.0 }
-
-    if start < historical_end
-      row = scoped_daily
-        .where(bucket: start...historical_end)
-        .pick(Arel.sql("COALESCE(SUM(event_count), 0)"), Arel.sql("COALESCE(SUM(total_cost), 0)"))
-      agg[:event_count] += row[0].to_i
-      agg[:cost_usd]    += row[1].to_f
+  def apply_project_scope(scope)
+    if unassigned_project_only
+      scope.where(project_id: nil)
+    elsif project_id.present?
+      scope.where(project_id: project_id)
+    else
+      scope
     end
+  end
 
+  def daily_aggregate_totals(start, cagg_end)
+    agg = { event_count: 0, cost_usd: 0.0 }
+    return agg unless start < cagg_end
+
+    row = scoped_daily
+      .where(bucket: start...cagg_end)
+      .pick(Arel.sql("COALESCE(SUM(event_count), 0)"), Arel.sql("COALESCE(SUM(total_cost), 0)"))
+    agg[:event_count] += row[0].to_i
+    agg[:cost_usd]    += row[1].to_f
     agg
+  end
+
+  def raw_hourly_buckets(start, finish)
+    scoped_raw
+      .where(occurred_at: start..finish)
+      .group("DATE_TRUNC('hour', occurred_at)")
+      .select(
+        "DATE_TRUNC('hour', occurred_at) as hour",
+        "COUNT(*) as event_count",
+        "SUM(tokens_in) as tokens_in",
+        "SUM(tokens_out) as tokens_out",
+        "SUM(cost_usd) as cost_usd",
+        "COUNT(DISTINCT user_id) as unique_users"
+      )
+      .order("hour")
+      .map { |row| row_to_hourly(row) }
   end
 
   def raw_totals(start, finish)
@@ -211,6 +310,14 @@ class StatsTimeSeriesQuery
 
     scope = scoped_raw.where(occurred_at: start..finish)
     { event_count: scope.count, cost_usd: scope.sum(:cost_usd).to_f }
+  end
+
+  def raw_distinct_user_count(start, finish)
+    scoped_raw
+      .where(occurred_at: start..finish)
+      .where.not(user_id: nil)
+      .distinct
+      .count(:user_id)
   end
 
   def merge_totals(agg, raw)
@@ -238,9 +345,6 @@ class StatsTimeSeriesQuery
       return
     end
 
-    # Cannot sum unique_users across slices — recompute from distinct if both slices present.
-    # For live+historical boundary at hour boundary this is rare; use max as conservative fallback
-    # only when merging partial hours (same hour in both slices shouldn't happen with hour cutoff).
     existing[:event_count] += row.event_count.to_i
     existing[:tokens_in]   += row.tokens_in.to_i
     existing[:tokens_out]  += row.tokens_out.to_i
@@ -252,6 +356,15 @@ class StatsTimeSeriesQuery
     key = day.to_date.iso8601
     entry = buckets[key] ||= { date: key, event_count: 0, cost_usd: 0.0 }
     entry[:event_count] += event_count.to_i
+    entry[:cost_usd]    += cost_usd.to_f
+  end
+
+  def merge_tool_period!(buckets, day, event_count, tokens_in, tokens_out, cost_usd)
+    key = day.to_date.iso8601
+    entry = buckets[key] ||= { date: key, event_count: 0, tokens_in: 0, tokens_out: 0, cost_usd: 0.0 }
+    entry[:event_count] += event_count.to_i
+    entry[:tokens_in]   += tokens_in.to_i
+    entry[:tokens_out]  += tokens_out.to_i
     entry[:cost_usd]    += cost_usd.to_f
   end
 
@@ -272,6 +385,19 @@ class StatsTimeSeriesQuery
       )
   end
 
+  def raw_tool_period_rows(start, finish, granularity, timezone)
+    scoped_raw
+      .where(occurred_at: start..finish)
+      .group(trunc_sql(granularity, timezone))
+      .select(
+        "#{trunc_sql(granularity, timezone)} as day",
+        "COUNT(*) as event_count",
+        "SUM(tokens_in) as tokens_in",
+        "SUM(tokens_out) as tokens_out",
+        "SUM(cost_usd) as cost_usd"
+      )
+  end
+
   def raw_period_buckets(start, finish, granularity, timezone)
     buckets = {}
     raw_period_rows(start, finish, granularity, timezone).each do |row|
@@ -279,6 +405,22 @@ class StatsTimeSeriesQuery
     end
     buckets.transform_values do |v|
       { date: v[:date], event_count: v[:event_count], cost_usd: v[:cost_usd].to_f }
+    end
+  end
+
+  def raw_tool_period_buckets(start, finish, granularity, timezone)
+    buckets = {}
+    raw_tool_period_rows(start, finish, granularity, timezone).each do |row|
+      merge_tool_period!(buckets, row.day, row.event_count, row.tokens_in, row.tokens_out, row.cost_usd)
+    end
+    buckets.transform_values do |v|
+      {
+        date: v[:date],
+        event_count: v[:event_count],
+        tokens_in: v[:tokens_in],
+        tokens_out: v[:tokens_out],
+        cost_usd: v[:cost_usd].to_f
+      }
     end
   end
 
@@ -291,8 +433,7 @@ class StatsTimeSeriesQuery
       .transform_keys(&:to_s)
   end
 
-  def raw_tool_breakdown(start, finish, timezone)
-    # timezone irrelevant for tool breakdown totals; use raw for non-UTC path consistency
+  def raw_tool_breakdown(start, finish, _timezone)
     scoped_raw
       .where(occurred_at: start..finish)
       .group(:tool_name)

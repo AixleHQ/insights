@@ -5,6 +5,13 @@ require "rails_helper"
 RSpec.describe StatsTimeSeriesQuery do
   self.use_transactional_tests = false
 
+  after(:context) do
+    ToolEvent.delete_all
+    OrganizationMembership.delete_all
+    Organization.delete_all
+    User.delete_all
+  end
+
   let(:organization) { create(:organization) }
   let(:user_a) { create(:user) }
   let(:user_b) { create(:user) }
@@ -17,7 +24,10 @@ RSpec.describe StatsTimeSeriesQuery do
   end
 
   around do |example|
+    StatsTimeSeriesQuery.enable_cagg_reads!
     travel_to(frozen_time) { example.run }
+  ensure
+    StatsTimeSeriesQuery.disable_cagg_reads!
   end
 
   after do
@@ -36,6 +46,19 @@ RSpec.describe StatsTimeSeriesQuery do
     end
 
     it "matches raw totals for a range spanning historical + live window" do
+      start = 30.days.ago.beginning_of_day
+      finish = Time.current
+      query = described_class.new(organization: organization)
+
+      expect(query.totals(start: start, finish: finish)).to eq(raw_totals(start, finish))
+    end
+
+    it "does not double-count events in the CAGG/raw boundary day" do
+      # Event inside the partial day (after daily_cagg_exclusive_end, before now)
+      create(:tool_event, organization: organization, user: user_a,
+             cost_usd: 4.0, occurred_at: frozen_time - 12.hours)
+      refresh_all_token_usage_aggregates!
+
       start = 30.days.ago.beginning_of_day
       finish = Time.current
       query = described_class.new(organization: organization)

@@ -1870,6 +1870,98 @@ RSpec.describe 'Api::V1::Stats', type: :request do
     end
   end
 
+  describe 'continuous aggregate parity' do
+    self.use_transactional_tests = false
+
+    after(:context) do
+      ToolEvent.delete_all
+      OrganizationMembership.delete_all
+      Organization.delete_all
+      User.delete_all
+    end
+
+    let(:cagg_org)  { create(:organization) }
+    let(:cagg_user) { create(:user) }
+    let!(:cagg_membership) { create(:organization_membership, user: cagg_user, organization: cagg_org, role: 'member') }
+    let(:anchor) { Time.zone.parse('2026-04-15 12:00:00') }
+
+    around do |ex|
+      StatsTimeSeriesQuery.enable_cagg_reads!
+      travel_to(anchor) { ex.run }
+    ensure
+      StatsTimeSeriesQuery.disable_cagg_reads!
+    end
+
+    after do
+      ToolEvent.delete_all
+    end
+
+    before do
+      create(:tool_event, organization: cagg_org, user: cagg_user, tool_name: "cursor",
+             cost_usd: 10.0, occurred_at: anchor - 10.days)
+      create(:tool_event, organization: cagg_org, user: cagg_user, tool_name: "cursor",
+             cost_usd: 5.0, occurred_at: anchor - 5.days)
+      create(:tool_event, organization: cagg_org, user: cagg_user, tool_name: "cursor",
+             cost_usd: 4.0, occurred_at: anchor - 12.hours)
+      create(:tool_event, organization: cagg_org, user: cagg_user, tool_name: "cursor",
+             cost_usd: 1.0, occurred_at: anchor - 30.minutes)
+      refresh_all_token_usage_aggregates!
+    end
+
+    it 'overview MTD totals match sum of seeded events' do
+      authenticated_get "/api/v1/organizations/#{cagg_org.id}/stats/overview",
+                        user: cagg_user, organization: cagg_org
+
+      expect_success
+      expect(json_response[:total_events]).to eq(4)
+      expect(json_response[:total_cost_usd]).to be_within(0.01).of(20.0)
+    end
+
+    it 'daily with tz=UTC returns historical + live cost' do
+      authenticated_get "/api/v1/organizations/#{cagg_org.id}/stats/daily",
+                        user: cagg_user, organization: cagg_org,
+                        params: { days: 30, tz: 'UTC' }
+
+      expect_success
+      total_cost = json_response[:data].sum { |r| r[:cost_usd] }
+      expect(total_cost).to be_within(0.01).of(20.0)
+    end
+
+    it 'heatmap with tz=UTC includes historical and live days' do
+      authenticated_get "/api/v1/organizations/#{cagg_org.id}/stats/heatmap",
+                        user: cagg_user, organization: cagg_org,
+                        params: { tz: 'UTC' }
+
+      expect_success
+      total_count = json_response.sum { |d| d[:count] }
+      expect(total_count).to eq(4)
+    end
+
+    it 'tool_daily with tz=UTC aggregates via continuous aggregates' do
+      claude_org = create(:organization)
+      claude_user = create(:user)
+      create(:organization_membership, user: claude_user, organization: claude_org, role: "member")
+
+      create(:tool_event, organization: claude_org, user: claude_user,
+             tool_name: "claude_code", tokens_in: 100, tokens_out: 200,
+             cost_usd: 2.0, occurred_at: anchor - 10.days)
+      create(:tool_event, organization: claude_org, user: claude_user,
+             tool_name: "claude_code", tokens_in: 10, tokens_out: 20,
+             cost_usd: 0.1, occurred_at: anchor - 20.minutes)
+      refresh_all_token_usage_aggregates!
+
+      authenticated_get "/api/v1/organizations/#{claude_org.id}/stats/tools/claude_code/daily",
+                        user: claude_user, organization: claude_org,
+                        params: { tz: "UTC" }
+
+      expect_success
+      total_events = json_response[:daily].sum { |d| d[:eventCount] }
+      total_cost   = json_response[:daily].sum { |d| d[:costUsd] }
+      expect(total_events).to eq(2)
+      expect(total_cost).to be_within(0.01).of(2.1)
+    end
+  end
+
   describe 'month_or_days_time_range validation' do
     it 'returns 400 for malformed month param' do
       authenticated_get "/api/v1/organizations/#{organization.id}/stats/daily_by_tool",
