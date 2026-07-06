@@ -440,7 +440,72 @@ RSpec.describe ToolEvents::Upsert do
     end
   end
 
-  # AIX-364 — model string normalisation at ingest
+  # AIX-519 (regression of AIX-350): server-side normalisation of
+  # cache-inflated tokens_in on the standard ingest path.
+  describe ".call — cache-inflated tokens_in normalisation (AIX-519)" do
+    let(:organization) { create(:organization) }
+    let(:user)         { create(:user) }
+
+    # Mirrors the staging event 9e67dae7 pattern (Grace Hopper, 2026-07-01):
+    # a stale CLI sends tokens_in = base + cache_read + cache_write while the
+    # metadata carries the correct base_input_tokens + cache breakdown.
+    let(:inflated_attributes) do
+      {
+        organization_id: organization.id,
+        user_id:         user.id,
+        tool_name:       "claude_code",
+        event_type:      "chat",
+        model:           "claude-sonnet-5",
+        tokens_in:       12_680_246, # 455 + 12_650_378 + 29_413
+        tokens_out:      16_889,
+        cost_usd:        nil,
+        occurred_at:     Time.current,
+        metadata: {
+          "session_id"         => SecureRandom.uuid,
+          "transcript_source"  => "claude_jsonl",
+          "base_input_tokens"  => 455,
+          "cache_read_tokens"  => 12_650_378,
+          "cache_write_tokens" => 29_413,
+          "output_tokens"      => 16_889
+        }
+      }
+    end
+
+    it "stores tokens_in equal to metadata.base_input_tokens, not the inflated value" do
+      event = described_class.call(inflated_attributes)[:tool_event]
+      expect(event.tokens_in).to eq(455)
+    end
+
+    it "recomputes tokens_total from base input + output (cache excluded)" do
+      event = described_class.call(inflated_attributes)[:tool_event]
+      expect(event.tokens_total).to eq(455 + 16_889)
+    end
+
+    it "prices with cache-aware rates instead of the inflated input count" do
+      event = described_class.call(inflated_attributes)[:tool_event]
+      # base 455 @ $3/M + output 16_889 @ $15/M + cache_read 12_650_378 @ $0.30/M
+      #   + cache_write 29_413 @ $3.75/M ≈ $4.16, far below the pre-fix $12.73.
+      expect(event.cost_usd.to_f).to be_within(0.05).of(4.16)
+      expect(event.cost_usd.to_f).to be < 12.73
+    end
+
+    it "leaves an already-correct payload untouched (tokens_in == base)" do
+      attrs = inflated_attributes.merge(tokens_in: 455)
+      event = described_class.call(attrs)[:tool_event]
+      expect(event.tokens_in).to eq(455)
+      expect(event.tokens_total).to eq(455 + 16_889)
+    end
+
+    it "does not touch tokens_in when no base_input_tokens is present" do
+      attrs = inflated_attributes.merge(
+        metadata: { "session_id" => SecureRandom.uuid, "cache_read_tokens" => 900_000 }
+      )
+      event = described_class.call(attrs)[:tool_event]
+      expect(event.tokens_in).to eq(12_680_246)
+    end
+  end
+
+
   describe ".call — model normalisation" do
     let(:organization) { create(:organization) }
     let(:user)         { create(:user) }
