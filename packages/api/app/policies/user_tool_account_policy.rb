@@ -10,14 +10,16 @@ class UserToolAccountPolicy < ApplicationPolicy
     own_account? || global_admin?
   end
 
-  # Users can link their own tool accounts
+  # Users can link their own tool accounts — but only if they can contribute
+  # data to the org. Viewers are read-only (post-AIX-503).
   def create?
-    own_membership? || global_admin?
+    (own_membership? && can_contribute?) || global_admin?
   end
 
-  # Users can update their own tool accounts
+  # Users can update their own tool accounts, including regenerating ingest
+  # tokens. Viewers cannot contribute, so they cannot rotate tokens either.
   def update?
-    own_account? || global_admin?
+    (own_account? && can_contribute?) || global_admin?
   end
 
   # Users can unlink their own tool accounts
@@ -26,6 +28,11 @@ class UserToolAccountPolicy < ApplicationPolicy
   end
 
   private
+
+  def can_contribute?
+    membership = record.is_a?(OrganizationMembership) ? record : record.organization_membership
+    membership&.can_contribute? || false
+  end
 
   def own_account?
     record.organization_membership&.user_id == user&.id

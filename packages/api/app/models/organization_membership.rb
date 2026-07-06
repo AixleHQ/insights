@@ -29,6 +29,12 @@ class OrganizationMembership < ApplicationRecord
     role.in?(%w[owner member])
   end
 
+  # Viewers may only read; owners and members may contribute usage data
+  # (obtain ingest tokens and ingest events). post-AIX-503
+  def can_contribute?
+    role.in?(%w[owner member])
+  end
+
   private
 
   def ensure_not_last_owner

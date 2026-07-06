@@ -140,4 +140,18 @@ RSpec.describe OrganizationMembership, type: :model do
       expect(membership.can_manage_projects?).to be false
     end
   end
+
+  describe '#can_contribute?' do
+    it 'returns true for owner' do
+      expect(build(:organization_membership, role: 'owner').can_contribute?).to be true
+    end
+
+    it 'returns true for member' do
+      expect(build(:organization_membership, role: 'member').can_contribute?).to be true
+    end
+
+    it 'returns false for viewer' do
+      expect(build(:organization_membership, role: 'viewer').can_contribute?).to be false
+    end
+  end
 end

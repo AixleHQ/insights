@@ -527,10 +527,14 @@ function ToolCard({
 }
 
 export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
-  const { currentOrg } = useOrg();
+  const { currentOrg, memberships } = useOrg();
   const { data: orgs, isLoading: orgsLoading } = useUserOrganizations();
   const [userSelectedOrgId, setUserSelectedOrgId] = useState<string | null>(null);
   const selectedOrgId = userSelectedOrgId ?? currentOrg?.id ?? "";
+  const selectedOrgRole =
+    memberships.find((m) => m.organization.id === selectedOrgId)?.role ?? null;
+  // Viewers are read-only: they cannot obtain ingest tokens or link tools (AIX-503).
+  const canContribute = selectedOrgRole === "owner" || selectedOrgRole === "member";
   const [connectingProvider, setConnectingProvider] = useState<ToolProvider | null>(null);
   const [reconnectingAccountId, setReconnectingAccountId] = useState<string | null>(null);
   const [ingestProvider, setIngestProvider] = useState<ProviderInfo | null>(null);
@@ -674,7 +678,21 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
         </div>
       )}
 
-      {isLoading ? (
+      {!canContribute && selectedOrgId ? (
+        <Card className="border-muted">
+          <CardContent className="flex items-start gap-4 p-6">
+            <AlertCircle className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+            <div className="space-y-1 text-sm">
+              <p className="font-medium">Viewer access</p>
+              <p className="text-muted-foreground">
+                You don't have permission to contribute data to this organization. Connecting
+                tools and generating ingest tokens require the Owner or Member role. Contact an
+                organization owner if you need to link a tool.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : isLoading ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
             <AccountSkeleton key={i} />
