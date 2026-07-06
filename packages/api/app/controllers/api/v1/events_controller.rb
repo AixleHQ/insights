@@ -15,7 +15,7 @@ module Api
         authorize! current_organization, to: :show?
         events = authorized_scope(current_organization.tool_events)
         events = apply_filters(events)
-        events = events.includes(:user, :project).order(occurred_at: :desc)
+        events = events.includes(:user, :project, :audit_logs).order(occurred_at: :desc)
 
         render_collection(events, ToolEventSerializer, serializer_params: ->(paginated) {
           { candidate_users: candidate_users_for(paginated) }
@@ -63,7 +63,7 @@ module Api
           events = events.where("(metadata->>'correlation_confidence')::float >= ?", params[:min_confidence].to_f)
         end
 
-        events = events.includes(:project).order(occurred_at: :desc)
+        events = events.includes(:project, :audit_logs).order(occurred_at: :desc)
 
         render_collection(events, ToolEventSerializer, serializer_params: ->(paginated) {
           { candidate_users: candidate_users_for(paginated) }
@@ -154,7 +154,7 @@ module Api
 
         events = authorized_scope(current_organization.tool_events)
         events = apply_filters(events)
-        events = events.includes(:user, :project).order(occurred_at: :desc)
+        events = events.includes(:user, :project, :audit_logs).order(occurred_at: :desc)
         total_count = events.count
 
         if total_count > EXPORT_ROW_CAP
