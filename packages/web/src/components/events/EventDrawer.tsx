@@ -125,9 +125,6 @@ export function EventDrawer({
       })
     : "";
 
-  const tokenCount =
-    event?.tokensTotal ??
-    (event?.inputTokens || 0) + (event?.outputTokens || 0);
 
   const recentCommit = event
     ? parseRecentCommitFields(event.metadata, event.eventType)
@@ -261,11 +258,24 @@ export function EventDrawer({
                     />
                     <DetailRow
                       icon={FileText}
-                      label="Tokens"
+                      label="Tokens In"
                       value={
-                        tokenCount > 0 ? (
+                        (event.inputTokens ?? 0) > 0 ? (
                           <span className="text-sm">
-                            {formatTokens(tokenCount)}
+                            {formatTokens(event.inputTokens!)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )
+                      }
+                    />
+                    <DetailRow
+                      icon={FileText}
+                      label="Tokens Out"
+                      value={
+                        (event.outputTokens ?? 0) > 0 ? (
+                          <span className="text-sm">
+                            {formatTokens(event.outputTokens!)}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">-</span>

@@ -620,7 +620,7 @@ export function useMemberStats(orgId: string, memberId: string) {
   return useQuery({
     queryKey: queryKeys.members.stats(orgId, memberId),
     queryFn: async () => {
-      const response = await api.get<MemberStats>(`/organizations/${orgId}/members/${memberId}/stats`);
+      const response = await api.get<MemberStats>(appendTz(`/organizations/${orgId}/members/${memberId}/stats`));
       return response;
     },
     enabled: !!orgId && !!memberId,
@@ -648,7 +648,7 @@ export function useMemberDashboardStats(orgId: string, userId: string, period = 
     queryKey: queryKeys.members.dashboardStats(orgId, userId, period),
     queryFn: async () => {
       const response = await api.get<MemberDashboardStats>(
-        `/organizations/${orgId}/members/${userId}/dashboard_stats?period=${period}`
+        appendTz(`/organizations/${orgId}/members/${userId}/dashboard_stats?period=${period}`)
       );
       return response;
     },
@@ -692,7 +692,7 @@ export function usePromptInsights(orgId: string, userId: string, period = "30d")
     queryKey: queryKeys.members.promptInsights(orgId, userId, period),
     queryFn: async () => {
       const response = await api.get<PromptInsights>(
-        `/organizations/${orgId}/members/${userId}/prompt_insights?period=${period}`
+        appendTz(`/organizations/${orgId}/members/${userId}/prompt_insights?period=${period}`)
       );
       return response;
     },
@@ -716,7 +716,7 @@ export function useProjects(orgId: string) {
   });
 }
 
-export function useProject(id: string) {
+export function useProject(id: string, options?: { refetchInterval?: number | false }) {
   return useQuery({
     queryKey: queryKeys.projects.detail(id),
     queryFn: async () => {
@@ -724,6 +724,7 @@ export function useProject(id: string) {
       return response.data;
     },
     enabled: !!id,
+    refetchInterval: options?.refetchInterval,
   });
 }
 
@@ -975,7 +976,7 @@ export function useProjectMemberStats(projectId: string, days = 30, enabled = tr
     queryKey: ["projects", projectId, "members", "stats", days],
     queryFn: async () => {
       const res = await api.get<{ data: ProjectMemberStat[] }>(
-        `/projects/${projectId}/members/stats?days=${days}`
+        appendTz(`/projects/${projectId}/members/stats?days=${days}`)
       );
       return res.data;
     },
@@ -1155,6 +1156,24 @@ export function useDisconnectRepo(projectId: string) {
 // Connectors Hooks
 // ============================================================================
 
+function invalidateConnectorsList(
+  queryClient: ReturnType<typeof useQueryClient>,
+  orgId: string,
+) {
+  return queryClient.invalidateQueries({
+    queryKey: queryKeys.connectors.all(orgId),
+    exact: true,
+  });
+}
+
+function invalidateConnectorsListAndHealth(
+  queryClient: ReturnType<typeof useQueryClient>,
+  orgId: string,
+) {
+  void invalidateConnectorsList(queryClient, orgId);
+  void queryClient.invalidateQueries({ queryKey: queryKeys.connectors.health(orgId) });
+}
+
 export function useConnectors(orgId: string) {
   return useQuery({
     queryKey: queryKeys.connectors.all(orgId),
@@ -1173,7 +1192,10 @@ export function useConnectors(orgId: string) {
   });
 }
 
-export function useConnectorHealth(orgId: string, options?: { enabled?: boolean }) {
+export function useConnectorHealth(
+  orgId: string,
+  options?: { enabled?: boolean; refetchInterval?: number | false }
+) {
   return useQuery({
     queryKey: queryKeys.connectors.health(orgId),
     queryFn: async () => {
@@ -1184,6 +1206,7 @@ export function useConnectorHealth(orgId: string, options?: { enabled?: boolean 
     },
     enabled: !!orgId && (options?.enabled ?? true),
     staleTime: 60_000,
+    refetchInterval: options?.refetchInterval || false,
   });
 }
 
@@ -1211,7 +1234,7 @@ export function useCreateConnector() {
       connectorType: string;
       label?: string;
     }) =>
-      api.post<Connector>(`/organizations/${orgId}/connectors/callback`, {
+      api.post<{ data: Connector }>(`/organizations/${orgId}/connectors/callback`, {
         code,
         connector_type: connectorType,
         ...(label ? { label } : {}),
@@ -1224,7 +1247,7 @@ export function useCreateConnector() {
         },
       }),
     onSuccess: (_, { orgId }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
+      void invalidateConnectorsList(queryClient, orgId);
     },
   });
 }
@@ -1250,7 +1273,7 @@ export function useConnectWithApiKey() {
         ...(label ? { label } : {}),
       }),
     onSuccess: (_, { orgId }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
+      void invalidateConnectorsList(queryClient, orgId);
     },
   });
 }
@@ -1261,8 +1284,8 @@ export function useSyncConnector() {
   return useMutation({
     mutationFn: ({ orgId, connectorId }: { orgId: string; connectorId: string }) =>
       api.post(`/organizations/${orgId}/connectors/${connectorId}/sync`),
-    onSuccess: (_, { orgId }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
+    onSettled: (_, __, { orgId }) => {
+      void invalidateConnectorsListAndHealth(queryClient, orgId);
       queryClient.invalidateQueries({ queryKey: queryKeys.projects.all(orgId) });
       queryClient.invalidateQueries({ queryKey: ["projects"] });
     },
@@ -1276,7 +1299,7 @@ export function useDeleteConnector() {
     mutationFn: ({ orgId, connectorId }: { orgId: string; connectorId: string }) =>
       api.delete(`/organizations/${orgId}/connectors/${connectorId}`),
     onSuccess: (_, { orgId }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
+      void invalidateConnectorsList(queryClient, orgId);
     },
   });
 }
@@ -1295,7 +1318,7 @@ export function useUpdateConnector() {
       data: Record<string, unknown>;
     }) => api.patch(`/organizations/${orgId}/connectors/${connectorId}`, data),
     onSuccess: (_, { orgId }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
+      void invalidateConnectorsList(queryClient, orgId);
     },
   });
 }
@@ -1319,7 +1342,7 @@ export function useConnectWithWebhook() {
         ...(channelLabel ? { external_account_name: channelLabel } : {}),
       }),
     onSuccess: (_, { orgId }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
+      void invalidateConnectorsList(queryClient, orgId);
     },
   });
 }
@@ -1333,7 +1356,7 @@ export function useTestConnector() {
         `/organizations/${orgId}/connectors/${connectorId}/test`
       ),
     onSettled: (_, __, { orgId }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.connectors.all(orgId) });
+      void invalidateConnectorsListAndHealth(queryClient, orgId);
     },
   });
 }
@@ -1769,7 +1792,7 @@ export function useActiveUsers(orgId: string, projectId?: string, days = 7) {
       const p = new URLSearchParams();
       p.set("days", String(days));
       if (projectId) p.set("project_id", projectId);
-      return api.get<ActiveUsersResponse>(`/organizations/${orgId}/stats/active_users?${p.toString()}`);
+      return api.get<ActiveUsersResponse>(appendTz(`/organizations/${orgId}/stats/active_users?${p.toString()}`));
     },
     enabled: !!orgId,
     staleTime: 5 * 60 * 1000,
@@ -1941,7 +1964,7 @@ export function useActiveTools(orgId: string) {
     queryKey: queryKeys.stats.activeTools(orgId),
     queryFn: () =>
       api.get<{ tools: Array<{ tool_name: string; total_events: number; total_cost_usd: number; active_users: number }> }>(
-        `/organizations/${orgId}/stats/active_tools`
+        appendTz(`/organizations/${orgId}/stats/active_tools`)
       ),
     enabled: !!orgId,
     refetchInterval: 30000,

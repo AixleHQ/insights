@@ -219,10 +219,12 @@ export function IntegrationCard({
   // Display as connected integration
   if (!integration) return null;
 
-  const status = statusConfig[integration.status];
+  const effectiveStatus = (healthStats?.status ?? integration.status) as ConnectorStatus;
+  const status = statusConfig[effectiveStatus];
   const StatusIcon = status.icon;
-  const isSyncing = integration.status === "testing" && !isTesting;
+  const isSyncing = effectiveStatus === "testing" && !isTesting;
   const statusLabel = isSyncing ? "Syncing…" : status.label;
+  const effectiveSyncError = healthStats?.last_error ?? integration.sync_error;
   const normalizedLabel = integration.label?.trim();
   const displayAccountLabel = normalizedLabel || integration.metadata?.account_name;
 
@@ -375,7 +377,7 @@ export function IntegrationCard({
             ) : (
               <Badge variant="outline" className={cn("gap-1", status.bg)}>
                 <StatusIcon
-                  className={cn("size-3", status.color, integration.status === "testing" && "animate-spin")}
+                  className={cn("size-3", status.color, effectiveStatus === "testing" && "animate-spin")}
                 />
                 <span className={status.color}>{statusLabel}</span>
               </Badge>
@@ -426,8 +428,8 @@ export function IntegrationCard({
           </div>
         )}
 
-        {integration.sync_error && (
-          <ErrorPanel error={integration.sync_error} />
+        {effectiveSyncError && (
+          <ErrorPanel error={effectiveSyncError} />
         )}
 
         {healthStats && (healthStats.success_rate_7d != null || healthStats.avg_sync_duration_ms_7d != null) && (

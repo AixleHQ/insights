@@ -21,11 +21,14 @@ class ToolEvent < ApplicationRecord
   validates :tool_name, presence: true, inclusion: { in: TOOL_NAMES }
   validates :event_type, presence: true, inclusion: { in: EVENT_TYPES }
   validates :occurred_at, presence: true
+  validates :model, format: { with: ModelStringNormalizer::MODEL_FORMAT,
+                               message: "contains invalid characters" }, allow_nil: true, allow_blank: true
   validates :tokens_in, numericality: { only_integer: true, greater_than_or_equal_to: 0 }, allow_nil: true
   validates :tokens_out, numericality: { only_integer: true, greater_than_or_equal_to: 0 }, allow_nil: true
   validates :tokens_total, numericality: { only_integer: true, greater_than_or_equal_to: 0 }, allow_nil: true
   validates :cost_usd, numericality: { greater_than_or_equal_to: 0 }, allow_nil: true
 
+  before_validation :normalize_model
   before_validation :calculate_tokens_total
 
   scope :by_tool, ->(tool) { where(tool_name: tool) }
@@ -45,6 +48,18 @@ class ToolEvent < ApplicationRecord
   end
 
   private
+
+  # Self-heals the model column on every save so legacy/out-of-band rows
+  # (console, admin scripts, future jobs) can't trip the format validation
+  # with a stale value. Ingest via ToolEvents::Upsert already normalises, but
+  # this guarantees the invariant for any AR write path. Only rewrites when the
+  # value actually changes to avoid touching untouched records needlessly.
+  def normalize_model
+    return if model.nil?
+
+    normalized = ModelStringNormalizer.normalize(model)
+    self.model = normalized unless normalized == model
+  end
 
   def calculate_tokens_total
     self.tokens_total = (tokens_in || 0) + (tokens_out || 0)

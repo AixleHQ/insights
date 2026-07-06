@@ -35,4 +35,5 @@ describe("CostTrendChart", () => {
 
     vi.useRealTimers();
   });
+
 });

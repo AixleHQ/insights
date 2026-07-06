@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title><%= content_for(:title) || "Admin" %> | DB90</title>
+  <title><%= content_for(:title) || "Admin" %> | Aixle Insights</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -64,11 +65,11 @@
     <aside class="fixed inset-y-0 left-0 z-50 w-64 bg-zinc-950 flex flex-col">
       <!-- Logo -->
       <div class="flex items-center gap-3 px-6 py-5 border-b border-zinc-800">
-        <div class="w-8 h-8 rounded-lg bg-white flex items-center justify-center">
-          <span class="text-zinc-950 font-bold text-sm">D9</span>
+        <div class="w-8 h-8 rounded-lg bg-white flex items-center justify-center shrink-0">
+          <span class="text-zinc-950 font-bold text-sm">AI</span>
         </div>
-        <span class="text-white font-semibold text-lg">DB90</span>
-        <span class="ml-auto px-2 py-0.5 text-[10px] font-medium text-zinc-400 bg-zinc-800 rounded">ADMIN</span>
+        <span class="text-white font-semibold text-sm truncate">Aixle Insights</span>
+        <span class="ml-auto shrink-0 px-2 py-0.5 text-[10px] font-medium text-zinc-400 bg-zinc-800 rounded">ADMIN</span>
       </div>
 
       <!-- Navigation -->
@@ -99,6 +100,10 @@
             <%= link_to admin_repositories_path, class: "flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors #{request.path.start_with?('/admin/repositories') ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:text-white hover:bg-zinc-900'}" do %>
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
               Repositories
+            <% end %>
+            <%= link_to admin_invitations_path, class: "flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors #{request.path.start_with?('/admin/invitations') ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:text-white hover:bg-zinc-900'}" do %>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.99 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.92 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 8.91a16 16 0 0 0 5.99 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              Invitations
             <% end %>
           </div>
         </div>

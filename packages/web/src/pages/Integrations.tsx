@@ -50,7 +50,14 @@ export function Integrations() {
   const { data: connectorsData, isLoading: connectorsLoading } = useConnectors(
     currentOrg?.id || "",
   );
-  const { data: healthData } = useConnectorHealth(currentOrg?.id || "", { enabled: isOwner });
+  const isAnyConnectorSyncing = useMemo(
+    () => (connectorsData ?? []).some((c) => c.status === "testing"),
+    [connectorsData],
+  );
+  const { data: healthData } = useConnectorHealth(currentOrg?.id || "", {
+    enabled: isOwner,
+    refetchInterval: isAnyConnectorSyncing ? 3_000 : false,
+  });
   const isLoading = connectorsLoading;
 
   const healthStatsById = useMemo(() => {

@@ -29,7 +29,7 @@ interface AuthState {
 }
 
 interface AuthContextValue extends AuthState {
-  login: () => Promise<void>;
+  login: (returnUrl?: string) => Promise<void>;
   logout: () => Promise<void>;
   getAccessToken: () => Promise<string | null>;
   directLogin: (username: string, password: string) => Promise<void>;
@@ -175,10 +175,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
   }, []);
 
-  const login = useCallback(async () => {
+  const login = useCallback(async (returnUrl?: string) => {
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
     try {
-      await authLogin();
+      await authLogin(returnUrl);
     } catch (error) {
       setState((prev) => ({
         ...prev,

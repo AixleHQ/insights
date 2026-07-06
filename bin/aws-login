@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Repo-local AWS SSO login — uses gitignored .aws/ (never ~/.aws).
+set -euo pipefail
+
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null) \
+  || { printf '\033[31m✗ not a git repository\033[0m\n' >&2; exit 1; }
+
+AWS_DIR="$ROOT/.aws"
+CONFIG="$AWS_DIR/config"
+EXAMPLE="$ROOT/docker/aws-config.workstation.example"
+PROFILE="${1:-dbp-rd}"
+
+if [[ ! -f "$CONFIG" ]]; then
+  mkdir -p "$AWS_DIR"
+  cp "$EXAMPLE" "$CONFIG"
+  printf '→ created %s from the workstation example\n' "$CONFIG"
+fi
+
+if grep -q 'CHANGE-ME' "$CONFIG"; then
+  if [[ -n "${DBP_SSO_URL:-}" ]]; then
+    sed -i '' "s|https://CHANGE-ME.awsapps.com/start|${DBP_SSO_URL}|g" "$CONFIG"
+  else
+    printf '\033[31m✗ set sso_start_url in %s (or export DBP_SSO_URL and re-run)\033[0m\n' "$CONFIG" >&2
+    printf '  IAM Identity Center → Settings → AWS access portal URL\n' >&2
+    exit 1
+  fi
+fi
+
+export AWS_CONFIG_FILE="$CONFIG"
+exec aws sso login --profile "$PROFILE"

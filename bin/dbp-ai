@@ -1,0 +1,188 @@
+#!/usr/bin/env bash
+# dbp-ai — preflight + launch Claude Code in project-scoped Bedrock mode.
+# Thin wrapper: routing lives in .claude/settings.json (client repos) or
+# .claude/settings.local.json (opt-in dogfooding in this repo).
+set -euo pipefail
+
+red()    { printf '\033[31m%s\033[0m\n' "$*"; }
+green()  { printf '\033[32m%s\033[0m\n' "$*"; }
+yellow() { printf '\033[33m%s\033[0m\n' "$*"; }
+die()    { red "✗ $*"; exit 1; }
+
+usage() {
+  cat <<'EOF'
+Usage: dbp-ai [check | --debug] [claude args...]
+
+  (no args)   preflight, export repo routing env, launch claude
+  check       preflight + one Bedrock call; print the raw AWS error and exit
+  --debug     same as default but with DEBUG=1 and claude --debug
+
+Fail-fast: sets CLAUDE_CODE_MAX_RETRIES=1 unless already in settings env.
+Credentials: exports every key from settings env; unsets ANTHROPIC_API_KEY
+and other direct-API tokens so Bedrock + repo-local AWS_PROFILE win.
+EOF
+}
+
+load_routing_config() {
+  command -v jq >/dev/null || die "jq is required"
+
+  ROOT=$(git rev-parse --show-toplevel 2>/dev/null) \
+    || die "not a git repository — AI sessions are allowed in project repos only"
+
+  COMMITTED="$ROOT/.claude/settings.json"
+  LOCAL="$ROOT/.claude/settings.local.json"
+  if [[ -f "$COMMITTED" ]]; then
+    CFG="$COMMITTED"
+  elif [[ -f "$LOCAL" ]]; then
+    CFG="$LOCAL"
+  else
+    die "missing $COMMITTED (or $LOCAL for opt-in dogfooding) — repo is not enrolled in DBP AI routing. Working through DBP accounts without a config is prohibited."
+  fi
+
+  PROFILE=$(jq -r '.env.AWS_PROFILE // empty' "$CFG")
+  REGION=$(jq -r '.env.AWS_REGION // empty' "$CFG")
+  BEDROCK=$(jq -r '.env.CLAUDE_CODE_USE_BEDROCK // empty' "$CFG")
+  SONNET=$(jq -r '.env.ANTHROPIC_DEFAULT_SONNET_MODEL // "built-in default"' "$CFG")
+  HAIKU=$(jq -r '.env.ANTHROPIC_DEFAULT_HAIKU_MODEL // empty' "$CFG")
+  MODELS=$(jq -r '(.availableModels // []) | join(", ")' "$CFG")
+  GUARDRAIL_ID=$(jq -r '.env.ANTHROPIC_CUSTOM_HEADERS // ""' "$CFG" \
+    | awk -F': ' '/^X-Amzn-Bedrock-GuardrailIdentifier:/ {print $2; exit}')
+  GUARDRAIL_VER=$(jq -r '.env.ANTHROPIC_CUSTOM_HEADERS // ""' "$CFG" \
+    | awk -F': ' '/^X-Amzn-Bedrock-GuardrailVersion:/ {print $2; exit}')
+
+  [[ "$BEDROCK" == "1" || "$BEDROCK" == "true" ]] \
+    || die "CLAUDE_CODE_USE_BEDROCK is not enabled in the config"
+  [[ -n "$PROFILE" && -n "$REGION" ]] \
+    || die "config is missing AWS_PROFILE/AWS_REGION"
+}
+
+apply_repo_aws() {
+  REPO_AWS="$ROOT/.aws"
+  AWS_CONFIG_SRC="~/.aws/config"
+  if [[ -f "$REPO_AWS/config" ]]; then
+    export AWS_CONFIG_FILE="$REPO_AWS/config"
+    AWS_CONFIG_SRC="$REPO_AWS/config"
+    [[ -f "$REPO_AWS/credentials" ]] \
+      && export AWS_SHARED_CREDENTIALS_FILE="$REPO_AWS/credentials"
+    if grep -q 'CHANGE-ME' "$REPO_AWS/config"; then
+      die "repo-local $REPO_AWS/config still has a placeholder SSO URL — run bin/aws-login (or set DBP_SSO_URL) after editing it"
+    fi
+  fi
+}
+
+clear_conflicting_credentials() {
+  # Direct Anthropic API tokens override Bedrock routing if left in the shell.
+  unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN 2>/dev/null || true
+  unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN 2>/dev/null || true
+}
+
+export_settings_env() {
+  while IFS= read -r key; do
+    [[ -n "$key" ]] || continue
+    # shellcheck disable=SC2163
+    export "$key=$(jq -r --arg k "$key" '.env[$k]' "$CFG")"
+  done < <(jq -r '.env | keys[]? // empty' "$CFG")
+
+  # Repo-local .aws/config wins over a stale absolute path in settings.
+  apply_repo_aws
+  export AWS_PROFILE="$PROFILE" AWS_REGION="$REGION"
+
+  # Fail fast on Bedrock errors (override in settings env if you want more retries).
+  export CLAUDE_CODE_MAX_RETRIES="${CLAUDE_CODE_MAX_RETRIES:-1}"
+}
+
+ensure_aws_session() {
+  if ! IDENTITY=$(aws sts get-caller-identity --output json 2>/dev/null); then
+    echo "→ SSO session expired, logging in..."
+    "$ROOT/bin/aws-login" "$PROFILE" || die "SSO login failed"
+    IDENTITY=$(aws sts get-caller-identity --output json) \
+      || die "credentials still failing after login"
+  fi
+  ACCOUNT=$(jq -r '.Account' <<<"$IDENTITY")
+  ARN=$(jq -r '.Arn' <<<"$IDENTITY")
+
+  CFG_ACCOUNT=$(grep -oE 'arn:aws:bedrock:[^:]*:([0-9]{12})' "$CFG" \
+    | head -1 | grep -oE '[0-9]{12}' || true)
+  if [[ -n "$CFG_ACCOUNT" && "$CFG_ACCOUNT" != "$ACCOUNT" ]]; then
+    die "MISMATCH: credentials resolve to $ACCOUNT, repo config points to $CFG_ACCOUNT. Wrong profile / wrong client."
+  fi
+}
+
+print_preflight() {
+  green "── DBP AI routing ──────────────────────────────"
+  echo  "  Repo:        $(basename "$ROOT")"
+  echo  "  Config:      $CFG"
+  echo  "  AWS config:  $AWS_CONFIG_SRC"
+  echo  "  AWS profile: $PROFILE"
+  echo  "  Account:     $ACCOUNT"
+  echo  "  Identity:    $ARN"
+  echo  "  Region:      $REGION"
+  echo  "  Sonnet:      $SONNET"
+  echo  "  Models:      ${MODELS:-unrestricted}"
+  echo  "  Max retries: ${CLAUDE_CODE_MAX_RETRIES}"
+  green "────────────────────────────────────────────────"
+}
+
+run_bedrock_check() {
+  [[ -n "$HAIKU" ]] || die "settings env missing ANTHROPIC_DEFAULT_HAIKU_MODEL"
+  [[ -n "$GUARDRAIL_ID" && -n "$GUARDRAIL_VER" ]] \
+    || die "settings env missing guardrail headers in ANTHROPIC_CUSTOM_HEADERS"
+
+  yellow "→ Bedrock probe (haiku profile + guardrail, no Claude Code)..."
+  set +e
+  OUT=$(aws bedrock-runtime converse \
+    --model-id "$HAIKU" \
+    --messages '[{"role":"user","content":[{"text":"ping"}]}]' \
+    --inference-config '{"maxTokens":5}' \
+    --guardrail-config "{\"guardrailIdentifier\":\"$GUARDRAIL_ID\",\"guardrailVersion\":\"$GUARDRAIL_VER\"}" \
+    --region "$REGION" 2>&1)
+  RC=$?
+  set -e
+
+  if [[ $RC -eq 0 ]]; then
+    green "✓ Bedrock invoke succeeded"
+    echo "$OUT" | head -20
+    return 0
+  fi
+
+  red "✗ Bedrock invoke failed (exit $RC)"
+  echo "$OUT"
+  echo
+  yellow "This is the error Claude Code would retry silently. Fix IAM/config, then re-run: bin/dbp-ai check"
+  return 1
+}
+
+preflight() {
+  load_routing_config
+  clear_conflicting_credentials
+  export_settings_env
+  ensure_aws_session
+}
+
+MODE=run
+CLAUDE_ARGS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    check) MODE=check; shift ;;
+    --debug) export DEBUG=1; CLAUDE_ARGS+=(--debug); shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) CLAUDE_ARGS+=("$1"); shift ;;
+  esac
+done
+
+preflight
+print_preflight
+
+case "$MODE" in
+  check)
+    run_bedrock_check
+    ;;
+  run)
+    command -v claude >/dev/null \
+      || die "Claude Code not installed (npm i -g @anthropic-ai/claude-code)"
+    # Env vars from settings + exports above override file merge ambiguity.
+    # ${arr[@]+...} guard: empty array under `set -u` is an error in bash 3.2
+    # (the macOS system bash), which would break a bare `dbp-ai` with no args.
+    exec claude ${CLAUDE_ARGS[@]+"${CLAUDE_ARGS[@]}"}
+    ;;
+esac

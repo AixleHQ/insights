@@ -94,6 +94,7 @@ export interface ProjectWithStats extends Project {
   linearProjectId?: string | null;
   linearProjectName?: string | null;
   linearConnectorId?: string | null;
+  issuesSyncedAt?: string | null;
   sourceControlSummary?: SourceControlSummary[];
   issueThroughputSummary?: IssueThroughputSummary[];
 }
@@ -159,10 +160,13 @@ export interface Connector {
   activeUsersCount?: number | null;
   copilotConnector?: boolean;
   config?: Record<string, unknown>;
-  // Webhook fields (OpenRouter-specific)
+  // Webhook fields
   webhookActive?: boolean;
   webhookToken?: string;
   webhookSecretSet?: boolean;
+  // Source-control configuration fields (null for non-source-control connectors)
+  syncRepositories?: boolean | null;
+  syncPullRequests?: boolean | null;
 }
 
 // Project connector types
@@ -482,6 +486,7 @@ export type MemberRole = "owner" | "member" | "viewer";
 
 export interface Invitation {
   id: string;
+  token: string;
   email: string;
   role: MemberRole;
   status: InvitationStatus;
@@ -503,6 +508,7 @@ export interface Invitation {
 
 export interface InvitationPublic {
   id: string;
+  token: string;
   role: MemberRole;
   status: InvitationStatus;
   organization: {

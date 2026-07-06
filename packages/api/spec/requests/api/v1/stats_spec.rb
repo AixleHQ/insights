@@ -72,6 +72,45 @@ RSpec.describe 'Api::V1::Stats', type: :request do
       expect(response).to have_http_status(:not_found)
     end
 
+    it 'filters to events with no project when project_id=none' do
+      project = create(:project, organization: organization)
+      create(:tool_event, organization: organization, project: project, user: user,
+             tool_name: 'claude_code', cost_usd: 99.0, occurred_at: Time.current)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/overview",
+                        user: user,
+                        organization: organization,
+                        params: { project_id: 'none' }
+
+      expect_success
+      # The 2 events from before-block have no project; the project-scoped event above must not appear
+      expect(json_response[:total_events]).to eq(2)
+    end
+
+    it 'treats whitespace-only project_id as blank' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/overview",
+                        user: user,
+                        organization: organization,
+                        params: { project_id: "   " }
+
+      expect_success
+      expect(json_response[:total_events]).to be >= 1
+    end
+
+    it 'does not raise for array-form project_id and scopes by first value' do
+      project = create(:project, organization: organization)
+      create(:tool_event, organization: organization, project: project, user: user,
+             tool_name: 'claude_code', cost_usd: 3.0, occurred_at: Time.current)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/overview",
+                        user: user,
+                        organization: organization,
+                        params: { project_id: [ project.id ] }
+
+      expect_success
+      expect(json_response[:total_events]).to eq(1)
+    end
+
     it 'returns 403 for non-members' do
       non_member = create(:user)
 
@@ -296,6 +335,93 @@ RSpec.describe 'Api::V1::Stats', type: :request do
     end
   end
 
+  describe 'timezone-aware date ranges (AIX-447)' do
+    let(:org)    { create(:organization) }
+    let(:member) { create(:user) }
+
+    before { create(:organization_membership, user: member, organization: org, role: 'member') }
+
+    it 'anchors the rolling window to local midnight for the tz param' do
+      travel_to(Time.utc(2026, 7, 2, 8, 24)) do
+        # 00:30 on Jun 3 in Brussels (UTC+2) == 22:30 on Jun 2 UTC — inside a
+        # 30-day window anchored to Brussels midnight, outside one anchored to UTC.
+        create(:tool_event, organization: org, user: member,
+               occurred_at: Time.utc(2026, 6, 2, 22, 30))
+
+        authenticated_get "/api/v1/organizations/#{org.id}/stats/active_users",
+                          user: member,
+                          organization: org,
+                          params: { days: 30, tz: "Europe/Brussels" }
+
+        expect_success
+        expect(json_response[:active_users]).to eq(1)
+        expect(json_response[:timeRange][:start]).to eq("2026-06-03T00:00:00+02:00")
+      end
+    end
+
+    it 'keeps UTC midnight when tz is absent' do
+      travel_to(Time.utc(2026, 7, 2, 8, 24)) do
+        create(:tool_event, organization: org, user: member,
+               occurred_at: Time.utc(2026, 6, 2, 22, 30))
+
+        authenticated_get "/api/v1/organizations/#{org.id}/stats/active_users",
+                          user: member,
+                          organization: org,
+                          params: { days: 30 }
+
+        expect_success
+        expect(json_response[:active_users]).to eq(0)
+        expect(json_response[:timeRange][:start]).to eq("2026-06-03T00:00:00Z")
+      end
+    end
+
+    it 'falls back to UTC for an unknown tz identifier' do
+      travel_to(Time.utc(2026, 7, 2, 8, 24)) do
+        authenticated_get "/api/v1/organizations/#{org.id}/stats/active_users",
+                          user: member,
+                          organization: org,
+                          params: { days: 30, tz: "Not/AZone" }
+
+        expect_success
+        expect(json_response[:timeRange][:start]).to eq("2026-06-03T00:00:00Z")
+      end
+    end
+
+    it 'buckets daily stats by local calendar day and starts the window at local midnight' do
+      travel_to(Time.utc(2026, 7, 2, 8, 24)) do
+        create(:tool_event, organization: org, user: member,
+               occurred_at: Time.utc(2026, 6, 2, 22, 30), cost_usd: 1.0)
+
+        authenticated_get "/api/v1/organizations/#{org.id}/stats/daily",
+                          user: member,
+                          organization: org,
+                          params: { days: 30, tz: "Europe/Brussels" }
+
+        expect_success
+        dates = json_response[:data].map { |d| d[:date] }
+        expect(dates.first).to eq("2026-06-03")
+        row = json_response[:data].find { |d| d[:date] == "2026-06-03" }
+        expect(row[:event_count]).to eq(1)
+      end
+    end
+
+    it 'scopes the overview month to the client timezone' do
+      travel_to(Time.utc(2026, 7, 2, 8, 24)) do
+        # 00:30 on Jun 1 in Brussels == 22:30 on May 31 UTC — belongs to June locally.
+        create(:tool_event, organization: org, user: member,
+               occurred_at: Time.utc(2026, 5, 31, 22, 30))
+
+        authenticated_get "/api/v1/organizations/#{org.id}/stats/overview",
+                          user: member,
+                          organization: org,
+                          params: { month: "2026-06", tz: "Europe/Brussels" }
+
+        expect_success
+        expect(json_response[:total_events]).to eq(1)
+      end
+    end
+  end
+
   describe 'GET /api/v1/organizations/:organization_id/stats/hourly' do
     it 'returns hourly aggregated statistics' do
       authenticated_get "/api/v1/organizations/#{organization.id}/stats/hourly",
@@ -371,6 +497,29 @@ RSpec.describe 'Api::V1::Stats', type: :request do
         expect_success
         total_cost = json_response[:data].sum { |r| r[:cost_usd] }
         expect(total_cost).to be_within(0.01).of(project_event.cost_usd)
+      end
+
+      it 'filters to unattributed events when project_id=none' do
+        fresh_org = create(:organization)
+        fresh_user = create(:user)
+        create(:organization_membership, user: fresh_user, organization: fresh_org, role: "member")
+
+        project = create(:project, organization: fresh_org)
+        create(:tool_event, organization: fresh_org, user: fresh_user,
+               project: project, cost_usd: 11.0,
+               occurred_at: Date.current.beginning_of_month + 1.day)
+        create(:tool_event, organization: fresh_org, user: fresh_user,
+               project: nil, cost_usd: 2.5,
+               occurred_at: Date.current.beginning_of_month + 2.days)
+
+        authenticated_get "/api/v1/organizations/#{fresh_org.id}/stats/daily",
+                          user: fresh_user,
+                          organization: fresh_org,
+                          params: { month: Date.current.strftime("%Y-%m"), project_id: "none" }
+
+        expect_success
+        total_cost = json_response[:data].sum { |r| r[:cost_usd] }
+        expect(total_cost).to be_within(0.01).of(2.5)
       end
     end
 
@@ -511,6 +660,27 @@ RSpec.describe 'Api::V1::Stats', type: :request do
                         params: { project_id: project.id }
 
       expect_success
+    end
+
+    it 'filters by project_id=none' do
+      fresh_org = create(:organization)
+      fresh_user = create(:user)
+      create(:organization_membership, user: fresh_user, organization: fresh_org, role: "member")
+
+      project = create(:project, organization: fresh_org)
+      create(:tool_event, organization: fresh_org, project: project, user: fresh_user,
+             tool_name: 'cursor', occurred_at: Time.current)
+      create(:tool_event, organization: fresh_org, project: nil, user: fresh_user,
+             tool_name: 'claude_code', occurred_at: Time.current)
+
+      authenticated_get "/api/v1/organizations/#{fresh_org.id}/stats/daily_by_tool",
+                        user: fresh_user,
+                        organization: fresh_org,
+                        params: { project_id: "none" }
+
+      expect_success
+      expect(json_response[:tools]).to include("claude_code")
+      expect(json_response[:tools]).not_to include("cursor")
     end
 
     context 'with all_time=true' do
@@ -1298,6 +1468,25 @@ RSpec.describe 'Api::V1::Stats', type: :request do
       expect(tool_names).not_to include('claude_code')
     end
 
+    it 'filters by project_id=none' do
+      project = create(:project, organization: organization)
+      project_event = create(:tool_event, organization: organization, project: project,
+                             user: user, tool_name: 'cursor', cost_usd: 1.0, occurred_at: Time.current)
+      create(:audit_log, organization: organization, tool_event: project_event, risk_level: 'high')
+
+      nil_project_event = create(:tool_event, organization: organization, project: nil,
+                                 user: user, tool_name: 'aider', cost_usd: 0.5, occurred_at: Time.current)
+      create(:audit_log, organization: organization, tool_event: nil_project_event, risk_level: 'high')
+
+      authenticated_get path, user: user, organization: organization,
+                        params: { project_id: "none" }
+
+      expect_success
+      tool_names = json_response.map { |r| r[:toolName] }
+      expect(tool_names).to include('aider')
+      expect(tool_names).not_to include('cursor')
+    end
+
     it 'returns 404 for cross-org project_id' do
       other_project = create(:project, organization: create(:organization))
 
@@ -1410,6 +1599,27 @@ RSpec.describe 'Api::V1::Stats', type: :request do
       expect_success
       expect(json_response[:data]).to be_an(Array)
       expect(json_response[:models]).to be_an(Array)
+    end
+
+    it 'filters by project_id=none' do
+      fresh_org = create(:organization)
+      fresh_user = create(:user)
+      create(:organization_membership, user: fresh_user, organization: fresh_org, role: "member")
+
+      project = create(:project, organization: fresh_org)
+      create(:tool_event, organization: fresh_org, project: project, user: fresh_user,
+             model: 'project-model', occurred_at: Time.current)
+      create(:tool_event, organization: fresh_org, project: nil, user: fresh_user,
+             model: 'nil-model', occurred_at: Time.current)
+
+      authenticated_get "/api/v1/organizations/#{fresh_org.id}/stats/daily_by_model",
+                        user: fresh_user,
+                        organization: fresh_org,
+                        params: { project_id: "none" }
+
+      expect_success
+      expect(json_response[:models]).to include('nil-model')
+      expect(json_response[:models]).not_to include('project-model')
     end
 
     it 'returns 403 for non-members' do

@@ -15,7 +15,9 @@ module ToolEventFilterable
       scope = scope.where(event_type: types)
     end
     scope = scope.where(user_id: fp["user_id"])       if fp["user_id"].present?
-    if (project_ids = normalize_string_array(fp["project_id"])).any?
+    if normalize_project_filter(fp["project_id"]) == "none"
+      scope = scope.where(project_id: nil)
+    elsif (project_ids = normalize_string_array(fp["project_id"])).any?
       scope = scope.where(project_id: project_ids)
     end
     scope = scope.where(model: fp["model"])            if fp["model"].present?
@@ -25,12 +27,15 @@ module ToolEventFilterable
 
   def apply_tool_event_time_filter(scope, fp)
     fp = fp.transform_keys(&:to_s)
+    zone = ActiveSupport::TimeZone[fp["tz"].to_s] || Time.zone
     if fp["start_date"].present?
-      scope = scope.where("occurred_at >= ?", Time.zone.parse(fp["start_date"]).beginning_of_day)
+      parsed = begin; zone.parse(fp["start_date"]); rescue ArgumentError; nil; end
+      scope = scope.where("occurred_at >= ?", parsed.beginning_of_day) if parsed
     end
     if fp["end_date"].present?
       # Inclusive calendar end date (UI sends YYYY-MM-DD from <input type="date">).
-      scope = scope.where("occurred_at <= ?", Time.zone.parse(fp["end_date"]).end_of_day)
+      parsed = begin; zone.parse(fp["end_date"]); rescue ArgumentError; nil; end
+      scope = scope.where("occurred_at <= ?", parsed.end_of_day) if parsed
     end
     scope
   end
@@ -111,6 +116,13 @@ module ToolEventFilterable
   end
 
   private
+
+  # Mirrors StatsController#scoped_events_base's normalization so array-form values
+  # (e.g. project_id[]=none) and stray whitespace match the "none" sentinel the same
+  # way on both endpoints.
+  def normalize_project_filter(value)
+    Array.wrap(value).first.to_s.strip.presence
+  end
 
   def normalize_string_array(value)
     case value

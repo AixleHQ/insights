@@ -33,15 +33,9 @@ module Api
           }, status: :unprocessable_content
         end
 
-        # Check if user is already a member
-        if @invitation.organization.members.include?(current_user)
-          return render json: {
-            error: "Unprocessable Entity",
-            message: "You are already a member of this organization"
-          }, status: :unprocessable_content
-        end
-
-        # Accept the invitation
+        # Accept the invitation. accept! is idempotent — if the user is already
+        # a member (e.g. auto-assigned on login) it still marks the invitation
+        # accepted and returns the existing membership (AIX-289).
         membership = @invitation.accept!(current_user)
 
         if membership

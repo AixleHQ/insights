@@ -299,7 +299,7 @@ RSpec.describe "Api::V1::Reports", type: :request do
     end
 
     context "date range defaults" do
-      it "returns data without from/to params (defaults to last 30 days)" do
+      it "returns all-time data without from/to params" do
         authenticated_get base_path,
                           user: owner,
                           organization: organization,
@@ -307,6 +307,54 @@ RSpec.describe "Api::V1::Reports", type: :request do
         expect(response).to have_http_status(:ok)
         expect(json_response[:data]).to be_an(Array)
         expect(json_response[:data]).not_to be_empty
+      end
+    end
+
+    context "users with events outside the default 30-day window" do
+      let!(:old_user) { create(:user) }
+      let!(:old_membership) do
+        create(:organization_membership, user: old_user, organization: organization, role: "member")
+      end
+      let!(:old_event) do
+        create(:tool_event,
+               organization: organization,
+               user: old_user,
+               tool_name: "claude_code",
+               tokens_in: 500,
+               tokens_out: 1000,
+               cost_usd: 0.75,
+               occurred_at: 45.days.ago)
+      end
+
+      it "includes users whose events predate 30 days ago when no date range is given" do
+        authenticated_get base_path,
+                          user: owner,
+                          organization: organization,
+                          params: { report_type: "cost_by_user" }
+        user_ids = json_response[:data].map { |r| r[:user_id] }
+        expect(user_ids).to include(old_user.id)
+      end
+
+      it "includes the correct cost for the old user" do
+        authenticated_get base_path,
+                          user: owner,
+                          organization: organization,
+                          params: { report_type: "cost_by_user" }
+        row = json_response[:data].find { |r| r[:user_id] == old_user.id }
+        expect(row[:total_cost_usd].to_f).to be_within(0.001).of(0.75)
+      end
+
+      it "excludes the old user when an explicit date range excludes their events" do
+        authenticated_get base_path,
+                          user: owner,
+                          organization: organization,
+                          params: {
+                            report_type: "cost_by_user",
+                            from: 30.days.ago.iso8601,
+                            to: Time.current.iso8601
+                          }
+        user_ids = json_response[:data].map { |r| r[:user_id] }
+        expect(user_ids).not_to include(old_user.id)
       end
     end
   end

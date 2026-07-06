@@ -76,7 +76,10 @@ class JiraSyncJob < ApplicationJob
   def sync_single_project(project_id)
     project  = Project.find(project_id)
     jira_key = project.project_settings.find_by(key: "jira_project_key")&.value
-    sync_project_issues(project, jira_key) if jira_key.present?
+    if jira_key.present?
+      sync_project_issues(project, jira_key)
+      project.update_column(:issues_synced_at, Time.current)
+    end
   end
 
   def sync_all_issues
@@ -84,7 +87,10 @@ class JiraSyncJob < ApplicationJob
     ProjectSetting.where(key: "jira_project_key", project_id: linked_connector_project_ids)
                   .includes(:project)
                   .each do |setting|
-      sync_project_issues(setting.project, setting.value) if setting.value.present?
+      next unless setting.value.present?
+
+      sync_project_issues(setting.project, setting.value)
+      setting.project.update_column(:issues_synced_at, Time.current)
     end
   end
 

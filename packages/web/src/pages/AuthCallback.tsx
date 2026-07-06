@@ -1,11 +1,10 @@
 import { useEffect, useState, useRef } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { loginCallback } from "../lib/auth";
-import { AppRoutes } from "@/lib/routes";
+import { AppRoutes, isSafeRedirectPath } from "@/lib/routes";
 
 export function AuthCallback() {
   const navigate = useNavigate();
-  const location = useLocation();
   const [error, setError] = useState<string | null>(null);
   const hasProcessed = useRef(false);
 
@@ -18,11 +17,13 @@ export function AuthCallback() {
 
     const handleCallback = async () => {
       try {
-        await loginCallback();
+        const user = await loginCallback();
 
-        // Get the original destination from state, or default to home
-        const state = location.state as { from?: { pathname: string } } | null;
-        const destination = state?.from?.pathname || AppRoutes.dashboard;
+        // Restore the destination the user was trying to reach before being
+        // sent to log in (e.g. an invitation link) — carried through the OIDC
+        // `state` param, since React Router's location.state cannot survive
+        // the external Keycloak redirect round-trip.
+        const destination = isSafeRedirectPath(user.state) ? user.state : AppRoutes.dashboard;
 
         navigate(destination, { replace: true });
       } catch (err) {
@@ -32,7 +33,7 @@ export function AuthCallback() {
     };
 
     handleCallback();
-  }, [navigate, location]);
+  }, [navigate]);
 
   if (error) {
     return (

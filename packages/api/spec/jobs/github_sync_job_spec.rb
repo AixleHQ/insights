@@ -61,6 +61,21 @@ RSpec.describe GithubSyncJob, type: :job do
 
       expect(provider).not_to have_received(:fetch_commits)
     end
+
+    it "marks the connector in error when fetch_repositories raises GithubApiError" do
+      provider = instance_double(Oauth::GithubProvider)
+      allow(Oauth::BaseProvider).to receive(:for).with(connector).and_return(provider)
+      allow(provider).to receive(:fetch_repositories)
+        .and_raise(Oauth::GithubApiError, "GitHub repos lookup failed (401)")
+
+      expect {
+        described_class.new.perform(connector.id, "sync")
+      }.to raise_error(Oauth::GithubApiError)
+
+      connector.reload
+      expect(connector.status).to eq("error")
+      expect(connector.last_error).to include("401")
+    end
   end
 
   describe "#perform — webhook push action" do
@@ -125,6 +140,67 @@ RSpec.describe GithubSyncJob, type: :job do
 
       event = ToolEvent.last
       expect(event.user_id).to be_nil
+    end
+  end
+
+  describe "sync_repositories? gating" do
+    it "skips repo fetch when sync_repositories is false" do
+      connector.update!(config: { "sync_repositories" => false })
+
+      expect(Oauth::BaseProvider).not_to receive(:for)
+
+      described_class.new.perform(connector.id, "sync")
+    end
+
+    it "syncs when sync_repositories key is absent (default-enabled)" do
+      connector.update!(config: {})
+
+      provider = instance_double(Oauth::GithubProvider)
+      allow(Oauth::BaseProvider).to receive(:for).with(connector).and_return(provider)
+      allow(provider).to receive(:fetch_repositories).and_return([])
+      allow(provider).to receive(:fetch_commits).and_return([])
+
+      described_class.new.perform(connector.id, "sync")
+
+      expect(provider).to have_received(:fetch_repositories)
+    end
+  end
+
+  describe "sync_pull_requests? gating" do
+    let(:pr_payload) do
+      {
+        "repository" => { "id" => 42 },
+        "action" => "opened",
+        "pull_request" => {
+          "number" => 1,
+          "title" => "Test PR",
+          "state" => "open",
+          "updated_at" => Time.current.iso8601,
+          "user" => { "login" => "dev" }
+        }
+      }
+    end
+
+    it "skips PR event creation when sync_pull_requests is false" do
+      connector.update!(config: { "sync_pull_requests" => false })
+
+      expect {
+        described_class.new.perform(connector.id, "webhook", {
+          "event_type" => "pull_request",
+          "payload" => pr_payload
+        })
+      }.not_to change(ToolEvent, :count)
+    end
+
+    it "creates PR event when sync_pull_requests key is absent (default-enabled)" do
+      connector.update!(config: {})
+
+      expect {
+        described_class.new.perform(connector.id, "webhook", {
+          "event_type" => "pull_request",
+          "payload" => pr_payload
+        })
+      }.to change(ToolEvent, :count).by(1)
     end
   end
 end

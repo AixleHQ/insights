@@ -65,7 +65,7 @@ module Ai
         request["Authorization"] = "Bearer #{api_key}"
         request["Content-Type"] = "application/json"
         request["HTTP-Referer"] = ENV.fetch("APP_URL", "https://db90.dev")
-        request["X-Title"] = "DB90"
+        request["X-Title"] = "Aixle Insights"
 
         response = http.request(request)
         handle_response(response)

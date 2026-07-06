@@ -85,7 +85,7 @@ RSpec.describe LinearSyncJob, type: :job do
     ).to eq(1)
   end
 
-  it 'creates a separate issue row per DB90 project when two projects link the same Linear project' do
+  it 'creates a separate issue row per project when two projects link the same Linear project' do
     project_a = create(:project, organization: organization)
     project_b = create(:project, organization: organization)
 

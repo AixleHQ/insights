@@ -112,6 +112,14 @@ class OrganizationConnectorSerializer < BaseSerializer
     connector.webhook_active?
   end
 
+  attribute :sync_repositories do |connector|
+    connector.sync_repositories? if connector.source_control?
+  end
+
+  attribute :sync_pull_requests do |connector|
+    connector.sync_pull_requests? if connector.source_control?
+  end
+
   attribute :webhook_token do |connector|
     connector.webhook_token if connector.openrouter?
   end

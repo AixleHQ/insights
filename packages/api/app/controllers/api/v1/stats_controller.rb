@@ -45,16 +45,17 @@ module Api
         parsed_month = parse_month_param!
         return if performed?
 
-        anchor = parsed_month || Date.current.beginning_of_month
+        zone   = client_zone
+        anchor = parsed_month || zone.today.beginning_of_month
 
-        current_start  = anchor.beginning_of_month.beginning_of_day
-        current_end    = params[:month].present? ? anchor.end_of_month.end_of_day : Time.current
+        current_start  = anchor.beginning_of_month.in_time_zone(zone)
+        current_end    = params[:month].present? ? anchor.end_of_month.in_time_zone(zone).end_of_day : Time.current
         current_events = base_scope.where(occurred_at: current_start..current_end)
         active_users   = current_events.distinct.count(:user_id)
 
         prev_anchor = anchor - 1.month
-        prev_start  = prev_anchor.beginning_of_month.beginning_of_day
-        prev_end    = prev_anchor.end_of_month.end_of_day
+        prev_start  = prev_anchor.beginning_of_month.in_time_zone(zone)
+        prev_end    = prev_anchor.end_of_month.in_time_zone(zone).end_of_day
         prev_events = base_scope.where(occurred_at: prev_start..prev_end)
 
         # Count distinct tool_events flagged with a non-trivial risk level in the reporting period.
@@ -179,8 +180,8 @@ module Api
         return if performed?
 
         time_range = if parsed_month
-          { start: parsed_month.beginning_of_month.beginning_of_day,
-            end:   parsed_month.end_of_month.end_of_day }
+          { start: parsed_month.beginning_of_month.in_time_zone(client_zone),
+            end:   parsed_month.end_of_month.in_time_zone(client_zone).end_of_day }
         else
           days = (params[:days] || 30).to_i
           parse_time_range(default_days: days)
@@ -283,7 +284,7 @@ module Api
         authorize! current_organization, to: :show?
 
         rows = current_organization.tool_events
-          .where(occurred_at: 30.days.ago.beginning_of_day..Time.current)
+          .where(occurred_at: (client_zone.now - 30.days).beginning_of_day..Time.current)
           .group(:tool_name)
           .select(
             "tool_name",
@@ -306,7 +307,7 @@ module Api
         authorize! current_organization, to: :show?
 
         # Get past year of data
-        start_date = 1.year.ago.beginning_of_day
+        start_date = (client_zone.now - 1.year).beginning_of_day
         end_date = Time.current
 
         daily_counts = current_organization.tool_events
@@ -415,9 +416,10 @@ module Api
       def tool_overview
         authorize! current_organization, to: :show?
 
-        current_start = Time.current.beginning_of_month
-        prev_start    = 1.month.ago.beginning_of_month
-        prev_end      = 1.month.ago.end_of_month
+        zone          = client_zone
+        current_start = zone.now.beginning_of_month
+        prev_start    = (zone.now - 1.month).beginning_of_month
+        prev_end      = (zone.now - 1.month).end_of_month
 
         current = @tool_events.where(occurred_at: current_start..Time.current)
         prev    = @tool_events.where(occurred_at: prev_start..prev_end)
@@ -583,10 +585,11 @@ module Api
       end
 
       def parse_time_range(default_days: 7, default_hours: nil)
+        zone = client_zone
         if params[:start_date].present? && params[:end_date].present?
           {
-            start: Time.zone.parse(params[:start_date]).beginning_of_day,
-            end: Time.zone.parse(params[:end_date]).end_of_day
+            start: zone.parse(params[:start_date]).beginning_of_day,
+            end: zone.parse(params[:end_date]).end_of_day
           }
         elsif default_hours
           {
@@ -595,8 +598,8 @@ module Api
           }
         else
           {
-            start: (default_days - 1).days.ago.beginning_of_day,
-            end: Time.current
+            start: zone.now.beginning_of_day - (default_days - 1).days,
+            end: zone.now
           }
         end
       end
@@ -683,8 +686,8 @@ module Api
         if ActiveModel::Type::Boolean.new.cast(params[:all_time])
           nil
         elsif (month = parse_month_param!)
-          { start: month.beginning_of_month.beginning_of_day,
-            end:   month.end_of_month.end_of_day }
+          { start: month.beginning_of_month.in_time_zone(client_zone),
+            end:   month.end_of_month.in_time_zone(client_zone).end_of_day }
         elsif performed?
           nil  # parse_month_param! rendered a 422; callers check performed? after this
         else
@@ -712,10 +715,15 @@ module Api
       # Returns a ToolEvent relation scoped to the org (and optionally a project).
       # project_id is validated through the org to prevent cross-org data access.
       def scoped_events_base
-        if params[:project_id].present?
-          current_organization.projects.find(params[:project_id]).tool_events
-        else
+        project_id = Array.wrap(params[:project_id]).first.to_s.strip.presence
+
+        case project_id
+        when "none"
+          current_organization.tool_events.where(project_id: nil)
+        when nil
           current_organization.tool_events
+        else
+          current_organization.projects.find(project_id).tool_events
         end
       end
 

@@ -6,7 +6,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { InvitationAccept } from "./InvitationAccept";
 
 const refreshOrganizations = vi.fn().mockResolvedValue(undefined);
-const setCurrentOrg = vi.fn();
 const useInvitationByToken = vi.fn();
 
 vi.mock("@/contexts/AuthContext", () => ({
@@ -19,7 +18,6 @@ vi.mock("@/contexts/AuthContext", () => ({
 vi.mock("@/contexts/OrgContext", () => ({
   useOrg: () => ({
     refreshOrganizations,
-    setCurrentOrg,
   }),
 }));
 
@@ -78,10 +76,7 @@ describe("InvitationAccept", () => {
     await user.click(screen.getByRole("button", { name: /accept invitation/i }));
 
     expect(mutateAsync).toHaveBeenCalledWith("tok123");
-    expect(refreshOrganizations).toHaveBeenCalled();
-    expect(setCurrentOrg).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "org-1", name: "Acme", slug: "acme", is_active: true })
-    );
+    expect(refreshOrganizations).toHaveBeenCalledWith("org-1");
 
     expect(screen.getByText(/you're connected/i)).toBeInTheDocument();
     expect(screen.getAllByText(/npx -y @aixle\/insights --token <YOUR_INGEST_TOKEN> --host/).length).toBeGreaterThanOrEqual(1);

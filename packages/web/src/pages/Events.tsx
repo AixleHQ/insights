@@ -27,8 +27,6 @@ import { showEventsUserColumn, type SortField, type SortDirection } from "@/lib/
 import { UnattributedEvents } from "./UnattributedEvents";
 import type { EventSortBy } from "@/hooks/useApi";
 
-type EventsTab = "all" | "not_assigned";
-
 // tokens_in is intentionally absent: the table shows a combined in+out token
 // count, so sorting by tokens_in alone would not match what the user sees.
 const SORT_FIELD_API_MAP: Record<SortField, EventSortBy> = {
@@ -37,6 +35,13 @@ const SORT_FIELD_API_MAP: Record<SortField, EventSortBy> = {
   risk_level: "risk_level",
   cost_usd: "cost_usd",
 };
+
+const clientTimezone =
+  typeof Intl !== "undefined"
+    ? Intl.DateTimeFormat().resolvedOptions().timeZone
+    : "UTC";
+
+type EventsTab = "all" | "not_assigned";
 
 export function Events() {
   const { currentOrg, hasRole, currentRole } = useOrg();
@@ -98,6 +103,7 @@ export function Events() {
     end_date: filters.dateTo,
     sort_by: SORT_FIELD_API_MAP[sortField],
     direction: sortDirection,
+    tz: clientTimezone,
   }), [page, pageSize, filters.tools, filters.riskLevels, filters.eventTypes, filters.projectIds, filters.dateFrom, filters.dateTo, sortField, sortDirection]);
 
   const { data: eventsResponse, isLoading, isFetching, isError, refetch } = useEvents(
@@ -170,6 +176,7 @@ export function Events() {
         project_id: filters.projectIds,
         sort_by: SORT_FIELD_API_MAP[sortField],
         direction: sortDirection,
+        tz: clientTimezone,
         filename,
       });
 

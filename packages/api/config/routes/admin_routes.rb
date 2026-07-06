@@ -29,7 +29,7 @@ namespace :admin do
   # Full CRUD - manually define to include new/edit in API-only mode
   # new/edit routes have no `as:` here — named helpers are registered below
   # outside the namespace block to get the correct new_admin_*/edit_admin_* names.
-  %w[organizations organization_connectors organization_memberships
+  %w[invitations organizations organization_connectors organization_memberships
      organization_retention_policies projects project_memberships
      repositories sanitization_policies users user_tool_accounts].each do |res|
     singular = res.singularize
@@ -69,7 +69,7 @@ end
 # auto-prefixed with "admin_". This gives us new_admin_user_path, edit_admin_user_path,
 # etc. — the conventions expected by Administrate views and polymorphic_path helpers.
 scope path: "/admin", module: "admin" do
-  %w[organizations organization_connectors organization_memberships
+  %w[invitations organizations organization_connectors organization_memberships
      organization_retention_policies projects project_memberships
      repositories sanitization_policies users user_tool_accounts].each do |res|
     singular = res.singularize
