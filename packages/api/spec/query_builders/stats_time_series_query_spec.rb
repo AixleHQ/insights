@@ -8,8 +8,8 @@ RSpec.describe StatsTimeSeriesQuery do
   after(:context) do
     ToolEvent.delete_all
     OrganizationMembership.delete_all
-    Organization.delete_all
-    User.delete_all
+    Organization.destroy_all
+    User.destroy_all
   end
 
   let(:organization) { create(:organization) }

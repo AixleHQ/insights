@@ -90,8 +90,6 @@ module ContinuousAggregateRefresh
   end
 end
 
-STATS_CAGG_SPEC = %r{stats_spec\.rb|stats_time_series_query_spec\.rb}.freeze
-
 RSpec.configure do |config|
   config.include ContinuousAggregateRefresh
 

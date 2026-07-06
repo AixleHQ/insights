@@ -1876,8 +1876,8 @@ RSpec.describe 'Api::V1::Stats', type: :request do
     after(:context) do
       ToolEvent.delete_all
       OrganizationMembership.delete_all
-      Organization.delete_all
-      User.delete_all
+      Organization.destroy_all
+      User.destroy_all
     end
 
     let(:cagg_org)  { create(:organization) }
