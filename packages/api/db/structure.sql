@@ -2436,6 +2436,7 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260706203934'),
 ('20260702122302'),
 ('20260626120000'),
 ('20260624105300'),
