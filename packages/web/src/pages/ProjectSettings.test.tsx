@@ -311,6 +311,46 @@ describe("ProjectSettings", () => {
     });
   });
 
+  describe("General settings — read-only for viewers (AIX-501)", () => {
+    function setupViewer() {
+      mockHasRole.mockReturnValue(false);
+      mockUseProjectMembers.mockReturnValue({ data: [{ id: "pm-1", userId: "user-1", role: "viewer" }] });
+    }
+
+    it("hides Save Changes for a viewer", () => {
+      setupViewer();
+      renderAtPath("/projects/proj-1/settings");
+
+      expect(screen.queryByRole("button", { name: /save changes/i })).not.toBeInTheDocument();
+    });
+
+    it("hides the Delete Project danger zone for a viewer", () => {
+      setupViewer();
+      renderAtPath("/projects/proj-1/settings");
+
+      expect(screen.queryByRole("button", { name: /delete project/i })).not.toBeInTheDocument();
+      expect(screen.queryByText(/danger zone/i)).not.toBeInTheDocument();
+    });
+
+    it("renders the General fields read-only for a viewer", () => {
+      setupViewer();
+      renderAtPath("/projects/proj-1/settings");
+
+      expect(screen.getByLabelText("Name")).toBeDisabled();
+      expect(screen.getByLabelText("Description")).toBeDisabled();
+      expect(screen.getByLabelText("Repository URL")).toBeDisabled();
+    });
+
+    it("keeps Save Changes and Delete Project available for a project owner", () => {
+      mockHasRole.mockReturnValue(true);
+      renderAtPath("/projects/proj-1/settings");
+
+      expect(screen.getByRole("button", { name: /save changes/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /delete project/i })).toBeInTheDocument();
+      expect(screen.getByLabelText("Name")).toBeEnabled();
+    });
+  });
+
   describe("Sub-routes", () => {
     it("renders Members tab at /settings/members for a project member", () => {
       mockUseProjectMembers.mockReturnValue({ data: [{ id: "pm-1", userId: "user-1", role: "member" }] });
