@@ -18,7 +18,7 @@ module ToolEvents
   # to INSERT into connector_event_dedup, and one wins via the unique constraint.
   # The loser re-reads the winner's row and falls through to the update branch.
   class ConnectorUpsert
-    IMMUTABLE_LOOKUP_FIELDS = %i[organization_id repository_id tool_name event_type].freeze
+    IMMUTABLE_LOOKUP_FIELDS = %i[organization_id repository_id tool_name event_type occurred_at].freeze
 
     def self.call(unique_key:, unique_value:, **attributes)
       new(unique_key:, unique_value:, attributes: attributes.deep_symbolize_keys).call

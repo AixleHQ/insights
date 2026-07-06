@@ -114,8 +114,18 @@
       "file": "app/controllers/concerns/timezone_bucketing.rb",
       "line": 33,
       "note": "False positive: interpolated tz comes from client_timezone, which only ever returns a value from the VALID_TIMEZONES whitelist (TZInfo::Timezone.all_identifiers) or the literal 'UTC'. No user input reaches the SQL."
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "2202ef3dfa117a334582fbb2409f6439efe4b7a0a8acea1fb7cb667b4db42967",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/query_builders/stats_time_series_query.rb",
+      "line": 261,
+      "note": "False positive: trunc is whitelisted to day/week/month and timezone comes from client_timezone, which only ever returns a value from the VALID_TIMEZONES whitelist (TZInfo::Timezone.all_identifiers) or the literal 'UTC'. No user input reaches the SQL."
     }
   ],
-  "updated": "2026-06-29 08:00:00 +0000",
+  "updated": "2026-07-06 00:00:00 +0000",
   "brakeman_version": "7.1.2"
 }
