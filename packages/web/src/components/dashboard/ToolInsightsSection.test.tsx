@@ -263,6 +263,13 @@ describe("ToolInsightsSection", () => {
     expect(screen.getByText("2")).toBeInTheDocument();
   });
 
+  it("fetches active users for the selected date range, not a fixed window", () => {
+    mockUseActiveTools.mockReturnValue(makeActiveTools([{ tool_name: "cursor", total_events: 5 }]) as never);
+    setupDefaults();
+    render(<ToolInsightsSection {...defaultProps} days={365} />);
+    expect(mockUseToolUsers).toHaveBeenCalledWith("org-123", "cursor", 365);
+  });
+
   it("handles unknown tool names with auto-formatted label", () => {
     mockUseActiveTools.mockReturnValue(
       makeActiveTools([{ tool_name: "some_new_tool", total_events: 5 }]) as never
