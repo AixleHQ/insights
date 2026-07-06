@@ -510,7 +510,7 @@ export function IntegrationSetup() {
                     <ProviderLogo provider={provider.id} size="lg" showBackground />
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    DB90 will request read-only access to monitor AI tool activity.
+                    Aixle Insights will request read-only access to monitor AI tool activity.
                     <br />
                     We never store your credentials.
                   </p>
@@ -589,7 +589,7 @@ export function IntegrationSetup() {
           <CardHeader>
             <CardTitle className="text-lg">Configure Integration</CardTitle>
             <CardDescription>
-              Customize how DB90 syncs with {provider.displayName}.
+              Customize how Aixle Insights syncs with {provider.displayName}.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -677,10 +677,10 @@ export function IntegrationSetup() {
             </div>
             <h2 className="text-xl font-semibold">Connection Successful!</h2>
             <p className="mt-2 text-muted-foreground">
-              Your {provider.displayName} account is now connected to DB90.
+              Your {provider.displayName} account is now connected to Aixle Insights.
             </p>
             <div className="mt-6 rounded-lg bg-muted/50 p-4">
-              <p className="text-sm">
+              <p className="text-sm"> 
                 Initial sync will begin shortly. You'll see data appear in your dashboard
                 within a few minutes.
               </p>

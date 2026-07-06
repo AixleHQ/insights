@@ -11,11 +11,11 @@ RSpec.configure do |config|
     'v1/swagger.yaml' => {
       openapi: '3.0.1',
       info: {
-        title: 'DB90 API V1',
+        title: 'Aixle Insights API V1',
         version: 'v1',
-        description: 'API for DB90 - Developer Tooling Platform',
+        description: 'API for Aixle Insights - Developer Tooling Platform',
         contact: {
-          name: 'DB90 Team'
+          name: 'Aixle Insights Team'
         }
       },
       paths: {},
@@ -25,7 +25,7 @@ RSpec.configure do |config|
           description: 'Development server'
         },
         {
-          url: 'https://api.db90.io',
+          url: 'https://insights.example.com',
           description: 'Production server'
         }
       ],
