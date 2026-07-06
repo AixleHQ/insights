@@ -532,7 +532,7 @@ export function ToolAccounts({ embedded = false }: { embedded?: boolean }) {
   const [userSelectedOrgId, setUserSelectedOrgId] = useState<string | null>(null);
   const selectedOrgId = userSelectedOrgId ?? currentOrg?.id ?? "";
   const selectedOrgRole =
-    memberships.find((m) => m.organization.id === selectedOrgId)?.role ?? null;
+    memberships?.find((m) => m.organization.id === selectedOrgId)?.role ?? null;
   // Viewers are read-only: they cannot obtain ingest tokens or link tools (AIX-503).
   const canContribute = selectedOrgRole === "owner" || selectedOrgRole === "member";
   const [connectingProvider, setConnectingProvider] = useState<ToolProvider | null>(null);
