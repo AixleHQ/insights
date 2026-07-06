@@ -20,7 +20,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
+import { cn, formatLocalDate } from "@/lib/utils";
 import { humanizeToolName } from "@/lib/utils";
 import type { EventsToolFilterOption } from "@/lib/eventsToolFilters";
 import {
@@ -83,9 +83,7 @@ function toggleArray<T extends string>(
   return next.length > 0 ? next : undefined;
 }
 
-function fmtDate(d: Date) {
-  return d.toISOString().split("T")[0];
-}
+const fmtDate = formatLocalDate;
 
 function getDatePreset(preset: "today" | "yesterday" | "this_week" | "this_month") {
   const now = new Date();

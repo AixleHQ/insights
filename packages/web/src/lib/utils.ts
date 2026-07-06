@@ -7,6 +7,17 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Format a Date as a local YYYY-MM-DD string (not toISOString, which renders
+ * in UTC and can shift the calendar day for users outside UTC).
+ */
+export function formatLocalDate(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/**
  * Format a date string as relative time (e.g., "5m ago", "2h ago")
  */
 export function formatDistanceToNow(date: string | Date | undefined | null): string {
