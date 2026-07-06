@@ -48,7 +48,8 @@ class StatsTimeSeriesQuery
     return raw_distinct_user_count(start, finish) unless cagg_eligible?(timezone)
 
     user_ids = Set.new
-    cagg_end = cagg_finish(start, finish, daily_cagg_exclusive_end)
+    cutoff   = daily_cagg_exclusive_end
+    cagg_end = cagg_finish(start, finish, cutoff)
 
     if start < cagg_end
       user_ids.merge(
@@ -60,7 +61,7 @@ class StatsTimeSeriesQuery
       )
     end
 
-    raw_from = raw_start(start, daily_cagg_exclusive_end)
+    raw_from = raw_start(start, cutoff)
     if finish >= raw_from
       user_ids.merge(
         scoped_raw
@@ -117,7 +118,8 @@ class StatsTimeSeriesQuery
   def period_buckets(start:, finish:, granularity: "day", timezone: "UTC")
     return raw_period_buckets(start, finish, granularity, timezone) unless cagg_eligible?(timezone)
 
-    cagg_end = cagg_finish(start, finish, daily_cagg_exclusive_end)
+    cutoff   = daily_cagg_exclusive_end
+    cagg_end = cagg_finish(start, finish, cutoff)
     bucket_expr = DailyTokenUsage.bucket_expr(granularity)
     buckets = {}
 
@@ -133,7 +135,7 @@ class StatsTimeSeriesQuery
         .each { |row| merge_period!(buckets, row.day, row.event_count, row.cost_usd) }
     end
 
-    raw_from = raw_start(start, daily_cagg_exclusive_end)
+    raw_from = raw_start(start, cutoff)
     if finish >= raw_from
       raw_period_rows(raw_from, finish, granularity, timezone).each do |row|
         merge_period!(buckets, row.day, row.event_count, row.cost_usd)
@@ -148,7 +150,8 @@ class StatsTimeSeriesQuery
   def tool_period_buckets(start:, finish:, granularity: "day", timezone: "UTC")
     return raw_tool_period_buckets(start, finish, granularity, timezone) unless cagg_eligible?(timezone)
 
-    cagg_end = cagg_finish(start, finish, daily_cagg_exclusive_end)
+    cutoff   = daily_cagg_exclusive_end
+    cagg_end = cagg_finish(start, finish, cutoff)
     bucket_expr = DailyTokenUsage.bucket_expr(granularity)
     buckets = {}
 
@@ -168,7 +171,7 @@ class StatsTimeSeriesQuery
         end
     end
 
-    raw_from = raw_start(start, daily_cagg_exclusive_end)
+    raw_from = raw_start(start, cutoff)
     if finish >= raw_from
       raw_tool_period_rows(raw_from, finish, granularity, timezone).each do |row|
         merge_tool_period!(buckets, row.day, row.event_count, row.tokens_in, row.tokens_out, row.cost_usd)
