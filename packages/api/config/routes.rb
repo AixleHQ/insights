@@ -2,8 +2,10 @@ require "sidekiq/web"
 require_relative "../lib/admin_constraint"
 
 Rails.application.routes.draw do
+  # Dev-only mail preview. Deliberately NOT under /admin — that path implies
+  # admin authentication, which this engine doesn't have.
   if Rails.env.development?
-    mount LetterOpenerWeb::Engine, at: "admin/letter_opener"
+    mount LetterOpenerWeb::Engine, at: "/letter_opener"
   end
 
   # Health check endpoint

@@ -18,6 +18,19 @@ If you add, change, or remove:
 
 You MUST update `packages/api/swagger/v1/swagger.yaml` in the **same commit**.
 
+## Scope
+
+Only routes and controllers under the public API are covered by this rule:
+
+- `packages/api/app/controllers/api/**`
+- `packages/api/config/routes/api_routes.rb` (and API routes in `routes.rb`)
+
+**Excluded from Swagger sync:**
+
+- `packages/api/app/controllers/admin/**` — Administrate UI, not public API
+- `packages/api/config/routes/admin_routes.rb`
+- Health check, Sidekiq, and LetterOpener mounts
+
 ## How to update
 
 1. Locate the path and method in `swagger.yaml` (or add a new entry if the route is new).
