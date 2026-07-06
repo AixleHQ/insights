@@ -37,9 +37,10 @@ class StatsTimeSeriesQuery
   def totals(start:, finish:, timezone: "UTC")
     return raw_totals(start, finish) unless cagg_eligible?(timezone)
 
+    cutoff = daily_cagg_exclusive_end
     merge_totals(
-      daily_aggregate_totals(start, cagg_finish(start, finish, daily_cagg_exclusive_end)),
-      raw_totals(raw_start(start, daily_cagg_exclusive_end), finish)
+      daily_aggregate_totals(start, cagg_finish(start, finish, cutoff)),
+      raw_totals(raw_start(start, cutoff), finish)
     )
   end
 
@@ -75,8 +76,9 @@ class StatsTimeSeriesQuery
 
   def hourly_buckets(start:, finish:)
     return raw_hourly_buckets(start, finish) unless self.class.cagg_reads_enabled?
-    cagg_end = cagg_finish(start, finish, hourly_cagg_exclusive_end)
-    buckets = {}
+    cutoff   = hourly_cagg_exclusive_end
+    cagg_end = cagg_finish(start, finish, cutoff)
+    buckets  = {}
 
     if start < cagg_end
       scoped_hourly
@@ -93,7 +95,7 @@ class StatsTimeSeriesQuery
         .each { |row| buckets[row.hour] = row_to_hourly(row) }
     end
 
-    raw_from = raw_start(start, hourly_cagg_exclusive_end)
+    raw_from = raw_start(start, cutoff)
     if finish >= raw_from
       scoped_raw
         .where(occurred_at: raw_from..finish)
@@ -194,7 +196,8 @@ class StatsTimeSeriesQuery
   def tool_breakdown(start:, finish:, timezone: "UTC")
     return raw_tool_breakdown(start, finish, timezone) unless cagg_eligible?(timezone)
 
-    cagg_end = cagg_finish(start, finish, daily_cagg_exclusive_end)
+    cutoff   = daily_cagg_exclusive_end
+    cagg_end = cagg_finish(start, finish, cutoff)
     totals_by_tool = Hash.new { |h, k| h[k] = { event_count: 0, cost_usd: 0.0 } }
 
     if start < cagg_end
@@ -208,7 +211,7 @@ class StatsTimeSeriesQuery
         end
     end
 
-    raw_from = raw_start(start, daily_cagg_exclusive_end)
+    raw_from = raw_start(start, cutoff)
     if finish >= raw_from
       scoped_raw
         .where(occurred_at: raw_from..finish)
@@ -369,9 +372,7 @@ class StatsTimeSeriesQuery
   end
 
   def trunc_sql(granularity, timezone)
-    trunc = %w[day week month].include?(granularity) ? granularity : "day"
-    expr = timezone == "UTC" ? "DATE_TRUNC('#{trunc}', occurred_at)" : "DATE_TRUNC('#{trunc}', occurred_at AT TIME ZONE '#{timezone}')"
-    Arel.sql(expr)
+    TimezoneBucketing.period_trunc_sql_for(granularity, timezone)
   end
 
   def raw_period_rows(start, finish, granularity, timezone)

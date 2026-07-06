@@ -5,6 +5,16 @@ module TimezoneBucketing
 
   VALID_TIMEZONES = TZInfo::Timezone.all_identifiers.to_set.freeze
 
+  # Shared SQL helpers — callable from both controllers (via the concern) and
+  # plain Ruby objects (e.g. StatsTimeSeriesQuery) via TimezoneBucketing.period_trunc_sql_for.
+  module_function
+
+  def period_trunc_sql_for(granularity, timezone)
+    trunc = %w[day week month].include?(granularity) ? granularity : "day"
+    expr  = timezone == "UTC" ? "DATE_TRUNC('#{trunc}', occurred_at)" : "DATE_TRUNC('#{trunc}', occurred_at AT TIME ZONE '#{timezone}')"
+    Arel.sql(expr)
+  end
+
   private
 
   def client_timezone
@@ -28,10 +38,7 @@ module TimezoneBucketing
   end
 
   def period_trunc_sql(trunc)
-    trunc = %w[day week month].include?(trunc) ? trunc : "day"
-    tz = client_timezone
-    expr = tz == "UTC" ? "DATE_TRUNC('#{trunc}', occurred_at)" : "DATE_TRUNC('#{trunc}', occurred_at AT TIME ZONE '#{tz}')"
-    Arel.sql(expr)
+    period_trunc_sql_for(trunc, client_timezone)
   end
 
   def date_sql
