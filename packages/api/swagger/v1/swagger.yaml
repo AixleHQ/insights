@@ -799,7 +799,7 @@ paths:
           $ref: '#/components/responses/NotFound'
     patch:
       summary: Update organization member role
-      description: Requires owner role. Cannot demote owners unless you are also an owner.
+      description: Requires owner role. Owners cannot change their own role (403). Downgrading the last owner returns 422 (model-level guard).
       tags:
         - Organization Members
       parameters:
@@ -827,7 +827,7 @@ paths:
           $ref: '#/components/responses/ValidationError'
     delete:
       summary: Remove organization member
-      description: Requires owner role. Cannot remove owners unless you are also an owner.
+      description: Requires owner role. Owners cannot remove themselves (403). Removing the last owner returns 422 (model-level guard).
       tags:
         - Organization Members
       parameters:

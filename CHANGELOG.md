@@ -5,6 +5,29 @@ All notable changes to DB90 are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.4] - 2026-07-07
+
+Fourth alpha release. A focused production-readiness pass (`AIX-333`): make
+the required-env contract explicit and fail fast, harden S3/SES/admin auth, and
+add an environment audit task. No database migrations.
+
+### Added
+- `production_readiness` rake tasks: `check_env` (audits ~30 required prod/staging
+  env vars and aborts on any missing), `send_test_email`, and `oauth_checklist`
+  (`AIX-333`).
+
+### Changed
+- Storage uploads use the ECS task IAM role for S3 instead of relying on implicit
+  credentials (`AIX-333`).
+- Raw event store and the Temporal `fetch_raw_event` activity hardened around
+  S3/SES access and error handling (`AIX-333`).
+
+### Fixed
+- Fail fast on a missing `SMTP_ADDRESS` in production/staging: drop the implicit
+  `smtp.sendgrid.net` default so a misconfigured mailer surfaces at boot instead
+  of silently mis-sending (`AIX-333`).
+- Tighten admin authentication on the affected endpoints (`AIX-333`).
+
 ## [1.0.0-alpha.3] - 2026-07-06
 
 Third alpha release. Ships product features and fixes cut from `develop` since
@@ -87,6 +110,7 @@ tags cut from the same `release/1.0.0` branch.
 ### Added
 - Initial DB90 platform release cut from `develop` for production infrastructure validation.
 
+[1.0.0-alpha.4]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.4
 [1.0.0-alpha.3]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.3
 [1.0.0-alpha.2]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.2
 [1.0.0-alpha.1]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.1
