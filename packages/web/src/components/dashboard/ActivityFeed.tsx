@@ -36,6 +36,7 @@ interface ActivityFeedProps {
   className?: string;
   onEventClick?: (eventId: string) => void;
   selectedEventId?: string | null;
+  subtitle?: string;
 }
 
 
@@ -124,15 +125,14 @@ export function ActivityFeed({
   className,
   onEventClick,
   selectedEventId,
+  subtitle = "Latest events across your organization",
 }: ActivityFeedProps) {
   return (
     <Card className={cn("col-span-full lg:col-span-2", className)}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <div>
           <CardTitle className="text-base font-medium">Recent Activity</CardTitle>
-          <CardDescription className="text-xs">
-            Latest events across your organization
-          </CardDescription>
+          <CardDescription className="text-xs">{subtitle}</CardDescription>
         </div>
         <Link
           to={AppRoutes.events.root}

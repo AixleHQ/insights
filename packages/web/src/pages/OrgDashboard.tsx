@@ -132,6 +132,7 @@ export function OrgDashboard() {
     setSelectedProjectId(undefined);
   }
 
+  const { data: projects } = useProjects(orgId);
   const { data: stats, isLoading: isLoadingStats, isError: isErrorStats, refetch: refetchStats } = useOverviewStats(orgId, selectedProjectId, selectedPeriod);
   // Active Members is intentionally pinned to a rolling window, not the month selector.
   const { data: activeUsersData } = useActiveUsers(orgId, selectedProjectId, ACTIVE_USERS_WINDOW_DAYS);
@@ -180,6 +181,18 @@ export function OrgDashboard() {
       })) || [],
     [eventsResponse?.data]
   );
+
+  const activitySubtitle = useMemo(() => {
+    const period = periodLabel(selectedPeriod);
+    let base: string;
+    if (!selectedProjectId) base = "Latest events across your organization";
+    else if (selectedProjectId === "none") base = "Latest events not assigned to a project";
+    else {
+      const name = projects?.find((p) => p.id === selectedProjectId)?.name;
+      base = name ? `Latest events in ${name}` : "Latest events for the selected project";
+    }
+    return `${base} · ${period}`;
+  }, [selectedProjectId, selectedPeriod, projects]);
 
   const [toolInsightsDays, setToolInsightsDays] = useState(30);
 
@@ -344,6 +357,7 @@ export function OrgDashboard() {
               monthScoped={selectedPeriod.type === "month" && !isCurrentMonthSelected}
             />
             <ActivityFeed
+              subtitle={activitySubtitle}
               events={events}
               isLoading={isLoadingEvents}
               isError={isErrorEvents}
