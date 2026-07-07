@@ -2,7 +2,7 @@
 
 class GenerateExportJob
   include Sidekiq::Job
-  sidekiq_options queue: "default", retry: 3
+  sidekiq_options queue: "exports", retry: 3
 
   def perform(export_record_id)
     record = ExportRecord.find(export_record_id)
