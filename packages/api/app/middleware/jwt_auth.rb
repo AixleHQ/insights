@@ -44,53 +44,67 @@ class JwtAuth
       return unauthorized_response("Missing authorization token")
     end
 
-    begin
-      impersonation_claims = ImpersonationService.decode_token(token)
-      if impersonation_claims
-        if ImpersonationService.revoked?(impersonation_claims["jti"])
-          Rails.logger.warn("[JwtAuth] Impersonation token has been revoked (jti=#{impersonation_claims['jti']})")
-          return unauthorized_response("Impersonation token has been revoked")
-        end
+    auth_result = authenticate(token)
+    return auth_result if rack_response?(auth_result)
 
-        env["jwt.claims"] = impersonation_claims
-        env["jwt.token"] = token
-        env["jwt.impersonation"] = true
-        env["jwt.impersonator_id"] = impersonation_claims["impersonator_id"]
-        env["jwt.impersonator_email"] = impersonation_claims["impersonator_email"]
-        Rails.logger.info("[JwtAuth] Impersonation token validated for #{impersonation_claims['email']}")
-        return @app.call(env)
-      end
-
-      Rails.logger.debug("[JwtAuth] Validating Keycloak token...")
-      begin
-        unverified = JWT.decode(token, nil, false).first
-        Rails.logger.debug("[JwtAuth] Token claims: #{unverified.keys.join(', ')}")
-      rescue => e
-        Rails.logger.debug("[JwtAuth] Could not decode token for debugging: #{e.message}")
-      end
-
-      claims = validate_token(token)
-      Rails.logger.info("[JwtAuth] Token validated for #{claims['email']}")
-      env["jwt.claims"] = claims
-      env["jwt.token"] = token
-      @app.call(env)
-    rescue TokenExpiredError
-      Rails.logger.warn("[JwtAuth] Token expired")
-      unauthorized_response("Token has expired")
-    rescue InvalidTokenError => e
-      Rails.logger.warn("[JwtAuth] Invalid token: #{e.message}")
-      unauthorized_response("Invalid token: #{e.message}")
-    rescue JWT::DecodeError => e
-      Rails.logger.warn("[JwtAuth] Token decode error: #{e.message}")
-      unauthorized_response("Token decode error: #{e.message}")
-    rescue => e
-      Rails.logger.error("[JwtAuth] Unexpected error: #{e.class} - #{e.message}")
-      Rails.logger.error(e.backtrace.first(5).join("\n"))
-      unauthorized_response("Authentication failed")
-    end
+    env.merge!(auth_result)
+    # Deliberately outside the authenticate rescue block — a downstream
+    # exception (controller, model, ...) must surface as its own error
+    # response, not get relabeled as an auth failure (AIX-465).
+    @app.call(env)
   end
 
   private
+
+  # Returns either an env-attributes hash (success) or a Rack response
+  # tuple (failure) — never raises.
+  def authenticate(token)
+    impersonation_claims = ImpersonationService.decode_token(token)
+    if impersonation_claims
+      if ImpersonationService.revoked?(impersonation_claims["jti"])
+        Rails.logger.warn("[JwtAuth] Impersonation token has been revoked (jti=#{impersonation_claims['jti']})")
+        return unauthorized_response("Impersonation token has been revoked")
+      end
+
+      Rails.logger.info("[JwtAuth] Impersonation token validated for #{impersonation_claims['email']}")
+      return {
+        "jwt.claims" => impersonation_claims,
+        "jwt.token" => token,
+        "jwt.impersonation" => true,
+        "jwt.impersonator_id" => impersonation_claims["impersonator_id"],
+        "jwt.impersonator_email" => impersonation_claims["impersonator_email"]
+      }
+    end
+
+    Rails.logger.debug("[JwtAuth] Validating Keycloak token...")
+    begin
+      unverified = JWT.decode(token, nil, false).first
+      Rails.logger.debug("[JwtAuth] Token claims: #{unverified.keys.join(', ')}")
+    rescue => e
+      Rails.logger.debug("[JwtAuth] Could not decode token for debugging: #{e.message}")
+    end
+
+    claims = validate_token(token)
+    Rails.logger.info("[JwtAuth] Token validated for #{claims['email']}")
+    { "jwt.claims" => claims, "jwt.token" => token }
+  rescue TokenExpiredError
+    Rails.logger.warn("[JwtAuth] Token expired")
+    unauthorized_response("Token has expired")
+  rescue InvalidTokenError => e
+    Rails.logger.warn("[JwtAuth] Invalid token: #{e.message}")
+    unauthorized_response("Invalid token: #{e.message}")
+  rescue JWT::DecodeError => e
+    Rails.logger.warn("[JwtAuth] Token decode error: #{e.message}")
+    unauthorized_response("Token decode error: #{e.message}")
+  rescue => e
+    Rails.logger.error("[JwtAuth] Unexpected error: #{e.class} - #{e.message}")
+    Rails.logger.error(e.backtrace.first(5).join("\n"))
+    unauthorized_response("Authentication failed")
+  end
+
+  def rack_response?(result)
+    result.is_a?(Array) && result.size == 3
+  end
 
   def excluded_path?(path)
     return true if EXCLUDED_PATHS.any? { |excluded| path == excluded || path.start_with?("#{excluded}/") }
