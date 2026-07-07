@@ -100,4 +100,17 @@ RSpec.describe AuditLog, type: :model do
       expect(log.linked_to_event?).to be false
     end
   end
+
+  describe '#user_display' do
+    it 'returns the acting user display name via the tool event' do
+      tool_event = create(:tool_event)
+      log = create(:audit_log, tool_event: tool_event)
+      expect(log.user_display).to eq(tool_event.user.display_name)
+    end
+
+    it 'returns nil when there is no tool event' do
+      log = build(:audit_log, tool_event: nil)
+      expect(log.user_display).to be_nil
+    end
+  end
 end
