@@ -1,11 +1,15 @@
 # frozen_string_literal: true
 
 class ScheduledExportMailer < ApplicationMailer
-  def deliver(export, report)
+  def export_report(export, report)
     @export       = export
     @organization = export.organization
 
-    filename = "db90-report-#{export.report_type}-#{Date.current.iso8601}.#{export.format}"
+    filename = ExportReportFilename.build(
+      organization: export.organization,
+      report_type:  export.report_type,
+      format:       export.format
+    )
     content  = if export.format == "csv"
       AggregatedReportCsvExporter.generate(report.rows, report.columns)
     else

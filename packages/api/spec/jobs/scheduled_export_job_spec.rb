@@ -10,10 +10,10 @@ RSpec.describe ScheduledExportJob, type: :job do
     create(:organization_membership, user: owner, organization: organization, role: "owner")
   end
 
-  let(:mailer_double) { instance_double(ActionMailer::MessageDelivery, deliver_later: true) }
+  let(:mailer_double) { instance_double(ActionMailer::MessageDelivery, deliver_now: true) }
 
   before do
-    allow(ScheduledExportMailer).to receive(:deliver).and_return(mailer_double)
+    allow(ScheduledExportMailer).to receive(:export_report).and_return(mailer_double)
   end
 
   describe "#perform" do
@@ -22,9 +22,9 @@ RSpec.describe ScheduledExportJob, type: :job do
         create(:scheduled_export, :overdue, organization: organization, created_by: owner)
       end
 
-      it "calls ScheduledExportMailer.deliver with the export and report" do
+      it "calls ScheduledExportMailer.export_report with the export and report" do
         described_class.new.perform
-        expect(ScheduledExportMailer).to have_received(:deliver).once
+        expect(ScheduledExportMailer).to have_received(:export_report).once
       end
 
       it "advances next_run_at after delivery" do
@@ -43,7 +43,7 @@ RSpec.describe ScheduledExportJob, type: :job do
 
       it "does not process exports that are not yet due" do
         described_class.new.perform
-        expect(ScheduledExportMailer).not_to have_received(:deliver)
+        expect(ScheduledExportMailer).not_to have_received(:export_report)
       end
     end
 
@@ -54,7 +54,7 @@ RSpec.describe ScheduledExportJob, type: :job do
 
       it "skips inactive exports" do
         described_class.new.perform
-        expect(ScheduledExportMailer).not_to have_received(:deliver)
+        expect(ScheduledExportMailer).not_to have_received(:export_report)
       end
     end
 
@@ -64,7 +64,7 @@ RSpec.describe ScheduledExportJob, type: :job do
       end
 
       before do
-        allow(ScheduledExportMailer).to receive(:deliver).and_raise(StandardError, "SMTP failure")
+        allow(ScheduledExportMailer).to receive(:export_report).and_raise(StandardError, "SMTP failure")
       end
 
       it "logs the error and continues without raising" do
@@ -86,7 +86,7 @@ RSpec.describe ScheduledExportJob, type: :job do
 
       it "processes all due exports" do
         described_class.new.perform
-        expect(ScheduledExportMailer).to have_received(:deliver).twice
+        expect(ScheduledExportMailer).to have_received(:export_report).twice
       end
     end
   end
