@@ -8,6 +8,7 @@ module Api
       TOOL_SCOPED_ACTIONS = %i[tool_overview tool_models tool_users tool_daily tool_event_types].freeze
       ALLOWED_PERIODS = %w[day week month].freeze
       MAX_ACTIVE_USERS_DAYS = 365
+      STATS_CACHE_TTL = 20.seconds
 
       rescue_from Date::Error, with: :render_invalid_month_format
 
@@ -20,74 +21,82 @@ module Api
       def overview
         authorize! current_organization, to: :show?
 
-        base_scope = scoped_events_base
-
-        # Counts users with at least one event in the selected month — intentionally activity-based,
-        # not membership-based. A newly-added member with no events will not appear here until
-        # they start generating activity.
-
-        if ActiveModel::Type::Boolean.new.cast(params[:all_time])
-          finish = Time.current
-          start  = base_scope.minimum(:occurred_at)&.beginning_of_day || finish
-          totals = stats_query.totals(start: start, finish: finish, timezone: client_timezone)
-          high_risk_count = base_scope.where(risky_event_condition).distinct.count
-          active_users = stats_query.distinct_user_count(start: start, finish: finish, timezone: client_timezone)
-
-          render json: {
-            total_events:          totals[:event_count],
-            total_cost_usd:        totals[:cost_usd],
-            risk_alerts:           high_risk_count,
-            active_users:          active_users,
-            events_change_percent: nil,
-            cost_change_percent:   nil
-          }
-          return
+        # Validate params before the cache block so 400s are never cached.
+        all_time_flag = ActiveModel::Type::Boolean.new.cast(params[:all_time])
+        parsed_month  = nil
+        unless all_time_flag
+          parsed_month = parse_month_param!
+          return if performed?
         end
 
-        # Determine reporting month: selected past month or current month (default).
-        parsed_month = parse_month_param!
-        return if performed?
+        result = with_stats_cache(
+          all_time: params[:all_time], month: params[:month],
+          project_id: params[:project_id], tz: params[:tz]
+        ) do
+          base_scope = scoped_events_base
 
-        zone   = client_zone
-        anchor = parsed_month || zone.today.beginning_of_month
+          # Counts users with at least one event in the selected month — intentionally activity-based,
+          # not membership-based. A newly-added member with no events will not appear here until
+          # they start generating activity.
 
-        current_start  = anchor.beginning_of_month.in_time_zone(zone)
-        current_end    = params[:month].present? ? anchor.end_of_month.in_time_zone(zone).end_of_day : Time.current
-        current_events = base_scope.where(occurred_at: current_start..current_end)
-        current_totals = stats_query.totals(start: current_start, finish: current_end, timezone: client_timezone)
-        active_users   = stats_query.distinct_user_count(start: current_start, finish: current_end, timezone: client_timezone)
+          if all_time_flag
+            finish = Time.current
+            start  = base_scope.minimum(:occurred_at)&.beginning_of_day || finish
+            totals = stats_query.totals(start: start, finish: finish, timezone: client_timezone)
+            high_risk_count = base_scope.where(risky_event_condition).distinct.count
+            active_users = stats_query.distinct_user_count(start: start, finish: finish, timezone: client_timezone)
 
-        prev_anchor = anchor - 1.month
-        prev_start  = prev_anchor.beginning_of_month.in_time_zone(zone)
-        prev_end    = prev_anchor.end_of_month.in_time_zone(zone).end_of_day
-        prev_totals = stats_query.totals(start: prev_start, finish: prev_end, timezone: client_timezone)
+            {
+              total_events:          totals[:event_count],
+              total_cost_usd:        totals[:cost_usd],
+              risk_alerts:           high_risk_count,
+              active_users:          active_users,
+              events_change_percent: nil,
+              cost_change_percent:   nil
+            }
+          else
+            zone           = client_zone
+            anchor         = parsed_month || zone.today.beginning_of_month
+            current_start  = anchor.beginning_of_month.in_time_zone(zone)
+            current_end    = params[:month].present? ? anchor.end_of_month.in_time_zone(zone).end_of_day : Time.current
+            current_events = base_scope.where(occurred_at: current_start..current_end)
+            current_totals = stats_query.totals(start: current_start, finish: current_end, timezone: client_timezone)
+            active_users   = stats_query.distinct_user_count(start: current_start, finish: current_end, timezone: client_timezone)
 
-        # Count distinct tool_events flagged with a non-trivial risk level in the reporting period.
-        # Checks audit_logs (canonical) OR metadata (fallback for events that bypassed Temporal).
-        high_risk_count = current_events.where(risky_event_condition).distinct.count
+            prev_anchor = anchor - 1.month
+            prev_start  = prev_anchor.beginning_of_month.in_time_zone(zone)
+            prev_end    = prev_anchor.end_of_month.in_time_zone(zone).end_of_day
+            prev_totals = stats_query.totals(start: prev_start, finish: prev_end, timezone: client_timezone)
 
-        current_count = current_totals[:event_count]
-        prev_count    = prev_totals[:event_count]
-        events_change = prev_count > 0 ? ((current_count - prev_count).to_f / prev_count * 100) : 0
+            # Count distinct tool_events flagged with a non-trivial risk level in the reporting period.
+            # Checks audit_logs (canonical) OR metadata (fallback for events that bypassed Temporal).
+            high_risk_count = current_events.where(risky_event_condition).distinct.count
 
-        current_cost = current_totals[:cost_usd]
-        prev_cost    = prev_totals[:cost_usd]
-        cost_change  = prev_cost > 0 ? ((current_cost - prev_cost) / prev_cost * 100) : 0
+            current_count = current_totals[:event_count]
+            prev_count    = prev_totals[:event_count]
+            events_change = prev_count > 0 ? ((current_count - prev_count).to_f / prev_count * 100) : 0
 
-        render json: {
-          total_events:          current_count,
-          total_cost_usd:        current_cost,
-          risk_alerts:           high_risk_count,
-          active_users:          active_users,
-          events_change_percent: events_change.round(1),
-          cost_change_percent:   cost_change.round(1)
-        }
+            current_cost = current_totals[:cost_usd]
+            prev_cost    = prev_totals[:cost_usd]
+            cost_change  = prev_cost > 0 ? ((current_cost - prev_cost) / prev_cost * 100) : 0
+
+            {
+              total_events:          current_count,
+              total_cost_usd:        current_cost,
+              risk_alerts:           high_risk_count,
+              active_users:          active_users,
+              events_change_percent: events_change.round(1),
+              cost_change_percent:   cost_change.round(1)
+            }
+          end
+        end
+        render json: result
       end
 
       # GET /api/v1/organizations/:organization_id/stats/active_users
       # Distinct active users over a rolling window (default 7 days). Intentionally
-      # decoupled from the dashboard month filter — stable regardless of which month
-      # the user is exploring. Still honours the optional project_id scope.
+      # decoupled from the dashboard month filter — see AIX-446. Still honours the
+      # optional project_id scope.
       def active_users
         authorize! current_organization, to: :show?
 
@@ -97,12 +106,18 @@ module Api
         end
 
         time_range = parse_time_range(default_days: days)
-        events = scoped_events_base.where(occurred_at: time_range[:start]..time_range[:end])
 
-        render json: {
-          active_users: events.where.not(user_id: nil).distinct.count(:user_id),
-          timeRange: { start: time_range[:start].iso8601, end: time_range[:end].iso8601 }
-        }
+        result = with_stats_cache(
+          days: params[:days], start_date: params[:start_date],
+          end_date: params[:end_date], project_id: params[:project_id], tz: params[:tz]
+        ) do
+          events = scoped_events_base.where(occurred_at: time_range[:start]..time_range[:end])
+          {
+            active_users: events.where.not(user_id: nil).distinct.count(:user_id),
+            timeRange: { start: time_range[:start].iso8601, end: time_range[:end].iso8601 }
+          }
+        end
+        render json: result
       end
 
       # GET /api/v1/organizations/:organization_id/stats/hourly
@@ -110,28 +125,29 @@ module Api
         authorize! current_organization, to: :show?
 
         time_range = parse_time_range(default_hours: 24)
-        hourly_data = stats_query
-          .hourly_buckets(start: time_range[:start], finish: time_range[:end])
-          .map do |row|
-            {
-              hour: row[:hour]&.iso8601,
-              eventCount: row[:event_count],
-              tokensIn: row[:tokens_in],
-              tokensOut: row[:tokens_out],
-              costUsd: row[:cost_usd],
-              uniqueUsers: row[:unique_users]
-            }
-          end
 
-        render json: {
-          data: {
-            timeRange: {
-              start: time_range[:start].iso8601,
-              end: time_range[:end].iso8601
-            },
-            hourly: hourly_data
+        result = with_stats_cache(start_date: params[:start_date], end_date: params[:end_date], tz: params[:tz]) do
+          hourly_data = stats_query
+            .hourly_buckets(start: time_range[:start], finish: time_range[:end])
+            .map do |row|
+              {
+                hour:        row[:hour]&.iso8601,
+                eventCount:  row[:event_count],
+                tokensIn:    row[:tokens_in],
+                tokensOut:   row[:tokens_out],
+                costUsd:     row[:cost_usd],
+                uniqueUsers: row[:unique_users]
+              }
+            end
+
+          {
+            data: {
+              timeRange: { start: time_range[:start].iso8601, end: time_range[:end].iso8601 },
+              hourly:    hourly_data
+            }
           }
-        }
+        end
+        render json: result
       end
 
       # GET /api/v1/organizations/:organization_id/stats/daily
@@ -139,74 +155,67 @@ module Api
       def daily
         authorize! current_organization, to: :show?
 
-        all_time    = ActiveModel::Type::Boolean.new.cast(params[:all_time])
-        granularity = %w[week month].include?(params[:period]) ? params[:period] : "day"
+        all_time = ActiveModel::Type::Boolean.new.cast(params[:all_time])
+        time_range = nil
+        unless all_time
+          parsed_month = parse_month_param!
+          return if performed?
 
-        if all_time
-          finish = Time.current
-          start  = scoped_events_base.minimum(:occurred_at)&.beginning_of_day || finish
-          rows_by_date = stats_query
-            .period_buckets(start: start, finish: finish, granularity: granularity, timezone: client_timezone)
-            .transform_values do |bucket|
-              {
-                date: bucket[:date],
-                event_count: bucket[:event_count],
-                cost_usd: bucket[:cost_usd]
-              }
-            end
-
-          tool_breakdown = stats_query
-            .tool_breakdown(start: start, finish: finish, timezone: client_timezone)
-            .map { |r| { tool_name: r[:tool_name], event_count: r[:event_count], cost_usd: r[:cost_usd] } }
-
-          render json: { data: rows_by_date.values, tool_breakdown: tool_breakdown }
-          return
-        end
-
-        parsed_month = parse_month_param!
-        return if performed?
-
-        time_range = if parsed_month
-          { start: parsed_month.beginning_of_month.in_time_zone(client_zone),
-            end:   parsed_month.end_of_month.in_time_zone(client_zone).end_of_day }
-        else
-          days = (params[:days] || 30).to_i
-          parse_time_range(default_days: days)
-        end
-
-        rows_by_date = stats_query
-          .period_buckets(
-            start: time_range[:start],
-            finish: time_range[:end],
-            granularity: granularity,
-            timezone: client_timezone
-          )
-          .transform_values do |bucket|
-            {
-              date: bucket[:date],
-              event_count: bucket[:event_count],
-              cost_usd: bucket[:cost_usd]
-            }
+          time_range = if parsed_month
+            { start: parsed_month.beginning_of_month.in_time_zone(client_zone),
+              end:   parsed_month.end_of_month.in_time_zone(client_zone).end_of_day }
+          else
+            parse_time_range(default_days: (params[:days] || 30).to_i)
           end
+        end
 
-        # Zero-fill every bucket in the range so the chart always shows the full window.
-        # Uses granularity-aware bucketing: day/week/month match the DB truncation above.
-        daily_data = DateBucketFiller.fill(
-          start:       time_range[:start],
-          finish:      time_range[:end],
-          granularity: granularity,
-          data_map:    rows_by_date
-        ).map { |e| { event_count: 0, cost_usd: 0.0 }.merge(e) }
+        result = with_stats_cache(
+          all_time: params[:all_time], month: params[:month],
+          days: params[:days], period: params[:period],
+          project_id: params[:project_id], tz: params[:tz]
+        ) do
+          granularity = %w[week month].include?(params[:period]) ? params[:period] : "day"
 
-        tool_breakdown = stats_query
-          .tool_breakdown(
-            start: time_range[:start],
-            finish: time_range[:end],
-            timezone: client_timezone
-          )
-          .map { |r| { tool_name: r[:tool_name], event_count: r[:event_count], cost_usd: r[:cost_usd] } }
+          if all_time
+            finish = Time.current
+            start  = scoped_events_base.minimum(:occurred_at)&.beginning_of_day || finish
+            rows_by_date = stats_query
+              .period_buckets(start: start, finish: finish, granularity: granularity, timezone: client_timezone)
+              .transform_values do |bucket|
+                { date: bucket[:date], event_count: bucket[:event_count], cost_usd: bucket[:cost_usd] }
+              end
 
-        render json: { data: daily_data, tool_breakdown: tool_breakdown }
+            tool_breakdown = stats_query
+              .tool_breakdown(start: start, finish: finish, timezone: client_timezone)
+              .map { |r| { tool_name: r[:tool_name], event_count: r[:event_count], cost_usd: r[:cost_usd] } }
+
+            { data: rows_by_date.values, tool_breakdown: tool_breakdown }
+          else
+            rows_by_date = stats_query
+              .period_buckets(
+                start: time_range[:start], finish: time_range[:end],
+                granularity: granularity, timezone: client_timezone
+              )
+              .transform_values do |bucket|
+                { date: bucket[:date], event_count: bucket[:event_count], cost_usd: bucket[:cost_usd] }
+              end
+
+            # Zero-fill every bucket in the range so the chart always shows the full window.
+            daily_data = DateBucketFiller.fill(
+              start:       time_range[:start],
+              finish:      time_range[:end],
+              granularity: granularity,
+              data_map:    rows_by_date
+            ).map { |e| { event_count: 0, cost_usd: 0.0 }.merge(e) }
+
+            tool_breakdown = stats_query
+              .tool_breakdown(start: time_range[:start], finish: time_range[:end], timezone: client_timezone)
+              .map { |r| { tool_name: r[:tool_name], event_count: r[:event_count], cost_usd: r[:cost_usd] } }
+
+            { data: daily_data, tool_breakdown: tool_breakdown }
+          end
+        end
+        render json: result
       end
 
       # GET /api/v1/organizations/:organization_id/stats/daily_by_tool
@@ -217,78 +226,78 @@ module Api
         time_range = month_or_days_time_range
         return if performed?
 
-        trunc = case params[:period]
-        when "month" then "month"
-        when "week"  then "week"
-        else              time_range.nil? ? "month" : "day"
+        result = with_stats_cache(
+          all_time: params[:all_time], month: params[:month],
+          days: params[:days], period: params[:period],
+          project_id: params[:project_id], tz: params[:tz]
+        ) do
+          trunc = case params[:period]
+          when "month" then "month"
+          when "week"  then "week"
+          else              time_range.nil? ? "month" : "day"
+          end
+          events = scoped_events(time_range)
+
+          top_tools = events
+            .group(:tool_name)
+            .order(Arel.sql("COUNT(*) DESC"))
+            .limit(3)
+            .pluck(:tool_name)
+
+          bucket_expr     = period_trunc_sql(trunc)
+          daily_tool_data = events
+            .group(bucket_expr, :tool_name)
+            .select("#{bucket_expr} as bucket", "tool_name", "COUNT(*) as event_count")
+            .order("bucket")
+
+          date_map = {}
+          daily_tool_data.each do |row|
+            date = row.bucket&.to_date&.iso8601
+            next unless date
+
+            date_map[date] ||= { date: date }
+            tool_key = top_tools.include?(row.tool_name) ? row.tool_name : "Other"
+            date_map[date][tool_key] = (date_map[date][tool_key] || 0) + row.event_count
+          end
+
+          # All-time: no zero-fill; return raw aggregated buckets only.
+          data = if time_range.nil?
+            date_map.values.sort_by { |d| d[:date] }
+          else
+            DateBucketFiller.fill(
+              start: time_range[:start], finish: time_range[:end],
+              granularity: trunc, data_map: date_map
+            )
+          end
+
+          { data: data, tools: top_tools + [ "Other" ], period: trunc }
         end
-        events     = scoped_events(time_range)
-
-        top_tools = events
-          .group(:tool_name)
-          .order(Arel.sql("COUNT(*) DESC"))
-          .limit(3)
-          .pluck(:tool_name)
-
-        bucket_expr = period_trunc_sql(trunc)
-        daily_tool_data = events
-          .group(bucket_expr, :tool_name)
-          .select(
-            "#{bucket_expr} as bucket",
-            "tool_name",
-            "COUNT(*) as event_count"
-          )
-          .order("bucket")
-
-        date_map = {}
-        daily_tool_data.each do |row|
-          date = row.bucket&.to_date&.iso8601
-          next unless date
-
-          date_map[date] ||= { date: date }
-          tool_key = top_tools.include?(row.tool_name) ? row.tool_name : "Other"
-          date_map[date][tool_key] = (date_map[date][tool_key] || 0) + row.event_count
-        end
-
-        # All-time: no zero-fill; return raw aggregated buckets only.
-        data = if time_range.nil?
-          date_map.values.sort_by { |d| d[:date] }
-        else
-          DateBucketFiller.fill(
-            start: time_range[:start],
-            finish: time_range[:end],
-            granularity: trunc,
-            data_map: date_map
-          )
-        end
-
-        render json: {
-          data:   data,
-          tools:  top_tools + [ "Other" ],
-          period: trunc
-        }
+        render json: result
       end
 
       # GET /api/v1/organizations/:organization_id/stats/active_tools
       def active_tools
         authorize! current_organization, to: :show?
 
-        rows = current_organization.tool_events
-          .where(occurred_at: (client_zone.now - 30.days).beginning_of_day..Time.current)
-          .group(:tool_name)
-          .select(
-            "tool_name",
-            "COUNT(*) as total_events",
-            "COALESCE(SUM(cost_usd), 0) as total_cost_usd",
-            "COUNT(DISTINCT user_id) as active_users"
-          )
-          .order(Arel.sql("COUNT(*) DESC"))
+        result = with_stats_cache(tz: params[:tz]) do
+          rows = current_organization.tool_events
+            .where(occurred_at: (client_zone.now - 30.days).beginning_of_day..Time.current)
+            .group(:tool_name)
+            .select(
+              "tool_name",
+              "COUNT(*) as total_events",
+              "COALESCE(SUM(cost_usd), 0) as total_cost_usd",
+              "COUNT(DISTINCT user_id) as active_users"
+            )
+            .order(Arel.sql("COUNT(*) DESC"))
 
-        render json: {
-          tools: rows.map { |r|
-            { tool_name: r.tool_name, total_events: r.total_events, total_cost_usd: r.total_cost_usd.to_f, active_users: r.active_users }
+          {
+            tools: rows.map { |r|
+              { tool_name: r.tool_name, total_events: r.total_events, total_cost_usd: r.total_cost_usd.to_f, active_users: r.active_users }
+            }
           }
-        }
+        end
+        render json: result
       end
 
       # GET /api/v1/organizations/:organization_id/stats/heatmap
@@ -296,25 +305,18 @@ module Api
       def heatmap
         authorize! current_organization, to: :show?
 
-        # Get past year of data
-        start_date = (client_zone.now - 1.year).beginning_of_day
-        end_date = Time.current
+        result = with_stats_cache(tz: params[:tz]) do
+          start_date = (client_zone.now - 1.year).beginning_of_day
+          end_date   = Time.current
 
-        daily_counts = stats_query.heatmap_counts(
-          start: start_date,
-          finish: end_date,
-          timezone: client_timezone
-        )
+          daily_counts = stats_query.heatmap_counts(
+            start: start_date, finish: end_date, timezone: client_timezone
+          )
 
-        # Convert to array format expected by frontend
-        heatmap_data = daily_counts.map do |date, count|
-          {
-            date: date.to_s,
-            count: count
-          }
+          # Convert to array format expected by frontend
+          daily_counts.map { |date, count| { date: date.to_s, count: count } }
         end
-
-        render json: heatmap_data
+        render json: result
       end
 
       # GET /api/v1/organizations/:organization_id/stats/risk_alerts
@@ -327,31 +329,37 @@ module Api
         time_range = month_or_days_time_range
         return if performed?
 
-        risky_ids = scoped_events(time_range)
-          .where(risky_event_condition)
-          .select("tool_events.id")
-          .distinct
+        result = with_stats_cache(
+          all_time: params[:all_time], month: params[:month],
+          days: params[:days], project_id: params[:project_id], tz: params[:tz]
+        ) do
+          risky_ids = scoped_events(time_range)
+            .where(risky_event_condition)
+            .select("tool_events.id")
+            .distinct
 
-        rows = ToolEvent.where(id: risky_ids)
-          .group(:tool_name)
-          .select(
-            "tool_name",
-            "COUNT(*) AS event_count",
-            "SUM(tokens_in)  AS tokens_in",
-            "SUM(tokens_out) AS tokens_out",
-            "SUM(cost_usd)   AS cost_usd"
-          )
-          .order(Arel.sql("COUNT(*) DESC"))
+          rows = ToolEvent.where(id: risky_ids)
+            .group(:tool_name)
+            .select(
+              "tool_name",
+              "COUNT(*) AS event_count",
+              "SUM(tokens_in)  AS tokens_in",
+              "SUM(tokens_out) AS tokens_out",
+              "SUM(cost_usd)   AS cost_usd"
+            )
+            .order(Arel.sql("COUNT(*) DESC"))
 
-        render json: rows.map { |r|
-          {
-            toolName:   r.tool_name,
-            eventCount: r.event_count,
-            tokensIn:   r.tokens_in.to_i,
-            tokensOut:  r.tokens_out.to_i,
-            costUsd:    r.cost_usd.to_f
+          rows.map { |r|
+            {
+              toolName:   r.tool_name,
+              eventCount: r.event_count,
+              tokensIn:   r.tokens_in.to_i,
+              tokensOut:  r.tokens_out.to_i,
+              costUsd:    r.cost_usd.to_f
+            }
           }
-        }
+        end
+        render json: result
       end
 
       # GET /api/v1/organizations/:organization_id/stats/daily_by_model
@@ -362,74 +370,77 @@ module Api
         time_range = month_or_days_time_range
         return if performed?
 
-        trunc = case params[:period]
-        when "month" then "month"
-        when "week"  then "week"
-        else              time_range.nil? ? "month" : "day"
+        result = with_stats_cache(
+          all_time: params[:all_time], month: params[:month],
+          days: params[:days], period: params[:period],
+          project_id: params[:project_id], tz: params[:tz]
+        ) do
+          trunc = case params[:period]
+          when "month" then "month"
+          when "week"  then "week"
+          else              time_range.nil? ? "month" : "day"
+          end
+          events = scoped_events(time_range)
+
+          top_models = events
+            .where.not(model: [ nil, "" ])
+            .group(:model)
+            .order(Arel.sql("COUNT(*) DESC"))
+            .limit(3)
+            .pluck(:model)
+
+          bucket_expr = period_trunc_sql(trunc)
+          data        = events
+            .where.not(model: [ nil, "" ])
+            .group(bucket_expr, :model)
+            .select("#{bucket_expr} as bucket", "model", "COUNT(*) as event_count")
+            .order("bucket")
+
+          date_map = {}
+          data.each do |row|
+            date = row.bucket&.to_date&.iso8601
+            next unless date
+
+            date_map[date] ||= { date: date }
+            key = top_models.include?(row.model) ? row.model : "Other"
+            date_map[date][key] = (date_map[date][key] || 0) + row.event_count
+          end
+
+          { data: date_map.values.sort_by { |d| d[:date] }, models: top_models + [ "Other" ] }
         end
-        events     = scoped_events(time_range)
-
-        top_models = events
-          .where.not(model: [ nil, "" ])
-          .group(:model)
-          .order(Arel.sql("COUNT(*) DESC"))
-          .limit(3)
-          .pluck(:model)
-
-        bucket_expr = period_trunc_sql(trunc)
-        data = events
-          .where.not(model: [ nil, "" ])
-          .group(bucket_expr, :model)
-          .select(
-            "#{bucket_expr} as bucket",
-            "model",
-            "COUNT(*) as event_count"
-          )
-          .order("bucket")
-
-        date_map = {}
-        data.each do |row|
-          date = row.bucket&.to_date&.iso8601
-          next unless date
-
-          date_map[date] ||= { date: date }
-          key = top_models.include?(row.model) ? row.model : "Other"
-          date_map[date][key] = (date_map[date][key] || 0) + row.event_count
-        end
-
-        render json: {
-          data:   date_map.values.sort_by { |d| d[:date] },
-          models: top_models + [ "Other" ]
-        }
+        render json: result
       end
 
       # GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/overview
       def tool_overview
         authorize! current_organization, to: :show?
 
-        zone          = client_zone
-        current_start = zone.now.beginning_of_month
-        prev_start    = (zone.now - 1.month).beginning_of_month
-        prev_end      = (zone.now - 1.month).end_of_month
+        result = with_stats_cache(tool_name: @tool_name, tz: params[:tz]) do
+          zone          = client_zone
+          current_start = zone.now.beginning_of_month
+          prev_start    = (zone.now - 1.month).beginning_of_month
+          prev_end      = (zone.now - 1.month).end_of_month
 
-        current = @tool_events.where(occurred_at: current_start..Time.current)
-        prev    = @tool_events.where(occurred_at: prev_start..prev_end)
+          current = @tool_events.where(occurred_at: current_start..Time.current)
+          prev    = @tool_events.where(occurred_at: prev_start..prev_end)
 
-        current_count = current.count
-        prev_count    = prev.count
-        current_cost  = current.sum(:cost_usd).to_f
-        prev_cost     = prev.sum(:cost_usd).to_f
+          current_count = current.count
+          prev_count    = prev.count
+          current_cost  = current.sum(:cost_usd).to_f
+          prev_cost     = prev.sum(:cost_usd).to_f
 
-        render json: {
-          tool:              @tool_name,
-          total_events:      current_count,
-          total_cost_usd:    current_cost,
-          total_tokens_in:   current.sum(:tokens_in).to_i,
-          total_tokens_out:  current.sum(:tokens_out).to_i,
-          active_users:      current.where.not(user_id: nil).distinct.count(:user_id),
-          events_change_pct: prev_count > 0 ? ((current_count - prev_count).to_f / prev_count * 100).round(1) : 0,
-          cost_change_pct:   prev_cost  > 0 ? ((current_cost  - prev_cost).to_f / prev_cost  * 100).round(1) : 0
-        }
+          {
+            tool:              @tool_name,
+            total_events:      current_count,
+            total_cost_usd:    current_cost,
+            total_tokens_in:   current.sum(:tokens_in).to_i,
+            total_tokens_out:  current.sum(:tokens_out).to_i,
+            active_users:      current.where.not(user_id: nil).distinct.count(:user_id),
+            events_change_pct: prev_count > 0 ? ((current_count - prev_count).to_f / prev_count * 100).round(1) : 0,
+            cost_change_pct:   prev_cost  > 0 ? ((current_cost  - prev_cost).to_f / prev_cost  * 100).round(1) : 0
+          }
+        end
+        render json: result
       end
 
       # GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/models
@@ -437,26 +448,33 @@ module Api
         authorize! current_organization, to: :show?
 
         time_range = parse_time_range(default_days: (params[:days] || 30).to_i)
-        events = @tool_events.where(occurred_at: time_range[:start]..time_range[:end])
 
-        models = aggregate_by_column(events, :model).map do |row|
-          pricing = ModelPricingService.pricing_for_model(row[:name])
-          provider_slug, routed_model = split_model_key(row[:name])
+        result = with_stats_cache(
+          tool_name: @tool_name, days: params[:days],
+          start_date: params[:start_date], end_date: params[:end_date], tz: params[:tz]
+        ) do
+          events = @tool_events.where(occurred_at: time_range[:start]..time_range[:end])
 
-          row.merge(
-            provider: provider_slug,
-            model: routed_model,
-            displayName: display_name_for_model(row[:name], provider_slug, routed_model),
-            price_per_million_input: pricing&.dig(:input),
-            price_per_million_output: pricing&.dig(:output)
-          )
+          models = aggregate_by_column(events, :model).map do |row|
+            pricing = ModelPricingService.pricing_for_model(row[:name])
+            provider_slug, routed_model = split_model_key(row[:name])
+
+            row.merge(
+              provider:                 provider_slug,
+              model:                    routed_model,
+              displayName:              display_name_for_model(row[:name], provider_slug, routed_model),
+              price_per_million_input:  pricing&.dig(:input),
+              price_per_million_output: pricing&.dig(:output)
+            )
+          end
+
+          {
+            tool:      @tool_name,
+            timeRange: { start: time_range[:start].iso8601, end: time_range[:end].iso8601 },
+            models:    models
+          }
         end
-
-        render json: {
-          tool: @tool_name,
-          timeRange: { start: time_range[:start].iso8601, end: time_range[:end].iso8601 },
-          models: models
-        }
+        render json: result
       end
 
       # GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/users
@@ -464,14 +482,19 @@ module Api
         authorize! current_organization, to: :show?
 
         time_range = parse_time_range(default_days: (params[:days] || 30).to_i)
-        events = @tool_events.where(occurred_at: time_range[:start]..time_range[:end])
-        limit = (params[:limit] || 20).to_i.clamp(1, 100)
+        limit      = (params[:limit] || 20).to_i.clamp(1, 100)
 
-        render json: {
-          tool: @tool_name,
-          timeRange: { start: time_range[:start].iso8601, end: time_range[:end].iso8601 },
-          users: top_users(events, limit)
-        }
+        result = with_stats_cache(
+          tool_name: @tool_name, days: params[:days], limit: params[:limit], tz: params[:tz]
+        ) do
+          events = @tool_events.where(occurred_at: time_range[:start]..time_range[:end])
+          {
+            tool:      @tool_name,
+            timeRange: { start: time_range[:start].iso8601, end: time_range[:end].iso8601 },
+            users:     top_users(events, limit)
+          }
+        end
+        render json: result
       end
 
       # GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/daily
@@ -482,81 +505,103 @@ module Api
         days       = (params[:days] || 30).to_i.clamp(1, 730)
         trunc      = ALLOWED_PERIODS.include?(params[:period]) ? params[:period] : "day"
         time_range = parse_time_range(default_days: days)
-        rows = tool_stats_query
-          .tool_period_buckets(
-            start: time_range[:start],
-            finish: time_range[:end],
-            granularity: trunc,
-            timezone: client_timezone
-          )
-          .transform_values do |bucket|
-            {
-              date:       bucket[:date],
-              eventCount: bucket[:event_count],
-              tokensIn:   bucket[:tokens_in],
-              tokensOut:  bucket[:tokens_out],
-              costUsd:    bucket[:cost_usd]
-            }
+
+        result = with_stats_cache(
+          tool_name: @tool_name, days: params[:days], period: params[:period], tz: params[:tz]
+        ) do
+          rows = tool_stats_query
+            .tool_period_buckets(
+              start:       time_range[:start],
+              finish:      time_range[:end],
+              granularity: trunc,
+              timezone:    client_timezone
+            )
+            .transform_values do |bucket|
+              {
+                date:       bucket[:date],
+                eventCount: bucket[:event_count],
+                tokensIn:   bucket[:tokens_in],
+                tokensOut:  bucket[:tokens_out],
+                costUsd:    bucket[:cost_usd]
+              }
+            end
+
+          all_buckets = case trunc
+          when "month"
+            start_month = time_range[:start].beginning_of_month.to_date
+            end_month   = time_range[:end].beginning_of_month.to_date
+            months      = []
+            m           = start_month
+            while m <= end_month
+              months << m.iso8601
+              m = m.next_month
+            end
+            months
+          when "week"
+            start_week = time_range[:start].to_date.beginning_of_week(:monday)
+            end_week   = time_range[:end].to_date.beginning_of_week(:monday)
+            weeks      = []
+            w          = start_week
+            while w <= end_week
+              weeks << w.iso8601
+              w += 7
+            end
+            weeks
+          else
+            (time_range[:start].to_date..time_range[:end].to_date).map(&:iso8601)
           end
 
-        all_buckets = case trunc
-        when "month"
-          start_month = time_range[:start].beginning_of_month.to_date
-          end_month   = time_range[:end].beginning_of_month.to_date
-          months = []
-          m = start_month
-          while m <= end_month
-            months << m.iso8601
-            m = m.next_month
+          daily = all_buckets.map do |bucket|
+            rows[bucket] || { date: bucket, eventCount: 0, tokensIn: 0, tokensOut: 0, costUsd: 0.0 }
           end
-          months
-        when "week"
-          start_week = time_range[:start].to_date.beginning_of_week(:monday)
-          end_week   = time_range[:end].to_date.beginning_of_week(:monday)
-          weeks = []
-          w = start_week
-          while w <= end_week
-            weeks << w.iso8601
-            w += 7
-          end
-          weeks
-        else
-          (time_range[:start].to_date..time_range[:end].to_date).map(&:iso8601)
+
+          {
+            tool:      @tool_name,
+            timeRange: { start: time_range[:start].iso8601, end: time_range[:end].iso8601 },
+            period:    trunc,
+            daily:     daily
+          }
         end
-
-        daily = all_buckets.map do |bucket|
-          rows[bucket] || { date: bucket, eventCount: 0, tokensIn: 0, tokensOut: 0, costUsd: 0.0 }
-        end
-
-        render json: {
-          tool:      @tool_name,
-          timeRange: { start: time_range[:start].iso8601, end: time_range[:end].iso8601 },
-          period:    trunc,
-          daily:     daily
-        }
+        render json: result
       end
 
       # GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/event_types
       def tool_event_types
         authorize! current_organization, to: :show?
 
-        time_range  = parse_time_range(default_days: (params[:days] || 30).to_i)
-        events      = @tool_events.where(occurred_at: time_range[:start]..time_range[:end])
-        aggregated  = aggregate_by_column(events, :event_type)
+        time_range = parse_time_range(default_days: (params[:days] || 30).to_i)
 
-        existing_names = aggregated.map { |e| e[:name] }
-        all_event_types = aggregated + (ToolEvent::EVENT_TYPES - existing_names).map do |name|
-          { name: name, eventCount: 0, tokensIn: 0, tokensOut: 0, costUsd: 0.0 }
+        result = with_stats_cache(tool_name: @tool_name, days: params[:days], tz: params[:tz]) do
+          events     = @tool_events.where(occurred_at: time_range[:start]..time_range[:end])
+          aggregated = aggregate_by_column(events, :event_type)
+
+          existing_names  = aggregated.map { |e| e[:name] }
+          all_event_types = aggregated + (ToolEvent::EVENT_TYPES - existing_names).map do |name|
+            { name: name, eventCount: 0, tokensIn: 0, tokensOut: 0, costUsd: 0.0 }
+          end
+
+          {
+            tool:       @tool_name,
+            timeRange:  { start: time_range[:start].iso8601, end: time_range[:end].iso8601 },
+            eventTypes: all_event_types
+          }
         end
-
-        render json: {
-          tool:       @tool_name,
-          timeRange:  { start: time_range[:start].iso8601, end: time_range[:end].iso8601 },
-          eventTypes: all_event_types
-        }
+        render json: result
       end
 
       private
+
+      # Role omitted: StatsController does not filter by role today — all authorized org
+      # members see identical data. Add current_user role to the key if per-role
+      # data filtering is introduced in future.
+      def with_stats_cache(**cache_params, &block)
+        key = "stats:#{action_name}:#{current_organization.id}:#{cache_digest(cache_params)}"
+        Rails.cache.fetch(key, expires_in: STATS_CACHE_TTL, &block)
+      end
+
+      def cache_digest(params)
+        Digest::SHA1.hexdigest(params.compact.sort.to_s)
+      end
 
       def stats_query
         @stats_query ||= build_stats_query
@@ -638,11 +683,11 @@ module Api
           .limit(20)
           .map do |row|
             {
-              name: row.public_send(column),
+              name:       row.public_send(column),
               eventCount: row.event_count,
-              tokensIn: row.tokens_in || 0,
-              tokensOut: row.tokens_out || 0,
-              costUsd: (row.cost_usd || 0).to_f
+              tokensIn:   row.tokens_in || 0,
+              tokensOut:  row.tokens_out || 0,
+              costUsd:    (row.cost_usd || 0).to_f
             }
           end
       end
@@ -662,12 +707,12 @@ module Api
           .map do |row|
             user = User.find_by(id: row.user_id)
             {
-              userId: row.user_id,
-              name: user&.name || "Unknown",
-              email: user&.email,
-              eventCount: row.event_count,
+              userId:      row.user_id,
+              name:        user&.name || "Unknown",
+              email:       user&.email,
+              eventCount:  row.event_count,
               totalTokens: row.total_tokens || 0,
-              costUsd: (row.cost_usd || 0).to_f
+              costUsd:     (row.cost_usd || 0).to_f
             }
           end
       end
@@ -693,8 +738,8 @@ module Api
           .where(tool_events: { occurred_at: time_range[:start]..time_range[:end] })
 
         {
-          total: audit_logs.count,
-          byRiskLevel: audit_logs.group(:risk_level).count,
+          total:         audit_logs.count,
+          byRiskLevel:   audit_logs.group(:risk_level).count,
           highRiskCount: audit_logs.where(risk_level: %w[high critical]).count
         }
       end

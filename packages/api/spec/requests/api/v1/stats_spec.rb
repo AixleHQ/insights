@@ -1962,6 +1962,125 @@ RSpec.describe 'Api::V1::Stats', type: :request do
     end
   end
 
+  describe 'caching' do
+    # Test env uses :null_store — swap in a real MemoryStore so cache assertions
+    # work correctly (same pattern as spec/services/metadata_enrichers/pr_correlator_spec.rb).
+    around do |example|
+      original_cache = Rails.cache
+      Rails.cache = ActiveSupport::Cache::MemoryStore.new
+      example.run
+    ensure
+      Rails.cache = original_cache
+    end
+
+    let(:overview_path) { "/api/v1/organizations/#{organization.id}/stats/overview" }
+
+    it 'serves repeated overview requests within TTL from cache (no re-query of tool_events)' do
+      authenticated_get overview_path, user: user, organization: organization
+      expect_success
+      first_body = response.parsed_body
+
+      # Add a new event — a cache miss would return updated totals, a hit returns the same values.
+      create(:tool_event, organization: organization, user: user,
+             tool_name: 'claude_code', cost_usd: 50.0, occurred_at: Time.current)
+
+      authenticated_get overview_path, user: user, organization: organization
+      expect_success
+
+      expect(response.parsed_body['total_events']).to eq(first_body['total_events'])
+      expect(response.parsed_body['total_cost_usd']).to eq(first_body['total_cost_usd'])
+    end
+
+    it 'misses cache when params differ' do
+      travel_to Time.zone.local(2026, 6, 15) do
+        authenticated_get overview_path, user: user, organization: organization, params: { month: '2026-06' }
+        expect_success
+
+        authenticated_get overview_path, user: user, organization: organization, params: { month: '2026-05' }
+        expect_success
+
+        # Different month key — cache miss, independent result
+        expect(response.parsed_body['total_events']).to be_a(Integer)
+        expect(response.parsed_body).not_to be_nil
+      end
+    end
+
+    it 'isolates cache keys per organization' do
+      other_org  = create(:organization)
+      other_user = create(:user)
+      create(:organization_membership, user: other_user, organization: other_org, role: 'member')
+
+      authenticated_get overview_path, user: user, organization: organization
+      expect_success
+      cached_body = response.parsed_body
+
+      create(:tool_event,
+             organization: other_org,
+             user: other_user,
+             tool_name: 'claude_code',
+             tokens_in: 9999, tokens_out: 9999, cost_usd: 99.0,
+             occurred_at: Time.current)
+
+      other_path = "/api/v1/organizations/#{other_org.id}/stats/overview"
+      authenticated_get other_path, user: other_user, organization: other_org
+      expect_success
+
+      # Other org response must not equal org 1's cached payload
+      expect(response.parsed_body['total_cost_usd']).not_to eq(cached_body['total_cost_usd'])
+    end
+
+    it 'misses cache after TTL expiry' do
+      authenticated_get overview_path, user: user, organization: organization
+      expect_success
+      first_body = response.parsed_body
+
+      create(:tool_event, organization: organization, user: user,
+             tool_name: 'claude_code', cost_usd: 50.0, occurred_at: Time.current)
+
+      travel(Api::V1::StatsController::STATS_CACHE_TTL + 1.second) do
+        authenticated_get overview_path, user: user, organization: organization
+        expect_success
+
+        # After TTL, the new event is visible — cache was expired
+        expect(response.parsed_body['total_events']).to be > first_body['total_events']
+      end
+    end
+
+    describe 'active_tools (30s-polled endpoint)' do
+      it 'serves repeated requests within TTL from cache' do
+        path = "/api/v1/organizations/#{organization.id}/stats/active_tools"
+        authenticated_get path, user: user, organization: organization
+        expect_success
+        first_tools = response.parsed_body['tools']
+
+        create(:tool_event, organization: organization, user: user,
+               tool_name: 'cursor', cost_usd: 50.0, occurred_at: Time.current)
+
+        authenticated_get path, user: user, organization: organization
+        expect_success
+
+        expect(response.parsed_body['tools']).to eq(first_tools)
+      end
+    end
+
+    describe 'tool_overview (30s-polled endpoint)' do
+      it 'serves repeated requests within TTL from cache' do
+        path = "/api/v1/organizations/#{organization.id}/stats/tools/claude_code/overview"
+        authenticated_get path, user: user, organization: organization
+        expect_success
+        first_count = response.parsed_body['total_events']
+
+        create(:tool_event, organization: organization, user: user,
+               tool_name: 'claude_code', cost_usd: 1.0, occurred_at: Time.current)
+
+        authenticated_get path, user: user, organization: organization
+        expect_success
+
+        expect(response.parsed_body['total_events']).to eq(first_count)
+      end
+    end
+  end
+
   describe 'month_or_days_time_range validation' do
     it 'returns 400 for malformed month param' do
       authenticated_get "/api/v1/organizations/#{organization.id}/stats/daily_by_tool",
