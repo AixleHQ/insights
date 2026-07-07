@@ -23,21 +23,27 @@ module Api
 
       # POST /api/v1/projects/:project_id/connectors
       def create
-        # Support retrying a failed connector of the same type
-        @connector = @project.project_connectors.find_or_initialize_by(
-          connector_type: params[:connector_type]
-        )
-
-        # Reject if an active connector of this type already exists
-        if @connector.persisted? && @connector.is_active?
-          return render json: {
-            error: "Unprocessable Entity",
-            errors: { connector_type: [ "already exists for this project" ] }
-          }, status: :unprocessable_content
-        end
-
-        @connector.assign_attributes(connector_params)
+        # Build minimal unsaved connector just for the policy check so authorize!
+        # fires before any information-disclosing early returns.
+        @connector = @project.project_connectors.new(connector_type: params[:connector_type])
         authorize! @connector
+
+        multi_instance = ProjectConnector::MULTI_INSTANCE_CONNECTOR_TYPES.include?(params[:connector_type].to_s)
+
+        if multi_instance
+          @connector.assign_attributes(connector_params)
+        else
+          existing = @project.project_connectors.find_by(connector_type: params[:connector_type])
+          if existing&.is_active?
+            return render json: {
+              error: "Unprocessable Entity",
+              errors: { connector_type: [ "already exists for this project" ] }
+            }, status: :unprocessable_content
+          end
+          # Reuse existing record for retry-on-error UX, or keep the new one
+          @connector = existing || @connector
+          @connector.assign_attributes(connector_params)
+        end
 
         # Validate API key / webhook URL for AI providers and Slack webhooks
         provider = Oauth::BaseProvider.for(@connector) if @connector.ai_provider? || @connector.slack_webhook?
@@ -80,10 +86,10 @@ module Api
         authorize! @connector
 
         # Track only non-sensitive fields; token fields are intentionally excluded from audit logs.
-        changes_before = @connector.slice(:is_active, :status, :external_org_name)
+        changes_before = @connector.slice(:is_active, :status, :external_org_name, :label)
 
         if @connector.update(connector_update_params)
-          changes_after = @connector.slice(:is_active, :status, :external_org_name)
+          changes_after = @connector.slice(:is_active, :status, :external_org_name, :label)
           ProjectAuditLog.log(
             project: @project,
             actor: current_user,
@@ -199,12 +205,12 @@ module Api
 
       def connector_params
         params.permit(:connector_type, :access_token, :refresh_token, :token_expires_at,
-                      :external_org_id, :external_org_name, :is_active)
+                      :external_org_id, :external_org_name, :is_active, :label)
       end
 
       def connector_update_params
         params.permit(:access_token, :refresh_token, :token_expires_at,
-                      :external_org_id, :external_org_name, :is_active)
+                      :external_org_id, :external_org_name, :is_active, :label)
       end
     end
   end

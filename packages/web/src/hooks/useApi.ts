@@ -1415,7 +1415,7 @@ export function useProjectConnectWithSlack() {
       api.post<ProjectConnector>(`/projects/${projectId}/connectors`, {
         connector_type: "slack",
         access_token: webhookUrl,
-        ...(channelLabel ? { external_org_name: channelLabel } : {}),
+        ...(channelLabel ? { label: channelLabel } : {}),
       }),
     onSuccess: (_, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projectConnectors.all(projectId) });
@@ -1444,6 +1444,25 @@ export function useProjectTestConnector() {
         `/projects/${projectId}/connectors/${connectorId}/test`
       ),
     onSettled: (_, __, { projectId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.projectConnectors.all(projectId) });
+    },
+  });
+}
+
+export function useProjectUpdateConnector() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      projectId,
+      connectorId,
+      data,
+    }: {
+      projectId: string;
+      connectorId: string;
+      data: Record<string, unknown>;
+    }) => api.patch<ProjectConnector>(`/projects/${projectId}/connectors/${connectorId}`, data),
+    onSuccess: (_, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projectConnectors.all(projectId) });
     },
   });

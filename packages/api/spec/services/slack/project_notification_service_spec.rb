@@ -157,5 +157,35 @@ RSpec.describe Slack::ProjectNotificationService, type: :service do
         described_class.deliver_alert(project, alert_data)
       end
     end
+
+    context "when multiple active Slack connectors exist" do
+      let!(:connector1) { create(:project_connector, :slack, project: project) }
+      let!(:connector2) do
+        create(:project_connector, :slack, project: project,
+               access_token: "https://hooks.slack.com/services/T00000001/B00000001/EXAMPLE-WEBHOOK-SECRET-2",
+               label: "#engineering")
+      end
+      let(:faraday_response) { instance_double(Faraday::Response, success?: true) }
+
+      before do
+        allow(Faraday).to receive(:post).and_return(faraday_response)
+      end
+
+      it "delivers to both connectors" do
+        expect(Faraday).to receive(:post).with(connector1.access_token).and_return(faraday_response)
+        expect(Faraday).to receive(:post).with(connector2.access_token).and_return(faraday_response)
+
+        described_class.deliver_alert(project, alert_data)
+      end
+
+      it "continues delivering to remaining connectors if one fails" do
+        allow(Faraday).to receive(:post).with(connector1.access_token)
+          .and_raise(Faraday::ConnectionFailed.new("timeout"))
+        expect(Faraday).to receive(:post).with(connector2.access_token).and_return(faraday_response)
+
+        allow(Rails.logger).to receive(:error)
+        expect { described_class.deliver_alert(project, alert_data) }.not_to raise_error
+      end
+    end
   end
 end

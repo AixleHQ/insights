@@ -6,11 +6,18 @@ module Slack
       @project = project
     end
 
-    private
+    def deliver_alert(alert_data)
+      connectors = @project.project_connectors.by_type("slack").active.to_a
 
-    def find_connector
-      @project.project_connectors.by_type("slack").active.first
+      if connectors.empty?
+        Rails.logger.warn("[Slack::ProjectNotificationService] No active Slack connectors for project #{@project.slug}")
+        return
+      end
+
+      connectors.each { |connector| deliver_to(connector, alert_data) }
     end
+
+    private
 
     def display_name
       @project.organization&.name || "Unknown"
