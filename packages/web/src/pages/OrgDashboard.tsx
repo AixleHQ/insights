@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Activity, DollarSign, AlertTriangle, Users } from "lucide-react";
 import { useOrg } from "@/contexts/OrgContext";
-import { useOverviewStats, useActiveUsers, useDailyStats, useEvents, useProjects } from "@/hooks/useApi";
+import { useOverviewStats, useActiveUsers, useDailyStats, useEvents, useProjects, clientTimezone } from "@/hooks/useApi";
 import {
   MetricCard,
   MetricGrid,
@@ -31,7 +31,7 @@ import { MemberDashboard } from "@/pages/MemberDashboard";
 import { StatCardSkeleton } from "@/components/ui/skeletons";
 import { formatPercent, periodLabel } from "@/lib/formatters";
 import { type DashboardPeriod } from "@/lib/types";
-import { currentMonth, getLast12Months, isCurrentMonth } from "@/lib/dashboardUtils";
+import { currentMonth, getLast12Months, isCurrentMonth, periodToDateRange } from "@/lib/dashboardUtils";
 
 // Active Members intentionally uses a fixed rolling window, not the month filter,
 // so the number stays stable while users explore historical months.
@@ -142,7 +142,16 @@ export function OrgDashboard() {
     isAllTime ? "month" : undefined,
     selectedProjectId,
   );
-  const { data: eventsResponse, isLoading: isLoadingEvents, isError: isErrorEvents, refetch: refetchEvents } = useEvents(orgId, { per_page: 10 });
+  const eventsFilters = useMemo(
+    () => ({
+      per_page: 10,
+      ...(selectedProjectId ? { project_id: selectedProjectId } : {}),
+      ...periodToDateRange(selectedPeriod),
+      tz: clientTimezone,
+    }),
+    [selectedProjectId, selectedPeriod],
+  );
+  const { data: eventsResponse, isLoading: isLoadingEvents, isError: isErrorEvents, refetch: refetchEvents } = useEvents(orgId, eventsFilters);
 
   const chartData: DailyCostData[] = dailyData?.data?.map((d) => ({
     date: d.date,
