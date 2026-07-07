@@ -45,7 +45,7 @@ Rails.application.configure do
   config.action_mailer.default_url_options = { host: "localhost", port: 3000 }
 
   # Use letter_opener_web to preview emails in browser during development
-  # Visit http://localhost:3000/admin/letter_opener to see sent emails
+  # Visit http://localhost:3000/letter_opener to see sent emails
   config.action_mailer.delivery_method = :letter_opener_web
 
   # Print deprecation notices to the Rails logger.

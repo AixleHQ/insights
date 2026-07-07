@@ -101,21 +101,33 @@ class RawEventStore
     private
 
     def client
-      @client ||= Aws::S3::Client.new(
-        endpoint: endpoint_url,
-        region: region,
-        access_key_id: access_key_id,
-        secret_access_key: secret_access_key,
-        force_path_style: true
-      )
+      @client ||= Aws::S3::Client.new(s3_client_options)
+    end
+
+    def s3_client_options
+      options = { region: region }
+
+      # Production: credentials resolved from ECS task IAM role (no explicit keys needed)
+      if minio_mode?
+        options[:endpoint] = endpoint_url
+        options[:force_path_style] = true
+        options[:access_key_id] = access_key_id
+        options[:secret_access_key] = secret_access_key
+      end
+
+      options
+    end
+
+    def minio_mode?
+      endpoint_url.present?
     end
 
     def endpoint_url
-      ENV.fetch("MINIO_ENDPOINT", "http://localhost:9000")
+      ENV["MINIO_ENDPOINT"].presence || (Rails.env.local? ? "http://localhost:9000" : nil)
     end
 
     def region
-      ENV.fetch("MINIO_REGION", "us-east-1")
+      ENV.fetch("S3_REGION", ENV.fetch("MINIO_REGION", "us-east-1"))
     end
 
     def access_key_id
