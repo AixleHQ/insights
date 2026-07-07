@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Layers, Bug, BookOpen, CheckSquare, Zap, Circle, RefreshCw } from "lucide-react";
+import { Layers, Bug, BookOpen, CheckSquare, Zap, Circle, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import { useProject, useProjectIssues, useSyncProjectIssues } from "@/hooks/useApi";
 import type { ProjectWithStats } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -77,6 +77,7 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [typeFilter, setTypeFilter] = useState<string>("");
   const [assigneeFilter, setAssigneeFilter] = useState<string>("");
+  const [page, setPage] = useState(1);
 
   const linkedProvider = project.linearProjectId ? "linear" : project.jiraProjectKey ? "jira" : null;
   const isLinked = !!linkedProvider;
@@ -87,11 +88,18 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
       ? {
           status_category: statusFilter || undefined,
           type: typeFilter || undefined,
+          page,
         }
       : undefined
   );
 
   const allIssues = useMemo(() => issuesResponse?.data ?? [], [issuesResponse]);
+  const meta = issuesResponse?.meta;
+  // The assignee filter is client-side, so it can only see the current page.
+  // On multi-page results it would filter/count inconsistently, so we hide it
+  // and show the full page instead. Cross-page assignee filtering is tracked
+  // as a separate backend follow-up.
+  const isPaginated = !!meta && meta.total_pages > 1;
 
   // Projects linked before issues_synced_at existed have it as null even though issues
   // are already loaded — only treat as syncing when there's genuinely nothing loaded yet.
@@ -124,7 +132,7 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
     [allIssues]
   );
 
-  const issues = assigneeFilter
+  const issues = assigneeFilter && !isPaginated
     ? allIssues.filter((i) => i.assigneeName === assigneeFilter)
     : allIssues;
 
@@ -184,7 +192,14 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
 
           {/* Filters */}
           <div className="flex flex-wrap gap-2 px-6 pb-3">
-            <Select value={statusFilter || "__all__"} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
+            <Select
+              value={statusFilter || "__all__"}
+              onValueChange={(v) => {
+                setStatusFilter(v === "__all__" ? "" : v);
+                setAssigneeFilter("");
+                setPage(1);
+              }}
+            >
               <SelectTrigger className="h-8 w-[160px] text-sm">
                 <SelectValue placeholder="All statuses" />
               </SelectTrigger>
@@ -196,7 +211,14 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
               </SelectContent>
             </Select>
 
-            <Select value={typeFilter || "__all__"} onValueChange={(v) => setTypeFilter(v === "__all__" ? "" : v)}>
+            <Select
+              value={typeFilter || "__all__"}
+              onValueChange={(v) => {
+                setTypeFilter(v === "__all__" ? "" : v);
+                setAssigneeFilter("");
+                setPage(1);
+              }}
+            >
               <SelectTrigger className="h-8 w-[140px] text-sm">
                 <SelectValue placeholder="All types" />
               </SelectTrigger>
@@ -209,23 +231,25 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
               </SelectContent>
             </Select>
 
-            <Select
-              value={assigneeFilter || "__all__"}
-              onValueChange={(v) => setAssigneeFilter(v === "__all__" ? "" : v)}
-              disabled={uniqueAssignees.length === 0}
-            >
-              <SelectTrigger className="h-8 w-[160px] text-sm">
-                <SelectValue placeholder="All assignees" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">All assignees</SelectItem>
-                {uniqueAssignees.map((name) => (
-                  <SelectItem key={name} value={name}>
-                    {name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {!isPaginated && (
+              <Select
+                value={assigneeFilter || "__all__"}
+                onValueChange={(v) => setAssigneeFilter(v === "__all__" ? "" : v)}
+                disabled={uniqueAssignees.length === 0}
+              >
+                <SelectTrigger className="h-8 w-[160px] text-sm">
+                  <SelectValue placeholder="All assignees" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All assignees</SelectItem>
+                  {uniqueAssignees.map((name) => (
+                    <SelectItem key={name} value={name}>
+                      {name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           <CardContent className="p-0">
@@ -289,6 +313,34 @@ export function ProjectIssuesTab({ projectId, project }: ProjectIssuesTabProps) 
               </div>
             )}
           </CardContent>
+
+          {!isLoading && !isSyncing && meta && meta.total_pages > 1 && (
+            <div className="flex items-center justify-between border-t px-6 py-3">
+              <p className="text-sm text-muted-foreground">
+                Page {meta.current_page} of {meta.total_pages} ({meta.total_count} issues)
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => p - 1)}
+                >
+                  <ChevronLeft className="size-4" />
+                  Previous
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={page >= meta.total_pages}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  Next
+                  <ChevronRight className="size-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
       )}
 
