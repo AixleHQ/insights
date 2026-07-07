@@ -1,3 +1,5 @@
+import type { DashboardPeriod } from "@/lib/types";
+
 export function formatDateLabel(dateStr: string, granularity: "month" | "day"): string {
   const date = new Date(dateStr + "T00:00:00");
   if (granularity === "month") {
@@ -42,4 +44,23 @@ export function getLast12Months(): { value: string; label: string }[] {
     });
   }
   return months;
+}
+
+/**
+ * Convert a dashboard period into the inclusive date range the /events endpoint
+ * accepts (start_date / end_date, YYYY-MM-DD). all_time → no bounds. Mirrors the
+ * month window the stats endpoints compute server-side so Recent Activity matches
+ * the stats cards.
+ */
+export function periodToDateRange(
+  period: DashboardPeriod
+): { start_date?: string; end_date?: string } {
+  if (period.type !== "month") return {};
+  const [year, month] = period.value.split("-").map(Number);
+  // Day 0 of the next month == last calendar day of this month.
+  const lastDay = new Date(year, month, 0).getDate();
+  return {
+    start_date: `${period.value}-01`,
+    end_date: `${period.value}-${String(lastDay).padStart(2, "0")}`,
+  };
 }
