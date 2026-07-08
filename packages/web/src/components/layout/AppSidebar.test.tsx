@@ -65,16 +65,17 @@ describe("AppSidebar", () => {
   });
 
   describe("owner role", () => {
-    it("shows all 8 nav items", () => {
+    it("shows all 7 nav items", () => {
       renderSidebar();
       expect(screen.getByRole("link", { name: /Dashboard/i })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: /Events/i })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: /Projects/i })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: /Members/i })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: /Integrations/i })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /Alerts/i })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: /Settings/i })).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: /Library/i })).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: /Feedback/i })).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /Library/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /Feedback/i })).not.toBeInTheDocument();
     });
 
     it("does not show Profile as a sidebar nav item", () => {
@@ -94,13 +95,13 @@ describe("AppSidebar", () => {
       orgMock.currentRole = "member";
     });
 
-    it("shows Dashboard, Events, Projects, Library, Feedback", () => {
+    it("shows Dashboard, Events, Projects", () => {
       renderSidebar();
       expect(screen.getByRole("link", { name: /Dashboard/i })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: /Events/i })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: /Projects/i })).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: /Library/i })).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: /Feedback/i })).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /Library/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /Feedback/i })).not.toBeInTheDocument();
     });
 
     it("hides Members, Integrations, Settings", () => {
@@ -116,13 +117,13 @@ describe("AppSidebar", () => {
       orgMock.currentRole = "viewer";
     });
 
-    it("shows Dashboard, Events, Projects, Library, Feedback", () => {
+    it("shows Dashboard, Events, Projects", () => {
       renderSidebar();
       expect(screen.getByRole("link", { name: /Dashboard/i })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: /Events/i })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: /Projects/i })).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: /Library/i })).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: /Feedback/i })).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /Library/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /Feedback/i })).not.toBeInTheDocument();
     });
 
     it("hides Members, Integrations, Settings", () => {

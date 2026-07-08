@@ -15,11 +15,7 @@ import {
   Check,
   User,
   Users,
-  BookOpen,
-  MessageSquare,
   Star,
-  FileText,
-  Shield,
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -78,8 +74,6 @@ const navItems: NavItem[] = [
   { title: "Integrations", icon: Plug,            href: AppRoutes.integrations.root, roles: ["owner"] },
   { title: "Alerts",       icon: OctagonAlert,    href: AppRoutes.alerts,            roles: ["owner"] },
   { title: "Settings",     icon: Settings,        href: AppRoutes.settings.root,     roles: ["owner"] },
-  { title: "Library",      icon: BookOpen,        href: AppRoutes.library,           roles: ["owner", "member", "viewer"] },
-  { title: "Feedback",     icon: MessageSquare,   href: AppRoutes.feedback,          roles: ["owner", "member", "viewer"] },
 ];
 
 function getOrgInitials(name: string | undefined | null) {
@@ -507,24 +501,6 @@ export function AppSidebar() {
             <SidebarSeparator />
           </>
         )}
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Terms of Service">
-              <Link to={AppRoutes.legal.terms} state={{ from: location.pathname }}>
-                <FileText className="size-4" />
-                <span>Terms</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Privacy Policy">
-              <Link to={AppRoutes.legal.privacy} state={{ from: location.pathname }}>
-                <Shield className="size-4" />
-                <span>Privacy</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
         <SidebarMenu>
           <SidebarMenuItem>
             <UserMenu />

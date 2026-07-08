@@ -42,10 +42,7 @@ import {
   AdminOrganizations,
   WebhookDeliveriesPage,
 } from "./pages/admin";
-import { ComingSoon } from "./components/ui/ComingSoon";
 import { NotFound } from "./pages/NotFound";
-import { TermsOfService } from "./pages/TermsOfService";
-import { PrivacyPolicy } from "./pages/PrivacyPolicy";
 import { AppRoutes } from "./lib/routes";
 
 function TeamIdRedirect() {
@@ -86,10 +83,6 @@ function App() {
                 <Route path={AppRoutes.authSilentCallback} element={<AuthSilentCallback />} />
                 <Route path={AppRoutes.authIframeCallback} element={<AuthIframeCallback />} />
                 <Route path={AppRoutes.authPopupCallback} element={<AuthPopupCallback />} />
-
-                {/* Legal pages - public, no auth required */}
-                <Route path={AppRoutes.legal.terms} element={<TermsOfService />} />
-                <Route path={AppRoutes.legal.privacy} element={<PrivacyPolicy />} />
 
                 {/* OAuth callback for integrations (outside protected routes for popup) */}
                 <Route path={AppRoutes.integrations.callback} element={<IntegrationOAuthCallback />} />
@@ -176,9 +169,6 @@ function App() {
                   <Route path="/settings/tool-accounts" element={<Navigate to={AppRoutes.profile.tools} replace />} />
                   <Route path={AppRoutes.events.unattributed} element={<UnattributedEvents />} />
                   <Route path={AppRoutes.notifications} element={<Notifications />} />
-                  <Route path={AppRoutes.library} element={<ComingSoon title="Library" />} />
-                  <Route path={AppRoutes.feedback} element={<ComingSoon title="Feedback" />} />
-
                   {/* Admin routes */}
                   <Route path={AppRoutes.admin.root} element={<AdminLayout />}>
                     <Route index element={<AdminOverview />} />
