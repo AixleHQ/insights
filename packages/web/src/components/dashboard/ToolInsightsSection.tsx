@@ -40,6 +40,7 @@ interface ToolInsightsSectionProps {
   orgId: string;
   days: number;
   onDaysChange: (days: number) => void;
+  projectId?: string;
 }
 
 const TOOL_LABELS: Record<string, string> = {
@@ -206,11 +207,13 @@ function ToolTabContent({
   toolSlug,
   days,
   period,
+  projectId,
 }: {
   orgId: string;
   toolSlug: string;
   days: number;
   period: "day" | "week" | "month";
+  projectId?: string;
 }) {
   const gradientId = useId();
   const connectorType = TOOL_CONNECTOR[toolSlug] ?? null;
@@ -219,10 +222,10 @@ function ToolTabContent({
   const label = toolLabel(toolSlug);
 
   const { data: connectorsResp } = useConnectors(orgId);
-  const { data: dailyResp, isLoading: isLoadingDaily, isError: isErrorDaily, refetch: refetchDaily } = useToolDaily(orgId, toolSlug, days, period === "month" ? undefined : period);
-  const { data: modelsResp, isLoading: isLoadingModels, isError: isErrorModels, refetch: refetchModels } = useToolModels(orgId, toolSlug, days);
-  const { data: usersResp, isLoading: isLoadingUsers, isError: isErrorUsers, refetch: refetchUsers } = useToolUsers(orgId, toolSlug, days);
-  const { data: eventTypesResp, isLoading: isLoadingEventTypes, isError: isErrorEventTypes, refetch: refetchEventTypes } = useToolEventTypes(orgId, showEventTypes ? toolSlug : "", days);
+  const { data: dailyResp, isLoading: isLoadingDaily, isError: isErrorDaily, refetch: refetchDaily } = useToolDaily(orgId, toolSlug, days, period === "month" ? undefined : period, projectId);
+  const { data: modelsResp, isLoading: isLoadingModels, isError: isErrorModels, refetch: refetchModels } = useToolModels(orgId, toolSlug, days, projectId);
+  const { data: usersResp, isLoading: isLoadingUsers, isError: isErrorUsers, refetch: refetchUsers } = useToolUsers(orgId, toolSlug, days, projectId);
+  const { data: eventTypesResp, isLoading: isLoadingEventTypes, isError: isErrorEventTypes, refetch: refetchEventTypes } = useToolEventTypes(orgId, showEventTypes ? toolSlug : "", days, projectId);
 
   const activeConnector = connectorType
     ? connectorsResp?.find((c) => {
@@ -379,7 +382,7 @@ function ToolTabContent({
   );
 }
 
-export function ToolInsightsSection({ orgId, days, onDaysChange }: ToolInsightsSectionProps) {
+export function ToolInsightsSection({ orgId, days, onDaysChange, projectId }: ToolInsightsSectionProps) {
   const queryClient = useQueryClient();
   const { data: activeToolsResp, isLoading } = useActiveTools(orgId);
   const { data: connectors } = useConnectors(orgId);
@@ -468,6 +471,7 @@ export function ToolInsightsSection({ orgId, days, onDaysChange }: ToolInsightsS
                 toolSlug={tool.tool_name}
                 days={days}
                 period={periodForDays(days)}
+                projectId={projectId}
               />
             </TabsContent>
           ))}

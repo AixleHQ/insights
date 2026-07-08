@@ -267,7 +267,7 @@ describe("ToolInsightsSection", () => {
     mockUseActiveTools.mockReturnValue(makeActiveTools([{ tool_name: "cursor", total_events: 5 }]) as never);
     setupDefaults();
     render(<ToolInsightsSection {...defaultProps} days={365} />);
-    expect(mockUseToolUsers).toHaveBeenCalledWith("org-123", "cursor", 365);
+    expect(mockUseToolUsers).toHaveBeenCalledWith("org-123", "cursor", 365, undefined);
   });
 
   it("handles unknown tool names with auto-formatted label", () => {
@@ -277,5 +277,29 @@ describe("ToolInsightsSection", () => {
     setupDefaults();
     render(<ToolInsightsSection {...defaultProps} />);
     expect(screen.getByRole("tab", { name: "Some New Tool" })).toBeInTheDocument();
+  });
+
+  it("passes projectId to the per-tab data hooks but not to useActiveTools", () => {
+    mockUseActiveTools.mockReturnValue(
+      makeActiveTools([{ tool_name: "cursor", total_events: 5 }]) as never
+    );
+    setupDefaults();
+    render(<ToolInsightsSection {...defaultProps} projectId="proj-9" />);
+
+    expect(mockUseActiveTools).toHaveBeenCalledWith("org-123");
+    expect(mockUseToolDaily).toHaveBeenCalledWith("org-123", "cursor", 30, "day", "proj-9");
+    expect(mockUseToolModels).toHaveBeenCalledWith("org-123", "cursor", 30, "proj-9");
+    expect(mockUseToolUsers).toHaveBeenCalledWith("org-123", "cursor", 30, "proj-9");
+  });
+
+  it("passes undefined projectId to the per-tab hooks when no project is selected", () => {
+    mockUseActiveTools.mockReturnValue(
+      makeActiveTools([{ tool_name: "cursor", total_events: 5 }]) as never
+    );
+    setupDefaults();
+    render(<ToolInsightsSection {...defaultProps} />);
+
+    expect(mockUseActiveTools).toHaveBeenCalledWith("org-123");
+    expect(mockUseToolDaily).toHaveBeenCalledWith("org-123", "cursor", 30, "day", undefined);
   });
 });
