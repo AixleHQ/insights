@@ -88,17 +88,18 @@ class JwtAuth
     Rails.logger.info("[JwtAuth] Token validated for #{claims['email']}")
     { "jwt.claims" => claims, "jwt.token" => token }
   rescue TokenExpiredError
-    Rails.logger.warn("[JwtAuth] Token expired")
+    Rails.logger.warn("[JwtAuth] Token expired #{token_ref(token)}")
     unauthorized_response("Token has expired")
   rescue InvalidTokenError => e
-    Rails.logger.warn("[JwtAuth] Invalid token: #{e.message}")
+    Rails.logger.warn("[JwtAuth] Invalid token: #{e.message} #{token_ref(token)}")
     unauthorized_response("Invalid token: #{e.message}")
   rescue JWT::DecodeError => e
     Rails.logger.warn("[JwtAuth] Token decode error: #{e.message}")
     unauthorized_response("Token decode error: #{e.message}")
   rescue => e
-    Rails.logger.error("[JwtAuth] Unexpected error: #{e.class} - #{e.message}")
+    Rails.logger.error("[JwtAuth] Unexpected error: #{e.class} - #{e.message} #{token_ref(token)}")
     Rails.logger.error(e.backtrace.first(5).join("\n"))
+    Rollbar.error(e, context: "jwt_auth_unexpected")
     unauthorized_response("Authentication failed")
   end
 
@@ -168,6 +169,18 @@ class JwtAuth
     if claims["nbf"] && Time.now.to_i < claims["nbf"]
       raise InvalidTokenError, "Token not yet valid"
     end
+  end
+
+  # Correlation reference from the UNVERIFIED token claims — logged on auth failure so a
+  # Rails-side rejection can be cross-referenced against Keycloak's Events log. Decodes
+  # without verifying and never logs the raw token; returns "" if the token can't be read.
+  def token_ref(token)
+    return "" if token.nil?
+
+    claims = JWT.decode(token, nil, false).first
+    "(sub=#{claims['sub']} sid=#{claims['sid']} jti=#{claims['jti']})"
+  rescue StandardError
+    ""
   end
 
   def unauthorized_response(message)

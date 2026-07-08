@@ -7,6 +7,10 @@ module Admin
   class KeycloakAuthService
     Result = Struct.new(:success?, :user, :error, keyword_init: true)
 
+    # Raised when the Keycloak token endpoint can't be reached (vs. a code that was
+    # rejected). Lets #authenticate tell the user "try again" instead of "session expired".
+    class UnavailableError < StandardError; end
+
     def authorize_url(redirect_uri, code_verifier)
       params = {
         client_id: config.audience,
@@ -33,6 +37,8 @@ module Admin
       return failure("Access denied. Global admin role required.") unless user
 
       Result.new(success?: true, user: user)
+    rescue UnavailableError
+      failure("Identity provider is temporarily unavailable. Please try again.")
     end
 
     private
@@ -51,7 +57,7 @@ module Admin
 
     def exchange_code(code, verifier, redirect_uri)
       uri = URI(config.internal_token_url)
-      response = Net::HTTP.post_form(uri, {
+      response = post_form(uri, {
         grant_type: "authorization_code",
         client_id: config.audience,
         code: code,
@@ -60,14 +66,41 @@ module Admin
       })
 
       unless response.is_a?(Net::HTTPSuccess)
-        Rails.logger.error("[KeycloakAuthService] Token exchange failed: #{response.code} #{response.body}")
+        # A response came back but the code was rejected (expired/replayed/PKCE mismatch).
+        # Distinct from a connectivity failure — return nil so the caller reports a code error.
+        Rails.logger.error("[KeycloakAuthService] Token exchange rejected: #{response.code} #{response.body}")
         return nil
       end
 
       JSON.parse(response.body)
-    rescue StandardError => e
-      Rails.logger.error("[KeycloakAuthService] Token exchange error: #{e.class} #{e.message}")
-      nil
+    rescue *Keycloak::JwtVerifier::CONNECT_ERRORS => e
+      Rails.logger.error("[KeycloakAuthService] Token exchange connectivity failure: #{e.class} #{e.message}")
+      Rollbar.error(e, context: "keycloak_admin_token_exchange")
+      raise UnavailableError
+    end
+
+    # POST with explicit timeouts and one bounded retry, reusing JwtVerifier's timeout /
+    # retry / connectivity-error policy. Net::HTTP.post_form has no timeout control, so an
+    # unreachable Keycloak would otherwise hang the admin-login request thread.
+    def post_form(uri, params)
+      attempt = 0
+      begin
+        attempt += 1
+        Net::HTTP.start(uri.host, uri.port,
+          use_ssl: uri.scheme == "https",
+          open_timeout: Keycloak::JwtVerifier::OPEN_TIMEOUT_SECONDS,
+          read_timeout: Keycloak::JwtVerifier::READ_TIMEOUT_SECONDS) do |http|
+          request = Net::HTTP::Post.new(uri.request_uri)
+          request.set_form_data(params)
+          http.request(request)
+        end
+      rescue *Keycloak::JwtVerifier::CONNECT_ERRORS
+        if attempt < Keycloak::JwtVerifier::MAX_ATTEMPTS
+          sleep(Keycloak::JwtVerifier::RETRY_BACKOFF_SECONDS)
+          retry
+        end
+        raise
+      end
     end
 
     def find_admin_user(claims)
