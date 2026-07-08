@@ -7,7 +7,7 @@ import type { ToolEvent } from "@/lib/types";
 const mockCurrentOrg = { id: "org-1", role: "owner" };
 
 vi.mock("@/contexts/OrgContext", () => ({
-  useOrg: () => ({ currentOrg: mockCurrentOrg, currentRole: () => "owner" }),
+  useOrg: () => ({ currentOrg: mockCurrentOrg, currentRole: "owner" }),
 }));
 
 vi.mock("@/components/ui/risk-badge", () => ({
@@ -140,5 +140,21 @@ describe("EventDrawer time and unmatched author display", () => {
   it("shows Not assigned when there is no user and no git author metadata", () => {
     renderDrawer({ user: null, metadata: {} });
     expect(screen.getByText("Not assigned")).toBeInTheDocument();
+  });
+});
+
+describe("EventDrawer graceful empty prompt (AIX-511)", () => {
+  it("commit event shows only Metadata tab, no Sanitized prompt tab", () => {
+    renderDrawer({ eventType: "commit", sanitizedContent: null, metadata: {} });
+    expect(screen.queryByRole("tab", { name: /sanitized/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /metadata/i })).toBeInTheDocument();
+    expect(screen.queryByText("No content available")).not.toBeInTheDocument();
+  });
+
+  it("chat event with no text shows placeholder, not blank block", () => {
+    renderDrawer({ eventType: "chat", sanitizedContent: null });
+    expect(screen.getByRole("tab", { name: /sanitized/i })).toBeInTheDocument();
+    expect(screen.getByText(/prompt capture is not enabled/i)).toBeInTheDocument();
+    expect(screen.queryByText("No content available")).not.toBeInTheDocument();
   });
 });
