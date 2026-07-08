@@ -57,5 +57,43 @@ RSpec.describe ScheduledExportMailer, type: :mailer do
         expect(mail.attachments.first.filename).to match(/\.json\z/)
       end
     end
+
+    describe "HTML email" do
+      subject(:mail) { described_class.export_report(export, report) }
+
+      it "is a single well-formed HTML document (no nested layout)" do
+        html = mail.html_part.body.decoded
+
+        expect(html.scan(/<!DOCTYPE/i).size).to eq(1)
+        expect(html.scan(/<html/i).size).to eq(1)
+        expect(html.scan(/<body/i).size).to eq(1)
+      end
+
+      it "includes the Aixle Insights brand name" do
+        expect(mail.html_part.body.decoded).to include("Aixle Insights")
+      end
+
+      it "includes the report type in the heading" do
+        expect(mail.html_part.body.decoded).to include("Cost by tool")
+      end
+
+      it "includes the organization name" do
+        expect(mail.html_part.body.decoded).to include("Acme Corp")
+      end
+
+      it "includes format, frequency, and generated-at metadata" do
+        html = mail.html_part.body.decoded
+        expect(html).to include("CSV")
+        expect(html).to include("Daily")
+        expect(html).to match(/\d{4}-\d{2}-\d{2}/)
+      end
+
+      it "has the branded card structure" do
+        html = mail.html_part.body.decoded
+        expect(html).to include('class="card"')
+        expect(html).to include('class="logo-text"')
+        expect(html).to include('class="footer"')
+      end
+    end
   end
 end
