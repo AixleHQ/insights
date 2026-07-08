@@ -136,22 +136,24 @@ describe("ProjectSettings", () => {
       expect(screen.getByRole("link", { name: /alerts/i })).toBeInTheDocument();
     });
 
-    it("shows Members but not Integrations for a project member who is not org owner", () => {
+    it("redirects a project member who is not an owner (no nav)", () => {
       mockHasRole.mockReturnValue(false);
       mockUseProjectMembers.mockReturnValue({ data: [{ id: "pm-1", userId: "user-1", role: "member" }] });
       renderAtPath("/projects/proj-1/settings");
 
-      expect(screen.getByRole("link", { name: /^members$/i })).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /^members$/i })).not.toBeInTheDocument();
       expect(screen.queryByRole("link", { name: /^integrations$/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /general/i })).not.toBeInTheDocument();
     });
 
-    it("shows neither Members nor Integrations for a non-member", () => {
+    it("redirects a non-member (no nav)", () => {
       mockHasRole.mockReturnValue(false);
       mockUseProjectMembers.mockReturnValue({ data: [] });
       renderAtPath("/projects/proj-1/settings");
 
       expect(screen.queryByRole("link", { name: /^members$/i })).not.toBeInTheDocument();
       expect(screen.queryByRole("link", { name: /^integrations$/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /general/i })).not.toBeInTheDocument();
     });
 
     it("marks General as active on the index route", () => {
@@ -311,49 +313,42 @@ describe("ProjectSettings", () => {
     });
   });
 
-  describe("General settings — read-only for viewers (AIX-501)", () => {
+  describe("Owner-only access guard (AIX-501)", () => {
     function setupViewer() {
       mockHasRole.mockReturnValue(false);
       mockUseProjectMembers.mockReturnValue({ data: [{ id: "pm-1", userId: "user-1", role: "viewer" }] });
     }
 
-    it("hides Save Changes for a viewer", () => {
+    it("redirects a viewer away from the Settings page (no General form)", () => {
       setupViewer();
       renderAtPath("/projects/proj-1/settings");
 
+      expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /save changes/i })).not.toBeInTheDocument();
-    });
-
-    it("hides the Delete Project danger zone for a viewer", () => {
-      setupViewer();
-      renderAtPath("/projects/proj-1/settings");
-
       expect(screen.queryByRole("button", { name: /delete project/i })).not.toBeInTheDocument();
-      expect(screen.queryByText(/danger zone/i)).not.toBeInTheDocument();
     });
 
-    it("renders the General fields read-only for a viewer", () => {
-      setupViewer();
+    it("redirects a plain project member who is not an owner", () => {
+      mockHasRole.mockReturnValue(false);
+      mockUseProjectMembers.mockReturnValue({ data: [{ id: "pm-1", userId: "user-1", role: "member" }] });
       renderAtPath("/projects/proj-1/settings");
 
-      expect(screen.getByLabelText("Name")).toBeDisabled();
-      expect(screen.getByLabelText("Description")).toBeDisabled();
-      expect(screen.getByLabelText("Repository URL")).toBeDisabled();
+      expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
     });
 
-    it("keeps Save Changes and Delete Project available for a project owner", () => {
+    it("renders the full Settings page for a project owner", () => {
       mockHasRole.mockReturnValue(true);
       renderAtPath("/projects/proj-1/settings");
 
+      expect(screen.getByLabelText("Name")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /save changes/i })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /delete project/i })).toBeInTheDocument();
-      expect(screen.getByLabelText("Name")).toBeEnabled();
     });
   });
 
   describe("Sub-routes", () => {
-    it("renders Members tab at /settings/members for a project member", () => {
-      mockUseProjectMembers.mockReturnValue({ data: [{ id: "pm-1", userId: "user-1", role: "member" }] });
+    it("renders Members tab at /settings/members for a project owner", () => {
+      mockHasRole.mockReturnValue(true);
       renderAtPath("/projects/proj-1/settings/members");
 
       expect(screen.getByText("Members Tab")).toBeInTheDocument();

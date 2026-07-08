@@ -218,28 +218,30 @@ export function ProjectDetail() {
             <p className="text-sm text-muted-foreground">{project.description}</p>
           </div>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon" aria-label="Project actions">
-              <MoreHorizontal className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => navigate(AppRoutes.projects.settings(id || ""))}>
-              <Settings className="mr-2 size-4" />
-              Settings
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <RefreshCw className="mr-2 size-4" />
-              Sync connectors
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive" onClick={handleDelete}>
-              <Trash2 className="mr-2 size-4" />
-              Delete project
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {isProjectOwner && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" aria-label="Project actions">
+                <MoreHorizontal className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => navigate(AppRoutes.projects.settings(id || ""))}>
+                <Settings className="mr-2 size-4" />
+                Settings
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <RefreshCw className="mr-2 size-4" />
+                Sync connectors
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive" onClick={handleDelete}>
+                <Trash2 className="mr-2 size-4" />
+                Delete project
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       {isGitRemoteMissing(project) && (

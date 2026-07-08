@@ -108,12 +108,10 @@ function ProjectGeneralSettingsForm({
   projectId,
   defaultValues,
   serverGitRemoteMissing,
-  canManageProject,
 }: {
   projectId: string;
   defaultValues: GeneralFormData;
   serverGitRemoteMissing: boolean;
-  canManageProject: boolean;
 }) {
   const updateProject = useUpdateProject();
   const deleteProject = useDeleteProject();
@@ -188,7 +186,6 @@ function ProjectGeneralSettingsForm({
               id="proj-name"
               value={formData.name}
               onChange={(e) => handleChange("name", e.target.value)}
-              disabled={!canManageProject}
             />
           </div>
           <div className="space-y-2">
@@ -198,7 +195,6 @@ function ProjectGeneralSettingsForm({
               value={formData.description}
               onChange={(e) => handleChange("description", e.target.value)}
               placeholder="A brief description of this project"
-              disabled={!canManageProject}
             />
           </div>
           <div className="space-y-2">
@@ -208,7 +204,6 @@ function ProjectGeneralSettingsForm({
               value={formData.repository_url}
               onChange={(e) => handleChange("repository_url", e.target.value)}
               placeholder="https://github.com/org/repo"
-              disabled={!canManageProject}
             />
           </div>
           <div className="space-y-2">
@@ -218,7 +213,6 @@ function ProjectGeneralSettingsForm({
               value={formData.git_remote_url}
               onChange={(e) => handleChange("git_remote_url", e.target.value)}
               placeholder="git@github.com:org/repo.git"
-              disabled={!canManageProject}
             />
             <p className="type-caption text-muted-foreground">
               Paste the output of <code className="font-mono">git remote get-url origin</code> from the repository where
@@ -230,7 +224,6 @@ function ProjectGeneralSettingsForm({
               id="proj-active"
               checked={formData.is_active}
               onCheckedChange={(checked) => handleChange("is_active", checked)}
-              disabled={!canManageProject}
             />
             <Label htmlFor="proj-active">Active</Label>
           </div>
@@ -244,53 +237,47 @@ function ProjectGeneralSettingsForm({
         </Alert>
       )}
 
-      {canManageProject && (
-        <div className="flex justify-end">
-          <Button onClick={handleSave} disabled={updateProject.isPending || !hasChanges}>
-            {updateProject.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
-            <Save className="mr-2 size-4" />
-            Save Changes
-          </Button>
-        </div>
-      )}
+      <div className="flex justify-end">
+        <Button onClick={handleSave} disabled={updateProject.isPending || !hasChanges}>
+          {updateProject.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
+          <Save className="mr-2 size-4" />
+          Save Changes
+        </Button>
+      </div>
 
       <ProjectSettingsSection projectId={projectId} />
 
-      {canManageProject && (
-        <>
-          <Separator />
+      <Separator />
 
-          <div>
-            <h2 className="type-h4 text-destructive">Danger Zone</h2>
-            <p className="text-sm text-muted-foreground">
-              Irreversible and destructive actions
-            </p>
-          </div>
+      <div>
+        <h2 className="type-h4 text-destructive">Danger Zone</h2>
+        <p className="text-sm text-muted-foreground">
+          Irreversible and destructive actions
+        </p>
+      </div>
 
-          <Card className="border-destructive/50">
-            <CardHeader>
-              <CardTitle className="type-body-lg">Delete Project</CardTitle>
-              <CardDescription>
-                Once you delete a project, there is no going back. All data associated with this
-                project will be permanently deleted.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {deleteError && (
-                <Alert variant="destructive">
-                  <AlertCircle className="size-4" />
-                  <AlertDescription>{deleteError}</AlertDescription>
-                </Alert>
-              )}
-              <Button variant="destructive" onClick={handleDelete} disabled={deleteProject.isPending}>
-                {deleteProject.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
-                <Trash2 className="mr-2 size-4" />
-                Delete Project
-              </Button>
-            </CardContent>
-          </Card>
-        </>
-      )}
+      <Card className="border-destructive/50">
+        <CardHeader>
+          <CardTitle className="type-body-lg">Delete Project</CardTitle>
+          <CardDescription>
+            Once you delete a project, there is no going back. All data associated with this
+            project will be permanently deleted.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {deleteError && (
+            <Alert variant="destructive">
+              <AlertCircle className="size-4" />
+              <AlertDescription>{deleteError}</AlertDescription>
+            </Alert>
+          )}
+          <Button variant="destructive" onClick={handleDelete} disabled={deleteProject.isPending}>
+            {deleteProject.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
+            <Trash2 className="mr-2 size-4" />
+            Delete Project
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -299,12 +286,10 @@ function ProjectGeneralSettings({
   projectId,
   project,
   isLoading,
-  canManageProject,
 }: {
   projectId: string;
   project: ReturnType<typeof useProject>["data"];
   isLoading: boolean;
-  canManageProject: boolean;
 }) {
   if (isLoading) {
     return (
@@ -335,7 +320,6 @@ function ProjectGeneralSettings({
       projectId={projectId}
       defaultValues={defaultValues}
       serverGitRemoteMissing={serverGitRemoteMissing}
-      canManageProject={canManageProject}
     />
   );
 }
@@ -345,7 +329,7 @@ export function ProjectSettings() {
   const { data: project, isLoading: isLoadingProject } = useProject(id || "");
   const { hasRole } = useOrg();
   const { data: me } = useCurrentUser();
-  const { data: projectMembers = [] } = useProjectMembers(id ?? "");
+  const { data: projectMembers = [], isLoading: isLoadingMembers } = useProjectMembers(id ?? "");
 
   const myMembership = projectMembers.find((m: ProjectMember) => m.userId === me?.id);
   const isProjectOwner = hasRole(["owner"]) || myMembership?.role === "owner";
@@ -353,6 +337,21 @@ export function ProjectSettings() {
   const isMemberOfProject = isProjectOwner || !!myMembership;
 
   if (!id) return null;
+
+  // Project settings management is owner-only (backend ProjectPolicy#settings? == update?).
+  // Wait for project + membership data to resolve, then redirect non-owners away entirely.
+  if (isLoadingProject || isLoadingMembers) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-[300px]" />
+      </div>
+    );
+  }
+
+  if (project && !isProjectOwner) {
+    return <Navigate to={AppRoutes.projects.detail(id)} replace />;
+  }
 
   const orgId = project?.organization_id ?? "";
 
@@ -388,7 +387,7 @@ export function ProjectSettings() {
         </aside>
         <div className="flex-1 min-w-0">
           <Routes>
-            <Route index element={<ProjectGeneralSettings projectId={id} project={project} isLoading={isLoadingProject} canManageProject={isProjectOwner} />} />
+            <Route index element={<ProjectGeneralSettings projectId={id} project={project} isLoading={isLoadingProject} />} />
             <Route
               path="members"
               element={
