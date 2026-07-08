@@ -2749,7 +2749,7 @@ export function useDownloadPersonalExport() {
       });
       const filename = `db90-personal-${params.reportType}-${params.from ?? "all"}-${params.to ?? new Date().toISOString().slice(0, 10)}.${params.format}`;
       const accept = params.format === "csv" ? "text/csv" : "application/json";
-      await downloadBlob(`/api/v1/users/me/exports?${query}`, filename, accept, null);
+      await downloadBlob(`/users/me/exports?${query}`, filename, accept, null);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Download failed";
       setError(msg);
