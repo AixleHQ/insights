@@ -1798,13 +1798,6 @@ CREATE UNIQUE INDEX idx_organization_connectors_webhook_token ON public.organiza
 
 
 --
--- Name: idx_project_connectors_single_instance; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_project_connectors_single_instance ON public.project_connectors USING btree (project_id, connector_type) WHERE (connector_type <> 'slack'::public.connector_type);
-
-
---
 -- Name: idx_repositories_connector_external; Type: INDEX; Schema: public; Owner: -
 --
 
