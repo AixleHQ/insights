@@ -1,12 +1,12 @@
-Scheduled Report: <%= @export.report_type.humanize %>
+Scheduled Report: <%= @report_type_label %>
 
 Hi,
 
-Your scheduled <%= @export.report_type.humanize %> report for <%= @organization.name %> is attached.
+Your scheduled <%= @report_type_label %> report for <%= @organization.name %> is attached.
 
   Format:       <%= @export.format.upcase %>
   Frequency:    <%= @export.frequency.capitalize %>
-  Generated at: <%= Time.current.strftime("%Y-%m-%d %H:%M UTC") %>
+  Generated at: <%= @generated_at.strftime("%Y-%m-%d %H:%M UTC") %>
 
 This is an automated report from Aixle Insights. You are receiving it because you are listed as a
 recipient for this scheduled export.
