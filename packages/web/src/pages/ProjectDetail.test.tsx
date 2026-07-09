@@ -59,6 +59,8 @@ vi.mock("@/hooks/useApi", () => ({
   useRemoveProjectMember: () => ({ mutate: vi.fn(), isPending: false }),
   useOrganizationMembers: () => ({ data: [] }),
   useProjectStats: () => ({ data: undefined, isLoading: false }),
+  useFavoriteProjects: () => ({ data: [] }),
+  useToggleFavorite: () => ({ mutate: vi.fn() }),
 }));
 
 const mockProject = {

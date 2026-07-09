@@ -26,6 +26,7 @@ import {
 } from "@/hooks/useApi";
 
 import { useProjectEventsTab } from "@/hooks/useProjectEventsTab";
+import { useFavorites } from "@/hooks/useFavorites";
 import { formatCost, formatCount } from "@/lib/formatters";
 import { Button } from "@/components/ui/button";
 import {
@@ -66,7 +67,7 @@ import {
 } from "@/components/project";
 import { TabNav } from "@/components/ui/tab-nav";
 import { TabsContent } from "@/components/ui/tabs";
-import { formatDistanceToNow } from "@/lib/utils";
+import { formatDistanceToNow, cn } from "@/lib/utils";
 import { isGitRemoteMissing } from "@/lib/project-git-remote";
 import { AppRoutes } from "@/lib/routes";
 
@@ -131,6 +132,8 @@ export function ProjectDetail() {
   const { data: projectRepositories, isLoading: isLoadingRepositories } = useProjectRepositories(id || "");
   const disconnectRepo = useDisconnectRepo(id || "");
   const deleteProject = useDeleteProject();
+  const { toggleFavorite, favorites } = useFavorites();
+  const isFavorited = favorites.some((f) => f.id === id);
 
   const eventsTab = useProjectEventsTab({
     projectId: id || "",
@@ -219,10 +222,11 @@ export function ProjectDetail() {
           <Button
             variant="ghost"
             size="icon"
-            className="size-7 text-muted-foreground hover:text-warning"
-            aria-label="Favorite project"
+            className={cn("size-7 transition-colors", isFavorited ? "text-warning" : "text-muted-foreground hover:text-warning")}
+            aria-label={isFavorited ? "Remove from favorites" : "Add to favorites"}
+            onClick={() => id && toggleFavorite({ id, name: project.name })}
           >
-            <Star className="size-4" />
+            <Star className={cn("size-4", isFavorited && "fill-current")} />
           </Button>
           {isProjectOwner && (
             <DropdownMenu>
