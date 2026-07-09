@@ -1,14 +1,11 @@
 import { useMemo, useState } from "react";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, MoreHorizontal } from "lucide-react";
 import {
   useProjectConnectors,
   useProjectConnectWithApiKey,
   useProjectDeleteConnector,
-  useProjectTestConnector,
-  useProjectUpdateConnector,
   useOrgProviderSettings,
 } from "@/hooks/useApi";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -20,8 +17,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 import {
-  IntegrationCard,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
+import { ProviderLogo } from "@/components/icons";
+import {
   IntegrationSkeleton,
   type IntegrationData,
   type IntegrationProvider,
@@ -34,19 +39,21 @@ import { SlackConnectSheet } from "@/components/integrations/SlackConnectSheet";
 
 const MULTI_INSTANCE_PROVIDER_IDS = new Set<string>(["slack"]);
 
-const PROVIDERS: ProviderInfo[] = [
+type ProviderCategory = "ai" | "communication" | "code-hosting" | "project-mgmt" | "design";
+
+interface ExtendedProviderInfo extends ProviderInfo {
+  category: ProviderCategory;
+  features: string[];
+}
+
+const PROVIDERS: ExtendedProviderInfo[] = [
   {
     id: "anthropic",
     name: "Anthropic API",
     description: "Track Anthropic API usage, costs, and model analytics",
     category: "ai",
     scope: "project",
-    features: [
-      "API key management",
-      "Usage monitoring",
-      "Cost tracking",
-      "Rate limit visibility",
-    ],
+    features: ["Usage monitoring", "Cost tracking", "Rate limit visibility"],
     available: true,
   },
   {
@@ -55,12 +62,7 @@ const PROVIDERS: ProviderInfo[] = [
     description: "Track OpenAI API usage and costs",
     category: "ai",
     scope: "project",
-    features: [
-      "API usage tracking",
-      "GPT model analytics",
-      "Token consumption",
-      "Cost breakdown",
-    ],
+    features: ["API usage tracking", "Token consumption", "Cost breakdown"],
     available: true,
   },
   {
@@ -69,12 +71,7 @@ const PROVIDERS: ProviderInfo[] = [
     description: "Multi-model AI gateway tracking",
     category: "ai",
     scope: "project",
-    features: [
-      "Multi-provider analytics",
-      "Model comparison",
-      "Cost optimization",
-      "Usage patterns",
-    ],
+    features: ["Multi-provider analytics", "Model comparison", "Cost optimization"],
     available: true,
   },
   {
@@ -83,12 +80,7 @@ const PROVIDERS: ProviderInfo[] = [
     description: "Track Google Gemini API usage and costs",
     category: "ai",
     scope: "project",
-    features: [
-      "API usage tracking",
-      "Model analytics",
-      "Token consumption",
-      "Cost breakdown",
-    ],
+    features: ["API usage tracking", "Model analytics", "Cost breakdown"],
     available: true,
   },
   {
@@ -97,40 +89,110 @@ const PROVIDERS: ProviderInfo[] = [
     description: "Send project alerts and notifications to Slack",
     category: "communication",
     scope: "project",
-    features: [
-      "Cost alerts",
-      "Usage notifications",
-      "Custom channel routing",
-      "Webhook-based delivery",
-    ],
+    features: ["Cost alerts", "Usage notifications", "Custom channel routing"],
     available: true,
     connectSheet: "webhook",
   },
 ];
 
+const CATEGORY_LABELS: Record<string, string> = {
+  all: "All",
+  ai: "AI Tools",
+  communication: "Communication",
+  "code-hosting": "Code Hosting",
+  "project-mgmt": "Project Mgmt",
+  design: "Design",
+};
 
 interface ProjectConnectorsTabProps {
   projectId: string;
   orgId?: string;
 }
 
-// orgId defaults to "" so useOrgProviderSettings is disabled and all providers show (fail-open)
+function ConnectedCard({
+  integration,
+  onDisconnect,
+}: {
+  integration: IntegrationData;
+  onDisconnect?: (id: string) => void;
+}) {
+  const provider = PROVIDERS.find((p) => p.id === integration.provider);
+  const features = provider?.features ?? [];
+
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-card px-4 py-3.5">
+      <ProviderLogo provider={integration.provider} size="md" showBackground />
+      <div className="min-w-0 flex-1">
+        <p className="type-label font-semibold text-foreground">{integration.name}</p>
+        <p className="type-caption text-muted-foreground truncate">
+          {features.join(" · ")}
+        </p>
+      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="size-7 shrink-0 text-muted-foreground hover:text-foreground">
+            <MoreHorizontal className="size-4" />
+            <span className="sr-only">Actions</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem
+            className="text-destructive"
+            onClick={() => onDisconnect?.(integration.id)}
+          >
+            Disconnect
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
+
+function AvailableCard({
+  provider,
+  onConnect,
+}: {
+  provider: ExtendedProviderInfo;
+  onConnect?: (id: string) => void;
+}) {
+  return (
+    <div
+      data-testid={`provider-card-${provider.id}`}
+      className={cn(
+        "flex items-center gap-3 rounded-lg border border-border/60 bg-card px-4 py-3.5",
+        !provider.available && "opacity-60"
+      )}
+    >
+      <ProviderLogo provider={provider.id} size="md" showBackground />
+      <div className="min-w-0 flex-1">
+        <p className="type-label font-semibold text-foreground">{provider.name}</p>
+        <p className="type-caption text-muted-foreground truncate">
+          {provider.features.join(" · ")}
+        </p>
+      </div>
+      <Button
+        size="sm"
+        variant="outline"
+        className="shrink-0"
+        disabled={!provider.available}
+        onClick={() => onConnect?.(provider.id)}
+      >
+        {provider.available ? "Connect" : "Coming Soon"}
+      </Button>
+    </div>
+  );
+}
+
 export function ProjectConnectorsTab({ projectId, orgId = "" }: ProjectConnectorsTabProps) {
   const { data: connectorsData, isLoading } = useProjectConnectors(projectId);
   const { enabledMap } = useOrgProviderSettings(orgId);
   const connectWithApiKey = useProjectConnectWithApiKey();
   const deleteConnector = useProjectDeleteConnector();
-  const testConnector = useProjectTestConnector();
-  const updateConnector = useProjectUpdateConnector();
 
-  const [activeTab, setActiveTab] = useState("connected");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [slackSheetOpen, setSlackSheetOpen] = useState(false);
-  const [connectingProvider, setConnectingProvider] =
-    useState<ProviderInfo | null>(null);
-  const [testingConnectorId, setTestingConnectorId] = useState<string | null>(
-    null,
-  );
+  const [connectingProvider, setConnectingProvider] = useState<ProviderInfo | null>(null);
   const [disconnectingConnectorId, setDisconnectingConnectorId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -139,15 +201,11 @@ export function ProjectConnectorsTab({ projectId, orgId = "" }: ProjectConnector
     return connectorsData.map((c) => {
       const connectorType = c.connectorType || c.connector_type || "anthropic";
       const lastError = c.lastError || c.last_error;
-      const externalAccountName =
-        c.externalAccountName || c.external_account_name;
+      const externalAccountName = c.externalAccountName || c.external_account_name;
       const lastSyncAt = c.lastSyncAt || c.last_sync_at;
       const status: ConnectorStatus = c.status;
       const providerInfo = PROVIDERS.find((p) => p.id === connectorType);
-      // Only show error copy when the connector is actually in error state,
-      // so a stale last_error from a previous attempt does not appear after reconnect.
-      const syncError =
-        status === "error" && lastError ? lastError : undefined;
+      const syncError = status === "error" && lastError ? lastError : undefined;
 
       return {
         id: c.id,
@@ -157,25 +215,30 @@ export function ProjectConnectorsTab({ projectId, orgId = "" }: ProjectConnector
         status,
         last_sync_at: lastSyncAt || undefined,
         sync_error: syncError,
-        metadata: {
-          account_name: externalAccountName || "",
-          resources_count: 0,
-        },
+        metadata: { account_name: externalAccountName || "", resources_count: 0 },
         scope: c.scope as IntegrationScope,
       };
     });
   }, [connectorsData]);
 
   const availableProviders = useMemo(() => {
-    const connectedSingleInstanceIds = new Set(
-      integrations
-        .filter((i) => !MULTI_INSTANCE_PROVIDER_IDS.has(i.provider))
-        .map((i) => i.provider),
+    const connectedSingleIds = new Set(
+      integrations.filter((i) => !MULTI_INSTANCE_PROVIDER_IDS.has(i.provider)).map((i) => i.provider)
     );
     return PROVIDERS.filter(
-      (p) => !connectedSingleInstanceIds.has(p.id) && enabledMap[p.id] !== false,
+      (p) => !connectedSingleIds.has(p.id) && enabledMap[p.id] !== false
     );
   }, [integrations, enabledMap]);
+
+  const availableCategories = useMemo(() => {
+    const cats = new Set(availableProviders.map((p) => p.category));
+    return ["all", ...Array.from(cats)];
+  }, [availableProviders]);
+
+  const filteredAvailable = useMemo(() => {
+    if (categoryFilter === "all") return availableProviders;
+    return availableProviders.filter((p) => p.category === categoryFilter);
+  }, [availableProviders, categoryFilter]);
 
   const handleConnect = (providerId: string) => {
     const provider = PROVIDERS.find((p) => p.id === providerId) ?? null;
@@ -189,15 +252,7 @@ export function ProjectConnectorsTab({ projectId, orgId = "" }: ProjectConnector
 
   const handleConnectWithApiKey = async (apiKey: string) => {
     if (!connectingProvider) return;
-    await connectWithApiKey.mutateAsync({
-      projectId,
-      connectorType: connectingProvider.id,
-      apiKey,
-    });
-  };
-
-  const handleDisconnect = (id: string) => {
-    setDisconnectingConnectorId(id);
+    await connectWithApiKey.mutateAsync({ projectId, connectorType: connectingProvider.id, apiKey });
   };
 
   const handleDisconnectConfirm = async () => {
@@ -212,106 +267,90 @@ export function ProjectConnectorsTab({ projectId, orgId = "" }: ProjectConnector
     }
   };
 
-  const handleTest = async (id: string) => {
-    setTestingConnectorId(id);
-    setActionError(null);
-    try {
-      await testConnector.mutateAsync({ projectId, connectorId: id });
-    } catch {
-      setActionError("Failed to run connection test. Please try again.");
-    } finally {
-      setTestingConnectorId(null);
-    }
-  };
-
-  const handleRename = async (id: string, newLabel: string) => {
-    await updateConnector.mutateAsync({
-      projectId,
-      connectorId: id,
-      data: { label: newLabel },
-    });
-  };
-
   return (
     <>
       {actionError && (
-        <Alert variant="destructive">
+        <Alert variant="destructive" className="mb-4">
           <AlertCircle className="size-4" />
           <AlertDescription>{actionError}</AlertDescription>
         </Alert>
       )}
-      <Tabs
-        value={activeTab}
-        onValueChange={setActiveTab}
-        className="space-y-4"
-      >
-        <TabsList>
-          <TabsTrigger value="connected">
-            Connected ({integrations.length})
-          </TabsTrigger>
-          <TabsTrigger value="available">
-            Available ({availableProviders.length})
-          </TabsTrigger>
-        </TabsList>
 
-        <TabsContent value="connected" className="space-y-4">
-          {isLoading ? (
-            <div className="grid gap-4 md:grid-cols-2">
-              {Array.from({ length: 2 }).map((_, i) => (
-                <IntegrationSkeleton key={i} />
+      <div className="space-y-6">
+        {/* Currently Connected */}
+        {(isLoading || integrations.length > 0) && (
+          <div className="space-y-3">
+            <p className="font-mono-display type-caption font-medium uppercase tracking-wider text-muted-foreground">
+              Currently Connected
+            </p>
+            {isLoading ? (
+              <div className="grid gap-3 md:grid-cols-2">
+                {Array.from({ length: 2 }).map((_, i) => (
+                  <IntegrationSkeleton key={i} />
+                ))}
+              </div>
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2">
+                {integrations.map((integration) => (
+                  <ConnectedCard
+                    key={integration.id}
+                    integration={integration}
+                    onDisconnect={(id) => setDisconnectingConnectorId(id)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Category filter + available providers */}
+        {!isLoading && availableProviders.length > 0 && (
+          <div className="space-y-3">
+            {/* Filter pills */}
+            <div className="flex flex-wrap gap-2">
+              {availableCategories.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setCategoryFilter(cat)}
+                  className={cn(
+                    "rounded-full px-3 py-1 type-caption font-medium transition-colors border",
+                    categoryFilter === cat
+                      ? "bg-foreground text-background border-foreground"
+                      : "bg-transparent text-muted-foreground border-border/60 hover:border-foreground/40 hover:text-foreground"
+                  )}
+                >
+                  {CATEGORY_LABELS[cat] ?? cat}
+                </button>
               ))}
             </div>
-          ) : integrations.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-8">
-              <p className="text-muted-foreground text-sm">
-                No providers connected
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Switch to the Available tab to connect a provider
-              </p>
-            </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              {integrations.map((integration) => (
-                <IntegrationCard
-                  key={integration.id}
-                  integration={integration}
-                  onTest={handleTest}
-                  onRename={handleRename}
-                  onDisconnect={handleDisconnect}
-                  isTesting={testingConnectorId === integration.id}
-                />
-              ))}
-            </div>
-          )}
-        </TabsContent>
 
-        <TabsContent value="available" className="space-y-4">
-          {availableProviders.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-8">
-              <p className="text-muted-foreground text-sm">
-                All providers are connected
-              </p>
-            </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              {availableProviders.map((provider) => (
-                <IntegrationCard
+            {/* Available grid */}
+            <div className="grid gap-3 md:grid-cols-2">
+              {filteredAvailable.map((provider) => (
+                <AvailableCard
                   key={provider.id}
                   provider={provider}
                   onConnect={handleConnect}
                 />
               ))}
             </div>
-          )}
-        </TabsContent>
-      </Tabs>
+          </div>
+        )}
+
+        {/* Empty state — nothing connected, nothing available */}
+        {!isLoading && integrations.length === 0 && availableProviders.length === 0 && (
+          <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12">
+            <p className="type-label text-muted-foreground">All providers are connected</p>
+          </div>
+        )}
+      </div>
 
       <ApiKeyConnectSheet
         provider={connectingProvider}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
-        onSuccess={() => setActiveTab("connected")}
+        onSuccess={() => {}}
         onConnect={handleConnectWithApiKey}
       />
 
@@ -319,7 +358,7 @@ export function ProjectConnectorsTab({ projectId, orgId = "" }: ProjectConnector
         projectId={projectId}
         open={slackSheetOpen}
         onOpenChange={setSlackSheetOpen}
-        onSuccess={() => setActiveTab("connected")}
+        onSuccess={() => {}}
       />
 
       <AlertDialog
@@ -335,9 +374,7 @@ export function ProjectConnectorsTab({ projectId, orgId = "" }: ProjectConnector
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDisconnectConfirm}>
-              Disconnect
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleDisconnectConfirm}>Disconnect</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
