@@ -210,47 +210,45 @@ export function ProjectDetail() {
         <span className="text-foreground">{project.name}</span>
       </div>
 
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="type-h3">{project.name}</h1>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7 text-muted-foreground hover:text-warning"
-              aria-label="Favorite project"
-            >
-              <Star className="size-4" />
-            </Button>
-          </div>
-          {project.description && (
-            <p className="mt-1 type-caption text-muted-foreground max-w-xl">{project.description}</p>
+      <div className="relative">
+        <h1 className="type-h2">{project.name}</h1>
+        {project.description && (
+          <p className="mt-2 type-caption text-muted-foreground max-w-xl">{project.description}</p>
+        )}
+        <div className="absolute right-0 top-0 flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7 text-muted-foreground hover:text-warning"
+            aria-label="Favorite project"
+          >
+            <Star className="size-4" />
+          </Button>
+          {isProjectOwner && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="size-7" aria-label="Project actions">
+                  <MoreHorizontal className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => navigate(AppRoutes.projects.settings(id || ""))}>
+                  <Settings className="mr-2 size-4" />
+                  Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <RefreshCw className="mr-2 size-4" />
+                  Sync connectors
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-destructive" onClick={handleDelete}>
+                  <Trash2 className="mr-2 size-4" />
+                  Delete project
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
-        {isProjectOwner && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" aria-label="Project actions">
-                <MoreHorizontal className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => navigate(AppRoutes.projects.settings(id || ""))}>
-                <Settings className="mr-2 size-4" />
-                Settings
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <RefreshCw className="mr-2 size-4" />
-                Sync connectors
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive" onClick={handleDelete}>
-                <Trash2 className="mr-2 size-4" />
-                Delete project
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
       </div>
 
       {isGitRemoteMissing(project) && (
