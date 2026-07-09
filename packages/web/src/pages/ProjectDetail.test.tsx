@@ -58,6 +58,7 @@ vi.mock("@/hooks/useApi", () => ({
   useUpdateProjectMember: () => ({ mutate: vi.fn(), isPending: false }),
   useRemoveProjectMember: () => ({ mutate: vi.fn(), isPending: false }),
   useOrganizationMembers: () => ({ data: [] }),
+  useProjectStats: () => ({ data: undefined, isLoading: false }),
 }));
 
 const mockProject = {
@@ -136,7 +137,7 @@ describe("ProjectDetail", () => {
   it("renders project name and description", () => {
     render(<ProjectDetail />);
 
-    expect(screen.getByText("My Project")).toBeInTheDocument();
+    expect(screen.getAllByText("My Project").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("A test project")).toBeInTheDocument();
   });
 
@@ -145,16 +146,15 @@ describe("ProjectDetail", () => {
 
     expect(screen.getByText("Total Events")).toBeInTheDocument();
     expect(screen.getByText("Total Cost")).toBeInTheDocument();
-    expect(screen.getByText("Created")).toBeInTheDocument();
-    expect(screen.getByText("Last Activity")).toBeInTheDocument();
-    expect(screen.getAllByText("All-time attributed").length).toBeGreaterThanOrEqual(3);
+    expect(screen.getByText("Total Tokens")).toBeInTheDocument();
+    expect(screen.getByText("Most Used Tool")).toBeInTheDocument();
     expect(screen.getByText("42")).toBeInTheDocument();
     expect(screen.getByText("$12.50")).toBeInTheDocument();
   });
 
   it("shows unavailable placeholders when aggregate fields are absent", () => {
     const projectWithoutAggregates = { ...mockProject };
-    for (const key of ["eventCount", "totalCostUsd", "lastEventAt"] as const) {
+    for (const key of ["eventCount", "totalCostUsd"] as const) {
       Reflect.deleteProperty(projectWithoutAggregates, key);
     }
     mockUseProject.mockReturnValue({
@@ -164,7 +164,7 @@ describe("ProjectDetail", () => {
 
     render(<ProjectDetail />);
 
-    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(3);
+    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(2);
   });
 
   it("renders source control summary when available", () => {
@@ -183,10 +183,10 @@ describe("ProjectDetail", () => {
     expect(screen.getByText("8")).toBeInTheDocument();
   });
 
-  it("renders Leaderboard section on the overview", () => {
+  it("renders repositories section on the overview", () => {
     render(<ProjectDetail />);
 
-    expect(screen.getByText("Leaderboard")).toBeInTheDocument();
+    expect(screen.getByText("Repositories")).toBeInTheDocument();
   });
 
   it("navigates to settings when Settings menu item is clicked", async () => {
@@ -232,22 +232,11 @@ describe("ProjectDetail", () => {
     });
   });
 
-  describe("Active badge", () => {
-    it("shows Active badge for active project", () => {
-      render(<ProjectDetail />);
+  it("renders breadcrumb with Projects link and project name", () => {
+    render(<ProjectDetail />);
 
-      expect(screen.getByText("Active")).toBeInTheDocument();
-    });
-
-    it("shows Inactive badge for inactive project", () => {
-      mockUseProject.mockReturnValue({
-        data: { ...mockProject, isActive: false },
-        isLoading: false,
-      });
-      render(<ProjectDetail />);
-
-      expect(screen.getByText("Inactive")).toBeInTheDocument();
-    });
+    expect(screen.getByRole("link", { name: "Projects" })).toBeInTheDocument();
+    expect(screen.getAllByText("My Project").length).toBeGreaterThanOrEqual(1);
   });
 
   describe("Tab navigation", () => {
