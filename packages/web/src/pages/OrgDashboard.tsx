@@ -339,6 +339,7 @@ export function OrgDashboard() {
             orgId={orgId}
             days={toolInsightsDays}
             onDaysChange={setToolInsightsDays}
+            projectId={selectedProjectId}
           />
 
           <EventDrawer

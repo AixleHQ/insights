@@ -13,6 +13,7 @@ module Api
 
       before_action :require_organization!
       before_action :set_tool_scope, only: TOOL_SCOPED_ACTIONS
+      after_action :no_store_tool_stats!, only: TOOL_SCOPED_ACTIONS
 
       # GET /api/v1/organizations/:organization_id/stats/overview
       # Optional param: project_id — scopes all counts to that project
@@ -581,7 +582,19 @@ module Api
         @tool_name = tool
         # @tool_events is intentionally unbounded — always scope by time range before querying.
         # Use: @tool_events.where(occurred_at: time_range[:start]..time_range[:end])
-        @tool_events = current_organization.tool_events.where(tool_name: tool)
+        # Routed through scoped_events_base so the optional project_id filter (incl. "none")
+        # applies to every per-tab tool endpoint (AIX-524). Cross-org project_id raises
+        # RecordNotFound (→ 404), consistent with the other stats endpoints.
+        # NOTE: active_tools (the tab list) is deliberately NOT scoped — the tabs stay
+        # independent of the dashboard project filter per the ticket.
+        @tool_events = scoped_events_base.where(tool_name: tool)
+      end
+
+      # QA (AIX-524) reported project-scoped stats appearing stale/incorrect on
+      # staging in a way the underlying scoping logic couldn't reproduce locally.
+      # Disable any intermediate caching of these responses defensively.
+      def no_store_tool_stats!
+        response.headers["Cache-Control"] = "no-store"
       end
 
       def parse_time_range(default_days: 7, default_hours: nil)

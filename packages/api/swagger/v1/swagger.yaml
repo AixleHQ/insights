@@ -2578,7 +2578,7 @@ paths:
   /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/overview:
     get:
       summary: Tool overview stats
-      description: Returns aggregate usage stats (events, cost, tokens, active users) for a specific tool. Returns 422 if tool_name is not a recognised value.
+      description: Returns aggregate usage stats (events, cost, tokens, active users) for a specific tool. Returns 422 if tool_name is not a recognised value. Pass project_id to scope to a single project (or "none" for unattributed events).
       tags:
         - Stats
       parameters:
@@ -2593,6 +2593,13 @@ paths:
             enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github, gitlab]
         - $ref: '#/components/parameters/start_date'
         - $ref: '#/components/parameters/end_date'
+        - name: project_id
+          in: query
+          description: >
+            UUID of a specific project, or "none" to filter for events with no project assigned.
+            Omit or leave blank for all activity (org-wide total).
+          schema:
+            type: string
       responses:
         '200':
           description: Tool overview stats for the current month vs previous month
@@ -2638,7 +2645,7 @@ paths:
   /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/models:
     get:
       summary: Tool model breakdown
-      description: Returns per-model usage aggregates (event count, tokens, cost) enriched with pricing data. Sorted by eventCount descending. Null-model events are excluded. Defaults to the last 30 days; pass days or start_date/end_date to override.
+      description: Returns per-model usage aggregates (event count, tokens, cost) enriched with pricing data. Sorted by eventCount descending. Null-model events are excluded. Defaults to the last 30 days; pass days or start_date/end_date to override. Pass project_id to scope to a single project (or "none" for unattributed events).
       tags:
         - Stats
       parameters:
@@ -2659,6 +2666,13 @@ paths:
             default: 30
         - $ref: '#/components/parameters/start_date'
         - $ref: '#/components/parameters/end_date'
+        - name: project_id
+          in: query
+          description: >
+            UUID of a specific project, or "none" to filter for events with no project assigned.
+            Omit or leave blank for all activity (org-wide total).
+          schema:
+            type: string
       responses:
         '200':
           description: Model breakdown for the tool
@@ -2717,7 +2731,7 @@ paths:
   /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/users:
     get:
       summary: Tool user breakdown
-      description: Returns top users by token consumption for a specific tool, sorted by totalTokens descending. Events without a user_id are excluded.
+      description: Returns top users by token consumption for a specific tool, sorted by totalTokens descending. Events without a user_id are excluded. Pass project_id to scope to a single project (or "none" for unattributed events).
       tags:
         - Stats
       parameters:
@@ -2748,6 +2762,13 @@ paths:
             default: 20
             minimum: 1
             maximum: 100
+        - name: project_id
+          in: query
+          description: >
+            UUID of a specific project, or "none" to filter for events with no project assigned.
+            Omit or leave blank for all activity (org-wide total).
+          schema:
+            type: string
       responses:
         '200':
           description: User breakdown sorted by totalTokens descending
@@ -2803,7 +2824,7 @@ paths:
   /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/daily:
     get:
       summary: Tool daily stats
-      description: Returns event counts, tokens, and cost bucketed by the requested granularity (day/week/month) for a specific tool. Every bucket in the range has an entry — buckets with no events are zero-filled.
+      description: Returns event counts, tokens, and cost bucketed by the requested granularity (day/week/month) for a specific tool. Every bucket in the range has an entry — buckets with no events are zero-filled. Pass project_id to scope to a single project (or "none" for unattributed events).
       tags:
         - Stats
       parameters:
@@ -2833,6 +2854,13 @@ paths:
             enum: [day, week, month]
             default: day
         - $ref: '#/components/parameters/tz'
+        - name: project_id
+          in: query
+          description: >
+            UUID of a specific project, or "none" to filter for events with no project assigned.
+            Omit or leave blank for all activity (org-wide total).
+          schema:
+            type: string
       responses:
         '200':
           description: Bucketed trend data with zero-filled gaps
@@ -2890,7 +2918,7 @@ paths:
   /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/event_types:
     get:
       summary: Tool event type breakdown
-      description: Returns per-event-type usage aggregates (event count, tokens, cost) for a specific tool. Sorted by eventCount descending. Defaults to the last 30 days; pass days or start_date/end_date to override.
+      description: Returns per-event-type usage aggregates (event count, tokens, cost) for a specific tool. Sorted by eventCount descending. Defaults to the last 30 days; pass days or start_date/end_date to override. Pass project_id to scope to a single project (or "none" for unattributed events).
       tags:
         - Stats
       parameters:
@@ -2912,6 +2940,13 @@ paths:
           schema:
             type: integer
             default: 30
+        - name: project_id
+          in: query
+          description: >
+            UUID of a specific project, or "none" to filter for events with no project assigned.
+            Omit or leave blank for all activity (org-wide total).
+          schema:
+            type: string
       responses:
         '200':
           description: Event type breakdown sorted by eventCount descending

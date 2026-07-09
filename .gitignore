@@ -73,3 +73,6 @@ packages/tools/db90-telemetry-mcp/LOCAL-DEV.es.md
 
 # Repo-local AWS SSO config (never commit credentials)
 .aws/
+
+# In-repo planning docs — keep out of feature PRs (AIX-524)
+/plans
