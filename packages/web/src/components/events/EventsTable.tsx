@@ -12,7 +12,7 @@ import { SortButton, type SortDirection } from "@/components/ui/sort-button";
 import { RiskBadge } from "@/components/ui/risk-badge";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { normalizeRiskLevel } from "@/lib/riskLevel";
-import { EventTypeBadge } from "@/components/ui/event-type-badge";
+import { labelForEventType } from "@/lib/eventTypes";
 import { humanizeToolName, cn } from "@/lib/utils";
 import {
   formatCost as formatCostValue,
@@ -38,6 +38,18 @@ export interface EventRow {
 }
 
 type SortField = "created_at" | "tool_name" | "risk_level" | "cost_usd";
+
+function EventTypeBadge({ type }: { type?: string | null }) {
+  if (!type) {
+    return <span className="type-caption text-muted-foreground">—</span>;
+  }
+
+  return (
+    <span className="inline-flex items-center rounded-full border border-foreground/10 bg-foreground/5 px-[7px] py-[3px] text-xs font-medium text-foreground">
+      {labelForEventType(type)}
+    </span>
+  );
+}
 
 interface EventsTableProps {
   events: EventRow[];
