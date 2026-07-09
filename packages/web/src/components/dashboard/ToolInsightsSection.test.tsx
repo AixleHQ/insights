@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@/test/utils";
+import { render, screen, fireEvent, waitFor } from "@/test/utils";
+import { QueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { ToolInsightsSection } from "./ToolInsightsSection";
 import type {
   ToolModelsResponse,
@@ -7,6 +9,10 @@ import type {
   ToolDailyResponse,
   ToolEventTypesResponse,
 } from "@/lib/types";
+
+vi.mock("sonner", () => ({
+  toast: { error: vi.fn(), success: vi.fn() },
+}));
 
 vi.mock("recharts", () => ({
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => (
@@ -301,5 +307,33 @@ describe("ToolInsightsSection", () => {
 
     expect(mockUseActiveTools).toHaveBeenCalledWith("org-123");
     expect(mockUseToolDaily).toHaveBeenCalledWith("org-123", "cursor", 30, "day", undefined);
+  });
+
+  it("still invalidates stats queries and shows an error toast when connector sync fails", async () => {
+    mockUseActiveTools.mockReturnValue(
+      makeActiveTools([{ tool_name: "openrouter_api", total_events: 10 }]) as never
+    );
+    setupDefaults();
+    mockUseConnectors.mockReturnValue({
+      data: [{ id: "conn-1", connectorType: "openrouter", isActive: true, status: "connected" }],
+      isLoading: false,
+    } as never);
+    const mockSyncConnector = vi.fn().mockRejectedValue(new Error("sync failed"));
+    mockUseSyncConnector.mockReturnValue({ mutateAsync: mockSyncConnector, isPending: false } as never);
+
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+
+    render(<ToolInsightsSection {...defaultProps} />);
+    fireEvent.click(screen.getByRole("button", { name: /Refresh Now/i }));
+
+    await waitFor(() => expect(mockSyncConnector).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          queryKey: ["organizations", "org-123", "stats", "tools", "openrouter_api"],
+        })
+      )
+    );
+    expect(toast.error).toHaveBeenCalled();
   });
 });

@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/chart";
 import type { ChartConfig } from "@/components/ui/chart";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Activity, DollarSign, Coins, Users, RefreshCw, LayoutGrid } from "lucide-react";
 import { formatCost, formatTokens, formatCount } from "@/lib/formatters";
 import {
@@ -405,10 +406,14 @@ export function ToolInsightsSection({ orgId, days, onDaysChange, projectId }: To
           return type === connectorType && active;
         });
         if (connector) {
-          await syncConnector({ orgId, connectorId: connector.id });
+          try {
+            await syncConnector({ orgId, connectorId: connector.id });
+          } catch {
+            toast.error("Connector sync failed — showing last-fetched stats.");
+          }
         }
       }
-      queryClient.invalidateQueries({
+      await queryClient.invalidateQueries({
         queryKey: ["organizations", orgId, "stats", "tools", resolvedTab],
       });
     } finally {
