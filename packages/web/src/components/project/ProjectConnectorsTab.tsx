@@ -33,20 +33,14 @@ import {
   type IntegrationScope,
   type ProviderInfo,
 } from "@/components/integrations";
+import { categoryLabels } from "@/lib/providers";
 import type { ConnectorStatus } from "@/lib/types";
 import { ApiKeyConnectSheet } from "@/components/integrations/ApiKeyConnectSheet";
 import { SlackConnectSheet } from "@/components/integrations/SlackConnectSheet";
 
 const MULTI_INSTANCE_PROVIDER_IDS = new Set<string>(["slack"]);
 
-type ProviderCategory = "ai" | "communication" | "code-hosting" | "project-mgmt" | "design";
-
-interface ExtendedProviderInfo extends ProviderInfo {
-  category: ProviderCategory;
-  features: string[];
-}
-
-const PROVIDERS: ExtendedProviderInfo[] = [
+const PROVIDERS: ProviderInfo[] = [
   {
     id: "anthropic",
     name: "Anthropic API",
@@ -95,14 +89,7 @@ const PROVIDERS: ExtendedProviderInfo[] = [
   },
 ];
 
-const CATEGORY_LABELS: Record<string, string> = {
-  all: "All",
-  ai: "AI Tools",
-  communication: "Communication",
-  "code-hosting": "Code Hosting",
-  "project-mgmt": "Project Mgmt",
-  design: "Design",
-};
+const CATEGORY_LABELS: Record<string, string> = { all: "All", ...categoryLabels };
 
 interface ProjectConnectorsTabProps {
   projectId: string;
@@ -152,7 +139,7 @@ function AvailableCard({
   provider,
   onConnect,
 }: {
-  provider: ExtendedProviderInfo;
+  provider: ProviderInfo;
   onConnect?: (id: string) => void;
 }) {
   return (
