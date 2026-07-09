@@ -12,7 +12,7 @@ import { SortButton, type SortDirection } from "@/components/ui/sort-button";
 import { RiskBadge } from "@/components/ui/risk-badge";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { normalizeRiskLevel } from "@/lib/riskLevel";
-import { labelForEventType } from "@/lib/eventTypes";
+import { getEventTypeMeta } from "@/lib/event-types";
 import { humanizeToolName, cn } from "@/lib/utils";
 import {
   formatCost as formatCostValue,
@@ -44,9 +44,10 @@ function EventTypeBadge({ type }: { type?: string | null }) {
     return <span className="type-caption text-muted-foreground">—</span>;
   }
 
+  const meta = getEventTypeMeta(type);
   return (
     <span className="inline-flex items-center rounded-full border border-foreground/10 bg-foreground/5 px-[7px] py-[3px] text-xs font-medium text-foreground">
-      {labelForEventType(type)}
+      {meta.label}
     </span>
   );
 }
