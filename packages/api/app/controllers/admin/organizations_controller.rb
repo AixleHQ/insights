@@ -16,16 +16,18 @@ module Admin
       return redirect_to(admin_organizations_path) if ids.empty?
 
       orgs = Organization.where(id: ids)
-      orgs.each do |org|
+      destroyed, skipped = orgs.partition do |org|
+        success = org.destroy
         AdminAuditLog.log_action(
           admin_user:      current_admin_user,
           action:          "batch_delete",
           resource:        org,
           tracked_changes: { name: org.name, slug: org.slug },
-          request:         request
+          request:         request,
+          outcome:         success ? "success" : "failure"
         )
+        success
       end
-      destroyed, skipped = orgs.partition { |org| org.destroy }
       notice = "Successfully deleted #{destroyed.size} organizations."
       notice += " #{skipped.size} could not be deleted: #{skipped.map { |o| "#{o.name} (#{o.errors.full_messages.join(', ')})" }.join('; ')}." if skipped.any?
       redirect_to admin_organizations_path, notice: notice
