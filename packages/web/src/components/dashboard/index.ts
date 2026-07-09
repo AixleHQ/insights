@@ -14,5 +14,6 @@ export { ToolModelTable } from "./ToolModelTable";
 export { ToolUsersTable } from "./ToolUsersTable";
 export { ToolEventTypesTable } from "./ToolEventTypesTable";
 export { WeeklyToolUsageChart } from "./WeeklyToolUsageChart";
+export { ToolUsageByDayChart } from "./ToolUsageByDayChart";
 export { RiskAlertsTable } from "./RiskAlertsTable";
 export { PromptInsightsSection } from "./PromptInsightsSection";
