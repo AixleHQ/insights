@@ -325,8 +325,8 @@ export function ProjectConnectorsTab({ projectId, orgId = "" }: ProjectConnector
           </div>
         )}
 
-        {/* Empty state — nothing connected, nothing available */}
-        {!isLoading && integrations.length === 0 && availableProviders.length === 0 && (
+        {/* Empty state — nothing available to connect */}
+        {!isLoading && availableProviders.length === 0 && integrations.length === 0 && (
           <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12">
             <p className="type-label text-muted-foreground">All providers are connected</p>
           </div>
