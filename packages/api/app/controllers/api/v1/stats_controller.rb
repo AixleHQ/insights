@@ -13,6 +13,7 @@ module Api
 
       before_action :require_organization!
       before_action :set_tool_scope, only: TOOL_SCOPED_ACTIONS
+      after_action :no_store_tool_stats!, only: TOOL_SCOPED_ACTIONS
 
       # GET /api/v1/organizations/:organization_id/stats/overview
       # Optional param: project_id — scopes all counts to that project
@@ -587,6 +588,13 @@ module Api
         # NOTE: active_tools (the tab list) is deliberately NOT scoped — the tabs stay
         # independent of the dashboard project filter per the ticket.
         @tool_events = scoped_events_base.where(tool_name: tool)
+      end
+
+      # QA (AIX-524) reported project-scoped stats appearing stale/incorrect on
+      # staging in a way the underlying scoping logic couldn't reproduce locally.
+      # Disable any intermediate caching of these responses defensively.
+      def no_store_tool_stats!
+        response.headers["Cache-Control"] = "no-store"
       end
 
       def parse_time_range(default_days: 7, default_hours: nil)
