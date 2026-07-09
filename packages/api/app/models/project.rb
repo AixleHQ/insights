@@ -9,6 +9,7 @@ class Project < ApplicationRecord
   has_many :project_audit_logs, dependent: :destroy
   has_many :tool_events, class_name: "ToolEvent", dependent: :restrict_with_error
   has_many :issues, dependent: :destroy
+  has_many :retention_purge_logs, dependent: :restrict_with_error
   has_one :retention_policy, class_name: "ProjectRetentionPolicy", dependent: :destroy
 
   validates :name, presence: true

@@ -1,6 +1,10 @@
 require 'rails_helper'
 
 RSpec.describe Project, type: :model do
+  describe 'associations' do
+    it { should have_many(:retention_purge_logs).dependent(:restrict_with_error) }
+  end
+
   describe '.normalize_git_remote' do
     it 'returns nil for blank input' do
       expect(described_class.normalize_git_remote(nil)).to be_nil

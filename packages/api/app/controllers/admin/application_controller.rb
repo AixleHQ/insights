@@ -27,6 +27,21 @@ module Admin
       end
     end
 
+    # Overrides Administrate's default so a blocked delete always shows a reason.
+    # requested_resource.errors can be empty when a *nested* association (e.g. a
+    # project's tool_events) is what blocked the destroy — the restrict_with_error
+    # failure is recorded on that nested record, not on requested_resource itself.
+    def destroy
+      if requested_resource.destroy
+        flash[:notice] = translate_with_resource("destroy.success")
+      else
+        messages = requested_resource.errors.full_messages
+        messages = [ "Cannot delete #{resource_name.to_s.humanize.downcase}: it has related records that could not be removed." ] if messages.empty?
+        flash[:error] = messages.join("<br/>")
+      end
+      redirect_to after_resource_destroyed_path(requested_resource), status: :see_other
+    end
+
     private
 
     def authenticate_admin!

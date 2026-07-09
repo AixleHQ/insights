@@ -158,6 +158,29 @@ RSpec.describe 'Admin Users', type: :request do
     end
   end
 
+  describe 'DELETE /admin/users/:id' do
+    it 'destroys the user' do
+      user_id = user.id
+
+      delete admin_user_path(user)
+
+      expect(response).to redirect_to(admin_users_path)
+      expect(User.find_by(id: user_id)).to be_nil
+    end
+
+    context 'when the user is assigned to a Jira-synced issue' do
+      it 'nullifies the assignee instead of raising a foreign key violation' do
+        issue = create(:issue, :with_assignee, assignee: user)
+
+        delete admin_user_path(user)
+
+        expect(response).to redirect_to(admin_users_path)
+        expect(User.find_by(id: user.id)).to be_nil
+        expect(issue.reload.assignee_id).to be_nil
+      end
+    end
+  end
+
   describe 'GET /admin/users/export' do
     it 'exports users as CSV' do
       create_list(:user, 3)
