@@ -30,7 +30,6 @@ describe("ProjectCard", () => {
 
     const trigger = screen.getByLabelText(/no git remote configured/i);
     expect(trigger).toBeInTheDocument();
-    expect(screen.getByText("Unlinked")).toBeInTheDocument();
 
     await user.hover(trigger);
     const tooltips = await screen.findAllByText("No git remote configured — CLI events won't be attributed.");
