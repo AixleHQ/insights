@@ -78,14 +78,15 @@ export function EventsTable({
   showUserColumn = false,
   className,
 }: EventsTableProps) {
-  const columnCount = showUserColumn ? 9 : 8;
+  // Tool, Type, Risk, User (optional), Time, Cost, Tokens
+  const columnCount = showUserColumn ? 7 : 6;
 
   return (
-    <div className={cn("rounded-md border overflow-x-auto", className)}>
-      <Table className="min-w-[800px]">
+    <div className={cn("overflow-x-auto", className)}>
+      <Table className="min-w-[700px]">
         <TableHeader>
-          <TableRow>
-            <TableHead className="w-[160px]">
+          <TableRow className="border-b border-border/50">
+            <TableHead className="w-[180px] text-muted-foreground type-caption font-medium uppercase tracking-wider">
               <SortButton
                 field="tool_name"
                 currentField={sortField}
@@ -95,11 +96,8 @@ export function EventsTable({
                 Tool
               </SortButton>
             </TableHead>
-            <TableHead className="hidden sm:table-cell w-[120px]">Type</TableHead>
-            <TableHead className="hidden sm:table-cell w-[140px]">Model</TableHead>
-            {showUserColumn && <TableHead className="w-[160px]">User</TableHead>}
-            <TableHead className="w-[160px]">Project</TableHead>
-            <TableHead className="w-[90px]">
+            <TableHead className="w-[120px] text-muted-foreground type-caption font-medium uppercase tracking-wider">Type</TableHead>
+            <TableHead className="w-[110px] text-muted-foreground type-caption font-medium uppercase tracking-wider">
               <SortButton
                 field="risk_level"
                 currentField={sortField}
@@ -109,7 +107,10 @@ export function EventsTable({
                 Risk
               </SortButton>
             </TableHead>
-            <TableHead className="w-[120px]">
+            {showUserColumn && (
+              <TableHead className="w-[220px] text-muted-foreground type-caption font-medium uppercase tracking-wider">User</TableHead>
+            )}
+            <TableHead className="w-[100px] text-muted-foreground type-caption font-medium uppercase tracking-wider">
               <SortButton
                 field="created_at"
                 currentField={sortField}
@@ -119,8 +120,7 @@ export function EventsTable({
                 Time
               </SortButton>
             </TableHead>
-            <TableHead className="hidden sm:table-cell w-[100px]">Tokens</TableHead>
-            <TableHead className="w-[100px]">
+            <TableHead className="w-[90px] text-right text-muted-foreground type-caption font-medium uppercase tracking-wider">
               <SortButton
                 field="cost_usd"
                 currentField={sortField}
@@ -130,6 +130,7 @@ export function EventsTable({
                 Cost
               </SortButton>
             </TableHead>
+            <TableHead className="w-[80px] text-right text-muted-foreground type-caption font-medium uppercase tracking-wider">Tokens</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -159,23 +160,21 @@ export function EventsTable({
               <TableRow
                 key={event.id}
                 className={cn(
-                  "group cursor-pointer hover:bg-muted/50 transition-colors",
-                  selectedEventId === event.id && "bg-muted"
+                  "group cursor-pointer border-b border-border/30 transition-colors hover:bg-muted/30",
+                  selectedEventId === event.id && "bg-muted/50"
                 )}
                 onClick={() => onEventClick?.(event.id)}
               >
                 <TableCell>
-                  <span className="font-medium text-sm">
+                  <span className="type-label font-semibold text-foreground">
                     {humanizeToolName(event.tool_name)}
                   </span>
                 </TableCell>
-                <TableCell className="hidden sm:table-cell">
+                <TableCell>
                   <EventTypeBadge type={event.event_type} />
                 </TableCell>
-                <TableCell className="hidden sm:table-cell">
-                  <span className="font-mono text-sm">
-                    {event.model && event.model !== "unknown" ? event.model : "—"}
-                  </span>
+                <TableCell>
+                  <RiskBadge level={normalizeRiskLevel(event.risk_level)} />
                 </TableCell>
                 {showUserColumn && (
                   <TableCell>
@@ -184,34 +183,26 @@ export function EventsTable({
                     ) : event.suggested_user ? (
                       <UserAvatar name={event.suggested_user.name} email={event.suggested_user.email} avatarUrl={event.suggested_user.avatarUrl} suggested />
                     ) : event.attribution && event.attribution !== "unknown" ? (
-                      <span className="text-sm text-muted-foreground">{getEventActorLabel({ attribution: event.attribution })}</span>
+                      <span className="type-caption text-muted-foreground">{getEventActorLabel({ attribution: event.attribution })}</span>
                     ) : (
-                      <span className="text-sm text-muted-foreground">—</span>
+                      <span className="type-caption text-muted-foreground">—</span>
                     )}
                   </TableCell>
                 )}
-                <TableCell>
-                  <span className="text-sm truncate max-w-[160px] block">
-                    {event.project?.name || "-"}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <RiskBadge level={normalizeRiskLevel(event.risk_level)} />
-                </TableCell>
                 <TableCell>
                   <EventTimeCell
                     toolName={event.tool_name}
                     occurredAt={event.created_at}
                   />
                 </TableCell>
-                <TableCell className="hidden sm:table-cell">
-                  <span className="text-sm">
-                    {formatTokenCount(event.token_count)}
+                <TableCell className="text-right">
+                  <span className="font-mono-display type-label font-semibold tabular-nums text-foreground">
+                    {formatCost(event.cost_usd)}
                   </span>
                 </TableCell>
-                <TableCell>
-                  <span className="text-sm">
-                    {formatCost(event.cost_usd)}
+                <TableCell className="text-right">
+                  <span className="font-mono-display type-caption tabular-nums text-muted-foreground">
+                    {formatTokenCount(event.token_count)}
                   </span>
                 </TableCell>
               </TableRow>
