@@ -190,6 +190,7 @@ describe("ProjectDetail", () => {
   });
 
   it("navigates to settings when Settings menu item is clicked", async () => {
+    mockHasRole.mockReturnValue(true);
     const user = userEvent.setup();
     render(<ProjectDetail />);
 
@@ -197,6 +198,38 @@ describe("ProjectDetail", () => {
     await user.click(screen.getByText("Settings"));
 
     expect(mockNavigate).toHaveBeenCalledWith("/projects/proj-1/settings");
+  });
+
+  describe("Project actions menu (AIX-501)", () => {
+    it("hides the actions menu for a viewer / non-owner", () => {
+      // Default: hasRole false, current user is not an owner member.
+      render(<ProjectDetail />);
+
+      expect(screen.queryByRole("button", { name: /project actions/i })).not.toBeInTheDocument();
+    });
+
+    it("hides the actions menu for a plain project member who is not an owner", () => {
+      // user-2 is in mockMembers with role "member" (not owner), hasRole returns false.
+      mockUseCurrentUser.mockReturnValue({ data: { id: "user-2", globalAdmin: false }, isLoading: false });
+      render(<ProjectDetail />);
+
+      expect(screen.queryByRole("button", { name: /project actions/i })).not.toBeInTheDocument();
+    });
+
+    it("shows the actions menu for an org owner", () => {
+      mockHasRole.mockReturnValue(true);
+      render(<ProjectDetail />);
+
+      expect(screen.getByRole("button", { name: /project actions/i })).toBeInTheDocument();
+    });
+
+    it("shows the actions menu for a project owner member", () => {
+      // user-1 is in mockMembers with role "owner".
+      mockUseCurrentUser.mockReturnValue({ data: { id: "user-1", globalAdmin: false }, isLoading: false });
+      render(<ProjectDetail />);
+
+      expect(screen.getByRole("button", { name: /project actions/i })).toBeInTheDocument();
+    });
   });
 
   describe("Active badge", () => {
