@@ -118,6 +118,15 @@ export function OrgDashboard() {
   const orgId = currentOrg?.id || "";
   const isAllTime = selectedPeriod.type === "all_time";
 
+  // AIX-530: selectedProjectId belongs to whichever org it was picked under.
+  // Switching orgs must clear it, or dashboard requests keep scoping to a
+  // project that doesn't belong to the newly selected org, causing 404s.
+  const [prevOrgId, setPrevOrgId] = useState(orgId);
+  if (orgId !== prevOrgId) {
+    setPrevOrgId(orgId);
+    setSelectedProjectId(undefined);
+  }
+
   const { data: stats, isLoading: isLoadingStats, isError: isErrorStats, refetch: refetchStats } = useOverviewStats(orgId, selectedProjectId, selectedPeriod);
   // Active Members is intentionally pinned to a rolling window, not the month selector.
   const { data: activeUsersData } = useActiveUsers(orgId, selectedProjectId, ACTIVE_USERS_WINDOW_DAYS);
