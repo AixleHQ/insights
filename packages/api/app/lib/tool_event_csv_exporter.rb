@@ -91,7 +91,7 @@ module ToolEventCsvExporter
   end
 
   def self.risk_level_for(event)
-    event.metadata&.dig("risk_level") || "none"
+    event.canonical_risk_level
   end
 
   # Neutralises CSV formula-injection for values that may contain arbitrary

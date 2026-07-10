@@ -17,7 +17,7 @@ module ToolEventAttributes
     end
 
     attribute :risk_level do |event|
-      event.metadata&.dig("risk_level") || "none"
+      event.canonical_risk_level
     end
 
     attribute :attribution do |event|

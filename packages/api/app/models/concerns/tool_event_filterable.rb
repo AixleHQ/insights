@@ -40,79 +40,36 @@ module ToolEventFilterable
     scope
   end
 
+  # Same audit_logs-first, metadata-fallback precedence as ToolEvent#canonical_risk_level,
+  # expressed as SQL so filtering can never disagree with what the UI displays. A tool_event
+  # can accumulate multiple audit_logs over time (re-scans), so this must key off the single
+  # latest one by created_at rather than an EXISTS check across all of an event's history --
+  # otherwise an event whose latest scan is "critical" could still match a "medium" filter
+  # because some earlier scan happened to be "medium" (AIX-464).
+  CANONICAL_RISK_LEVEL_SQL = <<~SQL.freeze
+    COALESCE(
+      (
+        SELECT audit_logs.risk_level::text FROM audit_logs
+        WHERE audit_logs.tool_event_id = tool_events.id
+        ORDER BY audit_logs.created_at DESC
+        LIMIT 1
+      ),
+      tool_events.metadata->>'risk_level',
+      'none'
+    )
+  SQL
+
   def apply_tool_event_risk_level_filter(scope, risk_level)
     return scope if risk_level.blank?
 
     levels = normalize_string_array(risk_level)
     return scope if levels.empty?
 
-    # All risk-level conditions prefer the canonical audit_log classification (written
-    # by the Temporal workflow) and fall back to tool_events.metadata for events that
-    # bypassed Temporal. This mirrors risky_event_condition in StatsController so that
-    # the Events filter and the Risk Alerts dashboard count the same events.
     if levels.include?("not_none")
-      return scope.where(<<~SQL)
-        (
-          EXISTS (
-            SELECT 1 FROM audit_logs
-            WHERE audit_logs.tool_event_id = tool_events.id
-              AND audit_logs.risk_level NOT IN ('none')
-          )
-          OR (
-            NOT EXISTS (SELECT 1 FROM audit_logs WHERE audit_logs.tool_event_id = tool_events.id)
-            AND tool_events.metadata->>'risk_level' IS NOT NULL
-            AND tool_events.metadata->>'risk_level' NOT IN ('none', '')
-          )
-        )
-      SQL
+      return scope.where("(#{CANONICAL_RISK_LEVEL_SQL}) NOT IN ('none')")
     end
 
-    none_selected = levels.include?("none")
-    explicit      = levels.reject { |l| l == "none" }
-
-    result = nil
-
-    if explicit.any?
-      result = scope.where(<<~SQL, explicit, explicit)
-        (
-          EXISTS (
-            SELECT 1 FROM audit_logs
-            WHERE audit_logs.tool_event_id = tool_events.id
-              AND audit_logs.risk_level IN (?)
-          )
-          OR (
-            NOT EXISTS (SELECT 1 FROM audit_logs WHERE audit_logs.tool_event_id = tool_events.id)
-            AND tool_events.metadata->>'risk_level' IN (?)
-          )
-        )
-      SQL
-    end
-
-    if none_selected
-      none_scope = scope.where(<<~SQL)
-        (
-          EXISTS (
-            SELECT 1 FROM audit_logs
-            WHERE audit_logs.tool_event_id = tool_events.id
-              AND audit_logs.risk_level = 'none'
-          )
-          OR (
-            NOT EXISTS (
-              SELECT 1 FROM audit_logs
-              WHERE audit_logs.tool_event_id = tool_events.id
-                AND audit_logs.risk_level NOT IN ('none')
-            )
-            AND (
-              tool_events.metadata->>'risk_level' IS NULL
-              OR tool_events.metadata->>'risk_level' IN ('none', '')
-            )
-          )
-        )
-      SQL
-      result = result ? result.or(none_scope) : none_scope
-    end
-
-    result || scope
+    scope.where("(#{CANONICAL_RISK_LEVEL_SQL}) IN (?)", levels)
   end
 
   private
