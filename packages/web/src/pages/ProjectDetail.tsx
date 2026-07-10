@@ -67,7 +67,7 @@ import {
 } from "@/components/project";
 import { TabNav } from "@/components/ui/tab-nav";
 import { TabsContent } from "@/components/ui/tabs";
-import { formatDistanceToNow, cn } from "@/lib/utils";
+import { formatDistanceToNow, cn, humanizeToolName } from "@/lib/utils";
 import { isGitRemoteMissing } from "@/lib/project-git-remote";
 import { AppRoutes } from "@/lib/routes";
 
@@ -321,7 +321,7 @@ export function ProjectDetail() {
             />
             <StatCard
               label="Most Used Tool"
-              value={dailyByToolData?.tools[0] ?? "—"}
+              value={dailyByToolData?.tools[0] ? humanizeToolName(dailyByToolData.tools[0]) : "—"}
               isLoading={isLoadingDailyByTool}
             />
           </div>
