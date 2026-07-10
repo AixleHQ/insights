@@ -21,7 +21,7 @@ import {
   type EventRow,
 } from "@/components/events";
 import type { EventsToolFilterOption } from "@/lib/eventsToolFilters";
-import { humanizeToolName, toEventRow } from "@/lib/utils";
+import { formatLocalDate, humanizeToolName, toEventRow } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { showEventsUserColumn, type SortField, type SortDirection } from "@/lib/eventAccess";
 import { UnattributedEvents } from "./UnattributedEvents";
@@ -166,7 +166,7 @@ export function Events() {
     setExportQueued(false);
     setExportError(false);
     const startStr = filters.dateFrom ?? "all";
-    const endStr = filters.dateTo ?? new Date().toISOString().split("T")[0];
+    const endStr = filters.dateTo ?? formatLocalDate(new Date());
     const filename = `aixle-insights-events-${startStr}-${endStr}.csv`;
 
     try {
