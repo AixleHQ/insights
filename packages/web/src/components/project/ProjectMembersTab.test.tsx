@@ -61,7 +61,7 @@ describe("ProjectMembersTab", () => {
   });
 
   describe("member view (isProjectOwner=false)", () => {
-    it("shows Name and Role columns but not token/cost columns", () => {
+    it("shows Name, Email, Type columns but not token/cost columns", () => {
       render(
         <ProjectMembersTab
           projectId="proj-1"
@@ -72,7 +72,8 @@ describe("ProjectMembersTab", () => {
       );
 
       expect(screen.getByText("Name")).toBeInTheDocument();
-      expect(screen.getByText("Role")).toBeInTheDocument();
+      expect(screen.getByText("Email")).toBeInTheDocument();
+      expect(screen.getByText("Type")).toBeInTheDocument();
       expect(screen.queryByText("Tokens In / Out")).not.toBeInTheDocument();
       expect(screen.queryByText("Cost")).not.toBeInTheDocument();
     });

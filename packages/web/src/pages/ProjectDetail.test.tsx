@@ -256,19 +256,19 @@ describe("ProjectDetail", () => {
       expect(screen.getByRole("tab", { name: "Members" })).toBeInTheDocument();
     });
 
-    it("does not render Members tab for non-member org user", () => {
-      // user-99 is not in mockMembers and hasRole returns false
+    it("renders Members tab when project is loaded (access implies membership)", () => {
+      // Any user who can load the project sees the Members tab (policy scope enforces access)
       render(<ProjectDetail />);
 
-      expect(screen.queryByRole("tab", { name: "Members" })).not.toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: "Members" })).toBeInTheDocument();
     });
 
-    it("does not render Integrations tab for project member role", () => {
-      // user-2 is in mockMembers with role "member" (not owner), hasRole returns false
+    it("renders Integrations tab for project member role (read-only view)", () => {
+      // Members see Integrations in read-only mode per F7-S5 spec
       mockUseCurrentUser.mockReturnValue({ data: { id: "user-2", globalAdmin: false }, isLoading: false });
       render(<ProjectDetail />);
 
-      expect(screen.queryByRole("tab", { name: "Integrations" })).not.toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: "Integrations" })).toBeInTheDocument();
     });
 
     it("renders Integrations tab for org owner", () => {
