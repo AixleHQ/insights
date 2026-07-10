@@ -2,11 +2,13 @@ import { useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { useOrg } from "@/contexts/OrgContext";
 import { useEvent } from "@/hooks/useApi";
+import { useOrgNavGuard } from "@/hooks/useOrgNavGuard";
 import { EventDetail, type EventDetailData } from "@/components/events";
 
 export function EventDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { currentOrg } = useOrg();
+  useOrgNavGuard("/events");
 
   const { data: apiEvent, isLoading } = useEvent(currentOrg?.id || "", id || "");
 
