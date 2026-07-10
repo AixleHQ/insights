@@ -91,6 +91,30 @@ describe("ProjectCard", () => {
     expect(onClick).toHaveBeenCalledOnce();
   });
 
+  describe("actions menu RBAC (AIX-501)", () => {
+    it("hides Edit and Delete for a non-manager (default)", async () => {
+      const user = userEvent.setup();
+      render(<ProjectCard project={baseProject} onEdit={() => {}} onDelete={() => {}} />);
+
+      await user.click(screen.getByRole("button", { name: /actions/i }));
+
+      expect(screen.getByRole("menuitem", { name: /view details/i })).toBeInTheDocument();
+      expect(screen.queryByRole("menuitem", { name: /edit project/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("menuitem", { name: /delete project/i })).not.toBeInTheDocument();
+    });
+
+    it("shows Edit and Delete when the user can manage the project", async () => {
+      const user = userEvent.setup();
+      render(<ProjectCard project={baseProject} canManage onEdit={() => {}} onDelete={() => {}} />);
+
+      await user.click(screen.getByRole("button", { name: /actions/i }));
+
+      expect(screen.getByRole("menuitem", { name: /view details/i })).toBeInTheDocument();
+      expect(screen.getByRole("menuitem", { name: /edit project/i })).toBeInTheDocument();
+      expect(screen.getByRole("menuitem", { name: /delete project/i })).toBeInTheDocument();
+    });
+  });
+
   it("does not call onClick when favorite button is clicked", async () => {
     const user = userEvent.setup();
     const onClick = vi.fn();

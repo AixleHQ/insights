@@ -20,6 +20,7 @@ interface ProjectCardProps {
   project: ProjectWithStats;
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
+  canManage?: boolean;
   isFavorited?: boolean;
   onToggleFavorite?: (project: { id: string; name: string }) => void;
   onClick?: () => void;
@@ -35,7 +36,7 @@ function StatBadge({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFavorite, onClick, className }: ProjectCardProps) {
+export function ProjectCard({ project, onEdit, onDelete, canManage = false, isFavorited, onToggleFavorite, onClick, className }: ProjectCardProps) {
   const showUnlinkedRemote = isGitRemoteMissing(project);
   const detailHref = AppRoutes.projects.detail(project.id);
 
@@ -134,16 +135,20 @@ export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFa
               <DropdownMenuItem asChild>
                 <Link to={AppRoutes.projects.detail(project.id)}>View details</Link>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onEdit?.(project.id)}>
-                Edit project
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive"
-                onClick={() => onDelete?.(project.id)}
-              >
-                Delete project
-              </DropdownMenuItem>
+              {canManage && (
+                <>
+                  <DropdownMenuItem onClick={() => onEdit?.(project.id)}>
+                    Edit project
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive"
+                    onClick={() => onDelete?.(project.id)}
+                  >
+                    Delete project
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
           <Button
