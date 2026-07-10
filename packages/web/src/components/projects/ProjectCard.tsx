@@ -71,8 +71,27 @@ export function ProjectCard({ project, onEdit, onDelete, canManage = false, isFa
         <path d="M48 0 L48 10 Q48 16 42 16 L32 16" stroke="currentColor" strokeWidth="1" opacity="0.5" />
       </svg>
 
-      {/* Header: icon + name + star */}
-      <div className="relative z-10 flex items-start justify-between gap-2 pr-8">
+      {/* Star — absolute to card, above stretched link */}
+      {onToggleFavorite && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn(
+            "absolute right-8 top-3 z-10 size-7 transition-opacity",
+            isFavorited ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+          )}
+          aria-label="Toggle favorite"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleFavorite({ id: project.id, name: project.name });
+          }}
+        >
+          <Star className={cn("size-3.5", isFavorited && "fill-current text-warning")} />
+        </Button>
+      )}
+
+      {/* Header: icon + name */}
+      <div className="relative z-10 flex items-start gap-2 pr-8">
         <div className="flex min-w-0 items-center gap-2">
           <FolderOpen className="size-4 shrink-0 text-muted-foreground" />
           <h3 className="type-label truncate font-medium text-foreground">
@@ -92,23 +111,6 @@ export function ProjectCard({ project, onEdit, onDelete, canManage = false, isFa
             </Tooltip>
           )}
         </div>
-        {onToggleFavorite && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "absolute right-8 top-3 z-10 size-7 transition-opacity",
-              isFavorited ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-            )}
-            aria-label="Toggle favorite"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleFavorite({ id: project.id, name: project.name });
-            }}
-          >
-            <Star className={cn("size-3.5", isFavorited && "fill-current text-warning")} />
-          </Button>
-        )}
       </div>
 
       {/* Footer: stats + actions */}
