@@ -16,6 +16,10 @@ vi.mock("@/contexts/AuthContext", () => ({
 vi.mock("@/contexts/OrgContext", () => ({
   useOrg: () => ({
     currentOrg: { id: "test-org-id", name: "Test Org", slug: "test-org" },
+    memberships: [
+      { organization: { id: "test-org-id", name: "Test Org", slug: "test-org" }, role: "owner" },
+    ],
+    currentRole: "owner",
     isLoading: false,
   }),
 }));

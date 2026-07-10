@@ -22,9 +22,10 @@ module Api
         event_params[:tool_name] = @tool_account.tool_name
         event_params[:event_type] = event_params[:event_type].presence || "other"
 
-        # Strip project_id that is invalid or inaccessible — attribution is additive,
-        # never blocking.
-        strip_inaccessible_project_id!(event_params)
+        # Reject when the user lacks Owner/Member role on a project they can
+        # otherwise see; strip project_id that is invalid or from another scope
+        # (attribution is additive, never blocking) — see AIX-503.
+        enforce_project_contribution!(event_params)
 
         raw_key = store_raw_event(request.raw_post, org)
         workflow_result = start_ingestion_workflow(raw_key, event_params, org)
@@ -34,6 +35,8 @@ module Api
         data[:workflowId] = workflow_result[:workflow_id] if workflow_result[:workflow_id]
         data[:fallback] = true if workflow_result[:fallback]
         render json: { data: data }, status: :accepted
+      rescue ProjectContributionDenied
+        render json: { error: "Forbidden", code: "project_role_required" }, status: :forbidden
       rescue ActiveRecord::RecordInvalid => e
         Rails.logger.warn "[Ingest] Validation failed: #{e.message}"
         render json: {
@@ -51,11 +54,15 @@ module Api
       # bugs are silently masked as 422 responses and ingest clients incorrectly
       # treat them as their own bad input.
 
+      class ProjectContributionDenied < StandardError; end
+
       private
 
-      # Validate project_id belongs to the token's org or user's personal projects.
-      # Strips silently rather than rejecting — attribution is additive, never blocking.
-      def strip_inaccessible_project_id!(event_params)
+      # Enforce the project-level contribution rule (AIX-503):
+      #   - malformed / cross-scope / unknown project_id → stripped (additive attribution)
+      #   - project the user CAN reach but only as a Viewer → reject (403)
+      #   - project where the user is Owner/Member → passes through
+      def enforce_project_contribution!(event_params)
         pid = event_params[:project_id]
         return unless pid.present?
 
@@ -65,10 +72,29 @@ module Api
           return
         end
 
-        unless accessible_projects.exists?(id: pid)
+        project = accessible_projects.find_by(id: pid)
+        if project.nil?
           event_params.delete(:project_id)
           Rails.logger.warn("[Ingest] project_id #{pid} not accessible — stripped")
+          return
         end
+
+        return if can_contribute_to_project?(project)
+
+        Rails.logger.warn("[Ingest] project_id #{pid} rejected — user lacks Owner/Member role")
+        raise ProjectContributionDenied
+      end
+
+      # Owner/Member contribution rights on a specific project. Personal-project
+      # owners always qualify; org owners are implicit contributors to every org
+      # project; otherwise an explicit Owner/Member project membership is required.
+      def can_contribute_to_project?(project)
+        user = @tool_account.user
+        return true if project.personal? && project.owner_id == user.id
+        return true if project.organization_project? && user.role_in(project.organization) == "owner"
+
+        membership = project.project_memberships.find_by(user_id: user.id)
+        membership&.can_edit? || false
       end
 
       def store_raw_event(raw_payload, org)

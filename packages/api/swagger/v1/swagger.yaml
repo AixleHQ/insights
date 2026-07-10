@@ -1949,6 +1949,14 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/UserToolAccount'
+        '403':
+          description: |
+            The user holds only the Viewer role in this organization and cannot
+            link tools or obtain ingest tokens (post-AIX-503).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '422':
           $ref: '#/components/responses/ValidationError'
 
@@ -2012,6 +2020,14 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/UserToolAccount'
+        '403':
+          description: |
+            The user holds only the Viewer role in this organization and cannot
+            update tool accounts or rotate ingest tokens (post-AIX-503).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '422':
           $ref: '#/components/responses/ValidationError'
     delete:
@@ -5750,7 +5766,10 @@ paths:
                 project_id:
                   type: string
                   format: uuid
-                  description: Optional. Stripped silently if not accessible to the token's org/user.
+                  description: |
+                    Optional. Stripped silently if it is malformed or not accessible to the
+                    token's org/user. If it references a project the user can reach but where
+                    they only hold the Viewer role, the request is rejected with `403`.
                 metadata:
                   type: object
                   additionalProperties: true
@@ -5782,6 +5801,17 @@ paths:
                       - accepted
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: |
+            The token's user is not permitted to contribute usage data.
+            Returned when the user holds only the Viewer role in the organization
+            (`code: "viewer_cannot_contribute"`), or when a supplied `project_id`
+            references a project where the user is only a Viewer
+            (`code: "project_role_required"`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '422':
           $ref: '#/components/responses/ValidationError'
         '429':

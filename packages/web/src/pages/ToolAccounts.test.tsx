@@ -5,9 +5,15 @@ import { MemoryRouter } from "react-router-dom";
 import { ToolAccounts } from "./ToolAccounts";
 import type { ToolAccount } from "@/lib/types";
 
+const mockOrgRole = { role: "owner" as "owner" | "member" | "viewer" };
+
 vi.mock("@/contexts/OrgContext", () => ({
   useOrg: () => ({
     currentOrg: { id: "org-1", name: "Acme", slug: "acme" },
+    memberships: [
+      { organization: { id: "org-1", name: "Acme", slug: "acme" }, role: mockOrgRole.role },
+    ],
+    currentRole: mockOrgRole.role,
     isLoading: false,
   }),
 }));
@@ -81,6 +87,7 @@ async function openActionsMenu(user: ReturnType<typeof userEvent.setup>, index =
 describe("ToolAccounts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockOrgRole.role = "owner";
     mockCreateMutateAsync.mockResolvedValue({});
     mockDeleteMutateAsync.mockResolvedValue({});
     mockUpdateMutateAsync.mockResolvedValue({});
@@ -476,6 +483,25 @@ describe("ToolAccounts", () => {
       renderToolAccounts();
       expect(screen.queryByRole("menuitem", { name: "Disable" })).not.toBeInTheDocument();
       expect(screen.queryByRole("menuitem", { name: "Enable" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("viewer role (AIX-503)", () => {
+    beforeEach(() => {
+      mockOrgRole.role = "viewer";
+    });
+
+    it("shows a permission message instead of the connect UI", () => {
+      renderToolAccounts();
+      expect(screen.getByText(/Viewer access/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/don't have permission to contribute data/i)
+      ).toBeInTheDocument();
+    });
+
+    it("hides the provider tabs for viewers", () => {
+      renderToolAccounts();
+      expect(screen.queryByRole("tab", { name: /available/i })).not.toBeInTheDocument();
     });
   });
 });

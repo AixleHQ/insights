@@ -599,12 +599,36 @@ RSpec.describe 'Api::V1::Ingest', type: :request do
         create(:project, organization: other_organization, owner: nil)
       end
 
-      it 'passes project_id through when it belongs to the token org' do
+      it 'passes project_id through when the user is an owner/member of the project' do
+        create(:project_membership, project: accessible_project, user: user, role: 'member')
         ingest_post(payload: valid_payload.merge(project_id: accessible_project.id))
         expect(response).to have_http_status(:accepted)
         expect(Temporal::Client).to have_received(:start_workflow) do |_workflow, **kwargs|
           expect(kwargs[:args][:event][:project_id]).to eq(accessible_project.id)
         end
+      end
+
+      it 'passes project_id through for an org owner (implicit project owner)' do
+        membership.update!(role: 'owner')
+        ingest_post(payload: valid_payload.merge(project_id: accessible_project.id))
+        expect(response).to have_http_status(:accepted)
+        expect(Temporal::Client).to have_received(:start_workflow) do |_workflow, **kwargs|
+          expect(kwargs[:args][:event][:project_id]).to eq(accessible_project.id)
+        end
+      end
+
+      it 'rejects with 403 when the user has no Owner/Member role on the org project (AIX-503)' do
+        ingest_post(payload: valid_payload.merge(project_id: accessible_project.id))
+        expect(response).to have_http_status(:forbidden)
+        expect(response.parsed_body['code']).to eq('project_role_required')
+        expect(Temporal::Client).not_to have_received(:start_workflow)
+      end
+
+      it 'rejects with 403 when the user is only a viewer on the project (AIX-503)' do
+        create(:project_membership, project: accessible_project, user: user, role: 'viewer')
+        ingest_post(payload: valid_payload.merge(project_id: accessible_project.id))
+        expect(response).to have_http_status(:forbidden)
+        expect(response.parsed_body['code']).to eq('project_role_required')
       end
 
       it 'strips project_id from workflow payload when it belongs to a different org' do
@@ -630,6 +654,17 @@ RSpec.describe 'Api::V1::Ingest', type: :request do
         expect(Temporal::Client).to have_received(:start_workflow) do |_workflow, **kwargs|
           expect(kwargs[:args][:event][:project_id]).to eq(personal_project.id)
         end
+      end
+    end
+
+    context 'when the token user is only a viewer in the organization (AIX-503)' do
+      before { membership.update!(role: 'viewer') }
+
+      it 'rejects event ingestion with 403' do
+        ingest_post
+        expect(response).to have_http_status(:forbidden)
+        expect(response.parsed_body['code']).to eq('viewer_cannot_contribute')
+        expect(Temporal::Client).not_to have_received(:start_workflow)
       end
     end
   end
