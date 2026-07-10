@@ -766,7 +766,17 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
             <CardDescription>Latest events from this team member</CardDescription>
           </div>
           <Button asChild variant="outline" size="sm">
-            <Link to={`${AppRoutes.events.root}?user_id=${member.user.id}`}>View all</Link>
+            <Link
+              to={{
+                pathname: AppRoutes.events.root,
+                search: `?${new URLSearchParams({
+                  user_id: member.user.id,
+                  ...(member.user.name ? { user_name: member.user.name } : {}),
+                }).toString()}`,
+              }}
+            >
+              View all
+            </Link>
           </Button>
         </CardHeader>
         <CardContent className="px-0 pb-0">

@@ -45,6 +45,10 @@ export interface EventFiltersState {
   projectIds?: string[];
   /** Minimum correlation confidence (0–1). Only used in "Not Assigned" mode. */
   minConfidence?: number;
+  /** Member user UUID, e.g. from a "View all" deep-link on a member's profile. */
+  userId?: string;
+  /** Display label for `userId`, shown on the filter chip. */
+  userName?: string;
 }
 
 interface EventFiltersProps {
@@ -163,6 +167,7 @@ export function EventFilters({
     filters.projectIds?.length,
     (filters.dateFrom || filters.dateTo) ? 1 : 0,
     filters.minConfidence != null ? 1 : 0,
+    filters.userId ? 1 : 0,
   ].filter(Boolean).length;
 
   const clearAll = () => onFiltersChange({});
@@ -190,6 +195,15 @@ export function EventFilters({
     value: string;
     onRemove: () => void;
   }[] = [];
+
+  if (filters.userId) {
+    chips.push({
+      key: "user",
+      label: "User",
+      value: filters.userName ?? filters.userId,
+      onRemove: () => onFiltersChange({ ...filters, userId: undefined, userName: undefined }),
+    });
+  }
 
   if (filters.tools?.length) {
     const labels = filters.tools.map(
