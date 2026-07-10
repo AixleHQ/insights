@@ -5,6 +5,7 @@
 # Queue priority (higher priority first)
 :queues:
   - [critical, 6]
+  - [mailers, 5]
   - [default, 5]
   - [alerts, 4]
   - [ai, 3]
