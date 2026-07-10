@@ -134,13 +134,13 @@ function ClaudeCodeSetupInstructions({ token }: { token: string }) {
     <div className="space-y-3">
       <Tabs defaultValue="mcp-recommended">
         <TabsList className="w-full justify-start gap-2 flex-wrap h-auto rounded-md">
-          <TabsTrigger value="mcp-recommended" className="text-xs shrink-0">
+          <TabsTrigger value="mcp-recommended" className="text-xs flex-none h-auto py-1.5">
             MCP (recommended)
           </TabsTrigger>
-          <TabsTrigger value="standalone-cli" className="text-xs shrink-0">
+          <TabsTrigger value="standalone-cli" className="text-xs flex-none h-auto py-1.5">
             Standalone CLI
           </TabsTrigger>
-          <TabsTrigger value="advanced-hooks" className="text-xs shrink-0">
+          <TabsTrigger value="advanced-hooks" className="text-xs flex-none h-auto py-1.5">
             Advanced hooks
           </TabsTrigger>
         </TabsList>
@@ -255,10 +255,10 @@ function CursorSetupInstructions({ token }: { token: string }) {
     <div className="space-y-3">
       <Tabs defaultValue="mcp-recommended">
         <TabsList className="w-full justify-start gap-2 flex-wrap h-auto rounded-md">
-          <TabsTrigger value="mcp-recommended" className="text-xs shrink-0">
+          <TabsTrigger value="mcp-recommended" className="text-xs flex-none h-auto py-1.5">
             MCP (recommended)
           </TabsTrigger>
-          <TabsTrigger value="standalone-cli" className="text-xs shrink-0">
+          <TabsTrigger value="standalone-cli" className="text-xs flex-none h-auto py-1.5">
             Standalone CLI
           </TabsTrigger>
         </TabsList>

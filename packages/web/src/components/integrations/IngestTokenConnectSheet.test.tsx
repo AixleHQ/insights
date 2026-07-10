@@ -211,6 +211,13 @@ describe("IngestTokenConnectSheet", () => {
       expect(scrollContainer).not.toBeNull();
       expect(scrollContainer).toHaveClass("flex-1");
     });
+
+    it("gives setup tab triggers a natural height so wrapped tabs don't overlap content", async () => {
+      await goToSetupStep(claudeCodeProvider);
+      const advancedTab = screen.getByRole("tab", { name: /Advanced hooks/i });
+      expect(advancedTab).toHaveClass("h-auto");
+      expect(advancedTab).toHaveClass("flex-none");
+    });
   });
 
   describe("Copy button", () => {
