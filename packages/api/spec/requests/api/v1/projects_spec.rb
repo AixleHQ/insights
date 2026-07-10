@@ -242,6 +242,21 @@ RSpec.describe 'Api::V1::Projects', type: :request do
     end
   end
 
+  describe 'POST /api/v1/organizations/:organization_id/projects (duplicate name)' do
+    it 'returns 422 with a name error, not a git_remote_url error, when name is duplicate and git_remote_url is blank' do
+      create(:project, organization: organization, owner: nil, name: 'Duplicate Attempt', slug: nil)
+
+      authenticated_post "/api/v1/organizations/#{organization.id}/projects",
+                         user: user,
+                         organization: organization,
+                         params: { name: 'Duplicate Attempt' }
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(json_response[:errors][:name]).to be_present
+      expect(json_response[:errors]).not_to have_key(:git_remote_url)
+    end
+  end
+
   describe 'POST /api/v1/organizations/:organization_id/projects (duplicate git_remote_url)' do
     it 'returns 422 with git_remote_url error naming the conflicting project when URL is duplicate' do
       existing = create(:project, organization: organization, owner: nil,

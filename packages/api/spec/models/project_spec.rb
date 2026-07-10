@@ -106,6 +106,38 @@ RSpec.describe Project, type: :model do
     it { should allow_value(true).for(:is_active) }
     it { should allow_value(false).for(:is_active) }
 
+    context 'name/slug uniqueness' do
+      it 'rejects a duplicate name within the same organization' do
+        org = create(:organization)
+        create(:project, organization: org, name: 'Shared Name', slug: nil)
+        duplicate = build(:project, organization: org, name: 'Shared Name', slug: nil)
+        expect(duplicate).not_to be_valid
+        expect(duplicate.errors[:name]).to include('is already taken in this organization')
+      end
+
+      it 'rejects a duplicate name for the same personal owner' do
+        user = create(:user)
+        create(:project, :personal, owner: user, name: 'Shared Name', slug: nil)
+        duplicate = build(:project, :personal, owner: user, name: 'Shared Name', slug: nil)
+        expect(duplicate).not_to be_valid
+        expect(duplicate.errors[:name]).to include('is already taken on your account')
+      end
+
+      it 'allows the same name in different organizations' do
+        create(:project, name: 'Shared Name', slug: nil)
+        duplicate = build(:project, name: 'Shared Name', slug: nil, organization: create(:organization))
+        expect(duplicate).to be_valid
+      end
+
+      it 'does not report a git_remote_url error when the name is duplicated and git_remote_url is blank' do
+        org = create(:organization)
+        create(:project, organization: org, name: 'Shared Name', slug: nil)
+        duplicate = build(:project, organization: org, name: 'Shared Name', slug: nil, git_remote_url: nil)
+        expect(duplicate).not_to be_valid
+        expect(duplicate.errors[:git_remote_url]).to be_empty
+      end
+    end
+
     context 'git_remote_url uniqueness' do
       it 'allows the same git_remote_url in different organizations' do
         url = 'git@github.com:org/repo.git'
