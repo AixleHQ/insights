@@ -37,6 +37,7 @@ function StatBadge({ label, value }: { label: string; value: string }) {
 
 export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFavorite, onClick, className }: ProjectCardProps) {
   const showUnlinkedRemote = isGitRemoteMissing(project);
+  const detailHref = AppRoutes.projects.detail(project.id);
 
   return (
     <Card
@@ -46,17 +47,16 @@ export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFa
         className
       )}
       onClick={onClick}
-      {...(onClick && {
-        role: "button" as const,
-        tabIndex: 0,
-        onKeyDown: (e: React.KeyboardEvent) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onClick();
-          }
-        },
-      })}
     >
+      {/* Stretched link — primary keyboard/a11y navigation target; mouse clicks are handled by the Card onClick above */}
+      <Link
+        to={detailHref}
+        className="absolute inset-0 z-0 rounded-[inherit] focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+        aria-label={`View ${project.name}`}
+        tabIndex={0}
+        onClick={(e) => e.stopPropagation()}
+      />
+
       {/* Decorative corner trace */}
       <svg
         className="absolute right-0 top-0 text-border/50"
@@ -71,7 +71,7 @@ export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFa
       </svg>
 
       {/* Header: icon + name + star */}
-      <div className="flex items-start justify-between gap-2 pr-8">
+      <div className="relative z-10 flex items-start justify-between gap-2 pr-8">
         <div className="flex min-w-0 items-center gap-2">
           <FolderOpen className="size-4 shrink-0 text-muted-foreground" />
           <h3 className="type-label truncate font-medium text-foreground">
@@ -96,7 +96,7 @@ export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFa
             variant="ghost"
             size="icon"
             className={cn(
-              "absolute right-8 top-3 size-7 transition-opacity",
+              "absolute right-8 top-3 z-10 size-7 transition-opacity",
               isFavorited ? "opacity-100" : "opacity-0 group-hover:opacity-100"
             )}
             aria-label="Toggle favorite"
@@ -111,7 +111,7 @@ export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFa
       </div>
 
       {/* Footer: stats + actions */}
-      <div className="flex items-center justify-between gap-2">
+      <div className="relative z-10 flex items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
           <StatBadge label="Events" value={formatCount(project.eventCount || 0)} />
           <StatBadge label="Cost" value={formatCost(project.totalCostUsd || 0)} />
@@ -124,7 +124,6 @@ export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFa
                 variant="ghost"
                 size="icon"
                 className="size-7 opacity-0 transition-opacity group-hover:opacity-100"
-                onClick={(e) => e.stopPropagation()}
               >
                 <MoreHorizontal className="size-3.5" />
                 <span className="sr-only">Actions</span>
@@ -152,11 +151,9 @@ export function ProjectCard({ project, onEdit, onDelete, isFavorited, onToggleFa
             size="icon"
             className="size-7"
             asChild
-            onClick={(e) => e.stopPropagation()}
           >
-            <Link to={AppRoutes.projects.detail(project.id)}>
+            <Link to={detailHref} tabIndex={-1} aria-hidden="true">
               <ChevronRight className="size-3.5" />
-              <span className="sr-only">View project</span>
             </Link>
           </Button>
         </div>
