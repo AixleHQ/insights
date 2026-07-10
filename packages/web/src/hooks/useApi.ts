@@ -2285,6 +2285,7 @@ export interface IssueFilters {
   type?: string;
   assignee?: string;
   page?: number;
+  per_page?: number;
 }
 
 export function useProjectIssues(projectId: string, filters?: IssueFilters) {
@@ -2296,6 +2297,7 @@ export function useProjectIssues(projectId: string, filters?: IssueFilters) {
       if (filters?.type) params.set("type", filters.type);
       if (filters?.assignee) params.set("assignee", filters.assignee);
       if (filters?.page) params.set("page", String(filters.page));
+      if (filters?.per_page) params.set("per_page", String(filters.per_page));
       const query = params.toString();
       return api.get<PaginatedResponse<Issue>>(
         `/projects/${projectId}/issues${query ? `?${query}` : ""}`
