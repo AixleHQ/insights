@@ -58,11 +58,12 @@ module Activities
     end
 
     def s3_client_options
-      endpoint = ENV["MINIO_ENDPOINT"].presence
+      endpoint = ENV["MINIO_ENDPOINT"]
+      endpoint = nil if endpoint.nil? || endpoint.empty?
       region = ENV.fetch("S3_REGION", ENV.fetch("MINIO_REGION", "us-east-1"))
       options = { region: region }
 
-      if endpoint.present?
+      if endpoint
         options[:endpoint] = endpoint
         options[:force_path_style] = true
         options[:access_key_id] = ENV.fetch("MINIO_ACCESS_KEY", "minioadmin")
