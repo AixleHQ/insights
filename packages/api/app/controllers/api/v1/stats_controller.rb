@@ -415,7 +415,7 @@ module Api
       def tool_overview
         authorize! current_organization, to: :show?
 
-        result = with_stats_cache(tool_name: @tool_name, tz: params[:tz]) do
+        result = with_stats_cache(tool_name: @tool_name, project_id: params[:project_id], tz: params[:tz]) do
           zone          = client_zone
           current_start = zone.now.beginning_of_month
           prev_start    = (zone.now - 1.month).beginning_of_month
@@ -451,7 +451,8 @@ module Api
 
         result = with_stats_cache(
           tool_name: @tool_name, days: params[:days],
-          start_date: params[:start_date], end_date: params[:end_date], tz: params[:tz]
+          start_date: params[:start_date], end_date: params[:end_date],
+          project_id: params[:project_id], tz: params[:tz]
         ) do
           events = @tool_events.where(occurred_at: time_range[:start]..time_range[:end])
 
@@ -485,7 +486,8 @@ module Api
         limit      = (params[:limit] || 20).to_i.clamp(1, 100)
 
         result = with_stats_cache(
-          tool_name: @tool_name, days: params[:days], limit: params[:limit], tz: params[:tz]
+          tool_name: @tool_name, days: params[:days], limit: params[:limit],
+          project_id: params[:project_id], tz: params[:tz]
         ) do
           events = @tool_events.where(occurred_at: time_range[:start]..time_range[:end])
           {
@@ -507,7 +509,8 @@ module Api
         time_range = parse_time_range(default_days: days)
 
         result = with_stats_cache(
-          tool_name: @tool_name, days: params[:days], period: params[:period], tz: params[:tz]
+          tool_name: @tool_name, days: params[:days], period: params[:period],
+          project_id: params[:project_id], tz: params[:tz]
         ) do
           rows = tool_stats_query
             .tool_period_buckets(
@@ -571,7 +574,9 @@ module Api
 
         time_range = parse_time_range(default_days: (params[:days] || 30).to_i)
 
-        result = with_stats_cache(tool_name: @tool_name, days: params[:days], tz: params[:tz]) do
+        result = with_stats_cache(
+          tool_name: @tool_name, days: params[:days], project_id: params[:project_id], tz: params[:tz]
+        ) do
           events     = @tool_events.where(occurred_at: time_range[:start]..time_range[:end])
           aggregated = aggregate_by_column(events, :event_type)
 
@@ -642,8 +647,9 @@ module Api
       end
 
       # QA (AIX-524) reported project-scoped stats appearing stale/incorrect on
-      # staging in a way the underlying scoping logic couldn't reproduce locally.
-      # Disable any intermediate caching of these responses defensively.
+      # staging. The actual root cause was with_stats_cache's key omitting project_id
+      # for these 5 actions (fixed above) — this header is a defensive layer ruling
+      # out any additional intermediate (CDN/proxy) caching on top of that.
       def no_store_tool_stats!
         response.headers["Cache-Control"] = "no-store"
       end

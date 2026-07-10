@@ -2079,6 +2079,36 @@ RSpec.describe 'Api::V1::Stats', type: :request do
         expect(response.parsed_body['total_events']).to eq(first_count)
       end
     end
+
+    describe 'tool-scoped endpoints isolate cache keys by project_id (AIX-524 QA fail)' do
+      %w[daily models users event_types].each do |endpoint|
+        it "does not serve an org-wide #{endpoint} cache entry for a differently-scoped project_id request" do
+          empty_project = create(:project, organization: organization)
+          path = "/api/v1/organizations/#{organization.id}/stats/tools/cursor/#{endpoint}"
+
+          # Org-wide (no project_id) request — populates the cache first.
+          create(:tool_event, organization: organization, user: user,
+                 tool_name: 'cursor', event_type: 'chat', model: 'gpt-4o', cost_usd: 1.0)
+          authenticated_get path, user: user, organization: organization
+          expect_success
+
+          # Same tool/days/period/tz within the TTL, but scoped to a project with
+          # zero events — must not reuse the org-wide cache entry above.
+          authenticated_get path, user: user, organization: organization,
+                            params: { project_id: empty_project.id }
+          expect_success
+
+          total = case endpoint
+          when 'daily' then json_response[:daily].sum { |d| d[:eventCount] }
+          when 'models' then json_response[:models].sum { |m| m[:eventCount] }
+          when 'users' then json_response[:users].sum { |u| u[:eventCount] }
+          when 'event_types' then json_response[:eventTypes].sum { |e| e[:eventCount] }
+          end
+
+          expect(total).to eq(0)
+        end
+      end
+    end
   end
 
   describe 'month_or_days_time_range validation' do
