@@ -9,6 +9,13 @@ RSpec.describe User, type: :model do
     it { should have_many(:owned_projects).class_name('Project').with_foreign_key(:owner_id).dependent(:nullify) }
     it { should have_many(:user_settings).dependent(:destroy) }
     it { should have_many(:admin_audit_logs).with_foreign_key(:admin_user_id).dependent(:restrict_with_error) }
+    it { should have_many(:actor_organization_audit_logs).class_name('OrganizationAuditLog').with_foreign_key(:actor_id).dependent(:nullify) }
+    it { should have_many(:actor_project_audit_logs).class_name('ProjectAuditLog').with_foreign_key(:actor_id).dependent(:nullify) }
+    it { should have_many(:assigned_issues).class_name('Issue').with_foreign_key(:assignee_id).dependent(:nullify) }
+    it { should have_many(:notification_routes_as_recipient).class_name('NotificationRoute').with_foreign_key(:recipient_user_id).dependent(:nullify) }
+    it { should have_many(:updated_organization_retention_policies).class_name('OrganizationRetentionPolicy').with_foreign_key(:updated_by_id).dependent(:nullify) }
+    it { should have_many(:updated_project_retention_policies).class_name('ProjectRetentionPolicy').with_foreign_key(:updated_by_id).dependent(:nullify) }
+    it { should have_many(:created_scheduled_exports).class_name('ScheduledExport').with_foreign_key(:created_by_id).dependent(:restrict_with_error) }
 
     # Note: tool_events association uses timeseries schema, tested separately
   end

@@ -9,6 +9,7 @@ RSpec.describe Organization, type: :model do
     it { should have_many(:organization_connectors).dependent(:destroy) }
     it { should have_many(:projects).dependent(:destroy) }
     it { should have_many(:audit_logs).dependent(:restrict_with_error) }
+    it { should have_many(:retention_purge_logs).dependent(:restrict_with_error) }
 
     # Note: tool_events association uses timeseries schema, tested separately
   end
