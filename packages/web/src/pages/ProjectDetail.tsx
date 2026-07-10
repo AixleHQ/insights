@@ -145,15 +145,20 @@ export function ProjectDetail() {
   const myProjectMembership = projectMembers?.find((m: ProjectMember) => m.userId === me?.id);
   const isProjectOwner = hasRole(["owner"]) || myProjectMembership?.role === "owner";
   const canManageMembers = hasRole(["owner"]);
-  const isMemberOfProject = isProjectOwner || !!myProjectMembership;
+  // If the project loaded, the user has access (policy scope already enforces this).
+  // Don't rely on the paginated members list to detect membership — it may not include
+  // the current user if the list is large and they appear on a later page.
+  const isMemberOfProject = !!project;
 
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const activeTab = useMemo(() => {
     const allowed = new Set(["overview", "events", "issues"]);
-    if (isMemberOfProject) allowed.add("members");
-    if (isProjectOwner) {
+    if (isMemberOfProject) {
+      allowed.add("members");
       allowed.add("integrations");
+    }
+    if (isProjectOwner) {
       allowed.add("alerts");
     }
     if (tabParam && allowed.has(tabParam)) return tabParam;
@@ -282,7 +287,7 @@ export function ProjectDetail() {
           { label: "Overview", key: "overview" },
           { label: "Events", key: "events" },
           ...(isMemberOfProject ? [{ label: "Members", key: "members" }] : []),
-          ...(isProjectOwner ? [{ label: "Integrations", key: "integrations" }] : []),
+          ...(isMemberOfProject ? [{ label: "Integrations", key: "integrations" }] : []),
           ...(isProjectOwner ? [{ label: "Alerts", key: "alerts" }] : []),
           { label: "Issues", key: "issues" },
         ]}
@@ -564,10 +569,10 @@ export function ProjectDetail() {
           </TabsContent>
         )}
 
-        {/* ── Integrations (lead-only) ── */}
-        {isProjectOwner && (
+        {/* ── Integrations ── */}
+        {isMemberOfProject && (
           <TabsContent value="integrations" className="mt-4">
-            <ProjectConnectorsTab projectId={id || ""} orgId={currentOrg?.id || ""} />
+            <ProjectConnectorsTab projectId={id || ""} orgId={currentOrg?.id || ""} readOnly={!isProjectOwner} />
           </TabsContent>
         )}
 

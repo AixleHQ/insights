@@ -1,6 +1,8 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { MoreHorizontal, UserPlus } from "lucide-react";
+import { RoleBadge } from "@/components/ui/role-badge";
+import type { MemberRole } from "@/contexts/OrgContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -137,13 +139,15 @@ export function ProjectMembersTab({
         <TableHeader>
           <TableRow className="border-b border-border/50">
             <TableHead className="type-caption font-medium uppercase tracking-wider text-muted-foreground">Name</TableHead>
-            <TableHead className="type-caption font-medium uppercase tracking-wider text-muted-foreground">Role</TableHead>
+            <TableHead className="type-caption font-medium uppercase tracking-wider text-muted-foreground">Email</TableHead>
+            <TableHead className="type-caption font-medium uppercase tracking-wider text-muted-foreground">Type</TableHead>
+            <TableHead className="w-10" />
           </TableRow>
         </TableHeader>
         <TableBody>
           {filtered.length === 0 && (
             <TableRow>
-              <TableCell colSpan={2} className="py-8 text-center type-caption text-muted-foreground">
+              <TableCell colSpan={4} className="py-8 text-center type-caption text-muted-foreground">
                 No members found.
               </TableCell>
             </TableRow>
@@ -151,7 +155,7 @@ export function ProjectMembersTab({
           {filtered.map((m) => (
             <TableRow
               key={m.id}
-              className="cursor-pointer border-b border-border/30 hover:bg-muted/30 transition-colors"
+              className="group cursor-pointer border-b border-border/30 hover:bg-muted/30 transition-colors"
               onClick={() => navigate(`${AppRoutes.members.detail(m.userId)}?projectId=${projectId}`)}
             >
               <TableCell>
@@ -168,7 +172,26 @@ export function ProjectMembersTab({
                 </div>
               </TableCell>
               <TableCell>
-                <span className="type-caption text-muted-foreground capitalize">{m.role}</span>
+                <span className="type-caption text-muted-foreground">{m.email}</span>
+              </TableCell>
+              <TableCell>
+                <RoleBadge role={m.role as MemberRole} />
+              </TableCell>
+              <TableCell onClick={(e) => e.stopPropagation()}>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="size-7 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <MoreHorizontal className="size-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={() => navigate(`${AppRoutes.members.detail(m.userId)}?projectId=${projectId}`)}
+                    >
+                      View profile
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </TableCell>
             </TableRow>
           ))}
@@ -282,7 +305,7 @@ export function ProjectMembersTab({
             return (
               <TableRow
                 key={m.id}
-                className="cursor-pointer border-b border-border/30 hover:bg-muted/30 transition-colors"
+                className="group cursor-pointer border-b border-border/30 hover:bg-muted/30 transition-colors"
                 onClick={() => navigate(`${AppRoutes.members.detail(m.userId)}?projectId=${projectId}`)}
               >
                 <TableCell>

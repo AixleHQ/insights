@@ -94,14 +94,17 @@ const CATEGORY_LABELS: Record<string, string> = { all: "All", ...categoryLabels 
 interface ProjectConnectorsTabProps {
   projectId: string;
   orgId?: string;
+  readOnly?: boolean;
 }
 
 function ConnectedCard({
   integration,
   onDisconnect,
+  readOnly = false,
 }: {
   integration: IntegrationData;
   onDisconnect?: (id: string) => void;
+  readOnly?: boolean;
 }) {
   const provider = PROVIDERS.find((p) => p.id === integration.provider);
   const features = provider?.features ?? [];
@@ -115,22 +118,24 @@ function ConnectedCard({
           {features.join(" · ")}
         </p>
       </div>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="size-7 shrink-0 text-muted-foreground hover:text-foreground">
-            <MoreHorizontal className="size-4" />
-            <span className="sr-only">Actions</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            className="text-destructive"
-            onClick={() => onDisconnect?.(integration.id)}
-          >
-            Disconnect
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {!readOnly && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="size-7 shrink-0 text-muted-foreground hover:text-foreground">
+              <MoreHorizontal className="size-4" />
+              <span className="sr-only">Actions</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              className="text-destructive"
+              onClick={() => onDisconnect?.(integration.id)}
+            >
+              Disconnect
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
     </div>
   );
 }
@@ -138,9 +143,11 @@ function ConnectedCard({
 function AvailableCard({
   provider,
   onConnect,
+  readOnly = false,
 }: {
   provider: ProviderInfo;
   onConnect?: (id: string) => void;
+  readOnly?: boolean;
 }) {
   return (
     <div
@@ -157,20 +164,22 @@ function AvailableCard({
           {provider.features.join(" · ")}
         </p>
       </div>
-      <Button
-        size="sm"
-        variant="outline"
-        className="shrink-0"
-        disabled={!provider.available}
-        onClick={() => onConnect?.(provider.id)}
-      >
-        {provider.available ? "Connect" : "Coming Soon"}
-      </Button>
+      {!readOnly && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="shrink-0"
+          disabled={!provider.available}
+          onClick={() => onConnect?.(provider.id)}
+        >
+          {provider.available ? "Connect" : "Coming Soon"}
+        </Button>
+      )}
     </div>
   );
 }
 
-export function ProjectConnectorsTab({ projectId, orgId = "" }: ProjectConnectorsTabProps) {
+export function ProjectConnectorsTab({ projectId, orgId = "", readOnly = false }: ProjectConnectorsTabProps) {
   const { data: connectorsData, isLoading } = useProjectConnectors(projectId);
   const { enabledMap } = useOrgProviderSettings(orgId);
   const connectWithApiKey = useProjectConnectWithApiKey();
@@ -283,6 +292,7 @@ export function ProjectConnectorsTab({ projectId, orgId = "" }: ProjectConnector
                     key={integration.id}
                     integration={integration}
                     onDisconnect={(id) => setDisconnectingConnectorId(id)}
+                    readOnly={readOnly}
                   />
                 ))}
               </div>
@@ -293,32 +303,35 @@ export function ProjectConnectorsTab({ projectId, orgId = "" }: ProjectConnector
         {/* Category filter + available providers */}
         {!isLoading && availableProviders.length > 0 && (
           <div className="space-y-3">
-            {/* Filter pills */}
-            <div className="flex flex-wrap gap-2">
-              {availableCategories.map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setCategoryFilter(cat)}
-                  className={cn(
-                    "rounded-full px-3 py-1 type-caption font-medium transition-colors border",
-                    categoryFilter === cat
-                      ? "bg-foreground text-background border-foreground"
-                      : "bg-transparent text-muted-foreground border-border/60 hover:border-foreground/40 hover:text-foreground"
-                  )}
-                >
-                  {CATEGORY_LABELS[cat] ?? cat}
-                </button>
-              ))}
-            </div>
+            {/* Filter pills — hidden in read-only mode */}
+            {!readOnly && (
+              <div className="flex flex-wrap gap-2">
+                {availableCategories.map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setCategoryFilter(cat)}
+                    className={cn(
+                      "rounded-full px-3 py-1 type-caption font-medium transition-colors border",
+                      categoryFilter === cat
+                        ? "bg-foreground text-background border-foreground"
+                        : "bg-transparent text-muted-foreground border-border/60 hover:border-foreground/40 hover:text-foreground"
+                    )}
+                  >
+                    {CATEGORY_LABELS[cat] ?? cat}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Available grid */}
             <div className="grid gap-3 md:grid-cols-2">
-              {filteredAvailable.map((provider) => (
+              {(readOnly ? availableProviders : filteredAvailable).map((provider) => (
                 <AvailableCard
                   key={provider.id}
                   provider={provider}
                   onConnect={handleConnect}
+                  readOnly={readOnly}
                 />
               ))}
             </div>
