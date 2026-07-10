@@ -20,4 +20,10 @@ class AuditLog < ApplicationRecord
   def linked_to_event?
     tool_event_id.present?
   end
+
+  # Audit logs have no direct user; the acting user is reachable through the
+  # originating tool event (optional, so this can be nil).
+  def user_display
+    tool_event&.user&.display_name
+  end
 end
