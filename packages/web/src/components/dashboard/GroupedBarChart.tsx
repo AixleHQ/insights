@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { formatCount } from "@/lib/formatters";
 import {
   Bar,
   BarChart,
@@ -140,7 +141,7 @@ export function GroupedBarChart({
                               className="size-2 rounded-full"
                               style={{ backgroundColor: s?.color }}
                             />
-                            <span>{s?.label ?? String(name)}: {value}</span>
+                            <span>{s?.label ?? String(name)}: {formatCount(Number(value))}</span>
                           </span>
                         );
                       }}
