@@ -35,7 +35,7 @@ module IngestTokenAuthentication
   # rather than trusted from token issuance time (post-AIX-503).
   def authorize_contribution!
     return if performed?
-    return if @tool_account.organization_membership&.can_contribute?
+    return if @tool_account.organization_membership&.can_manage_projects?
 
     render json: { error: "Forbidden", code: "viewer_cannot_contribute" }, status: :forbidden
   end

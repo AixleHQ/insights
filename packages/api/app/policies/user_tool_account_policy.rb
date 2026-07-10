@@ -31,7 +31,7 @@ class UserToolAccountPolicy < ApplicationPolicy
 
   def can_contribute?
     membership = record.is_a?(OrganizationMembership) ? record : record.organization_membership
-    membership&.can_contribute? || false
+    membership&.can_manage_projects? || false
   end
 
   def own_account?
