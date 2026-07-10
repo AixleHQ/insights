@@ -111,6 +111,55 @@ RSpec.describe 'Admin Authentication', type: :request do
     end
   end
 
+  describe 'logout (DELETE /admin/logout)' do
+    let(:admin_user) { create(:user, :global_admin) }
+
+    it 'terminates the signed-cookie admin session' do
+      allow_any_instance_of(Admin::KeycloakAuthService).to receive(:authenticate)
+        .and_return(Admin::KeycloakAuthService::Result.new(success?: true, user: admin_user, id_token: 'the.id.token'))
+      get '/admin/callback', params: { code: 'irrelevant' }
+      expect(response).to redirect_to('/admin')
+
+      get admin_root_path
+      expect(response).to have_http_status(:ok)
+
+      delete '/admin/logout'
+      # Cookie is cleared AND the browser is bounced to Keycloak to end the SSO session.
+      expect(response).to redirect_to(%r{/protocol/openid-connect/logout})
+
+      get admin_users_path
+      expect(response).to redirect_to('/admin/login')
+    end
+
+    it 'ends the Keycloak SSO session via RP-initiated logout with id_token_hint' do
+      allow_any_instance_of(Admin::KeycloakAuthService).to receive(:authenticate)
+        .and_return(Admin::KeycloakAuthService::Result.new(success?: true, user: admin_user, id_token: 'the.id.token'))
+      get '/admin/callback', params: { code: 'irrelevant' }
+
+      delete '/admin/logout'
+
+      location = response.location
+      expect(location).to include(Keycloak.configuration.end_session_url)
+      expect(location).to include('id_token_hint=the.id.token')
+      expect(location).to include('post_logout_redirect_uri=')
+      # Decode the whole location so we can match the redirect target regardless of encoding.
+      expect(CGI.unescape(location)).to include('/admin/login?notice=Logged+out+successfully')
+    end
+
+    it 'also clears the admin_token JWT fallback cookie' do
+      allow(Keycloak::JwtVerifier).to receive(:verify)
+        .and_return({ 'sub' => admin_user.keycloak_sub })
+      cookies[:admin_token] = 'valid.jwt.token'
+      get admin_root_path
+      expect(response).to have_http_status(:ok)
+
+      delete '/admin/logout'
+
+      get admin_users_path
+      expect(response).to redirect_to('/admin/login')
+    end
+  end
+
   describe 'admin resources' do
     before do
       allow_any_instance_of(Admin::ApplicationController).to receive(:current_admin_user).and_return(global_admin)
