@@ -5,6 +5,7 @@ import {
   useProjectConnectWithApiKey,
   useProjectDeleteConnector,
   useProjectTestConnector,
+  useProjectUpdateConnector,
   useOrgProviderSettings,
 } from "@/hooks/useApi";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -30,6 +31,8 @@ import {
 import type { ConnectorStatus } from "@/lib/types";
 import { ApiKeyConnectSheet } from "@/components/integrations/ApiKeyConnectSheet";
 import { SlackConnectSheet } from "@/components/integrations/SlackConnectSheet";
+
+const MULTI_INSTANCE_PROVIDER_IDS = new Set<string>(["slack"]);
 
 const PROVIDERS: ProviderInfo[] = [
   {
@@ -118,6 +121,7 @@ export function ProjectConnectorsTab({ projectId, orgId = "" }: ProjectConnector
   const connectWithApiKey = useProjectConnectWithApiKey();
   const deleteConnector = useProjectDeleteConnector();
   const testConnector = useProjectTestConnector();
+  const updateConnector = useProjectUpdateConnector();
 
   const [activeTab, setActiveTab] = useState("connected");
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -148,7 +152,8 @@ export function ProjectConnectorsTab({ projectId, orgId = "" }: ProjectConnector
       return {
         id: c.id,
         provider: connectorType as IntegrationProvider,
-        name: externalAccountName || providerInfo?.name || connectorType,
+        name: c.label || externalAccountName || providerInfo?.name || connectorType,
+        label: c.label,
         status,
         last_sync_at: lastSyncAt || undefined,
         sync_error: syncError,
@@ -161,10 +166,16 @@ export function ProjectConnectorsTab({ projectId, orgId = "" }: ProjectConnector
     });
   }, [connectorsData]);
 
-  const connectedProviderIds = new Set(integrations.map((c) => c.provider));
-  const availableProviders = PROVIDERS.filter(
-    (p) => !connectedProviderIds.has(p.id) && enabledMap[p.id] !== false,
-  );
+  const availableProviders = useMemo(() => {
+    const connectedSingleInstanceIds = new Set(
+      integrations
+        .filter((i) => !MULTI_INSTANCE_PROVIDER_IDS.has(i.provider))
+        .map((i) => i.provider),
+    );
+    return PROVIDERS.filter(
+      (p) => !connectedSingleInstanceIds.has(p.id) && enabledMap[p.id] !== false,
+    );
+  }, [integrations, enabledMap]);
 
   const handleConnect = (providerId: string) => {
     const provider = PROVIDERS.find((p) => p.id === providerId) ?? null;
@@ -213,6 +224,14 @@ export function ProjectConnectorsTab({ projectId, orgId = "" }: ProjectConnector
     }
   };
 
+  const handleRename = async (id: string, newLabel: string) => {
+    await updateConnector.mutateAsync({
+      projectId,
+      connectorId: id,
+      data: { label: newLabel },
+    });
+  };
+
   return (
     <>
       {actionError && (
@@ -258,6 +277,7 @@ export function ProjectConnectorsTab({ projectId, orgId = "" }: ProjectConnector
                   key={integration.id}
                   integration={integration}
                   onTest={handleTest}
+                  onRename={handleRename}
                   onDisconnect={handleDisconnect}
                   isTesting={testingConnectorId === integration.id}
                 />

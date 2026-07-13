@@ -53,6 +53,11 @@ RSpec.describe UserToolAccountPolicy, type: :policy do
       expect(policy(other_membership, current_user: user).apply(:create?)).to be false
     end
 
+    it 'denies linking when the user is only a viewer (post-AIX-503)' do
+      viewer_membership = create(:organization_membership, :viewer, user: user, organization: organization)
+      expect(policy(viewer_membership, current_user: user).apply(:create?)).to be false
+    end
+
     it 'allows global admins' do
       expect(policy(other_membership, current_user: global_admin).apply(:create?)).to be true
     end
@@ -65,6 +70,13 @@ RSpec.describe UserToolAccountPolicy, type: :policy do
 
     it 'denies updating other users tool accounts' do
       expect(policy(other_tool_account, current_user: user).apply(:update?)).to be false
+    end
+
+    it 'denies rotating tokens when the user is only a viewer (post-AIX-503)' do
+      viewer = create(:user)
+      viewer_membership = create(:organization_membership, :viewer, user: viewer, organization: organization)
+      viewer_account = create(:user_tool_account, organization_membership: viewer_membership)
+      expect(policy(viewer_account, current_user: viewer).apply(:update?)).to be false
     end
 
     it 'allows global admins' do

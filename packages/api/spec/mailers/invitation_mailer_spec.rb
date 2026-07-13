@@ -81,5 +81,15 @@ RSpec.describe InvitationMailer, type: :mailer do
         expect(mail.text_part.body.decoded).to include(invitation.accept_url)
       end
     end
+
+    # AIX-468: deliver_later must target the "mailers" queue, which is the
+    # only queue Sidekiq is configured to process for mail. If the queue name
+    # drifts, invitation emails silently pile up and never send.
+    describe 'async delivery queue' do
+      it 'enqueues delivery on the "mailers" queue' do
+        expect { described_class.invite(invitation).deliver_later }
+          .to have_enqueued_job.on_queue('mailers')
+      end
+    end
   end
 end

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { AppRoutes, isSafeRedirectPath } from "@/lib/routes";
 import { Loader2, Mail, Fingerprint } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
@@ -216,23 +216,6 @@ export function Login() {
           >
             Sign Up
           </button>
-        </p>
-        <p className="mt-4 text-center text-xs text-muted-foreground/60">
-          <Link
-            to={AppRoutes.legal.terms}
-            state={{ from: AppRoutes.login }}
-            className="hover:text-muted-foreground underline-offset-4 hover:underline"
-          >
-            Terms of Service
-          </Link>
-          {" · "}
-          <Link
-            to={AppRoutes.legal.privacy}
-            state={{ from: AppRoutes.login }}
-            className="hover:text-muted-foreground underline-offset-4 hover:underline"
-          >
-            Privacy Policy
-          </Link>
         </p>
       </div>
     </div>

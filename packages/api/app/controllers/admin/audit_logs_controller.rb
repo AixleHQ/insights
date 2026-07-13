@@ -19,9 +19,9 @@ module Admin
     def generate_csv(audit_logs)
       require "csv"
       CSV.generate(headers: true) do |csv|
-        csv << %w[id user_id action resource_type resource_id created_at]
+        csv << %w[id organization_id raw_event_key risk_level confidence_score created_at]
         audit_logs.find_each do |log|
-          csv << [ log.id, log.user_id, log.action, log.resource_type, log.resource_id, log.created_at ]
+          csv << [ log.id, log.organization_id, log.raw_event_key, log.risk_level, log.confidence_score, log.created_at ]
         end
       end
     end

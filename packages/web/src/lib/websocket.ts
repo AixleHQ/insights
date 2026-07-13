@@ -49,8 +49,7 @@ class ActionCableClient {
 
     try {
       const token = await getAccessToken();
-      const wsUrl = this.baseUrl.replace(/^http/, "ws");
-      const url = `${wsUrl}/cable?token=${token}`;
+      const url = `${this.baseUrl}?token=${token}`;
 
       this.ws = new WebSocket(url);
 
@@ -243,10 +242,23 @@ class ActionCableClient {
 // Singleton instance
 let client: ActionCableClient | null = null;
 
+/**
+ * Build the ActionCable WebSocket URL from the current page origin.
+ *
+ * Rails mounts ActionCable at the root `/cable` (not under `/api/v1`), and both
+ * the Vite dev proxy and the production nginx config proxy `/cable` to the API.
+ * Deriving the URL from `window.location` keeps it same-origin and picks the
+ * correct scheme (`wss` on HTTPS), so it works in dev, staging, and production
+ * without a build-time `VITE_API_URL`.
+ */
+export function buildCableUrl(): string {
+  const scheme = window.location.protocol === "https:" ? "wss" : "ws";
+  return `${scheme}://${window.location.host}/cable`;
+}
+
 export function getWebSocketClient(): ActionCableClient {
   if (!client) {
-    const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
-    client = new ActionCableClient(baseUrl);
+    client = new ActionCableClient(buildCableUrl());
   }
   return client;
 }

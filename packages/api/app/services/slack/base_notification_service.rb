@@ -14,6 +14,12 @@ module Slack
         return
       end
 
+      deliver_to(connector, alert_data)
+    end
+
+    private
+
+    def deliver_to(connector, alert_data)
       response = Faraday.post(connector.access_token) do |req|
         req.headers["Content-Type"] = "application/json"
         req.body = format_message(alert_data).to_json
@@ -25,8 +31,6 @@ module Slack
     rescue Faraday::Error => e
       Rails.logger.error("[#{self.class.name}] Connection error delivering Slack alert for #{resource_identifier}: #{e.message}")
     end
-
-    private
 
     def find_connector
       raise NotImplementedError, "#{self.class.name} must implement #find_connector"

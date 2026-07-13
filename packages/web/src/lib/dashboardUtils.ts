@@ -27,6 +27,10 @@ export function currentMonth(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
+export function isCurrentMonth(value: string): boolean {
+  return value === currentMonth();
+}
+
 export function getLast12Months(): { value: string; label: string }[] {
   const months: { value: string; label: string }[] = [];
   const now = new Date();

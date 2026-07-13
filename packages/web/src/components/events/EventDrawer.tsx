@@ -118,13 +118,18 @@ export function EventDrawer({
   const isOwner = canViewEventPrompt(currentRole);
   const { data: event, isLoading } = useEvent(currentOrg?.id || "", eventId || "");
 
-  const formattedDate = event?.createdAt
-    ? new Date(event.createdAt).toLocaleString("en-US", {
+  const eventDate = event?.occurredAt || event?.createdAt;
+  const formattedDate = eventDate
+    ? new Date(eventDate).toLocaleString("en-US", {
         dateStyle: "medium",
         timeStyle: "short",
       })
     : "";
 
+  const asMetadataString = (value: unknown): string | undefined =>
+    typeof value === "string" && value.trim().length > 0 ? value : undefined;
+  const unmatchedGitAuthor =
+    asMetadataString(event?.metadata?.author_name) ?? asMetadataString(event?.metadata?.git_author_email);
 
   const recentCommit = event
     ? parseRecentCommitFields(event.metadata, event.eventType)
@@ -207,7 +212,7 @@ export function EventDrawer({
                   <div className="grid gap-4 sm:grid-cols-2">
                     <DetailRow
                       icon={Clock}
-                      label="Created"
+                      label="Time"
                       value={formattedDate}
                     />
                     <DetailRow
@@ -216,6 +221,10 @@ export function EventDrawer({
                       value={
                         event.user ? (
                           <span>{event.user.name || event.user.email}</span>
+                        ) : unmatchedGitAuthor ? (
+                          <span className="text-muted-foreground" title="No matching organization member">
+                            {unmatchedGitAuthor}
+                          </span>
                         ) : (
                           <span className="text-muted-foreground">Not assigned</span>
                         )

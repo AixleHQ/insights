@@ -6,35 +6,40 @@ class AuditLogDashboard < Administrate::BaseDashboard
   ATTRIBUTE_TYPES = {
     id: Field::String,
     organization: Field::BelongsTo,
-    user: Field::BelongsTo,
-    action: Field::String,
-    resource_type: Field::String,
-    resource_id: Field::String,
-    details: Field::Text,
-    ip_address: Field::String,
-    user_agent: Field::String,
+    tool_event: Field::BelongsTo,
+    policy_version: Field::BelongsTo,
+    user_display: Field::String,
+    raw_event_key: Field::String,
+    risk_level: Field::String,
+    classification_labels: Field::String,
+    confidence_score: Field::Number.with_options(decimals: 4),
+    sanitization_actions: Field::String,
+    temporal_workflow_id: Field::String,
+    metadata: Field::Text,
     created_at: Field::DateTime
   }.freeze
 
   COLLECTION_ATTRIBUTES = %i[
     id
     organization
-    user
-    action
-    resource_type
+    risk_level
+    confidence_score
     created_at
   ].freeze
 
   SHOW_PAGE_ATTRIBUTES = %i[
     id
     organization
-    user
-    action
-    resource_type
-    resource_id
-    details
-    ip_address
-    user_agent
+    tool_event
+    policy_version
+    user_display
+    raw_event_key
+    risk_level
+    classification_labels
+    confidence_score
+    sanitization_actions
+    temporal_workflow_id
+    metadata
     created_at
   ].freeze
 
@@ -44,6 +49,6 @@ class AuditLogDashboard < Administrate::BaseDashboard
   COLLECTION_FILTERS = {}.freeze
 
   def display_resource(log)
-    "#{log.action} #{log.resource_type} - #{log.created_at&.strftime('%Y-%m-%d %H:%M')}"
+    "#{log.risk_level} #{log.raw_event_key} - #{log.created_at&.strftime('%Y-%m-%d %H:%M')}"
   end
 end

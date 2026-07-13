@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { cn, formatDistanceToNow, formatCurrency, formatNumber, organizationMemberUserId } from "./utils";
+import { cn, formatDistanceToNow, formatCurrency, formatNumber, formatLocalDate, organizationMemberUserId } from "./utils";
 
 describe("cn", () => {
   it("should merge class names", () => {
@@ -15,6 +15,30 @@ describe("cn", () => {
   it("should merge tailwind classes correctly", () => {
     expect(cn("px-2 px-4")).toBe("px-4");
     expect(cn("bg-red-500", "bg-blue-500")).toBe("bg-blue-500");
+  });
+});
+
+describe("formatLocalDate", () => {
+  const originalTz = process.env.TZ;
+
+  afterEach(() => {
+    process.env.TZ = originalTz;
+    vi.useRealTimers();
+  });
+
+  it("uses the user's local calendar day, not UTC (regression for AIX-498)", () => {
+    // User at UTC+4 (Asia/Dubai, no DST): local wall-clock is July 2 00:30,
+    // but the same instant is still July 1 in UTC.
+    process.env.TZ = "Asia/Dubai";
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-01T20:30:00Z"));
+
+    expect(formatLocalDate(new Date())).toBe("2026-07-02");
+  });
+
+  it("pads single-digit month and day", () => {
+    process.env.TZ = "UTC";
+    expect(formatLocalDate(new Date("2026-01-05T12:00:00Z"))).toBe("2026-01-05");
   });
 });
 

@@ -60,6 +60,7 @@ module ToolEvents
       strip_reserved_metadata!
       promote_model_from_metadata!
       normalize_model!
+      normalize_cache_inflated_tokens!
       enrich_cost!
 
       if @session_id.present?
@@ -87,6 +88,34 @@ module ToolEvents
       return if model_from_metadata.blank?
 
       @attributes[:model] = model_from_metadata
+    end
+
+    # AIX-519 (regression of AIX-350): the standard ingest path trusts the
+    # client's tokens_in verbatim. A stale aixle-insights CLI reports
+    # tokens_in = base_input + cache_read + cache_write (Anthropic bundles all three
+    # in usage.input_tokens) while still emitting the correct base_input_tokens and
+    # cache breakdown in metadata. That inflates token aggregates and, because cost
+    # is then priced on the bloated count, server-estimated cost too.
+    #
+    # base_input_tokens is authoritative when present: tokens_in must equal it.
+    # We only ever correct downward (tokens_in > base) so a correctly-mapped payload
+    # (tokens_in already == base) is a no-op. This is the write-time twin of the
+    # BackfillCacheTokenAccuracy migration, keeping the invariant on fresh ingest.
+    def normalize_cache_inflated_tokens!
+      metadata = @attributes[:metadata]
+      return unless metadata.is_a?(Hash)
+
+      base = metadata["base_input_tokens"] || metadata[:base_input_tokens]
+      return if base.blank?
+
+      base = Integer(base, exception: false)
+      return if base.nil?
+
+      tokens_in = @attributes[:tokens_in].to_i
+      return unless tokens_in > base
+
+      @attributes[:tokens_in] = base
+      @attributes[:tokens_total] = base + @attributes[:tokens_out].to_i
     end
 
     def enrich_cost!

@@ -329,7 +329,7 @@ export function ProjectSettings() {
   const { data: project, isLoading: isLoadingProject } = useProject(id || "");
   const { hasRole } = useOrg();
   const { data: me } = useCurrentUser();
-  const { data: projectMembers = [] } = useProjectMembers(id ?? "");
+  const { data: projectMembers = [], isLoading: isLoadingMembers } = useProjectMembers(id ?? "");
 
   const myMembership = projectMembers.find((m: ProjectMember) => m.userId === me?.id);
   const isProjectOwner = hasRole(["owner"]) || myMembership?.role === "owner";
@@ -337,6 +337,21 @@ export function ProjectSettings() {
   const isMemberOfProject = isProjectOwner || !!myMembership;
 
   if (!id) return null;
+
+  // Project settings management is owner-only (backend ProjectPolicy#settings? == update?).
+  // Wait for project + membership data to resolve, then redirect non-owners away entirely.
+  if (isLoadingProject || isLoadingMembers) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-[300px]" />
+      </div>
+    );
+  }
+
+  if (project && !isProjectOwner) {
+    return <Navigate to={AppRoutes.projects.detail(id)} replace />;
+  }
 
   const orgId = project?.organization_id ?? "";
 

@@ -2,7 +2,7 @@
 
 class ScheduledExportJob
   include Sidekiq::Job
-  sidekiq_options queue: "default", retry: 3
+  sidekiq_options queue: "exports", retry: 3
 
   def perform
     ScheduledExport
@@ -29,6 +29,6 @@ class ScheduledExportJob
       }
     ).call
 
-    ScheduledExportMailer.deliver(export, report).deliver_later
+    ScheduledExportMailer.export_report(export, report).deliver_now
   end
 end

@@ -9,11 +9,13 @@ class Project < ApplicationRecord
   has_many :project_audit_logs, dependent: :destroy
   has_many :tool_events, class_name: "ToolEvent", dependent: :restrict_with_error
   has_many :issues, dependent: :destroy
+  has_many :retention_purge_logs, dependent: :restrict_with_error
   has_one :retention_policy, class_name: "ProjectRetentionPolicy", dependent: :destroy
 
   validates :name, presence: true
   validates :slug, presence: true, format: { with: /\A[a-z0-9]+(?:-[a-z0-9]+)*\z/, message: "must be lowercase alphanumeric with hyphens" }
   validates :is_active, inclusion: { in: [ true, false ] }
+  validate :slug_unique_within_scope
   validate :git_remote_url_unique_within_scope
   validate :must_belong_to_org_or_owner
 
@@ -87,6 +89,26 @@ class Project < ApplicationRecord
   def generate_slug
     return if slug.present?
     self.slug = name.to_s.parameterize
+  end
+
+  # Runs after generate_slug, so slug is already set. Mirrors the DB-level unique
+  # indexes on (organization_id, slug) / (owner_id, slug) so a duplicate name
+  # surfaces as a :name error instead of falling through to a RecordNotUnique
+  # at save time (which the controller could only attribute to git_remote_url).
+  def slug_unique_within_scope
+    return if slug.blank?
+
+    if organization_id.present?
+      conflict = Project.where(organization_id: organization_id, slug: slug).where.not(id: id).first
+      return unless conflict
+
+      errors.add(:name, "is already taken in this organization")
+    elsif owner_id.present?
+      conflict = Project.where(owner_id: owner_id, slug: slug).where.not(id: id).first
+      return unless conflict
+
+      errors.add(:name, "is already taken on your account")
+    end
   end
 
   # Runs after normalize_git_remote_url_field, so git_remote_url is already canonical.

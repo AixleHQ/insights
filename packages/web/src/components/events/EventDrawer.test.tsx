@@ -97,3 +97,48 @@ describe("EventDrawer token display", () => {
     expect(rows.length).toBeGreaterThanOrEqual(1);
   });
 });
+
+describe("EventDrawer time and unmatched author display", () => {
+  it("displays occurredAt rather than createdAt (ingestion time) in the Time row", () => {
+    renderDrawer({
+      createdAt: "2026-07-02T00:53:00Z",
+      occurredAt: "2026-06-15T09:00:00Z",
+    });
+    const expected = new Date("2026-06-15T09:00:00Z").toLocaleString("en-US", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+    expect(screen.getAllByText(new RegExp(expected)).length).toBeGreaterThan(0);
+  });
+
+  it("falls back to occurredAt || createdAt when occurredAt is missing", () => {
+    renderDrawer({ createdAt: "2026-07-02T00:53:00Z", occurredAt: undefined as unknown as string });
+    const expected = new Date("2026-07-02T00:53:00Z").toLocaleString("en-US", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+    expect(screen.getAllByText(new RegExp(expected)).length).toBeGreaterThan(0);
+  });
+
+  it("shows the raw git author name when no org member matches the commit author", () => {
+    renderDrawer({
+      user: null,
+      metadata: { author_name: "Margaret Hamilton", git_author_email: "margaret.hamilton@example.com" },
+    });
+    expect(screen.getByText("Margaret Hamilton")).toBeInTheDocument();
+    expect(screen.queryByText("Not assigned")).not.toBeInTheDocument();
+  });
+
+  it("falls back to the git author email when author_name is absent", () => {
+    renderDrawer({
+      user: null,
+      metadata: { git_author_email: "margaret.hamilton@example.com" },
+    });
+    expect(screen.getByText("margaret.hamilton@example.com")).toBeInTheDocument();
+  });
+
+  it("shows Not assigned when there is no user and no git author metadata", () => {
+    renderDrawer({ user: null, metadata: {} });
+    expect(screen.getByText("Not assigned")).toBeInTheDocument();
+  });
+});

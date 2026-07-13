@@ -706,7 +706,8 @@ CREATE TABLE public.project_connectors (
     last_error character varying,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    connector_scope character varying DEFAULT 'project'::character varying NOT NULL
+    connector_scope character varying DEFAULT 'project'::character varying NOT NULL,
+    label character varying
 );
 
 --
@@ -1778,10 +1779,10 @@ CREATE INDEX index_project_audit_logs_on_resource_type_and_resource_id ON public
 CREATE INDEX index_project_connectors_on_project_id ON public.project_connectors USING btree (project_id);
 
 --
--- Name: index_project_connectors_on_project_id_and_connector_type; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_project_connectors_single_instance; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX index_project_connectors_on_project_id_and_connector_type ON public.project_connectors USING btree (project_id, connector_type);
+CREATE UNIQUE INDEX idx_project_connectors_single_instance ON public.project_connectors USING btree (project_id, connector_type) WHERE (connector_type <> ALL (ARRAY['slack'::public.connector_type]));
 
 --
 -- Name: index_project_memberships_on_created_by_id; Type: INDEX; Schema: public; Owner: -
@@ -2435,6 +2436,8 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260706203934'),
+('20260702122302'),
 ('20260626120000'),
 ('20260624105300'),
 ('20260617091734'),

@@ -47,6 +47,16 @@ class ToolEvent < ApplicationRecord
     in_range(start_time, end_time).sum(:cost_usd)
   end
 
+  # Canonical risk classification for display. Mirrors the audit_logs-first,
+  # metadata-fallback precedence used by ToolEventFilterable#apply_tool_event_risk_level_filter
+  # so filtering and display never disagree about an event's risk level.
+  def canonical_risk_level
+    latest_audit_log = audit_logs.max_by(&:created_at)
+    return latest_audit_log.risk_level if latest_audit_log
+
+    metadata&.dig("risk_level") || "none"
+  end
+
   private
 
   # Self-heals the model column on every save so legacy/out-of-band rows
