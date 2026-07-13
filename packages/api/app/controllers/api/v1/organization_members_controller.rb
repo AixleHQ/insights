@@ -150,14 +150,20 @@ module Api
         authorize! @membership
         user = @membership.user
 
-        events = current_organization.tool_events.where(user_id: user.id)
+        all_events = current_organization.tool_events.where(user_id: user.id)
+
+        # Range-scoped events drive every metric and breakdown below. ?all_time=true
+        # removes the bound; ?days=N is a rolling window (default 30). The "today /
+        # this week / this month" cards are fixed windows independent of the range.
+        range_start = member_stats_range_start
+        events = range_start ? all_events.where("occurred_at >= ?", range_start) : all_events
 
         # Basic counts
         total_events = events.count
         total_cost = events.sum(:cost_usd)
-        events_today = events.where("occurred_at >= ?", client_zone.now.beginning_of_day).count
-        events_this_week = events.where("occurred_at >= ?", 1.week.ago).count
-        events_this_month = events.where("occurred_at >= ?", 1.month.ago).count
+        events_today = all_events.where("occurred_at >= ?", client_zone.now.beginning_of_day).count
+        events_this_week = all_events.where("occurred_at >= ?", 1.week.ago).count
+        events_this_month = all_events.where("occurred_at >= ?", 1.month.ago).count
 
         # Token totals
         total_tokens_in = events.sum(:tokens_in)
@@ -219,9 +225,8 @@ module Api
             }
           end
 
-        # Daily activity for last 30 days
+        # Daily activity for the selected range (drives the activity heatmap).
         daily_activity = events
-          .where("occurred_at >= ?", 30.days.ago)
           .group(date_sql)
           .select(
             "#{date_sql} as date",
@@ -238,8 +243,9 @@ module Api
           .select(:id, :name, :slug)
           .map { |p| { id: p.id, name: p.name, slug: p.slug } }
 
-        # Also include projects with events even if not explicitly a member
-        project_ids_from_events = events.where.not(project_id: nil).distinct.pluck(:project_id)
+        # Also include projects with events even if not explicitly a member.
+        # Uses full history so short ranges don't hide a member's projects.
+        project_ids_from_events = all_events.where.not(project_id: nil).distinct.pluck(:project_id)
         projects_from_events = current_organization.projects
           .where(id: project_ids_from_events)
           .where.not(id: projects.map { |p| p[:id] })
@@ -482,6 +488,16 @@ module Api
       end
 
       private
+
+      # Resolves the start of the member-stats window. Returns nil for ?all_time=true
+      # (no lower bound), otherwise a rolling window of ?days=N (default 30, clamped
+      # 1..730) anchored to the start of the day in the client's timezone.
+      def member_stats_range_start
+        return nil if ActiveModel::Type::Boolean.new.cast(params[:all_time])
+
+        days = (params[:days] || 30).to_i.clamp(1, 730)
+        client_zone.now.beginning_of_day - (days - 1).days
+      end
 
       def period_days(period)
         case period

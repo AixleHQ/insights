@@ -21,7 +21,7 @@ import {
   GitCommitHorizontal,
 } from "lucide-react";
 import { useOrg } from "@/contexts/OrgContext";
-import { useMember, useMemberEvents, useMemberStats, useProject, useEvents } from "@/hooks/useApi";
+import { useMember, useMemberEvents, useMemberStats, useProject, useEvents, type MemberStatsRange } from "@/hooks/useApi";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -72,6 +72,20 @@ function getInitials(name?: string | null, email?: string): string {
 }
 
 type EventSortField = "created_at" | "tool_name" | "risk_level" | "cost_usd";
+
+const RANGE_OPTIONS: { value: MemberStatsRange; label: string }[] = [
+  { value: "30d", label: "30d" },
+  { value: "90d", label: "90d" },
+  { value: "1y", label: "1y" },
+  { value: "all", label: "All time" },
+];
+
+const RANGE_SUBTITLE: Record<MemberStatsRange, string> = {
+  "30d": "Last 30 days",
+  "90d": "Last 90 days",
+  "1y": "Last year",
+  all: "All time",
+};
 
 const riskOrder: Record<string, number> = {
   critical: 4,
@@ -147,6 +161,8 @@ export interface MemberProfileViewProps {
 export function MemberProfileView({ memberId, embedded = false, projectId }: MemberProfileViewProps) {
   const { currentOrg } = useOrg();
 
+  // Time-range for headline stats, breakdowns, and the activity heatmap.
+  const [range, setRange] = useState<MemberStatsRange>("30d");
   // Tool usage sorting state
   const [toolSortField, setToolSortField] = useState<ToolSortField>("count");
   const [toolSortDirection, setToolSortDirection] = useState<SortDirection>("desc");
@@ -173,7 +189,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
   }, []);
 
   const { data: member, isLoading: memberLoading } = useMember(currentOrg?.id || "", memberId);
-  const { data: statsData } = useMemberStats(currentOrg?.id || "", memberId);
+  const { data: statsData } = useMemberStats(currentOrg?.id || "", memberId, range);
   const { data: eventsResponse, isLoading: eventsLoading } = useMemberEvents(
     currentOrg?.id || "",
     memberId,
@@ -422,6 +438,23 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
         </div>
       )}
 
+      {/* Time-range selector — applies to headline stats, breakdowns, and the heatmap */}
+      <div className="flex items-center justify-end">
+        <div className="flex gap-1">
+          {RANGE_OPTIONS.map((opt) => (
+            <Button
+              key={opt.value}
+              variant={range === opt.value ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => setRange(opt.value)}
+            >
+              {opt.label}
+            </Button>
+          ))}
+        </div>
+      </div>
+
       {/* Activity Heatmap */}
       {stats.daily_activity && stats.daily_activity.length > 0 && (
         <TooltipProvider>
@@ -440,7 +473,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
         <StatCard
           title="Total Cost"
           value={formatCost(stats.total_cost)}
-          subtitle="All time"
+          subtitle={RANGE_SUBTITLE[range]}
           icon={DollarSign}
         />
         <StatCard

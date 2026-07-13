@@ -87,7 +87,8 @@ export const queryKeys = {
     all: (orgId: string) => ["organizations", orgId, "members"] as const,
     detail: (orgId: string, id: string) => ["organizations", orgId, "members", id] as const,
     events: (orgId: string, id: string) => ["organizations", orgId, "members", id, "events"] as const,
-    stats: (orgId: string, id: string) => ["organizations", orgId, "members", id, "stats"] as const,
+    stats: (orgId: string, id: string, range?: string) =>
+      ["organizations", orgId, "members", id, "stats", range ?? "30d"] as const,
     dashboardStats: (orgId: string, userId: string, period: string) =>
       ["organizations", orgId, "members", userId, "dashboard_stats", period] as const,
     heatmap: (orgId: string, userId: string) =>
@@ -616,11 +617,22 @@ export interface MemberStats {
   }[];
 }
 
-export function useMemberStats(orgId: string, memberId: string) {
+export type MemberStatsRange = "30d" | "90d" | "1y" | "all";
+
+const MEMBER_STATS_RANGE_PARAM: Record<MemberStatsRange, string> = {
+  "30d": "days=30",
+  "90d": "days=90",
+  "1y": "days=365",
+  all: "all_time=true",
+};
+
+export function useMemberStats(orgId: string, memberId: string, range: MemberStatsRange = "30d") {
   return useQuery({
-    queryKey: queryKeys.members.stats(orgId, memberId),
+    queryKey: queryKeys.members.stats(orgId, memberId, range),
     queryFn: async () => {
-      const response = await api.get<MemberStats>(appendTz(`/organizations/${orgId}/members/${memberId}/stats`));
+      const response = await api.get<MemberStats>(
+        appendTz(`/organizations/${orgId}/members/${memberId}/stats?${MEMBER_STATS_RANGE_PARAM[range]}`)
+      );
       return response;
     },
     enabled: !!orgId && !!memberId,

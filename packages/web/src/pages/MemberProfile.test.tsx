@@ -118,6 +118,20 @@ describe("MemberProfileView", () => {
     });
   });
 
+  describe("time-range selector", () => {
+    it("requests the 30-day range by default", () => {
+      render(<MemberProfileView memberId="mem-1" />);
+      expect(mockUseMemberStats).toHaveBeenLastCalledWith("org-1", "mem-1", "30d");
+    });
+
+    it("re-requests stats for the selected range when All time is clicked", async () => {
+      const user = userEvent.setup();
+      render(<MemberProfileView memberId="mem-1" />);
+      await user.click(screen.getByRole("button", { name: "All time" }));
+      expect(mockUseMemberStats).toHaveBeenLastCalledWith("org-1", "mem-1", "all");
+    });
+  });
+
   describe("with projectId", () => {
     it("renders the project commits section header", () => {
       render(<MemberProfileView memberId="mem-1" projectId="proj-1" />);
