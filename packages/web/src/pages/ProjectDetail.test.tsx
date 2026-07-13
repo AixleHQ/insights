@@ -191,6 +191,12 @@ describe("ProjectDetail", () => {
     expect(screen.getByText("Repositories")).toBeInTheDocument();
   });
 
+  it("renders Leaderboard section on the overview", () => {
+    render(<ProjectDetail />);
+
+    expect(screen.getByText("Leaderboard")).toBeInTheDocument();
+  });
+
   it("navigates to settings when Settings menu item is clicked", async () => {
     mockHasRole.mockReturnValue(true);
     const user = userEvent.setup();

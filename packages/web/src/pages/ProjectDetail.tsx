@@ -58,6 +58,7 @@ import { ToolUsageByDayChart } from "@/components/dashboard";
 import { getDaysForRange, type TimeRange } from "@/lib/chartUtils";
 import {
   ProjectReposSection,
+  ProjectTeamSection,
   ProjectNotFound,
   ConnectRepoSheet,
   ProjectIssuesTab,
@@ -125,7 +126,7 @@ export function ProjectDetail() {
   const granularity = timeRange === "1y" ? "month" : "day";
 
   const { data: project, isLoading: isLoadingProject } = useProject(id || "");
-  const { data: projectMembers } = useProjectMembers(id || "");
+  const { data: projectMembers, isLoading: isLoadingMembers } = useProjectMembers(id || "");
   const { data: me } = useCurrentUser();
   const { data: projectStats, isLoading: isLoadingStats } = useProjectStats(id || "", 30);
   const { data: dailyByToolData, isLoading: isLoadingDailyByTool, isError: isErrorDailyByTool, refetch: refetchDailyByTool } = useProjectDailyByTool(id || "", selectedDays, granularity);
@@ -339,13 +340,23 @@ export function ProjectDetail() {
             />
           )}
 
-          {/* Repositories */}
-          <ProjectReposSection
-            repositories={projectRepositories}
-            isLoading={isLoadingRepositories}
-            onConnectRepo={() => setConnectRepoOpen(true)}
-            onDisconnect={(repoId) => disconnectRepo.mutateAsync(repoId)}
-          />
+          {/* Repositories + Leaderboard */}
+          <div className="grid gap-4 md:grid-cols-2">
+            <ProjectReposSection
+              repositories={projectRepositories}
+              isLoading={isLoadingRepositories}
+              onConnectRepo={() => setConnectRepoOpen(true)}
+              onDisconnect={(repoId) => disconnectRepo.mutateAsync(repoId)}
+            />
+
+            <ProjectTeamSection
+              members={projectMembers}
+              isLoading={isLoadingMembers}
+              projectId={id}
+              orgId={currentOrg?.id}
+              canManage={canManageMembers}
+            />
+          </div>
 
           {(project.sourceControlSummary?.length ?? 0) > 0 && (
             <Card>
