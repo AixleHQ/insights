@@ -442,6 +442,51 @@ RSpec.describe 'Api::V1::Ingest', type: :request do
       end
     end
 
+    # AIX-519 (regression of AIX-350) — end-to-end guard on the standard
+    # ingest path. A stale CLI sends cache-inflated tokens_in with the correct
+    # base_input_tokens in metadata; the server must store the base value and
+    # price with cache-aware rates. Temporal is stubbed to fail so the request
+    # takes fallback_direct_insert → ToolEvents::Upsert and persists synchronously.
+    context 'with a claude_jsonl chat event carrying cache-inflated tokens_in (AIX-519)' do
+      let!(:tool_account) do
+        create(:user_tool_account, organization_membership: membership, tool_name: 'claude_code')
+      end
+      let(:cache_inflated_payload) do
+        {
+          event_type: 'chat',
+          model: 'claude-sonnet-5',
+          tokens_in: 12_680_246, # 455 + 12_650_378 + 29_413
+          tokens_out: 16_889,
+          metadata: {
+            session_id: 'qa-519-regression-test:1',
+            claude_session_id: 'qa-519-regression-test',
+            transcript_source: 'claude_jsonl',
+            base_input_tokens: 455,
+            cache_read_tokens: 12_650_378,
+            cache_write_tokens: 29_413,
+            output_tokens: 16_889
+          }
+        }
+      end
+
+      before do
+        allow(Temporal::Client).to receive(:start_workflow).and_raise(StandardError, 'skip workflow')
+      end
+
+      it 'stores tokens_in == base_input_tokens and a cache-aware cost' do
+        expect {
+          ingest_post(payload: cache_inflated_payload)
+        }.to change(ToolEvent, :count).by(1)
+
+        expect(response).to have_http_status(:accepted)
+        event = ToolEvent.last
+        expect(event.tokens_in).to eq(455)
+        expect(event.tokens_total).to eq(455 + 16_889)
+        expect(event.cost_usd.to_f).to be < 12.73
+        expect(event.metadata['cost_source']).to eq('server_estimated')
+      end
+    end
+
     # AIX-261 — server-side jira_ticket extraction. Same fallback_direct_insert
     # path as the AIX-260 block above.
     context 'with a commit event carrying a ticket-bearing branch_name (AIX-261)' do
