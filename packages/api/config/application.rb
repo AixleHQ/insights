@@ -34,7 +34,24 @@ module Api
     # (api_only mode strips it out by default, breaking PATCH/DELETE form submissions)
     config.middleware.use Rack::MethodOverride
     config.middleware.use ActionDispatch::Cookies
-    config.middleware.use ActionDispatch::Session::CookieStore, key: "_db90_admin_session"
+    # CacheStore (not CookieStore): admin session content (e.g. the Keycloak id_token
+    # needed for RP-initiated logout) must live server-side — a full JWT would blow past
+    # cookie/header size limits if it round-tripped through the browser cookie itself.
+    #
+    # Uses its own RedisCacheStore instance (own "admin_session" namespace), not the shared
+    # Rails.cache — the app cache is also used for rate limiting, JWKS caching, etc., and a
+    # future Rails.cache.clear elsewhere would otherwise silently force-logout every admin.
+    # Note: this still shares the underlying Redis with Rails.cache, so a `maxmemory-policy`
+    # with eviction (e.g. allkeys-lru) on that instance could still drop sessions under memory
+    # pressure — confirm with infra that eviction isn't enabled for this Redis.
+    config.middleware.use ActionDispatch::Session::CacheStore,
+      key: "_db90_admin_session",
+      cache: if Rails.env.test?
+        ActiveSupport::Cache::MemoryStore.new
+      else
+        ActiveSupport::Cache::RedisCacheStore.new(url: ENV["REDIS_URL"], namespace: "admin_session")
+      end,
+      expire_after: 1.day
     config.middleware.use ActionDispatch::Flash
 
     # Use SQL format for schema to preserve raw SQL (TimescaleDB, custom types, etc.)
