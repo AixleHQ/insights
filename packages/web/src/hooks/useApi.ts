@@ -150,14 +150,14 @@ export const queryKeys = {
       ["organizations", orgId, "stats", "daily_by_model", { ...opts, tz: clientTimezone }] as const,
     toolOverview: (orgId: string, tool: string) =>
       ["organizations", orgId, "stats", "tools", tool, "overview", clientTimezone] as const,
-    toolModels: (orgId: string, tool: string, days?: number) =>
-      ["organizations", orgId, "stats", "tools", tool, "models", days, clientTimezone] as const,
-    toolUsers: (orgId: string, tool: string, days?: number) =>
-      ["organizations", orgId, "stats", "tools", tool, "users", days, clientTimezone] as const,
-    toolDaily: (orgId: string, tool: string, days?: number, period?: string) =>
-      ["organizations", orgId, "stats", "tools", tool, "daily", days, period, clientTimezone] as const,
-    toolEventTypes: (orgId: string, tool: string, days?: number) =>
-      ["organizations", orgId, "stats", "tools", tool, "event_types", days, clientTimezone] as const,
+    toolModels: (orgId: string, tool: string, days?: number, projectId?: string) =>
+      ["organizations", orgId, "stats", "tools", tool, "models", days, projectId, clientTimezone] as const,
+    toolUsers: (orgId: string, tool: string, days?: number, projectId?: string) =>
+      ["organizations", orgId, "stats", "tools", tool, "users", days, projectId, clientTimezone] as const,
+    toolDaily: (orgId: string, tool: string, days?: number, period?: string, projectId?: string) =>
+      ["organizations", orgId, "stats", "tools", tool, "daily", days, period, projectId, clientTimezone] as const,
+    toolEventTypes: (orgId: string, tool: string, days?: number, projectId?: string) =>
+      ["organizations", orgId, "stats", "tools", tool, "event_types", days, projectId, clientTimezone] as const,
     activeTools: (orgId: string) =>
       ["organizations", orgId, "stats", "active_tools"] as const,
   },
@@ -1415,7 +1415,7 @@ export function useProjectConnectWithSlack() {
       api.post<ProjectConnector>(`/projects/${projectId}/connectors`, {
         connector_type: "slack",
         access_token: webhookUrl,
-        ...(channelLabel ? { external_org_name: channelLabel } : {}),
+        ...(channelLabel ? { label: channelLabel } : {}),
       }),
     onSuccess: (_, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projectConnectors.all(projectId) });
@@ -1444,6 +1444,25 @@ export function useProjectTestConnector() {
         `/projects/${projectId}/connectors/${connectorId}/test`
       ),
     onSettled: (_, __, { projectId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.projectConnectors.all(projectId) });
+    },
+  });
+}
+
+export function useProjectUpdateConnector() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      projectId,
+      connectorId,
+      data,
+    }: {
+      projectId: string;
+      connectorId: string;
+      data: Record<string, unknown>;
+    }) => api.patch<ProjectConnector>(`/projects/${projectId}/connectors/${connectorId}`, data),
+    onSuccess: (_, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projectConnectors.all(projectId) });
     },
   });
@@ -1981,43 +2000,51 @@ export function useToolOverview(orgId: string, tool: string) {
   });
 }
 
-export function useToolModels(orgId: string, tool: string, days = 30) {
+export function useToolModels(orgId: string, tool: string, days = 30, projectId?: string) {
   return useQuery({
-    queryKey: queryKeys.stats.toolModels(orgId, tool, days),
-    queryFn: () =>
-      api.get<ToolModelsResponse>(appendTz(`/organizations/${orgId}/stats/tools/${tool}/models?days=${days}`)),
+    queryKey: queryKeys.stats.toolModels(orgId, tool, days, projectId),
+    queryFn: () => {
+      const p = new URLSearchParams({ days: String(days) });
+      if (projectId) p.set("project_id", projectId);
+      return api.get<ToolModelsResponse>(appendTz(`/organizations/${orgId}/stats/tools/${tool}/models?${p}`));
+    },
     enabled: !!orgId && !!tool,
   });
 }
 
-export function useToolUsers(orgId: string, tool: string, days = 30) {
+export function useToolUsers(orgId: string, tool: string, days = 30, projectId?: string) {
   return useQuery({
-    queryKey: queryKeys.stats.toolUsers(orgId, tool, days),
-    queryFn: () =>
-      api.get<ToolUsersResponse>(appendTz(`/organizations/${orgId}/stats/tools/${tool}/users?days=${days}`)),
+    queryKey: queryKeys.stats.toolUsers(orgId, tool, days, projectId),
+    queryFn: () => {
+      const p = new URLSearchParams({ days: String(days) });
+      if (projectId) p.set("project_id", projectId);
+      return api.get<ToolUsersResponse>(appendTz(`/organizations/${orgId}/stats/tools/${tool}/users?${p}`));
+    },
     enabled: !!orgId && !!tool,
   });
 }
 
-export function useToolDaily(orgId: string, tool: string, days = 30, period?: "day" | "week" | "month") {
+export function useToolDaily(orgId: string, tool: string, days = 30, period?: "day" | "week" | "month", projectId?: string) {
   return useQuery({
-    queryKey: queryKeys.stats.toolDaily(orgId, tool, days, period),
+    queryKey: queryKeys.stats.toolDaily(orgId, tool, days, period, projectId),
     queryFn: () => {
       const p = new URLSearchParams({ days: String(days) });
       if (period) p.set("period", period);
+      if (projectId) p.set("project_id", projectId);
       return api.get<ToolDailyResponse>(appendTz(`/organizations/${orgId}/stats/tools/${tool}/daily?${p}`));
     },
     enabled: !!orgId && !!tool,
   });
 }
 
-export function useToolEventTypes(orgId: string, tool: string, days = 30) {
+export function useToolEventTypes(orgId: string, tool: string, days = 30, projectId?: string) {
   return useQuery({
-    queryKey: queryKeys.stats.toolEventTypes(orgId, tool, days),
-    queryFn: () =>
-      api.get<ToolEventTypesResponse>(
-        appendTz(`/organizations/${orgId}/stats/tools/${tool}/event_types?days=${days}`)
-      ),
+    queryKey: queryKeys.stats.toolEventTypes(orgId, tool, days, projectId),
+    queryFn: () => {
+      const p = new URLSearchParams({ days: String(days) });
+      if (projectId) p.set("project_id", projectId);
+      return api.get<ToolEventTypesResponse>(appendTz(`/organizations/${orgId}/stats/tools/${tool}/event_types?${p}`));
+    },
     enabled: !!orgId && !!tool,
   });
 }
@@ -2258,6 +2285,7 @@ export interface IssueFilters {
   type?: string;
   assignee?: string;
   page?: number;
+  per_page?: number;
 }
 
 export function useProjectIssues(projectId: string, filters?: IssueFilters) {
@@ -2269,6 +2297,7 @@ export function useProjectIssues(projectId: string, filters?: IssueFilters) {
       if (filters?.type) params.set("type", filters.type);
       if (filters?.assignee) params.set("assignee", filters.assignee);
       if (filters?.page) params.set("page", String(filters.page));
+      if (filters?.per_page) params.set("per_page", String(filters.per_page));
       const query = params.toString();
       return api.get<PaginatedResponse<Issue>>(
         `/projects/${projectId}/issues${query ? `?${query}` : ""}`

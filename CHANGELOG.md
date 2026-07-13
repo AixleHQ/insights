@@ -5,6 +5,55 @@ All notable changes to DB90 are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.5] - 2026-07-13
+
+Fifth alpha release. A large accumulated batch from `develop`: multi-Slack
+connectors, export delivery fixes, token-accuracy normalization, access-control
+tightening, and the release runbook. Two reversible migrations (multi-Slack
+index + a batched token backfill on the `tool_events` hypertable).
+
+### Added
+- Multiple Slack connectors per project with fan-out delivery and connector
+  rename/label UI (`AIX-362`).
+- Release & hotfix runbook at `docs/RELEASE.md` (`AIX-169`).
+
+### Changed
+- Thread the dashboard project filter through per-tab tool-insights stats and
+  scope them by `project_id` (`AIX-524`).
+- Hide Library/Feedback nav stubs and remove Terms/Privacy links (`AIX-510`).
+- Move export jobs to a dedicated `exports` queue and drop DB90 branding from
+  export emails and filenames (`AIX-401`).
+- Bump Keycloak to 26.6.4 for jdbc-ping clustering (`AIX-527`).
+- Restrict data contribution to Owners and Members (`AIX-503`).
+- Hide project management actions and guard settings for viewers (`AIX-501`).
+
+### Fixed
+- Normalize cache-inflated `tokens_in` at ingest and backfill the post-350
+  window on existing events (`AIX-519`).
+- Fix scheduled export delivery and download URLs via direct S3 presigned links
+  (`AIX-401`).
+- Process the `mailers` queue so invitation emails actually deliver
+  (`AIX-468`).
+- Fix 500 errors on admin delete of an organization or user by covering the
+  remaining foreign-key gaps (`AIX-372`).
+- Align the audit-log admin dashboard with the real schema (`AIX-520`).
+- Validate duplicate project names and extract create/update into form objects
+  (`AIX-507`).
+- Redirect detail pages on organization switch and reset the dashboard project
+  filter on org switch (`AIX-346`, `AIX-530`).
+- Paginate the project issues list (`AIX-494`).
+- Keep the Cost Trend chart as a rolling window for the current month
+  (`AIX-496`).
+- Derive the ActionCable URL from the page origin (`AIX-497`).
+- Use the local calendar date for Events date presets and apply the `user_id`
+  filter on the Events page (`AIX-498`, `AIX-506`).
+- Show the real event time and git author in the Event Drawer (`AIX-499`).
+- Prevent connector icons from squishing in flex rows (`AIX-500`).
+- Key the Events `risk_level` filter off the latest audit log rather than any
+  historical match (`AIX-464`).
+- Remove ActiveSupport `presence`/`present?` calls from the Temporal worker
+  (`AIX-333`).
+
 ## [1.0.0-alpha.4] - 2026-07-07
 
 Fourth alpha release. A focused production-readiness pass (`AIX-333`): make
@@ -110,6 +159,7 @@ tags cut from the same `release/1.0.0` branch.
 ### Added
 - Initial DB90 platform release cut from `develop` for production infrastructure validation.
 
+[1.0.0-alpha.5]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.5
 [1.0.0-alpha.4]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.4
 [1.0.0-alpha.3]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.3
 [1.0.0-alpha.2]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.2

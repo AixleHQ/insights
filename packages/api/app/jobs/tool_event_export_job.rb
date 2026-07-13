@@ -27,7 +27,7 @@ class ToolEventExportJob
     # column redaction inside ToolEventCsvExporter, not row-level filtering.
     events = org.tool_events
     events = apply_tool_event_filters(events, fp)
-             .includes(:user, :project)
+             .includes(:user, :project, :audit_logs)
              .order(occurred_at: :desc)
 
     summary_lines = ToolEventCsvExporter.filter_summary_lines_for_export(fp, organization: org)

@@ -23,15 +23,6 @@ export const AppRoutes = {
   dashboard: "/",
   notifications: "/notifications",
   alerts: "/alerts",
-  library: "/library",
-  feedback: "/feedback",
-
-  // Legal
-  legal: {
-    terms: "/legal/terms",
-    privacy: "/legal/privacy",
-  },
-
   // Events
   events: {
     root: "/events",

@@ -184,6 +184,15 @@ RSpec.describe 'Api::V1::ProjectLookup', type: :request do
       end
     end
 
+    context 'when the token user is only a viewer (AIX-503)' do
+      before { membership.update!(role: 'viewer') }
+
+      it 'returns 403 and does not resolve the project' do
+        lookup_get(git_remote: raw_url)
+        expect(response).to have_http_status(:forbidden)
+      end
+    end
+
     context 'when project belongs to a different organization' do
       let(:other_org) { create(:organization) }
       let!(:other_project) do

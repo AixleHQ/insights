@@ -442,6 +442,51 @@ RSpec.describe 'Api::V1::Ingest', type: :request do
       end
     end
 
+    # AIX-519 (regression of AIX-350) — end-to-end guard on the standard
+    # ingest path. A stale CLI sends cache-inflated tokens_in with the correct
+    # base_input_tokens in metadata; the server must store the base value and
+    # price with cache-aware rates. Temporal is stubbed to fail so the request
+    # takes fallback_direct_insert → ToolEvents::Upsert and persists synchronously.
+    context 'with a claude_jsonl chat event carrying cache-inflated tokens_in (AIX-519)' do
+      let!(:tool_account) do
+        create(:user_tool_account, organization_membership: membership, tool_name: 'claude_code')
+      end
+      let(:cache_inflated_payload) do
+        {
+          event_type: 'chat',
+          model: 'claude-sonnet-5',
+          tokens_in: 12_680_246, # 455 + 12_650_378 + 29_413
+          tokens_out: 16_889,
+          metadata: {
+            session_id: 'qa-519-regression-test:1',
+            claude_session_id: 'qa-519-regression-test',
+            transcript_source: 'claude_jsonl',
+            base_input_tokens: 455,
+            cache_read_tokens: 12_650_378,
+            cache_write_tokens: 29_413,
+            output_tokens: 16_889
+          }
+        }
+      end
+
+      before do
+        allow(Temporal::Client).to receive(:start_workflow).and_raise(StandardError, 'skip workflow')
+      end
+
+      it 'stores tokens_in == base_input_tokens and a cache-aware cost' do
+        expect {
+          ingest_post(payload: cache_inflated_payload)
+        }.to change(ToolEvent, :count).by(1)
+
+        expect(response).to have_http_status(:accepted)
+        event = ToolEvent.last
+        expect(event.tokens_in).to eq(455)
+        expect(event.tokens_total).to eq(455 + 16_889)
+        expect(event.cost_usd.to_f).to be < 12.73
+        expect(event.metadata['cost_source']).to eq('server_estimated')
+      end
+    end
+
     # AIX-261 — server-side jira_ticket extraction. Same fallback_direct_insert
     # path as the AIX-260 block above.
     context 'with a commit event carrying a ticket-bearing branch_name (AIX-261)' do
@@ -599,12 +644,36 @@ RSpec.describe 'Api::V1::Ingest', type: :request do
         create(:project, organization: other_organization, owner: nil)
       end
 
-      it 'passes project_id through when it belongs to the token org' do
+      it 'passes project_id through when the user is an owner/member of the project' do
+        create(:project_membership, project: accessible_project, user: user, role: 'member')
         ingest_post(payload: valid_payload.merge(project_id: accessible_project.id))
         expect(response).to have_http_status(:accepted)
         expect(Temporal::Client).to have_received(:start_workflow) do |_workflow, **kwargs|
           expect(kwargs[:args][:event][:project_id]).to eq(accessible_project.id)
         end
+      end
+
+      it 'passes project_id through for an org owner (implicit project owner)' do
+        membership.update!(role: 'owner')
+        ingest_post(payload: valid_payload.merge(project_id: accessible_project.id))
+        expect(response).to have_http_status(:accepted)
+        expect(Temporal::Client).to have_received(:start_workflow) do |_workflow, **kwargs|
+          expect(kwargs[:args][:event][:project_id]).to eq(accessible_project.id)
+        end
+      end
+
+      it 'rejects with 403 when the user has no Owner/Member role on the org project (AIX-503)' do
+        ingest_post(payload: valid_payload.merge(project_id: accessible_project.id))
+        expect(response).to have_http_status(:forbidden)
+        expect(response.parsed_body['code']).to eq('project_role_required')
+        expect(Temporal::Client).not_to have_received(:start_workflow)
+      end
+
+      it 'rejects with 403 when the user is only a viewer on the project (AIX-503)' do
+        create(:project_membership, project: accessible_project, user: user, role: 'viewer')
+        ingest_post(payload: valid_payload.merge(project_id: accessible_project.id))
+        expect(response).to have_http_status(:forbidden)
+        expect(response.parsed_body['code']).to eq('project_role_required')
       end
 
       it 'strips project_id from workflow payload when it belongs to a different org' do
@@ -630,6 +699,17 @@ RSpec.describe 'Api::V1::Ingest', type: :request do
         expect(Temporal::Client).to have_received(:start_workflow) do |_workflow, **kwargs|
           expect(kwargs[:args][:event][:project_id]).to eq(personal_project.id)
         end
+      end
+    end
+
+    context 'when the token user is only a viewer in the organization (AIX-503)' do
+      before { membership.update!(role: 'viewer') }
+
+      it 'rejects event ingestion with 403' do
+        ingest_post
+        expect(response).to have_http_status(:forbidden)
+        expect(response.parsed_body['code']).to eq('viewer_cannot_contribute')
+        expect(Temporal::Client).not_to have_received(:start_workflow)
       end
     end
   end

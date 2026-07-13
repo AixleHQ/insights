@@ -172,4 +172,33 @@ RSpec.describe ProjectConnector, type: :model do
       expect(connector.is_active).to be false
     end
   end
+
+  describe '#multi_instance?' do
+    it 'returns true for slack' do
+      connector = build(:project_connector, :slack)
+      expect(connector.multi_instance?).to be true
+    end
+
+    it 'returns false for anthropic' do
+      connector = build(:project_connector, :anthropic)
+      expect(connector.multi_instance?).to be false
+    end
+  end
+
+  describe 'uniqueness validation' do
+    let(:project) { create(:project) }
+
+    it 'blocks a second anthropic connector on the same project' do
+      create(:project_connector, :anthropic, project: project)
+      duplicate = build(:project_connector, :anthropic, project: project)
+      expect(duplicate).not_to be_valid
+      expect(duplicate.errors[:connector_type]).to include("already exists for this project")
+    end
+
+    it 'allows a second slack connector on the same project' do
+      create(:project_connector, :slack, project: project)
+      second = build(:project_connector, :slack, project: project)
+      expect(second).to be_valid
+    end
+  end
 end

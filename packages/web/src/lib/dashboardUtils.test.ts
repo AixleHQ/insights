@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { formatDateLabel, formatLocalDate, sliceCostTrendWindow } from "./dashboardUtils";
+import { describe, it, expect, vi } from "vitest";
+import { formatDateLabel, formatLocalDate, isCurrentMonth, sliceCostTrendWindow } from "./dashboardUtils";
 
 describe("formatDateLabel", () => {
   it("returns month+day for day granularity", () => {
@@ -16,6 +16,27 @@ describe("formatDateLabel", () => {
 describe("formatLocalDate", () => {
   it("formats a local calendar date as YYYY-MM-DD", () => {
     expect(formatLocalDate(new Date(2026, 5, 23))).toBe("2026-06-23");
+  });
+});
+
+describe("isCurrentMonth", () => {
+  it("returns true for the current calendar month", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 6, 1));
+
+    expect(isCurrentMonth("2026-07")).toBe(true);
+
+    vi.useRealTimers();
+  });
+
+  it("returns false for a past or future month", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 6, 1));
+
+    expect(isCurrentMonth("2026-06")).toBe(false);
+    expect(isCurrentMonth("2026-08")).toBe(false);
+
+    vi.useRealTimers();
   });
 });
 

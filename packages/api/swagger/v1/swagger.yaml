@@ -1949,6 +1949,14 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/UserToolAccount'
+        '403':
+          description: |
+            The user holds only the Viewer role in this organization and cannot
+            link tools or obtain ingest tokens (post-AIX-503).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '422':
           $ref: '#/components/responses/ValidationError'
 
@@ -2012,6 +2020,14 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/UserToolAccount'
+        '403':
+          description: |
+            The user holds only the Viewer role in this organization and cannot
+            update tool accounts or rotate ingest tokens (post-AIX-503).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '422':
           $ref: '#/components/responses/ValidationError'
     delete:
@@ -2578,7 +2594,7 @@ paths:
   /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/overview:
     get:
       summary: Tool overview stats
-      description: Returns aggregate usage stats (events, cost, tokens, active users) for a specific tool. Returns 422 if tool_name is not a recognised value.
+      description: Returns aggregate usage stats (events, cost, tokens, active users) for a specific tool. Returns 422 if tool_name is not a recognised value. Pass project_id to scope to a single project (or "none" for unattributed events).
       tags:
         - Stats
       parameters:
@@ -2593,6 +2609,13 @@ paths:
             enum: [claude_code, cursor, windsurf, github_copilot, aider, continue, cody, tabnine, amazon_q, openrouter_api, anthropic_api, openai_api, gemini_api, custom, jira, linear, github, gitlab]
         - $ref: '#/components/parameters/start_date'
         - $ref: '#/components/parameters/end_date'
+        - name: project_id
+          in: query
+          description: >
+            UUID of a specific project, or "none" to filter for events with no project assigned.
+            Omit or leave blank for all activity (org-wide total).
+          schema:
+            type: string
       responses:
         '200':
           description: Tool overview stats for the current month vs previous month
@@ -2638,7 +2661,7 @@ paths:
   /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/models:
     get:
       summary: Tool model breakdown
-      description: Returns per-model usage aggregates (event count, tokens, cost) enriched with pricing data. Sorted by eventCount descending. Null-model events are excluded. Defaults to the last 30 days; pass days or start_date/end_date to override.
+      description: Returns per-model usage aggregates (event count, tokens, cost) enriched with pricing data. Sorted by eventCount descending. Null-model events are excluded. Defaults to the last 30 days; pass days or start_date/end_date to override. Pass project_id to scope to a single project (or "none" for unattributed events).
       tags:
         - Stats
       parameters:
@@ -2659,6 +2682,13 @@ paths:
             default: 30
         - $ref: '#/components/parameters/start_date'
         - $ref: '#/components/parameters/end_date'
+        - name: project_id
+          in: query
+          description: >
+            UUID of a specific project, or "none" to filter for events with no project assigned.
+            Omit or leave blank for all activity (org-wide total).
+          schema:
+            type: string
       responses:
         '200':
           description: Model breakdown for the tool
@@ -2717,7 +2747,7 @@ paths:
   /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/users:
     get:
       summary: Tool user breakdown
-      description: Returns top users by token consumption for a specific tool, sorted by totalTokens descending. Events without a user_id are excluded.
+      description: Returns top users by token consumption for a specific tool, sorted by totalTokens descending. Events without a user_id are excluded. Pass project_id to scope to a single project (or "none" for unattributed events).
       tags:
         - Stats
       parameters:
@@ -2748,6 +2778,13 @@ paths:
             default: 20
             minimum: 1
             maximum: 100
+        - name: project_id
+          in: query
+          description: >
+            UUID of a specific project, or "none" to filter for events with no project assigned.
+            Omit or leave blank for all activity (org-wide total).
+          schema:
+            type: string
       responses:
         '200':
           description: User breakdown sorted by totalTokens descending
@@ -2803,7 +2840,7 @@ paths:
   /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/daily:
     get:
       summary: Tool daily stats
-      description: Returns event counts, tokens, and cost bucketed by the requested granularity (day/week/month) for a specific tool. Every bucket in the range has an entry — buckets with no events are zero-filled.
+      description: Returns event counts, tokens, and cost bucketed by the requested granularity (day/week/month) for a specific tool. Every bucket in the range has an entry — buckets with no events are zero-filled. Pass project_id to scope to a single project (or "none" for unattributed events).
       tags:
         - Stats
       parameters:
@@ -2833,6 +2870,13 @@ paths:
             enum: [day, week, month]
             default: day
         - $ref: '#/components/parameters/tz'
+        - name: project_id
+          in: query
+          description: >
+            UUID of a specific project, or "none" to filter for events with no project assigned.
+            Omit or leave blank for all activity (org-wide total).
+          schema:
+            type: string
       responses:
         '200':
           description: Bucketed trend data with zero-filled gaps
@@ -2890,7 +2934,7 @@ paths:
   /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/event_types:
     get:
       summary: Tool event type breakdown
-      description: Returns per-event-type usage aggregates (event count, tokens, cost) for a specific tool. Sorted by eventCount descending. Defaults to the last 30 days; pass days or start_date/end_date to override.
+      description: Returns per-event-type usage aggregates (event count, tokens, cost) for a specific tool. Sorted by eventCount descending. Defaults to the last 30 days; pass days or start_date/end_date to override. Pass project_id to scope to a single project (or "none" for unattributed events).
       tags:
         - Stats
       parameters:
@@ -2912,6 +2956,13 @@ paths:
           schema:
             type: integer
             default: 30
+        - name: project_id
+          in: query
+          description: >
+            UUID of a specific project, or "none" to filter for events with no project assigned.
+            Omit or leave blank for all activity (org-wide total).
+          schema:
+            type: string
       responses:
         '200':
           description: Event type breakdown sorted by eventCount descending
@@ -4393,6 +4444,236 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /api/v1/projects/{project_id}/connectors:
+    get:
+      summary: List project connectors
+      description: Returns AI provider and Slack connectors for the project. Slack supports multiple connectors per project.
+      tags:
+        - Project Connectors
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [anthropic, openai, openrouter, gemini, slack]
+        - name: active
+          in: query
+          schema:
+            type: string
+            enum: ['true', 'false']
+      responses:
+        '200':
+          description: Connector list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProjectConnector'
+    post:
+      summary: Create project connector
+      description: >
+        Creates a connector for the project. AI provider types (anthropic, openai, openrouter, gemini)
+        allow only one connector per project. Slack is multi-instance: multiple webhook connectors
+        can be connected simultaneously.
+      tags:
+        - Project Connectors
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                connector_type:
+                  type: string
+                  enum: [anthropic, openai, openrouter, gemini, slack]
+                access_token:
+                  type: string
+                  description: API key (AI providers) or Slack webhook URL
+                label:
+                  type: string
+                  nullable: true
+                  description: Optional label to distinguish multiple Slack connectors (e.g. "#alerts")
+                external_org_name:
+                  type: string
+                  nullable: true
+                is_active:
+                  type: boolean
+                  default: true
+              required:
+                - connector_type
+                - access_token
+      responses:
+        '201':
+          description: Connector created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ProjectConnector'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/projects/{project_id}/connectors/{id}:
+    get:
+      summary: Get project connector
+      tags:
+        - Project Connectors
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Connector
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ProjectConnector'
+    patch:
+      summary: Update project connector
+      tags:
+        - Project Connectors
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                access_token:
+                  type: string
+                refresh_token:
+                  type: string
+                token_expires_at:
+                  type: string
+                  format: date-time
+                external_org_id:
+                  type: string
+                external_org_name:
+                  type: string
+                  nullable: true
+                is_active:
+                  type: boolean
+                label:
+                  type: string
+                  nullable: true
+                  description: User-supplied label to distinguish multiple Slack connectors (e.g. "#alerts")
+      responses:
+        '200':
+          description: Updated connector
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ProjectConnector'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      summary: Delete project connector
+      tags:
+        - Project Connectors
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Connector deleted
+
+  /api/v1/projects/{project_id}/connectors/{id}/test:
+    post:
+      summary: Test project connector
+      tags:
+        - Project Connectors
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Test result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      success:
+                        type: boolean
+                      message:
+                        type: string
+                        nullable: true
+                      error:
+                        type: string
+                        nullable: true
+
+  /api/v1/projects/{project_id}/connectors/{id}/sync:
+    post:
+      summary: Sync project connector
+      tags:
+        - Project Connectors
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Synced connector
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ProjectConnector'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   # ============================================
   # EVENTS
   # ============================================
@@ -5485,7 +5766,10 @@ paths:
                 project_id:
                   type: string
                   format: uuid
-                  description: Optional. Stripped silently if not accessible to the token's org/user.
+                  description: |
+                    Optional. Stripped silently if it is malformed or not accessible to the
+                    token's org/user. If it references a project the user can reach but where
+                    they only hold the Viewer role, the request is rejected with `403`.
                 metadata:
                   type: object
                   additionalProperties: true
@@ -5517,6 +5801,17 @@ paths:
                       - accepted
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: |
+            The token's user is not permitted to contribute usage data.
+            Returned when the user holds only the Viewer role in the organization
+            (`code: "viewer_cannot_contribute"`), or when a supplied `project_id`
+            references a project where the user is only a Viewer
+            (`code: "project_role_required"`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '422':
           $ref: '#/components/responses/ValidationError'
         '429':
@@ -7010,6 +7305,69 @@ components:
         - connectorType
         - isActive
         - scope
+        - createdAt
+        - updatedAt
+
+    ProjectConnector:
+      type: object
+      description: Project-level connector (AI provider or Slack webhook). Tokens are never exposed.
+      properties:
+        id:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        connectorType:
+          type: string
+          enum: [anthropic, openai, openrouter, gemini, slack]
+        isActive:
+          type: boolean
+        status:
+          type: string
+          enum: [connected, testing, error, disconnected]
+        scope:
+          type: string
+          enum: [project]
+        label:
+          type: string
+          nullable: true
+          description: User-supplied label to distinguish multiple connectors of the same provider
+        externalAccountId:
+          type: string
+          nullable: true
+        externalAccountName:
+          type: string
+          nullable: true
+        lastSyncAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastError:
+          type: string
+          nullable: true
+        tokenExpiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        tokenExpired:
+          type: boolean
+        aiProvider:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - projectId
+        - connectorType
+        - isActive
+        - status
+        - scope
+        - aiProvider
         - createdAt
         - updatedAt
 

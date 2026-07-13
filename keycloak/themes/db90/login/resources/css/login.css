@@ -506,14 +506,6 @@ html.login-pf .pf-c-form__label-text {
   cursor: not-allowed;
 }
 
-/* Terms */
-.db90-terms {
-  font-size: 0.75rem;
-  color: var(--db90-muted);
-  text-align: center;
-  line-height: 1.5;
-}
-
 /* Links */
 a {
   color: var(--db90-primary);

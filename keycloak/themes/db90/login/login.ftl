@@ -454,14 +454,6 @@
             box-shadow: 0 0 0 3px oklch(from var(--ring) l c h / 50%);
         }
 
-        /* Terms */
-        .db90-terms {
-            font-size: 0.75rem;
-            color: var(--muted-foreground);
-            text-align: center;
-            line-height: 1.5;
-        }
-
         /* Links */
         a {
             color: var(--primary);
@@ -611,7 +603,6 @@
                         </form>
                     </#if>
 
-                    <p class="db90-terms">By continuing, you agree to our Terms of Service and Privacy Policy.</p>
                 </div>
             </div>
         </div>

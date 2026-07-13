@@ -701,6 +701,24 @@ RSpec.describe 'Api::V1::Stats', type: :request do
     end
   end
 
+  describe 'GET /api/v1/organizations/:organization_id/stats/active_tools (project filter is a no-op)' do
+    it 'ignores project_id — the tab list stays org-wide (AIX-524)' do
+      project = create(:project, organization: organization)
+      create(:tool_event, organization: organization, project: project, user: user,
+             tool_name: 'windsurf', cost_usd: 1.0, occurred_at: Time.current)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/active_tools",
+                        user: user, organization: organization,
+                        params: { project_id: 'none' }
+
+      expect_success
+      names = json_response[:tools].map { |t| t[:tool_name] }
+      # windsurf only exists as a project-attributed event, yet still appears under
+      # project_id=none, because the tab list is intentionally org-wide.
+      expect(names).to include('windsurf')
+    end
+  end
+
   describe 'GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/overview' do
     let(:frozen_time) { Time.zone.parse("2026-04-15 12:00:00") }
     let(:user2) { create(:user) }
@@ -944,6 +962,26 @@ RSpec.describe 'Api::V1::Stats', type: :request do
 
       expect_forbidden
     end
+
+    it 'returns zero events for a project with no matching events, even when other events exist' do
+      empty_project = create(:project, organization: organization)
+      other_project = create(:project, organization: organization)
+
+      travel_to(frozen_time) do
+        create(:tool_event, organization: organization, project: other_project, user: user,
+               tool_name: 'openrouter_api', model: 'claude-3-5-sonnet-20241022', cost_usd: 0.1)
+        create(:tool_event, organization: organization, user: user,
+               tool_name: 'openrouter_api', model: 'claude-3-5-sonnet-20241022', cost_usd: 0.1)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/openrouter_api/models",
+                          user: user, organization: organization,
+                          params: { project_id: empty_project.id }
+      end
+
+      expect_success
+      total = json_response[:models].sum { |m| m[:eventCount] }
+      expect(total).to eq(0)
+    end
   end
 
   describe 'GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/users' do
@@ -1092,6 +1130,26 @@ RSpec.describe 'Api::V1::Stats', type: :request do
       end
 
       expect_forbidden
+    end
+
+    it 'returns zero events for a project with no matching events, even when other events exist' do
+      empty_project = create(:project, organization: organization)
+      other_project = create(:project, organization: organization)
+
+      travel_to(frozen_time) do
+        create(:tool_event, organization: organization, project: other_project, user: user,
+               tool_name: 'cursor', cost_usd: 0.1)
+        create(:tool_event, organization: organization, user: user,
+               tool_name: 'cursor', cost_usd: 0.1)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/cursor/users",
+                          user: user, organization: organization,
+                          params: { project_id: empty_project.id }
+      end
+
+      expect_success
+      total = json_response[:users].sum { |u| u[:eventCount] }
+      expect(total).to eq(0)
     end
   end
 
@@ -1261,6 +1319,67 @@ RSpec.describe 'Api::V1::Stats', type: :request do
 
       expect_forbidden
     end
+
+    it 'scopes to project_id when provided' do
+      project = create(:project, organization: organization)
+      travel_to(frozen_time) do
+        create(:tool_event, organization: organization, project: project, user: user,
+               tool_name: 'claude_code', tokens_in: 10, tokens_out: 10,
+               cost_usd: 0.5, occurred_at: Time.zone.parse('2026-04-10 11:00:00'))
+        authenticated_get path, user: user, organization: organization,
+                          params: { project_id: project.id }
+      end
+
+      expect_success
+      total = json_response[:daily].sum { |d| d[:eventCount] }
+      # Only the single project-attributed event, not the 3 org-wide ones.
+      expect(total).to eq(1)
+    end
+
+    it 'filters to unattributed events when project_id=none' do
+      project = create(:project, organization: organization)
+      travel_to(frozen_time) do
+        create(:tool_event, organization: organization, project: project, user: user,
+               tool_name: 'claude_code', cost_usd: 0.5,
+               occurred_at: Time.zone.parse('2026-04-10 11:00:00'))
+        authenticated_get path, user: user, organization: organization,
+                          params: { project_id: 'none' }
+      end
+
+      expect_success
+      total = json_response[:daily].sum { |d| d[:eventCount] }
+      # The 3 no-project claude_code events; the project-attributed one is excluded.
+      expect(total).to eq(3)
+    end
+
+    it 'returns 404 for project_id belonging to another org' do
+      other_project = create(:project, organization: create(:organization))
+      travel_to(frozen_time) do
+        authenticated_get path, user: user, organization: organization,
+                          params: { project_id: other_project.id }
+      end
+
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it 'returns zero events for a project with no matching events, even when other events exist' do
+      empty_project = create(:project, organization: organization)
+      other_project = create(:project, organization: organization)
+
+      travel_to(frozen_time) do
+        create(:tool_event, organization: organization, project: other_project, user: user,
+               tool_name: 'claude_code', cost_usd: 0.1, occurred_at: Time.zone.parse('2026-04-10 11:00:00'))
+        create(:tool_event, organization: organization, user: user,
+               tool_name: 'claude_code', cost_usd: 0.1, occurred_at: Time.zone.parse('2026-04-11 11:00:00'))
+
+        authenticated_get path, user: user, organization: organization,
+                          params: { project_id: empty_project.id, tz: 'Europe/Belgrade' }
+      end
+
+      expect_success
+      total = json_response[:daily].sum { |d| d[:eventCount] }
+      expect(total).to eq(0)
+    end
   end
 
   describe 'GET /api/v1/organizations/:organization_id/stats/tools/:tool_name/event_types' do
@@ -1373,6 +1492,35 @@ RSpec.describe 'Api::V1::Stats', type: :request do
       end
 
       expect_forbidden
+    end
+
+    it 'returns zero events for a project with no matching events, even when other events exist' do
+      empty_project = create(:project, organization: organization)
+      other_project = create(:project, organization: organization)
+
+      travel_to(frozen_time) do
+        create(:tool_event, organization: organization, project: other_project, user: user,
+               tool_name: 'cursor', event_type: 'chat', cost_usd: 0.1)
+        create(:tool_event, organization: organization, user: user,
+               tool_name: 'cursor', event_type: 'chat', cost_usd: 0.1)
+
+        authenticated_get path, user: user, organization: organization,
+                          params: { project_id: empty_project.id }
+      end
+
+      expect_success
+      total = json_response[:eventTypes].sum { |e| e[:eventCount] }
+      expect(total).to eq(0)
+    end
+  end
+
+  describe 'Cache-Control on tool-scoped stats endpoints (AIX-524 QA follow-up)' do
+    it 'sets Cache-Control: no-store so no intermediate proxy caches project-scoped stats' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/cursor/daily",
+                        user: user, organization: organization
+
+      expect_success
+      expect(response.headers['Cache-Control']).to eq('no-store')
     end
   end
 

@@ -60,6 +60,32 @@ RSpec.describe 'Admin Organizations', type: :request do
       expect(response).to redirect_to(admin_organizations_path)
       expect(Organization.find_by(id: org_id)).to be_nil
     end
+
+    context 'when a project under the organization has a project-level retention purge log' do
+      it 'does not 500 and leaves the organization intact' do
+        project = create(:project, organization: organization)
+        create(:retention_purge_log, :project_level, organization: organization, project: project)
+
+        delete admin_organization_path(organization)
+
+        expect(response).to redirect_to(admin_organizations_path)
+        expect(Organization.find_by(id: organization.id)).to be_present
+        expect(flash[:error]).to be_present
+      end
+    end
+
+    context 'when a project under the organization has tool events (nested restrict)' do
+      it 'shows a non-blank reason instead of leaving the flash message empty' do
+        project = create(:project, organization: organization)
+        create(:tool_event, organization: organization, project: project)
+
+        delete admin_organization_path(organization)
+
+        expect(response).to redirect_to(admin_organizations_path)
+        expect(Organization.find_by(id: organization.id)).to be_present
+        expect(flash[:error]).to be_present
+      end
+    end
   end
 
   describe 'GET /admin/organizations/export' do

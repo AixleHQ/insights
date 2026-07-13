@@ -21,7 +21,7 @@ import {
   type EventRow,
 } from "@/components/events";
 import type { EventsToolFilterOption } from "@/lib/eventsToolFilters";
-import { humanizeToolName, toEventRow } from "@/lib/utils";
+import { formatLocalDate, humanizeToolName, toEventRow } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { showEventsUserColumn, type SortField, type SortDirection } from "@/lib/eventAccess";
 import { UnattributedEvents } from "./UnattributedEvents";
@@ -71,6 +71,8 @@ export function Events() {
     riskLevels: urlParams.get("risk_level")
       ? [urlParams.get("risk_level")!]
       : undefined,
+    userId: urlParams.get("user_id") || undefined,
+    userName: urlParams.get("user_name") || undefined,
   }));
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -99,12 +101,13 @@ export function Events() {
     risk_level: filters.riskLevels,
     event_type: filters.eventTypes,
     project_id: filters.projectIds,
+    user_id: filters.userId,
     start_date: filters.dateFrom,
     end_date: filters.dateTo,
     sort_by: SORT_FIELD_API_MAP[sortField],
     direction: sortDirection,
     tz: clientTimezone,
-  }), [page, pageSize, filters.tools, filters.riskLevels, filters.eventTypes, filters.projectIds, filters.dateFrom, filters.dateTo, sortField, sortDirection]);
+  }), [page, pageSize, filters.tools, filters.riskLevels, filters.eventTypes, filters.projectIds, filters.userId, filters.dateFrom, filters.dateTo, sortField, sortDirection]);
 
   const { data: eventsResponse, isLoading, isFetching, isError, refetch } = useEvents(
     currentOrg?.id || "",
@@ -163,7 +166,7 @@ export function Events() {
     setExportQueued(false);
     setExportError(false);
     const startStr = filters.dateFrom ?? "all";
-    const endStr = filters.dateTo ?? new Date().toISOString().split("T")[0];
+    const endStr = filters.dateTo ?? formatLocalDate(new Date());
     const filename = `aixle-insights-events-${startStr}-${endStr}.csv`;
 
     try {
@@ -174,6 +177,7 @@ export function Events() {
         start_date: filters.dateFrom,
         end_date: filters.dateTo,
         project_id: filters.projectIds,
+        user_id: filters.userId,
         sort_by: SORT_FIELD_API_MAP[sortField],
         direction: sortDirection,
         tz: clientTimezone,

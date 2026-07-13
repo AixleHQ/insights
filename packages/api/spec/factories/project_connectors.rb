@@ -27,6 +27,7 @@ FactoryBot.define do
       connector_type { 'slack' }
       access_token { 'https://hooks.slack.com/services/T00000000/B00000000/EXAMPLE-WEBHOOK-SECRET' }
       external_org_name { '#general' }
+      label { nil }
     end
 
     trait :inactive do

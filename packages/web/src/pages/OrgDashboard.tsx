@@ -31,7 +31,7 @@ import { MemberDashboard } from "@/pages/MemberDashboard";
 import { StatCardSkeleton } from "@/components/ui/skeletons";
 import { formatPercent, periodLabel } from "@/lib/formatters";
 import { type DashboardPeriod } from "@/lib/types";
-import { currentMonth, getLast12Months } from "@/lib/dashboardUtils";
+import { currentMonth, getLast12Months, isCurrentMonth } from "@/lib/dashboardUtils";
 
 // Active Members intentionally uses a fixed rolling window, not the month filter,
 // so the number stays stable while users explore historical months.
@@ -117,13 +117,27 @@ export function OrgDashboard() {
 
   const orgId = currentOrg?.id || "";
   const isAllTime = selectedPeriod.type === "all_time";
+  // AIX-496: the Cost Trend chart has its own Last 7/30 Days window, which should
+  // stay a true trailing window (crossing into the previous month if needed) when the
+  // current month is selected — only historical months stay clamped to the calendar month.
+  const isCurrentMonthSelected = selectedPeriod.type === "month" && isCurrentMonth(selectedPeriod.value);
+  const dailyStatsPeriod = isCurrentMonthSelected ? undefined : selectedPeriod;
+
+  // AIX-530: selectedProjectId belongs to whichever org it was picked under.
+  // Switching orgs must clear it, or dashboard requests keep scoping to a
+  // project that doesn't belong to the newly selected org, causing 404s.
+  const [prevOrgId, setPrevOrgId] = useState(orgId);
+  if (orgId !== prevOrgId) {
+    setPrevOrgId(orgId);
+    setSelectedProjectId(undefined);
+  }
 
   const { data: stats, isLoading: isLoadingStats, isError: isErrorStats, refetch: refetchStats } = useOverviewStats(orgId, selectedProjectId, selectedPeriod);
   // Active Members is intentionally pinned to a rolling window, not the month selector.
   const { data: activeUsersData } = useActiveUsers(orgId, selectedProjectId, ACTIVE_USERS_WINDOW_DAYS);
   const { data: dailyData, isLoading: isLoadingDaily, isError: isErrorDaily, refetch: refetchDaily } = useDailyStats(
     orgId,
-    selectedPeriod,
+    dailyStatsPeriod,
     30,
     isAllTime ? "month" : undefined,
     selectedProjectId,
@@ -318,7 +332,7 @@ export function OrgDashboard() {
               isError={isErrorDaily}
               onRetry={() => refetchDaily()}
               allTime={isAllTime}
-              monthScoped={selectedPeriod.type === "month"}
+              monthScoped={selectedPeriod.type === "month" && !isCurrentMonthSelected}
             />
             <ActivityFeed
               events={events}
@@ -339,6 +353,7 @@ export function OrgDashboard() {
             orgId={orgId}
             days={toolInsightsDays}
             onDaysChange={setToolInsightsDays}
+            projectId={selectedProjectId}
           />
 
           <EventDrawer

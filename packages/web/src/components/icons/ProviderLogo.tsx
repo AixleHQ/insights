@@ -116,7 +116,7 @@ export function ProviderLogo({
     return (
       <span
         className={cn(
-          "inline-flex items-center justify-center rounded-lg bg-muted font-medium uppercase",
+          "inline-flex shrink-0 items-center justify-center rounded-lg bg-muted font-medium uppercase",
           showBackground ? containerSizeClasses[size] : sizeClasses[size],
           className
         )}
@@ -130,7 +130,7 @@ export function ProviderLogo({
     <img
       src={logoPath}
       alt={`${provider} logo`}
-      className={cn("object-contain", sizeClasses[size], !showBackground && className)}
+      className={cn("shrink-0 object-contain", sizeClasses[size], !showBackground && className)}
     />
   );
 
@@ -139,7 +139,7 @@ export function ProviderLogo({
     return (
       <div
         className={cn(
-          "inline-flex items-center justify-center rounded-lg text-white",
+          "inline-flex shrink-0 items-center justify-center rounded-lg text-white",
           containerSizeClasses[size],
           bgColor,
           className

@@ -1,13 +1,15 @@
 class ProjectConnector < ApplicationRecord
   AI_PROVIDER_TYPES = %w[openrouter anthropic openai gemini].freeze
   SLACK_TYPES = %w[slack].freeze
+  MULTI_INSTANCE_CONNECTOR_TYPES = SLACK_TYPES.freeze
   CONNECTOR_TYPES = (AI_PROVIDER_TYPES + SLACK_TYPES).freeze
   STATUSES = %w[connected testing error disconnected].freeze
 
   belongs_to :project
 
   validates :connector_type, presence: true, inclusion: { in: CONNECTOR_TYPES }
-  validates :connector_type, uniqueness: { scope: :project_id, message: "already exists for this project" }
+  validates :connector_type, uniqueness: { scope: :project_id, message: "already exists for this project" },
+            unless: :multi_instance?
   validates :is_active, inclusion: { in: [ true, false ] }
   validates :status, inclusion: { in: STATUSES }
   validates :connector_scope, inclusion: { in: %w[project] }
@@ -24,6 +26,10 @@ class ProjectConnector < ApplicationRecord
   def token_expired?
     return false if token_expires_at.nil?
     token_expires_at < Time.current
+  end
+
+  def multi_instance?
+    connector_type.in?(MULTI_INSTANCE_CONNECTOR_TYPES)
   end
 
   def ai_provider?

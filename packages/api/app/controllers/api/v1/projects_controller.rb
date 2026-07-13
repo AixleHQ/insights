@@ -62,37 +62,30 @@ module Api
 
         authorize! @project
 
-        Project.transaction do
-          @project.save!
-          # Add creator as project owner (for org projects)
-          if @project.organization_project?
-            @project.project_memberships.create!(user: current_user, role: "owner")
-          end
-          log_project_created!
-        end
+        form = Api::V1::ProjectCreateForm.new(@project, current_user: current_user)
 
-        stats = ProjectToolEventAggregates.for_project_ids(
-          [ @project.id ],
-          **aggregate_scope_for_project(@project)
-        )
-        render_created(@project, ProjectSerializer, serializer_params: { project_aggregate_stats: stats })
-      rescue ActiveRecord::RecordInvalid => e
-        render json: {
-          error: "Unprocessable Entity",
-          errors: format_validation_errors(e.record.errors)
-        }, status: :unprocessable_content
-      rescue ActiveRecord::RecordNotUnique
-        render json: {
-          error: "Unprocessable Entity",
-          errors: { git_remote_url: [ "has already been taken" ] }
-        }, status: :unprocessable_content
+        if form.save
+          log_project_created!
+          stats = ProjectToolEventAggregates.for_project_ids(
+            [ @project.id ],
+            **aggregate_scope_for_project(@project)
+          )
+          render_created(@project, ProjectSerializer, serializer_params: { project_aggregate_stats: stats })
+        else
+          render json: {
+            error: "Unprocessable Entity",
+            errors: format_validation_errors(form.errors)
+          }, status: :unprocessable_content
+        end
       end
 
       # PATCH /api/v1/projects/:id
       def update
         authorize! @project
 
-        if @project.update(project_update_params)
+        form = Api::V1::ProjectUpdateForm.new(@project)
+
+        if form.update(project_update_params)
           stats = ProjectToolEventAggregates.for_project_ids(
             [ @project.id ],
             **aggregate_scope_for_project(@project)
@@ -101,14 +94,9 @@ module Api
         else
           render json: {
             error: "Unprocessable Entity",
-            errors: format_validation_errors(@project.errors)
+            errors: format_validation_errors(form.errors)
           }, status: :unprocessable_content
         end
-      rescue ActiveRecord::RecordNotUnique
-        render json: {
-          error: "Unprocessable Entity",
-          errors: { git_remote_url: [ "has already been taken" ] }
-        }, status: :unprocessable_content
       end
 
       # DELETE /api/v1/projects/:id

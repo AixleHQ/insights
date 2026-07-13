@@ -34,8 +34,10 @@ function extractIngestToken(data: McpIngestExchangeData, toolName: string): stri
 }
 
 export function SettingsToolsSection() {
-  const { currentOrg } = useOrg();
+  const { currentOrg, currentRole } = useOrg();
   const orgId = currentOrg?.id ?? "";
+  // Viewers are read-only: no ingest token access (AIX-503).
+  const canContribute = currentRole === "owner" || currentRole === "member";
   const { data: ingestRows, isLoading, isError, error } = useMyToolAccounts(orgId);
   const mcpExchange = useMcpIngestExchange();
 
@@ -117,6 +119,14 @@ export function SettingsToolsSection() {
         <CardContent className="space-y-4">
           {!orgId ? (
             <p className="text-sm text-muted-foreground">Select an organization to manage ingest tokens.</p>
+          ) : !canContribute ? (
+            <div className="rounded-lg border border-dashed bg-muted/30 p-6">
+              <p className="text-sm text-muted-foreground">
+                You don't have permission to contribute data to this organization. Ingest tokens
+                are available to Owners and Members only. Contact an organization owner if you need
+                to connect a tool.
+              </p>
+            </div>
           ) : isLoading ? (
             <div className="space-y-2">
               <Skeleton className="h-10 w-full" />
