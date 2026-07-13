@@ -48,9 +48,9 @@ module Api
       key: "_db90_admin_session",
       cache: if Rails.env.test?
         ActiveSupport::Cache::MemoryStore.new
-      else
+             else
         ActiveSupport::Cache::RedisCacheStore.new(url: ENV["REDIS_URL"], namespace: "admin_session")
-      end,
+             end,
       expire_after: 1.day
     config.middleware.use ActionDispatch::Flash
 
