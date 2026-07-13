@@ -345,8 +345,8 @@ export function ProjectDetail() {
             <ProjectReposSection
               repositories={projectRepositories}
               isLoading={isLoadingRepositories}
-              onConnectRepo={() => setConnectRepoOpen(true)}
-              onDisconnect={(repoId) => disconnectRepo.mutateAsync(repoId)}
+              onConnectRepo={isProjectOwner ? () => setConnectRepoOpen(true) : undefined}
+              onDisconnect={isProjectOwner ? (repoId) => disconnectRepo.mutateAsync(repoId) : undefined}
             />
 
             <ProjectTeamSection
