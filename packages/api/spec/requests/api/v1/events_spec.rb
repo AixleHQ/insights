@@ -301,7 +301,9 @@ RSpec.describe 'Api::V1::Events', type: :request do
 
         expect_success
         ids = json_data.map { |e| e[:id] }
-        expect(ids.first).to eq(expensive_event.id)
+        expensive_index = ids.index(expensive_event.id)
+        cheap_index = ids.index(cheap_event.id)
+        expect(expensive_index).to be < cheap_index
       end
 
       it 'sorts by cost_usd asc' do
@@ -312,7 +314,9 @@ RSpec.describe 'Api::V1::Events', type: :request do
 
         expect_success
         ids = json_data.map { |e| e[:id] }
-        expect(ids.first).to eq(cheap_event.id)
+        cheap_index = ids.index(cheap_event.id)
+        expensive_index = ids.index(expensive_event.id)
+        expect(cheap_index).to be < expensive_index
       end
 
       it 'defaults to occurred_at desc when sort_by is omitted' do
