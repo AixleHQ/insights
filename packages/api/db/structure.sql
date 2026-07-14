@@ -2016,67 +2016,67 @@ CREATE INDEX index_webhook_deliveries_on_organization_connector_id ON public.web
 -- Name: idx_tool_events_external_id; Type: INDEX; Schema: timeseries; Owner: -
 --
 
-CREATE INDEX idx_tool_events_external_id ON timeseries.tool_events USING btree (organization_id, ((metadata ->> 'external_id'::text))) WHERE ((metadata ->> 'external_id'::text) IS NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_tool_events_external_id ON timeseries.tool_events USING btree (organization_id, ((metadata ->> 'external_id'::text))) WHERE ((metadata ->> 'external_id'::text) IS NOT NULL);
 
 --
 -- Name: idx_tool_events_org_cost_occurred; Type: INDEX; Schema: timeseries; Owner: -
 --
 
-CREATE INDEX idx_tool_events_org_cost_occurred ON timeseries.tool_events USING btree (organization_id, cost_usd DESC NULLS LAST, occurred_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_tool_events_org_cost_occurred ON timeseries.tool_events USING btree (organization_id, cost_usd DESC NULLS LAST, occurred_at DESC, id DESC);
 
 --
 -- Name: idx_tool_events_org_occurred; Type: INDEX; Schema: timeseries; Owner: -
 --
 
-CREATE INDEX idx_tool_events_org_occurred ON timeseries.tool_events USING btree (organization_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tool_events_org_occurred ON timeseries.tool_events USING btree (organization_id, occurred_at DESC);
 
 --
 -- Name: idx_tool_events_org_tool_occurred; Type: INDEX; Schema: timeseries; Owner: -
 --
 
-CREATE INDEX idx_tool_events_org_tool_occurred ON timeseries.tool_events USING btree (organization_id, tool_name, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tool_events_org_tool_occurred ON timeseries.tool_events USING btree (organization_id, tool_name, occurred_at DESC);
 
 --
 -- Name: idx_tool_events_org_tokens_in_occurred; Type: INDEX; Schema: timeseries; Owner: -
 --
 
-CREATE INDEX idx_tool_events_org_tokens_in_occurred ON timeseries.tool_events USING btree (organization_id, tokens_in DESC NULLS LAST, occurred_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_tool_events_org_tokens_in_occurred ON timeseries.tool_events USING btree (organization_id, tokens_in DESC NULLS LAST, occurred_at DESC, id DESC);
 
 --
 -- Name: idx_tool_events_project_occurred; Type: INDEX; Schema: timeseries; Owner: -
 --
 
-CREATE INDEX idx_tool_events_project_occurred ON timeseries.tool_events USING btree (project_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tool_events_project_occurred ON timeseries.tool_events USING btree (project_id, occurred_at DESC);
 
 --
 -- Name: idx_tool_events_session_id; Type: INDEX; Schema: timeseries; Owner: -
 --
 
-CREATE INDEX idx_tool_events_session_id ON timeseries.tool_events USING btree (((metadata ->> 'session_id'::text))) WHERE ((metadata ->> 'session_id'::text) IS NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_tool_events_session_id ON timeseries.tool_events USING btree (((metadata ->> 'session_id'::text))) WHERE ((metadata ->> 'session_id'::text) IS NOT NULL);
 
 --
 -- Name: idx_tool_events_tool_occurred; Type: INDEX; Schema: timeseries; Owner: -
 --
 
-CREATE INDEX idx_tool_events_tool_occurred ON timeseries.tool_events USING btree (tool_name, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tool_events_tool_occurred ON timeseries.tool_events USING btree (tool_name, occurred_at DESC);
 
 --
 -- Name: idx_tool_events_user_occurred; Type: INDEX; Schema: timeseries; Owner: -
 --
 
-CREATE INDEX idx_tool_events_user_occurred ON timeseries.tool_events USING btree (user_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tool_events_user_occurred ON timeseries.tool_events USING btree (user_id, occurred_at DESC);
 
 --
 -- Name: index_tool_events_on_metadata_risk_level; Type: INDEX; Schema: timeseries; Owner: -
 --
 
-CREATE INDEX index_tool_events_on_metadata_risk_level ON timeseries.tool_events USING btree (((metadata ->> 'risk_level'::text))) WHERE ((metadata ->> 'risk_level'::text) IS NOT NULL);
+CREATE INDEX IF NOT EXISTS index_tool_events_on_metadata_risk_level ON timeseries.tool_events USING btree (((metadata ->> 'risk_level'::text))) WHERE ((metadata ->> 'risk_level'::text) IS NOT NULL);
 
 --
 -- Name: tool_events_occurred_at_idx; Type: INDEX; Schema: timeseries; Owner: -
 --
 
-CREATE INDEX tool_events_occurred_at_idx ON timeseries.tool_events USING btree (occurred_at DESC);
+CREATE INDEX IF NOT EXISTS tool_events_occurred_at_idx ON timeseries.tool_events USING btree (occurred_at DESC);
 
 --
 -- Name: retention_purge_logs retention_purge_logs_append_only; Type: TRIGGER; Schema: public; Owner: -
