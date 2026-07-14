@@ -59,6 +59,80 @@ RSpec.describe "Performance indexes", type: :model do
     end
   end
 
+  describe "idx_tool_events_org_cost_occurred" do
+    it "exists on timeseries.tool_events" do
+      expect(index_exists?("timeseries", "tool_events", "idx_tool_events_org_cost_occurred")).to be true
+    end
+
+    it "orders cost_usd DESC NULLS LAST (AIX-334: nulls treated as lowest value)" do
+      result = conn.execute(<<~SQL).first
+        SELECT indexdef
+        FROM pg_indexes
+        WHERE schemaname = 'timeseries'
+          AND tablename  = 'tool_events'
+          AND indexname  = 'idx_tool_events_org_cost_occurred'
+      SQL
+
+      expect(result["indexdef"]).to include("cost_usd", "NULLS LAST")
+    end
+
+    it "is used for org + cost sort queries (no Seq Scan on any chunk)" do
+      org = create(:organization)
+      create_list(:tool_event, 5, organization: org, cost_usd: 1.0, occurred_at: 7.days.ago)
+
+      conn.execute("SET LOCAL enable_seqscan = off")
+
+      query = ToolEvent
+        .where(organization_id: org.id)
+        .order(Arel.sql("cost_usd DESC NULLS LAST, occurred_at DESC, id DESC"))
+
+      node_types = explain_with_index_forced(query.to_sql)
+
+      expect(node_types).to(
+        satisfy("include Index Scan or Index Only Scan") do |types|
+          types.include?("Index Scan") || types.include?("Index Only Scan")
+        end
+      )
+    end
+  end
+
+  describe "idx_tool_events_org_tokens_in_occurred" do
+    it "exists on timeseries.tool_events" do
+      expect(index_exists?("timeseries", "tool_events", "idx_tool_events_org_tokens_in_occurred")).to be true
+    end
+
+    it "orders tokens_in DESC NULLS LAST (AIX-334: nulls treated as lowest value)" do
+      result = conn.execute(<<~SQL).first
+        SELECT indexdef
+        FROM pg_indexes
+        WHERE schemaname = 'timeseries'
+          AND tablename  = 'tool_events'
+          AND indexname  = 'idx_tool_events_org_tokens_in_occurred'
+      SQL
+
+      expect(result["indexdef"]).to include("tokens_in", "NULLS LAST")
+    end
+
+    it "is used for org + tokens_in sort queries (no Seq Scan on any chunk)" do
+      org = create(:organization)
+      create_list(:tool_event, 5, organization: org, tokens_in: 100, occurred_at: 7.days.ago)
+
+      conn.execute("SET LOCAL enable_seqscan = off")
+
+      query = ToolEvent
+        .where(organization_id: org.id)
+        .order(Arel.sql("tokens_in DESC NULLS LAST, occurred_at DESC, id DESC"))
+
+      node_types = explain_with_index_forced(query.to_sql)
+
+      expect(node_types).to(
+        satisfy("include Index Scan or Index Only Scan") do |types|
+          types.include?("Index Scan") || types.include?("Index Only Scan")
+        end
+      )
+    end
+  end
+
   describe "index_audit_logs_on_organization_id_and_created_at" do
     it "exists on public.audit_logs" do
       expect(

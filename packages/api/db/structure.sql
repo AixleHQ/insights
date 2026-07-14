@@ -2022,7 +2022,7 @@ CREATE INDEX idx_tool_events_external_id ON timeseries.tool_events USING btree (
 -- Name: idx_tool_events_org_cost_occurred; Type: INDEX; Schema: timeseries; Owner: -
 --
 
-CREATE INDEX idx_tool_events_org_cost_occurred ON timeseries.tool_events USING btree (organization_id, cost_usd DESC, occurred_at DESC, id DESC);
+CREATE INDEX idx_tool_events_org_cost_occurred ON timeseries.tool_events USING btree (organization_id, cost_usd DESC NULLS LAST, occurred_at DESC, id DESC);
 
 --
 -- Name: idx_tool_events_org_occurred; Type: INDEX; Schema: timeseries; Owner: -
@@ -2040,7 +2040,7 @@ CREATE INDEX idx_tool_events_org_tool_occurred ON timeseries.tool_events USING b
 -- Name: idx_tool_events_org_tokens_in_occurred; Type: INDEX; Schema: timeseries; Owner: -
 --
 
-CREATE INDEX idx_tool_events_org_tokens_in_occurred ON timeseries.tool_events USING btree (organization_id, tokens_in DESC, occurred_at DESC, id DESC);
+CREATE INDEX idx_tool_events_org_tokens_in_occurred ON timeseries.tool_events USING btree (organization_id, tokens_in DESC NULLS LAST, occurred_at DESC, id DESC);
 
 --
 -- Name: idx_tool_events_project_occurred; Type: INDEX; Schema: timeseries; Owner: -
@@ -2448,6 +2448,7 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260714120000'),
 ('20260706203934'),
 ('20260702122302'),
 ('20260626120000'),

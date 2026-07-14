@@ -394,6 +394,58 @@ RSpec.describe 'Api::V1::Events', type: :request do
         expect(ids.index(low_event.id)).to be < ids.index(none_event.id)
       end
 
+      it 'sorts null cost_usd last when sorting desc (treated as lowest value)' do
+        null_cost_event = create(:tool_event, organization: organization, user: user, cost_usd: nil)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                          user: user,
+                          organization: organization,
+                          params: { sort_by: 'cost_usd', direction: 'desc' }
+
+        expect_success
+        ids = json_data.map { |e| e[:id] }
+        expect(ids.last).to eq(null_cost_event.id)
+      end
+
+      it 'sorts null cost_usd first when sorting asc (treated as lowest value)' do
+        null_cost_event = create(:tool_event, organization: organization, user: user, cost_usd: nil)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                          user: user,
+                          organization: organization,
+                          params: { sort_by: 'cost_usd', direction: 'asc' }
+
+        expect_success
+        ids = json_data.map { |e| e[:id] }
+        expect(ids.first).to eq(null_cost_event.id)
+      end
+
+      it 'sorts null tokens_in last when sorting desc (treated as lowest value)' do
+        null_tokens_event = create(:tool_event, organization: organization, user: user, tokens_in: nil)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                          user: user,
+                          organization: organization,
+                          params: { sort_by: 'tokens_in', direction: 'desc' }
+
+        expect_success
+        ids = json_data.map { |e| e[:id] }
+        expect(ids.last).to eq(null_tokens_event.id)
+      end
+
+      it 'sorts null tokens_in first when sorting asc (treated as lowest value)' do
+        null_tokens_event = create(:tool_event, organization: organization, user: user, tokens_in: nil)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                          user: user,
+                          organization: organization,
+                          params: { sort_by: 'tokens_in', direction: 'asc' }
+
+        expect_success
+        ids = json_data.map { |e| e[:id] }
+        expect(ids.first).to eq(null_tokens_event.id)
+      end
+
       it 'keeps global sort order consistent across pagination' do
         bulk_events = Array.new(30) do |i|
           create(:tool_event,

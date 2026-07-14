@@ -6,13 +6,14 @@
 # Falls back to `occurred_at DESC` for unknown or missing values.
 # A stable `occurred_at DESC, id DESC` tiebreak is always appended.
 #
-# NULL ordering is left at PostgreSQL defaults (ASC → NULLS LAST,
-# DESC → NULLS FIRST) so that the plain-DESC composite indexes from
-# AddToolEventsSortIndexes serve BOTH directions: a forward scan matches
-# DESC NULLS FIRST, a backward scan matches ASC NULLS LAST. An explicit
-# NULLS LAST on DESC would break pathkey matching and force a seq scan +
-# sort on the hypertable. cost_usd / tokens_in default to 0, so NULLs are
-# rare legacy rows; occurred_at is NOT NULL.
+# cost_usd / tokens_in conceptually default to 0, so NULL rows (rare legacy
+# events) should sort as the lowest value in both directions — NULLS FIRST
+# on ASC, NULLS LAST on DESC. That's the opposite of PostgreSQL's implicit
+# defaults, so both directions specify NULLS ordering explicitly here. This
+# still matches FixToolEventsSortIndexesNullOrdering's `col DESC NULLS LAST`
+# composite indexes: a forward scan matches DESC NULLS LAST, a backward scan
+# matches ASC NULLS FIRST, so one index continues to serve both directions.
+# occurred_at is NOT NULL, so it needs no explicit NULLS ordering.
 #
 # Brakeman note: Arel.sql receives only prebuilt string literals from
 # COLUMN_SORT_SQL / RISK_LEVEL_SORT_SQL — no user input is interpolated.
@@ -27,10 +28,10 @@ class ToolEventSortScope
   COLUMN_SORT_SQL = {
     %w[occurred_at asc]  => Arel.sql("occurred_at ASC,  id ASC"),
     %w[occurred_at desc] => Arel.sql("occurred_at DESC, id DESC"),
-    %w[cost_usd asc]     => Arel.sql("cost_usd ASC,  occurred_at ASC,  id ASC"),
-    %w[cost_usd desc]    => Arel.sql("cost_usd DESC, occurred_at DESC, id DESC"),
-    %w[tokens_in asc]    => Arel.sql("tokens_in ASC,  occurred_at ASC,  id ASC"),
-    %w[tokens_in desc]   => Arel.sql("tokens_in DESC, occurred_at DESC, id DESC"),
+    %w[cost_usd asc]     => Arel.sql("cost_usd ASC NULLS FIRST,  occurred_at ASC,  id ASC"),
+    %w[cost_usd desc]    => Arel.sql("cost_usd DESC NULLS LAST, occurred_at DESC, id DESC"),
+    %w[tokens_in asc]    => Arel.sql("tokens_in ASC NULLS FIRST,  occurred_at ASC,  id ASC"),
+    %w[tokens_in desc]   => Arel.sql("tokens_in DESC NULLS LAST, occurred_at DESC, id DESC"),
     %w[tool_name asc]    => Arel.sql("tool_name ASC,  occurred_at ASC,  id ASC"),
     %w[tool_name desc]   => Arel.sql("tool_name DESC, occurred_at DESC, id DESC")
   }.freeze
