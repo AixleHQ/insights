@@ -2583,13 +2583,6 @@ CREATE INDEX idx_tool_events_external_id ON timeseries.tool_events USING btree (
 -- Name: idx_tool_events_org_cost_occurred; Type: INDEX; Schema: timeseries; Owner: -
 --
 
-CREATE INDEX idx_tool_events_org_cost_occurred ON timeseries.tool_events USING btree (organization_id, cost_usd DESC, occurred_at DESC, id DESC);
-
-
---
--- Name: idx_tool_events_org_cost_occurred; Type: INDEX; Schema: timeseries; Owner: -
---
-
 CREATE INDEX idx_tool_events_org_cost_occurred ON timeseries.tool_events USING btree (organization_id, cost_usd DESC NULLS LAST, occurred_at DESC, id DESC);
 
 --
