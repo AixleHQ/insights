@@ -27,13 +27,15 @@ module Api
         # they start generating activity.
 
         if ActiveModel::Type::Boolean.new.cast(params[:all_time])
-          current_events = base_scope
-          high_risk_count = current_events.where(risky_event_condition).distinct.count
-          active_users = current_events.distinct.count(:user_id)
+          finish = Time.current
+          start  = base_scope.minimum(:occurred_at)&.beginning_of_day || finish
+          totals = stats_query.totals(start: start, finish: finish, timezone: client_timezone)
+          high_risk_count = base_scope.where(risky_event_condition).distinct.count
+          active_users = stats_query.distinct_user_count(start: start, finish: finish, timezone: client_timezone)
 
           render json: {
-            total_events:          current_events.count,
-            total_cost_usd:        current_events.sum(:cost_usd).to_f,
+            total_events:          totals[:event_count],
+            total_cost_usd:        totals[:cost_usd],
             risk_alerts:           high_risk_count,
             active_users:          active_users,
             events_change_percent: nil,
@@ -52,23 +54,24 @@ module Api
         current_start  = anchor.beginning_of_month.in_time_zone(zone)
         current_end    = params[:month].present? ? anchor.end_of_month.in_time_zone(zone).end_of_day : Time.current
         current_events = base_scope.where(occurred_at: current_start..current_end)
-        active_users   = current_events.distinct.count(:user_id)
+        current_totals = stats_query.totals(start: current_start, finish: current_end, timezone: client_timezone)
+        active_users   = stats_query.distinct_user_count(start: current_start, finish: current_end, timezone: client_timezone)
 
         prev_anchor = anchor - 1.month
         prev_start  = prev_anchor.beginning_of_month.in_time_zone(zone)
         prev_end    = prev_anchor.end_of_month.in_time_zone(zone).end_of_day
-        prev_events = base_scope.where(occurred_at: prev_start..prev_end)
+        prev_totals = stats_query.totals(start: prev_start, finish: prev_end, timezone: client_timezone)
 
         # Count distinct tool_events flagged with a non-trivial risk level in the reporting period.
         # Checks audit_logs (canonical) OR metadata (fallback for events that bypassed Temporal).
         high_risk_count = current_events.where(risky_event_condition).distinct.count
 
-        current_count = current_events.count
-        prev_count    = prev_events.count
+        current_count = current_totals[:event_count]
+        prev_count    = prev_totals[:event_count]
         events_change = prev_count > 0 ? ((current_count - prev_count).to_f / prev_count * 100) : 0
 
-        current_cost = current_events.sum(:cost_usd).to_f
-        prev_cost    = prev_events.sum(:cost_usd).to_f
+        current_cost = current_totals[:cost_usd]
+        prev_cost    = prev_totals[:cost_usd]
         cost_change  = prev_cost > 0 ? ((current_cost - prev_cost) / prev_cost * 100) : 0
 
         render json: {
@@ -107,28 +110,16 @@ module Api
         authorize! current_organization, to: :show?
 
         time_range = parse_time_range(default_hours: 24)
-        events = current_organization.tool_events
-                                     .where(occurred_at: time_range[:start]..time_range[:end])
-
-        hourly_data = events
-          .group("DATE_TRUNC('hour', occurred_at)")
-          .select(
-            "DATE_TRUNC('hour', occurred_at) as hour",
-            "COUNT(*) as event_count",
-            "SUM(tokens_in) as tokens_in",
-            "SUM(tokens_out) as tokens_out",
-            "SUM(cost_usd) as cost_usd",
-            "COUNT(DISTINCT user_id) as unique_users"
-          )
-          .order("hour")
+        hourly_data = stats_query
+          .hourly_buckets(start: time_range[:start], finish: time_range[:end])
           .map do |row|
             {
-              hour: row.hour&.iso8601,
-              eventCount: row.event_count,
-              tokensIn: row.tokens_in || 0,
-              tokensOut: row.tokens_out || 0,
-              costUsd: (row.cost_usd || 0).to_f,
-              uniqueUsers: row.unique_users
+              hour: row[:hour]&.iso8601,
+              eventCount: row[:event_count],
+              tokensIn: row[:tokens_in],
+              tokensOut: row[:tokens_out],
+              costUsd: row[:cost_usd],
+              uniqueUsers: row[:unique_users]
             }
           end
 
@@ -150,28 +141,23 @@ module Api
 
         all_time    = ActiveModel::Type::Boolean.new.cast(params[:all_time])
         granularity = %w[week month].include?(params[:period]) ? params[:period] : "day"
-        trunc_sql   = period_trunc_sql(granularity)
 
         if all_time
-          events = scoped_events_base
-
-          rows_by_date = events
-            .group(trunc_sql)
-            .select("#{trunc_sql} as day, COUNT(*) as event_count, SUM(cost_usd) as cost_usd")
-            .order("day")
-            .each_with_object({}) do |row, h|
-              h[row.day.to_date.iso8601] = {
-                date: row.day.to_date.iso8601,
-                event_count: row.event_count,
-                cost_usd: (row.cost_usd || 0).to_f
+          finish = Time.current
+          start  = scoped_events_base.minimum(:occurred_at)&.beginning_of_day || finish
+          rows_by_date = stats_query
+            .period_buckets(start: start, finish: finish, granularity: granularity, timezone: client_timezone)
+            .transform_values do |bucket|
+              {
+                date: bucket[:date],
+                event_count: bucket[:event_count],
+                cost_usd: bucket[:cost_usd]
               }
             end
 
-          tool_breakdown = events
-            .group(:tool_name)
-            .select("tool_name, COUNT(*) as event_count, SUM(cost_usd) as cost_usd")
-            .order(Arel.sql("event_count DESC"))
-            .map { |r| { tool_name: r.tool_name, event_count: r.event_count, cost_usd: (r.cost_usd || 0).to_f } }
+          tool_breakdown = stats_query
+            .tool_breakdown(start: start, finish: finish, timezone: client_timezone)
+            .map { |r| { tool_name: r[:tool_name], event_count: r[:event_count], cost_usd: r[:cost_usd] } }
 
           render json: { data: rows_by_date.values, tool_breakdown: tool_breakdown }
           return
@@ -188,17 +174,18 @@ module Api
           parse_time_range(default_days: days)
         end
 
-        events = scoped_events_base.where(occurred_at: time_range[:start]..time_range[:end])
-
-        rows_by_date = events
-          .group(trunc_sql)
-          .select("#{trunc_sql} as day, COUNT(*) as event_count, SUM(cost_usd) as cost_usd")
-          .order("day")
-          .each_with_object({}) do |row, h|
-            h[row.day.to_date.iso8601] = {
-              date: row.day.to_date.iso8601,
-              event_count: row.event_count,
-              cost_usd: (row.cost_usd || 0).to_f
+        rows_by_date = stats_query
+          .period_buckets(
+            start: time_range[:start],
+            finish: time_range[:end],
+            granularity: granularity,
+            timezone: client_timezone
+          )
+          .transform_values do |bucket|
+            {
+              date: bucket[:date],
+              event_count: bucket[:event_count],
+              cost_usd: bucket[:cost_usd]
             }
           end
 
@@ -211,11 +198,13 @@ module Api
           data_map:    rows_by_date
         ).map { |e| { event_count: 0, cost_usd: 0.0 }.merge(e) }
 
-        tool_breakdown = events
-          .group(:tool_name)
-          .select("tool_name, COUNT(*) as event_count, SUM(cost_usd) as cost_usd")
-          .order(Arel.sql("event_count DESC"))
-          .map { |r| { tool_name: r.tool_name, event_count: r.event_count, cost_usd: (r.cost_usd || 0).to_f } }
+        tool_breakdown = stats_query
+          .tool_breakdown(
+            start: time_range[:start],
+            finish: time_range[:end],
+            timezone: client_timezone
+          )
+          .map { |r| { tool_name: r[:tool_name], event_count: r[:event_count], cost_usd: r[:cost_usd] } }
 
         render json: { data: daily_data, tool_breakdown: tool_breakdown }
       end
@@ -311,10 +300,11 @@ module Api
         start_date = (client_zone.now - 1.year).beginning_of_day
         end_date = Time.current
 
-        daily_counts = current_organization.tool_events
-          .where(occurred_at: start_date..end_date)
-          .group(date_sql)
-          .count
+        daily_counts = stats_query.heatmap_counts(
+          start: start_date,
+          finish: end_date,
+          timezone: client_timezone
+        )
 
         # Convert to array format expected by frontend
         heatmap_data = daily_counts.map do |date, count|
@@ -492,25 +482,20 @@ module Api
         days       = (params[:days] || 30).to_i.clamp(1, 730)
         trunc      = ALLOWED_PERIODS.include?(params[:period]) ? params[:period] : "day"
         time_range = parse_time_range(default_days: days)
-        events     = @tool_events.where(occurred_at: time_range[:start]..time_range[:end])
-
-        rows = events
-          .group(period_trunc_sql(trunc))
-          .select(
-            "#{period_trunc_sql(trunc)} as bucket",
-            "COUNT(*) as event_count",
-            "SUM(tokens_in) as tokens_in",
-            "SUM(tokens_out) as tokens_out",
-            "SUM(cost_usd) as cost_usd"
+        rows = tool_stats_query
+          .tool_period_buckets(
+            start: time_range[:start],
+            finish: time_range[:end],
+            granularity: trunc,
+            timezone: client_timezone
           )
-          .order(Arel.sql("bucket"))
-          .each_with_object({}) do |row, h|
-            h[row.bucket.to_date.iso8601] = {
-              date:       row.bucket.to_date.iso8601,
-              eventCount: row.event_count,
-              tokensIn:   row.tokens_in  || 0,
-              tokensOut:  row.tokens_out || 0,
-              costUsd:    (row.cost_usd  || 0).to_f
+          .transform_values do |bucket|
+            {
+              date:       bucket[:date],
+              eventCount: bucket[:event_count],
+              tokensIn:   bucket[:tokens_in],
+              tokensOut:  bucket[:tokens_out],
+              costUsd:    bucket[:cost_usd]
             }
           end
 
@@ -572,6 +557,27 @@ module Api
       end
 
       private
+
+      def stats_query
+        @stats_query ||= build_stats_query
+      end
+
+      def tool_stats_query
+        @tool_stats_query ||= build_stats_query(tool_name: @tool_name)
+      end
+
+      def build_stats_query(tool_name: nil)
+        project_id = Array.wrap(params[:project_id]).first.to_s.strip.presence
+        unassigned = project_id == "none"
+        resolved_project_id = unassigned ? nil : project_id
+
+        StatsTimeSeriesQuery.new(
+          organization: current_organization,
+          project_id: resolved_project_id,
+          unassigned_project_only: unassigned,
+          tool_name: tool_name
+        )
+      end
 
       def set_tool_scope
         tool = params[:tool_name]
