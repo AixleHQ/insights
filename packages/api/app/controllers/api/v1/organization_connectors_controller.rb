@@ -62,8 +62,17 @@ module Api
       def update
         authorize! @connector
 
+        changes_before = @connector.slice(:is_active, :status, :external_account_name)
+
+        attrs = connector_update_params.to_h.stringify_keys
+
+        if (incoming_config = attrs.delete("config")).present?
+          attrs["config"] = merge_connector_config(incoming_config) if @connector.source_control?
+        end
+
+        @connector.assign_attributes(attrs)
+
         if params[:access_token].present? && (@connector.ai_provider? || @connector.slack_webhook? || @connector.cursor?)
-          @connector.assign_attributes(connector_update_params)
           provider = Oauth::BaseProvider.for(@connector)
           result = provider.test_connection
           unless result[:success]
@@ -74,15 +83,7 @@ module Api
           end
         end
 
-        changes_before = @connector.slice(:is_active, :status, :external_account_name)
-
-        attrs = connector_update_params.to_h.stringify_keys
-
-        if (incoming_config = attrs.delete("config")).present?
-          attrs["config"] = merge_connector_config(incoming_config) if @connector.source_control?
-        end
-
-        if @connector.update(attrs)
+        if @connector.save
           OrganizationAuditLog.log(
             organization: current_organization,
             actor: current_user,
