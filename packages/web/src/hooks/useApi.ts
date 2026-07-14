@@ -1606,6 +1606,9 @@ export function useMcpIngestExchange() {
 // Events Hooks
 // ============================================================================
 
+export type EventSortBy = "occurred_at" | "cost_usd" | "tokens_in" | "tool_name" | "risk_level";
+export type EventSortDirection = "asc" | "desc";
+
 export interface EventsParams {
   [key: string]: string | number | string[] | undefined;
   page?: number;
@@ -1618,10 +1621,8 @@ export interface EventsParams {
   user_id?: string;
   project_id?: string | string[];
   sort_by?: EventSortBy;
-  direction?: "asc" | "desc";
+  direction?: EventSortDirection;
 }
-
-export type EventSortBy = "occurred_at" | "cost_usd" | "tokens_in" | "tool_name" | "risk_level";
 
 /** Serializes query values; arrays become comma-separated. */
 export function appendQueryParam(
@@ -1654,6 +1655,7 @@ export function useEvents(orgId: string, params?: EventsParams, options?: { enab
       );
     },
     enabled: options?.enabled !== false && !!orgId,
+    staleTime: 30_000,
   });
 }
 
