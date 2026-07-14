@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { CheckSquare, Download, Loader2, RefreshCw } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useOrg } from "@/contexts/OrgContext";
-import { useEvents, useExportEvents, useProjects, useCurrentUser, useEventsSummary, queryKeys } from "@/hooks/useApi";
+import { useEvents, useExportEvents, useProjects, useCurrentUser, useEventsSummary, useOrganizationMembers, queryKeys } from "@/hooks/useApi";
 import { useEventsPageUpdates } from "@/hooks/useWebSocket";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,10 +46,9 @@ type EventsTab = "all" | "not_assigned";
 export function Events() {
   const { currentOrg, hasRole, currentRole } = useOrg();
   const { data: me, isLoading: isLoadingMe } = useCurrentUser();
-  const showNotAssignedTab =
-    Boolean(currentOrg) &&
-    (hasRole(["owner"]) ||
-      (!isLoadingMe && Boolean(me?.globalAdmin ?? me?.super_admin)));
+  const isOwnerOrPlatformAdmin =
+    hasRole(["owner"]) || (!isLoadingMe && Boolean(me?.globalAdmin ?? me?.super_admin));
+  const showNotAssignedTab = Boolean(currentOrg) && isOwnerOrPlatformAdmin;
   const [activeTab, setActiveTab] = useState<EventsTab>("all");
   const [bulkAssign, setBulkAssign] = useState<{ fn: () => void; count: number } | null>(null);
   const [assignEventFn, setAssignEventFn] = useState<((eventId: string) => void) | null>(null);
@@ -84,6 +83,9 @@ export function Events() {
   const [exportError, setExportError] = useState(false);
 
   const { data: orgProjects } = useProjects(currentOrg?.id || "");
+  const { data: orgMembers } = useOrganizationMembers(currentOrg?.id || "", {
+    enabled: isOwnerOrPlatformAdmin && !!currentOrg?.id,
+  });
   const { data: eventsSummary } = useEventsSummary(currentOrg?.id || "");
 
   const toolFilterOptions = useMemo<EventsToolFilterOption[]>(() => {
@@ -247,6 +249,7 @@ export function Events() {
         }}
         tools={toolFilterOptions}
         projects={orgProjects}
+        members={orgMembers}
         showConfidence={activeTab === "not_assigned"}
         hideAdvancedFilters={activeTab === "not_assigned"}
         trailing={
