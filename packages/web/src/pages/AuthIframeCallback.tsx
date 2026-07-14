@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Loader2, CheckCircle, XCircle } from "lucide-react";
 import { User } from "oidc-client-ts";
 import { getUserManager } from "../lib/auth";
+import { reportAuthError } from "../lib/rollbar";
 import { config } from "../lib/config";
 
 const keycloakConfig = {
@@ -101,6 +102,7 @@ export function AuthIframeCallback() {
         }
       } catch (error) {
         console.error("Auth callback error:", error);
+        reportAuthError(error, { surface: "AuthIframeCallback" });
         setStatus("error");
         setErrorMessage(error instanceof Error ? error.message : "Authentication failed");
 
