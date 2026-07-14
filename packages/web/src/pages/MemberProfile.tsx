@@ -439,13 +439,20 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
         </div>
       )}
 
-      {/* Time-range selector — applies to headline stats, breakdowns, and the heatmap */}
+      {/* Activity Heatmap */}
+      {heatmapData && heatmapData.length > 0 && (
+        <TooltipProvider>
+          <ActivityHeatmap data={heatmapData} />
+        </TooltipProvider>
+      )}
+
+      {/* Time-range selector — applies to headline stats and breakdowns below */}
       <div className="flex items-center justify-end">
         <div className="flex gap-1">
           {RANGE_OPTIONS.map((opt) => (
             <Button
               key={opt.value}
-              variant={range === opt.value ? "secondary" : "ghost"}
+              variant={range === opt.value ? "default" : "ghost"}
               size="sm"
               className="h-7 text-xs"
               onClick={() => setRange(opt.value)}
@@ -455,13 +462,6 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
           ))}
         </div>
       </div>
-
-      {/* Activity Heatmap */}
-      {heatmapData && heatmapData.length > 0 && (
-        <TooltipProvider>
-          <ActivityHeatmap data={heatmapData} />
-        </TooltipProvider>
-      )}
 
       {/* Stats Grid - Row 1 */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
