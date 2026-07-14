@@ -146,8 +146,10 @@ export function Projects() {
               project={project}
               onEdit={handleEdit}
               onDelete={handleDelete}
+              canManage={currentRole === "owner"}
               isFavorited={isFavorite(project.id)}
               onToggleFavorite={toggleFavorite}
+              onClick={() => navigate(`/projects/${project.id}`)}
             />
           ))}
         </div>

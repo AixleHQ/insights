@@ -2,17 +2,13 @@ import React, { useMemo, useState } from "react";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   AlertCircle,
-  ArrowLeft,
-  Activity,
-  DollarSign,
-  Calendar,
-  GitBranch,
   Settings,
   MoreHorizontal,
   RefreshCw,
   Trash2,
   Download,
   Loader2,
+  Star,
 } from "lucide-react";
 import { useOrg } from "@/contexts/OrgContext";
 import { useOrgNavGuard } from "@/hooks/useOrgNavGuard";
@@ -20,6 +16,7 @@ import { useOrgNavGuard } from "@/hooks/useOrgNavGuard";
 import {
   useProject,
   useDeleteProject,
+  useProjectStats,
   useProjectDailyByTool,
   useProjectRepositories,
   useDisconnectRepo,
@@ -29,6 +26,7 @@ import {
 } from "@/hooks/useApi";
 
 import { useProjectEventsTab } from "@/hooks/useProjectEventsTab";
+import { useFavorites } from "@/hooks/useFavorites";
 import { formatCost, formatCount } from "@/lib/formatters";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,7 +36,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ProviderLogo } from "@/components/icons";
@@ -61,54 +58,58 @@ import { ToolUsageByDayChart } from "@/components/dashboard";
 import { getDaysForRange, type TimeRange } from "@/lib/chartUtils";
 import {
   ProjectReposSection,
+  ProjectTeamSection,
   ProjectNotFound,
   ConnectRepoSheet,
   ProjectIssuesTab,
   ProjectConnectorsTab,
   ProjectMembersTab,
   ProjectAlertsTab,
-  ProjectTeamSection,
 } from "@/components/project";
 import { TabNav } from "@/components/ui/tab-nav";
 import { TabsContent } from "@/components/ui/tabs";
-import { formatDistanceToNow } from "@/lib/utils";
+import { formatDistanceToNow, cn, humanizeToolName } from "@/lib/utils";
 import { isGitRemoteMissing } from "@/lib/project-git-remote";
 import { AppRoutes } from "@/lib/routes";
 
 function StatCard({
-  icon: Icon,
   label,
   subtitle,
   value,
   delta,
   isLoading,
+  accent,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
   label: string;
   subtitle?: string;
   value: React.ReactNode;
   delta?: string;
   isLoading?: boolean;
+  accent?: React.ReactNode;
 }) {
   return (
-    <Card>
-      <CardContent className="flex items-center gap-4 px-4 py-0">
-        <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
-          <Icon className="size-5 text-muted-foreground" />
-        </div>
-        <div>
-          <p className="type-caption text-muted-foreground">{label}</p>
-          {subtitle && <p className="text-[10px] text-muted-foreground">{subtitle}</p>}
-          {isLoading ? (
-            <Skeleton className="h-6 w-20 mt-1" />
-          ) : (
-            <>
-              <p className="font-mono-display type-h4">{value}</p>
-              {delta && <p className="text-xs text-muted-foreground mt-0.5">{delta}</p>}
-            </>
+    <Card className="flex flex-col gap-2 p-4">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex flex-col gap-0.5">
+          <p className="type-caption font-medium uppercase tracking-wider text-muted-foreground">
+            {label}
+          </p>
+          {subtitle && (
+            <p className="text-[10px] text-muted-foreground">{subtitle}</p>
           )}
         </div>
-      </CardContent>
+        {accent && <div className="shrink-0">{accent}</div>}
+      </div>
+      {isLoading ? (
+        <Skeleton className="h-8 w-24" />
+      ) : (
+        <>
+          <p className="font-mono-display type-h3 font-semibold">{value}</p>
+          {delta && (
+            <p className="type-caption text-muted-foreground">{delta}</p>
+          )}
+        </>
+      )}
     </Card>
   );
 }
@@ -127,10 +128,13 @@ export function ProjectDetail() {
   const { data: project, isLoading: isLoadingProject } = useProject(id || "");
   const { data: projectMembers, isLoading: isLoadingMembers } = useProjectMembers(id || "");
   const { data: me } = useCurrentUser();
+  const { data: projectStats, isLoading: isLoadingStats } = useProjectStats(id || "", 30);
   const { data: dailyByToolData, isLoading: isLoadingDailyByTool, isError: isErrorDailyByTool, refetch: refetchDailyByTool } = useProjectDailyByTool(id || "", selectedDays, granularity);
   const { data: projectRepositories, isLoading: isLoadingRepositories } = useProjectRepositories(id || "");
   const disconnectRepo = useDisconnectRepo(id || "");
   const deleteProject = useDeleteProject();
+  const { toggleFavorite, favorites } = useFavorites();
+  const isFavorited = favorites.some((f) => f.id === id);
 
   const eventsTab = useProjectEventsTab({
     projectId: id || "",
@@ -142,15 +146,20 @@ export function ProjectDetail() {
   const myProjectMembership = projectMembers?.find((m: ProjectMember) => m.userId === me?.id);
   const isProjectOwner = hasRole(["owner"]) || myProjectMembership?.role === "owner";
   const canManageMembers = hasRole(["owner"]);
-  const isMemberOfProject = isProjectOwner || !!myProjectMembership;
+  // If the project loaded, the user has access (policy scope already enforces this).
+  // Don't rely on the paginated members list to detect membership — it may not include
+  // the current user if the list is large and they appear on a later page.
+  const isMemberOfProject = !!project;
 
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const activeTab = useMemo(() => {
     const allowed = new Set(["overview", "events", "issues"]);
-    if (isMemberOfProject) allowed.add("members");
-    if (isProjectOwner) {
+    if (isMemberOfProject) {
+      allowed.add("members");
       allowed.add("integrations");
+    }
+    if (isProjectOwner) {
       allowed.add("alerts");
     }
     if (tabParam && allowed.has(tabParam)) return tabParam;
@@ -195,55 +204,61 @@ export function ProjectDetail() {
 
   const hasAttributedEventCount = Object.prototype.hasOwnProperty.call(project, "eventCount");
   const hasAttributedCostUsd = Object.prototype.hasOwnProperty.call(project, "totalCostUsd");
-  const hasLastAttributedAt = Object.prototype.hasOwnProperty.call(project, "lastEventAt");
 
   const attributedEventCount = project.eventCount;
   const attributedCostUsd = project.totalCostUsd;
-  const lastAttributedAt = project.lastEventAt;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-4">
-          <Button asChild variant="ghost" size="icon">
-            <Link to={AppRoutes.projects.root}>
-              <ArrowLeft className="size-4" />
-            </Link>
-          </Button>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="type-h3">{project.name}</h1>
-              <Badge variant={(project.is_active ?? project.isActive) ? "default" : "secondary"}>
-                {(project.is_active ?? project.isActive) ? "Active" : "Inactive"}
-              </Badge>
-            </div>
-            <p className="text-sm text-muted-foreground">{project.description}</p>
-          </div>
-        </div>
-        {isProjectOwner && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" aria-label="Project actions">
-                <MoreHorizontal className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => navigate(AppRoutes.projects.settings(id || ""))}>
-                <Settings className="mr-2 size-4" />
-                Settings
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <RefreshCw className="mr-2 size-4" />
-                Sync connectors
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive" onClick={handleDelete}>
-                <Trash2 className="mr-2 size-4" />
-                Delete project
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-1.5 type-caption text-muted-foreground">
+        <Link to={AppRoutes.projects.root} className="hover:text-foreground transition-colors">
+          Projects
+        </Link>
+        <span>/</span>
+        <span className="text-foreground">{project.name}</span>
+      </div>
+
+      <div className="relative">
+        <h1 className="type-h2">{project.name}</h1>
+        {project.description && (
+          <p className="mt-2 type-caption text-muted-foreground max-w-xl">{project.description}</p>
         )}
+        <div className="absolute right-0 top-0 flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn("size-7 transition-colors", isFavorited ? "text-warning" : "text-muted-foreground hover:text-warning")}
+            aria-label={isFavorited ? "Remove from favorites" : "Add to favorites"}
+            onClick={() => id && toggleFavorite({ id, name: project.name })}
+          >
+            <Star className={cn("size-4", isFavorited && "fill-current")} />
+          </Button>
+          {isProjectOwner && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="size-7" aria-label="Project actions">
+                  <MoreHorizontal className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => navigate(AppRoutes.projects.settings(id || ""))}>
+                  <Settings className="mr-2 size-4" />
+                  Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <RefreshCw className="mr-2 size-4" />
+                  Sync connectors
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-destructive" onClick={handleDelete}>
+                  <Trash2 className="mr-2 size-4" />
+                  Delete project
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
       </div>
 
       {isGitRemoteMissing(project) && (
@@ -273,7 +288,7 @@ export function ProjectDetail() {
           { label: "Overview", key: "overview" },
           { label: "Events", key: "events" },
           ...(isMemberOfProject ? [{ label: "Members", key: "members" }] : []),
-          ...(isProjectOwner ? [{ label: "Integrations", key: "integrations" }] : []),
+          ...(isMemberOfProject ? [{ label: "Integrations", key: "integrations" }] : []),
           ...(isProjectOwner ? [{ label: "Alerts", key: "alerts" }] : []),
           { label: "Issues", key: "issues" },
         ]}
@@ -283,6 +298,36 @@ export function ProjectDetail() {
 
         {/* ── Overview ── */}
         <TabsContent value="overview" className="space-y-6 mt-4">
+          {/* Stat cards */}
+          <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+            <StatCard
+              label="Total Events"
+              subtitle="All-time attributed"
+              value={hasAttributedEventCount ? formatCount(attributedEventCount ?? 0) : "—"}
+              isLoading={isLoadingStats}
+              delta={projectStats ? `${formatCount(projectStats.totalEvents)} last 30 days` : undefined}
+            />
+            <StatCard
+              label="Total Cost"
+              subtitle="All-time attributed"
+              value={hasAttributedCostUsd ? formatCost(attributedCostUsd ?? 0) : "—"}
+              isLoading={isLoadingStats}
+              delta={projectStats ? `${formatCost(projectStats.totalCost)} last 30 days` : undefined}
+            />
+            <StatCard
+              label="Total Tokens"
+              subtitle="Last 30 days"
+              value={projectStats ? formatCount(projectStats.totalEvents) : "—"}
+              isLoading={isLoadingStats}
+            />
+            <StatCard
+              label="Most Used Tool"
+              value={dailyByToolData?.tools[0] ? humanizeToolName(dailyByToolData.tools[0]) : "—"}
+              isLoading={isLoadingDailyByTool}
+            />
+          </div>
+
+          {/* Usage chart */}
           {dailyByToolData && dailyByToolData.data && (
             <ToolUsageByDayChart
               data={dailyByToolData.data}
@@ -295,32 +340,7 @@ export function ProjectDetail() {
             />
           )}
 
-          <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
-            <StatCard
-              icon={Activity}
-              label="Total Events"
-              subtitle="All-time attributed"
-              value={hasAttributedEventCount ? formatCount(attributedEventCount ?? 0) : "—"}
-            />
-            <StatCard
-              icon={DollarSign}
-              label="Total Cost"
-              subtitle="All-time attributed"
-              value={hasAttributedCostUsd ? formatCost(attributedCostUsd ?? 0) : "—"}
-            />
-            <StatCard
-              icon={Calendar}
-              label="Created"
-              value={new Date(project.createdAt || project.created_at).toLocaleDateString()}
-            />
-            <StatCard
-              icon={GitBranch}
-              label="Last Activity"
-              subtitle="All-time attributed"
-              value={hasLastAttributedAt ? (lastAttributedAt ? formatDistanceToNow(lastAttributedAt) : "Never") : "—"}
-            />
-          </div>
-
+          {/* Repositories + Leaderboard */}
           <div className="grid gap-4 md:grid-cols-2">
             <ProjectReposSection
               repositories={projectRepositories}
@@ -432,22 +452,6 @@ export function ProjectDetail() {
                     )}
                   </div>
                 ))}
-              </CardContent>
-            </Card>
-          )}
-
-          {project.repositoryUrl && (
-            <Card>
-              <CardContent className="flex items-center gap-3 p-4">
-                <GitBranch className="size-4 text-muted-foreground" />
-                <a
-                  href={project.repositoryUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-primary hover:underline"
-                >
-                  {project.repositoryUrl}
-                </a>
               </CardContent>
             </Card>
           )}
@@ -576,10 +580,10 @@ export function ProjectDetail() {
           </TabsContent>
         )}
 
-        {/* ── Integrations (lead-only) ── */}
-        {isProjectOwner && (
+        {/* ── Integrations ── */}
+        {isMemberOfProject && (
           <TabsContent value="integrations" className="mt-4">
-            <ProjectConnectorsTab projectId={id || ""} orgId={currentOrg?.id || ""} />
+            <ProjectConnectorsTab projectId={id || ""} orgId={currentOrg?.id || ""} readOnly={!isProjectOwner} />
           </TabsContent>
         )}
 
