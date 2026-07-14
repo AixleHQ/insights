@@ -105,6 +105,11 @@ module Api
         )
 
         render_no_content
+      rescue ActiveRecord::RecordNotDestroyed => e
+        render json: {
+          error: "Unprocessable Entity",
+          errors: { base: [ e.message ] }
+        }, status: :unprocessable_content
       end
 
       # POST /api/v1/organizations/:organization_id/connectors/:id/test

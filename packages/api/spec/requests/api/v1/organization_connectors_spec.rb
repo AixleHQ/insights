@@ -374,6 +374,32 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
 
       expect_forbidden
     end
+
+    it 'deletes the connector even when its GitHub authorization has been revoked (AIX-465)' do
+      connector.update!(status: 'error', last_error: 'GitHub API error: 401')
+      expect(Oauth::BaseProvider).not_to receive(:for)
+
+      authenticated_delete "/api/v1/organizations/#{organization.id}/connectors/#{connector.id}",
+                           user: admin,
+                           organization: organization
+
+      expect_no_content
+      expect(OrganizationConnector.find_by(id: connector.id)).to be_nil
+    end
+
+    it 'deletes the connector even when its repositories have synced tool_events (AIX-465)' do
+      repository = create(:repository, organization_connector: connector)
+      tool_event = create(:tool_event, organization: organization, repository: repository, tool_name: 'github')
+
+      authenticated_delete "/api/v1/organizations/#{organization.id}/connectors/#{connector.id}",
+                           user: admin,
+                           organization: organization
+
+      expect_no_content
+      expect(OrganizationConnector.find_by(id: connector.id)).to be_nil
+      expect(Repository.find_by(id: repository.id)).to be_nil
+      expect(tool_event.reload.repository_id).to be_nil
+    end
   end
 
   describe 'POST /api/v1/organizations/:organization_id/connectors/:id/test' do

@@ -153,6 +153,73 @@ RSpec.describe JwtAuth do
       end
     end
 
+    context 'when the downstream app raises an unexpected error (AIX-465)' do
+      let(:private_key) { OpenSSL::PKey::RSA.generate(2048) }
+      let(:public_key) { private_key.public_key }
+      let(:kid) { 'test-key-id' }
+
+      let(:claims) do
+        {
+          'sub' => 'user-123',
+          'email' => 'test@example.com',
+          'iss' => 'http://localhost:8080/realms/db90',
+          'aud' => 'db90-web',
+          'exp' => 1.hour.from_now.to_i,
+          'iat' => Time.now.to_i
+        }
+      end
+
+      let(:token) { JWT.encode(claims, private_key, 'RS256', { kid: kid }) }
+
+      let(:jwks_response) do
+        {
+          'keys' => [
+            {
+              'kid' => kid,
+              'kty' => 'RSA',
+              'n' => Base64.urlsafe_encode64(public_key.n.to_s(2)),
+              'e' => Base64.urlsafe_encode64(public_key.e.to_s(2))
+            }
+          ]
+        }
+      end
+
+      let(:failing_app) do
+        ->(_env) { raise ActiveRecord::RecordNotDestroyed, 'Failed to destroy Repository with id=123' }
+      end
+
+      before do
+        allow(Rails.cache).to receive(:fetch) do |key, **options, &block|
+          if key == 'keycloak_jwks'
+            jwks_response
+          else
+            block&.call
+          end
+        end
+      end
+
+      around do |example|
+        original_issuer = ENV['KEYCLOAK_ISSUER']
+        original_audience = ENV['KEYCLOAK_AUDIENCE']
+        ENV['KEYCLOAK_ISSUER'] = 'http://localhost:8080/realms/db90'
+        ENV['KEYCLOAK_AUDIENCE'] = 'db90-web'
+
+        example.run
+
+        ENV['KEYCLOAK_ISSUER'] = original_issuer
+        ENV['KEYCLOAK_AUDIENCE'] = original_audience
+      end
+
+      it 'propagates the error instead of masking it as a 401' do
+        fresh_middleware = described_class.new(failing_app)
+        env = Rack::MockRequest.env_for('/api/v1/organizations/1/connectors/1',
+          'HTTP_AUTHORIZATION' => "Bearer #{token}"
+        )
+
+        expect { fresh_middleware.call(env) }.to raise_error(ActiveRecord::RecordNotDestroyed)
+      end
+    end
+
     context 'with a valid impersonation token' do
       let(:admin) { create(:user, :global_admin) }
       let(:target) { create(:user) }
