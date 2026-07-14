@@ -223,6 +223,27 @@ export function Events() {
   const totalCount = eventsResponse?.meta?.total_count || 0;
   const hasClientSideFilters = !!filters.search;
 
+  const handleTabChange = useCallback((value: string) => {
+    const nextTab = value as EventsTab;
+    setActiveTab(nextTab);
+    setPage(1);
+
+    if (nextTab === "not_assigned") {
+      setFilters((prev) => ({
+        ...prev,
+        riskLevels: undefined,
+        eventTypes: undefined,
+        projectIds: undefined,
+        userId: undefined,
+        userName: undefined,
+      }));
+      return;
+    }
+
+    setBulkAssign(null);
+    setFilters((prev) => ({ ...prev, minConfidence: undefined }));
+  }, []);
+
   return (
     <div className="space-y-6">
       <div>
@@ -233,9 +254,9 @@ export function Events() {
       </div>
 
       {showNotAssignedTab && (
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as EventsTab)}>
+        <Tabs value={activeTab} onValueChange={handleTabChange}>
           <TabsList>
-            <TabsTrigger value="all" onClick={() => setBulkAssign(null)}>All</TabsTrigger>
+            <TabsTrigger value="all">All</TabsTrigger>
             <TabsTrigger value="not_assigned">Not Assigned</TabsTrigger>
           </TabsList>
         </Tabs>

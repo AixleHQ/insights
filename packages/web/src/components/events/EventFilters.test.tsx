@@ -181,8 +181,9 @@ describe("EventFilters", () => {
     });
 
     it("shows active filters section when only userId is set", () => {
-      renderFilters({ userId: "user-1", userName: "Jane Doe" });
+      renderFilters({ userId: "user-1" });
       expect(screen.getByText("Active filters:")).toBeInTheDocument();
+      expect(screen.getByText("user-1")).toBeInTheDocument();
     });
   });
 
