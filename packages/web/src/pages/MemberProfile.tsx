@@ -21,7 +21,7 @@ import {
   GitCommitHorizontal,
 } from "lucide-react";
 import { useOrg } from "@/contexts/OrgContext";
-import { useMember, useMemberEvents, useMemberStats, useProject, useEvents, type MemberStatsRange } from "@/hooks/useApi";
+import { useMember, useMemberEvents, useMemberHeatmap, useMemberStats, useProject, useEvents, type MemberStatsRange } from "@/hooks/useApi";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -190,6 +190,7 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
 
   const { data: member, isLoading: memberLoading } = useMember(currentOrg?.id || "", memberId);
   const { data: statsData } = useMemberStats(currentOrg?.id || "", memberId, range);
+  const { data: heatmapData } = useMemberHeatmap(currentOrg?.id || "", memberId);
   const { data: eventsResponse, isLoading: eventsLoading } = useMemberEvents(
     currentOrg?.id || "",
     memberId,
@@ -456,9 +457,9 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
       </div>
 
       {/* Activity Heatmap */}
-      {stats.daily_activity && stats.daily_activity.length > 0 && (
+      {heatmapData && heatmapData.length > 0 && (
         <TooltipProvider>
-          <ActivityHeatmap data={stats.daily_activity} />
+          <ActivityHeatmap data={heatmapData} />
         </TooltipProvider>
       )}
 

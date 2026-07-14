@@ -12,6 +12,7 @@ vi.mock("@/contexts/OrgContext", () => ({
 
 const mockUseMember = vi.fn();
 const mockUseMemberStats = vi.fn();
+const mockUseMemberHeatmap = vi.fn();
 const mockUseMemberEvents = vi.fn();
 const mockUseProject = vi.fn();
 const mockUseEvents = vi.fn();
@@ -20,6 +21,7 @@ const mockUseEvent = vi.fn();
 vi.mock("@/hooks/useApi", () => ({
   useMember: (...args: unknown[]) => mockUseMember(...args),
   useMemberStats: (...args: unknown[]) => mockUseMemberStats(...args),
+  useMemberHeatmap: (...args: unknown[]) => mockUseMemberHeatmap(...args),
   useMemberEvents: (...args: unknown[]) => mockUseMemberEvents(...args),
   useProject: (...args: unknown[]) => mockUseProject(...args),
   useEvents: (...args: unknown[]) => mockUseEvents(...args),
@@ -69,6 +71,7 @@ const mockProject = {
 function setupDefaultMocks() {
   mockUseMember.mockReturnValue({ data: mockMember, isLoading: false });
   mockUseMemberStats.mockReturnValue({ data: mockStats });
+  mockUseMemberHeatmap.mockReturnValue({ data: [] });
   mockUseMemberEvents.mockReturnValue({ data: emptyEventsResponse, isLoading: false });
   mockUseProject.mockReturnValue({ data: mockProject, isLoading: false });
   mockUseEvents.mockReturnValue({ data: emptyEventsResponse, isLoading: false });
