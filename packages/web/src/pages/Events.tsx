@@ -159,17 +159,8 @@ export function Events() {
       );
     }
 
-    // Client-side risk filter (API handles single value; client handles multi-select)
-    if (filters.riskLevels && filters.riskLevels.length > 0) {
-      result = result.filter((e) =>
-        filters.riskLevels!.includes(e.risk_level || "none")
-      );
-    }
-
-    // sort block removed — ordering is now done server-side
-
     return result;
-  }, [events, filters.search, filters.riskLevels]);
+  }, [events, filters.search]);
 
   const handleExport = async () => {
     setExportQueued(false);
