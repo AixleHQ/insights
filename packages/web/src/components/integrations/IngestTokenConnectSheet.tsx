@@ -133,14 +133,14 @@ function ClaudeCodeSetupInstructions({ token }: { token: string }) {
   return (
     <div className="space-y-3">
       <Tabs defaultValue="mcp-recommended">
-        <TabsList className="w-full justify-start gap-2 flex-wrap h-auto rounded-md">
-          <TabsTrigger value="mcp-recommended" className="text-xs flex-none h-auto py-1.5">
+        <TabsList className="w-full justify-start gap-1.5 flex-wrap h-auto group-data-[orientation=horizontal]/tabs:h-auto min-h-9 rounded-md">
+          <TabsTrigger value="mcp-recommended" className="text-xs flex-none h-auto py-1.5 px-2">
             MCP (recommended)
           </TabsTrigger>
-          <TabsTrigger value="standalone-cli" className="text-xs flex-none h-auto py-1.5">
+          <TabsTrigger value="standalone-cli" className="text-xs flex-none h-auto py-1.5 px-2">
             Standalone CLI
           </TabsTrigger>
-          <TabsTrigger value="advanced-hooks" className="text-xs flex-none h-auto py-1.5">
+          <TabsTrigger value="advanced-hooks" className="text-xs flex-none h-auto py-1.5 px-2">
             Advanced hooks
           </TabsTrigger>
         </TabsList>
@@ -254,11 +254,11 @@ function CursorSetupInstructions({ token }: { token: string }) {
   return (
     <div className="space-y-3">
       <Tabs defaultValue="mcp-recommended">
-        <TabsList className="w-full justify-start gap-2 flex-wrap h-auto rounded-md">
-          <TabsTrigger value="mcp-recommended" className="text-xs flex-none h-auto py-1.5">
+        <TabsList className="w-full justify-start gap-1.5 flex-wrap h-auto group-data-[orientation=horizontal]/tabs:h-auto min-h-9 rounded-md">
+          <TabsTrigger value="mcp-recommended" className="text-xs flex-none h-auto py-1.5 px-2">
             MCP (recommended)
           </TabsTrigger>
-          <TabsTrigger value="standalone-cli" className="text-xs flex-none h-auto py-1.5">
+          <TabsTrigger value="standalone-cli" className="text-xs flex-none h-auto py-1.5 px-2">
             Standalone CLI
           </TabsTrigger>
         </TabsList>
