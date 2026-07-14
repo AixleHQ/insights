@@ -311,6 +311,57 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
         expect_forbidden
       end
     end
+
+    context 'access_token rotation for an AI-provider connector' do
+      let!(:anthropic_connector) { create(:organization_connector, :anthropic, organization: organization) }
+
+      it 'rejects an invalid access_token and does not persist it' do
+        allow_any_instance_of(Oauth::AnthropicProvider)
+          .to receive(:test_connection)
+          .and_return({ success: false, error: 'Invalid API key — ensure you are using an Admin API key (sk-ant-admin-...)' })
+
+        original_token = anthropic_connector.access_token
+
+        authenticated_patch "/api/v1/organizations/#{organization.id}/connectors/#{anthropic_connector.id}",
+                            user: admin,
+                            organization: organization,
+                            params: { access_token: 'sk-ant-not-an-admin-key', is_active: false }
+
+        expect_unprocessable
+        expect(json_response[:errors][:access_token]).to include('Invalid API key — ensure you are using an Admin API key (sk-ant-admin-...)')
+        reloaded = anthropic_connector.reload
+        expect(reloaded.access_token).to eq(original_token)
+        expect(reloaded.is_active).to be true
+      end
+
+      it 'rotates the token when the new key passes validation' do
+        allow_any_instance_of(Oauth::AnthropicProvider).to receive(:test_connection).and_return({ success: true })
+
+        authenticated_patch "/api/v1/organizations/#{organization.id}/connectors/#{anthropic_connector.id}",
+                            user: admin,
+                            organization: organization,
+                            params: { access_token: 'sk-ant-admin-new-key' }
+
+        expect_success
+        expect(anthropic_connector.reload.access_token).to eq('sk-ant-admin-new-key')
+      end
+
+      it 'records the correct before/after is_active state in the audit log when rotated alongside other fields' do
+        allow_any_instance_of(Oauth::AnthropicProvider).to receive(:test_connection).and_return({ success: true })
+
+        expect {
+          authenticated_patch "/api/v1/organizations/#{organization.id}/connectors/#{anthropic_connector.id}",
+                              user: admin,
+                              organization: organization,
+                              params: { access_token: 'sk-ant-admin-new-key', is_active: false }
+        }.to change(OrganizationAuditLog, :count).by(1)
+
+        expect_success
+        log = OrganizationAuditLog.order(:created_at).last
+        expect(log.tracked_changes['before']['is_active']).to be true
+        expect(log.tracked_changes['after']['is_active']).to be false
+      end
+    end
   end
 
   describe 'POST /api/v1/organizations/:organization_id/connectors (multi-instance)' do
