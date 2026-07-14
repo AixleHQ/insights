@@ -62,7 +62,7 @@ import type { IntegrationProvider } from "@/lib/providers";
 
 // Client IANA timezone, resolved once per session. Sent to date-bucketed stats
 // endpoints (?tz=) so day/week/month boundaries match the viewer's local day.
-const clientTimezone =
+export const clientTimezone =
   typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC";
 
 function appendTz(url: string): string {
