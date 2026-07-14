@@ -54,8 +54,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { EventsTable, EventDrawer, EventFilters } from "@/components/events";
-import { ToolUsageByDayChart } from "@/components/dashboard";
-import { getDaysForRange, type TimeRange } from "@/lib/chartUtils";
+import { GroupedBarChart, type GroupedBarSeries } from "@/components/dashboard";
+import { getDaysForRange, type TimeRange, TIME_RANGE_OPTIONS } from "@/lib/chartUtils";
 import {
   ProjectReposSection,
   ProjectTeamSection,
@@ -68,7 +68,7 @@ import {
 } from "@/components/project";
 import { TabNav } from "@/components/ui/tab-nav";
 import { TabsContent } from "@/components/ui/tabs";
-import { formatDistanceToNow, cn, humanizeToolName } from "@/lib/utils";
+import { formatDistanceToNow, cn, getToolColor, humanizeToolName } from "@/lib/utils";
 import { isGitRemoteMissing } from "@/lib/project-git-remote";
 import { AppRoutes } from "@/lib/routes";
 
@@ -141,6 +141,42 @@ export function ProjectDetail() {
     orgId: currentOrg?.id || "",
     currentRole,
   });
+
+  const toolChartProps = useMemo(() => {
+    if (!dailyByToolData?.data || !dailyByToolData?.tools) return null;
+
+    const tools = dailyByToolData.tools;
+    const rawData = dailyByToolData.data;
+
+    const groups: string[] = rawData.map((item) => {
+      const date = new Date(item.date);
+      if (timeRange === "7d")
+        return date.toLocaleDateString("en-US", { weekday: "short" });
+      if (timeRange === "1y")
+        return date.toLocaleDateString("en-US", { month: "short" });
+      return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    });
+
+    const data: Record<string, number>[] = rawData.map((item) =>
+      Object.fromEntries(tools.map((t) => [t, Number(item[t]) || 0])),
+    );
+
+    const series: GroupedBarSeries[] = tools.map((t) => ({
+      key: t,
+      label: humanizeToolName(t),
+      color: getToolColor(t),
+    }));
+
+    const totalEvents = data.reduce(
+      (sum, d) => sum + tools.reduce((s, t) => s + (d[t] ?? 0), 0),
+      0,
+    );
+
+    const rangeLabel =
+      TIME_RANGE_OPTIONS.find((o) => o.value === timeRange)?.label ?? "7 days";
+
+    return { data, groups, series, totalEvents, rangeLabel };
+  }, [dailyByToolData, timeRange]);
 
   // Permission flags (reused by tab gates)
   const myProjectMembership = projectMembers?.find((m: ProjectMember) => m.userId === me?.id);
@@ -327,17 +363,41 @@ export function ProjectDetail() {
             />
           </div>
 
-          {/* Usage chart */}
-          {dailyByToolData && dailyByToolData.data && (
-            <ToolUsageByDayChart
-              data={dailyByToolData.data}
-              tools={dailyByToolData.tools}
-              isLoading={isLoadingDailyByTool}
-              isError={isErrorDailyByTool}
-              onRetry={() => refetchDailyByTool()}
-              timeRange={timeRange}
-              onTimeRangeChange={setTimeRange}
-            />
+          {(toolChartProps || isLoadingDailyByTool) && (
+            <div>
+              <div className="flex justify-end mb-2">
+                <Select
+                  value={timeRange}
+                  onValueChange={(v) => setTimeRange(v as TimeRange)}
+                >
+                  <SelectTrigger className="h-8 w-[100px] text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIME_RANGE_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <GroupedBarChart
+                data={toolChartProps?.data ?? []}
+                groups={toolChartProps?.groups ?? []}
+                series={toolChartProps?.series ?? []}
+                yLabel="Events"
+                title="Usage by Tool"
+                description={
+                  toolChartProps
+                    ? `${formatCount(toolChartProps.totalEvents)} events in the last ${toolChartProps.rangeLabel}`
+                    : undefined
+                }
+                isLoading={isLoadingDailyByTool}
+                isError={isErrorDailyByTool}
+                onRetry={() => refetchDailyByTool()}
+              />
+            </div>
           )}
 
           {/* Repositories + Leaderboard */}
