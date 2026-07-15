@@ -24,7 +24,6 @@ interface ProjectCardProps {
   canManage?: boolean;
   isFavorited?: boolean;
   onToggleFavorite?: (project: { id: string; name: string }) => void;
-  onClick?: () => void;
   className?: string;
 }
 
@@ -37,18 +36,16 @@ function StatBadge({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function ProjectCard({ project, onEdit, onDelete, canManage = false, isFavorited, onToggleFavorite, onClick, className }: ProjectCardProps) {
+export function ProjectCard({ project, onEdit, onDelete, canManage = false, isFavorited, onToggleFavorite, className }: ProjectCardProps) {
   const showUnlinkedRemote = isGitRemoteMissing(project);
   const detailHref = AppRoutes.projects.detail(project.id);
 
   return (
     <Card
       className={cn(
-        "group relative flex flex-col justify-between gap-4 overflow-hidden p-5 transition-all duration-200 hover:shadow-md",
-        onClick && "cursor-pointer",
+        "group relative flex flex-col justify-between gap-4 overflow-hidden p-5 transition-all duration-200 hover:shadow-md cursor-pointer",
         className
       )}
-      onClick={onClick}
     >
       {/* Stretched link — primary keyboard/a11y navigation target; mouse clicks are handled by the Card onClick above */}
       <Link

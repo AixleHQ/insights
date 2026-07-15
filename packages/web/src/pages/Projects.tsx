@@ -149,7 +149,6 @@ export function Projects() {
               canManage={currentRole === "owner"}
               isFavorited={isFavorite(project.id)}
               onToggleFavorite={toggleFavorite}
-              onClick={() => navigate(`/projects/${project.id}`)}
             />
           ))}
         </div>
