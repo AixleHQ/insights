@@ -117,6 +117,7 @@ vi.mock("@/hooks/useApi", () => {
       tool_accounts: [],
     },
   }),
+  useMemberHeatmap: () => ({ data: [] }),
   useMemberEvents: () => ({
     data: { data: [] },
     isLoading: false,

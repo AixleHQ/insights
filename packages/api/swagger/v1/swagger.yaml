@@ -857,6 +857,19 @@ paths:
           description: Membership ID or user UUID
           schema:
             type: string
+        - name: days
+          in: query
+          description: Rolling window size in days for all metrics, breakdowns, and the activity heatmap. Defaults to 30. Ignored when all_time is true.
+          schema:
+            type: integer
+            default: 30
+            minimum: 1
+            maximum: 730
+        - name: all_time
+          in: query
+          description: When true, aggregate over the member's entire history with no date bound. Overrides days.
+          schema:
+            type: boolean
         - $ref: '#/components/parameters/tz'
       responses:
         '200':
