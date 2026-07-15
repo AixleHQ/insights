@@ -193,8 +193,11 @@ module Api
         prev_start = (client_zone.now - (2 * days).days).beginning_of_day
         prev_end   = time_range_start
 
-        curr_count, curr_cost = events.pick(
-          Arel.sql("COUNT(*)"), Arel.sql("COALESCE(SUM(cost_usd), 0)")
+        curr_count, curr_cost, curr_tokens_in, curr_tokens_out = events.pick(
+          Arel.sql("COUNT(*)"),
+          Arel.sql("COALESCE(SUM(cost_usd), 0)"),
+          Arel.sql("COALESCE(SUM(tokens_in), 0)"),
+          Arel.sql("COALESCE(SUM(tokens_out), 0)")
         )
         prev_count, prev_cost = @project.tool_events
           .where(occurred_at: prev_start...prev_end)
@@ -204,6 +207,8 @@ module Api
           daily: daily_data,
           totalEvents: curr_count,
           totalCost: curr_cost.to_f,
+          totalTokensIn: curr_tokens_in.to_i,
+          totalTokensOut: curr_tokens_out.to_i,
           previousPeriod: {
             totalEvents: prev_count,
             totalCost: prev_cost.to_f

@@ -27,7 +27,7 @@ import {
 
 import { useProjectEventsTab } from "@/hooks/useProjectEventsTab";
 import { useFavorites } from "@/hooks/useFavorites";
-import { formatCost, formatCount } from "@/lib/formatters";
+import { formatCost, formatCount, formatTokens } from "@/lib/formatters";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -124,11 +124,12 @@ export function ProjectDetail() {
 
   const selectedDays = getDaysForRange(timeRange);
   const granularity = timeRange === "1y" ? "month" : "day";
+  const rangeLabel = TIME_RANGE_OPTIONS.find((o) => o.value === timeRange)?.label ?? "7 days";
 
   const { data: project, isLoading: isLoadingProject } = useProject(id || "");
   const { data: projectMembers, isLoading: isLoadingMembers } = useProjectMembers(id || "");
   const { data: me } = useCurrentUser();
-  const { data: projectStats, isLoading: isLoadingStats } = useProjectStats(id || "", 30);
+  const { data: projectStats, isLoading: isLoadingStats } = useProjectStats(id || "", selectedDays);
   const { data: dailyByToolData, isLoading: isLoadingDailyByTool, isError: isErrorDailyByTool, refetch: refetchDailyByTool } = useProjectDailyByTool(id || "", selectedDays, granularity);
   const { data: projectRepositories, isLoading: isLoadingRepositories } = useProjectRepositories(id || "");
   const disconnectRepo = useDisconnectRepo(id || "");
@@ -177,6 +178,12 @@ export function ProjectDetail() {
 
     return { data, groups, series, totalEvents, rangeLabel };
   }, [dailyByToolData, timeRange]);
+
+  const mostUsedToolEventCount = useMemo(() => {
+    if (!dailyByToolData?.data || !dailyByToolData?.tools?.[0]) return null;
+    const topTool = dailyByToolData.tools[0];
+    return dailyByToolData.data.reduce((sum, row) => sum + (Number(row[topTool]) || 0), 0);
+  }, [dailyByToolData]);
 
   // Permission flags (reused by tab gates)
   const myProjectMembership = projectMembers?.find((m: ProjectMember) => m.userId === me?.id);
@@ -341,25 +348,28 @@ export function ProjectDetail() {
               subtitle="All-time attributed"
               value={hasAttributedEventCount ? formatCount(attributedEventCount ?? 0) : "—"}
               isLoading={isLoadingStats}
-              delta={projectStats ? `${formatCount(projectStats.totalEvents)} last 30 days` : undefined}
+              delta={projectStats ? `${formatCount(projectStats.totalEvents)} last ${rangeLabel}` : undefined}
             />
             <StatCard
               label="Total Cost"
               subtitle="All-time attributed"
               value={hasAttributedCostUsd ? formatCost(attributedCostUsd ?? 0) : "—"}
               isLoading={isLoadingStats}
-              delta={projectStats ? `${formatCost(projectStats.totalCost)} last 30 days` : undefined}
+              delta={projectStats ? `${formatCost(projectStats.totalCost)} last ${rangeLabel}` : undefined}
             />
             <StatCard
               label="Total Tokens"
-              subtitle="Last 30 days"
-              value={projectStats ? formatCount(projectStats.totalEvents) : "—"}
+              subtitle={`Last ${rangeLabel}`}
+              value={projectStats ? formatTokens(projectStats.totalTokensIn + projectStats.totalTokensOut) : "—"}
               isLoading={isLoadingStats}
+              delta={projectStats ? `${formatTokens(projectStats.totalTokensIn)} in · ${formatTokens(projectStats.totalTokensOut)} out` : undefined}
             />
             <StatCard
               label="Most Used Tool"
+              subtitle={`Last ${rangeLabel}`}
               value={dailyByToolData?.tools[0] ? humanizeToolName(dailyByToolData.tools[0]) : "—"}
               isLoading={isLoadingDailyByTool}
+              delta={mostUsedToolEventCount !== null ? `${formatCount(mostUsedToolEventCount)} events` : undefined}
             />
           </div>
 
