@@ -35,7 +35,7 @@ export function Projects() {
   }, [projects, search]);
 
   const handleEdit = (id: string) => {
-    navigate(AppRoutes.projects.edit(id));
+    navigate(AppRoutes.projects.settings(id));
   };
 
   const handleDelete = async (id: string) => {
