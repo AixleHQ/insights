@@ -1,10 +1,8 @@
-import { StrictMode, type ReactNode } from "react"
+import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
-import { Provider as RollbarProvider } from "@rollbar/react"
 import { QueryClientProvider } from "@tanstack/react-query"
 import { queryClient } from "./lib/queryClient"
-import { config } from "./lib/config"
-import { rollbar, rollbarConfig } from "./lib/rollbar"
+import { AppRollbarProvider } from "./components/AppRollbarProvider"
 import "./index.css"
 import App from "./App.tsx"
 
@@ -15,19 +13,6 @@ import App from "./App.tsx"
   const isDark = stored === "dark" || (stored !== "light" && prefersDark)
   document.documentElement.classList.toggle("dark", isDark)
 })()
-
-/**
- * @rollbar/react treats `instance` as valid only when `options.accessToken` is
- * truthy (`isRollbarInstance`). Local Vite has no `__APP_CONFIG__.rollbarClientToken`,
- * so passing the shared disabled client as `instance` throws and blanks the app.
- * With no token, pass `config` instead and let the Provider construct its own client.
- */
-function AppRollbarProvider({ children }: { children: ReactNode }) {
-  if (config.rollbarClientToken) {
-    return <RollbarProvider instance={rollbar}>{children}</RollbarProvider>
-  }
-  return <RollbarProvider config={rollbarConfig}>{children}</RollbarProvider>
-}
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
