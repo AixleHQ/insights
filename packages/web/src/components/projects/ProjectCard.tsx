@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { FolderOpen, MoreHorizontal, Star, AlertCircle, ChevronRight } from "lucide-react";
+import { MoreHorizontal, Star, AlertCircle, ChevronRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatCost, formatCount } from "@/lib/formatters";
@@ -15,6 +15,7 @@ import { isGitRemoteMissing } from "@/lib/project-git-remote";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { type ProjectWithStats } from "@/lib/types";
 import { AppRoutes } from "@/lib/routes";
+import { FolderBoltIcon } from "@/components/icons";
 
 interface ProjectCardProps {
   project: ProjectWithStats;
@@ -77,7 +78,7 @@ export function ProjectCard({ project, onEdit, onDelete, canManage = false, isFa
           variant="ghost"
           size="icon"
           className={cn(
-            "absolute right-8 top-3 z-10 size-7 transition-opacity",
+            "absolute right-8 top-3 z-20 size-7 transition-opacity",
             isFavorited ? "opacity-100" : "opacity-0 group-hover:opacity-100"
           )}
           aria-label="Toggle favorite"
@@ -93,7 +94,7 @@ export function ProjectCard({ project, onEdit, onDelete, canManage = false, isFa
       {/* Header: icon + name */}
       <div className="relative z-10 flex items-start gap-2 pr-8">
         <div className="flex min-w-0 items-center gap-2">
-          <FolderOpen className="size-4 shrink-0 text-muted-foreground" />
+          <FolderBoltIcon className="size-4 shrink-0 text-muted-foreground" />
           <h3 className="type-label truncate font-medium text-foreground">
             {project.name}
           </h3>
@@ -127,6 +128,7 @@ export function ProjectCard({ project, onEdit, onDelete, canManage = false, isFa
                 variant="ghost"
                 size="icon"
                 className="size-7 opacity-0 transition-opacity group-hover:opacity-100"
+                onClick={(e) => e.stopPropagation()}
               >
                 <MoreHorizontal className="size-3.5" />
                 <span className="sr-only">Actions</span>
