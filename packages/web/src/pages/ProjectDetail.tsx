@@ -370,6 +370,7 @@ export function ProjectDetail() {
               value={dailyByToolData?.tools[0] ? humanizeToolName(dailyByToolData.tools[0]) : "—"}
               isLoading={isLoadingDailyByTool}
               delta={mostUsedToolEventCount !== null ? `${formatCount(mostUsedToolEventCount)} events` : undefined}
+              accent={dailyByToolData?.tools[0] ? <ProviderLogo provider={dailyByToolData.tools[0]} size="sm" showBackground /> : undefined}
             />
           </div>
 
