@@ -6,6 +6,7 @@ declare global {
       keycloakClientId?: string;
       apiUrl?: string;
       rollbarClientToken?: string;
+      showPromptInsights?: string;
     };
   }
 }
@@ -16,4 +17,5 @@ export const config = {
   keycloakClientId: window.__APP_CONFIG__?.keycloakClientId || import.meta.env.VITE_KEYCLOAK_CLIENT_ID || "db90-web",
   apiUrl: window.__APP_CONFIG__?.apiUrl || import.meta.env.VITE_API_URL || "/api/v1",
   rollbarClientToken: window.__APP_CONFIG__?.rollbarClientToken || "",
+  showPromptInsights: window.__APP_CONFIG__?.showPromptInsights || "false",
 };
