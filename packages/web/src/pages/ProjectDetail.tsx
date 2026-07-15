@@ -79,6 +79,7 @@ function StatCard({
   delta,
   isLoading,
   accent,
+  monoValue = true,
 }: {
   label: string;
   subtitle?: string;
@@ -86,6 +87,7 @@ function StatCard({
   delta?: string;
   isLoading?: boolean;
   accent?: React.ReactNode;
+  monoValue?: boolean;
 }) {
   return (
     <Card className="flex flex-col gap-2 p-4">
@@ -100,7 +102,7 @@ function StatCard({
             {subtitle && (
               <p className="text-[10px] text-muted-foreground">{subtitle}</p>
             )}
-            <p className="font-mono-display type-h3 font-semibold">{value}</p>
+            <p className={cn("type-h3 font-semibold", monoValue && "font-mono-display")}>{value}</p>
             {delta && (
               <p className="type-caption text-muted-foreground">{delta}</p>
             )}
@@ -369,6 +371,7 @@ export function ProjectDetail() {
               isLoading={isLoadingDailyByTool}
               delta={mostUsedToolEventCount !== null ? `${formatCount(mostUsedToolEventCount)} events` : undefined}
               accent={dailyByToolData?.tools[0] ? <ProviderLogo provider={dailyByToolData.tools[0]} size="lg" showBackground /> : undefined}
+              monoValue={false}
             />
           </div>
 
