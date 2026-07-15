@@ -67,6 +67,12 @@ module Keycloak
     def logout_url
       "#{issuer}/protocol/openid-connect/logout"
     end
+
+    # Browser-facing RP-initiated logout (end session) endpoint.
+    # Uses external_url so the redirect resolves from the user's browser.
+    def end_session_url
+      "#{external_url}/realms/#{realm}/protocol/openid-connect/logout"
+    end
   end
 
   class << self

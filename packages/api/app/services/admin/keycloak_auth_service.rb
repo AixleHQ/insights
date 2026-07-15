@@ -5,7 +5,7 @@ require "digest"
 
 module Admin
   class KeycloakAuthService
-    Result = Struct.new(:success?, :user, :error, keyword_init: true)
+    Result = Struct.new(:success?, :user, :error, :id_token, keyword_init: true)
 
     # Raised when the Keycloak token endpoint can't be reached (vs. a code that was
     # rejected). Lets #authenticate tell the user "try again" instead of "session expired".
@@ -36,9 +36,22 @@ module Admin
       user = find_admin_user(claims)
       return failure("Access denied. Global admin role required.") unless user
 
-      Result.new(success?: true, user: user)
+      Result.new(success?: true, user: user, id_token: token_response["id_token"])
     rescue UnavailableError
       failure("Identity provider is temporarily unavailable. Please try again.")
+    end
+
+    # Builds the Keycloak RP-initiated logout URL. Passing id_token_hint lets
+    # Keycloak terminate the SSO session and redirect back without showing a
+    # logout-confirmation prompt. Without this, the SSO session survives and the
+    # next visit to /admin silently re-authenticates the user.
+    def logout_url(post_logout_redirect_uri, id_token_hint: nil)
+      params = {
+        client_id: config.audience,
+        post_logout_redirect_uri: post_logout_redirect_uri
+      }
+      params[:id_token_hint] = id_token_hint if id_token_hint.present?
+      "#{config.end_session_url}?#{params.to_query}"
     end
 
     private
