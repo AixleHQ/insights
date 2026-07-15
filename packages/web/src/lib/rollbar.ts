@@ -11,9 +11,10 @@ export const rollbarConfig: Rollbar.Configuration = {
 };
 
 /**
- * Shared Rollbar instance. Passed to <RollbarProvider instance={rollbar}> in main.tsx
- * so React error boundaries and imperative reporters (auth.ts, the auth callbacks) all
- * report through the same client.
+ * Shared Rollbar instance for imperative reporters (auth.ts, auth callbacks).
+ * When a client token exists, main.tsx also passes this to <RollbarProvider instance={…}>.
+ * With an empty token (`enabled: false`), main.tsx must use `config={rollbarConfig}`
+ * instead — @rollbar/react rejects `instance` unless `options.accessToken` is truthy.
  */
 export const rollbar = new Rollbar(rollbarConfig);
 
