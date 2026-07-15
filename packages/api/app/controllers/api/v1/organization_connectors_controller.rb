@@ -70,7 +70,20 @@ module Api
           attrs["config"] = merge_connector_config(incoming_config) if @connector.source_control?
         end
 
-        if @connector.update(attrs)
+        @connector.assign_attributes(attrs)
+
+        if params[:access_token].present? && (@connector.ai_provider? || @connector.slack_webhook? || @connector.cursor?)
+          provider = Oauth::BaseProvider.for(@connector)
+          result = provider.test_connection
+          unless result[:success]
+            return render json: {
+              error: "Unprocessable Entity",
+              errors: { access_token: [ result[:error] || "Invalid API key" ] }
+            }, status: :unprocessable_content
+          end
+        end
+
+        if @connector.save
           OrganizationAuditLog.log(
             organization: current_organization,
             actor: current_user,
