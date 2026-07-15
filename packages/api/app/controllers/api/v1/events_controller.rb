@@ -227,7 +227,7 @@ module Api
         start_str = params[:start_date].presence || "all"
         zone      = ActiveSupport::TimeZone[params[:tz].to_s] || Time.zone
         end_str   = params[:end_date].presence || zone.today.iso8601
-        "db90-events-#{start_str}-#{end_str}.csv"
+        "aixle-insights-events-#{start_str}-#{end_str}.csv"
       end
 
       def export_filter_params

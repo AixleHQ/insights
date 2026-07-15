@@ -30,7 +30,7 @@ module Api
         end
 
         send_data csv,
-                  filename: "db90-events-export-#{params[:id]}.csv",
+                  filename: "aixle-insights-events-export-#{params[:id]}.csv",
                   type: "text/csv",
                   disposition: "attachment"
       end

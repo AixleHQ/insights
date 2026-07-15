@@ -57,7 +57,7 @@ module Api
       def export_filename
         from_label = params[:from].presence || "all"
         to_label   = params[:to].presence   || Date.current.iso8601
-        "db90-report-#{params[:report_type]}-#{from_label}-#{to_label}.csv"
+        "aixle-insights-report-#{params[:report_type]}-#{from_label}-#{to_label}.csv"
       end
 
       def render_invalid_param(param, valid_values)
