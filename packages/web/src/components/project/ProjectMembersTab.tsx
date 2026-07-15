@@ -34,6 +34,7 @@ import {
   useRemoveProjectMember,
   useUpdateProjectMember,
   useOrganizationMembers,
+  type ProjectMember,
 } from "@/hooks/useApi";
 import { formatCount, formatCost, formatTokens } from "@/lib/formatters";
 import {
@@ -83,7 +84,7 @@ export function ProjectMembersTab({
   );
 
   const existingUserIds = useMemo(
-    () => new Set(members.map((m) => m.userId)),
+    () => new Set(members.map((m: ProjectMember) => m.userId)),
     [members]
   );
 
@@ -100,7 +101,7 @@ export function ProjectMembersTab({
     if (!search) return members;
     const q = search.toLowerCase();
     return members.filter(
-      (m) =>
+      (m: ProjectMember) =>
         m.name?.toLowerCase().includes(q) || m.email.toLowerCase().includes(q)
     );
   }, [members, search]);
@@ -134,6 +135,25 @@ export function ProjectMembersTab({
     );
   };
 
+  const handleRemoveMember = (memberId: string) => {
+    setRemoveError(null);
+    removeMember.mutate(memberId, {
+      onError: (err) => {
+        if (err instanceof ApiError && err.status === 422 && err.data) {
+          const data = err.data as { errors?: Record<string, string[]>; message?: string };
+          const messages = data.errors
+            ? Object.values(data.errors).flat()
+            : data.message
+              ? [data.message]
+              : [];
+          setRemoveError(messages.join(" ") || "Could not remove member.");
+        } else {
+          setRemoveError(err instanceof Error ? err.message : "Could not remove member.");
+        }
+      },
+    });
+  };
+
   if (!isProjectOwner) {
     return (
       <Table>
@@ -153,7 +173,7 @@ export function ProjectMembersTab({
               </TableCell>
             </TableRow>
           )}
-          {filtered.map((m) => (
+          {filtered.map((m: ProjectMember) => (
             <TableRow
               key={m.id}
               className="group cursor-pointer border-b border-border/30 hover:bg-muted/30 transition-colors"
@@ -307,7 +327,7 @@ export function ProjectMembersTab({
               </TableCell>
             </TableRow>
           )}
-          {filtered.map((m) => {
+          {filtered.map((m: ProjectMember) => {
             const stat = statsById.get(m.userId);
             return (
               <TableRow
@@ -378,24 +398,7 @@ export function ProjectMembersTab({
                       {canManageMembers && (
                         <DropdownMenuItem
                           className="text-destructive"
-                          onClick={() => {
-                            setRemoveError(null);
-                            removeMember.mutate(m.id, {
-                              onError: (err) => {
-                                if (err instanceof ApiError && err.status === 422 && err.data) {
-                                  const data = err.data as { errors?: Record<string, string[]>; message?: string };
-                                  const messages = data.errors
-                                    ? Object.values(data.errors).flat()
-                                    : data.message
-                                      ? [data.message]
-                                      : [];
-                                  setRemoveError(messages.join(" ") || "Could not remove member.");
-                                } else {
-                                  setRemoveError(err instanceof Error ? err.message : "Could not remove member.");
-                                }
-                              },
-                            });
-                          }}
+                          onClick={() => handleRemoveMember(m.id)}
                         >
                           Remove from project
                         </DropdownMenuItem>
