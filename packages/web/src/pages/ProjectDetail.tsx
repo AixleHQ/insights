@@ -89,26 +89,24 @@ function StatCard({
 }) {
   return (
     <Card className="flex flex-col gap-2 p-4">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex flex-col gap-0.5">
-          <p className="type-caption font-medium uppercase tracking-wider text-muted-foreground">
-            {label}
-          </p>
-          {subtitle && (
-            <p className="text-[10px] text-muted-foreground">{subtitle}</p>
-          )}
-        </div>
-        {accent && <div className="shrink-0">{accent}</div>}
-      </div>
+      <p className="type-caption font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </p>
       {isLoading ? (
         <Skeleton className="h-8 w-24" />
       ) : (
-        <>
-          <p className="font-mono-display type-h3 font-semibold">{value}</p>
-          {delta && (
-            <p className="type-caption text-muted-foreground">{delta}</p>
-          )}
-        </>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-0.5 min-w-0">
+            {subtitle && (
+              <p className="text-[10px] text-muted-foreground">{subtitle}</p>
+            )}
+            <p className="font-mono-display type-h3 font-semibold">{value}</p>
+            {delta && (
+              <p className="type-caption text-muted-foreground">{delta}</p>
+            )}
+          </div>
+          {accent && <div className="shrink-0">{accent}</div>}
+        </div>
       )}
     </Card>
   );
@@ -370,7 +368,7 @@ export function ProjectDetail() {
               value={dailyByToolData?.tools[0] ? humanizeToolName(dailyByToolData.tools[0]) : "—"}
               isLoading={isLoadingDailyByTool}
               delta={mostUsedToolEventCount !== null ? `${formatCount(mostUsedToolEventCount)} events` : undefined}
-              accent={dailyByToolData?.tools[0] ? <ProviderLogo provider={dailyByToolData.tools[0]} size="sm" showBackground /> : undefined}
+              accent={dailyByToolData?.tools[0] ? <ProviderLogo provider={dailyByToolData.tools[0]} size="lg" showBackground /> : undefined}
             />
           </div>
 
