@@ -262,6 +262,29 @@ describe("ProjectDetail", () => {
     });
   });
 
+  describe("Repository controls RBAC (AIX-501)", () => {
+    const repos = [
+      { id: "repo-1", provider: "github", name: "repo", fullName: "org/repo", url: "https://github.com/org/repo", isActive: true, lastSyncAt: null },
+    ];
+
+    it("hides Connect Repository and Disconnect for a viewer / non-owner", () => {
+      mockUseProjectRepositories.mockReturnValue({ data: repos, isLoading: false });
+      render(<ProjectDetail />);
+
+      expect(screen.queryByRole("button", { name: /connect repository/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /disconnect/i })).not.toBeInTheDocument();
+    });
+
+    it("shows Connect Repository and Disconnect for an org owner", () => {
+      mockHasRole.mockReturnValue(true);
+      mockUseProjectRepositories.mockReturnValue({ data: repos, isLoading: false });
+      render(<ProjectDetail />);
+
+      expect(screen.getByRole("button", { name: /connect repository/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /disconnect/i })).toBeInTheDocument();
+    });
+  });
+
   it("renders breadcrumb with Projects link and project name", () => {
     render(<ProjectDetail />);
 
