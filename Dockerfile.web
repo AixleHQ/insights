@@ -100,7 +100,7 @@ ENV KEYCLOAK_URL=""
 ENV KEYCLOAK_REALM="db90"
 ENV KEYCLOAK_CLIENT_ID="db90-web"
 ENV ROLLBAR_CLIENT_TOKEN=""
-ENV SHOW_PROMPT_INSIGHTS="false"
+ENV SHOW_PROMPT_INSIGHTS_SECTION_IN_PERSONAL_DASHBOARD="false"
 
 COPY <<'ENTRYPOINT' /docker-entrypoint.d/90-runtime-config.sh
 #!/bin/sh
@@ -110,7 +110,7 @@ window.__APP_CONFIG__ = {
   keycloakRealm: "${KEYCLOAK_REALM}",
   keycloakClientId: "${KEYCLOAK_CLIENT_ID}",
   rollbarClientToken: "${ROLLBAR_CLIENT_TOKEN}",
-  showPromptInsights: "${SHOW_PROMPT_INSIGHTS}"
+  showPromptInsightsSectionInPersonalDashboard: "${SHOW_PROMPT_INSIGHTS_SECTION_IN_PERSONAL_DASHBOARD}"
 };
 EOF
 ENTRYPOINT
