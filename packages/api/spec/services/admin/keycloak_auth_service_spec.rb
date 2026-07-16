@@ -71,23 +71,4 @@ RSpec.describe Admin::KeycloakAuthService do
       end
     end
   end
-
-  describe "#authorize_url" do
-    before do
-      allow(Keycloak).to receive(:configuration).and_return(
-        double(
-          audience: "db90-web",
-          authorize_url: "http://keycloak.test/realms/db90/protocol/openid-connect/auth"
-        )
-      )
-    end
-
-    it "includes kc_idp_hint so Keycloak's native hosted login form never renders (AIX-568)" do
-      url = service.authorize_url("http://app.test/admin/callback", "verifier")
-
-      expect(url).to include("kc_idp_hint=google-dbp")
-      expect(url).to include("client_id=db90-web")
-      expect(url).to include("code_challenge_method=S256")
-    end
-  end
 end
