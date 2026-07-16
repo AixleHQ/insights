@@ -47,7 +47,7 @@ module Admin
     def authenticate_admin!
       unless current_admin_user&.global_admin?
         respond_to do |format|
-          format.html { redirect_to "/admin/login" }
+          format.html { redirect_to "/login?redirect=#{ERB::Util.url_encode('/admin/login')}" }
           format.json { render json: { error: "Forbidden" }, status: :forbidden }
         end
       end

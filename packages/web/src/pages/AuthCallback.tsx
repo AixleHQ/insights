@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { loginCallback, login, isDeadSessionError } from "../lib/auth";
 import { reportAuthError } from "../lib/rollbar";
-import { AppRoutes, isSafeRedirectPath } from "@/lib/routes";
+import { AppRoutes, isAdminPath, isSafeRedirectPath } from "@/lib/routes";
 
 /**
  * sessionStorage flag guarding the single automatic retry below, so a persistently
@@ -33,6 +33,13 @@ export function AuthCallback() {
         // `state` param, since React Router's location.state cannot survive
         // the external Keycloak redirect round-trip.
         const destination = isSafeRedirectPath(user.state) ? user.state : AppRoutes.dashboard;
+
+        // /admin/* is Rails-served, not an SPA route — a client-side navigate() would
+        // silently no-op (AIX-568). Leave the SPA for real.
+        if (isAdminPath(destination)) {
+          window.location.assign(destination);
+          return;
+        }
 
         navigate(destination, { replace: true });
       } catch (err) {

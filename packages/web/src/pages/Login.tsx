@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { AppRoutes, isSafeRedirectPath } from "@/lib/routes";
+import { AppRoutes, isAdminPath, isSafeRedirectPath } from "@/lib/routes";
 import { Loader2, Mail, Fingerprint } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,10 @@ export function Login() {
 
   useEffect(() => {
     if (isAuthenticated) {
+      if (redirectTarget && isAdminPath(redirectTarget)) {
+        window.location.assign(redirectTarget);
+        return;
+      }
       navigate(redirectTarget || AppRoutes.dashboard, { replace: true });
     }
   }, [isAuthenticated, navigate, redirectTarget]);
@@ -53,6 +57,10 @@ export function Login() {
     setIsSubmitting(true);
     try {
       await directLogin(email, password);
+      if (redirectTarget && isAdminPath(redirectTarget)) {
+        window.location.assign(redirectTarget);
+        return;
+      }
       navigate(redirectTarget || AppRoutes.dashboard, { replace: true });
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Login failed");

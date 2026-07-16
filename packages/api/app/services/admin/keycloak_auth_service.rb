@@ -18,7 +18,8 @@ module Admin
         response_type: "code",
         scope: "openid profile email",
         code_challenge: pkce_challenge(code_verifier),
-        code_challenge_method: "S256"
+        code_challenge_method: "S256",
+        kc_idp_hint: "google-dbp"
       }
       "#{config.authorize_url}?#{params.to_query}"
     end
