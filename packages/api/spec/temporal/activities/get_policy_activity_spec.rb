@@ -27,7 +27,6 @@ RSpec.describe Activities::GetPolicyActivity, type: :unit do
     it "aws_access_key matches a real AWS IAM key prefix" do
       regex = Regexp.new(policy.dig("rules", "secrets", "patterns", "aws_access_key"), Regexp::IGNORECASE)
       expect("AKIAIOSFODNN7EXAMPLEKEY").to match(regex)
-      expect("AKIAIOSFODNN7EXAMPLEKEY").to match(regex)
     end
 
     it "aws_session_key matches a real STS key prefix" do
@@ -47,6 +46,16 @@ RSpec.describe Activities::GetPolicyActivity, type: :unit do
       expect("sk-" + "a" * 48).to match(regex)
       expect("sk-proj-" + "a" * 45).to match(regex)
       expect("sk-" + "a" * 10).not_to match(regex)
+    end
+
+    it "openai_key does NOT match Anthropic sk-ant- keys" do
+      regex = Regexp.new(policy.dig("rules", "secrets", "patterns", "openai_key"), Regexp::IGNORECASE)
+      expect("sk-ant-" + "a" * 93).not_to match(regex)
+    end
+
+    it "openai_key does NOT match sk- substring inside ordinary words" do
+      regex = Regexp.new(policy.dig("rules", "secrets", "patterns", "openai_key"), Regexp::IGNORECASE)
+      expect("task-something-long-enough").not_to match(regex)
     end
 
     it "anthropic_key matches sk-ant- prefixed tokens" do

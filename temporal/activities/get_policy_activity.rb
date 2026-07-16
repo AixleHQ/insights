@@ -26,8 +26,9 @@ module Activities
             "aws_access_key"  => 'AKIA[0-9A-Z]{16}',
             "aws_session_key" => 'ASIA[0-9A-Z]{16}',
             "github_token"    => 'gh[pousr]_[A-Za-z0-9_]{36,}',
-            "openai_key"      => 'sk-[A-Za-z0-9_\-]{20,}',
-            "anthropic_key"   => 'sk-ant-[A-Za-z0-9_\-]{93,}',
+            # Word-bounded; (?!ant-) so Anthropic keys do not also match openai_key.
+            "openai_key"      => '\bsk-(?!ant-)[A-Za-z0-9_\-]{20,}\b',
+            "anthropic_key"   => '\bsk-ant-[A-Za-z0-9_\-]{93,}\b',
             "slack_token"     => 'xox[baprs]-[0-9A-Za-z\-]{10,}',
             "stripe_key"      => '(?:sk|rk)_live_[0-9a-zA-Z]{24,}',
             "google_api_key"  => 'AIza[0-9A-Za-z_\-]{35}',

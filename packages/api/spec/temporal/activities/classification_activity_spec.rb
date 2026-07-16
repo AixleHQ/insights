@@ -264,13 +264,40 @@ RSpec.describe Activities::ClassificationActivity, type: :unit do
         "Help me resolve the conflict",
         "How do I fix this merge conflict?",
         "refactor the auth module please",
-        "what does this function do?"
+        "what does this function do?",
+        "task-something-long-enough"
       ]
       benign_prompts.each do |prompt|
         result = classify(prompt)
         expect(result["risk_level"]).not_to be_in(%w[high critical]),
           "Expected '#{prompt}' to not be high/critical but got #{result['risk_level']}"
       end
+    end
+
+    it "UUID and git SHA in content body are not flagged as secrets" do
+      result = classify(
+        "session 550e8400-e29b-41d4-a716-446655440000 commit #{'a' * 40}"
+      )
+      expect(result["risk_level"]).not_to be_in(%w[high critical])
+      expect(result["detections"]).to be_empty
+    end
+
+    it "Anthropic key scores high once — not critical via openai_key overlap" do
+      key = "sk-ant-" + "a" * 93
+      result = classify("Anthropic key: #{key}")
+      expect(result["risk_level"]).to eq("high")
+      expect(result["risk_score"]).to eq(3)
+      patterns = result["detections"].map { |d| d["pattern"] }
+      expect(patterns).to eq([ "anthropic_key" ])
+    end
+
+    it "OpenAI key is detected at high without also matching anthropic_key" do
+      key = "sk-" + "a" * 48
+      result = classify("OpenAI key: #{key}")
+      expect(result["risk_level"]).to eq("high")
+      expect(result["risk_score"]).to eq(3)
+      patterns = result["detections"].map { |d| d["pattern"] }
+      expect(patterns).to eq([ "openai_key" ])
     end
   end
 end
