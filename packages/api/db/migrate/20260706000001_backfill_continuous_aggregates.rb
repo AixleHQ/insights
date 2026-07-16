@@ -1,4 +1,8 @@
 class BackfillContinuousAggregates < ActiveRecord::Migration[8.1]
+  # refresh_continuous_aggregate() cannot run inside a transaction block, so the
+  # migration must not be wrapped in the implicit DDL transaction.
+  disable_ddl_transaction!
+
   CAGGS = %w[timeseries.hourly_token_usage timeseries.daily_token_usage].freeze
 
   def up
