@@ -6,10 +6,6 @@ vi.mock("@/components/ui/risk-badge", () => ({
   RiskBadge: ({ level }: { level: string }) => <span>{level}</span>,
 }));
 
-vi.mock("@/components/ui/event-type-badge", () => ({
-  EventTypeBadge: ({ type }: { type?: string }) => <span>{type}</span>,
-}));
-
 vi.mock("@/lib/riskLevel", () => ({
   normalizeRiskLevel: (value: string | null | undefined) => value ?? "none",
 }));

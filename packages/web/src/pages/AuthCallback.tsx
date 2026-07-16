@@ -1,7 +1,14 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { loginCallback } from "../lib/auth";
+import { loginCallback, login, isDeadSessionError } from "../lib/auth";
+import { reportAuthError } from "../lib/rollbar";
 import { AppRoutes, isSafeRedirectPath } from "@/lib/routes";
+
+/**
+ * sessionStorage flag guarding the single automatic retry below, so a persistently
+ * failing code exchange can't loop between this page and Keycloak.
+ */
+const RETRY_FLAG = "auth_callback_retried";
 
 export function AuthCallback() {
   const navigate = useNavigate();
@@ -18,6 +25,8 @@ export function AuthCallback() {
     const handleCallback = async () => {
       try {
         const user = await loginCallback();
+        // Success — clear the retry guard so a future genuine failure can retry once.
+        sessionStorage.removeItem(RETRY_FLAG);
 
         // Restore the destination the user was trying to reach before being
         // sent to log in (e.g. an invitation link) — carried through the OIDC
@@ -28,6 +37,21 @@ export function AuthCallback() {
         navigate(destination, { replace: true });
       } catch (err) {
         console.error("[AuthCallback] Error:", err);
+        reportAuthError(err, { surface: "AuthCallback" });
+
+        // A dead authorization code (Keycloak `invalid_grant` — typically a transient
+        // node/cluster blip during the exchange) is recoverable: a fresh code usually
+        // succeeds. Silently retry the login redirect once, guarded by RETRY_FLAG so a
+        // persistent failure can't loop, before surfacing the dead-end banner.
+        if (isDeadSessionError(err) && !sessionStorage.getItem(RETRY_FLAG)) {
+          sessionStorage.setItem(RETRY_FLAG, "1");
+          login().catch((retryErr) => {
+            reportAuthError(retryErr, { surface: "AuthCallback.retry" });
+            setError(retryErr instanceof Error ? retryErr.message : "Authentication failed");
+          });
+          return;
+        }
+
         setError(err instanceof Error ? err.message : "Authentication failed");
       }
     };

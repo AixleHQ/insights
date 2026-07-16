@@ -15,7 +15,8 @@ module Api
         authorize! current_organization, to: :show?
         events = authorized_scope(current_organization.tool_events)
         events = apply_filters(events)
-        events = events.includes(:user, :project, :audit_logs).order(occurred_at: :desc)
+        events = events.includes(:user, :project, :audit_logs)
+        events = ToolEventSortScope.new(scope: events, params: params).call
 
         render_collection(events, ToolEventSerializer, serializer_params: ->(paginated) {
           { candidate_users: candidate_users_for(paginated) }
@@ -154,7 +155,8 @@ module Api
 
         events = authorized_scope(current_organization.tool_events)
         events = apply_filters(events)
-        events = events.includes(:user, :project, :audit_logs).order(occurred_at: :desc)
+        events = events.includes(:user, :project, :audit_logs)
+        events = ToolEventSortScope.new(scope: events, params: params).call
         total_count = events.count
 
         if total_count > EXPORT_ROW_CAP
@@ -230,7 +232,8 @@ module Api
 
       def export_filter_params
         params.permit(:tool_name, :user_id, :project_id,
-                      :model, :start_date, :end_date, :risk_level, :tz,
+                      :model, :start_date, :end_date, :risk_level,
+                      :sort_by, :direction, :tz,
                       :event_type, event_type: [])
       end
     end

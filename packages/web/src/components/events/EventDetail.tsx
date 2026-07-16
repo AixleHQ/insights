@@ -16,7 +16,9 @@ import { AppRoutes } from "@/lib/routes";
 import { formatCost, formatTokens, isDayGranularityEvent, formatEventDate, formatDateTime } from "@/lib/formatters";
 import { canViewEventPrompt } from "@/lib/eventAccess";
 import { parseRecentCommitFields } from "@/lib/recentCommitEvent";
+import { isDerivativeEvent } from "@/lib/event-types";
 import { RecentCommitDetail } from "./RecentCommitDetail";
+import { ContentPanel } from "./ContentPanel";
 
 export interface EventDetailData {
   id: string;
@@ -79,17 +81,6 @@ function DetailRow({
   );
 }
 
-function ContentPanel({ title, content }: { title: string; content?: string }) {
-  return (
-    <div className="space-y-2">
-      <h4 className="type-label">{title}</h4>
-      <pre className="max-h-96 overflow-auto rounded-md bg-muted p-4 text-xs">
-        <code>{content || "No content available"}</code>
-      </pre>
-    </div>
-  );
-}
-
 export function EventDetail({ event, isLoading, className }: EventDetailProps) {
   const { currentRole } = useOrg();
   const isOwner = canViewEventPrompt(currentRole);
@@ -131,6 +122,10 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
     : formatDateTime(event.created_at);
 
   const recentCommit = parseRecentCommitFields(event.metadata, event.event_type);
+  const isDerivative = isDerivativeEvent(event.event_type);
+  const emptyPromptMessage = isDerivative
+    ? "This event has no prompt text. See its summary above."
+    : "No prompt text. Prompt capture is not enabled for this event.";
 
   return (
     <div className={cn("space-y-6", className)}>
@@ -244,11 +239,34 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
           <CardHeader>
             <CardTitle className="type-body-lg">Content</CardTitle>
             <CardDescription>
-              Raw and sanitized content from this event
+              {isDerivative
+                ? "This event type has no prompt content"
+                : "Raw and sanitized content from this event"}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {isOwner ? (
+            {!isOwner ? (
+              <p className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
+                Prompt content is visible to organization owners only.
+              </p>
+            ) : isDerivative ? (
+              <Tabs defaultValue="metadata">
+                <TabsList>
+                  <TabsTrigger value="metadata">Metadata</TabsTrigger>
+                </TabsList>
+                <TabsContent value="metadata" className="mt-4">
+                  <ContentPanel
+                    title="Event Metadata"
+                    content={
+                      event.metadata
+                        ? JSON.stringify(event.metadata, null, 2)
+                        : undefined
+                    }
+                    emptyMessage={emptyPromptMessage}
+                  />
+                </TabsContent>
+              </Tabs>
+            ) : (
               <Tabs defaultValue="sanitized">
                 <TabsList>
                   <TabsTrigger value="sanitized">Sanitized</TabsTrigger>
@@ -259,10 +277,15 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
                   <ContentPanel
                     title="Sanitized Content"
                     content={event.sanitized_content}
+                    emptyMessage={emptyPromptMessage}
                   />
                 </TabsContent>
                 <TabsContent value="raw" className="mt-4">
-                  <ContentPanel title="Raw Content" content={event.raw_content} />
+                  <ContentPanel
+                    title="Raw Content"
+                    content={event.raw_content}
+                    emptyMessage={emptyPromptMessage}
+                  />
                 </TabsContent>
                 <TabsContent value="metadata" className="mt-4">
                   <ContentPanel
@@ -275,10 +298,6 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
                   />
                 </TabsContent>
               </Tabs>
-            ) : (
-              <p className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
-                Prompt content is visible to organization owners only.
-              </p>
             )}
           </CardContent>
         </Card>

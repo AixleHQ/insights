@@ -1,7 +1,10 @@
 class Repository < ApplicationRecord
   belongs_to :project, optional: true
   belongs_to :organization_connector
-  has_many :tool_events, class_name: "ToolEvent", dependent: :restrict_with_error
+  # Historical tool events (tokens/cost) must outlive the repository — nullify
+  # rather than block/destroy, so disconnecting a connector never loses
+  # already-synced usage history (AIX-465).
+  has_many :tool_events, class_name: "ToolEvent", dependent: :nullify
 
   validates :external_id, presence: true, uniqueness: { scope: :organization_connector_id }
   validates :name, presence: true

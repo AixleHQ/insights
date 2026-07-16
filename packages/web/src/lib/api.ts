@@ -73,6 +73,18 @@ function isImpersonating(): boolean {
 }
 
 /**
+ * On a 401, attempt a single OIDC silent renew and report whether the caller should
+ * retry the request. Returns false (no retry) for non-401 responses, when skipped
+ * (impersonation / skipAuth), or when the renew fails. Shared by apiRequest and
+ * downloadBlob so the retry-once policy lives in one place.
+ */
+async function shouldRetryAfterRenew(status: number, skip: boolean): Promise<boolean> {
+  if (status !== 401 || skip) return false;
+  const renewed = await silentRenew();
+  return !!renewed;
+}
+
+/**
  * Make an authenticated API request
  */
 export async function apiRequest<T = unknown>(
@@ -113,11 +125,8 @@ export async function apiRequest<T = unknown>(
   let response = await doFetch();
 
   // Expired access token right after silent renew window: retry once after OIDC refresh.
-  if (response.status === 401 && !skipAuth && !impersonating) {
-    const renewed = await silentRenew();
-    if (renewed) {
-      response = await doFetch();
-    }
+  if (await shouldRetryAfterRenew(response.status, skipAuth || impersonating)) {
+    response = await doFetch();
   }
 
   // Handle common error responses
@@ -195,11 +204,8 @@ export async function downloadBlob(
 
   let response = await doFetch();
 
-  if (response.status === 401 && !impersonating) {
-    const renewed = await silentRenew();
-    if (renewed) {
-      response = await doFetch();
-    }
+  if (await shouldRetryAfterRenew(response.status, impersonating)) {
+    response = await doFetch();
   }
 
   if (response.status === 202) {

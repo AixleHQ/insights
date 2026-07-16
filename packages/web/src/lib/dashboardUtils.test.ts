@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { formatDateLabel, formatLocalDate, isCurrentMonth, sliceCostTrendWindow } from "./dashboardUtils";
+import { formatDateLabel, formatLocalDate, isCurrentMonth, sliceCostTrendWindow, periodToDateRange } from "./dashboardUtils";
 
 describe("formatDateLabel", () => {
   it("returns month+day for day granularity", () => {
@@ -104,5 +104,32 @@ describe("sliceCostTrendWindow", () => {
       today: new Date(2026, 5, 3),
     });
     expect(result.map((d) => d.date)).toEqual(["2026-06-01", "2026-06-02", "2026-06-03"]);
+  });
+});
+
+describe("periodToDateRange", () => {
+  it("returns first/last day for a 31-day month", () => {
+    expect(periodToDateRange({ type: "month", value: "2026-07" })).toEqual({
+      start_date: "2026-07-01",
+      end_date: "2026-07-31",
+    });
+  });
+
+  it("returns first/last day for a 30-day month", () => {
+    expect(periodToDateRange({ type: "month", value: "2026-06" })).toEqual({
+      start_date: "2026-06-01",
+      end_date: "2026-06-30",
+    });
+  });
+
+  it("handles February in a leap year", () => {
+    expect(periodToDateRange({ type: "month", value: "2024-02" })).toEqual({
+      start_date: "2024-02-01",
+      end_date: "2024-02-29",
+    });
+  });
+
+  it("returns an empty range for all_time", () => {
+    expect(periodToDateRange({ type: "all_time" })).toEqual({});
   });
 });

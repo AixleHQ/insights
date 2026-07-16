@@ -1,6 +1,8 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { MoreHorizontal, UserPlus } from "lucide-react";
+import { RoleBadge } from "@/components/ui/role-badge";
+import type { MemberRole } from "@/contexts/OrgContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +12,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { RoleBadge } from "@/components/ui/role-badge";
 import {
   Select,
   SelectContent,
@@ -26,7 +27,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   useProjectMembers,
   useProjectMemberStats,
@@ -36,7 +36,6 @@ import {
   useOrganizationMembers,
 } from "@/hooks/useApi";
 import { formatCount, formatCost, formatTokens } from "@/lib/formatters";
-import { CliStatusBadge } from "@/components/ui/CliStatusBadge";
 import {
   formatDistanceToNow,
   getMemberDisplayName,
@@ -105,13 +104,6 @@ export function ProjectMembersTab({
     );
   }, [members, search]);
 
-  const aggregates = useMemo(() => ({
-    count: members.length,
-    cliConnected: members.filter((m) => m.cliConnected === true).length,
-    totalEvents: members.reduce((s, m) => s + (m.totalEvents ?? 0), 0),
-    totalCost: members.reduce((s, m) => s + (m.totalCost ?? 0), 0),
-  }), [members]);
-
   const handleAddMember = () => {
     if (!addUserId) return;
     setAddError(null);
@@ -143,104 +135,87 @@ export function ProjectMembersTab({
 
   if (!isProjectOwner) {
     return (
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
+      <Table>
+        <TableHeader>
+          <TableRow className="border-b border-border/50">
+            <TableHead className="type-caption font-medium uppercase tracking-wider text-muted-foreground">Name</TableHead>
+            <TableHead className="type-caption font-medium uppercase tracking-wider text-muted-foreground">Email</TableHead>
+            <TableHead className="type-caption font-medium uppercase tracking-wider text-muted-foreground">Type</TableHead>
+            <TableHead className="w-10" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filtered.length === 0 && (
             <TableRow>
-              <TableHead>Member</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Role</TableHead>
+              <TableCell colSpan={4} className="py-8 text-center type-caption text-muted-foreground">
+                No members found.
+              </TableCell>
             </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.length === 0 && (
-              <TableRow>
-                <TableCell
-                  colSpan={3}
-                  className="py-8 text-center text-sm text-muted-foreground"
-                >
-                  No members found.
-                </TableCell>
-              </TableRow>
-            )}
-            {filtered.map((m) => (
-              <TableRow
-                key={m.id}
-                className="cursor-pointer"
-                onClick={() =>
-                  navigate(`${AppRoutes.members.detail(m.userId)}?projectId=${projectId}`)
-                }
-              >
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Avatar className="size-7">
-                      <AvatarImage src={m.avatarUrl ?? undefined} />
-                      <AvatarFallback className="text-xs">
-                        {getMemberDisplayName(m).charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm font-medium">
-                      {getMemberDisplayName(m)}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {m.email}
-                </TableCell>
-                <TableCell>
-                  <RoleBadge role={m.role as "owner" | "member" | "viewer"} />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+          )}
+          {filtered.map((m) => (
+            <TableRow
+              key={m.id}
+              className="group cursor-pointer border-b border-border/30 hover:bg-muted/30 transition-colors"
+              onClick={() => navigate(`${AppRoutes.members.detail(m.userId)}?projectId=${projectId}`)}
+            >
+              <TableCell>
+                <div className="flex items-center gap-2.5">
+                  <Avatar className="size-7 shrink-0">
+                    <AvatarImage src={m.avatarUrl ?? undefined} />
+                    <AvatarFallback className="type-caption">
+                      {getMemberDisplayName(m).charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="type-label font-medium text-foreground">
+                    {getMemberDisplayName(m)}
+                  </span>
+                </div>
+              </TableCell>
+              <TableCell>
+                <span className="type-caption text-muted-foreground">{m.email}</span>
+              </TableCell>
+              <TableCell>
+                <RoleBadge role={m.role as MemberRole} />
+              </TableCell>
+              <TableCell onClick={(e) => e.stopPropagation()}>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="size-7 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <MoreHorizontal className="size-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={() => navigate(`${AppRoutes.members.detail(m.userId)}?projectId=${projectId}`)}
+                    >
+                      View profile
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="px-4 py-0">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Members</p>
-            <p className="mt-1 font-mono text-2xl font-bold">{aggregates.count}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="px-4 py-0">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total events</p>
-            <p className="mt-1 font-mono text-2xl font-bold">{formatCount(aggregates.totalEvents)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="px-4 py-0">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total cost</p>
-            <p className="mt-1 font-mono text-2xl font-bold">{formatCost(aggregates.totalCost)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="px-4 py-0">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">CLI connected</p>
-            <p className="mt-1 font-mono text-2xl font-bold">
-              {aggregates.cliConnected}
-              <span className="ml-1 text-sm font-normal text-muted-foreground">/ {aggregates.count}</span>
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <Input
-          placeholder="Search members…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-xs"
-        />
+      <div className="flex items-center justify-between gap-3">
+        <div className="relative max-w-xs flex-1">
+          <Input
+            placeholder="Search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <kbd className="absolute right-3 top-1/2 -translate-y-1/2 type-caption text-muted-foreground pointer-events-none hidden sm:inline">
+            ⌘K
+          </kbd>
+        </div>
         {canManageMembers && (
           <Button
             size="sm"
-            variant="secondary"
             onClick={() => {
               setShowAddForm((v) => !v);
               setAddError(null);
@@ -305,132 +280,110 @@ export function ProjectMembersTab({
         </div>
       )}
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
+      <Table>
+        <TableHeader>
+          <TableRow className="border-b border-border/50">
+            <TableHead className="type-caption font-medium uppercase tracking-wider text-muted-foreground">Name</TableHead>
+            <TableHead className="type-caption font-medium uppercase tracking-wider text-muted-foreground">Seat Type</TableHead>
+            <TableHead className="type-caption font-medium uppercase tracking-wider text-muted-foreground">Tokens In / Out</TableHead>
+            <TableHead className="type-caption font-medium uppercase tracking-wider text-muted-foreground text-right">Events</TableHead>
+            <TableHead className="type-caption font-medium uppercase tracking-wider text-muted-foreground text-right">Cost</TableHead>
+            <TableHead className="type-caption font-medium uppercase tracking-wider text-muted-foreground">Last Active</TableHead>
+            <TableHead className="w-10" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filtered.length === 0 && (
             <TableRow>
-              <TableHead>Member</TableHead>
-              <TableHead>Seat Type</TableHead>
-              <TableHead>CLI</TableHead>
-              <TableHead className="text-right">Tokens In</TableHead>
-              <TableHead className="text-right">Tokens Out</TableHead>
-              <TableHead className="text-right">Events</TableHead>
-              <TableHead className="text-right">Cost</TableHead>
-              <TableHead>Last Active</TableHead>
-              {canManageMembers && <TableHead />}
+              <TableCell colSpan={7} className="py-8 text-center type-caption text-muted-foreground">
+                No members found.
+              </TableCell>
             </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.length === 0 && (
-              <TableRow>
-                <TableCell
-                  colSpan={canManageMembers ? 9 : 8}
-                  className="py-8 text-center text-sm text-muted-foreground"
-                >
-                  No members found.
+          )}
+          {filtered.map((m) => {
+            const stat = statsById.get(m.userId);
+            return (
+              <TableRow
+                key={m.id}
+                className="group cursor-pointer border-b border-border/30 hover:bg-muted/30 transition-colors"
+                onClick={() => navigate(`${AppRoutes.members.detail(m.userId)}?projectId=${projectId}`)}
+              >
+                <TableCell>
+                  <div className="flex items-center gap-2.5">
+                    <Avatar className="size-7 shrink-0">
+                      <AvatarImage src={m.avatarUrl ?? undefined} />
+                      <AvatarFallback className="type-caption">
+                        {getMemberDisplayName(m).charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="type-label font-medium text-foreground">
+                      {getMemberDisplayName(m)}
+                    </span>
+                  </div>
+                </TableCell>
+                <TableCell onClick={(e) => e.stopPropagation()}>
+                  {canManageMembers ? (
+                    <Select
+                      value={m.role}
+                      onValueChange={(role) => updateMember.mutate({ id: m.id, role })}
+                    >
+                      <SelectTrigger className="h-7 w-24 type-caption">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ROLES.map((r) => (
+                          <SelectItem key={r} value={r} className="type-caption">{r}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <span className="type-caption text-muted-foreground capitalize">{m.role}</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <span className="font-mono-display type-caption tabular-nums text-muted-foreground">
+                    {stat ? `${formatTokens(stat.inputTokens)} / ${formatTokens(stat.outputTokens)}` : "—"}
+                  </span>
+                </TableCell>
+                <TableCell className="text-right">
+                  <span className="font-mono-display type-caption tabular-nums">
+                    {stat ? formatCount(stat.eventCount) : "—"}
+                  </span>
+                </TableCell>
+                <TableCell className="text-right">
+                  <span className="font-mono-display type-label font-semibold tabular-nums text-foreground">
+                    {stat ? formatCost(stat.costUsd) : "—"}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <span className="type-caption text-muted-foreground">
+                    {stat?.lastEventAt ? formatDistanceToNow(stat.lastEventAt) : "—"}
+                  </span>
+                </TableCell>
+                <TableCell onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="size-7 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <MoreHorizontal className="size-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {canManageMembers && (
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onClick={() => removeMember.mutate(m.id)}
+                        >
+                          Remove from project
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
               </TableRow>
-            )}
-            {filtered.map((m) => {
-              const stat = statsById.get(m.userId);
-              return (
-                <TableRow
-                  key={m.id}
-                  className="cursor-pointer"
-                  onClick={() => navigate(`${AppRoutes.members.detail(m.userId)}?projectId=${projectId}`)}
-                >
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Avatar className="size-7">
-                        <AvatarImage src={m.avatarUrl ?? undefined} />
-                        <AvatarFallback className="text-xs">
-                          {getMemberDisplayName(m).charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="text-sm font-medium">
-                          {getMemberDisplayName(m)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {m.email}
-                        </p>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell onClick={(e) => e.stopPropagation()}>
-                    {canManageMembers ? (
-                      <Select
-                        value={m.role}
-                        onValueChange={(role) => updateMember.mutate({ id: m.id, role })}
-                      >
-                        <SelectTrigger className="h-7 w-24 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {ROLES.map((r) => (
-                            <SelectItem key={r} value={r} className="text-xs">{r}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <RoleBadge role={m.role as "owner" | "member" | "viewer"} />
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <CliStatusBadge connected={m.cliConnected} />
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-sm">
-                    {stat ? formatTokens(stat.inputTokens) : "—"}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-sm">
-                    {stat ? formatTokens(stat.outputTokens) : "—"}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-sm">
-                    {stat ? formatCount(stat.eventCount) : "—"}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-sm">
-                    {stat ? formatCost(stat.costUsd) : "—"}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {stat?.lastEventAt
-                      ? formatDistanceToNow(stat.lastEventAt)
-                      : "Never"}
-                  </TableCell>
-                  {canManageMembers && (
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger
-                          asChild
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-7"
-                          >
-                            <MoreHorizontal className="size-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeMember.mutate(m.id);
-                            }}
-                          >
-                            Remove from project
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  )}
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
+            );
+          })}
+        </TableBody>
+      </Table>
     </div>
   );
 }

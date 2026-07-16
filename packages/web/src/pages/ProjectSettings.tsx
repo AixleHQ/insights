@@ -349,8 +349,8 @@ export function ProjectSettings() {
     );
   }
 
-  if (project && !isProjectOwner) {
-    return <Navigate to={AppRoutes.projects.detail(id)} replace />;
+  if (!isProjectOwner) {
+    return <Navigate to={AppRoutes.projects.root} replace />;
   }
 
   const orgId = project?.organization_id ?? "";

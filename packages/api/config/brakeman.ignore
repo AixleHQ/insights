@@ -98,24 +98,24 @@
     {
       "warning_type": "SQL Injection",
       "warning_code": 0,
-      "fingerprint": "b6a32502ade568c962a3ccb2a46b96a677f597e4048d7e0ed49a69241dfc0805",
-      "check_name": "SQL",
-      "message": "Possible SQL injection",
-      "file": "app/controllers/concerns/timezone_bucketing.rb",
-      "line": 27,
-      "note": "False positive: trunc is whitelisted to day/week/month and tz comes from client_timezone, which only ever returns a value from the VALID_TIMEZONES whitelist or the literal 'UTC'. No user input reaches the SQL."
-    },
-    {
-      "warning_type": "SQL Injection",
-      "warning_code": 0,
       "fingerprint": "1bbe03c4a69bea1ea4930613f98af1f659edd1b9c401ce20fc9e3b56e0d1ca8b",
       "check_name": "SQL",
       "message": "Possible SQL injection",
       "file": "app/controllers/concerns/timezone_bucketing.rb",
       "line": 33,
       "note": "False positive: interpolated tz comes from client_timezone, which only ever returns a value from the VALID_TIMEZONES whitelist (TZInfo::Timezone.all_identifiers) or the literal 'UTC'. No user input reaches the SQL."
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "ab358088244c5643ffc66be27499fd01768e49a020478824966cc650d9a10460",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/controllers/concerns/timezone_bucketing.rb",
+      "line": 15,
+      "note": "False positive: trunc is whitelisted to day/week/month and timezone is either 'UTC' or a value from the VALID_TIMEZONES whitelist (TZInfo::Timezone.all_identifiers). No user input reaches the SQL unescaped."
     }
   ],
-  "updated": "2026-06-29 08:00:00 +0000",
+  "updated": "2026-07-06 00:00:00 +0000",
   "brakeman_version": "7.1.2"
 }

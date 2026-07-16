@@ -65,6 +65,14 @@ const riskIcon: Record<RiskLevel, ReactNode> = {
   none:     <NoneIcon />,
 };
 
+const riskPillClass: Record<RiskLevel, string> = {
+  critical: "bg-risk-critical/15 text-risk-critical border-risk-critical/30",
+  high:     "bg-risk-high/15 text-risk-high border-risk-high/30",
+  medium:   "bg-risk-medium/15 text-risk-medium border-risk-medium/30",
+  low:      "bg-risk-low/15 text-risk-low border-risk-low/30",
+  none:     "bg-muted text-muted-foreground border-border",
+};
+
 export interface RiskBadgeProps {
   level: RiskLevel;
   className?: string;
@@ -74,7 +82,8 @@ export function RiskBadge({ level, className }: RiskBadgeProps) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-[6px] text-sm font-medium text-foreground",
+        "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 type-caption font-medium",
+        riskPillClass[level],
         className
       )}
     >

@@ -6,6 +6,7 @@ module Oauth
     API_VERSION = "2023-06-01"
     USAGE_URL = "#{API_URL}/v1/organizations/usage_report/messages"
     MAX_PAGES = 100
+    ADMIN_KEY_PREFIX = "sk-ant-admin"
 
     # Structural GET-only constraint: all outbound requests must go through this
     # connection. It exposes only #get — accidental write verbs in this file
@@ -79,6 +80,12 @@ module Oauth
 
     def test_connection
       # Admin keys are scoped to usage-reporting endpoints, not /v1/models.
+      # Guard on format first — non-admin keys can return HTTP 200 with empty data
+      # from the usage endpoint, which would silently pass the HTTP-status check.
+      unless connector.access_token.to_s.start_with?(ADMIN_KEY_PREFIX)
+        return { success: false, error: "Invalid API key — ensure you are using an Admin API key (#{ADMIN_KEY_PREFIX}-...)" }
+      end
+
       # Validate by hitting the usage report endpoint with a minimal date range.
       response = READ_ONLY_CONNECTION.get(USAGE_URL) do |req|
         req.headers["x-api-key"] = connector.access_token
@@ -90,7 +97,7 @@ module Oauth
       if response.success?
         { success: true }
       elsif response.status == 401 || response.status == 403
-        { success: false, error: "Invalid API key — ensure you are using an Admin API key (sk-ant-admin-...)" }
+        { success: false, error: "Invalid API key — ensure you are using an Admin API key (#{ADMIN_KEY_PREFIX}-...)" }
       else
         { success: false, error: "Anthropic API error: #{response.status}" }
       end

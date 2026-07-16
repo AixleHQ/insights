@@ -22,7 +22,11 @@
     <% if @notice.present? %>
       <div class="notice"><%= @notice %></div>
     <% end %>
-    <%= link_to 'Try Again', '/admin/login', class: 'btn' %>
+    <% if @error.present? %>
+      <%= link_to 'Try Again', '/admin/login', class: 'btn' %>
+    <% else %>
+      <%= link_to 'Log In', '/admin/login', class: 'btn' %>
+    <% end %>
   </div>
 </body>
 </html>
