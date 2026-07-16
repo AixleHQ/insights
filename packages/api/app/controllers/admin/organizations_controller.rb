@@ -2,6 +2,22 @@
 
 module Admin
   class OrganizationsController < Admin::ApplicationController
+    # Every dependent: :restrict_with_error association on Organization (tool_events,
+    # audit_logs, retention_purge_logs) represents retained history the org can't shed —
+    # show one actionable reason instead of Rails' per-association default text.
+    BLOCKED_DELETE_MESSAGE = "This organization has retained tool activity, audit, or " \
+      "retention-purge history and cannot be permanently deleted. Deactivate the " \
+      "organization instead, or contact an authorized admin to run a compliant data purge.".freeze
+
+    def destroy
+      if requested_resource.destroy
+        flash[:notice] = translate_with_resource("destroy.success")
+      else
+        flash[:error] = BLOCKED_DELETE_MESSAGE
+      end
+      redirect_to after_resource_destroyed_path(requested_resource), status: :see_other
+    end
+
     def export
       organizations = Organization.all
       respond_to do |format|
