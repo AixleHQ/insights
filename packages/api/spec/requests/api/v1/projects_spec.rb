@@ -304,6 +304,15 @@ RSpec.describe 'Api::V1::Projects', type: :request do
         authenticated_delete "/api/v1/projects/#{project.id}", user: user
       }.not_to change(OrganizationAuditLog, :count)
     end
+
+    it 'returns 422 instead of 500 when the project has dependent tool events' do
+      create(:tool_event, :with_project, project: project, organization: organization)
+
+      authenticated_delete "/api/v1/projects/#{project.id}", user: user
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(Project.find_by(id: project.id)).to be_present
+    end
   end
 
   describe 'DELETE /api/v1/projects/:id (organization project)' do

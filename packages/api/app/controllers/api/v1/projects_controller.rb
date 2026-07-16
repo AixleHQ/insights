@@ -107,6 +107,11 @@ module Api
           @project.destroy!
         end
         render_no_content
+      rescue ActiveRecord::RecordNotDestroyed
+        render json: {
+          error: "Unprocessable Entity",
+          errors: format_validation_errors(@project.errors)
+        }, status: :unprocessable_content
       end
 
       # GET /api/v1/projects/:id/settings
