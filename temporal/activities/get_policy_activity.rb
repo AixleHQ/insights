@@ -26,7 +26,7 @@ module Activities
             "aws_access_key"  => 'AKIA[0-9A-Z]{16}',
             "aws_session_key" => 'ASIA[0-9A-Z]{16}',
             "github_token"    => 'gh[pousr]_[A-Za-z0-9_]{36,}',
-            "openai_key"      => 'sk-[A-Za-z0-9]{48}',
+            "openai_key"      => 'sk-[A-Za-z0-9_\-]{20,}',
             "anthropic_key"   => 'sk-ant-[A-Za-z0-9_\-]{93,}',
             "slack_token"     => 'xox[baprs]-[0-9A-Za-z\-]{10,}',
             "stripe_key"      => '(?:sk|rk)_live_[0-9a-zA-Z]{24,}',
@@ -61,7 +61,7 @@ module Activities
       return policy if policy
 
       # Fall back to default policy
-      DEFAULT_POLICY.dup
+      JSON.parse(JSON.generate(DEFAULT_POLICY))
     end
 
     private

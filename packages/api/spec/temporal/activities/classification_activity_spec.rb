@@ -194,8 +194,10 @@ RSpec.describe Activities::ClassificationActivity, type: :unit do
     it "UUID in session_id field is not flagged" do
       result = activity.execute(
         "raw_payload" => JSON.generate({
-          "metadata" => { "scannable" => false },
-          "session_id" => "550e8400-e29b-41d4-a716-446655440000"
+          "metadata" => {
+            "scannable" => false,
+            "session_id" => "550e8400-e29b-41d4-a716-446655440000"
+          }
         }),
         "policy" => real_policy
       )

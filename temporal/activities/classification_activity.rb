@@ -8,7 +8,7 @@ module Activities
     VALID_RISK_LEVELS = %w[low medium high critical none].freeze
 
     STRUCTURAL_KEYS = %w[
-      id model
+      id
       commit_hash commit_sha git_sha
     ].freeze
 

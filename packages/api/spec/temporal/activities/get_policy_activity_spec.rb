@@ -45,6 +45,8 @@ RSpec.describe Activities::GetPolicyActivity, type: :unit do
     it "openai_key matches sk- prefixed tokens of correct length" do
       regex = Regexp.new(policy.dig("rules", "secrets", "patterns", "openai_key"), Regexp::IGNORECASE)
       expect("sk-" + "a" * 48).to match(regex)
+      expect("sk-proj-" + "a" * 45).to match(regex)
+      expect("sk-" + "a" * 10).not_to match(regex)
     end
 
     it "anthropic_key matches sk-ant- prefixed tokens" do
