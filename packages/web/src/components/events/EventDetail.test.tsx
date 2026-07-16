@@ -161,11 +161,13 @@ describe("EventDetail", () => {
       expect(screen.getByText("Tell me about this codebase")).toBeInTheDocument();
     });
 
-    it("raw tab shows 'No content available' (field not mapped from API)", async () => {
+    it("raw tab shows prompt placeholder (field not mapped from API)", async () => {
       const user = userEvent.setup();
       renderDetail(mockEvent);
       await user.click(screen.getByRole("tab", { name: /raw/i }));
-      expect(screen.getByText("No content available")).toBeInTheDocument();
+      expect(
+        screen.getByText(/prompt capture is not enabled/i)
+      ).toBeInTheDocument();
     });
 
     it("metadata tab shows JSON stringified output", async () => {
@@ -242,6 +244,44 @@ describe("EventDetail", () => {
     it("does not render RecentCommitDetail for regular events", () => {
       renderDetail(mockEvent);
       expect(screen.queryByTestId("recent-commit-detail")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("graceful empty prompt (AIX-511)", () => {
+    it("commit event renders no prompt tab, only Metadata, and no empty <pre>", () => {
+      renderDetail({
+        ...mockEvent,
+        event_type: "commit",
+        sanitized_content: undefined,
+        metadata: { source: "recent_commit", commit_hash: "abc1234" },
+      });
+      expect(screen.getByTestId("recent-commit-detail")).toBeInTheDocument();
+      expect(screen.queryByRole("tab", { name: /sanitized/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("tab", { name: /raw/i })).not.toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /metadata/i })).toBeInTheDocument();
+      expect(screen.queryByText("No content available")).not.toBeInTheDocument();
+    });
+
+    it("edit event (derivative, no commit metadata) shows placeholder, no prompt tabs", () => {
+      renderDetail({
+        ...mockEvent,
+        event_type: "edit",
+        sanitized_content: undefined,
+        metadata: null,
+      });
+      expect(screen.queryByRole("tab", { name: /sanitized/i })).not.toBeInTheDocument();
+      expect(screen.getByText(/has no prompt text/i)).toBeInTheDocument();
+    });
+
+    it("chat event with no captured text shows a clear placeholder, not blank", () => {
+      renderDetail({
+        ...mockEvent,
+        event_type: "chat",
+        sanitized_content: undefined,
+      });
+      expect(screen.getByRole("tab", { name: /sanitized/i })).toBeInTheDocument();
+      expect(screen.getByText(/prompt capture is not enabled/i)).toBeInTheDocument();
+      expect(screen.queryByText("No content available")).not.toBeInTheDocument();
     });
   });
 });

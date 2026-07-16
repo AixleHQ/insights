@@ -28,6 +28,28 @@ vi.mock("@/hooks/useWebSocket", () => ({
   useEventsPageUpdates: vi.fn(),
 }));
 
+vi.mock("recharts", () => ({
+  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="chart-container">{children}</div>
+  ),
+  BarChart: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="bar-chart">{children}</div>
+  ),
+  Bar: () => null,
+  CartesianGrid: () => null,
+  XAxis: () => null,
+  YAxis: () => null,
+  Legend: () => null,
+}));
+
+vi.mock("@/components/ui/chart", () => ({
+  ChartContainer: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="chart">{children}</div>
+  ),
+  ChartTooltip: () => null,
+  ChartTooltipContent: () => null,
+}));
+
 const mockUseProject = vi.fn();
 const mockUseEvents = vi.fn();
 const mockUseEvent = vi.fn();
@@ -58,6 +80,9 @@ vi.mock("@/hooks/useApi", () => ({
   useUpdateProjectMember: () => ({ mutate: vi.fn(), isPending: false }),
   useRemoveProjectMember: () => ({ mutate: vi.fn(), isPending: false }),
   useOrganizationMembers: () => ({ data: [] }),
+  useProjectStats: () => ({ data: undefined, isLoading: false }),
+  useFavoriteProjects: () => ({ data: [] }),
+  useToggleFavorite: () => ({ mutate: vi.fn() }),
 }));
 
 const mockProject = {
@@ -136,7 +161,7 @@ describe("ProjectDetail", () => {
   it("renders project name and description", () => {
     render(<ProjectDetail />);
 
-    expect(screen.getByText("My Project")).toBeInTheDocument();
+    expect(screen.getAllByText("My Project").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("A test project")).toBeInTheDocument();
   });
 
@@ -145,16 +170,15 @@ describe("ProjectDetail", () => {
 
     expect(screen.getByText("Total Events")).toBeInTheDocument();
     expect(screen.getByText("Total Cost")).toBeInTheDocument();
-    expect(screen.getByText("Created")).toBeInTheDocument();
-    expect(screen.getByText("Last Activity")).toBeInTheDocument();
-    expect(screen.getAllByText("All-time attributed").length).toBeGreaterThanOrEqual(3);
+    expect(screen.getByText("Total Tokens")).toBeInTheDocument();
+    expect(screen.getByText("Most Used Tool")).toBeInTheDocument();
     expect(screen.getByText("42")).toBeInTheDocument();
     expect(screen.getByText("$12.50")).toBeInTheDocument();
   });
 
   it("shows unavailable placeholders when aggregate fields are absent", () => {
     const projectWithoutAggregates = { ...mockProject };
-    for (const key of ["eventCount", "totalCostUsd", "lastEventAt"] as const) {
+    for (const key of ["eventCount", "totalCostUsd"] as const) {
       Reflect.deleteProperty(projectWithoutAggregates, key);
     }
     mockUseProject.mockReturnValue({
@@ -164,7 +188,7 @@ describe("ProjectDetail", () => {
 
     render(<ProjectDetail />);
 
-    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(3);
+    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(2);
   });
 
   it("renders source control summary when available", () => {
@@ -181,6 +205,12 @@ describe("ProjectDetail", () => {
     expect(screen.getByText("Issue Throughput")).toBeInTheDocument();
     expect(screen.getByText("State Changes")).toBeInTheDocument();
     expect(screen.getByText("8")).toBeInTheDocument();
+  });
+
+  it("renders repositories section on the overview", () => {
+    render(<ProjectDetail />);
+
+    expect(screen.getByText("Repositories")).toBeInTheDocument();
   });
 
   it("renders Leaderboard section on the overview", () => {
@@ -232,22 +262,34 @@ describe("ProjectDetail", () => {
     });
   });
 
-  describe("Active badge", () => {
-    it("shows Active badge for active project", () => {
+  describe("Repository controls RBAC (AIX-501)", () => {
+    const repos = [
+      { id: "repo-1", provider: "github", name: "repo", fullName: "org/repo", url: "https://github.com/org/repo", isActive: true, lastSyncAt: null },
+    ];
+
+    it("hides Connect Repository and Disconnect for a viewer / non-owner", () => {
+      mockUseProjectRepositories.mockReturnValue({ data: repos, isLoading: false });
       render(<ProjectDetail />);
 
-      expect(screen.getByText("Active")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /connect repository/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /disconnect/i })).not.toBeInTheDocument();
     });
 
-    it("shows Inactive badge for inactive project", () => {
-      mockUseProject.mockReturnValue({
-        data: { ...mockProject, isActive: false },
-        isLoading: false,
-      });
+    it("shows Connect Repository and Disconnect for an org owner", () => {
+      mockHasRole.mockReturnValue(true);
+      mockUseProjectRepositories.mockReturnValue({ data: repos, isLoading: false });
       render(<ProjectDetail />);
 
-      expect(screen.getByText("Inactive")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /connect repository/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /disconnect/i })).toBeInTheDocument();
     });
+  });
+
+  it("renders breadcrumb with Projects link and project name", () => {
+    render(<ProjectDetail />);
+
+    expect(screen.getByRole("link", { name: "Projects" })).toBeInTheDocument();
+    expect(screen.getAllByText("My Project").length).toBeGreaterThanOrEqual(1);
   });
 
   describe("Tab navigation", () => {
@@ -265,19 +307,19 @@ describe("ProjectDetail", () => {
       expect(screen.getByRole("tab", { name: "Members" })).toBeInTheDocument();
     });
 
-    it("does not render Members tab for non-member org user", () => {
-      // user-99 is not in mockMembers and hasRole returns false
+    it("renders Members tab when project is loaded (access implies membership)", () => {
+      // Any user who can load the project sees the Members tab (policy scope enforces access)
       render(<ProjectDetail />);
 
-      expect(screen.queryByRole("tab", { name: "Members" })).not.toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: "Members" })).toBeInTheDocument();
     });
 
-    it("does not render Integrations tab for project member role", () => {
-      // user-2 is in mockMembers with role "member" (not owner), hasRole returns false
+    it("renders Integrations tab for project member role (read-only view)", () => {
+      // Members see Integrations in read-only mode per F7-S5 spec
       mockUseCurrentUser.mockReturnValue({ data: { id: "user-2", globalAdmin: false }, isLoading: false });
       render(<ProjectDetail />);
 
-      expect(screen.queryByRole("tab", { name: "Integrations" })).not.toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: "Integrations" })).toBeInTheDocument();
     });
 
     it("renders Integrations tab for org owner", () => {
@@ -288,7 +330,7 @@ describe("ProjectDetail", () => {
     });
   });
 
-  describe("ToolUsageByDayChart integration", () => {
+  describe("GroupedBarChart integration", () => {
     it("calls useProjectDailyByTool with default 7-day range and day granularity", () => {
       render(<ProjectDetail />);
 

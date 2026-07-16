@@ -1870,6 +1870,247 @@ RSpec.describe 'Api::V1::Stats', type: :request do
     end
   end
 
+  describe 'continuous aggregate parity' do
+    self.use_transactional_tests = false
+
+    after(:context) do
+      ToolEvent.delete_all
+      OrganizationMembership.delete_all
+      Organization.destroy_all
+      User.destroy_all
+    end
+
+    let(:cagg_org)  { create(:organization) }
+    let(:cagg_user) { create(:user) }
+    let!(:cagg_membership) { create(:organization_membership, user: cagg_user, organization: cagg_org, role: 'member') }
+    let(:anchor) { Time.zone.parse('2026-04-15 12:00:00') }
+
+    around do |ex|
+      StatsTimeSeriesQuery.enable_cagg_reads!
+      travel_to(anchor) { ex.run }
+    ensure
+      StatsTimeSeriesQuery.disable_cagg_reads!
+    end
+
+    after do
+      ToolEvent.delete_all
+    end
+
+    before do
+      create(:tool_event, organization: cagg_org, user: cagg_user, tool_name: "cursor",
+             cost_usd: 10.0, occurred_at: anchor - 10.days)
+      create(:tool_event, organization: cagg_org, user: cagg_user, tool_name: "cursor",
+             cost_usd: 5.0, occurred_at: anchor - 5.days)
+      create(:tool_event, organization: cagg_org, user: cagg_user, tool_name: "cursor",
+             cost_usd: 4.0, occurred_at: anchor - 12.hours)
+      create(:tool_event, organization: cagg_org, user: cagg_user, tool_name: "cursor",
+             cost_usd: 1.0, occurred_at: anchor - 30.minutes)
+      refresh_all_token_usage_aggregates!
+    end
+
+    it 'overview MTD totals match sum of seeded events' do
+      authenticated_get "/api/v1/organizations/#{cagg_org.id}/stats/overview",
+                        user: cagg_user, organization: cagg_org
+
+      expect_success
+      expect(json_response[:total_events]).to eq(4)
+      expect(json_response[:total_cost_usd]).to be_within(0.01).of(20.0)
+    end
+
+    it 'daily with tz=UTC returns historical + live cost' do
+      authenticated_get "/api/v1/organizations/#{cagg_org.id}/stats/daily",
+                        user: cagg_user, organization: cagg_org,
+                        params: { days: 30, tz: 'UTC' }
+
+      expect_success
+      total_cost = json_response[:data].sum { |r| r[:cost_usd] }
+      expect(total_cost).to be_within(0.01).of(20.0)
+    end
+
+    it 'heatmap with tz=UTC includes historical and live days' do
+      authenticated_get "/api/v1/organizations/#{cagg_org.id}/stats/heatmap",
+                        user: cagg_user, organization: cagg_org,
+                        params: { tz: 'UTC' }
+
+      expect_success
+      total_count = json_response.sum { |d| d[:count] }
+      expect(total_count).to eq(4)
+    end
+
+    it 'tool_daily with tz=UTC aggregates via continuous aggregates' do
+      claude_org = create(:organization)
+      claude_user = create(:user)
+      create(:organization_membership, user: claude_user, organization: claude_org, role: "member")
+
+      create(:tool_event, organization: claude_org, user: claude_user,
+             tool_name: "claude_code", tokens_in: 100, tokens_out: 200,
+             cost_usd: 2.0, occurred_at: anchor - 10.days)
+      create(:tool_event, organization: claude_org, user: claude_user,
+             tool_name: "claude_code", tokens_in: 10, tokens_out: 20,
+             cost_usd: 0.1, occurred_at: anchor - 20.minutes)
+      refresh_all_token_usage_aggregates!
+
+      authenticated_get "/api/v1/organizations/#{claude_org.id}/stats/tools/claude_code/daily",
+                        user: claude_user, organization: claude_org,
+                        params: { tz: "UTC" }
+
+      expect_success
+      total_events = json_response[:daily].sum { |d| d[:eventCount] }
+      total_cost   = json_response[:daily].sum { |d| d[:costUsd] }
+      expect(total_events).to eq(2)
+      expect(total_cost).to be_within(0.01).of(2.1)
+    end
+  end
+
+  describe 'caching' do
+    # Test env uses :null_store — swap in a real MemoryStore so cache assertions
+    # work correctly (same pattern as spec/services/metadata_enrichers/pr_correlator_spec.rb).
+    around do |example|
+      original_cache = Rails.cache
+      Rails.cache = ActiveSupport::Cache::MemoryStore.new
+      example.run
+    ensure
+      Rails.cache = original_cache
+    end
+
+    let(:overview_path) { "/api/v1/organizations/#{organization.id}/stats/overview" }
+
+    it 'serves repeated overview requests within TTL from cache (no re-query of tool_events)' do
+      authenticated_get overview_path, user: user, organization: organization
+      expect_success
+      first_body = response.parsed_body
+
+      # Add a new event — a cache miss would return updated totals, a hit returns the same values.
+      create(:tool_event, organization: organization, user: user,
+             tool_name: 'claude_code', cost_usd: 50.0, occurred_at: Time.current)
+
+      authenticated_get overview_path, user: user, organization: organization
+      expect_success
+
+      expect(response.parsed_body['total_events']).to eq(first_body['total_events'])
+      expect(response.parsed_body['total_cost_usd']).to eq(first_body['total_cost_usd'])
+    end
+
+    it 'misses cache when params differ' do
+      travel_to Time.zone.local(2026, 6, 15) do
+        authenticated_get overview_path, user: user, organization: organization, params: { month: '2026-06' }
+        expect_success
+
+        authenticated_get overview_path, user: user, organization: organization, params: { month: '2026-05' }
+        expect_success
+
+        # Different month key — cache miss, independent result
+        expect(response.parsed_body['total_events']).to be_a(Integer)
+        expect(response.parsed_body).not_to be_nil
+      end
+    end
+
+    it 'isolates cache keys per organization' do
+      other_org  = create(:organization)
+      other_user = create(:user)
+      create(:organization_membership, user: other_user, organization: other_org, role: 'member')
+
+      authenticated_get overview_path, user: user, organization: organization
+      expect_success
+      cached_body = response.parsed_body
+
+      create(:tool_event,
+             organization: other_org,
+             user: other_user,
+             tool_name: 'claude_code',
+             tokens_in: 9999, tokens_out: 9999, cost_usd: 99.0,
+             occurred_at: Time.current)
+
+      other_path = "/api/v1/organizations/#{other_org.id}/stats/overview"
+      authenticated_get other_path, user: other_user, organization: other_org
+      expect_success
+
+      # Other org response must not equal org 1's cached payload
+      expect(response.parsed_body['total_cost_usd']).not_to eq(cached_body['total_cost_usd'])
+    end
+
+    it 'misses cache after TTL expiry' do
+      authenticated_get overview_path, user: user, organization: organization
+      expect_success
+      first_body = response.parsed_body
+
+      create(:tool_event, organization: organization, user: user,
+             tool_name: 'claude_code', cost_usd: 50.0, occurred_at: Time.current)
+
+      travel(Api::V1::StatsController::STATS_CACHE_TTL + 1.second) do
+        authenticated_get overview_path, user: user, organization: organization
+        expect_success
+
+        # After TTL, the new event is visible — cache was expired
+        expect(response.parsed_body['total_events']).to be > first_body['total_events']
+      end
+    end
+
+    describe 'active_tools (30s-polled endpoint)' do
+      it 'serves repeated requests within TTL from cache' do
+        path = "/api/v1/organizations/#{organization.id}/stats/active_tools"
+        authenticated_get path, user: user, organization: organization
+        expect_success
+        first_tools = response.parsed_body['tools']
+
+        create(:tool_event, organization: organization, user: user,
+               tool_name: 'cursor', cost_usd: 50.0, occurred_at: Time.current)
+
+        authenticated_get path, user: user, organization: organization
+        expect_success
+
+        expect(response.parsed_body['tools']).to eq(first_tools)
+      end
+    end
+
+    describe 'tool_overview (30s-polled endpoint)' do
+      it 'serves repeated requests within TTL from cache' do
+        path = "/api/v1/organizations/#{organization.id}/stats/tools/claude_code/overview"
+        authenticated_get path, user: user, organization: organization
+        expect_success
+        first_count = response.parsed_body['total_events']
+
+        create(:tool_event, organization: organization, user: user,
+               tool_name: 'claude_code', cost_usd: 1.0, occurred_at: Time.current)
+
+        authenticated_get path, user: user, organization: organization
+        expect_success
+
+        expect(response.parsed_body['total_events']).to eq(first_count)
+      end
+    end
+
+    describe 'tool-scoped endpoints isolate cache keys by project_id (AIX-524 QA fail)' do
+      %w[daily models users event_types].each do |endpoint|
+        it "does not serve an org-wide #{endpoint} cache entry for a differently-scoped project_id request" do
+          empty_project = create(:project, organization: organization)
+          path = "/api/v1/organizations/#{organization.id}/stats/tools/cursor/#{endpoint}"
+
+          # Org-wide (no project_id) request — populates the cache first.
+          create(:tool_event, organization: organization, user: user,
+                 tool_name: 'cursor', event_type: 'chat', model: 'gpt-4o', cost_usd: 1.0)
+          authenticated_get path, user: user, organization: organization
+          expect_success
+
+          # Same tool/days/period/tz within the TTL, but scoped to a project with
+          # zero events — must not reuse the org-wide cache entry above.
+          authenticated_get path, user: user, organization: organization,
+                            params: { project_id: empty_project.id }
+          expect_success
+
+          total = case endpoint
+          when 'daily' then json_response[:daily].sum { |d| d[:eventCount] }
+          when 'models' then json_response[:models].sum { |m| m[:eventCount] }
+          when 'users' then json_response[:users].sum { |u| u[:eventCount] }
+          when 'event_types' then json_response[:eventTypes].sum { |e| e[:eventCount] }
+          end
+
+          expect(total).to eq(0)
+        end
+      end
+    end
+  end
+
   describe 'month_or_days_time_range validation' do
     it 'returns 400 for malformed month param' do
       authenticated_get "/api/v1/organizations/#{organization.id}/stats/daily_by_tool",

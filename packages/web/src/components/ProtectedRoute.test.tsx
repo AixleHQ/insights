@@ -1,12 +1,20 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { ProtectedRoute } from "./ProtectedRoute";
 
 const mockHasRole = vi.fn();
 
+// Hoisted so the AuthContext mock factory can read a mutable auth state per test.
+const h = vi.hoisted(() => ({
+  auth: { isAuthenticated: true, isLoading: false } as {
+    isAuthenticated: boolean;
+    isLoading: boolean;
+  },
+}));
+
 vi.mock("@/contexts/AuthContext", () => ({
-  useAuth: () => ({ isAuthenticated: true, isLoading: false }),
+  useAuth: () => h.auth,
 }));
 
 vi.mock("@/contexts/OrgContext", () => ({
@@ -31,12 +39,38 @@ function renderRoute(requireRoles?: string[]) {
             </ProtectedRoute>
           }
         />
+        <Route path="/login" element={<div>Login Page</div>} />
       </Routes>
     </MemoryRouter>
   );
 }
 
+describe("ProtectedRoute — authentication", () => {
+  beforeEach(() => {
+    h.auth = { isAuthenticated: true, isLoading: false };
+    mockHasRole.mockReset();
+  });
+
+  it("redirects to /login when the user is not authenticated", () => {
+    h.auth = { isAuthenticated: false, isLoading: false };
+    renderRoute();
+    expect(screen.getByText("Login Page")).toBeInTheDocument();
+    expect(screen.queryByText("Manage Catalog Page")).not.toBeInTheDocument();
+  });
+
+  it("renders children when no requireRoles is specified", () => {
+    mockHasRole.mockReturnValue(false);
+    renderRoute();
+    expect(screen.getByText("Manage Catalog Page")).toBeInTheDocument();
+  });
+});
+
 describe("ProtectedRoute — requireRoles", () => {
+  beforeEach(() => {
+    h.auth = { isAuthenticated: true, isLoading: false };
+    mockHasRole.mockReset();
+  });
+
   it("renders children when user has the required role", () => {
     mockHasRole.mockReturnValue(true);
     renderRoute(["owner"]);

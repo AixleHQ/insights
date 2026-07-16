@@ -1,6 +1,7 @@
-import { UserManager, User, Log } from "oidc-client-ts";
+import { UserManager, User, Log, ErrorResponse } from "oidc-client-ts";
 import type { UserManagerSettings } from "oidc-client-ts";
 import { config } from "./config";
+import { reportAuthError } from "./rollbar";
 
 if (import.meta.env.DEV) {
   Log.setLogger(console);
@@ -41,6 +42,23 @@ let signinRedirectCallbackInFlight: Promise<User> | null = null;
 
 /** Deduplicate concurrent signinSilent calls (React Strict Mode double-mount, parallel hooks). */
 let signinSilentInFlight: Promise<User | null> | null = null;
+
+/**
+ * True when an OIDC error means the session/refresh token or authorization code is
+ * genuinely dead and a fresh login is required — Keycloak returns `invalid_grant` for
+ * both "Token is not active" (dead refresh token on silent renew) and "Code not valid"
+ * (dead authorization code on the exchange). Network/timeout failures are NOT
+ * `ErrorResponse`s (they surface as `TypeError`/`ErrorTimeout`), so they return false
+ * and stay tolerated rather than forcing a logout.
+ */
+export function isDeadSessionError(error: unknown): boolean {
+  const isErrorResponse =
+    error instanceof ErrorResponse ||
+    (typeof error === "object" &&
+      error !== null &&
+      (error as { name?: string }).name === "ErrorResponse");
+  return isErrorResponse && (error as ErrorResponse).error === "invalid_grant";
+}
 
 export function getUserManager(): UserManager {
   if (!userManager) {
@@ -127,7 +145,15 @@ export async function getAccessToken(): Promise<string | null> {
         user = await manager.signinSilent();
       } catch (error) {
         console.error("[Auth] Silent renew failed in getAccessToken:", error);
-        // Return the existing token anyway - it might still work
+        reportAuthError(error, { surface: "getAccessToken" });
+        // On a genuinely dead session, do NOT hand back the stale token — return null so
+        // callers (api.ts, AuthContext) treat this as unauthenticated instead of looping
+        // on 401s with a token Keycloak will never accept again.
+        if (isDeadSessionError(error)) {
+          return null;
+        }
+        // Transient error (network/timeout): fall through and return the existing token,
+        // which may still be valid for its remaining lifetime.
       }
     }
   }
@@ -142,6 +168,7 @@ export async function silentRenew(): Promise<User | null> {
   const manager = getUserManager();
   signinSilentInFlight = manager.signinSilent().catch((error) => {
     console.error("[Auth] Silent renew failed:", error);
+    reportAuthError(error, { surface: "silentRenew" });
     return null;
   }).finally(() => {
     signinSilentInFlight = null;

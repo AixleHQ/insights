@@ -61,7 +61,7 @@ describe("ProjectMembersTab", () => {
   });
 
   describe("member view (isProjectOwner=false)", () => {
-    it("shows Name, Email, Role columns but not token/cost columns", () => {
+    it("shows Name, Email, Type columns but not token/cost columns", () => {
       render(
         <ProjectMembersTab
           projectId="proj-1"
@@ -71,10 +71,10 @@ describe("ProjectMembersTab", () => {
         />
       );
 
-      expect(screen.getByText("Member")).toBeInTheDocument();
+      expect(screen.getByText("Name")).toBeInTheDocument();
       expect(screen.getByText("Email")).toBeInTheDocument();
-      expect(screen.getByText("Role")).toBeInTheDocument();
-      expect(screen.queryByText("Tokens In")).not.toBeInTheDocument();
+      expect(screen.getByText("Type")).toBeInTheDocument();
+      expect(screen.queryByText("Tokens In / Out")).not.toBeInTheDocument();
       expect(screen.queryByText("Cost")).not.toBeInTheDocument();
     });
 
@@ -98,7 +98,7 @@ describe("ProjectMembersTab", () => {
       vi.mocked(useProjectMemberStats).mockReturnValue({ data: mockStats } as ReturnType<typeof useProjectMemberStats>);
     });
 
-    it("shows stats columns including CLI", () => {
+    it("shows stats columns: Name, Seat Type, Tokens In / Out, Events, Cost, Last Active", () => {
       render(
         <ProjectMembersTab
           projectId="proj-1"
@@ -108,15 +108,16 @@ describe("ProjectMembersTab", () => {
         />
       );
 
-      expect(screen.getByText("CLI")).toBeInTheDocument();
-      expect(screen.getByText("Tokens In")).toBeInTheDocument();
-      expect(screen.getByText("Tokens Out")).toBeInTheDocument();
+      expect(screen.getByText("Name")).toBeInTheDocument();
+      expect(screen.getByText("Seat Type")).toBeInTheDocument();
+      expect(screen.getByText("Tokens In / Out")).toBeInTheDocument();
       expect(screen.getByText("Events")).toBeInTheDocument();
       expect(screen.getByText("Cost")).toBeInTheDocument();
       expect(screen.getByText("Last Active")).toBeInTheDocument();
+      expect(screen.queryByText("CLI")).not.toBeInTheDocument();
     });
 
-    it("shows Connected badge for cliConnected=true members", () => {
+    it("shows combined tokens In / Out when stats are available", () => {
       render(
         <ProjectMembersTab
           projectId="proj-1"
@@ -126,27 +127,11 @@ describe("ProjectMembersTab", () => {
         />
       );
 
-      expect(screen.getByText("Connected")).toBeInTheDocument();
+      // Alice has inputTokens=1500 → "1.5K", outputTokens=3000 → "3.0K"
+      expect(screen.getByText("1.5K / 3.0K")).toBeInTheDocument();
     });
 
-    it("shows Not set up badge for cliConnected=false members", () => {
-      render(
-        <ProjectMembersTab
-          projectId="proj-1"
-          orgId="org-1"
-          isProjectOwner={true}
-          canManageMembers={false}
-        />
-      );
-
-      expect(screen.getByText("Not set up")).toBeInTheDocument();
-    });
-
-    it("renders no CLI badge when cliConnected is absent", () => {
-      vi.mocked(useProjectMembers).mockReturnValue({
-        data: [{ id: "m3", userId: "user-3", email: "carol@example.com", name: "Carol", avatarUrl: null, role: "member", joinedAt: "2024-01-01T00:00:00Z", totalEvents: 0, totalCost: 0, lastActiveAt: null }],
-      } as ReturnType<typeof useProjectMembers>);
-
+    it("renders no CLI badge regardless of cliConnected", () => {
       render(
         <ProjectMembersTab
           projectId="proj-1"
@@ -170,7 +155,7 @@ describe("ProjectMembersTab", () => {
         />
       );
 
-      expect(screen.getByPlaceholderText("Search members…")).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Search")).toBeInTheDocument();
     });
 
     it("filters members by name when searching", () => {
@@ -183,7 +168,7 @@ describe("ProjectMembersTab", () => {
         />
       );
 
-      fireEvent.change(screen.getByPlaceholderText("Search members…"), {
+      fireEvent.change(screen.getByPlaceholderText("Search"), {
         target: { value: "alice" },
       });
 

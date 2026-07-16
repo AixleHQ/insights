@@ -74,6 +74,25 @@ export function getEventTypeMeta(value: string | null | undefined): EventTypeMet
   return FALLBACK_META;
 }
 
+/**
+ * Derivative tool-use event types have no conversation content — they're emitted
+ * per tool-use block (a commit, an edit, a test run). A prompt panel makes no
+ * sense for these, so views should surface the event's own summary instead.
+ */
+const DERIVATIVE_EVENT_TYPES: ReadonlySet<string> = new Set<EventType>([
+  "edit",
+  "commit",
+  "test",
+  "debug",
+  "refactor",
+  "documentation",
+  "tool_use",
+]);
+
+export function isDerivativeEvent(value: string | null | undefined): boolean {
+  return typeof value === "string" && DERIVATIVE_EVENT_TYPES.has(value);
+}
+
 export const EVENT_TYPE_BAND_ORDER: EventTypeBand[] = ["ai", "code", "quality", "pm", "other"];
 
 export const EVENT_TYPE_BAND_LABEL: Record<EventTypeBand, string> = {

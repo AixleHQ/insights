@@ -284,6 +284,202 @@ RSpec.describe 'Api::V1::Events', type: :request do
         expect(ids).to include(tool_event.id, other_event.id)
       end
     end
+
+    context 'sorting' do
+      let!(:cheap_event) do
+        create(:tool_event, organization: organization, user: user, cost_usd: 0.01, occurred_at: 2.hours.ago)
+      end
+      let!(:expensive_event) do
+        create(:tool_event, organization: organization, user: user, cost_usd: 99.99, occurred_at: 1.hour.ago)
+      end
+
+      it 'sorts by cost_usd desc' do
+        authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                          user: user,
+                          organization: organization,
+                          params: { sort_by: 'cost_usd', direction: 'desc' }
+
+        expect_success
+        ids = json_data.map { |e| e[:id] }
+        expensive_index = ids.index(expensive_event.id)
+        cheap_index = ids.index(cheap_event.id)
+        expect(expensive_index).to be < cheap_index
+      end
+
+      it 'sorts by cost_usd asc' do
+        authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                          user: user,
+                          organization: organization,
+                          params: { sort_by: 'cost_usd', direction: 'asc' }
+
+        expect_success
+        ids = json_data.map { |e| e[:id] }
+        cheap_index = ids.index(cheap_event.id)
+        expensive_index = ids.index(expensive_event.id)
+        expect(cheap_index).to be < expensive_index
+      end
+
+      it 'defaults to occurred_at desc when sort_by is omitted' do
+        # expensive_event (1.hour.ago) is more recent than cheap_event (2.hours.ago)
+        authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                          user: user,
+                          organization: organization
+
+        expect_success
+        ids = json_data.map { |e| e[:id] }
+        expensive_index = ids.index(expensive_event.id)
+        cheap_index = ids.index(cheap_event.id)
+        expect(expensive_index).to be < cheap_index
+      end
+
+      it 'ignores unknown sort_by values and falls back to occurred_at desc' do
+        authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                          user: user,
+                          organization: organization,
+                          params: { sort_by: "injected_column; DROP TABLE users", direction: 'desc' }
+
+        expect_success
+        ids = json_data.map { |e| e[:id] }
+        expensive_index = ids.index(expensive_event.id)
+        cheap_index = ids.index(cheap_event.id)
+        expect(expensive_index).to be < cheap_index
+      end
+
+      it 'ignores unknown sort_by values and preserves valid direction (occurred_at asc)' do
+        authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                          user: user,
+                          organization: organization,
+                          params: { sort_by: 'not_a_column', direction: 'asc' }
+
+        expect_success
+        ids = json_data.map { |e| e[:id] }
+        cheap_index = ids.index(cheap_event.id)
+        expensive_index = ids.index(expensive_event.id)
+        expect(cheap_index).to be < expensive_index
+      end
+
+      it 'ignores unknown direction values and falls back to desc' do
+        authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                          user: user,
+                          organization: organization,
+                          params: { sort_by: 'cost_usd', direction: 'sideways' }
+
+        expect_success
+        ids = json_data.map { |e| e[:id] }
+        expect(ids.first).to eq(expensive_event.id)
+      end
+
+      it 'accepts tool_name as sort_by without error' do
+        authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                          user: user,
+                          organization: organization,
+                          params: { sort_by: 'tool_name', direction: 'asc' }
+
+        expect_success
+        expect(json_data).to be_an(Array)
+      end
+
+      it 'sorts by risk_level severity in desc order' do
+        low_event = create(:tool_event, organization: organization, user: user, metadata: { "risk_level" => "low" })
+        high_event = create(:tool_event, organization: organization, user: user, metadata: { "risk_level" => "high" })
+        critical_event = create(:tool_event, organization: organization, user: user, metadata: { "risk_level" => "critical" })
+        none_event = create(:tool_event, organization: organization, user: user, metadata: {})
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                          user: user,
+                          organization: organization,
+                          params: { sort_by: 'risk_level', direction: 'desc' }
+
+        expect_success
+        ids = json_data.map { |e| e[:id] }
+
+        expect(ids.index(critical_event.id)).to be < ids.index(high_event.id)
+        expect(ids.index(high_event.id)).to be < ids.index(low_event.id)
+        expect(ids.index(low_event.id)).to be < ids.index(none_event.id)
+      end
+
+      it 'sorts null cost_usd last when sorting desc (treated as lowest value)' do
+        null_cost_event = create(:tool_event, organization: organization, user: user, cost_usd: nil)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                          user: user,
+                          organization: organization,
+                          params: { sort_by: 'cost_usd', direction: 'desc' }
+
+        expect_success
+        ids = json_data.map { |e| e[:id] }
+        expect(ids.last).to eq(null_cost_event.id)
+      end
+
+      it 'sorts null cost_usd first when sorting asc (treated as lowest value)' do
+        null_cost_event = create(:tool_event, organization: organization, user: user, cost_usd: nil)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                          user: user,
+                          organization: organization,
+                          params: { sort_by: 'cost_usd', direction: 'asc' }
+
+        expect_success
+        ids = json_data.map { |e| e[:id] }
+        expect(ids.first).to eq(null_cost_event.id)
+      end
+
+      it 'sorts null tokens_in last when sorting desc (treated as lowest value)' do
+        null_tokens_event = create(:tool_event, organization: organization, user: user, tokens_in: nil)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                          user: user,
+                          organization: organization,
+                          params: { sort_by: 'tokens_in', direction: 'desc' }
+
+        expect_success
+        ids = json_data.map { |e| e[:id] }
+        expect(ids.last).to eq(null_tokens_event.id)
+      end
+
+      it 'sorts null tokens_in first when sorting asc (treated as lowest value)' do
+        null_tokens_event = create(:tool_event, organization: organization, user: user, tokens_in: nil)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                          user: user,
+                          organization: organization,
+                          params: { sort_by: 'tokens_in', direction: 'asc' }
+
+        expect_success
+        ids = json_data.map { |e| e[:id] }
+        expect(ids.first).to eq(null_tokens_event.id)
+      end
+
+      it 'keeps global sort order consistent across pagination' do
+        bulk_events = Array.new(30) do |i|
+          create(:tool_event,
+                 organization: organization,
+                 user: user,
+                 cost_usd: 1000 + i,
+                 occurred_at: (i + 1).minutes.ago)
+        end
+        expected_ids = bulk_events.sort_by { |event| -event.cost_usd.to_f }.map(&:id)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                          user: user,
+                          organization: organization,
+                          params: { sort_by: 'cost_usd', direction: 'desc', page: 1, per_page: 10 }
+
+        expect_success
+        page_one_ids = json_data.map { |e| e[:id] }
+        expect(page_one_ids).to eq(expected_ids.first(10))
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/events",
+                          user: user,
+                          organization: organization,
+                          params: { sort_by: 'cost_usd', direction: 'desc', page: 2, per_page: 10 }
+
+        expect_success
+        page_two_ids = json_data.map { |e| e[:id] }
+        expect(page_two_ids).to eq(expected_ids.slice(10, 10))
+        expect(page_two_ids & page_one_ids).to be_empty
+      end
+    end
   end
 
   describe 'GET /api/v1/organizations/:organization_id/events/:id' do

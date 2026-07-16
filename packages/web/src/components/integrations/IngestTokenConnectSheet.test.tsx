@@ -204,6 +204,20 @@ describe("IngestTokenConnectSheet", () => {
       await user.click(screen.getByRole("tab", { name: /Advanced hooks/i }));
       expect(screen.getByText(/~\/.claude\/settings\.json/i)).toBeInTheDocument();
     });
+
+    it("keeps the setup content in a scrollable container so tall tabs stay reachable", async () => {
+      await goToSetupStep(claudeCodeProvider);
+      const scrollContainer = screen.getByText("Your ingest token").closest(".overflow-y-auto");
+      expect(scrollContainer).not.toBeNull();
+      expect(scrollContainer).toHaveClass("flex-1");
+    });
+
+    it("gives setup tab triggers a natural height so wrapped tabs don't overlap content", async () => {
+      await goToSetupStep(claudeCodeProvider);
+      const advancedTab = screen.getByRole("tab", { name: /Advanced hooks/i });
+      expect(advancedTab).toHaveClass("h-auto");
+      expect(advancedTab).toHaveClass("flex-none");
+    });
   });
 
   describe("Copy button", () => {

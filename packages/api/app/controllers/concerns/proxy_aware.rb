@@ -8,8 +8,16 @@ module ProxyAware
   private
 
   def external_origin
-    scheme = request.headers["X-Forwarded-Proto"] || request.scheme
-    host = request.headers["X-Forwarded-Host"] || request.host_with_port
-    "#{scheme}://#{host}"
+    # In staging/production, pin to APP_HOST (already required by required_env_vars.rb and
+    # HTTPS-only there) instead of trusting X-Forwarded-Host/-Proto — those headers aren't
+    # covered by config.hosts, so trusting them here would let a spoofed header redirect the
+    # OIDC callback or Keycloak post-logout redirect to an attacker-controlled origin.
+    if Rails.env.production? || Rails.env.staging?
+      "https://#{ENV.fetch('APP_HOST')}"
+    else
+      scheme = request.headers["X-Forwarded-Proto"] || request.scheme
+      host = request.headers["X-Forwarded-Host"] || request.host_with_port
+      "#{scheme}://#{host}"
+    end
   end
 end

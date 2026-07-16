@@ -65,9 +65,13 @@ function InvitationCard({
       )}
 
       <div className="relative flex items-start justify-between gap-4">
-        <div className="flex-1 space-y-1">
+        <div className="flex-1 min-w-0 space-y-1">
           <div className="flex items-center gap-2">
-            <h4 className="font-medium">{invitation.organization.name}</h4>
+            <h4 className="font-medium truncate max-w-[200px]" title={invitation.organization.name}>
+              {invitation.organization.name.length > 50
+                ? `${invitation.organization.name.slice(0, 50)}…`
+                : invitation.organization.name}
+            </h4>
             <Badge
               variant={isExpired ? "secondary" : "outline"}
               className="text-xs capitalize"

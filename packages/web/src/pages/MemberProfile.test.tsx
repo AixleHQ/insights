@@ -12,6 +12,7 @@ vi.mock("@/contexts/OrgContext", () => ({
 
 const mockUseMember = vi.fn();
 const mockUseMemberStats = vi.fn();
+const mockUseMemberHeatmap = vi.fn();
 const mockUseMemberEvents = vi.fn();
 const mockUseProject = vi.fn();
 const mockUseEvents = vi.fn();
@@ -20,6 +21,7 @@ const mockUseEvent = vi.fn();
 vi.mock("@/hooks/useApi", () => ({
   useMember: (...args: unknown[]) => mockUseMember(...args),
   useMemberStats: (...args: unknown[]) => mockUseMemberStats(...args),
+  useMemberHeatmap: (...args: unknown[]) => mockUseMemberHeatmap(...args),
   useMemberEvents: (...args: unknown[]) => mockUseMemberEvents(...args),
   useProject: (...args: unknown[]) => mockUseProject(...args),
   useEvents: (...args: unknown[]) => mockUseEvents(...args),
@@ -69,6 +71,7 @@ const mockProject = {
 function setupDefaultMocks() {
   mockUseMember.mockReturnValue({ data: mockMember, isLoading: false });
   mockUseMemberStats.mockReturnValue({ data: mockStats });
+  mockUseMemberHeatmap.mockReturnValue({ data: [] });
   mockUseMemberEvents.mockReturnValue({ data: emptyEventsResponse, isLoading: false });
   mockUseProject.mockReturnValue({ data: mockProject, isLoading: false });
   mockUseEvents.mockReturnValue({ data: emptyEventsResponse, isLoading: false });
@@ -115,6 +118,20 @@ describe("MemberProfileView", () => {
 
       const backLinks = screen.getAllByRole("link").filter((link) => link.getAttribute("href") === "/members");
       expect(backLinks.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("time-range selector", () => {
+    it("requests the 30-day range by default", () => {
+      render(<MemberProfileView memberId="mem-1" />);
+      expect(mockUseMemberStats).toHaveBeenLastCalledWith("org-1", "mem-1", "30d");
+    });
+
+    it("re-requests stats for the selected range when All time is clicked", async () => {
+      const user = userEvent.setup();
+      render(<MemberProfileView memberId="mem-1" />);
+      await user.click(screen.getByRole("button", { name: "All time" }));
+      expect(mockUseMemberStats).toHaveBeenLastCalledWith("org-1", "mem-1", "all");
     });
   });
 

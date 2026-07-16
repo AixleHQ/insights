@@ -11,6 +11,8 @@ class HourlyTokenUsage < ApplicationRecord
   scope :for_user, ->(user) { where(user: user) }
   scope :for_project, ->(project) { where(project: project) }
   scope :by_tool, ->(tool) { where(tool_name: tool) }
+  scope :for_tool, ->(tool) { where(tool_name: tool) }
+  scope :for_project_id, ->(id) { where(project_id: id) }
 
   def self.total_tokens_for_organization(org, start_time, end_time)
     for_organization(org).in_range(start_time, end_time).sum(:total_tokens)

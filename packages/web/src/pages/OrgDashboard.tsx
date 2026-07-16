@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Activity, DollarSign, AlertTriangle, Users } from "lucide-react";
 import { useOrg } from "@/contexts/OrgContext";
-import { useOverviewStats, useActiveUsers, useDailyStats, useEvents, useProjects } from "@/hooks/useApi";
+import { useOverviewStats, useActiveUsers, useDailyStats, useEvents, useProjects, clientTimezone } from "@/hooks/useApi";
 import {
   MetricCard,
   MetricGrid,
@@ -31,7 +31,7 @@ import { MemberDashboard } from "@/pages/MemberDashboard";
 import { StatCardSkeleton } from "@/components/ui/skeletons";
 import { formatPercent, periodLabel } from "@/lib/formatters";
 import { type DashboardPeriod } from "@/lib/types";
-import { currentMonth, getLast12Months, isCurrentMonth } from "@/lib/dashboardUtils";
+import { currentMonth, getLast12Months, isCurrentMonth, periodToDateRange } from "@/lib/dashboardUtils";
 
 // Active Members intentionally uses a fixed rolling window, not the month filter,
 // so the number stays stable while users explore historical months.
@@ -132,6 +132,7 @@ export function OrgDashboard() {
     setSelectedProjectId(undefined);
   }
 
+  const { data: projects } = useProjects(orgId);
   const { data: stats, isLoading: isLoadingStats, isError: isErrorStats, refetch: refetchStats } = useOverviewStats(orgId, selectedProjectId, selectedPeriod);
   // Active Members is intentionally pinned to a rolling window, not the month selector.
   const { data: activeUsersData } = useActiveUsers(orgId, selectedProjectId, ACTIVE_USERS_WINDOW_DAYS);
@@ -142,7 +143,16 @@ export function OrgDashboard() {
     isAllTime ? "month" : undefined,
     selectedProjectId,
   );
-  const { data: eventsResponse, isLoading: isLoadingEvents, isError: isErrorEvents, refetch: refetchEvents } = useEvents(orgId, { per_page: 10 });
+  const eventsFilters = useMemo(
+    () => ({
+      per_page: 10,
+      ...(selectedProjectId ? { project_id: selectedProjectId } : {}),
+      ...periodToDateRange(selectedPeriod),
+      tz: clientTimezone,
+    }),
+    [selectedProjectId, selectedPeriod],
+  );
+  const { data: eventsResponse, isLoading: isLoadingEvents, isError: isErrorEvents, refetch: refetchEvents } = useEvents(orgId, eventsFilters);
 
   const chartData: DailyCostData[] = dailyData?.data?.map((d) => ({
     date: d.date,
@@ -171,6 +181,18 @@ export function OrgDashboard() {
       })) || [],
     [eventsResponse?.data]
   );
+
+  const activitySubtitle = useMemo(() => {
+    const period = periodLabel(selectedPeriod);
+    let base: string;
+    if (!selectedProjectId) base = "Latest events across your organization";
+    else if (selectedProjectId === "none") base = "Latest events not assigned to a project";
+    else {
+      const name = projects?.find((p) => p.id === selectedProjectId)?.name;
+      base = name ? `Latest events in ${name}` : "Latest events for the selected project";
+    }
+    return `${base} · ${period}`;
+  }, [selectedProjectId, selectedPeriod, projects]);
 
   const [toolInsightsDays, setToolInsightsDays] = useState(30);
 
@@ -335,6 +357,7 @@ export function OrgDashboard() {
               monthScoped={selectedPeriod.type === "month" && !isCurrentMonthSelected}
             />
             <ActivityFeed
+              subtitle={activitySubtitle}
               events={events}
               isLoading={isLoadingEvents}
               isError={isErrorEvents}

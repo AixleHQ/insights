@@ -15,10 +15,12 @@ import {
   getAccessToken as getAuthAccessToken,
   getUserProfile,
   silentRenew,
+  isDeadSessionError,
   directLogin as authDirectLogin,
   type User,
   type UserProfile,
 } from "../lib/auth";
+import { reportAuthError } from "../lib/rollbar";
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -104,7 +106,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const handleSilentRenewError = (error: Error) => {
       console.error("[AuthContext] Silent renew error:", error);
-      setState((prev) => ({ ...prev, error }));
+      reportAuthError(error, { surface: "automaticSilentRenew" });
+      if (isDeadSessionError(error)) {
+        // Refresh token / SSO session is genuinely dead — drop to unauthenticated so
+        // ProtectedRoute sends the user cleanly to /login instead of leaving them in a
+        // "still authenticated but every request 401s" limbo until the token expires.
+        setState((prev) => ({
+          ...prev,
+          isAuthenticated: false,
+          user: null,
+          profile: null,
+          error,
+        }));
+      } else {
+        // Transient (network/timeout): record the error but keep the session; the next
+        // renew attempt may succeed.
+        setState((prev) => ({ ...prev, error }));
+      }
     };
 
     manager.events.addUserLoaded(handleUserLoaded);

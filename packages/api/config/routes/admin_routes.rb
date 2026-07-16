@@ -7,7 +7,6 @@ namespace :admin do
   get "login", to: "sessions#new"
   get "callback", to: "sessions#callback"
   delete "logout", to: "sessions#destroy"
-  get "logout", to: "sessions#destroy"
 
   # Read-only resources with export
   resources :admin_audit_logs, only: [ :index, :show ] do

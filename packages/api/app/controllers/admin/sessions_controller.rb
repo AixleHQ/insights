@@ -31,6 +31,8 @@ module Admin
           secure: request.ssl? || request.headers["X-Forwarded-Proto"] == "https",
           expires: 1.day.from_now
         }
+        # Retain the id_token so logout can end the Keycloak SSO session cleanly.
+        session[:admin_id_token] = result.id_token
         redirect_to "/admin"
       else
         redirect_to "/admin/login?error=#{ERB::Util.url_encode(result.error)}"
@@ -39,8 +41,18 @@ module Admin
 
     # DELETE /admin/logout
     def destroy
-      cookies.delete(:admin_user_id)
-      redirect_to "/admin/login?notice=Logged+out+successfully"
+      id_token = session[:admin_id_token]
+
+      # Clear local auth vectors first: signed session cookie and the JWT fallback.
+      cookies.delete(:admin_user_id, path: "/")
+      cookies.delete(:admin_token, path: "/")
+      reset_session
+
+      # Terminate the Keycloak SSO session too — otherwise the next /admin visit
+      # silently re-authenticates via the still-active Keycloak session.
+      post_logout_redirect = "#{external_origin}/admin/login?notice=Logged+out+successfully"
+      redirect_to auth_service.logout_url(post_logout_redirect, id_token_hint: id_token),
+                  allow_other_host: true
     end
 
     private

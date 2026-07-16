@@ -354,6 +354,47 @@ RSpec.describe 'Api::V1::OrganizationMembers', type: :request do
 
       expect_success
     end
+
+    context 'with a member who has events older than 30 days' do
+      before do
+        create(:tool_event,
+               organization: organization,
+               user: member,
+               tool_name: 'claude_code',
+               tokens_in: 10,
+               tokens_out: 10,
+               cost_usd: 1.0,
+               occurred_at: 90.days.ago)
+      end
+
+      it 'excludes events outside the default 30-day window' do
+        authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/stats",
+                          user: owner,
+                          organization: organization
+
+        expect_success
+        expect(json_response[:total_events]).to eq(2)
+      end
+
+      it 'includes the older window when days is widened' do
+        authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/stats?days=365",
+                          user: owner,
+                          organization: organization
+
+        expect_success
+        expect(json_response[:total_events]).to eq(3)
+      end
+
+      it 'aggregates the full history when all_time is true' do
+        authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/stats?all_time=true",
+                          user: owner,
+                          organization: organization
+
+        expect_success
+        expect(json_response[:total_events]).to eq(3)
+        expect(json_response[:daily_activity].sum { |d| d[:count] }).to eq(3)
+      end
+    end
   end
 
   describe 'GET /api/v1/organizations/:organization_id/members/:id/events' do

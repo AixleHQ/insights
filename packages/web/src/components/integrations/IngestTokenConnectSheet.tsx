@@ -133,14 +133,14 @@ function ClaudeCodeSetupInstructions({ token }: { token: string }) {
   return (
     <div className="space-y-3">
       <Tabs defaultValue="mcp-recommended">
-        <TabsList className="w-full justify-start gap-2 flex-wrap h-auto rounded-md">
-          <TabsTrigger value="mcp-recommended" className="text-xs shrink-0">
+        <TabsList className="w-full justify-start gap-1.5 flex-wrap h-auto group-data-[orientation=horizontal]/tabs:h-auto min-h-9 rounded-md">
+          <TabsTrigger value="mcp-recommended" className="text-xs flex-none h-auto py-1.5 px-2">
             MCP (recommended)
           </TabsTrigger>
-          <TabsTrigger value="standalone-cli" className="text-xs shrink-0">
+          <TabsTrigger value="standalone-cli" className="text-xs flex-none h-auto py-1.5 px-2">
             Standalone CLI
           </TabsTrigger>
-          <TabsTrigger value="advanced-hooks" className="text-xs shrink-0">
+          <TabsTrigger value="advanced-hooks" className="text-xs flex-none h-auto py-1.5 px-2">
             Advanced hooks
           </TabsTrigger>
         </TabsList>
@@ -254,11 +254,11 @@ function CursorSetupInstructions({ token }: { token: string }) {
   return (
     <div className="space-y-3">
       <Tabs defaultValue="mcp-recommended">
-        <TabsList className="w-full justify-start gap-2 flex-wrap h-auto rounded-md">
-          <TabsTrigger value="mcp-recommended" className="text-xs shrink-0">
+        <TabsList className="w-full justify-start gap-1.5 flex-wrap h-auto group-data-[orientation=horizontal]/tabs:h-auto min-h-9 rounded-md">
+          <TabsTrigger value="mcp-recommended" className="text-xs flex-none h-auto py-1.5 px-2">
             MCP (recommended)
           </TabsTrigger>
-          <TabsTrigger value="standalone-cli" className="text-xs shrink-0">
+          <TabsTrigger value="standalone-cli" className="text-xs flex-none h-auto py-1.5 px-2">
             Standalone CLI
           </TabsTrigger>
         </TabsList>
@@ -452,7 +452,7 @@ export function IngestTokenConnectSheet({
           </div>
         </SheetHeader>
 
-        <div className="flex flex-col gap-4 px-4">
+        <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4">
           {step === "connect" && (
             <>
               {provider?.features && provider.features.length > 0 && (

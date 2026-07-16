@@ -35,7 +35,9 @@ import { AppRoutes } from "@/lib/routes";
 import { formatCost, formatTokens } from "@/lib/formatters";
 import { canViewEventPrompt } from "@/lib/eventAccess";
 import { parseRecentCommitFields } from "@/lib/recentCommitEvent";
+import { isDerivativeEvent } from "@/lib/event-types";
 import { RecentCommitDetail } from "./RecentCommitDetail";
+import { ContentPanel } from "./ContentPanel";
 
 interface EventDrawerProps {
   eventId: string | null;
@@ -67,17 +69,6 @@ function DetailRow({
         <p className="type-caption text-muted-foreground">{label}</p>
         <div className="mt-0.5 type-label">{value}</div>
       </div>
-    </div>
-  );
-}
-
-function ContentPanel({ title, content }: { title: string; content?: string }) {
-  return (
-    <div className="space-y-2">
-      <h4 className="type-label">{title}</h4>
-      <pre className="max-h-64 overflow-auto rounded-md bg-muted p-4 text-xs">
-        <code className="whitespace-pre-wrap break-all">{content || "No content available"}</code>
-      </pre>
     </div>
   );
 }
@@ -134,6 +125,10 @@ export function EventDrawer({
   const recentCommit = event
     ? parseRecentCommitFields(event.metadata, event.eventType)
     : null;
+  const isDerivative = event ? isDerivativeEvent(event.eventType) : false;
+  const emptyPromptMessage = isDerivative
+    ? "This event has no prompt text."
+    : "No prompt text. Prompt capture is not enabled for this event.";
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -315,7 +310,29 @@ export function EventDrawer({
                   <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
                     Content
                   </h3>
-                  {isOwner ? (
+                  {!isOwner ? (
+                    <p className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
+                      Prompt content is visible to organization owners only.
+                    </p>
+                  ) : isDerivative ? (
+                    <Tabs defaultValue="metadata">
+                      <TabsList className="w-full justify-start">
+                        <TabsTrigger value="metadata">Metadata</TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="metadata" className="mt-4">
+                        <ContentPanel
+                          title="Event Metadata"
+                          content={
+                            event.metadata
+                              ? JSON.stringify(event.metadata, null, 2)
+                              : undefined
+                          }
+                          emptyMessage={emptyPromptMessage}
+                          preClassName="max-h-64"
+                        />
+                      </TabsContent>
+                    </Tabs>
+                  ) : (
                     <Tabs defaultValue="sanitized">
                       <TabsList className="w-full justify-start">
                         <TabsTrigger value="sanitized">Sanitized</TabsTrigger>
@@ -325,6 +342,8 @@ export function EventDrawer({
                         <ContentPanel
                           title="Sanitized Content"
                           content={event.sanitizedContent || undefined}
+                          emptyMessage={emptyPromptMessage}
+                          preClassName="max-h-64"
                         />
                       </TabsContent>
                       <TabsContent value="metadata" className="mt-4">
@@ -335,13 +354,10 @@ export function EventDrawer({
                               ? JSON.stringify(event.metadata, null, 2)
                               : undefined
                           }
+                          preClassName="max-h-64"
                         />
                       </TabsContent>
                     </Tabs>
-                  ) : (
-                    <p className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
-                      Prompt content is visible to organization owners only.
-                    </p>
                   )}
                 </div>
 

@@ -3,7 +3,7 @@
 require 'rails_helper'
 
 RSpec.describe Oauth::AnthropicProvider, type: :service do
-  let(:connector) { instance_double('OrganizationConnector', access_token: 'sk-ant-test123') }
+  let(:connector) { instance_double('OrganizationConnector', access_token: 'sk-ant-admin01-test123') }
   let(:provider) { described_class.new(connector) }
 
   describe "GET-only constraint" do
@@ -241,6 +241,30 @@ RSpec.describe Oauth::AnthropicProvider, type: :service do
       stub_request(:get, usage_url)
         .with(query: hash_including('bucket_width' => '1d'))
         .to_return(status: status, body: body, headers: { 'Content-Type' => 'application/json' })
+    end
+
+    context 'when the API key is not an Admin key (wrong prefix)' do
+      let(:connector) { instance_double('OrganizationConnector', access_token: 'sk-ant-api03-EXAMPLE-workspace-key') }
+
+      it 'returns failure without making an API call' do
+        result = provider.test_connection
+
+        expect(result[:success]).to be false
+        expect(result[:error]).to include('Admin API key')
+        expect(WebMock).not_to have_requested(:get, usage_url)
+      end
+    end
+
+    context 'when the API key is blank' do
+      let(:connector) { instance_double('OrganizationConnector', access_token: nil) }
+
+      it 'returns failure without making an API call' do
+        result = provider.test_connection
+
+        expect(result[:success]).to be false
+        expect(result[:error]).to include('Admin API key')
+        expect(WebMock).not_to have_requested(:get, usage_url)
+      end
     end
 
     context 'when the admin API key is valid' do

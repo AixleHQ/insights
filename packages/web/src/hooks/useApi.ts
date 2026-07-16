@@ -62,7 +62,7 @@ import type { IntegrationProvider } from "@/lib/providers";
 
 // Client IANA timezone, resolved once per session. Sent to date-bucketed stats
 // endpoints (?tz=) so day/week/month boundaries match the viewer's local day.
-const clientTimezone =
+export const clientTimezone =
   typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC";
 
 function appendTz(url: string): string {
@@ -87,7 +87,8 @@ export const queryKeys = {
     all: (orgId: string) => ["organizations", orgId, "members"] as const,
     detail: (orgId: string, id: string) => ["organizations", orgId, "members", id] as const,
     events: (orgId: string, id: string) => ["organizations", orgId, "members", id, "events"] as const,
-    stats: (orgId: string, id: string) => ["organizations", orgId, "members", id, "stats"] as const,
+    stats: (orgId: string, id: string, range?: string) =>
+      ["organizations", orgId, "members", id, "stats", range ?? "30d"] as const,
     dashboardStats: (orgId: string, userId: string, period: string) =>
       ["organizations", orgId, "members", userId, "dashboard_stats", period] as const,
     heatmap: (orgId: string, userId: string) =>
@@ -616,11 +617,22 @@ export interface MemberStats {
   }[];
 }
 
-export function useMemberStats(orgId: string, memberId: string) {
+export type MemberStatsRange = "30d" | "90d" | "1y" | "all";
+
+const MEMBER_STATS_RANGE_PARAM: Record<MemberStatsRange, string> = {
+  "30d": "days=30",
+  "90d": "days=90",
+  "1y": "days=365",
+  all: "all_time=true",
+};
+
+export function useMemberStats(orgId: string, memberId: string, range: MemberStatsRange = "30d") {
   return useQuery({
-    queryKey: queryKeys.members.stats(orgId, memberId),
+    queryKey: queryKeys.members.stats(orgId, memberId, range),
     queryFn: async () => {
-      const response = await api.get<MemberStats>(appendTz(`/organizations/${orgId}/members/${memberId}/stats`));
+      const response = await api.get<MemberStats>(
+        appendTz(`/organizations/${orgId}/members/${memberId}/stats?${MEMBER_STATS_RANGE_PARAM[range]}`)
+      );
       return response;
     },
     enabled: !!orgId && !!memberId,
@@ -1606,6 +1618,9 @@ export function useMcpIngestExchange() {
 // Events Hooks
 // ============================================================================
 
+export type EventSortBy = "occurred_at" | "cost_usd" | "tokens_in" | "tool_name" | "risk_level";
+export type EventSortDirection = "asc" | "desc";
+
 export interface EventsParams {
   [key: string]: string | number | string[] | undefined;
   page?: number;
@@ -1618,10 +1633,8 @@ export interface EventsParams {
   user_id?: string;
   project_id?: string | string[];
   sort_by?: EventSortBy;
-  direction?: "asc" | "desc";
+  direction?: EventSortDirection;
 }
-
-export type EventSortBy = "occurred_at" | "cost_usd" | "tokens_in" | "tool_name" | "risk_level";
 
 /** Serializes query values; arrays become comma-separated. */
 export function appendQueryParam(
@@ -1654,6 +1667,7 @@ export function useEvents(orgId: string, params?: EventsParams, options?: { enab
       );
     },
     enabled: options?.enabled !== false && !!orgId,
+    staleTime: 30_000,
   });
 }
 
