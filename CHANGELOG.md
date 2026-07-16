@@ -5,6 +5,18 @@ All notable changes to DB90 are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.7] - 2026-07-16
+
+Hotfix on top of `1.0.0-alpha.6`. The alpha.6 production deploy failed in the
+`Run DB Migrations` step: `BackfillContinuousAggregates` called
+`refresh_continuous_aggregate()` inside the implicit migration transaction, which
+TimescaleDB rejects (`cannot run inside a transaction block`). Same feature scope
+as alpha.6 — this release only makes that migration runnable.
+
+### Fixed
+- Add `disable_ddl_transaction!` to `BackfillContinuousAggregates` so the CAGG
+  refresh runs outside a transaction block (`AIX-421`).
+
 ## [1.0.0-alpha.6] - 2026-07-16
 
 Sixth alpha release. Large accumulated batch from `develop`: TimescaleDB
@@ -202,6 +214,7 @@ tags cut from the same `release/1.0.0` branch.
 ### Added
 - Initial DB90 platform release cut from `develop` for production infrastructure validation.
 
+[1.0.0-alpha.7]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.7
 [1.0.0-alpha.6]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.6
 [1.0.0-alpha.5]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.5
 [1.0.0-alpha.4]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.4
