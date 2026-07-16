@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Plus, Grid, List, Search } from "lucide-react";
+import { toast } from "sonner";
 import { useOrg } from "@/contexts/OrgContext";
 import { useProjects, useDeleteProject } from "@/hooks/useApi";
 import { useFavorites } from "@/hooks/useFavorites";
@@ -10,6 +11,7 @@ import { ProjectCardSkeleton } from "@/components/ui/skeletons";
 import { ProjectCard } from "@/components/projects";
 import { cn } from "@/lib/utils";
 import { AppRoutes } from "@/lib/routes";
+import { getApiErrorMessage } from "@/lib/api";
 
 type ViewMode = "grid" | "list";
 
@@ -43,7 +45,7 @@ export function Projects() {
       try {
         await deleteProject.mutateAsync(id);
       } catch (error) {
-        console.error("Failed to delete project:", error);
+        toast.error(getApiErrorMessage(error, "Failed to delete project. Please try again."));
       }
     }
   };

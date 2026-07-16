@@ -177,6 +177,26 @@ export class ApiError extends Error {
 }
 
 /**
+ * Extracts a human-readable message from an ApiError's response body
+ * (`{ errors: { field: ["msg"] } }` or `{ message }` / `{ error }`), falling
+ * back to `fallback` when the shape doesn't match or the error isn't an ApiError.
+ */
+export function getApiErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiError && error.data && typeof error.data === "object") {
+    const data = error.data as { errors?: Record<string, string[]>; message?: string; error?: string };
+    if (data.errors) {
+      const messages = Object.entries(data.errors).flatMap(([field, msgs]) =>
+        (msgs ?? []).map((msg) => (field === "base" ? msg : `${field} ${msg}`))
+      );
+      if (messages.length > 0) return messages.join(". ");
+    }
+    if (data.message) return data.message;
+    if (data.error) return data.error;
+  }
+  return fallback;
+}
+
+/**
  * Fetch a binary resource with authentication and trigger a browser download.
  * Returns { queued: true, jobId } if the server responds 202 (large async export).
  *
