@@ -26,7 +26,7 @@ const mockExportEvents = vi.fn();
 
 vi.mock("@/hooks/useApi", () => ({
   useCurrentUser: () => mockCurrentUser(),
-  useEvents: () => mockEvents(),
+  useEvents: (...args: unknown[]) => mockEvents(...args),
   useEvent: () => ({ data: undefined, isLoading: false }),
   useProjects: () => mockProjects(),
   useOrganizationMembers: () => mockOrgMembers(),
@@ -71,9 +71,9 @@ beforeEach(() => {
   mockExportEvents.mockReturnValue({ exportEvents: vi.fn(), isExporting: false });
 });
 
-function renderPage() {
+function renderPage(path = "/events") {
   return render(
-    <MemoryRouter initialEntries={["/events"]}>
+    <MemoryRouter initialEntries={[path]}>
       <Events />
     </MemoryRouter>
   );
@@ -84,6 +84,8 @@ async function openFilters() {
   await user.click(screen.getByRole("button", { name: /filters/i }));
   return user;
 }
+
+const lastApiParams = () => mockEvents.mock.calls.at(-1)?.[1];
 
 describe("Events page User filter gating", () => {
   it("hides the User filter sub-menu for a plain member, even with cached member data", async () => {
@@ -113,5 +115,31 @@ describe("Events page User filter gating", () => {
     await openFilters();
 
     expect(screen.getByRole("menuitem", { name: "User" })).toBeInTheDocument();
+  });
+});
+
+describe("Events — URL filter hydration (AIX-565)", () => {
+  it("hydrates projectIds and date range from a dashboard 'View all' deep-link", () => {
+    renderPage("/events?project_id=proj-1&date_from=2026-07-01&date_to=2026-07-31");
+
+    const params = lastApiParams();
+    expect(params.project_id).toEqual(["proj-1"]);
+    expect(params.start_date).toBe("2026-07-01");
+    expect(params.end_date).toBe("2026-07-31");
+  });
+
+  it("hydrates the 'No Project' sentinel from project_id=none", () => {
+    renderPage("/events?project_id=none");
+
+    expect(lastApiParams().project_id).toEqual(["none"]);
+  });
+
+  it("leaves filters empty when no query params are present (unfiltered visit)", () => {
+    renderPage("/events");
+
+    const params = lastApiParams();
+    expect(params.project_id).toBeUndefined();
+    expect(params.start_date).toBeUndefined();
+    expect(params.end_date).toBeUndefined();
   });
 });

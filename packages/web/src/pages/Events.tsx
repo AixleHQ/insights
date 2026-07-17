@@ -72,6 +72,9 @@ export function Events() {
       : undefined,
     userId: urlParams.get("user_id") || undefined,
     userName: urlParams.get("user_name") || undefined,
+    projectIds: urlParams.get("project_id") ? [urlParams.get("project_id")!] : undefined,
+    dateFrom: urlParams.get("date_from") || undefined,
+    dateTo: urlParams.get("date_to") || undefined,
   }));
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");

@@ -229,7 +229,7 @@ export function EventFilters({
 
   if (filters.projectIds?.length) {
     const names = filters.projectIds.map(
-      (id) => projects?.find((p) => p.id === id)?.name ?? id
+      (id) => projects?.find((p) => p.id === id)?.name ?? (id === "none" ? "No Project" : id)
     );
     chips.push({
       key: "projects",

@@ -37,6 +37,7 @@ interface ActivityFeedProps {
   onEventClick?: (eventId: string) => void;
   selectedEventId?: string | null;
   subtitle?: string;
+  viewAllTo?: string;
 }
 
 
@@ -126,6 +127,7 @@ export function ActivityFeed({
   onEventClick,
   selectedEventId,
   subtitle = "Latest events across your organization",
+  viewAllTo,
 }: ActivityFeedProps) {
   return (
     <Card className={cn("col-span-full lg:col-span-2", className)}>
@@ -135,7 +137,7 @@ export function ActivityFeed({
           <CardDescription className="text-xs">{subtitle}</CardDescription>
         </div>
         <Link
-          to={AppRoutes.events.root}
+          to={viewAllTo ?? AppRoutes.events.root}
           className="text-xs font-medium text-primary hover:underline"
         >
           View all
