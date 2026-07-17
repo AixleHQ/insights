@@ -68,6 +68,7 @@ export function ProjectMembersTab({
   const [addRole, setAddRole] = useState("member");
   const [addError, setAddError] = useState<string | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
+  const [roleError, setRoleError] = useState<string | null>(null);
 
   const { data: members = [] } = useProjectMembers(projectId);
   const { data: stats } = useProjectMemberStats(projectId, 30, isProjectOwner);
@@ -152,6 +153,28 @@ export function ProjectMembersTab({
         }
       },
     });
+  };
+
+  const handleRoleChange = (memberId: string, role: string) => {
+    setRoleError(null);
+    updateMember.mutate(
+      { id: memberId, role },
+      {
+        onError: (err) => {
+          if (err instanceof ApiError && err.status === 422 && err.data) {
+            const data = err.data as { errors?: Record<string, string[]>; message?: string };
+            const messages = data.errors
+              ? Object.values(data.errors).flat()
+              : data.message
+                ? [data.message]
+                : [];
+            setRoleError(messages.join(" ") || "Could not update role.");
+          } else {
+            setRoleError(err instanceof Error ? err.message : "Could not update role.");
+          }
+        },
+      }
+    );
   };
 
   if (!isProjectOwner) {
@@ -307,6 +330,12 @@ export function ProjectMembersTab({
         </p>
       )}
 
+      {roleError && (
+        <p className="text-sm text-destructive" role="alert">
+          {roleError}
+        </p>
+      )}
+
       <Table>
         <TableHeader>
           <TableRow className="border-b border-border/50">
@@ -352,7 +381,7 @@ export function ProjectMembersTab({
                   {canManageMembers ? (
                     <Select
                       value={m.role}
-                      onValueChange={(role) => updateMember.mutate({ id: m.id, role })}
+                      onValueChange={(role) => handleRoleChange(m.id, role)}
                     >
                       <SelectTrigger className="h-7 w-24 type-caption">
                         <SelectValue />
