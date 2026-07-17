@@ -376,8 +376,18 @@ export function ProjectDetail() {
           </div>
 
           {(toolChartProps || isLoadingDailyByTool) && (
-            <div>
-              <div className="flex justify-end mb-2">
+            <GroupedBarChart
+              data={toolChartProps?.data ?? []}
+              groups={toolChartProps?.groups ?? []}
+              series={toolChartProps?.series ?? []}
+              yLabel="Events"
+              title="Usage by Tool"
+              description={
+                toolChartProps
+                  ? `${formatCount(toolChartProps.totalEvents)} events in the last ${toolChartProps.rangeLabel}`
+                  : undefined
+              }
+              headerAction={
                 <Select
                   value={timeRange}
                   onValueChange={(v) => setTimeRange(v as TimeRange)}
@@ -393,23 +403,11 @@ export function ProjectDetail() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-              <GroupedBarChart
-                data={toolChartProps?.data ?? []}
-                groups={toolChartProps?.groups ?? []}
-                series={toolChartProps?.series ?? []}
-                yLabel="Events"
-                title="Usage by Tool"
-                description={
-                  toolChartProps
-                    ? `${formatCount(toolChartProps.totalEvents)} events in the last ${toolChartProps.rangeLabel}`
-                    : undefined
-                }
-                isLoading={isLoadingDailyByTool}
-                isError={isErrorDailyByTool}
-                onRetry={() => refetchDailyByTool()}
-              />
-            </div>
+              }
+              isLoading={isLoadingDailyByTool}
+              isError={isErrorDailyByTool}
+              onRetry={() => refetchDailyByTool()}
+            />
           )}
 
           {/* Repositories + Leaderboard */}
