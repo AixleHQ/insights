@@ -3931,6 +3931,10 @@ paths:
                   totalCost:
                     type: number
                     format: float
+                  totalTokensIn:
+                    type: integer
+                  totalTokensOut:
+                    type: integer
                   previousPeriod:
                     type: object
                     properties:

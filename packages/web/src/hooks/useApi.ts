@@ -844,6 +844,8 @@ export interface ProjectStatsResponse {
   daily: ProjectStatsData[];
   totalEvents: number;
   totalCost: number;
+  totalTokensIn: number;
+  totalTokensOut: number;
   previousPeriod?: {
     totalEvents: number;
     totalCost: number;

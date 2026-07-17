@@ -113,6 +113,7 @@ export function GroupedBarChart({
                   axisLine={false}
                   tickMargin={8}
                   tick={{ fill: "currentColor", fontSize: 11 }}
+                  interval={chartData.length > 30 ? Math.ceil(chartData.length / 15) - 1 : 0}
                 />
                 <YAxis
                   tickLine={false}
