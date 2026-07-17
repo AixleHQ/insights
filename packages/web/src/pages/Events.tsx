@@ -270,7 +270,7 @@ export function Events() {
         }}
         tools={toolFilterOptions}
         projects={orgProjects}
-        members={orgMembers}
+        members={isOwnerOrPlatformAdmin ? orgMembers : undefined}
         showConfidence={activeTab === "not_assigned"}
         hideAdvancedFilters={activeTab === "not_assigned"}
         trailing={
