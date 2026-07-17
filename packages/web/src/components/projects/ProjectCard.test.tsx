@@ -89,6 +89,16 @@ describe("ProjectCard", () => {
     expect(link).toHaveAttribute("href", "/projects/p1");
   });
 
+  it("stat badge container has pointer-events-none so clicks fall through to the stretched link", () => {
+    render(<ProjectCard project={baseProject} />);
+
+    // The stat badge wrapper must have pointer-events-none so that in-browser clicks
+    // fall through to the absolute inset-0 stretched Link underneath (z-0), not just
+    // bubble up to the Card which has no onClick handler.
+    const badgeWrapper = screen.getByText("Events").closest(".pointer-events-none");
+    expect(badgeWrapper).toBeInTheDocument();
+  });
+
   describe("actions menu RBAC (AIX-501)", () => {
     it("hides Edit and Delete for a non-manager (default)", async () => {
       const user = userEvent.setup();
