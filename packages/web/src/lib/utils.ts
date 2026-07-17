@@ -160,6 +160,7 @@ const TOOL_COLOR_MAP: Record<string, string> = {
   "claude-code": "var(--color-warning)",
   github_copilot: "#7EC4FD",
   "github-copilot": "#7EC4FD",
+  github: "#7EC4FD",
   cursor: "#AD96FF",
   aider: "hsl(142 71% 45%)",
   windsurf: "hsl(199 89% 48%)",
