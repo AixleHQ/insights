@@ -1,6 +1,7 @@
 require 'rails_helper'
 
 require_relative '../../../../../temporal/activities/classification_activity'
+require_relative '../../../../../temporal/activities/get_policy_activity'
 
 RSpec.describe Activities::ClassificationActivity, type: :unit do
   subject(:activity) { described_class.new }
@@ -170,6 +171,133 @@ RSpec.describe Activities::ClassificationActivity, type: :unit do
       result = activity.execute(params)
 
       expect(result["risk_level"]).to eq("low")
+    end
+  end
+
+  describe "Path 3: real DEFAULT_POLICY — false-positive regression suite" do
+    # Deep copy so mutations in tests don't affect the frozen constant
+    let(:real_policy) { JSON.parse(JSON.generate(Activities::GetPolicyActivity::DEFAULT_POLICY)) }
+
+    def classify(content)
+      activity.execute(
+        "raw_payload" => JSON.generate({ "content" => content }),
+        "policy"      => real_policy
+      )
+    end
+
+    it "benign Russian text scores low (live false-positive case)" do
+      result = classify("Help me resolve the conflict")
+      expect(result["risk_level"]).to eq("low")
+      expect(result["detections"]).to be_empty
+    end
+
+    it "UUID in session_id field is not flagged" do
+      result = activity.execute(
+        "raw_payload" => JSON.generate({
+          "metadata" => {
+            "scannable" => false,
+            "session_id" => "550e8400-e29b-41d4-a716-446655440000"
+          }
+        }),
+        "policy" => real_policy
+      )
+      expect(result["risk_level"]).to eq("none")
+      expect(result["detections"]).to be_empty
+    end
+
+    it "40-char git SHA in commit_hash field is not flagged" do
+      result = activity.execute(
+        "raw_payload" => JSON.generate({
+          "metadata" => {
+            "scannable" => false,
+            "commit_hash" => "a" * 40
+          }
+        }),
+        "policy" => real_policy
+      )
+      expect(result["risk_level"]).to eq("none")
+      expect(result["detections"]).to be_empty
+    end
+
+    it "base64 blob in content without provider prefix is not flagged" do
+      # 44-char base64 with no real secret prefix
+      blob = "dGhpcyBpcyBub3QgYSBzZWNyZXQgYXQgYWxs"
+      result = classify("Encode this: #{blob}")
+      expect(result["risk_level"]).to eq("low")
+      expect(result["detections"]).to be_empty
+    end
+
+    it "real AWS access key in prompt is detected at high or critical" do
+      result = classify("My key is AKIAIOSFODNN7EXAMPLEKEY and should be secret")
+      expect(result["risk_level"]).to be_in(%w[high critical])
+      detection = result["detections"].find { |d| d["pattern"] == "aws_access_key" }
+      expect(detection).not_to be_nil
+    end
+
+    it "real GitHub personal token in prompt is detected at high or critical" do
+      token = "ghp_" + "A" * 36
+      result = classify("Token: #{token}")
+      expect(result["risk_level"]).to be_in(%w[high critical])
+      detection = result["detections"].find { |d| d["pattern"] == "github_token" }
+      expect(detection).not_to be_nil
+    end
+
+    it "JWT in prompt is detected" do
+      jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+      result = classify("Authorization: Bearer #{jwt}")
+      detection = result["detections"].find { |d| d["pattern"] == "jwt" }
+      expect(detection).not_to be_nil
+    end
+
+    it "same GitHub token repeated 5 times scores once (deduplication)" do
+      token = "ghp_" + "B" * 36
+      result = classify(([ token ] * 5).join(" "))
+      detection = result["detections"].find { |d| d["pattern"] == "github_token" }
+      expect(detection).not_to be_nil
+      expect(detection["count"]).to eq(1)
+      # score = weight(3) * unique_count(1) = 3, not 15
+      expect(result["risk_score"]).to eq(3)
+    end
+
+    it "benign prompt never triggers high or critical (alert regression gate)" do
+      benign_prompts = [
+        "Help me resolve the conflict",
+        "How do I fix this merge conflict?",
+        "refactor the auth module please",
+        "what does this function do?",
+        "task-something-long-enough"
+      ]
+      benign_prompts.each do |prompt|
+        result = classify(prompt)
+        expect(result["risk_level"]).not_to be_in(%w[high critical]),
+          "Expected '#{prompt}' to not be high/critical but got #{result['risk_level']}"
+      end
+    end
+
+    it "UUID and git SHA in content body are not flagged as secrets" do
+      result = classify(
+        "session 550e8400-e29b-41d4-a716-446655440000 commit #{'a' * 40}"
+      )
+      expect(result["risk_level"]).not_to be_in(%w[high critical])
+      expect(result["detections"]).to be_empty
+    end
+
+    it "Anthropic key scores high once — not critical via openai_key overlap" do
+      key = "sk-ant-" + "a" * 93
+      result = classify("Anthropic key: #{key}")
+      expect(result["risk_level"]).to eq("high")
+      expect(result["risk_score"]).to eq(3)
+      patterns = result["detections"].map { |d| d["pattern"] }
+      expect(patterns).to eq([ "anthropic_key" ])
+    end
+
+    it "OpenAI key is detected at high without also matching anthropic_key" do
+      key = "sk-" + "a" * 48
+      result = classify("OpenAI key: #{key}")
+      expect(result["risk_level"]).to eq("high")
+      expect(result["risk_score"]).to eq(3)
+      patterns = result["detections"].map { |d| d["pattern"] }
+      expect(patterns).to eq([ "openai_key" ])
     end
   end
 end
