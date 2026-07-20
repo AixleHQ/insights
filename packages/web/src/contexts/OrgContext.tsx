@@ -187,6 +187,9 @@ export function OrgProvider({ children, apiBaseUrl = "/api/v1" }: OrgProviderPro
     if (isAuthenticated) {
       refreshOrganizations();
     } else {
+      // Clear the stored org on logout so the default_org_id preference wins on
+      // the next login instead of the last-used org from the previous session.
+      localStorage.removeItem(ORG_STORAGE_KEY);
       setState({
         currentOrg: null,
         organizations: [],

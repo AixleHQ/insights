@@ -3,8 +3,10 @@ import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { OrgProvider, useOrg } from "./OrgContext";
 
+let mockIsAuthenticated = true;
+
 vi.mock("./AuthContext", () => ({
-  useAuth: () => ({ isAuthenticated: true, isLoading: false }),
+  useAuth: () => ({ isAuthenticated: mockIsAuthenticated, isLoading: false }),
 }));
 
 vi.mock("./ImpersonationContext", () => ({
@@ -58,6 +60,7 @@ function wrapper({ children }: { children: ReactNode }) {
 
 describe("OrgProvider — org selection priority", () => {
   beforeEach(() => {
+    mockIsAuthenticated = true;
     localStorage.clear();
     vi.clearAllMocks();
   });
@@ -194,6 +197,29 @@ describe("OrgProvider — org selection priority", () => {
     await waitFor(() => expect(result.current.isInitialized).toBe(true));
 
     expect(setItemSpy).toHaveBeenCalledWith(ORG_STORAGE_KEY, ORG_B.id);
+  });
+
+  it("clears localStorage on logout so default_org_id wins on next login", async () => {
+    // Simulate: user selected ORG_A in a previous session (stored in localStorage)
+    localStorage.setItem(ORG_STORAGE_KEY, ORG_A.id);
+
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(makeOrgsResponse([ORG_A, ORG_B]) as never)
+      .mockResolvedValueOnce(makeUserResponse(ORG_B.id) as never);
+
+    const { result, rerender } = renderHook(() => useOrg(), { wrapper });
+    await waitFor(() => expect(result.current.isInitialized).toBe(true));
+
+    // localStorage still has ORG_A — on initial load localStorage wins
+    expect(result.current.currentOrg?.id).toBe(ORG_A.id);
+    expect(localStorage.getItem(ORG_STORAGE_KEY)).toBe(ORG_A.id);
+
+    // Simulate logout: isAuthenticated goes false
+    mockIsAuthenticated = false;
+    rerender();
+
+    // localStorage must be cleared so the default_org_id preference wins on next login
+    await waitFor(() => expect(localStorage.getItem(ORG_STORAGE_KEY)).toBeNull());
   });
 
   it("selects preferOrgId over default_org_id and localStorage", async () => {
