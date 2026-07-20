@@ -280,7 +280,7 @@ describe("ProjectMembersTab", () => {
       const removeItem = await screen.findByText("Remove from project");
       await user.click(removeItem);
 
-      expect(mockRemoveMutate).toHaveBeenCalledWith("m1");
+      expect(mockRemoveMutate).toHaveBeenCalledWith("m1", expect.objectContaining({ onError: expect.any(Function) }));
     });
   });
 });
