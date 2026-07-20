@@ -50,6 +50,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn, humanizeToolName, toEventRow } from "@/lib/utils";
 import { AppRoutes } from "@/lib/routes";
 import { formatTokens, formatCost, formatCount } from "@/lib/formatters";
+import { RANGE_OPTIONS, RANGE_SUBTITLE } from "@/lib/memberStatsRange";
 
 type MemberRole = "owner" | "member" | "viewer";
 
@@ -72,20 +73,6 @@ function getInitials(name?: string | null, email?: string): string {
 }
 
 type EventSortField = "created_at" | "tool_name" | "risk_level" | "cost_usd";
-
-const RANGE_OPTIONS: { value: MemberStatsRange; label: string }[] = [
-  { value: "30d", label: "30d" },
-  { value: "90d", label: "90d" },
-  { value: "1y", label: "1y" },
-  { value: "all", label: "All time" },
-];
-
-const RANGE_SUBTITLE: Record<MemberStatsRange, string> = {
-  "30d": "Last 30 days",
-  "90d": "Last 90 days",
-  "1y": "Last year",
-  all: "All time",
-};
 
 const riskOrder: Record<string, number> = {
   critical: 4,

@@ -984,13 +984,24 @@ export interface ProjectMemberStat {
   primaryTool: string | null;
 }
 
+const PROJECT_MEMBER_STATS_RANGE_PARAM: Record<MemberStatsRange, string> = {
+  "30d": "days=30",
+  "90d": "days=90",
+  "1y": "days=365",
+  all: "all_time=true",
+};
+
 // Pass enabled=false for non-project-owners — the API returns 403 for plain members.
-export function useProjectMemberStats(projectId: string, days = 30, enabled = true) {
+export function useProjectMemberStats(
+  projectId: string,
+  range: MemberStatsRange = "30d",
+  enabled = true
+) {
   return useQuery({
-    queryKey: ["projects", projectId, "members", "stats", days],
+    queryKey: ["projects", projectId, "members", "stats", range],
     queryFn: async () => {
       const res = await api.get<{ data: ProjectMemberStat[] }>(
-        appendTz(`/projects/${projectId}/members/stats?days=${days}`)
+        appendTz(`/projects/${projectId}/members/stats?${PROJECT_MEMBER_STATS_RANGE_PARAM[range]}`)
       );
       return res.data;
     },
