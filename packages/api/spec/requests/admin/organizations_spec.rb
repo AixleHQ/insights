@@ -69,7 +69,7 @@ RSpec.describe 'Admin Organizations', type: :request do
 
         expect(response).to redirect_to(admin_organizations_path)
         expect(Organization.find_by(id: organization.id)).to be_present
-        expect(flash[:error]).to eq(Admin::OrganizationsController::BLOCKED_DELETE_MESSAGE)
+        expect(flash[:error]).to eq(I18n.t("administrate.controller.destroy.blocked"))
       end
     end
 
@@ -82,7 +82,7 @@ RSpec.describe 'Admin Organizations', type: :request do
 
         expect(response).to redirect_to(admin_organizations_path)
         expect(Organization.find_by(id: organization.id)).to be_present
-        expect(flash[:error]).to eq(Admin::OrganizationsController::BLOCKED_DELETE_MESSAGE)
+        expect(flash[:error]).to eq(I18n.t("administrate.controller.destroy.blocked"))
       end
     end
 
@@ -95,7 +95,7 @@ RSpec.describe 'Admin Organizations', type: :request do
 
         expect(response).to redirect_to(admin_organizations_path)
         expect(Organization.find_by(id: organization.id)).to be_present
-        expect(flash[:error]).to eq(Admin::OrganizationsController::BLOCKED_DELETE_MESSAGE)
+        expect(flash[:error]).to eq(I18n.t("administrate.controller.destroy.blocked"))
       end
     end
 
@@ -108,7 +108,7 @@ RSpec.describe 'Admin Organizations', type: :request do
 
         expect(response).to redirect_to(admin_organizations_path)
         expect(Organization.find_by(id: organization.id)).to be_present
-        expect(flash[:error]).to eq(Admin::OrganizationsController::BLOCKED_DELETE_MESSAGE)
+        expect(flash[:error]).to eq(I18n.t("administrate.controller.destroy.blocked"))
       end
     end
 
@@ -122,7 +122,7 @@ RSpec.describe 'Admin Organizations', type: :request do
 
         expect(response).to redirect_to(admin_organizations_path)
         expect(Organization.find_by(id: organization.id)).to be_present
-        expect(flash[:error]).to eq(Admin::OrganizationsController::BLOCKED_DELETE_MESSAGE)
+        expect(flash[:error]).to eq(I18n.t("administrate.controller.destroy.blocked"))
       end
     end
   end

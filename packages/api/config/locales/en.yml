@@ -33,3 +33,7 @@ en:
     attributes:
       audit_log:
         user_display: "User"
+  administrate:
+    controller:
+      destroy:
+        blocked: "This organization has retained tool activity, audit, or retention-purge history and cannot be permanently deleted. Deactivate the organization instead, or contact an authorized admin to run a compliant data purge."
