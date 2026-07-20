@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 import {
   AlertCircle,
   Settings,
@@ -71,6 +72,7 @@ import { TabsContent } from "@/components/ui/tabs";
 import { formatDistanceToNow, cn, getToolColor, humanizeToolName } from "@/lib/utils";
 import { isGitRemoteMissing } from "@/lib/project-git-remote";
 import { AppRoutes } from "@/lib/routes";
+import { getApiErrorMessage } from "@/lib/api";
 
 function StatCard({
   label,
@@ -216,7 +218,7 @@ export function ProjectDetail() {
         await deleteProject.mutateAsync(id);
         navigate(AppRoutes.projects.root);
       } catch (error) {
-        console.error("Failed to delete project:", error);
+        toast.error(getApiErrorMessage(error, "Failed to delete project. Please try again."));
       }
     }
   };

@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ProjectSettings } from "./ProjectSettings";
+import { ApiError } from "@/lib/api";
 
 const mockNavigate = vi.fn();
 
@@ -284,6 +285,29 @@ describe("ProjectSettings", () => {
 
       await waitFor(() => {
         expect(screen.getByText("Failed to delete project. Please try again.")).toBeInTheDocument();
+      });
+    });
+
+    it("shows the server's validation message when delete is blocked by dependent records", async () => {
+      mockUseDeleteProject.mockReturnValue({
+        mutateAsync: vi.fn().mockRejectedValue(
+          new ApiError("Validation error", 422, {
+            error: "Unprocessable Entity",
+            errors: { base: [ "Cannot delete record because dependent tool events exist" ] },
+          })
+        ),
+        isPending: false,
+      });
+      vi.spyOn(window, "confirm").mockReturnValue(true);
+      const user = userEvent.setup();
+      renderAtPath("/projects/proj-1/settings");
+
+      await user.click(screen.getByRole("button", { name: /delete project/i }));
+
+      await waitFor(() => {
+        expect(
+          screen.getByText("Cannot delete record because dependent tool events exist")
+        ).toBeInTheDocument();
       });
     });
 

@@ -1,7 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@/test/utils";
+import { render, screen, waitFor } from "@/test/utils";
 import userEvent from "@testing-library/user-event";
+import { toast } from "sonner";
 import { ProjectDetail } from "./ProjectDetail";
+import { ApiError } from "@/lib/api";
+
+vi.mock("sonner", () => ({
+  toast: { error: vi.fn(), success: vi.fn() },
+}));
 
 const mockNavigate = vi.fn();
 const mockHasRole = vi.fn().mockReturnValue(false);
@@ -259,6 +265,29 @@ describe("ProjectDetail", () => {
       render(<ProjectDetail />);
 
       expect(screen.getByRole("button", { name: /project actions/i })).toBeInTheDocument();
+    });
+
+    it("shows a toast with the server's validation message when delete is blocked by dependent records", async () => {
+      mockHasRole.mockReturnValue(true);
+      mockUseDeleteProject.mockReturnValue({
+        mutateAsync: vi.fn().mockRejectedValue(
+          new ApiError("Validation error", 422, {
+            error: "Unprocessable Entity",
+            errors: { base: [ "Cannot delete record because dependent tool events exist" ] },
+          })
+        ),
+      });
+      vi.spyOn(window, "confirm").mockReturnValue(true);
+      const user = userEvent.setup();
+      render(<ProjectDetail />);
+
+      await user.click(screen.getByRole("button", { name: /project actions/i }));
+      await user.click(screen.getByText("Delete project"));
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith("Cannot delete record because dependent tool events exist");
+      });
+      expect(mockNavigate).not.toHaveBeenCalledWith("/projects");
     });
   });
 
