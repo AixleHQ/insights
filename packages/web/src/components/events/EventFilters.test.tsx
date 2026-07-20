@@ -163,6 +163,30 @@ describe("EventFilters", () => {
     });
   });
 
+  describe("User Filter chip", () => {
+    it("shows user chip with userName when userId and userName are set", () => {
+      renderFilters({ userId: "user-1", userName: "Jane Doe" });
+      expect(screen.getByText("User:")).toBeInTheDocument();
+      expect(screen.getByText("Jane Doe")).toBeInTheDocument();
+    });
+
+    it("removes user filter when chip remove button clicked", async () => {
+      const user = userEvent.setup();
+      renderFilters({ userId: "user-1", userName: "Jane Doe" });
+
+      await user.click(screen.getByRole("button", { name: /remove user filter/i }));
+      expect(mockOnFiltersChange).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: undefined, userName: undefined })
+      );
+    });
+
+    it("shows active filters section when only userId is set", () => {
+      renderFilters({ userId: "user-1" });
+      expect(screen.getByText("Active filters:")).toBeInTheDocument();
+      expect(screen.getByText("user-1")).toBeInTheDocument();
+    });
+  });
+
   describe("Filter State Management", () => {
     it("preserves other filters when updating search", async () => {
       const user = userEvent.setup();
