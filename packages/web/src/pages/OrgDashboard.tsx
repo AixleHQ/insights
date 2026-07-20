@@ -32,6 +32,7 @@ import { StatCardSkeleton } from "@/components/ui/skeletons";
 import { formatPercent, periodLabel } from "@/lib/formatters";
 import { type DashboardPeriod } from "@/lib/types";
 import { currentMonth, getLast12Months, isCurrentMonth, periodToDateRange } from "@/lib/dashboardUtils";
+import { AppRoutes } from "@/lib/routes";
 
 // Active Members intentionally uses a fixed rolling window, not the month filter,
 // so the number stays stable while users explore historical months.
@@ -152,6 +153,17 @@ export function OrgDashboard() {
     }),
     [selectedProjectId, selectedPeriod],
   );
+
+  const activityViewAllTo = useMemo(() => {
+    const { start_date, end_date } = periodToDateRange(selectedPeriod);
+    const params = new URLSearchParams({
+      ...(selectedProjectId ? { project_id: selectedProjectId } : {}),
+      ...(start_date ? { date_from: start_date } : {}),
+      ...(end_date ? { date_to: end_date } : {}),
+    });
+    const query = params.toString();
+    return query ? `${AppRoutes.events.root}?${query}` : AppRoutes.events.root;
+  }, [selectedProjectId, selectedPeriod]);
   const { data: eventsResponse, isLoading: isLoadingEvents, isError: isErrorEvents, refetch: refetchEvents } = useEvents(orgId, eventsFilters);
 
   const chartData: DailyCostData[] = dailyData?.data?.map((d) => ({
@@ -364,6 +376,7 @@ export function OrgDashboard() {
               onRetry={() => refetchEvents()}
               onEventClick={handleEventClick}
               selectedEventId={selectedEventId}
+              viewAllTo={activityViewAllTo}
             />
           </div>
 
