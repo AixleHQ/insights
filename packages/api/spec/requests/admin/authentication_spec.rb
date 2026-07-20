@@ -14,7 +14,7 @@ RSpec.describe 'Admin Authentication', type: :request do
       get admin_root_path
 
       # In test/dev environment, redirects to login instead of 403
-      expect(response).to redirect_to('/login?redirect=%2Fadmin%2Flogin')
+      expect(response).to redirect_to(login_path(redirect: admin_login_path))
     end
 
     it 'allows access to global admins' do
@@ -31,7 +31,7 @@ RSpec.describe 'Admin Authentication', type: :request do
       get admin_root_path
 
       # In test/dev environment, redirects to login instead of 403
-      expect(response).to redirect_to('/login?redirect=%2Fadmin%2Flogin')
+      expect(response).to redirect_to(login_path(redirect: admin_login_path))
     end
   end
 
@@ -64,7 +64,7 @@ RSpec.describe 'Admin Authentication', type: :request do
 
       it 'redirects to login' do
         get admin_root_path, headers: { 'Authorization' => 'Bearer valid.jwt.token' }
-        expect(response).to redirect_to('/login?redirect=%2Fadmin%2Flogin')
+        expect(response).to redirect_to(login_path(redirect: admin_login_path))
       end
     end
 
@@ -75,7 +75,7 @@ RSpec.describe 'Admin Authentication', type: :request do
 
       it 'denies access and redirects to login' do
         get admin_root_path, headers: { 'Authorization' => 'Bearer forged.unsigned.token' }
-        expect(response).to redirect_to('/login?redirect=%2Fadmin%2Flogin')
+        expect(response).to redirect_to(login_path(redirect: admin_login_path))
       end
     end
 
@@ -99,14 +99,14 @@ RSpec.describe 'Admin Authentication', type: :request do
 
       it 'redirects to login' do
         get admin_root_path, headers: { 'Authorization' => 'Bearer valid.jwt.token' }
-        expect(response).to redirect_to('/login?redirect=%2Fadmin%2Flogin')
+        expect(response).to redirect_to(login_path(redirect: admin_login_path))
       end
     end
 
     context 'when no JWT and no session cookie are present' do
       it 'redirects to login' do
         get admin_root_path
-        expect(response).to redirect_to('/login?redirect=%2Fadmin%2Flogin')
+        expect(response).to redirect_to(login_path(redirect: admin_login_path))
       end
     end
   end
@@ -128,7 +128,7 @@ RSpec.describe 'Admin Authentication', type: :request do
       expect(response).to redirect_to(%r{/protocol/openid-connect/logout})
 
       get admin_users_path
-      expect(response).to redirect_to('/login?redirect=%2Fadmin%2Flogin')
+      expect(response).to redirect_to(login_path(redirect: admin_login_path))
     end
 
     it 'ends the Keycloak SSO session via RP-initiated logout with id_token_hint' do
@@ -162,7 +162,7 @@ RSpec.describe 'Admin Authentication', type: :request do
       expect(location).not_to include('id_token_hint')
 
       get admin_users_path
-      expect(response).to redirect_to('/login?redirect=%2Fadmin%2Flogin')
+      expect(response).to redirect_to(login_path(redirect: admin_login_path))
     end
 
     it 'stores a realistically-sized Keycloak id_token in the session without cookie overflow, and round-trips it on the next request' do
