@@ -5,10 +5,11 @@ import { MemoryRouter } from "react-router-dom";
 import { Login } from "./Login";
 
 const mockLogin = vi.fn();
+let mockIsAuthenticated = false;
 
 vi.mock("../contexts/AuthContext", () => ({
   useAuth: () => ({
-    isAuthenticated: false,
+    isAuthenticated: mockIsAuthenticated,
     isLoading: false,
     login: mockLogin,
     directLogin: vi.fn(),
@@ -18,6 +19,7 @@ vi.mock("../contexts/AuthContext", () => ({
 describe("Login", () => {
   beforeEach(() => {
     mockLogin.mockReset();
+    mockIsAuthenticated = false;
   });
 
   it("passes the redirect query param through to login()", async () => {
@@ -57,5 +59,21 @@ describe("Login", () => {
     await user.click(screen.getByRole("button", { name: /continue with google/i }));
 
     expect(mockLogin).toHaveBeenCalledWith(undefined);
+  });
+
+  it("full-page navigates (not SPA navigate) to an admin redirect target when already authenticated", () => {
+    mockIsAuthenticated = true;
+    const assignSpy = vi.fn();
+    vi.stubGlobal("location", { ...window.location, assign: assignSpy });
+
+    render(
+      <MemoryRouter initialEntries={["/login?redirect=/admin/login"]}>
+        <Login />
+      </MemoryRouter>
+    );
+
+    expect(assignSpy).toHaveBeenCalledWith("/admin/login");
+
+    vi.unstubAllGlobals();
   });
 });

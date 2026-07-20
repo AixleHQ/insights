@@ -51,6 +51,25 @@ describe("AuthCallback", () => {
     });
   });
 
+  it("full-page navigates (not SPA navigate) to an admin destination", async () => {
+    mockLoginCallback.mockResolvedValue({ state: "/admin/login" });
+    const assignSpy = vi.fn();
+    vi.stubGlobal("location", { ...window.location, assign: assignSpy });
+
+    render(
+      <MemoryRouter>
+        <AuthCallback />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(assignSpy).toHaveBeenCalledWith("/admin/login");
+    });
+    expect(mockNavigate).not.toHaveBeenCalled();
+
+    vi.unstubAllGlobals();
+  });
+
   it("falls back to the dashboard when state is missing", async () => {
     mockLoginCallback.mockResolvedValue({ state: undefined });
 
