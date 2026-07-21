@@ -371,7 +371,10 @@ paths:
           $ref: '#/components/responses/NotFound'
     patch:
       summary: Update organization
-      description: Requires owner role in the organization
+      description: >
+        Requires owner role in the organization.
+        Returns 403 if the organization is inactive. Reactivation of inactive organizations
+        must be performed via the admin interface (Administrate).
       tags:
         - Organizations
       parameters:
@@ -4120,6 +4123,8 @@ paths:
                       $ref: '#/components/schemas/ProjectMemberListItem'
                   meta:
                     $ref: '#/components/schemas/PaginationMeta'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     post:
       summary: Add project member
       description: Requires organization owner (or personal project owner) for org projects
@@ -4336,6 +4341,8 @@ paths:
                       $ref: '#/components/schemas/Repository'
                   meta:
                     $ref: '#/components/schemas/PaginationMeta'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     post:
       summary: Add repository to project
       description: Requires admin role in the project
@@ -4501,6 +4508,8 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/ProjectConnector'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     post:
       summary: Create project connector
       description: >

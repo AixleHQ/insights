@@ -144,6 +144,37 @@ describe("ProtectedRoute — inactive org redirect", () => {
     expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
   });
 
+  it("redirects to /no-active-organization even when allowNoOrg is true and user has inactive orgs", () => {
+    h.org = {
+      currentOrg: null,
+      organizations: [],
+      hasInactiveOrganizations: true,
+      isLoading: false,
+      isInitialized: true,
+    };
+
+    render(
+      <MemoryRouter initialEntries={["/onboarding"]}>
+        <Routes>
+          <Route
+            path="/onboarding"
+            element={
+              <ProtectedRoute allowNoOrg>
+                <div>Onboarding Page</div>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/no-active-organization"
+            element={<div>No Active Org Page</div>}
+          />
+        </Routes>
+      </MemoryRouter>
+    );
+    expect(screen.getByText("No Active Org Page")).toBeInTheDocument();
+    expect(screen.queryByText("Onboarding Page")).not.toBeInTheDocument();
+  });
+
   it("redirects to /onboarding when organizations is empty and hasInactiveOrganizations is false", () => {
     h.org = {
       currentOrg: null,

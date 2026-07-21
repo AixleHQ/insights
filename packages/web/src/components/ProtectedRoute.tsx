@@ -41,15 +41,18 @@ export function ProtectedRoute({
     return <Navigate to={AppRoutes.login} state={{ from: location }} replace />;
   }
 
-  // Redirect to the appropriate empty-org page (unless allowNoOrg is set)
-  // Distinguish "never had an org" (→ onboarding) from "orgs exist but all inactive" (→ no-active-organization)
-  if (!allowNoOrg && organizations.length === 0) {
-    const destination = hasInactiveOrganizations
-      ? AppRoutes.noActiveOrganization
-      : AppRoutes.onboarding;
-    if (location.pathname !== destination) {
-      return <Navigate to={destination} state={{ from: location }} replace />;
-    }
+  // Redirect inactive-org users to the dedicated page regardless of allowNoOrg.
+  // This must run before the onboarding redirect so that /onboarding with inactive
+  // orgs is caught here rather than allowed through.
+  if (orgInitialized && organizations.length === 0 && hasInactiveOrganizations &&
+      location.pathname !== AppRoutes.noActiveOrganization) {
+    return <Navigate to={AppRoutes.noActiveOrganization} replace />;
+  }
+
+  // Redirect truly new users (no memberships at all) when org is required.
+  if (!allowNoOrg && orgInitialized && organizations.length === 0 &&
+      location.pathname !== AppRoutes.onboarding) {
+    return <Navigate to={AppRoutes.onboarding} state={{ from: location }} replace />;
   }
 
   // Check if organization is required
