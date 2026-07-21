@@ -12,6 +12,11 @@ Rails.application.routes.draw do
   get "health", to: "health#show"
   get "up" => "rails/health#show", as: :rails_health_check
 
+  direct :login do |options = {}|
+    redirect = options[:redirect]
+    redirect.present? ? "/login?#{{ redirect: redirect }.to_query}" : "/login"
+  end
+
   # API routes
   namespace :api do
     # Internal API for Temporal workers and other internal services

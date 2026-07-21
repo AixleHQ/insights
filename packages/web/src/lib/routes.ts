@@ -96,3 +96,14 @@ export const AppRoutes = {
 export function isSafeRedirectPath(value: unknown): value is string {
   return typeof value === "string" && value.startsWith("/") && !value.startsWith("//");
 }
+
+/**
+ * True when a redirect target is owned by the Rails-served Administrate panel
+ * (mounted at /admin) rather than an SPA route. Such paths must be reached via a
+ * real browser navigation (window.location.assign), not React Router's navigate() —
+ * nginx/vite proxy /admin straight to the API and no SPA route exists for e.g.
+ * /admin/login, so a client-side navigate() would silently no-op (AIX-568).
+ */
+export function isAdminPath(path: string): boolean {
+  return path === AppRoutes.admin.root || path.startsWith(`${AppRoutes.admin.root}/`);
+}

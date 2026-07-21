@@ -3642,6 +3642,8 @@ paths:
           description: Project deleted
         '403':
           $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
 
   /api/v1/projects/{id}/link_jira:
     post:
@@ -3931,6 +3933,10 @@ paths:
                   totalCost:
                     type: number
                     format: float
+                  totalTokensIn:
+                    type: integer
+                  totalTokensOut:
+                    type: integer
                   previousPeriod:
                     type: object
                     properties:

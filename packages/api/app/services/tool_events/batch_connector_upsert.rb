@@ -105,8 +105,6 @@ module ToolEvents
       end
 
       # --- Step 3: update mutable fields on existing ToolEvents ---
-      return if existing_records.empty?
-
       existing_records.each do |r|
         event_id = existing_map[r[:unique_value].to_s]
         next unless event_id
@@ -114,9 +112,27 @@ module ToolEvents
         event = ToolEvent.find_by(id: event_id)
         event&.update!(r.except(*IMMUTABLE_LOOKUP_FIELDS, :unique_value))
       end
+
+      # --- Step 4: auto-add contributing users to project members ---
+      ensure_project_memberships
     end
 
     private
+
+    # Raw-SQL inserts bypass the after_create callback on ToolEvent, and the
+    # update path above never fires it either — so auto-membership
+    # (AutoMembershipService) must be invoked explicitly, once per unique
+    # user/project pair in the batch.
+    def ensure_project_memberships
+      @records
+        .map { |r| r.values_at(:user_id, :project_id, :organization_id) }
+        .uniq
+        .each do |user_id, project_id, organization_id|
+          next if user_id.blank? || project_id.blank?
+
+          AutoMembershipService.call_with(user_id:, project_id:, organization_id:)
+        end
+    end
 
     # Rails upsert_all includes every column in the INSERT list, which causes
     # `id = NULL` for bigserial columns not present in the hash (Rails 8.1 bug).

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 import {
   AlertCircle,
   Settings,
@@ -27,7 +28,7 @@ import {
 
 import { useProjectEventsTab } from "@/hooks/useProjectEventsTab";
 import { useFavorites } from "@/hooks/useFavorites";
-import { formatCost, formatCount } from "@/lib/formatters";
+import { formatCost, formatCount, formatTokens } from "@/lib/formatters";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -71,6 +72,7 @@ import { TabsContent } from "@/components/ui/tabs";
 import { formatDistanceToNow, cn, getToolColor, humanizeToolName } from "@/lib/utils";
 import { isGitRemoteMissing } from "@/lib/project-git-remote";
 import { AppRoutes } from "@/lib/routes";
+import { getApiErrorMessage } from "@/lib/api";
 
 function StatCard({
   label,
@@ -79,6 +81,7 @@ function StatCard({
   delta,
   isLoading,
   accent,
+  monoValue = true,
 }: {
   label: string;
   subtitle?: string;
@@ -86,29 +89,28 @@ function StatCard({
   delta?: string;
   isLoading?: boolean;
   accent?: React.ReactNode;
+  monoValue?: boolean;
 }) {
   return (
     <Card className="flex flex-col gap-2 p-4">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex flex-col gap-0.5">
-          <p className="type-caption font-medium uppercase tracking-wider text-muted-foreground">
-            {label}
-          </p>
-          {subtitle && (
-            <p className="text-[10px] text-muted-foreground">{subtitle}</p>
-          )}
-        </div>
-        {accent && <div className="shrink-0">{accent}</div>}
-      </div>
+      <p className="type-caption font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </p>
       {isLoading ? (
         <Skeleton className="h-8 w-24" />
       ) : (
-        <>
-          <p className="font-mono-display type-h3 font-semibold">{value}</p>
-          {delta && (
-            <p className="type-caption text-muted-foreground">{delta}</p>
-          )}
-        </>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-0.5 min-w-0">
+            {subtitle && (
+              <p className="text-[10px] text-muted-foreground">{subtitle}</p>
+            )}
+            <p className={cn("type-h3 font-semibold", monoValue && "font-mono-display")}>{value}</p>
+            {delta && (
+              <p className="type-caption text-muted-foreground">{delta}</p>
+            )}
+          </div>
+          {accent && <div className="shrink-0">{accent}</div>}
+        </div>
       )}
     </Card>
   );
@@ -124,11 +126,12 @@ export function ProjectDetail() {
 
   const selectedDays = getDaysForRange(timeRange);
   const granularity = timeRange === "1y" ? "month" : "day";
+  const rangeLabel = TIME_RANGE_OPTIONS.find((o) => o.value === timeRange)?.label ?? "7 days";
 
   const { data: project, isLoading: isLoadingProject } = useProject(id || "");
   const { data: projectMembers, isLoading: isLoadingMembers } = useProjectMembers(id || "");
   const { data: me } = useCurrentUser();
-  const { data: projectStats, isLoading: isLoadingStats } = useProjectStats(id || "", 30);
+  const { data: projectStats, isLoading: isLoadingStats } = useProjectStats(id || "", selectedDays);
   const { data: dailyByToolData, isLoading: isLoadingDailyByTool, isError: isErrorDailyByTool, refetch: refetchDailyByTool } = useProjectDailyByTool(id || "", selectedDays, granularity);
   const { data: projectRepositories, isLoading: isLoadingRepositories } = useProjectRepositories(id || "");
   const disconnectRepo = useDisconnectRepo(id || "");
@@ -178,6 +181,12 @@ export function ProjectDetail() {
     return { data, groups, series, totalEvents, rangeLabel };
   }, [dailyByToolData, timeRange]);
 
+  const mostUsedToolEventCount = useMemo(() => {
+    if (!dailyByToolData?.data || !dailyByToolData?.tools?.[0]) return null;
+    const topTool = dailyByToolData.tools[0];
+    return dailyByToolData.data.reduce((sum, row) => sum + (Number(row[topTool]) || 0), 0);
+  }, [dailyByToolData]);
+
   // Permission flags (reused by tab gates)
   const myProjectMembership = projectMembers?.find((m: ProjectMember) => m.userId === me?.id);
   const isProjectOwner = hasRole(["owner"]) || myProjectMembership?.role === "owner";
@@ -209,7 +218,7 @@ export function ProjectDetail() {
         await deleteProject.mutateAsync(id);
         navigate(AppRoutes.projects.root);
       } catch (error) {
-        console.error("Failed to delete project:", error);
+        toast.error(getApiErrorMessage(error, "Failed to delete project. Please try again."));
       }
     }
   };
@@ -341,25 +350,30 @@ export function ProjectDetail() {
               subtitle="All-time attributed"
               value={hasAttributedEventCount ? formatCount(attributedEventCount ?? 0) : "—"}
               isLoading={isLoadingStats}
-              delta={projectStats ? `${formatCount(projectStats.totalEvents)} last 30 days` : undefined}
+              delta={projectStats ? `${formatCount(projectStats.totalEvents)} last ${rangeLabel}` : undefined}
             />
             <StatCard
               label="Total Cost"
               subtitle="All-time attributed"
               value={hasAttributedCostUsd ? formatCost(attributedCostUsd ?? 0) : "—"}
               isLoading={isLoadingStats}
-              delta={projectStats ? `${formatCost(projectStats.totalCost)} last 30 days` : undefined}
+              delta={projectStats ? `${formatCost(projectStats.totalCost)} last ${rangeLabel}` : undefined}
             />
             <StatCard
               label="Total Tokens"
-              subtitle="Last 30 days"
-              value={projectStats ? formatCount(projectStats.totalEvents) : "—"}
+              subtitle={`Last ${rangeLabel}`}
+              value={projectStats ? formatTokens(projectStats.totalTokensIn + projectStats.totalTokensOut) : "—"}
               isLoading={isLoadingStats}
+              delta={projectStats ? `${formatTokens(projectStats.totalTokensIn)} in · ${formatTokens(projectStats.totalTokensOut)} out` : undefined}
             />
             <StatCard
               label="Most Used Tool"
+              subtitle={`Last ${rangeLabel}`}
               value={dailyByToolData?.tools[0] ? humanizeToolName(dailyByToolData.tools[0]) : "—"}
               isLoading={isLoadingDailyByTool}
+              delta={mostUsedToolEventCount !== null ? `${formatCount(mostUsedToolEventCount)} events` : undefined}
+              accent={dailyByToolData?.tools[0] ? <ProviderLogo provider={dailyByToolData.tools[0]} size="lg" showBackground /> : undefined}
+              monoValue={false}
             />
           </div>
 

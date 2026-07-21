@@ -947,7 +947,7 @@ RSpec.describe 'Api::V1::Events', type: :request do
         authenticated_get export_path, user: user, organization: organization,
                           params: { start_date: "2026-01-01", end_date: "2026-04-30" }
 
-        expect(response.headers["Content-Disposition"]).to include("db90-events-2026-01-01-2026-04-30.csv")
+        expect(response.headers["Content-Disposition"]).to include("aixle-insights-events-2026-01-01-2026-04-30.csv")
       end
     end
 
