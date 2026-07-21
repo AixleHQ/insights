@@ -24,7 +24,9 @@ class CreateActiveStorageTables < ActiveRecord::Migration[7.0]
 
     create_table :active_storage_attachments, id: primary_key_type do |t|
       t.string     :name,     null: false
-      t.references :record,   null: false, polymorphic: true, index: false, type: foreign_key_type
+      # :record is polymorphic but in practice only ever points to User, whose primary key is uuid —
+      # foreign_key_type (bigint) would mismatch and reject User#id at insert time.
+      t.references :record,   null: false, polymorphic: true, index: false, type: :uuid
       t.references :blob,     null: false, type: foreign_key_type
 
       if connection.supports_datetime_with_precision?
