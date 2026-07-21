@@ -47,7 +47,7 @@ interface OrgContextValue extends OrgState {
 
 const OrgContext = createContext<OrgContextValue | null>(null);
 
-const ORG_STORAGE_KEY = "db90_current_org_id";
+export const ORG_STORAGE_KEY = "db90_current_org_id";
 
 interface OrgProviderProps {
   children: ReactNode;
@@ -187,9 +187,6 @@ export function OrgProvider({ children, apiBaseUrl = "/api/v1" }: OrgProviderPro
     if (isAuthenticated) {
       refreshOrganizations();
     } else {
-      // Clear the stored org on logout so the default_org_id preference wins on
-      // the next login instead of the last-used org from the previous session.
-      localStorage.removeItem(ORG_STORAGE_KEY);
       setState({
         currentOrg: null,
         organizations: [],
