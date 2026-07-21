@@ -84,7 +84,13 @@ paths:
                     items:
                       $ref: '#/components/schemas/OrganizationWithMembership'
                   meta:
-                    $ref: '#/components/schemas/PaginationMeta'
+                    allOf:
+                      - $ref: '#/components/schemas/PaginationMeta'
+                      - type: object
+                        properties:
+                          has_inactive_organizations:
+                            type: boolean
+                            description: True when the user has memberships in inactive organizations but zero active ones remain
 
   /api/v1/users/me/tool_accounts:
     get:

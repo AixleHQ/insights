@@ -192,6 +192,7 @@ module Api
 
       def set_organization
         @organization = authorized_scope(Organization.all).includes(:retention_policy).find(params[:id])
+        reject_inactive_organization!(@organization)
       end
 
       def organization_params

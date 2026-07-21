@@ -48,6 +48,43 @@ RSpec.describe 'Api::V1::Organizations', type: :request do
 
       expect_not_found
     end
+
+    context 'when organization is inactive and no X-Organization-ID header sent' do
+      let(:inactive_org) { create(:organization, :inactive) }
+      let!(:inactive_membership) { create(:organization_membership, user: user, organization: inactive_org, role: 'owner') }
+
+      it 'returns 403' do
+        # Deliberately do NOT pass organization: keyword so no X-Organization-ID header
+        authenticated_get "/api/v1/organizations/#{inactive_org.id}", user: user
+
+        expect(response).to have_http_status(:forbidden)
+      end
+    end
+  end
+
+  describe 'Inactive org header gate (X-Organization-ID)' do
+    let(:inactive_org) { create(:organization, :inactive) }
+    let!(:inactive_membership) { create(:organization_membership, user: user, organization: inactive_org, role: 'owner') }
+
+    it 'returns 403 when X-Organization-ID points to an inactive org' do
+      authenticated_get "/api/v1/organizations/#{inactive_org.id}", user: user, organization: inactive_org
+
+      expect(response).to have_http_status(:forbidden)
+      expect(json_response[:error]).to match(/inactive/i)
+    end
+  end
+
+  describe 'Inactive org path gate via project' do
+    let(:inactive_org) { create(:organization, :inactive) }
+    let!(:inactive_membership) { create(:organization_membership, user: user, organization: inactive_org, role: 'owner') }
+    let!(:project) { create(:project, organization: inactive_org) }
+    let!(:project_membership) { create(:project_membership, user: user, project: project, role: 'owner') }
+
+    it 'returns 403 when accessing a project under an inactive org' do
+      authenticated_get "/api/v1/projects/#{project.id}", user: user
+
+      expect(response).to have_http_status(:forbidden)
+    end
   end
 
   describe 'POST /api/v1/organizations' do

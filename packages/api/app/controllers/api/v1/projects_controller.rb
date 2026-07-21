@@ -464,6 +464,7 @@ module Api
         scope = authorized_scope(Project.all)
         scope = scope.includes(*includes) if includes.any?
         @project = scope.find(params[:id])
+        reject_inactive_organization!(@project.organization) if @project.organization_id.present?
       end
 
       # Defense-in-depth scoping kwargs for ProjectToolEventAggregates.

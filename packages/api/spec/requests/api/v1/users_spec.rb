@@ -83,6 +83,37 @@ RSpec.describe 'Api::V1::Users', type: :request do
       expect(json_data.length).to eq(1)
       expect(json_data.first[:id]).to eq(organization.id)
     end
+
+    context 'when user has inactive organizations' do
+      let!(:inactive_org) { create(:organization, :inactive) }
+      let!(:inactive_membership) { create(:organization_membership, user: user, organization: inactive_org) }
+
+      it 'omits inactive organizations from the list' do
+        authenticated_get '/api/v1/users/me/organizations', user: user
+
+        expect_success
+        returned_ids = json_data.map { |o| o[:id] }
+        expect(returned_ids).not_to include(inactive_org.id)
+      end
+
+      it 'sets meta.has_inactive_organizations to true when only inactive orgs exist' do
+        # remove membership from active org set up in outer let block
+        membership.destroy
+
+        authenticated_get '/api/v1/users/me/organizations', user: user
+
+        expect_success
+        expect(json_data).to be_empty
+        expect(json_response.dig(:meta, :has_inactive_organizations)).to eq(true)
+      end
+
+      it 'sets meta.has_inactive_organizations to false when at least one active org exists' do
+        authenticated_get '/api/v1/users/me/organizations', user: user
+
+        expect_success
+        expect(json_response.dig(:meta, :has_inactive_organizations)).to eq(false)
+      end
+    end
   end
 
   describe 'GET /api/v1/users/me/tool_accounts' do
