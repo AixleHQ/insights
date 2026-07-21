@@ -22,6 +22,10 @@ export interface RequestOptions extends RequestInit {
 const DEFAULT_BASE_URL = import.meta.env.VITE_API_URL || "/api/v1";
 const IMPERSONATION_STORAGE_KEY = "impersonation_token";
 
+// Dispatched when api.ts removes an expired impersonation token so ImpersonationContext
+// can sync React state without polling or storage-event (which only fires cross-tab).
+export const IMPERSONATION_EXPIRED_EVENT = "impersonation:expired";
+
 // Global state for current organization ID
 let currentOrgId: string | null = null;
 
@@ -40,12 +44,14 @@ export async function getAuthToken(): Promise<string | null> {
         if (payload.exp && payload.exp > Date.now() / 1000) {
           return impersonationToken;
         }
-        // Token expired, remove it
+        // Token expired — remove and notify ImpersonationContext to clear React state.
         localStorage.removeItem(IMPERSONATION_STORAGE_KEY);
+        window.dispatchEvent(new CustomEvent(IMPERSONATION_EXPIRED_EVENT));
       }
     } catch {
-      // Invalid token, remove it
+      // Invalid token — remove and notify.
       localStorage.removeItem(IMPERSONATION_STORAGE_KEY);
+      window.dispatchEvent(new CustomEvent(IMPERSONATION_EXPIRED_EVENT));
     }
   }
 

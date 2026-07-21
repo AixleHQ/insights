@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
-import { api } from "@/lib/api";
+import { api, IMPERSONATION_EXPIRED_EVENT } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 
 interface ImpersonationState {
@@ -37,6 +37,7 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
       // Check if token is expired
       if (payload.exp && payload.exp < Date.now() / 1000) {
         localStorage.removeItem(STORAGE_KEY);
+        setState({ isImpersonating: false, impersonatorEmail: null, token: null });
         return;
       }
 
@@ -52,6 +53,33 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem(STORAGE_KEY);
     }
   }, []);
+
+  // Keep React state in sync when api.ts removes the token on expiry.
+  // api.ts detects expiry in getAuthToken() and dispatches IMPERSONATION_EXPIRED_EVENT
+  // (same-tab) + removes the localStorage key (cross-tab storage event covers that case).
+  useEffect(() => {
+    const clearImpersonation = () => {
+      setState({ isImpersonating: false, impersonatorEmail: null, token: null });
+      queryClient.clear();
+    };
+
+    const handleExpiredEvent = () => {
+      if (state.isImpersonating) clearImpersonation();
+    };
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY && e.newValue === null && state.isImpersonating) {
+        clearImpersonation();
+      }
+    };
+
+    window.addEventListener(IMPERSONATION_EXPIRED_EVENT, handleExpiredEvent);
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener(IMPERSONATION_EXPIRED_EVENT, handleExpiredEvent);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, [state.isImpersonating]);
 
   // Check for impersonation token on mount
   useEffect(() => {
