@@ -69,6 +69,17 @@ describe("ImpersonationContext — expired token on mount", () => {
     expect(result.current.isImpersonating).toBe(true);
     expect(result.current.impersonatorEmail).toBe("admin@example.com");
   });
+
+  it("sets isImpersonating=false when stored token is invalid", () => {
+    localStorage.setItem(STORAGE_KEY, "not-a-valid-jwt");
+
+    const { result } = renderHook(() => useImpersonation(), { wrapper });
+
+    expect(result.current.isImpersonating).toBe(false);
+    expect(result.current.impersonatorEmail).toBeNull();
+    expect(result.current.token).toBeNull();
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+  });
 });
 
 describe("ImpersonationContext — IMPERSONATION_EXPIRED_EVENT (same-tab expiry via api.ts)", () => {

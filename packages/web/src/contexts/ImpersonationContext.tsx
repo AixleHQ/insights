@@ -51,6 +51,7 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error("Failed to decode impersonation token:", error);
       localStorage.removeItem(STORAGE_KEY);
+      setState({ isImpersonating: false, impersonatorEmail: null, token: null });
     }
   }, []);
 

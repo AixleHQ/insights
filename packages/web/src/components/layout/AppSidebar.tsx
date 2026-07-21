@@ -325,9 +325,14 @@ function UserMenu() {
   const { state } = useSidebar();
   const { isImpersonating } = useImpersonation();
 
-  const displayName = currentUser?.name || profile?.name || "User";
-  const displayEmail = currentUser?.email || profile?.email;
-  // During impersonation, don't fall back to the admin's Keycloak picture
+  // During impersonation, never fall back to the admin's Keycloak profile —
+  // that produces banner/identity desync when /users/me is still loading.
+  const displayName = isImpersonating
+    ? (currentUser?.name || "User")
+    : (currentUser?.name || profile?.name || "User");
+  const displayEmail = isImpersonating
+    ? currentUser?.email
+    : (currentUser?.email || profile?.email);
   const avatarSrc = currentUser?.avatarUrl || (isImpersonating ? undefined : profile?.picture);
 
   const getInitials = (name?: string, email?: string) => {
@@ -352,7 +357,7 @@ function UserMenu() {
           <Avatar className="size-8">
             {avatarSrc && <AvatarImage src={avatarSrc} alt={displayName} />}
             <AvatarFallback className="bg-sidebar-accent text-sidebar-accent-foreground text-xs">
-              {getInitials(displayName, profile?.email)}
+              {getInitials(displayName, displayEmail)}
             </AvatarFallback>
           </Avatar>
           <div className="grid flex-1 text-left text-sm leading-tight">
