@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import type { ComponentProps } from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
@@ -6,6 +7,19 @@ import type { MemberRole, OrganizationMembership } from "@/contexts/OrgContext";
 import type { FavoriteProject } from "@/hooks/useFavorites";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
+
+// Radix's Avatar.Image only mounts an <img> after an offscreen preload reports
+// "loaded", which never happens in jsdom — render a plain <img> synchronously
+// instead so tests can assert on avatarSrc without simulating image loads.
+vi.mock("@radix-ui/react-avatar", async () => {
+  const actual = await vi.importActual<typeof import("@radix-ui/react-avatar")>(
+    "@radix-ui/react-avatar",
+  );
+  return {
+    ...actual,
+    Image: (props: ComponentProps<"img">) => <img {...props} />,
+  };
+});
 
 // Hoisted mutable values so mock factories can read them at render time
 const orgMock = vi.hoisted(() => ({
@@ -22,11 +36,17 @@ const favoritesMock = vi.hoisted(() => ({
   isFavorite: vi.fn(() => false),
 }));
 
+const authMock = vi.hoisted(() => ({
+  profile: { name: "Test User", email: "test@example.com" } as {
+    name: string;
+    email: string;
+    picture?: string;
+  },
+  logout: vi.fn(),
+}));
+
 vi.mock("@/contexts/AuthContext", () => ({
-  useAuth: () => ({
-    profile: { name: "Test User", email: "test@example.com" },
-    logout: vi.fn(),
-  }),
+  useAuth: () => authMock,
 }));
 
 vi.mock("@/contexts/OrgContext", () => ({
@@ -73,11 +93,8 @@ describe("AppSidebar", () => {
     orgMock.currentRole = "owner";
     favoritesMock.favorites = [];
     impersonationMock.isImpersonating = false;
-    currentUserMock.data = {
-      name: "Test User",
-      email: "test@example.com",
-      avatarUrl: null,
-    };
+    authMock.profile = { name: "Test User", email: "test@example.com" };
+    currentUserMock.data = { name: "Test User", email: "test@example.com", avatarUrl: null };
   });
 
   describe("owner role", () => {
@@ -235,6 +252,39 @@ describe("AppSidebar", () => {
       expect(screen.getByText("Edsger Dijkstra")).toBeInTheDocument();
       expect(screen.getByText("ana@example.com")).toBeInTheDocument();
       expect(screen.queryByText("Test User")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("UserMenu avatar", () => {
+    it("uses currentUser.avatarUrl when set", () => {
+      currentUserMock.data = {
+        name: "Test User",
+        email: "test@example.com",
+        avatarUrl: "https://example.com/uploaded-avatar.png",
+      };
+      authMock.profile = { name: "Test User", email: "test@example.com", picture: "https://keycloak.example.com/picture.png" };
+      renderSidebar();
+      expect(screen.getByRole("img", { name: /Test User/i })).toHaveAttribute(
+        "src",
+        "https://example.com/uploaded-avatar.png",
+      );
+    });
+
+    it("falls back to the Keycloak picture only while currentUser hasn't loaded yet", () => {
+      currentUserMock.data = undefined;
+      authMock.profile = { name: "Test User", email: "test@example.com", picture: "https://keycloak.example.com/picture.png" };
+      renderSidebar();
+      expect(screen.getByRole("img", { name: /Test User/i })).toHaveAttribute(
+        "src",
+        "https://keycloak.example.com/picture.png",
+      );
+    });
+
+    it("does not fall back to the Keycloak picture once currentUser has loaded with no avatar (e.g. just removed)", () => {
+      currentUserMock.data = { name: "Test User", email: "test@example.com", avatarUrl: null };
+      authMock.profile = { name: "Test User", email: "test@example.com", picture: "https://keycloak.example.com/picture.png" };
+      renderSidebar();
+      expect(screen.queryByRole("img", { name: /Test User/i })).not.toBeInTheDocument();
     });
   });
 });
