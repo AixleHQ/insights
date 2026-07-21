@@ -81,14 +81,22 @@ describe("ProjectCard", () => {
     expect(onToggleFavorite).toHaveBeenCalledWith({ id: "p1", name: "Alpha" });
   });
 
-  it("calls onClick when card body is clicked", async () => {
-    const user = userEvent.setup();
-    const onClick = vi.fn();
+  it("renders a link to the project detail page", () => {
+    render(<ProjectCard project={baseProject} />);
 
-    render(<ProjectCard project={baseProject} onClick={onClick} />);
+    const link = screen.getByRole("link", { name: /view alpha/i });
+    expect(link).toBeInTheDocument();
+    expect(link).toHaveAttribute("href", "/projects/p1");
+  });
 
-    await user.click(screen.getByText("1,234"));
-    expect(onClick).toHaveBeenCalledOnce();
+  it("stat badge container has pointer-events-none so clicks fall through to the stretched link", () => {
+    render(<ProjectCard project={baseProject} />);
+
+    // The stat badge wrapper must have pointer-events-none so that in-browser clicks
+    // fall through to the absolute inset-0 stretched Link underneath (z-0), not just
+    // bubble up to the Card which has no onClick handler.
+    const badgeWrapper = screen.getByText("Events").closest(".pointer-events-none");
+    expect(badgeWrapper).toBeInTheDocument();
   });
 
   describe("actions menu RBAC (AIX-501)", () => {
@@ -115,22 +123,19 @@ describe("ProjectCard", () => {
     });
   });
 
-  it("does not call onClick when favorite button is clicked", async () => {
+  it("calls onToggleFavorite and does not navigate when favorite button is clicked", async () => {
     const user = userEvent.setup();
-    const onClick = vi.fn();
     const onToggleFavorite = vi.fn();
 
     render(
       <ProjectCard
         project={baseProject}
-        onClick={onClick}
         isFavorited={false}
         onToggleFavorite={onToggleFavorite}
       />
     );
 
     await user.click(screen.getByRole("button", { name: /toggle favorite/i }));
-    expect(onClick).not.toHaveBeenCalled();
     expect(onToggleFavorite).toHaveBeenCalledOnce();
   });
 });

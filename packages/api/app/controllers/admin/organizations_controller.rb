@@ -2,6 +2,18 @@
 
 module Admin
   class OrganizationsController < Admin::ApplicationController
+    def destroy
+      if requested_resource.destroy
+        flash[:notice] = translate_with_resource("destroy.success")
+      else
+        # Every dependent: :restrict_with_error association on Organization (tool_events,
+        # audit_logs, retention_purge_logs) represents retained history the org can't shed —
+        # show one actionable reason instead of Rails' per-association default text.
+        flash[:error] = translate_with_resource("destroy.blocked")
+      end
+      redirect_to after_resource_destroyed_path(requested_resource), status: :see_other
+    end
+
     def export
       organizations = Organization.all
       respond_to do |format|

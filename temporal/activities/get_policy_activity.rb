@@ -7,7 +7,7 @@ module Activities
     # Default sanitization rules when no policy is configured
     DEFAULT_POLICY = {
       "id" => "default",
-      "version" => 1,
+      "version" => 2,
       "rules" => {
         "pii" => {
           "enabled" => true,
@@ -23,10 +23,16 @@ module Activities
           "enabled" => true,
           "action" => "redact",
           "patterns" => {
-            "api_key" => '\b[A-Za-z0-9_-]{32,}\b',
-            "aws_key" => 'AKIA[0-9A-Z]{16}',
-            "github_token" => 'gh[pousr]_[A-Za-z0-9_]{36,}',
-            "jwt" => 'eyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*'
+            "aws_access_key"  => 'AKIA[0-9A-Z]{16}',
+            "aws_session_key" => 'ASIA[0-9A-Z]{16}',
+            "github_token"    => 'gh[pousr]_[A-Za-z0-9_]{36,}',
+            # Word-bounded; (?!ant-) so Anthropic keys do not also match openai_key.
+            "openai_key"      => '\bsk-(?!ant-)[A-Za-z0-9_\-]{20,}\b',
+            "anthropic_key"   => '\bsk-ant-[A-Za-z0-9_\-]{93,}\b',
+            "slack_token"     => 'xox[baprs]-[0-9A-Za-z\-]{10,}',
+            "stripe_key"      => '(?:sk|rk)_live_[0-9a-zA-Z]{24,}',
+            "google_api_key"  => 'AIza[0-9A-Za-z_\-]{35}',
+            "jwt"             => 'eyJ[A-Za-z0-9_\-]*\.eyJ[A-Za-z0-9_\-]*\.[A-Za-z0-9_\-]*'
           }
         },
         "hipaa" => {
@@ -56,7 +62,7 @@ module Activities
       return policy if policy
 
       # Fall back to default policy
-      DEFAULT_POLICY.dup
+      JSON.parse(JSON.generate(DEFAULT_POLICY))
     end
 
     private

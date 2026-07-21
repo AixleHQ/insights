@@ -127,6 +127,28 @@ RSpec.describe ToolEvent, type: :model do
   end
 
   describe 'callbacks' do
+    describe 'after_create :auto_add_project_membership' do
+      it 'auto-creates a project membership on creation' do
+        user = create(:user)
+        org = create(:organization)
+        project = create(:project, organization: org)
+        create(:organization_membership, user: user, organization: org)
+
+        expect {
+          create(:tool_event, user: user, project: project, organization: org)
+        }.to change(ProjectMembership, :count).by(1)
+      end
+
+      it 'does not create membership when project_id is nil' do
+        user = create(:user)
+        org = create(:organization)
+
+        expect {
+          create(:tool_event, user: user, project: nil, organization: org)
+        }.not_to change(ProjectMembership, :count)
+      end
+    end
+
     describe 'before_validation :calculate_tokens_total' do
       it 'calculates tokens_total from tokens_in and tokens_out' do
         event = build(:tool_event, tokens_in: 100, tokens_out: 200, tokens_total: nil)

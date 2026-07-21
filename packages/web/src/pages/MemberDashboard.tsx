@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatCardSkeleton } from "@/components/ui/skeletons";
 import { humanizeToolName } from "@/lib/utils";
 import { formatTokens, formatPercent, formatCount } from "@/lib/formatters";
+import { SHOW_PROMPT_INSIGHTS_SECTION_IN_PERSONAL_DASHBOARD } from "@/lib/featureFlags";
 
 const PERIODS = ["7d", "30d", "90d"] as const;
 type Period = (typeof PERIODS)[number];
@@ -162,10 +163,14 @@ export function MemberDashboard({ hideHeader = false }: { hideHeader?: boolean }
         )}
       </MetricGrid>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        <PromptInsightsSection orgId={orgId} userId={userId} period={period} />
+      {SHOW_PROMPT_INSIGHTS_SECTION_IN_PERSONAL_DASHBOARD ? (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <PromptInsightsSection orgId={orgId} userId={userId} period={period} />
+          <TopToolsChart data={toolUsage} isLoading={isLoadingStats} />
+        </div>
+      ) : (
         <TopToolsChart data={toolUsage} isLoading={isLoadingStats} />
-      </div>
+      )}
 
       {heatmapData ? (
         <ActivityHeatmap data={heatmapData} />

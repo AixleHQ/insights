@@ -20,7 +20,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { cn, formatLocalDate } from "@/lib/utils";
+import { cn, formatLocalDate, organizationMemberUserId, getMemberDisplayName } from "@/lib/utils";
 import { humanizeToolName } from "@/lib/utils";
 import type { EventsToolFilterOption } from "@/lib/eventsToolFilters";
 import {
@@ -30,7 +30,7 @@ import {
   EVENT_TYPE_BAND_ORDER,
   EVENT_TYPE_META,
 } from "@/lib/event-types";
-import type { ProjectWithStats, EventType } from "@/lib/types";
+import type { ProjectWithStats, EventType, OrganizationMember } from "@/lib/types";
 
 export interface EventFiltersState {
   search?: string;
@@ -45,7 +45,7 @@ export interface EventFiltersState {
   projectIds?: string[];
   /** Minimum correlation confidence (0–1). Only used in "Not Assigned" mode. */
   minConfidence?: number;
-  /** Member user UUID, e.g. from a "View all" deep-link on a member's profile. */
+  /** Member user UUID — set via the User filter dropdown, or from a "View all" deep-link on a member's profile. */
   userId?: string;
   /** Display label for `userId`, shown on the filter chip. */
   userName?: string;
@@ -57,6 +57,8 @@ interface EventFiltersProps {
   tools: readonly EventsToolFilterOption[];
   /** When provided, shows a project sub-menu in the filter panel. */
   projects?: ProjectWithStats[];
+  /** When provided (non-empty), shows a User sub-menu. Caller is responsible for admin/owner gating. */
+  members?: OrganizationMember[];
   /** Node rendered to the left of the search bar (e.g. tab switcher). */
   leading?: React.ReactNode;
   /** When true, shows a Confidence sub-menu in the filter dropdown. */
@@ -148,6 +150,7 @@ export function EventFilters({
   onFiltersChange,
   tools,
   projects,
+  members,
   leading,
   trailing,
   showConfidence,
@@ -226,7 +229,7 @@ export function EventFilters({
 
   if (filters.projectIds?.length) {
     const names = filters.projectIds.map(
-      (id) => projects?.find((p) => p.id === id)?.name ?? id
+      (id) => projects?.find((p) => p.id === id)?.name ?? (id === "none" ? "No Project" : id)
     );
     chips.push({
       key: "projects",
@@ -434,6 +437,38 @@ export function EventFilters({
                       {p.name}
                     </DropdownMenuCheckboxItem>
                   ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            )}
+
+            {/* User */}
+            {!hideAdvancedFilters && members && members.length > 0 && (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="text-sm">
+                  User
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="max-h-80 overflow-y-auto">
+                  {members.map((member) => {
+                    const uid = organizationMemberUserId(member);
+                    if (!uid) return null;
+                    const label = getMemberDisplayName(member.user);
+                    return (
+                      <DropdownMenuCheckboxItem
+                        key={member.id}
+                        checked={filters.userId === uid}
+                        onSelect={(e) => e.preventDefault()}
+                        onCheckedChange={(checked) =>
+                          onFiltersChange({
+                            ...filters,
+                            userId: checked ? uid : undefined,
+                            userName: checked ? label : undefined,
+                          })
+                        }
+                      >
+                        {label}
+                      </DropdownMenuCheckboxItem>
+                    );
+                  })}
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
             )}

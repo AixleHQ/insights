@@ -46,7 +46,11 @@ vi.mock("@/components/dashboard", () => ({
   MetricCard: () => null,
   MetricGrid: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   CostTrendChart: () => null,
-  ActivityFeed: () => null,
+  ActivityFeed: (props: { viewAllTo?: string }) => (
+    <a data-testid="activity-view-all" href={props.viewAllTo}>
+      View all
+    </a>
+  ),
   TopToolsChart: () => null,
   ToolInsightsSection: () => null,
   WeeklyToolUsageChart: () => null,
@@ -132,6 +136,71 @@ describe("OrgDashboard — Recent Activity filter (AIX-523)", () => {
     await waitFor(() => {
       expect(lastStatsProjectId()).toBe("none"); // stats card filtered (already worked)
       expect(lastEventsProjectId()).toBe("none"); // Recent Activity now filtered too (the fix)
+    });
+  });
+});
+
+describe("OrgDashboard — Recent Activity 'View all' deep-link (AIX-565)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCurrentOrg = { id: "org-1", name: "Org One", slug: "org-one" };
+    setupDefaultMocks();
+    mockUseProjects.mockReturnValue({ data: [{ id: "proj-1", name: "Aixle Insights" }] });
+    // Selecting a project must not fall into the "no data for project" empty
+    // state (OrgDashboard.tsx), which would unmount ActivityFeed entirely.
+    mockUseOverviewStats.mockReturnValue({ data: { total_events: 5 }, isLoading: false, isError: false, refetch: vi.fn() });
+  });
+
+  it("includes the current month's date range but no project_id when no project is selected", () => {
+    render(<OrgDashboard />);
+    const href = screen.getByTestId("activity-view-all").getAttribute("href")!;
+    const params = new URLSearchParams(href.split("?")[1]);
+    expect(href.startsWith("/events?")).toBe(true);
+    expect(params.get("project_id")).toBeNull();
+    expect(params.get("date_from")).toMatch(/^\d{4}-\d{2}-01$/);
+    expect(params.get("date_to")).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("carries project_id=none through to the View all link after selecting No Project", async () => {
+    const user = userEvent.setup();
+    render(<OrgDashboard />);
+    const [projectFilterTrigger] = screen.getAllByRole("combobox");
+    await user.click(projectFilterTrigger);
+    await user.click(screen.getByRole("option", { name: /no project/i }));
+
+    await waitFor(() => {
+      const href = screen.getByTestId("activity-view-all").getAttribute("href")!;
+      const params = new URLSearchParams(href.split("?")[1]);
+      expect(params.get("project_id")).toBe("none");
+    });
+  });
+
+  it("carries the selected project's UUID through to the View all link", async () => {
+    const user = userEvent.setup();
+    render(<OrgDashboard />);
+    const [projectFilterTrigger] = screen.getAllByRole("combobox");
+    await user.click(projectFilterTrigger);
+    await user.click(screen.getByRole("option", { name: "Aixle Insights" }));
+
+    await waitFor(() => {
+      const href = screen.getByTestId("activity-view-all").getAttribute("href")!;
+      const params = new URLSearchParams(href.split("?")[1]);
+      expect(params.get("project_id")).toBe("proj-1");
+    });
+  });
+
+  it("omits date_from/date_to when All time is selected", async () => {
+    const user = userEvent.setup();
+    render(<OrgDashboard />);
+    const [, periodTrigger] = screen.getAllByRole("combobox");
+    await user.click(periodTrigger);
+    await user.click(screen.getByRole("option", { name: "All time" }));
+
+    await waitFor(() => {
+      const href = screen.getByTestId("activity-view-all").getAttribute("href")!;
+      const params = new URLSearchParams(href.split("?")[1]);
+      expect(params.get("date_from")).toBeNull();
+      expect(params.get("date_to")).toBeNull();
     });
   });
 });

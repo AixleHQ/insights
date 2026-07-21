@@ -34,6 +34,7 @@ import {
   useRemoveProjectMember,
   useUpdateProjectMember,
   useOrganizationMembers,
+  type ProjectMember,
 } from "@/hooks/useApi";
 import { formatCount, formatCost, formatTokens } from "@/lib/formatters";
 import {
@@ -66,6 +67,8 @@ export function ProjectMembersTab({
   const [addUserId, setAddUserId] = useState("");
   const [addRole, setAddRole] = useState("member");
   const [addError, setAddError] = useState<string | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+  const [roleError, setRoleError] = useState<string | null>(null);
 
   const { data: members = [] } = useProjectMembers(projectId);
   const { data: stats } = useProjectMemberStats(projectId, 30, isProjectOwner);
@@ -82,7 +85,7 @@ export function ProjectMembersTab({
   );
 
   const existingUserIds = useMemo(
-    () => new Set(members.map((m) => m.userId)),
+    () => new Set(members.map((m: ProjectMember) => m.userId)),
     [members]
   );
 
@@ -99,7 +102,7 @@ export function ProjectMembersTab({
     if (!search) return members;
     const q = search.toLowerCase();
     return members.filter(
-      (m) =>
+      (m: ProjectMember) =>
         m.name?.toLowerCase().includes(q) || m.email.toLowerCase().includes(q)
     );
   }, [members, search]);
@@ -133,6 +136,47 @@ export function ProjectMembersTab({
     );
   };
 
+  const handleRemoveMember = (memberId: string) => {
+    setRemoveError(null);
+    removeMember.mutate(memberId, {
+      onError: (err) => {
+        if (err instanceof ApiError && err.status === 422 && err.data) {
+          const data = err.data as { errors?: Record<string, string[]>; message?: string };
+          const messages = data.errors
+            ? Object.values(data.errors).flat()
+            : data.message
+              ? [data.message]
+              : [];
+          setRemoveError(messages.join(" ") || "Could not remove member.");
+        } else {
+          setRemoveError(err instanceof Error ? err.message : "Could not remove member.");
+        }
+      },
+    });
+  };
+
+  const handleRoleChange = (memberId: string, role: string) => {
+    setRoleError(null);
+    updateMember.mutate(
+      { id: memberId, role },
+      {
+        onError: (err) => {
+          if (err instanceof ApiError && err.status === 422 && err.data) {
+            const data = err.data as { errors?: Record<string, string[]>; message?: string };
+            const messages = data.errors
+              ? Object.values(data.errors).flat()
+              : data.message
+                ? [data.message]
+                : [];
+            setRoleError(messages.join(" ") || "Could not update role.");
+          } else {
+            setRoleError(err instanceof Error ? err.message : "Could not update role.");
+          }
+        },
+      }
+    );
+  };
+
   if (!isProjectOwner) {
     return (
       <Table>
@@ -152,7 +196,7 @@ export function ProjectMembersTab({
               </TableCell>
             </TableRow>
           )}
-          {filtered.map((m) => (
+          {filtered.map((m: ProjectMember) => (
             <TableRow
               key={m.id}
               className="group cursor-pointer border-b border-border/30 hover:bg-muted/30 transition-colors"
@@ -280,6 +324,18 @@ export function ProjectMembersTab({
         </div>
       )}
 
+      {removeError && (
+        <p className="text-sm text-destructive" role="alert">
+          {removeError}
+        </p>
+      )}
+
+      {roleError && (
+        <p className="text-sm text-destructive" role="alert">
+          {roleError}
+        </p>
+      )}
+
       <Table>
         <TableHeader>
           <TableRow className="border-b border-border/50">
@@ -300,7 +356,7 @@ export function ProjectMembersTab({
               </TableCell>
             </TableRow>
           )}
-          {filtered.map((m) => {
+          {filtered.map((m: ProjectMember) => {
             const stat = statsById.get(m.userId);
             return (
               <TableRow
@@ -325,7 +381,7 @@ export function ProjectMembersTab({
                   {canManageMembers ? (
                     <Select
                       value={m.role}
-                      onValueChange={(role) => updateMember.mutate({ id: m.id, role })}
+                      onValueChange={(role) => handleRoleChange(m.id, role)}
                     >
                       <SelectTrigger className="h-7 w-24 type-caption">
                         <SelectValue />
@@ -371,7 +427,7 @@ export function ProjectMembersTab({
                       {canManageMembers && (
                         <DropdownMenuItem
                           className="text-destructive"
-                          onClick={() => removeMember.mutate(m.id)}
+                          onClick={() => handleRemoveMember(m.id)}
                         >
                           Remove from project
                         </DropdownMenuItem>

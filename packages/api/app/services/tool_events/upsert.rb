@@ -282,6 +282,7 @@ module ToolEvents
 
         if existing
           existing.update!(mutable_attributes)
+          ToolEvents::AutoMembershipService.call(existing)
           { tool_event: existing, created: false }
         else
           normalize_event_type!

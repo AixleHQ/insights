@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { CheckSquare, Download, Loader2, RefreshCw } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useOrg } from "@/contexts/OrgContext";
-import { useEvents, useExportEvents, useProjects, useCurrentUser, useEventsSummary, queryKeys } from "@/hooks/useApi";
+import { useEvents, useExportEvents, useProjects, useCurrentUser, useEventsSummary, useOrganizationMembers, queryKeys } from "@/hooks/useApi";
 import { useEventsPageUpdates } from "@/hooks/useWebSocket";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,10 +46,9 @@ type EventsTab = "all" | "not_assigned";
 export function Events() {
   const { currentOrg, hasRole, currentRole } = useOrg();
   const { data: me, isLoading: isLoadingMe } = useCurrentUser();
-  const showNotAssignedTab =
-    Boolean(currentOrg) &&
-    (hasRole(["owner"]) ||
-      (!isLoadingMe && Boolean(me?.globalAdmin ?? me?.super_admin)));
+  const isOwnerOrPlatformAdmin =
+    hasRole(["owner"]) || (!isLoadingMe && Boolean(me?.globalAdmin ?? me?.super_admin));
+  const showNotAssignedTab = Boolean(currentOrg) && isOwnerOrPlatformAdmin;
   const [activeTab, setActiveTab] = useState<EventsTab>("all");
   const [bulkAssign, setBulkAssign] = useState<{ fn: () => void; count: number } | null>(null);
   const [assignEventFn, setAssignEventFn] = useState<((eventId: string) => void) | null>(null);
@@ -73,6 +72,9 @@ export function Events() {
       : undefined,
     userId: urlParams.get("user_id") || undefined,
     userName: urlParams.get("user_name") || undefined,
+    projectIds: urlParams.get("project_id") ? [urlParams.get("project_id")!] : undefined,
+    dateFrom: urlParams.get("date_from") || undefined,
+    dateTo: urlParams.get("date_to") || undefined,
   }));
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -84,6 +86,9 @@ export function Events() {
   const [exportError, setExportError] = useState(false);
 
   const { data: orgProjects } = useProjects(currentOrg?.id || "");
+  const { data: orgMembers } = useOrganizationMembers(currentOrg?.id || "", {
+    enabled: isOwnerOrPlatformAdmin && !!currentOrg?.id,
+  });
   const { data: eventsSummary } = useEventsSummary(currentOrg?.id || "");
 
   const toolFilterOptions = useMemo<EventsToolFilterOption[]>(() => {
@@ -221,6 +226,27 @@ export function Events() {
   const totalCount = eventsResponse?.meta?.total_count || 0;
   const hasClientSideFilters = !!filters.search;
 
+  const handleTabChange = useCallback((value: string) => {
+    const nextTab = value as EventsTab;
+    setActiveTab(nextTab);
+    setPage(1);
+
+    if (nextTab === "not_assigned") {
+      setFilters((prev) => ({
+        ...prev,
+        riskLevels: undefined,
+        eventTypes: undefined,
+        projectIds: undefined,
+        userId: undefined,
+        userName: undefined,
+      }));
+      return;
+    }
+
+    setBulkAssign(null);
+    setFilters((prev) => ({ ...prev, minConfidence: undefined }));
+  }, []);
+
   return (
     <div className="space-y-6">
       <div>
@@ -231,9 +257,9 @@ export function Events() {
       </div>
 
       {showNotAssignedTab && (
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as EventsTab)}>
+        <Tabs value={activeTab} onValueChange={handleTabChange}>
           <TabsList>
-            <TabsTrigger value="all" onClick={() => setBulkAssign(null)}>All</TabsTrigger>
+            <TabsTrigger value="all">All</TabsTrigger>
             <TabsTrigger value="not_assigned">Not Assigned</TabsTrigger>
           </TabsList>
         </Tabs>
@@ -247,6 +273,7 @@ export function Events() {
         }}
         tools={toolFilterOptions}
         projects={orgProjects}
+        members={isOwnerOrPlatformAdmin ? orgMembers : undefined}
         showConfidence={activeTab === "not_assigned"}
         hideAdvancedFilters={activeTab === "not_assigned"}
         trailing={

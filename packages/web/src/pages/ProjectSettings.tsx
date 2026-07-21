@@ -48,6 +48,7 @@ import {
 import { cn } from "@/lib/utils";
 import { isGitRemoteMissing } from "@/lib/project-git-remote";
 import { AppRoutes } from "@/lib/routes";
+import { getApiErrorMessage } from "@/lib/api";
 
 const getNavItems = (id: string, isMemberOfProject: boolean, isProjectOwner: boolean) => [
   { title: "General",          href: AppRoutes.projects.settings(id),                     icon: Building2  },
@@ -143,8 +144,8 @@ function ProjectGeneralSettingsForm({
       try {
         await deleteProject.mutateAsync(projectId);
         navigate(AppRoutes.projects.root);
-      } catch {
-        setDeleteError("Failed to delete project. Please try again.");
+      } catch (error) {
+        setDeleteError(getApiErrorMessage(error, "Failed to delete project. Please try again."));
       }
     }
   };

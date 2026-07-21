@@ -61,6 +61,18 @@ RSpec.describe 'Admin Organizations', type: :request do
       expect(Organization.find_by(id: org_id)).to be_nil
     end
 
+    context 'when the organization has retention purge logs only' do
+      it 'blocks cleanly with the unified message and raises no ReadOnlyRecord error' do
+        create(:retention_purge_log, organization: organization)
+
+        expect { delete admin_organization_path(organization) }.not_to raise_error
+
+        expect(response).to redirect_to(admin_organizations_path)
+        expect(Organization.find_by(id: organization.id)).to be_present
+        expect(flash[:error]).to eq(I18n.t("administrate.controller.destroy.blocked"))
+      end
+    end
+
     context 'when a project under the organization has a project-level retention purge log' do
       it 'does not 500 and leaves the organization intact' do
         project = create(:project, organization: organization)
@@ -70,12 +82,25 @@ RSpec.describe 'Admin Organizations', type: :request do
 
         expect(response).to redirect_to(admin_organizations_path)
         expect(Organization.find_by(id: organization.id)).to be_present
-        expect(flash[:error]).to be_present
+        expect(flash[:error]).to eq(I18n.t("administrate.controller.destroy.blocked"))
+      end
+    end
+
+    context 'when the organization has tool events and audit logs only' do
+      it 'blocks cleanly with the unified message' do
+        create(:tool_event, organization: organization)
+        create(:audit_log, organization: organization)
+
+        delete admin_organization_path(organization)
+
+        expect(response).to redirect_to(admin_organizations_path)
+        expect(Organization.find_by(id: organization.id)).to be_present
+        expect(flash[:error]).to eq(I18n.t("administrate.controller.destroy.blocked"))
       end
     end
 
     context 'when a project under the organization has tool events (nested restrict)' do
-      it 'shows a non-blank reason instead of leaving the flash message empty' do
+      it 'shows the unified reason instead of leaving the flash message empty' do
         project = create(:project, organization: organization)
         create(:tool_event, organization: organization, project: project)
 
@@ -83,7 +108,21 @@ RSpec.describe 'Admin Organizations', type: :request do
 
         expect(response).to redirect_to(admin_organizations_path)
         expect(Organization.find_by(id: organization.id)).to be_present
-        expect(flash[:error]).to be_present
+        expect(flash[:error]).to eq(I18n.t("administrate.controller.destroy.blocked"))
+      end
+    end
+
+    context 'when the organization has both retention purge logs and tool events/audit logs' do
+      it 'blocks cleanly with the same unified message' do
+        create(:retention_purge_log, organization: organization)
+        create(:tool_event, organization: organization)
+        create(:audit_log, organization: organization)
+
+        expect { delete admin_organization_path(organization) }.not_to raise_error
+
+        expect(response).to redirect_to(admin_organizations_path)
+        expect(Organization.find_by(id: organization.id)).to be_present
+        expect(flash[:error]).to eq(I18n.t("administrate.controller.destroy.blocked"))
       end
     end
   end
