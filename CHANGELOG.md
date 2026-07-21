@@ -5,6 +5,42 @@ All notable changes to DB90 are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.8] - 2026-07-21
+
+Eighth alpha release. Code-only batch from `develop` — no database migrations.
+Secret-scanner hardening, admin `/admin` auth routing, Events user filter,
+project delete/member error handling, and project overview UI polish.
+
+### Added
+- User filter sub-menu on the Events page, restricted to admin/owner
+  (`AIX-564`).
+- Auto-add event-contributing users to project members (`AIX-331`).
+
+### Changed
+- Route unauthenticated `/admin` through the app login instead of Keycloak, via
+  a route helper (`AIX-568`).
+- Drive the personal-dashboard Prompt Insights section from a runtime container
+  flag and hide it on the Member Dashboard until the scorer ships (`AIX-572`).
+- Project overview stat cards: readability, tokens, and Most Used Tool logo/type
+  treatment; add `totalTokensIn/Out` to the project stats swagger schema
+  (`AIX-131`).
+- ProjectCard interaction rework — icon, star click, dropdown navigation, and
+  click pass-through to the stretched link; navigate straight to settings from
+  the Edit menu (`AIX-135`, `AIX-578`).
+- Unify the admin org-delete block message and move it to locales
+  (`AIX-561`).
+- Rename CSV export filenames from the `db90` prefix to `Aixle Insights`
+  (`AIX-567`).
+
+### Fixed
+- Harden the secret scanner: anchored `api_key`/`openai_key` patterns, dedup
+  matches, skip structural keys, and drop `sk-` false positives (`AIX-579`).
+- Return 422 instead of 500 on project delete with dependents and surface the
+  real server error (`AIX-562`).
+- Show an error when downgrading or removing the last project owner/member
+  (`AIX-383`).
+- Deep-link Recent Activity's "View all" to the active filters (`AIX-565`).
+
 ## [1.0.0-alpha.7] - 2026-07-16
 
 Hotfix on top of `1.0.0-alpha.6`. The alpha.6 production deploy failed in the
@@ -214,6 +250,7 @@ tags cut from the same `release/1.0.0` branch.
 ### Added
 - Initial DB90 platform release cut from `develop` for production infrastructure validation.
 
+[1.0.0-alpha.8]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.8
 [1.0.0-alpha.7]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.7
 [1.0.0-alpha.6]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.6
 [1.0.0-alpha.5]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.5
