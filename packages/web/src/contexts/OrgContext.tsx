@@ -32,6 +32,7 @@ interface OrgState {
   currentOrg: Organization | null;
   organizations: Organization[];
   memberships: OrganizationMembership[];
+  hasInactiveOrganizations: boolean;
   isLoading: boolean;
   isInitialized: boolean;
   error: Error | null;
@@ -62,6 +63,7 @@ export function OrgProvider({ children, apiBaseUrl = "/api/v1" }: OrgProviderPro
     currentOrg: null,
     organizations: [],
     memberships: [],
+    hasInactiveOrganizations: false,
     isLoading: false,
     isInitialized: false,
     error: null,
@@ -75,6 +77,7 @@ export function OrgProvider({ children, apiBaseUrl = "/api/v1" }: OrgProviderPro
         currentOrg: null,
         organizations: [],
         memberships: [],
+        hasInactiveOrganizations: false,
       }));
       return;
     }
@@ -99,17 +102,21 @@ export function OrgProvider({ children, apiBaseUrl = "/api/v1" }: OrgProviderPro
       }
 
       const data = await response.json();
-      // API returns { data: Organization[], meta: {...} }
-      // Each organization includes userRole field (camelCase from API)
-      const orgsWithRoles = data.data || [];
-      const organizations: Organization[] = orgsWithRoles.map((org: Record<string, unknown>) => ({
-        id: org.id as string,
-        name: org.name as string,
-        slug: org.slug as string,
-        description: org.description as string | undefined,
-        is_active: org.isActive as boolean,
-        user_role: (org.userRole as MemberRole) || "member",
-      }));
+      // API returns { data: Organization[], meta: { ..., has_inactive_organizations: boolean } }
+      // Each organization includes userRole and isActive fields (camelCase from Alba serializer)
+      const rawOrgs: Record<string, unknown>[] = data.data ?? [];
+      const hasInactiveOrganizations: boolean =
+        (data.meta?.has_inactive_organizations as boolean) ?? false;
+      const organizations: Organization[] = rawOrgs
+        .filter((org) => org.isActive !== false)
+        .map((org) => ({
+          id: org.id as string,
+          name: org.name as string,
+          slug: org.slug as string,
+          description: org.description as string | undefined,
+          is_active: org.isActive as boolean,
+          user_role: (org.userRole as MemberRole) || "member",
+        }));
       const memberships: OrganizationMembership[] = organizations.map((org) => ({
         organization: org,
         role: org.user_role || "member",
@@ -164,6 +171,7 @@ export function OrgProvider({ children, apiBaseUrl = "/api/v1" }: OrgProviderPro
         currentOrg,
         organizations,
         memberships,
+        hasInactiveOrganizations,
         isLoading: false,
         isInitialized: true,
         error: null,
@@ -191,6 +199,7 @@ export function OrgProvider({ children, apiBaseUrl = "/api/v1" }: OrgProviderPro
         currentOrg: null,
         organizations: [],
         memberships: [],
+        hasInactiveOrganizations: false,
         isLoading: false,
         isInitialized: true,
         error: null,

@@ -22,7 +22,7 @@ export function ProtectedRoute({
 }: ProtectedRouteProps) {
   const location = useLocation();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { currentOrg, organizations, hasRole, isLoading: orgLoading, isInitialized: orgInitialized } = useOrg();
+  const { currentOrg, organizations, hasInactiveOrganizations, hasRole, isLoading: orgLoading, isInitialized: orgInitialized } = useOrg();
 
   // Show loading state - wait for auth AND org context to be initialized
   if (authLoading || (isAuthenticated && (!orgInitialized || orgLoading))) {
@@ -41,10 +41,15 @@ export function ProtectedRoute({
     return <Navigate to={AppRoutes.login} state={{ from: location }} replace />;
   }
 
-  // Redirect to onboarding if user has no organizations (unless allowNoOrg is set)
-  // Don't redirect if we're already on the onboarding page
-  if (!allowNoOrg && organizations.length === 0 && location.pathname !== AppRoutes.onboarding) {
-    return <Navigate to={AppRoutes.onboarding} state={{ from: location }} replace />;
+  // Redirect to the appropriate empty-org page (unless allowNoOrg is set)
+  // Distinguish "never had an org" (→ onboarding) from "orgs exist but all inactive" (→ no-active-organization)
+  if (!allowNoOrg && organizations.length === 0) {
+    const destination = hasInactiveOrganizations
+      ? AppRoutes.noActiveOrganization
+      : AppRoutes.onboarding;
+    if (location.pathname !== destination) {
+      return <Navigate to={destination} state={{ from: location }} replace />;
+    }
   }
 
   // Check if organization is required

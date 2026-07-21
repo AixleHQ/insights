@@ -5,11 +5,18 @@ import { ProtectedRoute } from "./ProtectedRoute";
 
 const mockHasRole = vi.fn();
 
-// Hoisted so the AuthContext mock factory can read a mutable auth state per test.
+// Hoisted so mock factories can read mutable state per test.
 const h = vi.hoisted(() => ({
   auth: { isAuthenticated: true, isLoading: false } as {
     isAuthenticated: boolean;
     isLoading: boolean;
+  },
+  org: {
+    currentOrg: { id: "org-1" } as { id: string } | null,
+    organizations: [{ id: "org-1" }] as { id: string }[],
+    hasInactiveOrganizations: false,
+    isLoading: false,
+    isInitialized: true,
   },
 }));
 
@@ -18,13 +25,7 @@ vi.mock("@/contexts/AuthContext", () => ({
 }));
 
 vi.mock("@/contexts/OrgContext", () => ({
-  useOrg: () => ({
-    currentOrg: { id: "org-1" },
-    organizations: [{ id: "org-1" }],
-    hasRole: mockHasRole,
-    isLoading: false,
-    isInitialized: true,
-  }),
+  useOrg: () => ({ ...h.org, hasRole: mockHasRole }),
 }));
 
 function renderRoute(requireRoles?: string[]) {
@@ -48,6 +49,13 @@ function renderRoute(requireRoles?: string[]) {
 describe("ProtectedRoute — authentication", () => {
   beforeEach(() => {
     h.auth = { isAuthenticated: true, isLoading: false };
+    h.org = {
+      currentOrg: { id: "org-1" },
+      organizations: [{ id: "org-1" }],
+      hasInactiveOrganizations: false,
+      isLoading: false,
+      isInitialized: true,
+    };
     mockHasRole.mockReset();
   });
 
@@ -68,6 +76,13 @@ describe("ProtectedRoute — authentication", () => {
 describe("ProtectedRoute — requireRoles", () => {
   beforeEach(() => {
     h.auth = { isAuthenticated: true, isLoading: false };
+    h.org = {
+      currentOrg: { id: "org-1" },
+      organizations: [{ id: "org-1" }],
+      hasInactiveOrganizations: false,
+      isLoading: false,
+      isInitialized: true,
+    };
     mockHasRole.mockReset();
   });
 
@@ -88,5 +103,75 @@ describe("ProtectedRoute — requireRoles", () => {
     mockHasRole.mockReturnValue(false);
     renderRoute();
     expect(screen.getByText("Manage Catalog Page")).toBeInTheDocument();
+  });
+});
+
+describe("ProtectedRoute — inactive org redirect", () => {
+  beforeEach(() => {
+    h.auth = { isAuthenticated: true, isLoading: false };
+    mockHasRole.mockReset();
+  });
+
+  it("redirects to /no-active-organization when hasInactiveOrganizations is true and no active orgs", () => {
+    h.org = {
+      currentOrg: null,
+      organizations: [],
+      hasInactiveOrganizations: true,
+      isLoading: false,
+      isInitialized: true,
+    };
+
+    render(
+      <MemoryRouter initialEntries={["/dashboard"]}>
+        <Routes>
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <div>Dashboard</div>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/no-active-organization"
+            element={<div>No Active Org Page</div>}
+          />
+          <Route path="/onboarding" element={<div>Onboarding Page</div>} />
+        </Routes>
+      </MemoryRouter>
+    );
+    expect(screen.getByText("No Active Org Page")).toBeInTheDocument();
+    expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
+  });
+
+  it("redirects to /onboarding when organizations is empty and hasInactiveOrganizations is false", () => {
+    h.org = {
+      currentOrg: null,
+      organizations: [],
+      hasInactiveOrganizations: false,
+      isLoading: false,
+      isInitialized: true,
+    };
+
+    render(
+      <MemoryRouter initialEntries={["/dashboard"]}>
+        <Routes>
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <div>Dashboard</div>
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/onboarding" element={<div>Onboarding Page</div>} />
+          <Route
+            path="/no-active-organization"
+            element={<div>No Active Org Page</div>}
+          />
+        </Routes>
+      </MemoryRouter>
+    );
+    expect(screen.getByText("Onboarding Page")).toBeInTheDocument();
   });
 });
