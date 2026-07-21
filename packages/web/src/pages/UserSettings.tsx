@@ -18,6 +18,7 @@ import {
   useRetentionPolicy,
 } from "@/hooks/useApi";
 import { formatCost, formatTokens } from "@/lib/formatters";
+import { getApiErrorMessage } from "@/lib/api";
 import { formatRetentionLabel, retentionOrder } from "@/lib/retention-utils";
 import type { UserPersonalSettings } from "@/lib/types";
 import { MemberProfileView } from "./MemberProfile";
@@ -133,7 +134,8 @@ function ProfileSection() {
       onSuccess: (res) => {
         setAvatarPreviewUrl(res.data.avatarUrl ?? "");
       },
-      onError: () => setError("Failed to upload image. Please try again."),
+      onError: (err) =>
+        setError(getApiErrorMessage(err, "Failed to upload image. Please try again.")),
     });
     e.target.value = "";
   }
