@@ -9,7 +9,7 @@ import { AppRoutes } from "@/lib/routes";
 export default function NoActiveOrganization() {
   const navigate = useNavigate();
   const { logout } = useAuth();
-  const { refreshOrganizations, setCurrentOrg } = useOrg();
+  const { refreshOrganizations } = useOrg();
   const createOrg = useCreateOrganization();
   const [orgName, setOrgName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -20,14 +20,6 @@ export default function NoActiveOrganization() {
     try {
       const result = await createOrg.mutateAsync({ name: orgName, description: "" });
       await refreshOrganizations(result.id);
-      if (result) {
-        setCurrentOrg({
-          id: result.id,
-          name: result.name,
-          slug: result.slug,
-          is_active: true,
-        });
-      }
       navigate(AppRoutes.dashboard, { replace: true });
     } catch {
       setError("Failed to create organization. Please try again.");
