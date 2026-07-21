@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { api, IMPERSONATION_EXPIRED_EVENT } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 
@@ -55,32 +55,36 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Keep a ref so expiry listeners always see the latest value without re-binding.
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
   // Keep React state in sync when api.ts removes the token on expiry.
   // api.ts detects expiry in getAuthToken() and dispatches IMPERSONATION_EXPIRED_EVENT
   // (same-tab) + removes the localStorage key (cross-tab storage event covers that case).
   useEffect(() => {
-    const clearImpersonation = () => {
+    const syncCleared = () => {
+      const wasImpersonating = stateRef.current.isImpersonating;
+      // Always sync cleared state (idempotent) so banner and identity cannot disagree.
       setState({ isImpersonating: false, impersonatorEmail: null, token: null });
-      queryClient.clear();
-    };
-
-    const handleExpiredEvent = () => {
-      if (state.isImpersonating) clearImpersonation();
-    };
-
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY && e.newValue === null && state.isImpersonating) {
-        clearImpersonation();
+      if (wasImpersonating) {
+        queryClient.clear();
       }
     };
 
-    window.addEventListener(IMPERSONATION_EXPIRED_EVENT, handleExpiredEvent);
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY && e.newValue === null) {
+        syncCleared();
+      }
+    };
+
+    window.addEventListener(IMPERSONATION_EXPIRED_EVENT, syncCleared);
     window.addEventListener("storage", handleStorage);
     return () => {
-      window.removeEventListener(IMPERSONATION_EXPIRED_EVENT, handleExpiredEvent);
+      window.removeEventListener(IMPERSONATION_EXPIRED_EVENT, syncCleared);
       window.removeEventListener("storage", handleStorage);
     };
-  }, [state.isImpersonating]);
+  }, []);
 
   // Check for impersonation token on mount
   useEffect(() => {

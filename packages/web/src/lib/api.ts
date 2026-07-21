@@ -36,20 +36,20 @@ export async function getAuthToken(): Promise<string | null> {
   // Check for impersonation token first
   const impersonationToken = localStorage.getItem(IMPERSONATION_STORAGE_KEY);
   if (impersonationToken) {
-    // Verify token isn't expired
     try {
       const parts = impersonationToken.split(".");
-      if (parts.length === 3) {
-        const payload = JSON.parse(atob(parts[1]));
-        if (payload.exp && payload.exp > Date.now() / 1000) {
-          return impersonationToken;
-        }
-        // Token expired — remove and notify ImpersonationContext to clear React state.
-        localStorage.removeItem(IMPERSONATION_STORAGE_KEY);
-        window.dispatchEvent(new CustomEvent(IMPERSONATION_EXPIRED_EVENT));
+      if (parts.length !== 3) {
+        throw new Error("Invalid token format");
       }
+      const payload = JSON.parse(atob(parts[1]));
+      if (payload.exp && payload.exp > Date.now() / 1000) {
+        return impersonationToken;
+      }
+      // Token expired — remove and notify ImpersonationContext to clear React state.
+      localStorage.removeItem(IMPERSONATION_STORAGE_KEY);
+      window.dispatchEvent(new CustomEvent(IMPERSONATION_EXPIRED_EVENT));
     } catch {
-      // Invalid token — remove and notify.
+      // Invalid / malformed token — remove and notify.
       localStorage.removeItem(IMPERSONATION_STORAGE_KEY);
       window.dispatchEvent(new CustomEvent(IMPERSONATION_EXPIRED_EVENT));
     }

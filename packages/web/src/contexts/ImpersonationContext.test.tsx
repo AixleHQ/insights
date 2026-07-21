@@ -3,6 +3,7 @@ import { renderHook, act } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { ImpersonationProvider, useImpersonation } from "./ImpersonationContext";
 import { IMPERSONATION_EXPIRED_EVENT } from "@/lib/api";
+import { queryClient } from "@/lib/queryClient";
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
@@ -88,12 +89,13 @@ describe("ImpersonationContext — IMPERSONATION_EXPIRED_EVENT (same-tab expiry 
     vi.clearAllMocks();
   });
 
-  it("clears isImpersonating when api.ts dispatches the expired event mid-session", async () => {
+  it("clears isImpersonating and flushes query cache when api.ts dispatches the expired event", async () => {
     const future = Math.floor(Date.now() / 1000) + 3600;
     localStorage.setItem(STORAGE_KEY, makeToken(future));
 
     const { result } = renderHook(() => useImpersonation(), { wrapper });
     expect(result.current.isImpersonating).toBe(true);
+    vi.mocked(queryClient.clear).mockClear();
 
     // Simulate api.ts detecting expiry during a request and dispatching the event
     act(() => {
@@ -104,11 +106,13 @@ describe("ImpersonationContext — IMPERSONATION_EXPIRED_EVENT (same-tab expiry 
     expect(result.current.isImpersonating).toBe(false);
     expect(result.current.impersonatorEmail).toBeNull();
     expect(result.current.token).toBeNull();
+    expect(queryClient.clear).toHaveBeenCalledTimes(1);
   });
 
-  it("does not error when event fires without an active impersonation session", () => {
+  it("does not error or clear cache when event fires without an active session", () => {
     const { result } = renderHook(() => useImpersonation(), { wrapper });
     expect(result.current.isImpersonating).toBe(false);
+    vi.mocked(queryClient.clear).mockClear();
 
     expect(() => {
       act(() => {
@@ -117,5 +121,36 @@ describe("ImpersonationContext — IMPERSONATION_EXPIRED_EVENT (same-tab expiry 
     }).not.toThrow();
 
     expect(result.current.isImpersonating).toBe(false);
+    expect(queryClient.clear).not.toHaveBeenCalled();
+  });
+});
+
+describe("ImpersonationContext — storage event (cross-tab expiry)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  it("clears isImpersonating and flushes query cache when another tab removes the token", () => {
+    const future = Math.floor(Date.now() / 1000) + 3600;
+    localStorage.setItem(STORAGE_KEY, makeToken(future));
+
+    const { result } = renderHook(() => useImpersonation(), { wrapper });
+    expect(result.current.isImpersonating).toBe(true);
+    vi.mocked(queryClient.clear).mockClear();
+
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent("storage", {
+          key: STORAGE_KEY,
+          newValue: null,
+          oldValue: makeToken(future),
+        }),
+      );
+    });
+
+    expect(result.current.isImpersonating).toBe(false);
+    expect(result.current.token).toBeNull();
+    expect(queryClient.clear).toHaveBeenCalledTimes(1);
   });
 });
