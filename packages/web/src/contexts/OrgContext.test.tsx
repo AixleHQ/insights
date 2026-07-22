@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { OrgProvider, useOrg } from "./OrgContext";
+import { OrgProvider, useOrg, ORG_STORAGE_KEY } from "./OrgContext";
 
 vi.mock("./AuthContext", () => ({
   useAuth: () => ({ isAuthenticated: true, isLoading: false }),
@@ -16,7 +16,6 @@ vi.mock("../lib/api", () => ({
   setCurrentOrganizationId: vi.fn(),
 }));
 
-const ORG_STORAGE_KEY = "db90_current_org_id";
 
 const ORG_A = { id: "org-a", name: "Org A", slug: "org-a", isActive: true, userRole: "owner" };
 const ORG_B = { id: "org-b", name: "Org B", slug: "org-b", isActive: true, userRole: "member" };

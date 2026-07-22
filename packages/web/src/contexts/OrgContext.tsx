@@ -47,7 +47,7 @@ interface OrgContextValue extends OrgState {
 
 const OrgContext = createContext<OrgContextValue | null>(null);
 
-const ORG_STORAGE_KEY = "db90_current_org_id";
+export const ORG_STORAGE_KEY = "db90_current_org_id";
 
 interface OrgProviderProps {
   children: ReactNode;

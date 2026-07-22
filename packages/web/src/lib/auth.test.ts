@@ -7,6 +7,7 @@ import { ErrorResponse } from "oidc-client-ts";
 const mockManager = {
   getUser: vi.fn(),
   signinSilent: vi.fn(),
+  signoutRedirect: vi.fn().mockResolvedValue(undefined),
   events: {
     addAccessTokenExpiring: vi.fn(),
     addAccessTokenExpired: vi.fn(),
@@ -31,7 +32,8 @@ vi.mock("oidc-client-ts", async () => {
 
 vi.mock("./rollbar", () => ({ reportAuthError: vi.fn() }));
 
-import { isDeadSessionError, getAccessToken } from "./auth";
+import { isDeadSessionError, getAccessToken, logout } from "./auth";
+import { ORG_STORAGE_KEY } from "../contexts/OrgContext";
 
 describe("isDeadSessionError", () => {
   it("is true for a Keycloak invalid_grant ErrorResponse (dead refresh token / code)", () => {
@@ -66,6 +68,25 @@ describe("isDeadSessionError", () => {
     expect(isDeadSessionError(null)).toBe(false);
     expect(isDeadSessionError(undefined)).toBe(false);
     expect(isDeadSessionError("invalid_grant")).toBe(false);
+  });
+});
+
+describe("logout", () => {
+  beforeEach(() => {
+    mockManager.signoutRedirect.mockReset().mockResolvedValue(undefined);
+    localStorage.clear();
+  });
+
+  it("clears stored org from localStorage before redirecting (AIX-318)", async () => {
+    localStorage.setItem(ORG_STORAGE_KEY, "org-123");
+    await logout();
+    expect(localStorage.getItem(ORG_STORAGE_KEY)).toBeNull();
+    expect(mockManager.signoutRedirect).toHaveBeenCalledOnce();
+  });
+
+  it("still calls signoutRedirect even when no org was stored", async () => {
+    await logout();
+    expect(mockManager.signoutRedirect).toHaveBeenCalledOnce();
   });
 });
 
