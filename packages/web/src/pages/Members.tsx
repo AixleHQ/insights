@@ -19,6 +19,7 @@ import {
   useRemoveMember,
   useLeaveOrganization,
   useMemberRemovalPreview,
+  type MemberRemovalPreview,
   useInvitations,
   useRevokeInvitation,
   useNotificationRoutes,
@@ -560,10 +561,7 @@ function RemovalPreviewDetails({
   isLoading,
   subject,
 }: {
-  preview?: {
-    sole_owner_projects: Array<{ id: string; name: string }>;
-    new_owner: { id: string; name: string | null; email: string } | null;
-  };
+  preview?: MemberRemovalPreview;
   isLoading: boolean;
   subject: "they" | "you";
 }) {
