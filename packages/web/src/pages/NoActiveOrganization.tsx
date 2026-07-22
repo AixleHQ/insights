@@ -18,8 +18,8 @@ export default function NoActiveOrganization() {
     e.preventDefault();
     setError(null);
     try {
-      const result = await createOrg.mutateAsync({ name: orgName, description: "" });
-      await refreshOrganizations(result.id);
+      const created = await createOrg.mutateAsync({ name: orgName.trim(), description: "" });
+      await refreshOrganizations(created.id);
       navigate(AppRoutes.dashboard, { replace: true });
     } catch {
       setError("Failed to create organization. Please try again.");

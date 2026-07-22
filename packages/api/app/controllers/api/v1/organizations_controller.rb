@@ -6,8 +6,10 @@ module Api
       before_action :set_organization, only: %i[show update destroy retention_policy update_retention_policy retention_preview settings update_setting destroy_setting]
 
       # GET /api/v1/organizations
+      # Active-only for all app JWT users (including global admins). Inactive orgs are
+      # managed via Administrate, not the user-facing API.
       def index
-        orgs = authorized_scope(Organization.all).order(:name)
+        orgs = authorized_scope(Organization.active).order(:name)
         render_collection(orgs, OrganizationSerializer)
       end
 

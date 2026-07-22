@@ -262,8 +262,11 @@ export function useCreateOrganization() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: { name: string; description?: string }) =>
-      api.post<Organization>("/organizations", data),
+    mutationFn: async (data: { name: string; description?: string }) => {
+      // API wraps the resource as `{ data: Organization }`
+      const response = await api.post<{ data: Organization }>("/organizations", data);
+      return response.data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.user.organizations });
       queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all });

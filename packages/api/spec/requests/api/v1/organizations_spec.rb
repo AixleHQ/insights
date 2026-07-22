@@ -19,15 +19,30 @@ RSpec.describe 'Api::V1::Organizations', type: :request do
       expect(json_data.map { |o| o[:id] }).not_to include(other_org.id)
     end
 
+    it 'omits inactive organizations the user belongs to' do
+      inactive_org = create(:organization, :inactive)
+      create(:organization_membership, user: user, organization: inactive_org, role: 'member')
+
+      authenticated_get '/api/v1/organizations', user: user
+
+      expect_success
+      ids = json_data.map { |o| o[:id] }
+      expect(ids).to include(organization.id)
+      expect(ids).not_to include(inactive_org.id)
+    end
+
     context 'as global admin' do
-      it 'returns all organizations' do
+      it 'returns all active organizations' do
         other_org = create(:organization)
+        inactive_org = create(:organization, :inactive)
 
         authenticated_get '/api/v1/organizations', user: admin_user
 
         expect_success
-        expect(json_data.map { |o| o[:id] }).to include(organization.id)
-        expect(json_data.map { |o| o[:id] }).to include(other_org.id)
+        ids = json_data.map { |o| o[:id] }
+        expect(ids).to include(organization.id)
+        expect(ids).to include(other_org.id)
+        expect(ids).not_to include(inactive_org.id)
       end
     end
   end
@@ -96,6 +111,32 @@ RSpec.describe 'Api::V1::Organizations', type: :request do
 
       new_org = Organization.find(json_data[:id])
       expect(new_org.organization_memberships.find_by(user: user).role).to eq('owner')
+    end
+
+    it 'allows create when the user only has inactive memberships' do
+      only_inactive_user = create(:user)
+      inactive_org = create(:organization, :inactive)
+      create(:organization_membership, user: only_inactive_user, organization: inactive_org, role: 'member')
+
+      authenticated_post '/api/v1/organizations',
+                         user: only_inactive_user,
+                         params: { name: 'Fresh Org', description: 'After inactive' }
+
+      expect_created
+      expect(json_data[:name]).to eq('Fresh Org')
+      expect(json_data[:isActive]).to eq(true)
+    end
+  end
+
+  describe 'GET /api/v1/organizations/:id/model_pricing' do
+    it 'returns 403 when the organization is inactive' do
+      inactive_org = create(:organization, :inactive)
+      create(:organization_membership, user: user, organization: inactive_org, role: 'owner')
+
+      authenticated_get "/api/v1/organizations/#{inactive_org.id}/model_pricing", user: user
+
+      expect(response).to have_http_status(:forbidden)
+      expect(json_response[:error]).to match(/inactive/i)
     end
   end
 

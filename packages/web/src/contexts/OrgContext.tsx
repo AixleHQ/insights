@@ -159,9 +159,14 @@ export function OrgProvider({ children, apiBaseUrl = "/api/v1" }: OrgProviderPro
         currentOrg = organizations[0];
       }
 
-      // Keep localStorage in sync so within-session org switches continue to work
-      if (currentOrg && currentOrg.id !== storedOrgId) {
-        localStorage.setItem(ORG_STORAGE_KEY, currentOrg.id);
+      // Keep localStorage in sync; clear stale ids when no active org remains
+      // (e.g. sole org deactivated, or stored id was inactive and filtered out).
+      if (currentOrg) {
+        if (currentOrg.id !== storedOrgId) {
+          localStorage.setItem(ORG_STORAGE_KEY, currentOrg.id);
+        }
+      } else if (storedOrgId) {
+        localStorage.removeItem(ORG_STORAGE_KEY);
       }
 
       // Update the global API client state for X-Organization-ID header

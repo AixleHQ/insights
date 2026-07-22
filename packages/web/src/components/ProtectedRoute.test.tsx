@@ -144,7 +144,7 @@ describe("ProtectedRoute — inactive org redirect", () => {
     expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
   });
 
-  it("redirects to /no-active-organization even when allowNoOrg is true and user has inactive orgs", () => {
+  it("redirects to /no-active-organization even when allowNoOrg is true on onboarding", () => {
     h.org = {
       currentOrg: null,
       organizations: [],
@@ -173,6 +173,37 @@ describe("ProtectedRoute — inactive org redirect", () => {
     );
     expect(screen.getByText("No Active Org Page")).toBeInTheDocument();
     expect(screen.queryByText("Onboarding Page")).not.toBeInTheDocument();
+  });
+
+  it("allows invitation accept when user has only inactive orgs", () => {
+    h.org = {
+      currentOrg: null,
+      organizations: [],
+      hasInactiveOrganizations: true,
+      isLoading: false,
+      isInitialized: true,
+    };
+
+    render(
+      <MemoryRouter initialEntries={["/invitations/tok-123"]}>
+        <Routes>
+          <Route
+            path="/invitations/:token"
+            element={
+              <ProtectedRoute allowNoOrg>
+                <div>Invitation Accept</div>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/no-active-organization"
+            element={<div>No Active Org Page</div>}
+          />
+        </Routes>
+      </MemoryRouter>
+    );
+    expect(screen.getByText("Invitation Accept")).toBeInTheDocument();
+    expect(screen.queryByText("No Active Org Page")).not.toBeInTheDocument();
   });
 
   it("redirects to /onboarding when organizations is empty and hasInactiveOrganizations is false", () => {

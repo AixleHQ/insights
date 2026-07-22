@@ -41,11 +41,17 @@ export function ProtectedRoute({
     return <Navigate to={AppRoutes.login} state={{ from: location }} replace />;
   }
 
-  // Redirect inactive-org users to the dedicated page regardless of allowNoOrg.
-  // This must run before the onboarding redirect so that /onboarding with inactive
-  // orgs is caught here rather than allowed through.
-  if (orgInitialized && organizations.length === 0 && hasInactiveOrganizations &&
-      location.pathname !== AppRoutes.noActiveOrganization) {
+  // Redirect inactive-only users to the dedicated page (before onboarding).
+  // Escape hatch: invitation accept must stay reachable so they can join an active org.
+  // Onboarding remains blocked — create-org lives on /no-active-organization.
+  const isInvitationPath = location.pathname.startsWith("/invitations/");
+  if (
+    orgInitialized &&
+    organizations.length === 0 &&
+    hasInactiveOrganizations &&
+    location.pathname !== AppRoutes.noActiveOrganization &&
+    !isInvitationPath
+  ) {
     return <Navigate to={AppRoutes.noActiveOrganization} replace />;
   }
 

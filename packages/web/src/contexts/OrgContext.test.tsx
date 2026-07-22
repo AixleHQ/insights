@@ -272,7 +272,31 @@ describe("OrgProvider — org selection priority", () => {
     await waitFor(() => expect(result.current.isInitialized).toBe(true));
 
     // Inactive org was filtered; localStorage id didn't match any active org
-    // → fell back to first active org
+    // → fell back to first active org and rewrote storage
     expect(result.current.currentOrg?.id).toBe("org-a");
+    expect(localStorage.getItem(ORG_STORAGE_KEY)).toBe("org-a");
+  });
+
+  it("removes localStorage org key when no active organizations remain", async () => {
+    localStorage.setItem(ORG_STORAGE_KEY, ORG_INACTIVE.id);
+
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: [],
+            meta: { has_inactive_organizations: true },
+          }),
+      } as never)
+      .mockResolvedValueOnce(makeUserResponse(null) as never);
+
+    const { result } = renderHook(() => useOrg(), { wrapper });
+
+    await waitFor(() => expect(result.current.isInitialized).toBe(true));
+
+    expect(result.current.currentOrg).toBeNull();
+    expect(result.current.hasInactiveOrganizations).toBe(true);
+    expect(localStorage.getItem(ORG_STORAGE_KEY)).toBeNull();
   });
 });

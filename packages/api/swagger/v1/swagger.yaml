@@ -66,6 +66,11 @@ paths:
   /api/v1/users/me/organizations:
     get:
       summary: Get current user's organizations
+      description: >
+        Returns the current user's active organization memberships only (`is_active: true`).
+        Inactive organizations are omitted from `data`. When the user has inactive memberships
+        but zero active ones, `meta.has_inactive_organizations` is true so the client can show
+        the no-active-organization empty state instead of onboarding.
       tags:
         - Users
       parameters:
@@ -73,7 +78,7 @@ paths:
         - $ref: '#/components/parameters/per_page'
       responses:
         '200':
-          description: User's organizations with membership info
+          description: User's active organizations with membership info
           content:
             application/json:
               schema:
@@ -294,7 +299,10 @@ paths:
   /api/v1/organizations:
     get:
       summary: List organizations
-      description: Returns organizations the current user is a member of (or all for global admins)
+      description: >
+        Returns active organizations (`is_active: true`) the current user is a member of
+        (or all active organizations for global admins). Inactive organizations are omitted;
+        manage them via Administrate. Org-scoped requests against an inactive org return 403.
       tags:
         - Organizations
       parameters:
@@ -302,7 +310,7 @@ paths:
         - $ref: '#/components/parameters/per_page'
       responses:
         '200':
-          description: Organizations list
+          description: Active organizations list
           content:
             application/json:
               schema:
@@ -579,6 +587,7 @@ paths:
   /api/v1/organizations/{id}/model_pricing:
     get:
       summary: Get model and tool pricing table
+      description: Returns 403 when the organization is inactive.
       tags:
         - Organizations
       parameters:

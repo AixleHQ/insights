@@ -23,6 +23,7 @@ module Api
 
       def set_organization
         @organization = authorized_scope(Organization.all).find(params[:id])
+        reject_inactive_organization!(@organization)
       end
     end
   end

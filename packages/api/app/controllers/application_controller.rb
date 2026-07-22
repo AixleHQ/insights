@@ -38,6 +38,7 @@ class ApplicationController < ActionController::API
 
     unless @current_organization.is_active?
       render json: { error: "Organization inactive or access denied" }, status: :forbidden
+      return
     end
   end
 
@@ -75,7 +76,7 @@ class ApplicationController < ActionController::API
   end
 
   def reject_inactive_organization!(org)
-    return unless org && !org.is_active?
+    return if org.nil? || org.is_active?
 
     render json: { error: "Organization inactive or access denied" }, status: :forbidden
   end
