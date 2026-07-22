@@ -38,7 +38,6 @@ class ApplicationController < ActionController::API
 
     unless @current_organization.is_active?
       render json: { error: "Organization inactive or access denied" }, status: :forbidden
-      return
     end
   end
 
