@@ -47,15 +47,20 @@ class OrganizationMembershipPolicy < ApplicationPolicy
     true
   end
 
-  # Only owners can remove members. Owners cannot remove themselves.
-  # The last-owner removal guard is enforced at the model layer.
+  # Owners/global admins can remove other members.
+  # Any org member may leave themselves unless they are the sole org owner
+  # (last-owner guard is also enforced at the model layer).
   def destroy?
     return true if global_admin?
-    return false unless org_owner?(record.organization)
-    return false if record.user_id == user.id
 
-    true
+    if record.user_id == user.id
+      return org_member?(record.organization) && !sole_org_owner?(record)
+    end
+
+    org_owner?(record.organization)
   end
+
+  alias_method :removal_preview?, :destroy?
 
   relation_scope do |scope|
     if global_admin?
@@ -65,5 +70,11 @@ class OrganizationMembershipPolicy < ApplicationPolicy
     else
       scope.none
     end
+  end
+
+  private
+
+  def sole_org_owner?(membership)
+    membership.owner? && membership.organization.organization_memberships.owners.count == 1
   end
 end

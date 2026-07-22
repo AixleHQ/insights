@@ -892,8 +892,13 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationError'
     delete:
-      summary: Remove organization member
-      description: Requires owner role. Owners cannot remove themselves (403). Removing the last owner returns 422 (model-level guard).
+      summary: Remove organization member or leave organization
+      description: |
+        Org owners (and global admins) can remove other members. Any org member may leave
+        themselves unless they are the sole org owner (403). Sole project ownership is
+        transferred before cleanup (admin remove → actor when they are an org member;
+        self-leave → earliest other org owner). All of the departing user's project
+        memberships on org projects are destroyed. Removing the last org owner returns 422.
       tags:
         - Organization Members
       parameters:
@@ -905,6 +910,67 @@ paths:
           description: Member removed
         '403':
           $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/members/{id}/removal_preview:
+    get:
+      summary: Preview organization membership removal
+      description: |
+        Returns sole-owner org projects that would transfer ownership on remove/leave,
+        and the proposed new owner. Authorize like DELETE (owner/admin for remove; self for leave).
+      tags:
+        - Organization Members
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Removal preview
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                properties:
+                  data:
+                    type: object
+                    required:
+                      - sole_owner_projects
+                      - new_owner
+                    properties:
+                      sole_owner_projects:
+                        type: array
+                        items:
+                          type: object
+                          required:
+                            - id
+                            - name
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            name:
+                              type: string
+                      new_owner:
+                        nullable: true
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+                          name:
+                            type: string
+                            nullable: true
+                          email:
+                            type: string
+                            format: email
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /api/v1/organizations/{organization_id}/members/{id}/stats:
     get:
