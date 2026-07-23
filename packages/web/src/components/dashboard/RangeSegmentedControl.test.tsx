@@ -10,18 +10,26 @@ const OPTIONS = [
 ] as const;
 
 describe("RangeSegmentedControl (AIX-604)", () => {
-  it("marks the active option with data-state=active", () => {
+  it("marks the active option with data-state=active and aria-checked", () => {
     render(
       <RangeSegmentedControl value="30d" options={OPTIONS} onChange={() => {}} />
     );
 
-    expect(screen.getByRole("tab", { name: "30d" })).toHaveAttribute(
+    expect(screen.getByRole("radio", { name: "30d" })).toHaveAttribute(
       "data-state",
       "active"
     );
-    expect(screen.getByRole("tab", { name: "7d" })).toHaveAttribute(
+    expect(screen.getByRole("radio", { name: "30d" })).toHaveAttribute(
+      "aria-checked",
+      "true"
+    );
+    expect(screen.getByRole("radio", { name: "7d" })).toHaveAttribute(
       "data-state",
       "inactive"
+    );
+    expect(screen.getByRole("radio", { name: "7d" })).toHaveAttribute(
+      "aria-checked",
+      "false"
     );
   });
 
@@ -32,7 +40,19 @@ describe("RangeSegmentedControl (AIX-604)", () => {
       <RangeSegmentedControl value="30d" options={OPTIONS} onChange={onChange} />
     );
 
-    await user.click(screen.getByRole("tab", { name: "7d" }));
+    await user.click(screen.getByRole("radio", { name: "7d" }));
     expect(onChange).toHaveBeenCalledWith("7d");
+  });
+
+  it("moves selection with arrow keys", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <RangeSegmentedControl value="30d" options={OPTIONS} onChange={onChange} />
+    );
+
+    screen.getByRole("radio", { name: "30d" }).focus();
+    await user.keyboard("{ArrowRight}");
+    expect(onChange).toHaveBeenCalledWith("90d");
   });
 });

@@ -41,18 +41,18 @@ describe("CostTrendChart", () => {
     const user = userEvent.setup();
     render(<CostTrendChart data={june2026ChartData()} />);
 
-    expect(screen.getByRole("tab", { name: "7 days" })).toHaveAttribute(
+    expect(screen.getByRole("radio", { name: "7 days" })).toHaveAttribute(
       "data-state",
       "active"
     );
 
-    await user.click(screen.getByRole("tab", { name: "30 days" }));
+    await user.click(screen.getByRole("radio", { name: "30 days" }));
 
-    expect(screen.getByRole("tab", { name: "30 days" })).toHaveAttribute(
+    expect(screen.getByRole("radio", { name: "30 days" })).toHaveAttribute(
       "data-state",
       "active"
     );
-    expect(screen.getByRole("tab", { name: "7 days" })).toHaveAttribute(
+    expect(screen.getByRole("radio", { name: "7 days" })).toHaveAttribute(
       "data-state",
       "inactive"
     );

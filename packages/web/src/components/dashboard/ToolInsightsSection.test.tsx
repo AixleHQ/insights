@@ -186,24 +186,24 @@ describe("ToolInsightsSection", () => {
     expect(screen.queryByRole("tab", { name: "OpenRouter" })).not.toBeInTheDocument();
   });
 
-  it("renders day range tabs (7d, 30d, 90d, 1y) with selected state (AIX-604)", () => {
+  it("renders day range radios (7d, 30d, 90d, 1y) with selected state (AIX-604)", () => {
     mockUseActiveTools.mockReturnValue(makeActiveTools([{ tool_name: "cursor", total_events: 5 }]) as never);
     setupDefaults();
     // defaultProps.days is 30
     render(<ToolInsightsSection {...defaultProps} />);
-    expect(screen.getByRole("tab", { name: "7d" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "30d" })).toHaveAttribute("data-state", "active");
-    expect(screen.getByRole("tab", { name: "90d" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "1y" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "7d" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "30d" })).toHaveAttribute("data-state", "active");
+    expect(screen.getByRole("radio", { name: "90d" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "1y" })).toBeInTheDocument();
   });
 
-  it("calls onDaysChange when day range tab is clicked", async () => {
+  it("calls onDaysChange when day range radio is clicked", async () => {
     const user = userEvent.setup();
     const onDaysChange = vi.fn();
     mockUseActiveTools.mockReturnValue(makeActiveTools([{ tool_name: "cursor", total_events: 5 }]) as never);
     setupDefaults();
     render(<ToolInsightsSection {...defaultProps} onDaysChange={onDaysChange} />);
-    await user.click(screen.getByRole("tab", { name: "7d" }));
+    await user.click(screen.getByRole("radio", { name: "7d" }));
     expect(onDaysChange).toHaveBeenCalledWith(7);
   });
 
