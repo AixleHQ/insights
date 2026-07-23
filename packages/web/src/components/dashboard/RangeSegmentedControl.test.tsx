@@ -55,4 +55,26 @@ describe("RangeSegmentedControl (AIX-604)", () => {
     await user.keyboard("{ArrowRight}");
     expect(onChange).toHaveBeenCalledWith("90d");
   });
+
+  it("moves selection on consecutive arrow key presses (roving focus)", async () => {
+    const user = userEvent.setup();
+    let current = "7d";
+    const onChange = vi.fn((v: string) => { current = v; });
+
+    const { rerender } = render(
+      <RangeSegmentedControl value={current as "7d" | "30d" | "90d"} options={OPTIONS} onChange={onChange} />
+    );
+
+    screen.getByRole("radio", { name: "7d" }).focus();
+
+    await user.keyboard("{ArrowRight}");
+    expect(onChange).toHaveBeenLastCalledWith("30d");
+
+    rerender(
+      <RangeSegmentedControl value="30d" options={OPTIONS} onChange={onChange} />
+    );
+
+    await user.keyboard("{ArrowRight}");
+    expect(onChange).toHaveBeenLastCalledWith("90d");
+  });
 });

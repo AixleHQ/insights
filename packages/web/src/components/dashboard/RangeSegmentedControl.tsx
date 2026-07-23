@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { cn } from "@/lib/utils";
 
 export type RangeOption<T extends string> = {
@@ -23,11 +24,15 @@ export function RangeSegmentedControl<T extends string>({
   className?: string;
   "aria-label"?: string;
 }) {
+  const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
   const selectByOffset = (from: T, delta: number) => {
     const idx = options.findIndex((opt) => opt.value === from);
     if (idx < 0 || options.length === 0) return;
-    const next = options[(idx + delta + options.length) % options.length];
-    onChange(next.value);
+    const nextIdx = (idx + delta + options.length) % options.length;
+    onChange(options[nextIdx].value);
+    // Move DOM focus to the newly selected button (roving tabindex requires this).
+    buttonRefs.current[nextIdx]?.focus();
   };
 
   return (
@@ -39,11 +44,12 @@ export function RangeSegmentedControl<T extends string>({
         className
       )}
     >
-      {options.map((opt) => {
+      {options.map((opt, i) => {
         const selected = opt.value === value;
         return (
           <button
             key={opt.value}
+            ref={(el) => { buttonRefs.current[i] = el; }}
             type="button"
             role="radio"
             aria-checked={selected}
