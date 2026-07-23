@@ -10,6 +10,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RangeSegmentedControl } from "@/components/dashboard/RangeSegmentedControl";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ChartContainer,
@@ -77,6 +78,11 @@ function toolLabel(slug: string): string {
 }
 
 const DAY_OPTIONS = [7, 30, 90, 365] as const;
+
+const TOOL_INSIGHTS_RANGE_OPTIONS = DAY_OPTIONS.map((d) => ({
+  value: String(d),
+  label: labelForDays(d),
+}));
 
 const PERIOD_THRESHOLDS = { month: 365, week: 60 } as const;
 
@@ -444,19 +450,12 @@ export function ToolInsightsSection({ orgId, days, onDaysChange, projectId }: To
             <RefreshCw className={`size-3 ${isRefreshing ? "animate-spin" : ""}`} />
             {isRefreshing ? "Syncing..." : "Refresh Now"}
           </Button>
-          <div className="flex gap-1">
-            {DAY_OPTIONS.map((d) => (
-              <Button
-                key={d}
-                variant={days === d ? "secondary" : "ghost"}
-                size="sm"
-                className="h-7 text-xs"
-                onClick={() => onDaysChange(d)}
-              >
-                {labelForDays(d)}
-              </Button>
-            ))}
-          </div>
+          <RangeSegmentedControl
+            value={String(days)}
+            options={TOOL_INSIGHTS_RANGE_OPTIONS}
+            onChange={(next) => onDaysChange(Number(next))}
+            aria-label="Tool insights time range"
+          />
         </div>
       </CardHeader>
       <CardContent>

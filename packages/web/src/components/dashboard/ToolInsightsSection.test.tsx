@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@/test/utils";
+import userEvent from "@testing-library/user-event";
 import { QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ToolInsightsSection } from "./ToolInsightsSection";
@@ -185,22 +186,24 @@ describe("ToolInsightsSection", () => {
     expect(screen.queryByRole("tab", { name: "OpenRouter" })).not.toBeInTheDocument();
   });
 
-  it("renders day range buttons (7d, 30d, 90d, 1y)", () => {
+  it("renders day range tabs (7d, 30d, 90d, 1y) with selected state (AIX-604)", () => {
     mockUseActiveTools.mockReturnValue(makeActiveTools([{ tool_name: "cursor", total_events: 5 }]) as never);
     setupDefaults();
+    // defaultProps.days is 30
     render(<ToolInsightsSection {...defaultProps} />);
-    expect(screen.getByRole("button", { name: "7d" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "30d" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "90d" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "1y" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "7d" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "30d" })).toHaveAttribute("data-state", "active");
+    expect(screen.getByRole("tab", { name: "90d" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "1y" })).toBeInTheDocument();
   });
 
-  it("calls onDaysChange when day button is clicked", () => {
+  it("calls onDaysChange when day range tab is clicked", async () => {
+    const user = userEvent.setup();
     const onDaysChange = vi.fn();
     mockUseActiveTools.mockReturnValue(makeActiveTools([{ tool_name: "cursor", total_events: 5 }]) as never);
     setupDefaults();
     render(<ToolInsightsSection {...defaultProps} onDaysChange={onDaysChange} />);
-    fireEvent.click(screen.getByRole("button", { name: "7d" }));
+    await user.click(screen.getByRole("tab", { name: "7d" }));
     expect(onDaysChange).toHaveBeenCalledWith(7);
   });
 
