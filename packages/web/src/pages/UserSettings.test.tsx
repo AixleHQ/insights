@@ -13,6 +13,10 @@ vi.mock("@/contexts/AuthContext", () => ({
   }),
 }));
 
+vi.mock("@/contexts/ImpersonationContext", () => ({
+  useImpersonation: () => ({ isImpersonating: false }),
+}));
+
 vi.mock("@/contexts/OrgContext", () => ({
   useOrg: () => ({
     currentOrg: { id: "test-org-id", name: "Test Org", slug: "test-org" },

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Routes, Route, Link, Navigate, useLocation } from "react-router-dom";
 import { User, Settings2, Bell, Shield, Wrench, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useOrg } from "@/contexts/OrgContext";
 import { useTheme, type Theme } from "@/contexts/ThemeContext";
 import {
@@ -79,6 +80,7 @@ function UserSettingsNav() {
 
 function ProfileSection() {
   const { profile } = useAuth();
+  const { isImpersonating } = useImpersonation();
   const { currentOrg } = useOrg();
   const { data: members, isLoading: membersLoading } = useOrganizationMembers(currentOrg?.id || "");
   const { data: currentUser } = useCurrentUser();
@@ -89,9 +91,17 @@ function ProfileSection() {
   const [avatarUrl, setAvatarUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  // During impersonation, never fall back to the admin's Keycloak profile.
+  const identityEmail = isImpersonating
+    ? currentUser?.email
+    : (currentUser?.email || profile?.email);
+  const identityName = isImpersonating
+    ? currentUser?.name
+    : (currentUser?.name || profile?.name);
+
   const myMemberId = useMemo(
-    () => members?.find((m) => m.user.email === (currentUser?.email || profile?.email))?.id,
-    [members, currentUser?.email, profile?.email]
+    () => members?.find((m) => m.user.email === identityEmail)?.id,
+    [members, identityEmail]
   );
 
   function handleEdit() {
@@ -127,7 +137,7 @@ function ProfileSection() {
     );
   }
 
-  const displayName = currentUser?.name || profile?.name || "—";
+  const displayName = identityName || "—";
   const initials = displayName !== "—" ? displayName.slice(0, 2).toUpperCase() : "?";
 
   return (
@@ -174,7 +184,7 @@ function ProfileSection() {
               </div>
               <div className="space-y-1">
                 <p className="type-label">Email</p>
-                <p className="text-sm text-muted-foreground">{currentUser?.email || profile?.email || "—"}</p>
+                <p className="text-sm text-muted-foreground">{identityEmail || "—"}</p>
               </div>
               {error && <p className="text-sm text-destructive">{error}</p>}
               <div className="flex gap-2">
@@ -201,7 +211,7 @@ function ProfileSection() {
               </div>
               <div className="space-y-1">
                 <p className="type-label">Email</p>
-                <p className="text-sm text-muted-foreground">{currentUser?.email || profile?.email || "—"}</p>
+                <p className="text-sm text-muted-foreground">{identityEmail || "—"}</p>
               </div>
             </>
           )}

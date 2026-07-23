@@ -33,14 +33,24 @@ vi.mock("@/contexts/OrgContext", () => ({
   useOrg: () => orgMock,
 }));
 
+const impersonationMock = vi.hoisted(() => ({
+  isImpersonating: false,
+}));
+
+const currentUserMock = vi.hoisted(() => ({
+  data: { name: "Test User", email: "test@example.com", avatarUrl: null } as {
+    name: string;
+    email: string;
+    avatarUrl: string | null;
+  } | undefined,
+}));
+
 vi.mock("@/contexts/ImpersonationContext", () => ({
-  useImpersonation: () => ({ isImpersonating: false }),
+  useImpersonation: () => impersonationMock,
 }));
 
 vi.mock("@/hooks/useApi", () => ({
-  useCurrentUser: () => ({
-    data: { name: "Test User", email: "test@example.com", avatarUrl: null },
-  }),
+  useCurrentUser: () => currentUserMock,
   useCreateOrganization: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
@@ -62,6 +72,12 @@ describe("AppSidebar", () => {
   beforeEach(() => {
     orgMock.currentRole = "owner";
     favoritesMock.favorites = [];
+    impersonationMock.isImpersonating = false;
+    currentUserMock.data = {
+      name: "Test User",
+      email: "test@example.com",
+      avatarUrl: null,
+    };
   });
 
   describe("owner role", () => {
@@ -189,6 +205,36 @@ describe("AppSidebar", () => {
       renderSidebar();
       await openUserMenu();
       expect(screen.queryByRole("menuitem", { name: /Settings/i })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("UserMenu during impersonation", () => {
+    it("does not fall back to admin Keycloak profile when currentUser is loading", () => {
+      impersonationMock.isImpersonating = true;
+      currentUserMock.data = undefined;
+
+      renderSidebar();
+
+      // Admin profile is "Test User" / test@example.com — must not appear while
+      // impersonating with no /users/me payload yet.
+      expect(screen.queryByText("Test User")).not.toBeInTheDocument();
+      expect(screen.queryByText("test@example.com")).not.toBeInTheDocument();
+      expect(screen.getByText("User")).toBeInTheDocument();
+    });
+
+    it("shows impersonated user from currentUser when available", () => {
+      impersonationMock.isImpersonating = true;
+      currentUserMock.data = {
+        name: "Edsger Dijkstra",
+        email: "ana@example.com",
+        avatarUrl: null,
+      };
+
+      renderSidebar();
+
+      expect(screen.getByText("Edsger Dijkstra")).toBeInTheDocument();
+      expect(screen.getByText("ana@example.com")).toBeInTheDocument();
+      expect(screen.queryByText("Test User")).not.toBeInTheDocument();
     });
   });
 });

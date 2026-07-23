@@ -1,5 +1,5 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
-import { api } from "@/lib/api";
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from "react";
+import { api, IMPERSONATION_EXPIRED_EVENT } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 
 interface ImpersonationState {
@@ -37,6 +37,7 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
       // Check if token is expired
       if (payload.exp && payload.exp < Date.now() / 1000) {
         localStorage.removeItem(STORAGE_KEY);
+        setState({ isImpersonating: false, impersonatorEmail: null, token: null });
         return;
       }
 
@@ -50,7 +51,39 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error("Failed to decode impersonation token:", error);
       localStorage.removeItem(STORAGE_KEY);
+      setState({ isImpersonating: false, impersonatorEmail: null, token: null });
     }
+  }, []);
+
+  // Keep a ref so expiry listeners always see the latest value without re-binding.
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  // Keep React state in sync when api.ts removes the token on expiry.
+  // api.ts detects expiry in getAuthToken() and dispatches IMPERSONATION_EXPIRED_EVENT
+  // (same-tab) + removes the localStorage key (cross-tab storage event covers that case).
+  useEffect(() => {
+    const syncCleared = () => {
+      const wasImpersonating = stateRef.current.isImpersonating;
+      // Always sync cleared state (idempotent) so banner and identity cannot disagree.
+      setState({ isImpersonating: false, impersonatorEmail: null, token: null });
+      if (wasImpersonating) {
+        queryClient.clear();
+      }
+    };
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY && e.newValue === null) {
+        syncCleared();
+      }
+    };
+
+    window.addEventListener(IMPERSONATION_EXPIRED_EVENT, syncCleared);
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener(IMPERSONATION_EXPIRED_EVENT, syncCleared);
+      window.removeEventListener("storage", handleStorage);
+    };
   }, []);
 
   // Check for impersonation token on mount
