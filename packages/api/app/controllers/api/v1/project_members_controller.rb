@@ -311,6 +311,7 @@ module Api
 
       def set_project
         @project = authorized_scope(Project.all).find(params[:project_id])
+        reject_inactive_organization!(@project.organization) if @project.organization_id.present?
       end
 
       def set_membership

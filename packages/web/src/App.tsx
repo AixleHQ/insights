@@ -33,6 +33,7 @@ import { OrgAlerts } from "./pages/OrgAlerts";
 import { UnattributedEvents } from "./pages/UnattributedEvents";
 import { Notifications } from "./pages/Notifications";
 import { Onboarding } from "./pages/Onboarding";
+import NoActiveOrganization from "./pages/NoActiveOrganization";
 import { InvitationAccept } from "./pages/InvitationAccept";
 import { InvitationsManagement } from "./pages/InvitationsManagement";
 import {
@@ -103,6 +104,16 @@ function App() {
                   element={
                     <ProtectedRoute allowNoOrg>
                       <Onboarding />
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* No active organization page - for users with only inactive orgs */}
+                <Route
+                  path={AppRoutes.noActiveOrganization}
+                  element={
+                    <ProtectedRoute allowNoOrg>
+                      <NoActiveOrganization />
                     </ProtectedRoute>
                   }
                 />

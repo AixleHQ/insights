@@ -10,15 +10,21 @@ module Api
       # GET /api/v1/projects
       # GET /api/v1/organizations/:organization_id/projects
       def index
-        projects = authorized_scope(Project.all)
+        scope = authorized_scope(Project.all)
 
         # Scope to organization if provided
-        if params[:organization_id].present?
-          require_organization!
-          projects = projects.where(organization_id: current_organization.id)
-        elsif params[:personal] == "true"
-          projects = projects.where(owner_id: current_user.id)
-        end
+        projects =
+          if params[:organization_id].present?
+            require_organization!
+            scope.where(organization_id: current_organization.id)
+          elsif params[:personal] == "true"
+            scope.where(owner_id: current_user.id)
+          else
+            # Exclude org-scoped projects under inactive orgs; keep personal (nil org) projects.
+            scope.where(organization_id: nil).or(
+              scope.where(organization_id: Organization.active.select(:id))
+            )
+          end
 
         projects = projects.active if params[:active] == "true"
         projects = projects.order(:name)
@@ -464,6 +470,7 @@ module Api
         scope = authorized_scope(Project.all)
         scope = scope.includes(*includes) if includes.any?
         @project = scope.find(params[:id])
+        reject_inactive_organization!(@project.organization) if @project.organization_id.present?
       end
 
       # Defense-in-depth scoping kwargs for ProjectToolEventAggregates.

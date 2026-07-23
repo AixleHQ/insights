@@ -108,6 +108,7 @@ class EventsChannel < ApplicationCable::Channel
 
   def authorized?(organization)
     return false unless current_user
+    return false unless organization.is_active?
 
     current_user.member_of?(organization) || current_user.global_admin?
   end

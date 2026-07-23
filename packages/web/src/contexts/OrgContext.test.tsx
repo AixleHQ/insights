@@ -20,11 +20,18 @@ vi.mock("../lib/api", () => ({
 const ORG_A = { id: "org-a", name: "Org A", slug: "org-a", isActive: true, userRole: "owner" };
 const ORG_B = { id: "org-b", name: "Org B", slug: "org-b", isActive: true, userRole: "member" };
 const ORG_C = { id: "org-c", name: "Org C", slug: "org-c", isActive: true, userRole: "member" };
+const ORG_INACTIVE = {
+  id: "org-inactive",
+  name: "Inactive Org",
+  slug: "inactive-org",
+  isActive: false,
+  userRole: "owner",
+};
 
-function makeOrgsResponse(orgs: typeof ORG_A[]) {
+function makeOrgsResponse(orgs: typeof ORG_A[], meta?: Record<string, unknown>) {
   return Promise.resolve({
     ok: true,
-    json: () => Promise.resolve({ data: orgs }),
+    json: () => Promise.resolve({ data: orgs, meta: meta ?? {} }),
   } as Response);
 }
 
@@ -211,5 +218,84 @@ describe("OrgProvider — org selection priority", () => {
     await result.current.refreshOrganizations(ORG_C.id);
 
     await waitFor(() => expect(result.current.currentOrg?.id).toBe(ORG_C.id));
+  });
+
+  it("filters out inactive orgs from the list", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: [ORG_A, ORG_INACTIVE],
+            meta: { has_inactive_organizations: true },
+          }),
+      } as never)
+      .mockResolvedValueOnce(makeUserResponse(null) as never);
+
+    const { result } = renderHook(() => useOrg(), { wrapper });
+
+    await waitFor(() => expect(result.current.isInitialized).toBe(true));
+
+    expect(result.current.organizations.map((o) => o.id)).toEqual(["org-a"]);
+    expect(result.current.hasInactiveOrganizations).toBe(true);
+  });
+
+  it("sets hasInactiveOrganizations false when all orgs are active", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(makeOrgsResponse([ORG_A, ORG_B]) as never)
+      .mockResolvedValueOnce(makeUserResponse(null) as never);
+
+    const { result } = renderHook(() => useOrg(), { wrapper });
+
+    await waitFor(() => expect(result.current.isInitialized).toBe(true));
+
+    expect(result.current.hasInactiveOrganizations).toBe(false);
+  });
+
+  it("clears localStorage org selection when stored org is inactive (not in active list)", async () => {
+    localStorage.setItem(ORG_STORAGE_KEY, ORG_INACTIVE.id);
+
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: [ORG_A, ORG_INACTIVE],
+            meta: { has_inactive_organizations: false },
+          }),
+      } as never)
+      .mockResolvedValueOnce(makeUserResponse(null) as never);
+
+    const { result } = renderHook(() => useOrg(), { wrapper });
+
+    await waitFor(() => expect(result.current.isInitialized).toBe(true));
+
+    // Inactive org was filtered; localStorage id didn't match any active org
+    // → fell back to first active org and rewrote storage
+    expect(result.current.currentOrg?.id).toBe("org-a");
+    expect(localStorage.getItem(ORG_STORAGE_KEY)).toBe("org-a");
+  });
+
+  it("removes localStorage org key when no active organizations remain", async () => {
+    localStorage.setItem(ORG_STORAGE_KEY, ORG_INACTIVE.id);
+
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: [],
+            meta: { has_inactive_organizations: true },
+          }),
+      } as never)
+      .mockResolvedValueOnce(makeUserResponse(null) as never);
+
+    const { result } = renderHook(() => useOrg(), { wrapper });
+
+    await waitFor(() => expect(result.current.isInitialized).toBe(true));
+
+    expect(result.current.currentOrg).toBeNull();
+    expect(result.current.hasInactiveOrganizations).toBe(true);
+    expect(localStorage.getItem(ORG_STORAGE_KEY)).toBeNull();
   });
 });

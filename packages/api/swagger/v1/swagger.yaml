@@ -66,6 +66,11 @@ paths:
   /api/v1/users/me/organizations:
     get:
       summary: Get current user's organizations
+      description: >
+        Returns the current user's active organization memberships only (`is_active: true`).
+        Inactive organizations are omitted from `data`. When the user has inactive memberships
+        but zero active ones, `meta.has_inactive_organizations` is true so the client can show
+        the no-active-organization empty state instead of onboarding.
       tags:
         - Users
       parameters:
@@ -73,7 +78,7 @@ paths:
         - $ref: '#/components/parameters/per_page'
       responses:
         '200':
-          description: User's organizations with membership info
+          description: User's active organizations with membership info
           content:
             application/json:
               schema:
@@ -84,7 +89,13 @@ paths:
                     items:
                       $ref: '#/components/schemas/OrganizationWithMembership'
                   meta:
-                    $ref: '#/components/schemas/PaginationMeta'
+                    allOf:
+                      - $ref: '#/components/schemas/PaginationMeta'
+                      - type: object
+                        properties:
+                          has_inactive_organizations:
+                            type: boolean
+                            description: True when the user has memberships in inactive organizations but zero active ones remain
 
   /api/v1/users/me/tool_accounts:
     get:
@@ -288,7 +299,10 @@ paths:
   /api/v1/organizations:
     get:
       summary: List organizations
-      description: Returns organizations the current user is a member of (or all for global admins)
+      description: >
+        Returns active organizations (`is_active: true`) the current user is a member of
+        (or all active organizations for global admins). Inactive organizations are omitted;
+        manage them via Administrate. Org-scoped requests against an inactive org return 403.
       tags:
         - Organizations
       parameters:
@@ -296,7 +310,7 @@ paths:
         - $ref: '#/components/parameters/per_page'
       responses:
         '200':
-          description: Organizations list
+          description: Active organizations list
           content:
             application/json:
               schema:
@@ -365,7 +379,10 @@ paths:
           $ref: '#/components/responses/NotFound'
     patch:
       summary: Update organization
-      description: Requires owner role in the organization
+      description: >
+        Requires owner role in the organization.
+        Returns 403 if the organization is inactive. Reactivation of inactive organizations
+        must be performed via the admin interface (Administrate).
       tags:
         - Organizations
       parameters:
@@ -570,6 +587,7 @@ paths:
   /api/v1/organizations/{id}/model_pricing:
     get:
       summary: Get model and tool pricing table
+      description: Returns 403 when the organization is inactive.
       tags:
         - Organizations
       parameters:
@@ -4114,6 +4132,8 @@ paths:
                       $ref: '#/components/schemas/ProjectMemberListItem'
                   meta:
                     $ref: '#/components/schemas/PaginationMeta'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     post:
       summary: Add project member
       description: Requires organization owner (or personal project owner) for org projects
@@ -4330,6 +4350,8 @@ paths:
                       $ref: '#/components/schemas/Repository'
                   meta:
                     $ref: '#/components/schemas/PaginationMeta'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     post:
       summary: Add repository to project
       description: Requires admin role in the project
@@ -4495,6 +4517,8 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/ProjectConnector'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     post:
       summary: Create project connector
       description: >
