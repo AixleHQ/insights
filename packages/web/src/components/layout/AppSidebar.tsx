@@ -333,7 +333,11 @@ function UserMenu() {
   const displayEmail = isImpersonating
     ? currentUser?.email
     : (currentUser?.email || profile?.email);
-  const avatarSrc = currentUser?.avatarUrl || (isImpersonating ? undefined : profile?.picture);
+    const avatarSrc = currentUser
+    ? currentUser.avatarUrl || undefined
+    : isImpersonating
+      ? undefined
+      : profile?.picture;
 
   const getInitials = (name?: string, email?: string) => {
     if (name) {

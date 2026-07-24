@@ -3,7 +3,7 @@ FactoryBot.define do
     keycloak_sub { SecureRandom.uuid }
     sequence(:email) { |n| "user#{n}@example.com" }
     name { Faker::Name.name }
-    avatar_url { Faker::Avatar.image }
+    avatar_url { nil }
     global_admin { false }
 
     trait :admin do

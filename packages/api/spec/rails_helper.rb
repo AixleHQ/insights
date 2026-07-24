@@ -26,6 +26,11 @@ RSpec.configure do |config|
 
   # Include time helpers for freeze_time
   config.include ActiveSupport::Testing::TimeHelpers
+
+  # Active Storage requires url_options to generate URLs for Disk service
+  config.before(:each, type: :request) do
+    ActiveStorage::Current.url_options = { host: 'http://www.example.com' }
+  end
 end
 
 # Shoulda Matchers

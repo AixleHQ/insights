@@ -103,10 +103,10 @@ export async function apiRequest<T = unknown>(
   const impersonating = isImpersonating();
 
   const buildHeaders = async (): Promise<HeadersInit> => {
-    const requestHeaders: HeadersInit = {
-      "Content-Type": "application/json",
-      ...headers,
-    };
+    const isFormData = fetchOptions.body instanceof FormData;
+    const requestHeaders: HeadersInit = isFormData
+      ? { ...headers }
+      : { "Content-Type": "application/json", ...headers };
 
     if (!skipAuth) {
       const token = await getAuthToken();
@@ -150,6 +150,11 @@ export async function apiRequest<T = unknown>(
       const data = await response.json().catch(() => null);
       throw new ApiError("Validation error", response.status, data);
     }
+    if (response.status === 413) {
+      // The reverse proxy rejects oversized bodies before Rails sees the request,
+      // so the response is proxy-default HTML, not JSON — data is always null here.
+      throw new ApiError("Payload too large", response.status, await response.json().catch(() => null));
+    }
 
     const errorData = await response.json().catch(() => null);
     throw new ApiError(
@@ -188,16 +193,22 @@ export class ApiError extends Error {
  * back to `fallback` when the shape doesn't match or the error isn't an ApiError.
  */
 export function getApiErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof ApiError && error.data && typeof error.data === "object") {
-    const data = error.data as { errors?: Record<string, string[]>; message?: string; error?: string };
-    if (data.errors) {
-      const messages = Object.entries(data.errors).flatMap(([field, msgs]) =>
-        (msgs ?? []).map((msg) => (field === "base" ? msg : `${field} ${msg}`))
-      );
-      if (messages.length > 0) return messages.join(". ");
+  if (error instanceof ApiError) {
+    // The reverse proxy returns its own HTML error page for 413, never a JSON body,
+    // so this must be special-cased instead of relying on error.data below.
+    if (error.status === 413) return "File is too large. Please try a smaller file.";
+
+    if (error.data && typeof error.data === "object") {
+      const data = error.data as { errors?: Record<string, string[]>; message?: string; error?: string };
+      if (data.errors) {
+        const messages = Object.entries(data.errors).flatMap(([field, msgs]) =>
+          (msgs ?? []).map((msg) => (field === "base" ? msg : `${field} ${msg}`))
+        );
+        if (messages.length > 0) return messages.join(". ");
+      }
+      if (data.message) return data.message;
+      if (data.error) return data.error;
     }
-    if (data.message) return data.message;
-    if (data.error) return data.error;
   }
   return fallback;
 }

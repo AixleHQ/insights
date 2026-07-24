@@ -374,8 +374,6 @@ CREATE VIEW _timescaledb_internal._partial_view_4 AS
     sum(cost_usd) AS total_cost
    FROM timeseries.tool_events
   GROUP BY (public.time_bucket('1 day'::interval, occurred_at)), organization_id, user_id, project_id, tool_name, event_type;
-
-
 --
 -- Name: active_storage_attachments; Type: TABLE; Schema: public; Owner: -
 --
@@ -1264,8 +1262,6 @@ CREATE VIEW timeseries.hourly_token_usage AS
     total_tokens,
     total_cost
    FROM _timescaledb_internal._materialized_hypertable_3;
-
-
 --
 -- Name: active_storage_attachments id; Type: DEFAULT; Schema: public; Owner: -
 --
@@ -1306,8 +1302,6 @@ ALTER TABLE ONLY public.connector_event_dedup ALTER COLUMN id SET DEFAULT nextva
 --
 
 ALTER TABLE ONLY public.retention_purge_logs ALTER COLUMN id SET DEFAULT nextval('public.retention_purge_logs_id_seq'::regclass);
-
-
 --
 -- Name: active_storage_attachments active_storage_attachments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
@@ -1817,13 +1811,11 @@ CREATE UNIQUE INDEX idx_user_tool_accounts_membership_tool ON public.user_tool_a
 
 CREATE INDEX index_active_storage_attachments_on_blob_id ON public.active_storage_attachments USING btree (blob_id);
 
-
 --
 -- Name: index_active_storage_attachments_uniqueness; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX index_active_storage_attachments_uniqueness ON public.active_storage_attachments USING btree (record_type, record_id, name, blob_id);
-
 
 --
 -- Name: index_active_storage_blobs_on_key; Type: INDEX; Schema: public; Owner: -
@@ -1831,13 +1823,11 @@ CREATE UNIQUE INDEX index_active_storage_attachments_uniqueness ON public.active
 
 CREATE UNIQUE INDEX index_active_storage_blobs_on_key ON public.active_storage_blobs USING btree (key);
 
-
 --
 -- Name: index_active_storage_variant_records_uniqueness; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX index_active_storage_variant_records_uniqueness ON public.active_storage_variant_records USING btree (blob_id, variation_digest);
-
 
 --
 -- Name: index_admin_audit_logs_on_admin_user_id; Type: INDEX; Schema: public; Owner: -
@@ -2932,7 +2922,6 @@ ALTER TABLE ONLY public.repositories
 ALTER TABLE ONLY public.active_storage_variant_records
     ADD CONSTRAINT fk_rails_993965df05 FOREIGN KEY (blob_id) REFERENCES public.active_storage_blobs(id);
 
-
 --
 -- Name: projects fk_rails_9aee26923d; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
@@ -2987,7 +2976,6 @@ ALTER TABLE ONLY public.export_records
 
 ALTER TABLE ONLY public.active_storage_attachments
     ADD CONSTRAINT fk_rails_c3b3935057 FOREIGN KEY (blob_id) REFERENCES public.active_storage_blobs(id);
-
 
 --
 -- Name: organization_settings fk_rails_c56e4690c0; Type: FK CONSTRAINT; Schema: public; Owner: -

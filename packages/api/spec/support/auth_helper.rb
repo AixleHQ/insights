@@ -46,6 +46,12 @@ module AuthHelper
     post path, params: params.to_json, headers: headers
   end
 
+  def authenticated_multipart_post(path, user:, organization: nil, params: {})
+    headers = auth_headers_for(user).except('Content-Type')
+    headers['X-Organization-ID'] = organization.id.to_s if organization
+    post path, params: params, headers: headers
+  end
+
   def authenticated_patch(path, user:, organization: nil, params: {})
     headers = auth_headers_for(user)
     headers['X-Organization-ID'] = organization.id.to_s if organization

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Routes, Route, Link, Navigate, useLocation } from "react-router-dom";
 import { User, Settings2, Bell, Shield, Wrench, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -9,6 +9,8 @@ import {
   useOrganizationMembers,
   useCurrentUser,
   useUpdateCurrentUser,
+  useUploadAvatar,
+  useDeleteAvatar,
   useUserOrganizations,
   useUpdateUserSetting,
   usePersonalSettings,
@@ -16,6 +18,7 @@ import {
   useRetentionPolicy,
 } from "@/hooks/useApi";
 import { formatCost, formatTokens } from "@/lib/formatters";
+import { getApiErrorMessage } from "@/lib/api";
 import { formatRetentionLabel, retentionOrder } from "@/lib/retention-utils";
 import type { UserPersonalSettings } from "@/lib/types";
 import { MemberProfileView } from "./MemberProfile";
@@ -85,10 +88,14 @@ function ProfileSection() {
   const { data: members, isLoading: membersLoading } = useOrganizationMembers(currentOrg?.id || "");
   const { data: currentUser } = useCurrentUser();
   const updateUser = useUpdateCurrentUser();
+  const uploadAvatar = useUploadAvatar();
+  const deleteAvatar = useDeleteAvatar();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarUrlInput, setAvatarUrlInput] = useState("");
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   // During impersonation, never fall back to the admin's Keycloak profile.
@@ -106,22 +113,51 @@ function ProfileSection() {
 
   function handleEdit() {
     setName(currentUser?.name ?? "");
-    setAvatarUrl(currentUser?.avatarUrl ?? "");
+    setAvatarUrlInput(currentUser?.avatarUrl ?? "");
+    setAvatarPreviewUrl(currentUser?.avatarUrl ?? "");
     setError(null);
     setIsEditing(true);
   }
 
   function handleCancel() {
     setName(currentUser?.name ?? "");
-    setAvatarUrl(currentUser?.avatarUrl ?? "");
+    setAvatarUrlInput(currentUser?.avatarUrl ?? "");
+    setAvatarPreviewUrl(currentUser?.avatarUrl ?? "");
     setError(null);
     setIsEditing(false);
   }
 
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    uploadAvatar.mutate(file, {
+      onSuccess: (res) => {
+        setAvatarPreviewUrl(res.data.avatarUrl ?? "");
+      },
+      onError: (err) =>
+        setError(getApiErrorMessage(err, "Failed to upload image. Please try again.")),
+    });
+    e.target.value = "";
+  }
+
+  function handleRemoveAvatar() {
+    if (updateUser.isPending || uploadAvatar.isPending || deleteAvatar.isPending) return;
+
+    deleteAvatar.mutate(undefined, {
+      onSuccess: () => {
+        setAvatarUrlInput("");
+        setAvatarPreviewUrl("");
+      },
+      onError: () => setError("Failed to remove avatar. Please try again."),
+    });
+  }
+
   function handleSave() {
+    if (uploadAvatar.isPending || deleteAvatar.isPending || updateUser.isPending) return;
+
     setError(null);
     updateUser.mutate(
-      { name: name || undefined, avatar_url: avatarUrl || undefined },
+      { name: name || undefined, avatar_url: avatarUrlInput || null },
       {
         onSuccess: () => setIsEditing(false),
         onError: (err: unknown) => {
@@ -159,10 +195,43 @@ function ProfileSection() {
             <>
               <div className="flex items-center gap-4">
                 <Avatar size="lg" className="size-16">
-                  <AvatarImage src={avatarUrl || undefined} />
+                  <AvatarImage src={avatarPreviewUrl || undefined} />
                   <AvatarFallback>{initials}</AvatarFallback>
                 </Avatar>
-                <p className="text-sm text-muted-foreground">Avatar preview</p>
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm text-muted-foreground">Avatar preview</p>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadAvatar.isPending || updateUser.isPending || deleteAvatar.isPending}
+                    >
+                      {uploadAvatar.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
+                      Upload image
+                    </Button>
+                    {(avatarPreviewUrl || currentUser?.avatarUrl) && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleRemoveAvatar}
+                        disabled={deleteAvatar.isPending || updateUser.isPending || uploadAvatar.isPending}
+                      >
+                        {deleteAvatar.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="display-name">Display Name</Label>
@@ -177,8 +246,12 @@ function ProfileSection() {
                 <Label htmlFor="avatar-url">Avatar URL</Label>
                 <Input
                   id="avatar-url"
-                  value={avatarUrl}
-                  onChange={(e) => setAvatarUrl(e.target.value)}
+                  value={avatarUrlInput}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setAvatarUrlInput(value);
+                    setAvatarPreviewUrl(value);
+                  }}
                   placeholder="https://example.com/avatar.png"
                 />
               </div>
@@ -188,11 +261,18 @@ function ProfileSection() {
               </div>
               {error && <p className="text-sm text-destructive">{error}</p>}
               <div className="flex gap-2">
-                <Button onClick={handleSave} disabled={updateUser.isPending}>
+                <Button
+                  onClick={handleSave}
+                  disabled={updateUser.isPending || uploadAvatar.isPending || deleteAvatar.isPending}
+                >
                   {updateUser.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
                   Save
                 </Button>
-                <Button variant="outline" onClick={handleCancel} disabled={updateUser.isPending}>
+                <Button
+                  variant="outline"
+                  onClick={handleCancel}
+                  disabled={updateUser.isPending || uploadAvatar.isPending || deleteAvatar.isPending}
+                >
                   Cancel
                 </Button>
               </div>

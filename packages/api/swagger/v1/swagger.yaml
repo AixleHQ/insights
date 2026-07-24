@@ -63,6 +63,54 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationError'
 
+  /api/v1/users/me/avatar:
+    post:
+      summary: Upload user avatar
+      tags:
+        - Users
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Avatar uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      summary: Delete user avatar
+      tags:
+        - Users
+      responses:
+        '200':
+          description: Avatar deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /api/v1/users/me/organizations:
     get:
       summary: Get current user's organizations

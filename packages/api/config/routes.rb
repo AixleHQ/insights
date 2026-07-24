@@ -41,6 +41,7 @@ Rails.application.routes.draw do
       get   "users/me/personal_settings", to: "user_personal_settings#show"
       patch "users/me/personal_settings", to: "user_personal_settings#update"
       post "users/me/stop_impersonation", to: "users#stop_impersonation"
+      resource :avatar, only: [ :create, :destroy ], controller: "user_avatars", path: "users/me/avatar"
 
       # Organization routes
       resources :organizations do
