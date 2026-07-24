@@ -25,6 +25,7 @@ const orgMock = vi.hoisted(() => ({
 
 const mockUseOrganizationMembers = vi.fn();
 const mockUseInvitations = vi.fn();
+const mockUseMemberRemovalPreview = vi.fn();
 
 vi.mock("@/contexts/OrgContext", () => ({
   useOrg: () => orgMock,
@@ -42,6 +43,7 @@ vi.mock("@/hooks/useApi", () => ({
   useUpdateMemberRole: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useRemoveMember: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useLeaveOrganization: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useMemberRemovalPreview: (...args: unknown[]) => mockUseMemberRemovalPreview(...args),
   useRevokeInvitation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useRetentionPolicy: () => ({ data: { toolEventsRetention: "90_days", costThresholdCents: null, tokenThreshold: null }, isLoading: false }),
   useUpdateRetentionPolicy: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
@@ -108,6 +110,10 @@ function renderMembers(initialEntry = "/members") {
 function setupDefaultMocks() {
   mockUseOrganizationMembers.mockReturnValue({ data: mockMembers, isLoading: false });
   mockUseInvitations.mockReturnValue({ data: [], isLoading: false });
+  mockUseMemberRemovalPreview.mockReturnValue({
+    data: { sole_owner_projects: [], new_owner: null },
+    isLoading: false,
+  });
 }
 
 describe("Members", () => {
@@ -212,6 +218,69 @@ describe("Members", () => {
       renderMembers();
 
       expect(screen.getByText(/you are the sole owner/i)).toBeInTheDocument();
+    });
+
+    it("shows sole-owner project transfer details in the remove confirmation", async () => {
+      const user = userEvent.setup();
+      mockUseMemberRemovalPreview.mockReturnValue({
+        data: {
+          sole_owner_projects: [{ id: "proj-1", name: "Alpha Project" }],
+          new_owner: { id: "user-owner", name: "Owner User", email: "owner@example.com" },
+        },
+        isLoading: false,
+      });
+
+      renderMembers();
+
+      const aliceRow = screen.getByText("Alice Member").closest("tr");
+      await user.click(aliceRow!.querySelector("button")!);
+      await user.click(screen.getByRole("menuitem", { name: /^remove$/i }));
+
+      const dialog = screen.getByRole("alertdialog");
+      expect(dialog).toHaveTextContent(/they are the sole owner of this project/i);
+      expect(dialog).toHaveTextContent("Alpha Project");
+      expect(dialog).toHaveTextContent(/Owner User will become the new owner of this project/i);
+    });
+
+    it("shows leave confirmation with project transfer details when another owner exists", async () => {
+      const user = userEvent.setup();
+      mockUseOrganizationMembers.mockReturnValue({
+        data: [
+          ...mockMembers,
+          {
+            id: "mem-owner-2",
+            organization_id: "org-1",
+            role: "owner",
+            created_at: "2024-01-02T00:00:00Z",
+            updated_at: "2024-01-02T00:00:00Z",
+            user: { id: "user-owner-2", email: "owner2@example.com", name: "Second Owner", avatarUrl: null },
+            total_events: 0,
+            total_cost: 0,
+            last_active_at: null,
+          },
+        ],
+        isLoading: false,
+      });
+      mockUseMemberRemovalPreview.mockReturnValue({
+        data: {
+          sole_owner_projects: [
+            { id: "proj-1", name: "Beta Project" },
+            { id: "proj-2", name: "Gamma Project" },
+          ],
+          new_owner: { id: "user-owner-2", name: "Second Owner", email: "owner2@example.com" },
+        },
+        isLoading: false,
+      });
+
+      renderMembers();
+
+      await user.click(screen.getByRole("button", { name: /^leave$/i }));
+
+      const dialog = screen.getByRole("alertdialog");
+      expect(dialog).toHaveTextContent(/you are the sole owner of these projects/i);
+      expect(dialog).toHaveTextContent("Beta Project");
+      expect(dialog).toHaveTextContent("Gamma Project");
+      expect(dialog).toHaveTextContent(/Second Owner will become the new owner of these projects/i);
     });
   });
 

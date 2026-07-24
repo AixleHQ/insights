@@ -18,6 +18,8 @@ import {
   useUpdateMemberRole,
   useRemoveMember,
   useLeaveOrganization,
+  useMemberRemovalPreview,
+  type MemberRemovalPreview,
   useInvitations,
   useRevokeInvitation,
   useNotificationRoutes,
@@ -354,6 +356,7 @@ export function Members() {
                   member={member}
                   currentUserEmail={profile?.email}
                   currentUserRole={currentMembership?.role}
+                  orgId={currentOrg?.id || ""}
                   ownerCount={ownerCount}
                   onRoleChange={handleRoleChange}
                   onRemove={handleRemove}
@@ -399,6 +402,7 @@ export function Members() {
 
 interface MemberTableRowProps {
   member: MemberData;
+  orgId: string;
   currentUserEmail?: string;
   currentUserRole?: MemberRole;
   ownerCount: number;
@@ -410,6 +414,7 @@ interface MemberTableRowProps {
 
 function MemberTableRow({
   member,
+  orgId,
   currentUserEmail,
   currentUserRole,
   ownerCount,
@@ -419,6 +424,11 @@ function MemberTableRow({
   onRowClick,
 }: MemberTableRowProps) {
   const [removeOpen, setRemoveOpen] = useState(false);
+  const { data: removalPreview, isLoading: previewLoading } = useMemberRemovalPreview(
+    orgId,
+    member.id,
+    removeOpen
+  );
   const isCurrentUserOwner = currentUserRole === "owner";
   const isSelf = !!currentUserEmail && member.email === currentUserEmail;
   const isLastOwner = member.role === "owner" && ownerCount === 1;
@@ -516,16 +526,25 @@ function MemberTableRow({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove {member.name || member.email}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will remove them from the organization. They will lose access to all
-              projects, events, and data. This action cannot be undone.
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p>
+                  This will remove them from the organization. They will lose access to all
+                  projects, events, and data. This action cannot be undone.
+                </p>
+                <RemovalPreviewDetails
+                  preview={removalPreview}
+                  isLoading={previewLoading}
+                  subject="they"
+                />
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => onRemove(member.id)}
-              disabled={isRemoving}
+              disabled={isRemoving || previewLoading}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Remove
@@ -534,6 +553,45 @@ function MemberTableRow({
         </AlertDialogContent>
       </AlertDialog>
     </>
+  );
+}
+
+function RemovalPreviewDetails({
+  preview,
+  isLoading,
+  subject,
+}: {
+  preview?: MemberRemovalPreview;
+  isLoading: boolean;
+  subject: "they" | "you";
+}) {
+  if (isLoading) {
+    return <p>Checking project ownership…</p>;
+  }
+
+  const projects = preview?.sole_owner_projects ?? [];
+  if (projects.length === 0) return null;
+
+  const newOwnerLabel =
+    preview?.new_owner?.name || preview?.new_owner?.email || "another organization owner";
+  const soleOwnerLead =
+    subject === "you"
+      ? `You are the sole owner of ${projects.length === 1 ? "this project" : "these projects"}:`
+      : `They are the sole owner of ${projects.length === 1 ? "this project" : "these projects"}:`;
+
+  return (
+    <div className="rounded-md border border-border bg-muted/40 p-3 text-foreground">
+      <p className="font-medium">{soleOwnerLead}</p>
+      <ul className="mt-2 list-disc space-y-1 pl-5">
+        {projects.map((project) => (
+          <li key={project.id}>{project.name}</li>
+        ))}
+      </ul>
+      <p className="mt-2">
+        <span className="font-medium">{newOwnerLabel}</span> will become the new owner
+        {projects.length === 1 ? " of this project" : " of these projects"}.
+      </p>
+    </div>
   );
 }
 
@@ -612,9 +670,16 @@ function LeaveOrganizationSection({
   onLeave,
   isLeaving,
 }: LeaveOrganizationSectionProps) {
+  const [leaveOpen, setLeaveOpen] = useState(false);
+  const currentUserMember = members.find((m) => m.email === currentUserEmail);
+  const { data: removalPreview, isLoading: previewLoading } = useMemberRemovalPreview(
+    currentOrg?.id || "",
+    currentUserMember?.id || "",
+    leaveOpen
+  );
+
   if (!currentOrg || !currentMembership) return null;
 
-  const currentUserMember = members.find((m) => m.email === currentUserEmail);
   const owners = members.filter((m) => m.role === "owner");
   const isSoleOwner = currentMembership.role === "owner" && owners.length === 1;
 
@@ -643,7 +708,7 @@ function LeaveOrganizationSection({
               : " You will need to create or join another organization."}
           </p>
         </div>
-        <AlertDialog>
+        <AlertDialog open={leaveOpen} onOpenChange={setLeaveOpen}>
           <AlertDialogTrigger asChild>
             <Button variant="destructive" size="sm" disabled={isLeaving || !currentUserMember}>
               <LogOut className="mr-2 size-4" />
@@ -653,15 +718,25 @@ function LeaveOrganizationSection({
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Leave {currentOrg.name}?</AlertDialogTitle>
-              <AlertDialogDescription>
-                You will lose access to all projects, events, and data in this organization.
-                This action cannot be undone. You will need to be invited again to rejoin.
+              <AlertDialogDescription asChild>
+                <div className="space-y-3 text-sm text-muted-foreground">
+                  <p>
+                    You will lose access to all projects, events, and data in this organization.
+                    This action cannot be undone. You will need to be invited again to rejoin.
+                  </p>
+                  <RemovalPreviewDetails
+                    preview={removalPreview}
+                    isLoading={previewLoading}
+                    subject="you"
+                  />
+                </div>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => currentUserMember && onLeave(currentUserMember.id)}
+                disabled={isLeaving || previewLoading}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
                 Leave Organization

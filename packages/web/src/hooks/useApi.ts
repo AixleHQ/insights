@@ -95,6 +95,8 @@ export const queryKeys = {
       ["organizations", orgId, "members", userId, "heatmap", clientTimezone] as const,
     promptInsights: (orgId: string, userId: string, period: string) =>
       ["organizations", orgId, "members", userId, "prompt_insights", period] as const,
+    removalPreview: (orgId: string, id: string) =>
+      ["organizations", orgId, "members", id, "removal_preview"] as const,
   },
   projects: {
     all: (orgId: string) => ["organizations", orgId, "projects"] as const,
@@ -322,9 +324,10 @@ export function useLeaveOrganization() {
   return useMutation({
     mutationFn: ({ orgId, memberId }: { orgId: string; memberId: string }) =>
       api.delete(`/organizations/${orgId}/members/${memberId}`),
-    onSuccess: () => {
+    onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.user.organizations });
       queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects.all(orgId) });
     },
   });
 }
@@ -542,7 +545,26 @@ export function useRemoveMember() {
       api.delete(`/organizations/${orgId}/members/${memberId}`),
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.members.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects.all(orgId) });
     },
+  });
+}
+
+export interface MemberRemovalPreview {
+  sole_owner_projects: Array<{ id: string; name: string }>;
+  new_owner: { id: string; name: string | null; email: string } | null;
+}
+
+export function useMemberRemovalPreview(orgId: string, memberId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.members.removalPreview(orgId, memberId),
+    queryFn: async () => {
+      const response = await api.get<{ data: MemberRemovalPreview }>(
+        `/organizations/${orgId}/members/${memberId}/removal_preview`
+      );
+      return response.data;
+    },
+    enabled: !!orgId && !!memberId && enabled,
   });
 }
 
