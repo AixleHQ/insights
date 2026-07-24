@@ -709,6 +709,12 @@ export type ExportReportType =
   | "token_by_tool";
 export type ExportFrequency = "daily" | "weekly" | "monthly";
 
+export interface ExportUser {
+  id: string;
+  name: string | null;
+  email: string;
+}
+
 export interface ExportRecord {
   id: string;
   organizationId: string;
@@ -718,6 +724,7 @@ export interface ExportRecord {
   status: ExportStatus;
   rowCount: number | null;
   fileSizeBytes: number | null;
+  createdBy: ExportUser | null;
   downloadUrl: string | null;
   expiresAt: string | null;
   createdAt: string;

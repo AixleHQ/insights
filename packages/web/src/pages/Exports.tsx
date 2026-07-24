@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Download, Loader2, Plus, Trash2, Pencil, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
+import { Download, Loader2, Plus, Trash2, Pencil, AlertCircle, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { useOrg } from "@/contexts/OrgContext";
 import {
   useExportRecords,
@@ -10,6 +11,7 @@ import {
   useUpdateScheduledExport,
   useDeleteScheduledExport,
 } from "@/hooks/useApi";
+import { getApiErrorMessage } from "@/lib/api";
 import type {
   ExportRecord,
   ExportReportType,
@@ -82,17 +84,72 @@ const FREQUENCY_LABELS: Record<ExportFrequency, string> = {
   monthly: "Monthly",
 };
 
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function isExpired(record: ExportRecord): boolean {
+  if (!record.expiresAt) return false;
+  return new Date(record.expiresAt) < new Date();
+}
+
+// ── Pagination Footer ────────────────────────────────────────────────────────
+
+type PaginationFooterProps = {
+  currentPage: number;
+  totalPages: number;
+  totalCount: number;
+  noun: string;
+  onPageChange: (page: number) => void;
+};
+
+function PaginationFooter({ currentPage, totalPages, totalCount, noun, onPageChange }: PaginationFooterProps) {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="flex items-center justify-between border-t px-2 py-3 mt-2">
+      <p className="text-sm text-muted-foreground">
+        Page {currentPage} of {totalPages} ({totalCount} {noun})
+      </p>
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={currentPage <= 1}
+          onClick={() => onPageChange(currentPage - 1)}
+        >
+          <ChevronLeft className="size-4" />
+          Previous
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={currentPage >= totalPages}
+          onClick={() => onPageChange(currentPage + 1)}
+        >
+          Next
+          <ChevronRight className="size-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ── Status Badge ─────────────────────────────────────────────────────────────
 
-type StatusBadgeProps = { status: ExportRecord["status"] };
+type StatusBadgeProps = { status: ExportRecord["status"]; expired?: boolean };
 
-function StatusBadge({ status }: StatusBadgeProps) {
+function StatusBadge({ status, expired = false }: StatusBadgeProps) {
   const config: Record<ExportRecord["status"], { label: string; variant: "secondary" | "outline" | "default" | "destructive" }> = {
     pending:    { label: "Pending",    variant: "secondary" },
     generating: { label: "Generating", variant: "outline" },
     ready:      { label: "Ready",      variant: "default" },
     failed:     { label: "Failed",     variant: "destructive" },
   };
+
+  if (expired && status === "ready") {
+    return <Badge variant="outline" className="text-muted-foreground">Expired</Badge>;
+  }
+
   const { label, variant } = config[status];
   return (
     <Badge variant={variant} className="gap-1">
@@ -105,9 +162,12 @@ function StatusBadge({ status }: StatusBadgeProps) {
 // ── History Tab ──────────────────────────────────────────────────────────────
 
 function HistoryTab({ orgId }: { orgId: string }) {
-  const { data: records, isLoading } = useExportRecords(orgId);
+  const [page, setPage] = useState(1);
+  const { data, isLoading } = useExportRecords(orgId, page);
+  const records = data?.data;
+  const meta = data?.meta;
 
-  if (isLoading) {
+  if (isLoading && !data) {
     return (
       <div className="space-y-2">
         {Array.from({ length: 4 }).map((_, i) => (
@@ -127,72 +187,77 @@ function HistoryTab({ orgId }: { orgId: string }) {
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Report Type</TableHead>
-          <TableHead>Format</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead className="text-right">Rows</TableHead>
-          <TableHead className="text-right">Size</TableHead>
-          <TableHead>Expires</TableHead>
-          <TableHead>Created</TableHead>
-          <TableHead className="text-right">Download</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {records.map((record) => {
-          const isDownloadable = record.status === "ready" && !isExpired(record) && !!record.downloadUrl;
-          return (
-            <TableRow key={record.id}>
-              <TableCell className="font-medium">
-                {REPORT_TYPE_LABELS[record.reportType]}
-              </TableCell>
-              <TableCell className="uppercase text-xs">{record.format}</TableCell>
-              <TableCell><StatusBadge status={record.status} /></TableCell>
-              <TableCell className="text-right font-mono text-sm">
-                {record.rowCount ?? "—"}
-              </TableCell>
-              <TableCell className="text-right font-mono text-sm">
-                {formatFileSize(record.fileSizeBytes)}
-              </TableCell>
-              <TableCell className="text-sm text-muted-foreground">
-                {isExpired(record) ? (
-                  <span className="text-destructive">Expired</span>
-                ) : (
-                  formatDateTime(record.expiresAt)
-                )}
-              </TableCell>
-              <TableCell className="text-sm text-muted-foreground">
-                {formatDateTime(record.createdAt)}
-              </TableCell>
-              <TableCell className="text-right">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!isDownloadable}
-                  asChild={isDownloadable}
-                >
-                  {isDownloadable ? (
-                    <a href={record.downloadUrl!} download>
-                      <Download className="h-4 w-4" />
-                    </a>
-                  ) : (
-                    <span><Download className="h-4 w-4" /></span>
-                  )}
-                </Button>
-              </TableCell>
-            </TableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
+    <>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Report Type</TableHead>
+            <TableHead>Format</TableHead>
+            <TableHead>Date Range</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="text-right">Rows</TableHead>
+            <TableHead className="text-right">Size</TableHead>
+            <TableHead>Created By</TableHead>
+            <TableHead>Expires</TableHead>
+            <TableHead className="text-right">Download</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {records.map((record) => {
+            const expired = isExpired(record);
+            const isDownloadable = record.status === "ready" && !expired && !!record.downloadUrl;
+            return (
+              <TableRow key={record.id}>
+                <TableCell className="font-medium">
+                  {REPORT_TYPE_LABELS[record.reportType]}
+                </TableCell>
+                <TableCell className="uppercase text-xs">{record.format}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">All time</TableCell>
+                <TableCell><StatusBadge status={record.status} expired={expired} /></TableCell>
+                <TableCell className="text-right font-mono text-sm">
+                  {record.rowCount ?? "—"}
+                </TableCell>
+                <TableCell className="text-right font-mono text-sm">
+                  {formatFileSize(record.fileSizeBytes)}
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {record.createdBy?.name || record.createdBy?.email || "—"}
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {record.expiresAt ? formatDateTime(record.expiresAt) : "—"}
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!isDownloadable}
+                    asChild={isDownloadable}
+                  >
+                    {isDownloadable ? (
+                      <a href={record.downloadUrl!} download>
+                        <Download className="h-4 w-4" />
+                      </a>
+                    ) : (
+                      <span><Download className="h-4 w-4" /></span>
+                    )}
+                  </Button>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+      {meta && (
+        <PaginationFooter
+          currentPage={meta.current_page}
+          totalPages={meta.total_pages}
+          totalCount={meta.total_count}
+          noun="exports"
+          onPageChange={setPage}
+        />
+      )}
+    </>
   );
-}
-
-function isExpired(record: ExportRecord): boolean {
-  if (!record.expiresAt) return false;
-  return new Date(record.expiresAt) < new Date();
 }
 
 // ── Schedule Form Sheet ──────────────────────────────────────────────────────
@@ -212,29 +277,79 @@ function ScheduleFormSheet({ open, onClose, orgId, existing }: ScheduleFormProps
   const [reportType, setReportType] = useState<ExportReportType>(existing?.reportType ?? "cost_by_tool");
   const [format, setFormat]         = useState<ExportFormat>(existing?.format ?? "csv");
   const [frequency, setFrequency]   = useState<ExportFrequency>(existing?.frequency ?? "daily");
-  const [dayOfWeek, setDayOfWeek]   = useState<string>(String(existing?.dayOfWeek ?? "1"));
-  const [dayOfMonth, setDayOfMonth] = useState<string>(String(existing?.dayOfMonth ?? "1"));
-  const [recipients, setRecipients] = useState<string>(existing?.recipients.join(", ") ?? "");
+  const [dayOfWeek, setDayOfWeek]   = useState<string>(String(existing?.dayOfWeek ?? 1));
+  const [dayOfMonth, setDayOfMonth] = useState<string>(String(existing?.dayOfMonth ?? 1));
+  const [recipients, setRecipients] = useState<string[]>(existing?.recipients ?? []);
+  const [recipientInput, setRecipientInput] = useState<string>("");
+  const [recipientError, setRecipientError] = useState<string | null>(null);
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
+  function addRecipient(raw: string): boolean {
+    const email = raw.trim().replace(/,$/, "").trim();
+    if (!email) return false;
+    if (!isValidEmail(email)) {
+      setRecipientError(`"${email}" is not a valid email address`);
+      return false;
+    }
+    if (recipients.some((r) => r.toLowerCase() === email.toLowerCase())) {
+      setRecipientError(`"${email}" is already added`);
+      return false;
+    }
+    setRecipients((prev) => [...prev, email]);
+    setRecipientInput("");
+    setRecipientError(null);
+    return true;
+  }
+
+  function handleRecipientKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" || e.key === "," || e.key === " ") {
+      e.preventDefault();
+      addRecipient(recipientInput);
+    } else if (e.key === "Backspace" && !recipientInput && recipients.length) {
+      setRecipients((prev) => prev.slice(0, -1));
+    }
+  }
+
+  function removeRecipient(email: string) {
+    setRecipients((prev) => prev.filter((r) => r !== email));
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const recipientList = recipients.split(",").map((r) => r.trim()).filter(Boolean);
+
+    // Fold any half-typed address in the input into the list before submitting.
+    let finalRecipients = recipients;
+    if (recipientInput.trim()) {
+      const pending = recipientInput.trim();
+      if (!isValidEmail(pending)) {
+        setRecipientError(`"${pending}" is not a valid email address`);
+        return;
+      }
+      finalRecipients = [...recipients, pending];
+    }
+
+    if (finalRecipients.length === 0) {
+      setRecipientError("At least one recipient is required");
+      return;
+    }
 
     const payload = {
       report_type: reportType,
       format,
       frequency,
-      recipients: recipientList,
+      recipients: finalRecipients,
       day_of_week:  frequency === "weekly"  ? parseInt(dayOfWeek)  : null,
       day_of_month: frequency === "monthly" ? parseInt(dayOfMonth) : null,
     };
 
+    const onError = (error: unknown) =>
+      toast.error(getApiErrorMessage(error, "Failed to save schedule. Please try again."));
+
     if (isEditing) {
-      updateMutation.mutate({ id: existing!.id, ...payload }, { onSuccess: onClose });
+      updateMutation.mutate({ id: existing!.id, ...payload }, { onSuccess: onClose, onError });
     } else {
-      createMutation.mutate(payload, { onSuccess: onClose });
+      createMutation.mutate(payload, { onSuccess: onClose, onError });
     }
   }
 
@@ -309,13 +424,38 @@ function ScheduleFormSheet({ open, onClose, orgId, existing }: ScheduleFormProps
           )}
 
           <div className="space-y-1">
-            <Label>Recipients (comma-separated emails)</Label>
-            <Input
-              type="text"
-              placeholder="alice@example.com, bob@example.com"
-              value={recipients}
-              onChange={(e) => setRecipients(e.target.value)}
-            />
+            <Label>Recipients</Label>
+            <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-input bg-transparent px-2 py-1.5 focus-within:ring-1 focus-within:ring-ring">
+              {recipients.map((email) => (
+                <Badge key={email} variant="secondary" className="gap-1 pr-1">
+                  {email}
+                  <button
+                    type="button"
+                    onClick={() => removeRecipient(email)}
+                    className="ml-0.5 rounded-sm hover:bg-muted-foreground/20"
+                    aria-label={`Remove ${email}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+              <input
+                type="text"
+                className="flex-1 min-w-[8rem] bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                placeholder={recipients.length ? "" : "alice@example.com"}
+                value={recipientInput}
+                onChange={(e) => { setRecipientInput(e.target.value); setRecipientError(null); }}
+                onKeyDown={handleRecipientKeyDown}
+                onBlur={() => recipientInput.trim() && addRecipient(recipientInput)}
+              />
+            </div>
+            {recipientError ? (
+              <p className="text-xs text-destructive">{recipientError}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Type an email and press Enter or comma to add it.
+              </p>
+            )}
           </div>
 
           <SheetFooter>
@@ -334,7 +474,10 @@ function ScheduleFormSheet({ open, onClose, orgId, existing }: ScheduleFormProps
 // ── Scheduled Tab ────────────────────────────────────────────────────────────
 
 function ScheduledTab({ orgId }: { orgId: string }) {
-  const { data: schedules, isLoading } = useScheduledExports(orgId);
+  const [page, setPage] = useState(1);
+  const { data, isLoading } = useScheduledExports(orgId, page);
+  const schedules = data?.data;
+  const meta = data?.meta;
   const updateMutation = useUpdateScheduledExport(orgId);
   const deleteMutation = useDeleteScheduledExport(orgId);
 
@@ -342,7 +485,7 @@ function ScheduledTab({ orgId }: { orgId: string }) {
   const [editTarget, setEditTarget]             = useState<ScheduledExport | undefined>();
   const [deleteTarget, setDeleteTarget]         = useState<ScheduledExport | undefined>();
 
-  if (isLoading) {
+  if (isLoading && !data) {
     return (
       <div className="space-y-2">
         {Array.from({ length: 3 }).map((_, i) => (
@@ -384,7 +527,12 @@ function ScheduledTab({ orgId }: { orgId: string }) {
                 <div className="flex items-center gap-3">
                   <Switch
                     checked={s.active}
-                    onCheckedChange={(checked) => updateMutation.mutate({ id: s.id, active: checked })}
+                    onCheckedChange={(checked) =>
+                      updateMutation.mutate(
+                        { id: s.id, active: checked },
+                        { onError: (error) => toast.error(getApiErrorMessage(error, "Failed to update schedule.")) }
+                      )
+                    }
                   />
                   <Button variant="ghost" size="icon" onClick={() => { setEditTarget(s); setSheetOpen(true); }}>
                     <Pencil className="h-4 w-4" />
@@ -399,12 +547,25 @@ function ScheduledTab({ orgId }: { orgId: string }) {
         </div>
       )}
 
-      <ScheduleFormSheet
-        open={sheetOpen}
-        onClose={() => setSheetOpen(false)}
-        orgId={orgId}
-        existing={editTarget}
-      />
+      {meta && (
+        <PaginationFooter
+          currentPage={meta.current_page}
+          totalPages={meta.total_pages}
+          totalCount={meta.total_count}
+          noun="schedules"
+          onPageChange={setPage}
+        />
+      )}
+
+      {sheetOpen && (
+        <ScheduleFormSheet
+          key={editTarget?.id ?? "new"}
+          open={sheetOpen}
+          onClose={() => setSheetOpen(false)}
+          orgId={orgId}
+          existing={editTarget}
+        />
+      )}
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(undefined)}>
         <AlertDialogContent>
@@ -420,7 +581,10 @@ function ScheduledTab({ orgId }: { orgId: string }) {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
                 if (deleteTarget) {
-                  deleteMutation.mutate(deleteTarget.id, { onSuccess: () => setDeleteTarget(undefined) });
+                  deleteMutation.mutate(deleteTarget.id, {
+                    onSuccess: () => setDeleteTarget(undefined),
+                    onError: (error) => toast.error(getApiErrorMessage(error, "Failed to delete schedule.")),
+                  });
                 }
               }}
             >
@@ -447,6 +611,8 @@ function OnDemandTab({ orgId, onExportCreated }: { orgId: string; onExportCreate
         onSuccess: () => {
           onExportCreated();
         },
+        onError: (error) =>
+          toast.error(getApiErrorMessage(error, "Failed to queue export. Please try again.")),
       }
     );
   }

@@ -8370,6 +8370,18 @@ components:
         fileSizeBytes:
           type: integer
           nullable: true
+        createdBy:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+              nullable: true
+            email:
+              type: string
         downloadUrl:
           type: string
           format: uri

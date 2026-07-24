@@ -4,6 +4,16 @@ class ExportRecordSerializer < BaseSerializer
   attributes :id, :organization_id, :report_type, :format, :frequency, :status,
              :row_count, :file_size_bytes
 
+  attribute :created_by do |record|
+    if record.created_by
+      {
+        id:    record.created_by.id,
+        name:  record.created_by.name,
+        email: record.created_by.email
+      }
+    end
+  end
+
   attribute :download_url do |record|
     next nil unless record.status == "ready" && !record.expired? && record.file.attached?
 

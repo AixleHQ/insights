@@ -2545,21 +2545,22 @@ export function useUpdateOrgProviderSetting(orgId: string) {
 
 // ── Export Records ──────────────────────────────────────────────────────────
 
-export function useExportRecords(orgId: string) {
+export function useExportRecords(orgId: string, page = 1) {
   return useQuery({
-    queryKey: ["organizations", orgId, "export_records"],
+    queryKey: ["organizations", orgId, "export_records", page],
     queryFn: async () => {
-      const response = await api.get<{ data: ExportRecord[] }>(
-        `/organizations/${orgId}/export_records`
+      const params = new URLSearchParams({ page: String(page) });
+      return api.get<PaginatedResponse<ExportRecord>>(
+        `/organizations/${orgId}/export_records?${params}`
       );
-      return response.data;
     },
     enabled: !!orgId,
+    placeholderData: (prev) => prev,
     // Poll every 3 seconds while any record is pending or generating
     refetchInterval: (query) => {
-      const data = query.state.data as ExportRecord[] | undefined;
-      if (!data?.length) return false;
-      return data.some((r) => r.status === "pending" || r.status === "generating") ? 3_000 : false;
+      const data = query.state.data as PaginatedResponse<ExportRecord> | undefined;
+      if (!data?.data.length) return false;
+      return data.data.some((r) => r.status === "pending" || r.status === "generating") ? 3_000 : false;
     },
   });
 }
@@ -2582,16 +2583,17 @@ export function useCreateExportRecord(orgId: string) {
 
 // ── Scheduled Exports ───────────────────────────────────────────────────────
 
-export function useScheduledExports(orgId: string) {
+export function useScheduledExports(orgId: string, page = 1) {
   return useQuery({
-    queryKey: ["organizations", orgId, "scheduled_exports"],
+    queryKey: ["organizations", orgId, "scheduled_exports", page],
     queryFn: async () => {
-      const response = await api.get<{ data: ScheduledExport[] }>(
-        `/organizations/${orgId}/scheduled_exports`
+      const params = new URLSearchParams({ page: String(page) });
+      return api.get<PaginatedResponse<ScheduledExport>>(
+        `/organizations/${orgId}/scheduled_exports?${params}`
       );
-      return response.data;
     },
     enabled: !!orgId,
+    placeholderData: (prev) => prev,
   });
 }
 
