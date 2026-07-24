@@ -29,6 +29,10 @@
 
 en:
   hello: "Hello world"
+  errors:
+    user_avatars:
+      file_required: "file is required"
+      invalid_file: "file must be jpeg, png, gif, or webp and up to 5MB"
   activerecord:
     attributes:
       audit_log:

@@ -4,8 +4,6 @@ module Api
   module V1
     class UsersController < BaseController
       ALLOWED_THEMES = %w[light dark system].freeze
-      ALLOWED_AVATAR_CONTENT_TYPES = %w[image/jpeg image/png image/gif image/webp].freeze
-      MAX_AVATAR_FILE_SIZE = 5.megabytes
       NOTIFICATION_KEYS = %w[
         notify_in_app_risk notify_in_app_cost
         notify_email_digest notify_email_alerts
@@ -153,35 +151,6 @@ module Api
         render_no_content
       end
 
-      # POST /api/v1/users/me/avatar
-      def upload_avatar
-        authorize! current_user, to: :update?
-
-        unless params[:file].present?
-          return render json: { error: "file is required" }, status: :unprocessable_content
-        end
-        unless valid_avatar_file?(params[:file])
-          return render json: { error: "file must be jpeg, png, gif, or webp and up to 5MB" },
-                        status: :unprocessable_content
-        end
-
-        current_user.avatar_file.purge if current_user.avatar_file.attached?
-        current_user.avatar_file.attach(params[:file])
-        current_user.user_settings.load
-        render_resource(current_user, UserSerializer)
-      end
-
-      # DELETE /api/v1/users/me/avatar
-      def destroy_avatar
-        authorize! current_user, to: :update?
-
-        had_file = current_user.avatar_file.attached?
-        current_user.avatar_file.purge if had_file
-        current_user.update!(avatar_url: nil) if had_file
-        current_user.user_settings.load
-        render_resource(current_user, UserSerializer)
-      end
-
       # POST /api/v1/users/me/stop_impersonation
       def stop_impersonation
         authorize! current_user, to: :stop_impersonation?
@@ -222,10 +191,6 @@ module Api
         when *NOTIFICATION_KEYS
           "must be true or false" unless %w[true false].include?(value)
         end
-      end
-
-      def valid_avatar_file?(file)
-        file.content_type.in?(ALLOWED_AVATAR_CONTENT_TYPES) && file.size <= MAX_AVATAR_FILE_SIZE
       end
     end
   end
