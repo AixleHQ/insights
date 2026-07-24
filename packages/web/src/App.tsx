@@ -44,6 +44,7 @@ import {
   WebhookDeliveriesPage,
 } from "./pages/admin";
 import { NotFound } from "./pages/NotFound";
+import { Exports } from "./pages/Exports";
 import { AppRoutes } from "./lib/routes";
 
 function TeamIdRedirect() {
@@ -180,6 +181,7 @@ function App() {
                   <Route path="/settings/tool-accounts" element={<Navigate to={AppRoutes.profile.tools} replace />} />
                   <Route path={AppRoutes.events.unattributed} element={<UnattributedEvents />} />
                   <Route path={AppRoutes.notifications} element={<Notifications />} />
+                  <Route path={AppRoutes.exports} element={<Exports />} />
                   {/* Admin routes */}
                   <Route path={AppRoutes.admin.root} element={<AdminLayout />}>
                     <Route index element={<AdminOverview />} />

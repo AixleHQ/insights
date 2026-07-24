@@ -8,6 +8,7 @@ import {
   Plug,
   OctagonAlert,
   Settings,
+  Download,
   ChevronDown,
   LogOut,
   ChevronsUpDown,
@@ -74,6 +75,7 @@ const navItems: NavItem[] = [
   { title: "Integrations", icon: Plug,            href: AppRoutes.integrations.root, roles: ["owner"] },
   { title: "Alerts",       icon: OctagonAlert,    href: AppRoutes.alerts,            roles: ["owner"] },
   { title: "Settings",     icon: Settings,        href: AppRoutes.settings.root,     roles: ["owner"] },
+  { title: "Exports",      icon: Download,        href: AppRoutes.exports,           roles: ["owner"] },
 ];
 
 function getOrgInitials(name: string | undefined | null) {

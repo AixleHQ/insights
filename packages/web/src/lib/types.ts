@@ -698,3 +698,45 @@ export interface ModelPricingOverrideInput {
 export interface ModelPricingOverridesResponse {
   data: ModelPricingOverride[];
 }
+
+export type ExportStatus = "pending" | "generating" | "ready" | "failed";
+export type ExportFormat = "csv" | "json";
+export type ExportReportType =
+  | "cost_by_user"
+  | "cost_by_project"
+  | "cost_by_tool"
+  | "token_by_user"
+  | "token_by_tool";
+export type ExportFrequency = "daily" | "weekly" | "monthly";
+
+export interface ExportRecord {
+  id: string;
+  organizationId: string;
+  reportType: ExportReportType;
+  format: ExportFormat;
+  frequency: ExportFrequency | null;
+  status: ExportStatus;
+  rowCount: number | null;
+  fileSizeBytes: number | null;
+  downloadUrl: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ScheduledExport {
+  id: string;
+  organizationId: string;
+  reportType: ExportReportType;
+  format: ExportFormat;
+  frequency: ExportFrequency;
+  dayOfWeek: number | null;
+  dayOfMonth: number | null;
+  recipients: string[];
+  groupBy: "day" | "week" | "month" | null;
+  active: boolean;
+  lastRunAt: string | null;
+  nextRunAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
