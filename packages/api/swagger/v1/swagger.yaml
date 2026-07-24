@@ -4168,7 +4168,7 @@ paths:
   /api/v1/projects/{project_id}/members/stats:
     get:
       summary: Get per-member usage stats for a project
-      description: Returns usage statistics for all project members in the given time window. Restricted to project owners and org owners.
+      description: Returns usage statistics for all project members in the given time window (project-scoped, not org-wide). Restricted to project owners and org owners.
       tags:
         - Project Members
       parameters:
@@ -4176,10 +4176,17 @@ paths:
         - $ref: '#/components/parameters/project_id'
         - name: days
           in: query
+          description: Rolling window size in days. Defaults to 30. Ignored when all_time is true.
           schema:
             type: integer
             default: 30
-          description: Number of days to look back (default 30)
+            minimum: 1
+            maximum: 730
+        - name: all_time
+          in: query
+          description: When true, aggregate over the project's entire history with no date bound. Overrides days.
+          schema:
+            type: boolean
       responses:
         '200':
           description: Per-member stats

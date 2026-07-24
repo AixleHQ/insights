@@ -145,6 +145,36 @@ describe("ProjectMembersTab", () => {
       expect(screen.queryByText("Not set up")).not.toBeInTheDocument();
     });
 
+    it("labels the stats period and project scope, defaulting to 30 days", () => {
+      render(
+        <ProjectMembersTab
+          projectId="proj-1"
+          orgId="org-1"
+          isProjectOwner={true}
+          canManageMembers={false}
+        />
+      );
+
+      expect(screen.getByText("Usage stats: Last 30 days · this project")).toBeInTheDocument();
+    });
+
+    it("re-queries stats for the selected range when a range button is clicked", async () => {
+      const user = userEvent.setup();
+      render(
+        <ProjectMembersTab
+          projectId="proj-1"
+          orgId="org-1"
+          isProjectOwner={true}
+          canManageMembers={false}
+        />
+      );
+
+      await user.click(screen.getByRole("button", { name: "All time" }));
+
+      expect(screen.getByText("Usage stats: All time · this project")).toBeInTheDocument();
+      expect(useProjectMemberStats).toHaveBeenLastCalledWith("proj-1", "all", true);
+    });
+
     it("shows search input", () => {
       render(
         <ProjectMembersTab
