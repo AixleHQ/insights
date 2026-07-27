@@ -39,6 +39,8 @@ import type {
   Issue,
   JiraProject,
   IssueProviderProject,
+  PersonalReportType,
+  PersonalExportFormat,
   ToolOverviewStats,
   ToolModelsResponse,
   ToolUsersResponse,
@@ -2720,4 +2722,41 @@ export function useDeleteScheduledExport(orgId: string) {
       });
     },
   });
+}
+
+// ─── Personal Export (AIX-226) ─────────────────────────────────────────────
+
+export interface PersonalExportParams {
+  reportType: PersonalReportType;
+  format: PersonalExportFormat;
+  from?: string;
+  to?: string;
+}
+
+export function useDownloadPersonalExport() {
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const download = useCallback(async (params: PersonalExportParams) => {
+    setIsDownloading(true);
+    setError(null);
+    try {
+      const query = new URLSearchParams({
+        report_type: params.reportType,
+        format: params.format,
+        ...(params.from ? { from: params.from } : {}),
+        ...(params.to ? { to: params.to } : {}),
+      });
+      const filename = `db90-personal-${params.reportType}-${params.from ?? "all"}-${params.to ?? new Date().toISOString().slice(0, 10)}.${params.format}`;
+      const accept = params.format === "csv" ? "text/csv" : "application/json";
+      await downloadBlob(`/users/me/exports?${query}`, filename, accept, null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Download failed";
+      setError(msg);
+    } finally {
+      setIsDownloading(false);
+    }
+  }, []);
+
+  return { download, isDownloading, error };
 }

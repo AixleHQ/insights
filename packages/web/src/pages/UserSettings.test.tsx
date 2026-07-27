@@ -148,6 +148,11 @@ vi.mock("@/hooks/useApi", () => {
     },
     isLoading: false,
   }),
+  useDownloadPersonalExport: () => ({
+    download: vi.fn(),
+    isDownloading: false,
+    error: null,
+  }),
   };
 });
 
