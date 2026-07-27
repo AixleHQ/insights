@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@/test/utils";
+import userEvent from "@testing-library/user-event";
 import { CostTrendChart } from "./CostTrendChart";
 
 function june2026ChartData() {
@@ -36,4 +37,24 @@ describe("CostTrendChart", () => {
     vi.useRealTimers();
   });
 
+  it("highlights the active cost-trend range (AIX-604)", async () => {
+    const user = userEvent.setup();
+    render(<CostTrendChart data={june2026ChartData()} />);
+
+    expect(screen.getByRole("radio", { name: "7 days" })).toHaveAttribute(
+      "data-state",
+      "active"
+    );
+
+    await user.click(screen.getByRole("radio", { name: "30 days" }));
+
+    expect(screen.getByRole("radio", { name: "30 days" })).toHaveAttribute(
+      "data-state",
+      "active"
+    );
+    expect(screen.getByRole("radio", { name: "7 days" })).toHaveAttribute(
+      "data-state",
+      "inactive"
+    );
+  });
 });

@@ -17,6 +17,22 @@ RSpec.describe 'Admin Audit Logs', type: :request do
 
       expect(response).to have_http_status(:ok)
     end
+
+    it 'searches audit logs with a search term without erroring (AIX-570)' do
+      create(:audit_log, raw_event_key: 'test-event')
+
+      get admin_audit_logs_path(search: 'test', commit: 'Search')
+
+      expect(response).to have_http_status(:ok)
+    end
+
+    it 'searches audit logs with an empty search term without erroring (AIX-570)' do
+      create_list(:audit_log, 2)
+
+      get admin_audit_logs_path(search: '', commit: 'Search')
+
+      expect(response).to have_http_status(:ok)
+    end
   end
 
   describe 'GET /admin/audit_logs/:id' do

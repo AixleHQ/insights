@@ -16,3 +16,4 @@ export { ToolEventTypesTable } from "./ToolEventTypesTable";
 export { WeeklyToolUsageChart } from "./WeeklyToolUsageChart";
 export { RiskAlertsTable } from "./RiskAlertsTable";
 export { PromptInsightsSection } from "./PromptInsightsSection";
+export { RangeSegmentedControl, type RangeOption } from "./RangeSegmentedControl";

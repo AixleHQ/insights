@@ -8,7 +8,7 @@ class AuditLogDashboard < Administrate::BaseDashboard
     organization: Field::BelongsTo,
     tool_event: Field::BelongsTo,
     policy_version: Field::BelongsTo,
-    user_display: Field::String,
+    user_display: Field::String.with_options(searchable: false),
     raw_event_key: Field::String,
     risk_level: Field::String,
     classification_labels: Field::String,

@@ -31,6 +31,20 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       expect(ids).to include(personal_project.id)
       expect(ids).not_to include(org_project.id)
     end
+
+    it 'omits projects under inactive organizations while keeping personal projects' do
+      inactive_org = create(:organization, :inactive)
+      create(:organization_membership, user: user, organization: inactive_org, role: 'owner')
+      inactive_project = create(:project, organization: inactive_org, owner: nil)
+
+      authenticated_get '/api/v1/projects', user: user
+
+      expect_success
+      ids = json_data.map { |p| p[:id] }
+      expect(ids).to include(personal_project.id)
+      expect(ids).to include(org_project.id)
+      expect(ids).not_to include(inactive_project.id)
+    end
   end
 
   describe 'GET /api/v1/organizations/:organization_id/projects' do

@@ -22,7 +22,7 @@ export function ProtectedRoute({
 }: ProtectedRouteProps) {
   const location = useLocation();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { currentOrg, organizations, hasRole, isLoading: orgLoading, isInitialized: orgInitialized } = useOrg();
+  const { currentOrg, organizations, hasInactiveOrganizations, hasRole, isLoading: orgLoading, isInitialized: orgInitialized } = useOrg();
 
   // Show loading state - wait for auth AND org context to be initialized
   if (authLoading || (isAuthenticated && (!orgInitialized || orgLoading))) {
@@ -41,9 +41,23 @@ export function ProtectedRoute({
     return <Navigate to={AppRoutes.login} state={{ from: location }} replace />;
   }
 
-  // Redirect to onboarding if user has no organizations (unless allowNoOrg is set)
-  // Don't redirect if we're already on the onboarding page
-  if (!allowNoOrg && organizations.length === 0 && location.pathname !== AppRoutes.onboarding) {
+  // Redirect inactive-only users to the dedicated page (before onboarding).
+  // Escape hatch: invitation accept must stay reachable so they can join an active org.
+  // Onboarding remains blocked — create-org lives on /no-active-organization.
+  const isInvitationPath = location.pathname.startsWith("/invitations/");
+  if (
+    orgInitialized &&
+    organizations.length === 0 &&
+    hasInactiveOrganizations &&
+    location.pathname !== AppRoutes.noActiveOrganization &&
+    !isInvitationPath
+  ) {
+    return <Navigate to={AppRoutes.noActiveOrganization} replace />;
+  }
+
+  // Redirect truly new users (no memberships at all) when org is required.
+  if (!allowNoOrg && orgInitialized && organizations.length === 0 &&
+      location.pathname !== AppRoutes.onboarding) {
     return <Navigate to={AppRoutes.onboarding} state={{ from: location }} replace />;
   }
 

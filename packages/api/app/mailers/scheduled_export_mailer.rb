@@ -2,28 +2,27 @@
 
 class ScheduledExportMailer < ApplicationMailer
   def export_report(export, report)
-    @export       = export
-    @organization = export.organization
+    @export            = export
+    @organization      = export.organization
+    @generated_at      = Time.current
+    @report_type_label = export.report_type.humanize
 
     filename = ExportReportFilename.build(
       organization: export.organization,
       report_type:  export.report_type,
       format:       export.format
     )
-    content  = if export.format == "csv"
-      AggregatedReportCsvExporter.generate(report.rows, report.columns)
+    content, mime_type = if export.format == "csv"
+      [ AggregatedReportCsvExporter.generate(report.rows, report.columns), "text/csv" ]
     else
-      report.rows.to_json
+      [ report.rows.to_json, "application/json" ]
     end
 
-    attachments[filename] = {
-      mime_type: export.format == "csv" ? "text/csv" : "application/json",
-      content:   content
-    }
+    attachments[filename] = { mime_type:, content: }
 
     mail(
       to:      export.recipients,
-      subject: "#{export.organization.name} — #{export.report_type.humanize} Report"
+      subject: "#{@organization.name} — #{@report_type_label} Report"
     )
   end
 end

@@ -12,12 +12,11 @@ module Api
       def stats
         authorize! @project.project_memberships.new, to: :stats?
 
-        days = (params[:days] || 30).to_i
-        since = (client_zone.now - days.days).beginning_of_day
+        since = member_stats_range_start
+        scoped_events = since ? @project.tool_events.where(occurred_at: since..) : @project.tool_events
 
         # Single scan: group by user+tool, aggregate in Ruby
-        per_tool_rows = @project.tool_events
-          .where(occurred_at: since..)
+        per_tool_rows = scoped_events
           .where.not(user_id: nil)
           .group(:user_id, :tool_name)
           .select(
@@ -309,8 +308,19 @@ module Api
 
       private
 
+      # Resolves the start of the member-stats window. Returns nil for ?all_time=true
+      # (no lower bound), otherwise a rolling window of ?days=N (default 30, clamped
+      # 1..730) anchored to the start of the day in the client's timezone.
+      def member_stats_range_start
+        return nil if ActiveModel::Type::Boolean.new.cast(params[:all_time])
+
+        days = (params[:days] || 30).to_i.clamp(1, 730)
+        client_zone.now.beginning_of_day - (days - 1).days
+      end
+
       def set_project
         @project = authorized_scope(Project.all).find(params[:project_id])
+        reject_inactive_organization!(@project.organization) if @project.organization_id.present?
       end
 
       def set_membership

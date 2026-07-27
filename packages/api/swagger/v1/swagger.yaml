@@ -63,9 +63,62 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationError'
 
+  /api/v1/users/me/avatar:
+    post:
+      summary: Upload user avatar
+      tags:
+        - Users
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Avatar uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      summary: Delete user avatar
+      tags:
+        - Users
+      responses:
+        '200':
+          description: Avatar deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /api/v1/users/me/organizations:
     get:
       summary: Get current user's organizations
+      description: >
+        Returns the current user's active organization memberships only (`is_active: true`).
+        Inactive organizations are omitted from `data`. When the user has inactive memberships
+        but zero active ones, `meta.has_inactive_organizations` is true so the client can show
+        the no-active-organization empty state instead of onboarding.
       tags:
         - Users
       parameters:
@@ -73,7 +126,7 @@ paths:
         - $ref: '#/components/parameters/per_page'
       responses:
         '200':
-          description: User's organizations with membership info
+          description: User's active organizations with membership info
           content:
             application/json:
               schema:
@@ -84,7 +137,13 @@ paths:
                     items:
                       $ref: '#/components/schemas/OrganizationWithMembership'
                   meta:
-                    $ref: '#/components/schemas/PaginationMeta'
+                    allOf:
+                      - $ref: '#/components/schemas/PaginationMeta'
+                      - type: object
+                        properties:
+                          has_inactive_organizations:
+                            type: boolean
+                            description: True when the user has memberships in inactive organizations but zero active ones remain
 
   /api/v1/users/me/tool_accounts:
     get:
@@ -285,10 +344,73 @@ paths:
   # ============================================
   # ORGANIZATION ENDPOINTS
   # ============================================
+  /api/v1/users/me/exports:
+    get:
+      summary: Export personal usage data
+      description: >
+        Returns a personal usage report scoped strictly to the requesting user's own tool events.
+        Four report types are supported: my_cost_by_tool, my_token_by_tool, my_cost_by_project,
+        and my_events (raw event list). Any authenticated user may export their own data —
+        no org role requirement. If from/to are omitted the endpoint defaults to the last 30 days.
+      tags:
+        - Users
+      security:
+        - bearer_auth: []
+      parameters:
+        - name: report_type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [my_cost_by_tool, my_token_by_tool, my_cost_by_project, my_events]
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [csv, json]
+            default: json
+        - name: from
+          in: query
+          description: Start of date range (ISO 8601). Defaults to 30 days ago.
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: End of date range (ISO 8601). Defaults to now.
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Personal report data as CSV download or JSON array
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
   /api/v1/organizations:
     get:
       summary: List organizations
-      description: Returns organizations the current user is a member of (or all for global admins)
+      description: >
+        Returns active organizations (`is_active: true`) the current user is a member of
+        (or all active organizations for global admins). Inactive organizations are omitted;
+        manage them via Administrate. Org-scoped requests against an inactive org return 403.
       tags:
         - Organizations
       parameters:
@@ -296,7 +418,7 @@ paths:
         - $ref: '#/components/parameters/per_page'
       responses:
         '200':
-          description: Organizations list
+          description: Active organizations list
           content:
             application/json:
               schema:
@@ -365,7 +487,10 @@ paths:
           $ref: '#/components/responses/NotFound'
     patch:
       summary: Update organization
-      description: Requires owner role in the organization
+      description: >
+        Requires owner role in the organization.
+        Returns 403 if the organization is inactive. Reactivation of inactive organizations
+        must be performed via the admin interface (Administrate).
       tags:
         - Organizations
       parameters:
@@ -570,6 +695,7 @@ paths:
   /api/v1/organizations/{id}/model_pricing:
     get:
       summary: Get model and tool pricing table
+      description: Returns 403 when the organization is inactive.
       tags:
         - Organizations
       parameters:
@@ -826,8 +952,13 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationError'
     delete:
-      summary: Remove organization member
-      description: Requires owner role. Owners cannot remove themselves (403). Removing the last owner returns 422 (model-level guard).
+      summary: Remove organization member or leave organization
+      description: |
+        Org owners (and global admins) can remove other members. Any org member may leave
+        themselves unless they are the sole org owner (403). Sole project ownership is
+        transferred before cleanup (admin remove → actor when they are an org member;
+        self-leave → earliest other org owner). All of the departing user's project
+        memberships on org projects are destroyed. Removing the last org owner returns 422.
       tags:
         - Organization Members
       parameters:
@@ -839,6 +970,67 @@ paths:
           description: Member removed
         '403':
           $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/members/{id}/removal_preview:
+    get:
+      summary: Preview organization membership removal
+      description: |
+        Returns sole-owner org projects that would transfer ownership on remove/leave,
+        and the proposed new owner. Authorize like DELETE (owner/admin for remove; self for leave).
+      tags:
+        - Organization Members
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Removal preview
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                properties:
+                  data:
+                    type: object
+                    required:
+                      - sole_owner_projects
+                      - new_owner
+                    properties:
+                      sole_owner_projects:
+                        type: array
+                        items:
+                          type: object
+                          required:
+                            - id
+                            - name
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            name:
+                              type: string
+                      new_owner:
+                        nullable: true
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+                          name:
+                            type: string
+                            nullable: true
+                          email:
+                            type: string
+                            format: email
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /api/v1/organizations/{organization_id}/members/{id}/stats:
     get:
@@ -4114,6 +4306,8 @@ paths:
                       $ref: '#/components/schemas/ProjectMemberListItem'
                   meta:
                     $ref: '#/components/schemas/PaginationMeta'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     post:
       summary: Add project member
       description: Requires organization owner (or personal project owner) for org projects
@@ -4148,7 +4342,7 @@ paths:
   /api/v1/projects/{project_id}/members/stats:
     get:
       summary: Get per-member usage stats for a project
-      description: Returns usage statistics for all project members in the given time window. Restricted to project owners and org owners.
+      description: Returns usage statistics for all project members in the given time window (project-scoped, not org-wide). Restricted to project owners and org owners.
       tags:
         - Project Members
       parameters:
@@ -4156,10 +4350,17 @@ paths:
         - $ref: '#/components/parameters/project_id'
         - name: days
           in: query
+          description: Rolling window size in days. Defaults to 30. Ignored when all_time is true.
           schema:
             type: integer
             default: 30
-          description: Number of days to look back (default 30)
+            minimum: 1
+            maximum: 730
+        - name: all_time
+          in: query
+          description: When true, aggregate over the project's entire history with no date bound. Overrides days.
+          schema:
+            type: boolean
       responses:
         '200':
           description: Per-member stats
@@ -4330,6 +4531,8 @@ paths:
                       $ref: '#/components/schemas/Repository'
                   meta:
                     $ref: '#/components/schemas/PaginationMeta'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     post:
       summary: Add repository to project
       description: Requires admin role in the project
@@ -4495,6 +4698,8 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/ProjectConnector'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     post:
       summary: Create project connector
       description: >
@@ -6175,6 +6380,79 @@ paths:
                     $ref: '#/components/schemas/OrganizationProviderSetting'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/organizations/{organization_id}/export_records:
+    get:
+      summary: List export records
+      description: Returns all export records for the organization, newest first. Requires owner role.
+      tags:
+        - Export Records
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+      responses:
+        '200':
+          description: Export records list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ExportRecord'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      summary: Create an on-demand export
+      description: |
+        Creates a new export record and enqueues generation asynchronously.
+        Returns 202 Accepted immediately. Poll the index endpoint until status is `ready` or `failed`.
+        Requires owner role.
+      tags:
+        - Export Records
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - report_type
+              properties:
+                report_type:
+                  type: string
+                  enum: [cost_by_user, cost_by_project, cost_by_tool, token_by_user, token_by_tool]
+                format:
+                  type: string
+                  enum: [csv, json]
+                  default: csv
+      responses:
+        '202':
+          description: Export creation accepted — generation queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ExportRecord'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -8238,6 +8516,62 @@ components:
           description: Present when recipientType is 'user'.
         enabled:
           type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ExportRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        reportType:
+          type: string
+          enum: [cost_by_user, cost_by_project, cost_by_tool, token_by_user, token_by_tool]
+        format:
+          type: string
+          enum: [csv, json]
+        frequency:
+          type: string
+          nullable: true
+          enum: [daily, weekly, monthly]
+          description: Non-null when triggered by a scheduled export; null for on-demand.
+        status:
+          type: string
+          enum: [pending, generating, ready, failed]
+        rowCount:
+          type: integer
+          nullable: true
+        fileSizeBytes:
+          type: integer
+          nullable: true
+        createdBy:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+              nullable: true
+            email:
+              type: string
+        downloadUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: Presigned download URL. Present only when status is ready and not expired.
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
         createdAt:
           type: string
           format: date-time

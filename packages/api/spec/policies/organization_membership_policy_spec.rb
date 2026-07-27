@@ -69,8 +69,22 @@ RSpec.describe OrganizationMembershipPolicy, type: :policy do
       expect(policy(member_membership, current_user: admin).apply(:destroy?)).to be true
     end
 
-    it 'denies members from removing any members' do
-      expect(policy(member_membership, current_user: member).apply(:destroy?)).to be false
+    it 'denies members from removing other members' do
+      other_member = create(:user)
+      other_membership = create(:organization_membership, user: other_member, organization: organization, role: 'member')
+
+      expect(policy(other_membership, current_user: member).apply(:destroy?)).to be false
+    end
+
+    it 'allows members to leave themselves' do
+      expect(policy(member_membership, current_user: member).apply(:destroy?)).to be true
+    end
+
+    it 'allows viewers to leave themselves' do
+      viewer = create(:user)
+      viewer_membership = create(:organization_membership, user: viewer, organization: organization, role: 'viewer')
+
+      expect(policy(viewer_membership, current_user: viewer).apply(:destroy?)).to be true
     end
 
     it 'allows owners to remove other owners' do
@@ -80,8 +94,26 @@ RSpec.describe OrganizationMembershipPolicy, type: :policy do
       expect(policy(other_owner_membership, current_user: owner).apply(:destroy?)).to be true
     end
 
-    it 'denies an owner from removing their own membership' do
+    it 'allows an owner to leave when another owner exists' do
+      expect(policy(owner_membership, current_user: owner).apply(:destroy?)).to be true
+    end
+
+    it 'denies a sole owner from leaving' do
+      admin_membership.destroy!
+
       expect(policy(owner_membership, current_user: owner).apply(:destroy?)).to be false
+    end
+
+    it 'allows global admins to remove members' do
+      expect(policy(member_membership, current_user: global_admin).apply(:destroy?)).to be true
+    end
+  end
+
+  describe '#removal_preview?' do
+    it 'mirrors destroy?' do
+      expect(policy(member_membership, current_user: owner).apply(:removal_preview?)).to be true
+      expect(policy(member_membership, current_user: member).apply(:removal_preview?)).to be true
+      expect(policy(owner_membership, current_user: member).apply(:removal_preview?)).to be false
     end
   end
 

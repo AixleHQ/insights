@@ -33,6 +33,7 @@ import { OrgAlerts } from "./pages/OrgAlerts";
 import { UnattributedEvents } from "./pages/UnattributedEvents";
 import { Notifications } from "./pages/Notifications";
 import { Onboarding } from "./pages/Onboarding";
+import NoActiveOrganization from "./pages/NoActiveOrganization";
 import { InvitationAccept } from "./pages/InvitationAccept";
 import { InvitationsManagement } from "./pages/InvitationsManagement";
 import {
@@ -43,6 +44,7 @@ import {
   WebhookDeliveriesPage,
 } from "./pages/admin";
 import { NotFound } from "./pages/NotFound";
+import { Exports } from "./pages/Exports";
 import { AppRoutes } from "./lib/routes";
 
 function TeamIdRedirect() {
@@ -103,6 +105,16 @@ function App() {
                   element={
                     <ProtectedRoute allowNoOrg>
                       <Onboarding />
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* No active organization page - for users with only inactive orgs */}
+                <Route
+                  path={AppRoutes.noActiveOrganization}
+                  element={
+                    <ProtectedRoute allowNoOrg>
+                      <NoActiveOrganization />
                     </ProtectedRoute>
                   }
                 />
@@ -169,6 +181,7 @@ function App() {
                   <Route path="/settings/tool-accounts" element={<Navigate to={AppRoutes.profile.tools} replace />} />
                   <Route path={AppRoutes.events.unattributed} element={<UnattributedEvents />} />
                   <Route path={AppRoutes.notifications} element={<Notifications />} />
+                  <Route path={AppRoutes.exports} element={<Exports />} />
                   {/* Admin routes */}
                   <Route path={AppRoutes.admin.root} element={<AdminLayout />}>
                     <Route index element={<AdminOverview />} />

@@ -1,15 +1,48 @@
-<h2>Scheduled Report: <%= @export.report_type.humanize %></h2>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scheduled Report: <%= @report_type_label %></title>
+  <style>
+    <%= render "shared/aixle_email_base_styles" %>
+    <%= render "shared/aixle_email_report_styles" %>
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <%= render "shared/aixle_email_logo" %>
 
-<p>Hi,</p>
+      <h1>Scheduled Report: <%= @report_type_label %></h1>
 
-<p>Your scheduled <strong><%= @export.report_type.humanize %></strong> report for
-<strong><%= @organization.name %></strong> is attached.</p>
+      <p>Hi,</p>
 
-<ul>
-  <li><strong>Format:</strong> <%= @export.format.upcase %></li>
-  <li><strong>Frequency:</strong> <%= @export.frequency.capitalize %></li>
-  <li><strong>Generated at:</strong> <%= Time.current.strftime("%Y-%m-%d %H:%M UTC") %></li>
-</ul>
+      <p>
+        Your scheduled <strong><%= @report_type_label %></strong> report for
+        <span class="org-name"><%= @organization.name %></span> is attached.
+      </p>
 
-<p>This is an automated report from Aixle Insights. You are receiving it because you are listed as a
-recipient for this scheduled export.</p>
+      <table class="meta-table">
+        <tr>
+          <td>Format</td>
+          <td><%= @export.format.upcase %></td>
+        </tr>
+        <tr>
+          <td>Frequency</td>
+          <td><%= @export.frequency.capitalize %></td>
+        </tr>
+        <tr>
+          <td>Generated at</td>
+          <td><%= @generated_at.strftime("%Y-%m-%d %H:%M UTC") %></td>
+        </tr>
+      </table>
+
+      <div class="footer">
+        <p>This is an automated report from Aixle Insights. You are receiving it because you are listed as a recipient for this scheduled export.</p>
+        <p>&copy; <%= @generated_at.year %> Aixle Insights. All rights reserved.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

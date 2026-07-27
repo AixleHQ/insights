@@ -6,7 +6,9 @@ module Api
       include TimezoneBucketing
 
       before_action :require_organization!
-      before_action :set_membership, only: %i[show update destroy stats events dashboard_stats member_heatmap prompt_insights]
+      before_action :set_membership, only: %i[
+        show update destroy removal_preview stats events dashboard_stats member_heatmap prompt_insights
+      ]
 
       PROMPT_DIMENSION_TEXT = {
         strength: {
@@ -120,6 +122,27 @@ module Api
         end
       end
 
+      # GET /api/v1/organizations/:organization_id/members/:id/removal_preview
+      def removal_preview
+        authorize! @membership
+
+        preview = OrganizationMembershipRemovalService.preview(
+          membership: @membership,
+          actor: current_user
+        )
+
+        render json: {
+          data: {
+            sole_owner_projects: preview.sole_owner_projects.map { |p| { id: p.id, name: p.name } },
+            new_owner: preview.new_owner && {
+              id: preview.new_owner.id,
+              name: preview.new_owner.name,
+              email: preview.new_owner.email
+            }
+          }
+        }
+      end
+
       # DELETE /api/v1/organizations/:organization_id/members/:id
       def destroy
         authorize! @membership
@@ -127,22 +150,30 @@ module Api
         user_id = @membership.user_id
         role = @membership.role
 
-        if @membership.destroy
-          OrganizationAuditLog.log(
-            organization: current_organization,
-            actor: current_user,
-            action: "member.removed",
-            resource: @membership,
-            tracked_changes: { user_id: user_id, role: role },
-            request: request
-          )
-          render_no_content
-        else
-          render json: {
-            error: "Unprocessable Entity",
-            errors: format_validation_errors(@membership.errors)
-          }, status: :unprocessable_content
-        end
+        OrganizationMembershipRemovalService.call(
+          membership: @membership,
+          actor: current_user
+        )
+
+        OrganizationAuditLog.log(
+          organization: current_organization,
+          actor: current_user,
+          action: "member.removed",
+          resource: @membership,
+          tracked_changes: { user_id: user_id, role: role },
+          request: request
+        )
+        render_no_content
+      rescue OrganizationMembershipRemovalService::Error => e
+        render json: {
+          error: "Unprocessable Entity",
+          errors: [ { field: "base", message: e.message } ]
+        }, status: :unprocessable_content
+      rescue ActiveRecord::RecordInvalid => e
+        render json: {
+          error: "Unprocessable Entity",
+          errors: format_validation_errors(e.record.errors)
+        }, status: :unprocessable_content
       end
 
       # GET /api/v1/organizations/:organization_id/members/:id/stats

@@ -41,6 +41,8 @@ Rails.application.routes.draw do
       get   "users/me/personal_settings", to: "user_personal_settings#show"
       patch "users/me/personal_settings", to: "user_personal_settings#update"
       post "users/me/stop_impersonation", to: "users#stop_impersonation"
+      resource :avatar, only: [ :create, :destroy ], controller: "user_avatars", path: "users/me/avatar"
+      get "users/me/exports", to: "user_exports#show"
 
       # Organization routes
       resources :organizations do
@@ -66,6 +68,7 @@ Rails.application.routes.draw do
             get :events
             get :dashboard_stats
             get :prompt_insights
+            get :removal_preview
             get "stats/heatmap", action: :member_heatmap
           end
         end
@@ -82,6 +85,9 @@ Rails.application.routes.draw do
 
         # Scheduled report exports
         resources :scheduled_exports, only: %i[index create update destroy]
+
+        # On-demand export records (history + async generation)
+        resources :export_records, only: %i[index create]
 
         # Organization audit logs (export + unified must precede the resource to avoid capture by :index)
         get "audit_logs/unified/export", to: "unified_audit_logs#export"

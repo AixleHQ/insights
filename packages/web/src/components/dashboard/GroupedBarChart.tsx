@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { formatCount } from "@/lib/formatters";
 import {
   Bar,
@@ -39,6 +39,7 @@ export interface GroupedBarChartProps {
   yLabel?: string;
   title?: string;
   description?: string;
+  headerAction?: ReactNode;
   isLoading?: boolean;
   isError?: boolean;
   onRetry?: () => void;
@@ -52,6 +53,7 @@ export function GroupedBarChart({
   yLabel,
   title,
   description,
+  headerAction,
   isLoading,
   isError,
   onRetry,
@@ -74,12 +76,17 @@ export function GroupedBarChart({
 
   return (
     <Card className={cn("col-span-full", className)}>
-      {(title || description) && (
+      {(title || description || headerAction) && (
         <CardHeader className="pb-2">
-          {title && <CardTitle className="text-base font-medium">{title}</CardTitle>}
-          {description && (
-            <CardDescription className="text-xs">{description}</CardDescription>
-          )}
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              {title && <CardTitle className="text-base font-medium">{title}</CardTitle>}
+              {description && (
+                <CardDescription className="text-xs">{description}</CardDescription>
+              )}
+            </div>
+            {headerAction && <div className="shrink-0">{headerAction}</div>}
+          </div>
         </CardHeader>
       )}
       <CardContent>

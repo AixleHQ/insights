@@ -66,10 +66,16 @@ module Api
       def organizations
         authorize! current_user, to: :organizations?
 
-        orgs = paginate(current_user.organizations.order(:name))
+        active_orgs   = current_user.organizations.active.order(:name)
+        active_count  = active_orgs.count
+        all_count     = current_user.organizations.count
+        has_inactive  = active_count.zero? && all_count.positive?
+
+        orgs = paginate(active_orgs)
+
         render json: {
           data: ::OrganizationWithMembershipSerializer.new(orgs, params: { user: current_user }).serialize,
-          meta: pagination_meta(orgs)
+          meta: pagination_meta(orgs).merge(has_inactive_organizations: has_inactive)
         }
       end
 
