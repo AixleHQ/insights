@@ -410,6 +410,39 @@ RSpec.describe "Api::V1::ProjectMembers", type: :request do
       row = json_data.find { |r| r[:userId] == member.id }
       expect(row[:eventCount]).to eq(1)
     end
+
+    context "with a member who has events older than 30 days" do
+      before do
+        create(:tool_event, user: member, project: project,
+               organization: organization, tool_name: "cursor", occurred_at: 1.day.ago)
+        create(:tool_event, user: member, project: project,
+               organization: organization, tool_name: "cursor", occurred_at: 90.days.ago)
+      end
+
+      it "excludes events outside the default 30-day window" do
+        authenticated_get "/api/v1/projects/#{project.id}/members/stats", user: org_owner
+
+        expect_success
+        row = json_data.find { |r| r[:userId] == member.id }
+        expect(row[:eventCount]).to eq(1)
+      end
+
+      it "includes the older event when days is widened" do
+        authenticated_get "/api/v1/projects/#{project.id}/members/stats?days=365", user: org_owner
+
+        expect_success
+        row = json_data.find { |r| r[:userId] == member.id }
+        expect(row[:eventCount]).to eq(2)
+      end
+
+      it "aggregates the full history when all_time is true" do
+        authenticated_get "/api/v1/projects/#{project.id}/members/stats?all_time=true", user: org_owner
+
+        expect_success
+        row = json_data.find { |r| r[:userId] == member.id }
+        expect(row[:eventCount]).to eq(2)
+      end
+    end
   end
 
   describe "DELETE /api/v1/projects/:project_id/members/:id" do

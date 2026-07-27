@@ -22,6 +22,10 @@ export interface RequestOptions extends RequestInit {
 const DEFAULT_BASE_URL = import.meta.env.VITE_API_URL || "/api/v1";
 const IMPERSONATION_STORAGE_KEY = "impersonation_token";
 
+// Dispatched when api.ts removes an expired impersonation token so ImpersonationContext
+// can sync React state without polling or storage-event (which only fires cross-tab).
+export const IMPERSONATION_EXPIRED_EVENT = "impersonation:expired";
+
 // Global state for current organization ID
 let currentOrgId: string | null = null;
 
@@ -32,20 +36,22 @@ export async function getAuthToken(): Promise<string | null> {
   // Check for impersonation token first
   const impersonationToken = localStorage.getItem(IMPERSONATION_STORAGE_KEY);
   if (impersonationToken) {
-    // Verify token isn't expired
     try {
       const parts = impersonationToken.split(".");
-      if (parts.length === 3) {
-        const payload = JSON.parse(atob(parts[1]));
-        if (payload.exp && payload.exp > Date.now() / 1000) {
-          return impersonationToken;
-        }
-        // Token expired, remove it
-        localStorage.removeItem(IMPERSONATION_STORAGE_KEY);
+      if (parts.length !== 3) {
+        throw new Error("Invalid token format");
       }
-    } catch {
-      // Invalid token, remove it
+      const payload = JSON.parse(atob(parts[1]));
+      if (payload.exp && payload.exp > Date.now() / 1000) {
+        return impersonationToken;
+      }
+      // Token expired — remove and notify ImpersonationContext to clear React state.
       localStorage.removeItem(IMPERSONATION_STORAGE_KEY);
+      window.dispatchEvent(new CustomEvent(IMPERSONATION_EXPIRED_EVENT));
+    } catch {
+      // Invalid / malformed token — remove and notify.
+      localStorage.removeItem(IMPERSONATION_STORAGE_KEY);
+      window.dispatchEvent(new CustomEvent(IMPERSONATION_EXPIRED_EVENT));
     }
   }
 
@@ -97,10 +103,10 @@ export async function apiRequest<T = unknown>(
   const impersonating = isImpersonating();
 
   const buildHeaders = async (): Promise<HeadersInit> => {
-    const requestHeaders: HeadersInit = {
-      "Content-Type": "application/json",
-      ...headers,
-    };
+    const isFormData = fetchOptions.body instanceof FormData;
+    const requestHeaders: HeadersInit = isFormData
+      ? { ...headers }
+      : { "Content-Type": "application/json", ...headers };
 
     if (!skipAuth) {
       const token = await getAuthToken();
@@ -144,6 +150,11 @@ export async function apiRequest<T = unknown>(
       const data = await response.json().catch(() => null);
       throw new ApiError("Validation error", response.status, data);
     }
+    if (response.status === 413) {
+      // The reverse proxy rejects oversized bodies before Rails sees the request,
+      // so the response is proxy-default HTML, not JSON — data is always null here.
+      throw new ApiError("Payload too large", response.status, await response.json().catch(() => null));
+    }
 
     const errorData = await response.json().catch(() => null);
     throw new ApiError(
@@ -182,16 +193,22 @@ export class ApiError extends Error {
  * back to `fallback` when the shape doesn't match or the error isn't an ApiError.
  */
 export function getApiErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof ApiError && error.data && typeof error.data === "object") {
-    const data = error.data as { errors?: Record<string, string[]>; message?: string; error?: string };
-    if (data.errors) {
-      const messages = Object.entries(data.errors).flatMap(([field, msgs]) =>
-        (msgs ?? []).map((msg) => (field === "base" ? msg : `${field} ${msg}`))
-      );
-      if (messages.length > 0) return messages.join(". ");
+  if (error instanceof ApiError) {
+    // The reverse proxy returns its own HTML error page for 413, never a JSON body,
+    // so this must be special-cased instead of relying on error.data below.
+    if (error.status === 413) return "File is too large. Please try a smaller file.";
+
+    if (error.data && typeof error.data === "object") {
+      const data = error.data as { errors?: Record<string, string[]>; message?: string; error?: string };
+      if (data.errors) {
+        const messages = Object.entries(data.errors).flatMap(([field, msgs]) =>
+          (msgs ?? []).map((msg) => (field === "base" ? msg : `${field} ${msg}`))
+        );
+        if (messages.length > 0) return messages.join(". ");
+      }
+      if (data.message) return data.message;
+      if (data.error) return data.error;
     }
-    if (data.message) return data.message;
-    if (data.error) return data.error;
   }
   return fallback;
 }

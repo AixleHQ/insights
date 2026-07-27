@@ -1,22 +1,27 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Routes, Route, Link, Navigate, useLocation } from "react-router-dom";
-import { User, Settings2, Bell, Shield, Wrench, Loader2 } from "lucide-react";
+import { User, Settings2, Bell, Shield, Wrench, Loader2, Download } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useOrg } from "@/contexts/OrgContext";
 import { useTheme, type Theme } from "@/contexts/ThemeContext";
 import {
   useOrganizationMembers,
   useCurrentUser,
   useUpdateCurrentUser,
+  useUploadAvatar,
+  useDeleteAvatar,
   useUserOrganizations,
   useUpdateUserSetting,
   usePersonalSettings,
   useUpdatePersonalSettings,
   useRetentionPolicy,
+  useDownloadPersonalExport,
 } from "@/hooks/useApi";
 import { formatCost, formatTokens } from "@/lib/formatters";
+import { getApiErrorMessage } from "@/lib/api";
 import { formatRetentionLabel, retentionOrder } from "@/lib/retention-utils";
-import type { UserPersonalSettings } from "@/lib/types";
+import type { UserPersonalSettings, PersonalReportType, PersonalExportFormat } from "@/lib/types";
 import { MemberProfileView } from "./MemberProfile";
 import { cn } from "@/lib/utils";
 import { AppRoutes } from "@/lib/routes";
@@ -77,41 +82,187 @@ function UserSettingsNav() {
   );
 }
 
+const PERSONAL_REPORT_OPTIONS: { value: PersonalReportType; label: string }[] = [
+  { value: "my_events", label: "My Events (raw)" },
+  { value: "my_cost_by_tool", label: "My Cost by Tool" },
+  { value: "my_token_by_tool", label: "My Tokens by Tool" },
+  { value: "my_cost_by_project", label: "My Cost by Project" },
+];
+
+function ExportMyDataSection() {
+  const [reportType, setReportType] = useState<PersonalReportType>("my_events");
+  const [format, setFormat] = useState<PersonalExportFormat>("csv");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+
+  const { download, isDownloading, error } = useDownloadPersonalExport();
+
+  function handleDownload() {
+    download({
+      reportType,
+      format,
+      from: from || undefined,
+      to: to || undefined,
+    });
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Export My Data</CardTitle>
+        <CardDescription>
+          Download your personal usage data. Reports are scoped to your account only.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="personal-report-type">Report type</Label>
+            <Select value={reportType} onValueChange={(v) => setReportType(v as PersonalReportType)}>
+              <SelectTrigger id="personal-report-type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PERSONAL_REPORT_OPTIONS.map(({ value, label }) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="personal-format">Format</Label>
+            <Select value={format} onValueChange={(v) => setFormat(v as PersonalExportFormat)}>
+              <SelectTrigger id="personal-format">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="csv">CSV</SelectItem>
+                <SelectItem value="json">JSON</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="personal-from">From (optional)</Label>
+            <Input
+              id="personal-from"
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="personal-to">To (optional)</Label>
+            <Input
+              id="personal-to"
+              type="date"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {error && <p className="text-sm text-destructive">{error}</p>}
+
+        <Button onClick={handleDownload} disabled={isDownloading} size="sm">
+          {isDownloading ? (
+            <Loader2 className="mr-2 size-4 animate-spin" />
+          ) : (
+            <Download className="mr-2 size-4" />
+          )}
+          {isDownloading ? "Downloading…" : "Download"}
+        </Button>
+
+        <p className="text-xs text-muted-foreground">
+          If no date range is set, the last 30 days are exported. No data from other users is
+          included.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 function ProfileSection() {
   const { profile } = useAuth();
+  const { isImpersonating } = useImpersonation();
   const { currentOrg } = useOrg();
   const { data: members, isLoading: membersLoading } = useOrganizationMembers(currentOrg?.id || "");
   const { data: currentUser } = useCurrentUser();
   const updateUser = useUpdateCurrentUser();
+  const uploadAvatar = useUploadAvatar();
+  const deleteAvatar = useDeleteAvatar();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarUrlInput, setAvatarUrlInput] = useState("");
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  // During impersonation, never fall back to the admin's Keycloak profile.
+  const identityEmail = isImpersonating
+    ? currentUser?.email
+    : (currentUser?.email || profile?.email);
+  const identityName = isImpersonating
+    ? currentUser?.name
+    : (currentUser?.name || profile?.name);
+
   const myMemberId = useMemo(
-    () => members?.find((m) => m.user.email === (currentUser?.email || profile?.email))?.id,
-    [members, currentUser?.email, profile?.email]
+    () => members?.find((m) => m.user.email === identityEmail)?.id,
+    [members, identityEmail]
   );
 
   function handleEdit() {
     setName(currentUser?.name ?? "");
-    setAvatarUrl(currentUser?.avatarUrl ?? "");
+    setAvatarUrlInput(currentUser?.avatarUrl ?? "");
+    setAvatarPreviewUrl(currentUser?.avatarUrl ?? "");
     setError(null);
     setIsEditing(true);
   }
 
   function handleCancel() {
     setName(currentUser?.name ?? "");
-    setAvatarUrl(currentUser?.avatarUrl ?? "");
+    setAvatarUrlInput(currentUser?.avatarUrl ?? "");
+    setAvatarPreviewUrl(currentUser?.avatarUrl ?? "");
     setError(null);
     setIsEditing(false);
   }
 
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    uploadAvatar.mutate(file, {
+      onSuccess: (res) => {
+        setAvatarPreviewUrl(res.data.avatarUrl ?? "");
+      },
+      onError: (err) =>
+        setError(getApiErrorMessage(err, "Failed to upload image. Please try again.")),
+    });
+    e.target.value = "";
+  }
+
+  function handleRemoveAvatar() {
+    if (updateUser.isPending || uploadAvatar.isPending || deleteAvatar.isPending) return;
+
+    deleteAvatar.mutate(undefined, {
+      onSuccess: () => {
+        setAvatarUrlInput("");
+        setAvatarPreviewUrl("");
+      },
+      onError: () => setError("Failed to remove avatar. Please try again."),
+    });
+  }
+
   function handleSave() {
+    if (uploadAvatar.isPending || deleteAvatar.isPending || updateUser.isPending) return;
+
     setError(null);
     updateUser.mutate(
-      { name: name || undefined, avatar_url: avatarUrl || undefined },
+      { name: name || undefined, avatar_url: avatarUrlInput || null },
       {
         onSuccess: () => setIsEditing(false),
         onError: (err: unknown) => {
@@ -127,7 +278,7 @@ function ProfileSection() {
     );
   }
 
-  const displayName = currentUser?.name || profile?.name || "—";
+  const displayName = identityName || "—";
   const initials = displayName !== "—" ? displayName.slice(0, 2).toUpperCase() : "?";
 
   return (
@@ -149,10 +300,43 @@ function ProfileSection() {
             <>
               <div className="flex items-center gap-4">
                 <Avatar size="lg" className="size-16">
-                  <AvatarImage src={avatarUrl || undefined} />
+                  <AvatarImage src={avatarPreviewUrl || undefined} />
                   <AvatarFallback>{initials}</AvatarFallback>
                 </Avatar>
-                <p className="text-sm text-muted-foreground">Avatar preview</p>
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm text-muted-foreground">Avatar preview</p>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadAvatar.isPending || updateUser.isPending || deleteAvatar.isPending}
+                    >
+                      {uploadAvatar.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
+                      Upload image
+                    </Button>
+                    {(avatarPreviewUrl || currentUser?.avatarUrl) && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleRemoveAvatar}
+                        disabled={deleteAvatar.isPending || updateUser.isPending || uploadAvatar.isPending}
+                      >
+                        {deleteAvatar.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="display-name">Display Name</Label>
@@ -167,22 +351,33 @@ function ProfileSection() {
                 <Label htmlFor="avatar-url">Avatar URL</Label>
                 <Input
                   id="avatar-url"
-                  value={avatarUrl}
-                  onChange={(e) => setAvatarUrl(e.target.value)}
+                  value={avatarUrlInput}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setAvatarUrlInput(value);
+                    setAvatarPreviewUrl(value);
+                  }}
                   placeholder="https://example.com/avatar.png"
                 />
               </div>
               <div className="space-y-1">
                 <p className="type-label">Email</p>
-                <p className="text-sm text-muted-foreground">{currentUser?.email || profile?.email || "—"}</p>
+                <p className="text-sm text-muted-foreground">{identityEmail || "—"}</p>
               </div>
               {error && <p className="text-sm text-destructive">{error}</p>}
               <div className="flex gap-2">
-                <Button onClick={handleSave} disabled={updateUser.isPending}>
+                <Button
+                  onClick={handleSave}
+                  disabled={updateUser.isPending || uploadAvatar.isPending || deleteAvatar.isPending}
+                >
                   {updateUser.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
                   Save
                 </Button>
-                <Button variant="outline" onClick={handleCancel} disabled={updateUser.isPending}>
+                <Button
+                  variant="outline"
+                  onClick={handleCancel}
+                  disabled={updateUser.isPending || uploadAvatar.isPending || deleteAvatar.isPending}
+                >
                   Cancel
                 </Button>
               </div>
@@ -201,12 +396,14 @@ function ProfileSection() {
               </div>
               <div className="space-y-1">
                 <p className="type-label">Email</p>
-                <p className="text-sm text-muted-foreground">{currentUser?.email || profile?.email || "—"}</p>
+                <p className="text-sm text-muted-foreground">{identityEmail || "—"}</p>
               </div>
             </>
           )}
         </CardContent>
       </Card>
+      <ExportMyDataSection />
+
       {membersLoading ? (
         <Skeleton className="h-[400px]" />
       ) : myMemberId ? (

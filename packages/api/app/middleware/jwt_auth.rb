@@ -15,7 +15,8 @@ class JwtAuth
     "/admin",
     "/api/internal",
     "/api/v1/ingest",
-    "/api/v1/projects/lookup"
+    "/api/v1/projects/lookup",
+    "/rails/active_storage"
   ].freeze
 
   EXCLUDED_PATTERNS = [

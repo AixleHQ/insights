@@ -17,12 +17,14 @@ export const AppRoutes = {
   authIframeCallback: "/auth/iframe-callback",
   authPopupCallback: "/auth/popup-callback",
   onboarding: "/onboarding",
+  noActiveOrganization: "/no-active-organization",
   invitation: (token: string) => `/invitations/${token}`,
 
   // Core
   dashboard: "/",
   notifications: "/notifications",
   alerts: "/alerts",
+  exports: "/exports",
   // Events
   events: {
     root: "/events",

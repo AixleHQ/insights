@@ -26,6 +26,13 @@ RSpec.describe JwtAuth do
 
         expect(status).to eq(200)
       end
+
+      it 'skips auth for active storage routes' do
+        env = Rack::MockRequest.env_for('/rails/active_storage/blobs/test')
+        status, _headers, _body = middleware.call(env)
+
+        expect(status).to eq(200)
+      end
     end
 
     context 'without authorization header' do

@@ -5,6 +5,47 @@ All notable changes to DB90 are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.9] - 2026-07-27
+
+Ninth alpha release. A large batch from `develop`: user avatars and data
+exports on Active Storage, an inactive-organization access gate, and a round of
+auth/impersonation and dashboard fixes. Two migrations: Active Storage tables
+(additive) and a one-time cleanup that deletes orphaned project memberships
+(irreversible data delete — deploy in a low-ingest window).
+
+### Added
+- User avatar upload backed by Active Storage, with a dedicated
+  `UserAvatarsController`, validation, and upload-error surfacing
+  (`AIX-317`).
+- Exports UI and `ExportRecord` CRUD (`AIX-225`).
+- Personal usage export endpoint and profile section, with CSV-injection and
+  date-range guards (`AIX-226`).
+- Inactive-organization gate: list filter, empty-state page, route guard, and
+  header/path 403 enforcement (`AIX-590`).
+- Time-range selector and period labels on the Project Members tab
+  (`AIX-587`).
+
+### Changed
+- Brand scheduled report emails to match the Aixle Insights design and extract
+  shared email styles (`AIX-466`).
+- Clean up project memberships when a user leaves or is removed from an
+  organization; one-time backfill deletes existing orphaned rows
+  (`AIX-591`).
+
+### Fixed
+- Remove the doubled `/api/v1` prefix in the personal export download link
+  (`AIX-505`).
+- Harden impersonation token-expiry edge cases and prevent the admin profile
+  from leaking during impersonation (`AIX-584`).
+- Fix dashboard range toggles: selected state, radiogroup semantics, and roving
+  focus so arrow keys work after the first press (`AIX-604`).
+- Fix bar-chart tool colors to match Figma and give GitHub its own color
+  instead of the same grey as "Other" (`AIX-586`).
+- Clear the stored org on logout so `default_org_id` applies on re-login and
+  silent-renew stops false-positiving (`AIX-318`).
+- Stop searching the virtual `user_display` field in the admin audit-log
+  controller (`AIX-570`).
+
 ## [1.0.0-alpha.8] - 2026-07-21
 
 Eighth alpha release. Code-only batch from `develop` — no database migrations.
@@ -250,6 +291,7 @@ tags cut from the same `release/1.0.0` branch.
 ### Added
 - Initial DB90 platform release cut from `develop` for production infrastructure validation.
 
+[1.0.0-alpha.9]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.9
 [1.0.0-alpha.8]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.8
 [1.0.0-alpha.7]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.7
 [1.0.0-alpha.6]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.6

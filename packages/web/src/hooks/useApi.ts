@@ -7,7 +7,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useCallback, useMemo } from "react";
-import { api, downloadBlob } from "@/lib/api";
+import { api, apiRequest, downloadBlob } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import type {
   CurrentUser,
@@ -39,6 +39,8 @@ import type {
   Issue,
   JiraProject,
   IssueProviderProject,
+  PersonalReportType,
+  PersonalExportFormat,
   ToolOverviewStats,
   ToolModelsResponse,
   ToolUsersResponse,
@@ -57,6 +59,11 @@ import type {
   MyToolAccountMetadata,
   McpIngestExchangeData,
   DashboardPeriod,
+  ExportRecord,
+  ScheduledExport,
+  ExportReportType,
+  ExportFormat,
+  ExportFrequency,
 } from "@/lib/types";
 import type { IntegrationProvider } from "@/lib/providers";
 
@@ -95,6 +102,8 @@ export const queryKeys = {
       ["organizations", orgId, "members", userId, "heatmap", clientTimezone] as const,
     promptInsights: (orgId: string, userId: string, period: string) =>
       ["organizations", orgId, "members", userId, "prompt_insights", period] as const,
+    removalPreview: (orgId: string, id: string) =>
+      ["organizations", orgId, "members", id, "removal_preview"] as const,
   },
   projects: {
     all: (orgId: string) => ["organizations", orgId, "projects"] as const,
@@ -210,8 +219,37 @@ export function useUpdateCurrentUser() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: { name?: string; avatar_url?: string }) =>
+    mutationFn: (data: { name?: string; avatar_url?: string | null }) =>
       api.patch<{ data: CurrentUser }>("/users/me", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.current });
+    },
+  });
+}
+
+export function useUploadAvatar() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      return apiRequest<{ data: CurrentUser }>("/users/me/avatar", {
+        method: "POST",
+        body: formData,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.current });
+    },
+  });
+}
+
+export function useDeleteAvatar() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => api.delete<{ data: CurrentUser }>("/users/me/avatar"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.user.current });
     },
@@ -262,8 +300,11 @@ export function useCreateOrganization() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: { name: string; description?: string }) =>
-      api.post<Organization>("/organizations", data),
+    mutationFn: async (data: { name: string; description?: string }) => {
+      // API wraps the resource as `{ data: Organization }`
+      const response = await api.post<{ data: Organization }>("/organizations", data);
+      return response.data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.user.organizations });
       queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all });
@@ -290,9 +331,10 @@ export function useLeaveOrganization() {
   return useMutation({
     mutationFn: ({ orgId, memberId }: { orgId: string; memberId: string }) =>
       api.delete(`/organizations/${orgId}/members/${memberId}`),
-    onSuccess: () => {
+    onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.user.organizations });
       queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects.all(orgId) });
     },
   });
 }
@@ -510,7 +552,26 @@ export function useRemoveMember() {
       api.delete(`/organizations/${orgId}/members/${memberId}`),
     onSuccess: (_, { orgId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.members.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects.all(orgId) });
     },
+  });
+}
+
+export interface MemberRemovalPreview {
+  sole_owner_projects: Array<{ id: string; name: string }>;
+  new_owner: { id: string; name: string | null; email: string } | null;
+}
+
+export function useMemberRemovalPreview(orgId: string, memberId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.members.removalPreview(orgId, memberId),
+    queryFn: async () => {
+      const response = await api.get<{ data: MemberRemovalPreview }>(
+        `/organizations/${orgId}/members/${memberId}/removal_preview`
+      );
+      return response.data;
+    },
+    enabled: !!orgId && !!memberId && enabled,
   });
 }
 
@@ -984,13 +1045,24 @@ export interface ProjectMemberStat {
   primaryTool: string | null;
 }
 
+const PROJECT_MEMBER_STATS_RANGE_PARAM: Record<MemberStatsRange, string> = {
+  "30d": "days=30",
+  "90d": "days=90",
+  "1y": "days=365",
+  all: "all_time=true",
+};
+
 // Pass enabled=false for non-project-owners — the API returns 403 for plain members.
-export function useProjectMemberStats(projectId: string, days = 30, enabled = true) {
+export function useProjectMemberStats(
+  projectId: string,
+  range: MemberStatsRange = "30d",
+  enabled = true
+) {
   return useQuery({
-    queryKey: ["projects", projectId, "members", "stats", days],
+    queryKey: ["projects", projectId, "members", "stats", range],
     queryFn: async () => {
       const res = await api.get<{ data: ProjectMemberStat[] }>(
-        appendTz(`/projects/${projectId}/members/stats?days=${days}`)
+        appendTz(`/projects/${projectId}/members/stats?${PROJECT_MEMBER_STATS_RANGE_PARAM[range]}`)
       );
       return res.data;
     },
@@ -2533,4 +2605,158 @@ export function useUpdateOrgProviderSetting(orgId: string) {
       });
     },
   });
+}
+
+// ── Export Records ──────────────────────────────────────────────────────────
+
+export function useExportRecords(orgId: string, page = 1) {
+  return useQuery({
+    queryKey: ["organizations", orgId, "export_records", page],
+    queryFn: async () => {
+      const params = new URLSearchParams({ page: String(page) });
+      return api.get<PaginatedResponse<ExportRecord>>(
+        `/organizations/${orgId}/export_records?${params}`
+      );
+    },
+    enabled: !!orgId,
+    placeholderData: (prev) => prev,
+    // Poll every 3 seconds while any record is pending or generating
+    refetchInterval: (query) => {
+      const data = query.state.data as PaginatedResponse<ExportRecord> | undefined;
+      if (!data?.data.length) return false;
+      return data.data.some((r) => r.status === "pending" || r.status === "generating") ? 3_000 : false;
+    },
+  });
+}
+
+export function useCreateExportRecord(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { report_type: ExportReportType; format?: ExportFormat }) =>
+      api.post<{ data: ExportRecord }>(
+        `/organizations/${orgId}/export_records`,
+        { export_record: data }
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["organizations", orgId, "export_records"],
+      });
+    },
+  });
+}
+
+// ── Scheduled Exports ───────────────────────────────────────────────────────
+
+export function useScheduledExports(orgId: string, page = 1) {
+  return useQuery({
+    queryKey: ["organizations", orgId, "scheduled_exports", page],
+    queryFn: async () => {
+      const params = new URLSearchParams({ page: String(page) });
+      return api.get<PaginatedResponse<ScheduledExport>>(
+        `/organizations/${orgId}/scheduled_exports?${params}`
+      );
+    },
+    enabled: !!orgId,
+    placeholderData: (prev) => prev,
+  });
+}
+
+export function useCreateScheduledExport(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      report_type: ExportReportType;
+      format?: ExportFormat;
+      frequency: ExportFrequency;
+      day_of_week?: number | null;
+      day_of_month?: number | null;
+      group_by?: string | null;
+      recipients: string[];
+    }) =>
+      api.post<{ data: ScheduledExport }>(
+        `/organizations/${orgId}/scheduled_exports`,
+        { scheduled_export: data }
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["organizations", orgId, "scheduled_exports"],
+      });
+    },
+  });
+}
+
+export function useUpdateScheduledExport(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...data
+    }: {
+      id: string;
+      active?: boolean;
+      recipients?: string[];
+      frequency?: ExportFrequency;
+      day_of_week?: number | null;
+      day_of_month?: number | null;
+    }) =>
+      api.patch<{ data: ScheduledExport }>(
+        `/organizations/${orgId}/scheduled_exports/${id}`,
+        { scheduled_export: data }
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["organizations", orgId, "scheduled_exports"],
+      });
+    },
+  });
+}
+
+export function useDeleteScheduledExport(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api.delete(`/organizations/${orgId}/scheduled_exports/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["organizations", orgId, "scheduled_exports"],
+      });
+    },
+  });
+}
+
+// ─── Personal Export (AIX-226) ─────────────────────────────────────────────
+
+export interface PersonalExportParams {
+  reportType: PersonalReportType;
+  format: PersonalExportFormat;
+  from?: string;
+  to?: string;
+}
+
+export function useDownloadPersonalExport() {
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const download = useCallback(async (params: PersonalExportParams) => {
+    setIsDownloading(true);
+    setError(null);
+    try {
+      const query = new URLSearchParams({
+        report_type: params.reportType,
+        format: params.format,
+        ...(params.from ? { from: params.from } : {}),
+        ...(params.to ? { to: params.to } : {}),
+      });
+      const filename = `db90-personal-${params.reportType}-${params.from ?? "all"}-${params.to ?? new Date().toISOString().slice(0, 10)}.${params.format}`;
+      const accept = params.format === "csv" ? "text/csv" : "application/json";
+      await downloadBlob(`/users/me/exports?${query}`, filename, accept, null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Download failed";
+      setError(msg);
+    } finally {
+      setIsDownloading(false);
+    }
+  }, []);
+
+  return { download, isDownloading, error };
 }

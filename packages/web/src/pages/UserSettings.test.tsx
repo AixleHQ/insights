@@ -13,6 +13,10 @@ vi.mock("@/contexts/AuthContext", () => ({
   }),
 }));
 
+vi.mock("@/contexts/ImpersonationContext", () => ({
+  useImpersonation: () => ({ isImpersonating: false }),
+}));
+
 vi.mock("@/contexts/OrgContext", () => ({
   useOrg: () => ({
     currentOrg: { id: "test-org-id", name: "Test Org", slug: "test-org" },
@@ -130,6 +134,8 @@ vi.mock("@/hooks/useApi", () => {
   useEvent: () => ({ data: null, isLoading: false }),
   useCurrentUser: () => ({ data: { ...mockUser, settings: notificationSettings.value } }),
   useUpdateCurrentUser: () => ({ mutate: vi.fn(), isPending: false }),
+  useUploadAvatar: () => ({ mutate: vi.fn(), isPending: false }),
+  useDeleteAvatar: () => ({ mutate: vi.fn(), isPending: false }),
   useUserOrganizations: () => ({ data: mockOrgs, isLoading: false }),
   useUpdateUserSetting: () => ({ mutate: vi.fn(), isPending: false }),
   usePersonalSettings: () => ({ data: undefined, isLoading: false }),
@@ -141,6 +147,11 @@ vi.mock("@/hooks/useApi", () => {
       tokenThreshold: 500000,
     },
     isLoading: false,
+  }),
+  useDownloadPersonalExport: () => ({
+    download: vi.fn(),
+    isDownloading: false,
+    error: null,
   }),
   };
 });

@@ -8,7 +8,6 @@ import {
   YAxis,
 } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import {
   ChartContainer,
   ChartTooltip,
@@ -17,6 +16,7 @@ import {
 import type { ChartConfig } from "@/components/ui/chart";
 import { ChartSkeleton } from "@/components/ui/skeletons";
 import { ErrorState } from "@/components/ui/error-state";
+import { RangeSegmentedControl } from "@/components/dashboard/RangeSegmentedControl";
 import { formatDateLabel, sliceCostTrendWindow } from "@/lib/dashboardUtils";
 import { formatCost } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
@@ -38,6 +38,11 @@ interface CostTrendChartProps {
 }
 
 type TimeRange = "7d" | "30d";
+
+const COST_TREND_RANGE_OPTIONS = [
+  { value: "7d" as const, label: "7 days" },
+  { value: "30d" as const, label: "30 days" },
+];
 
 const chartConfig = {
   cost: {
@@ -86,24 +91,12 @@ export function CostTrendChart({
           </CardDescription>
         </div>
         {!allTime && (
-          <div className="flex gap-1">
-            <Button
-              variant={timeRange === "7d" ? "secondary" : "ghost"}
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => setTimeRange("7d")}
-            >
-              7 days
-            </Button>
-            <Button
-              variant={timeRange === "30d" ? "secondary" : "ghost"}
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => setTimeRange("30d")}
-            >
-              30 days
-            </Button>
-          </div>
+          <RangeSegmentedControl
+            value={timeRange}
+            options={COST_TREND_RANGE_OPTIONS}
+            onChange={setTimeRange}
+            aria-label="Cost trend time range"
+          />
         )}
       </CardHeader>
       <CardContent>

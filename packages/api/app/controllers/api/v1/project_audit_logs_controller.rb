@@ -44,6 +44,7 @@ module Api
         # Use authorized_scope so unauthorized project IDs 404 rather than 403-after-load,
         # consistent with IssuesController
         @project = authorized_scope(Project.all).find(params[:project_id])
+        reject_inactive_organization!(@project.organization) if @project.organization_id.present?
       end
     end
   end

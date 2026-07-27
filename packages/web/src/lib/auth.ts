@@ -2,6 +2,7 @@ import { UserManager, User, Log, ErrorResponse } from "oidc-client-ts";
 import type { UserManagerSettings } from "oidc-client-ts";
 import { config } from "./config";
 import { reportAuthError } from "./rollbar";
+import { ORG_STORAGE_KEY } from "../contexts/OrgContext";
 
 if (import.meta.env.DEV) {
   Log.setLogger(console);
@@ -119,6 +120,9 @@ export async function loginCallback(): Promise<User> {
 }
 
 export async function logout(): Promise<void> {
+  // Clear the stored org so the default_org_id preference wins on the next login
+  // instead of the last-used org from this session (AIX-318).
+  localStorage.removeItem(ORG_STORAGE_KEY);
   const manager = getUserManager();
   await manager.signoutRedirect();
 }

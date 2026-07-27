@@ -15,6 +15,7 @@ class Organization < ApplicationRecord
   has_many :notifications, dependent: :destroy
   has_many :organization_provider_settings, dependent: :destroy
   has_many :scheduled_exports, dependent: :destroy
+  has_many :export_records, dependent: :destroy
 
   validates :name, presence: true
   validates :slug, presence: true, uniqueness: true, format: { with: /\A[a-z0-9]+(?:-[a-z0-9]+)*\z/, message: "must be lowercase alphanumeric with hyphens" }

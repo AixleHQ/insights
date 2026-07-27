@@ -264,6 +264,40 @@ RSpec.describe 'Api::V1::OrganizationMembers', type: :request do
     end
   end
 
+  describe 'GET /api/v1/organizations/:organization_id/members/:id/removal_preview' do
+    it 'returns sole-owner projects and new owner for an admin remove' do
+      project = create(:project, organization: organization, name: 'Solo Project')
+      create(:project_membership, :owner, user: member, project: project)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/removal_preview",
+                        user: owner,
+                        organization: organization
+
+      expect_success
+      expect(json_data[:sole_owner_projects]).to contain_exactly(
+        hash_including(id: project.id, name: 'Solo Project')
+      )
+      expect(json_data[:new_owner]).to include(id: owner.id, email: owner.email)
+    end
+
+    it 'allows a member to preview their own leave' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/removal_preview",
+                        user: member,
+                        organization: organization
+
+      expect_success
+      expect(json_data[:sole_owner_projects]).to eq([])
+    end
+
+    it 'forbids a member from previewing another member removal' do
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{owner_membership.id}/removal_preview",
+                        user: member,
+                        organization: organization
+
+      expect_forbidden
+    end
+  end
+
   describe 'DELETE /api/v1/organizations/:organization_id/members/:id' do
     it 'removes a member as owner' do
       authenticated_delete "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}",
@@ -272,6 +306,99 @@ RSpec.describe 'Api::V1::OrganizationMembers', type: :request do
 
       expect_no_content
       expect(OrganizationMembership.find_by(id: member_membership.id)).to be_nil
+    end
+
+    it 'creates a member.removed organization audit log' do
+      expect do
+        authenticated_delete "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}",
+                             user: owner,
+                             organization: organization
+      end.to change(OrganizationAuditLog, :count).by(1)
+
+      log = OrganizationAuditLog.order(:created_at).last
+      expect(log.action).to eq('member.removed')
+      expect(log.tracked_changes.with_indifferent_access).to include(user_id: member.id, role: 'member')
+    end
+
+    it 'transfers sole-owner projects to the removing owner and clears project memberships' do
+      project = create(:project, organization: organization)
+      create(:project_membership, :owner, user: member, project: project)
+
+      authenticated_delete "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}",
+                           user: owner,
+                           organization: organization
+
+      expect_no_content
+      expect(ProjectMembership.find_by(user_id: member.id, project_id: project.id)).to be_nil
+      expect(ProjectMembership.find_by(user_id: owner.id, project_id: project.id)).to have_attributes(role: 'owner')
+    end
+
+    it 'allows a member to leave and cleans up project memberships' do
+      project = create(:project, organization: organization)
+      create(:project_membership, :owner, user: member, project: project)
+
+      authenticated_delete "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}",
+                           user: member,
+                           organization: organization
+
+      expect_no_content
+      expect(OrganizationMembership.find_by(id: member_membership.id)).to be_nil
+      expect(ProjectMembership.find_by(user_id: owner.id, project_id: project.id)).to have_attributes(role: 'owner')
+    end
+
+    it 'allows an owner to leave when another owner exists' do
+      authenticated_delete "/api/v1/organizations/#{organization.id}/members/#{owner_membership.id}",
+                           user: owner,
+                           organization: organization
+
+      expect_no_content
+      expect(OrganizationMembership.find_by(id: owner_membership.id)).to be_nil
+    end
+
+    it 'transfers sole-owner projects to a global admin actor who is an org member' do
+      global_admin = create(:user, :global_admin)
+      create(:organization_membership, user: global_admin, organization: organization, role: 'member')
+      project = create(:project, organization: organization, name: 'Admin Transfer Project')
+      create(:project_membership, :owner, user: member, project: project)
+
+      authenticated_delete "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}",
+                           user: global_admin,
+                           organization: organization
+
+      expect_no_content
+      expect(ProjectMembership.find_by(user_id: member.id, project_id: project.id)).to be_nil
+      expect(ProjectMembership.find_by(user_id: global_admin.id, project_id: project.id)).to have_attributes(role: 'owner')
+    end
+
+    it 'returns 422 when a global admin tries to remove the last org owner' do
+      global_admin = create(:user, :global_admin)
+      create(:organization_membership, user: global_admin, organization: organization, role: 'member')
+      admin_membership.destroy!
+      member_membership.destroy!
+
+      authenticated_delete "/api/v1/organizations/#{organization.id}/members/#{owner_membership.id}",
+                           user: global_admin,
+                           organization: organization
+
+      expect_unprocessable
+      expect(OrganizationMembership.exists?(owner_membership.id)).to be true
+    end
+
+    it 'returns 422 when the removal service cannot resolve a transfer target' do
+      project = create(:project, organization: organization)
+      create(:project_membership, :owner, user: member, project: project)
+
+      allow(OrganizationMembershipRemovalService).to receive(:call).and_raise(
+        OrganizationMembershipRemovalService::Error,
+        'Cannot transfer sole-owner projects: no eligible new owner'
+      )
+
+      authenticated_delete "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}",
+                           user: owner,
+                           organization: organization
+
+      expect_unprocessable
+      expect(json_errors).to include(hash_including(field: 'base', message: /no eligible new owner/))
     end
 
     it 'member cannot remove an owner' do
@@ -284,7 +411,7 @@ RSpec.describe 'Api::V1::OrganizationMembers', type: :request do
 
     it 'returns 403 when an owner attempts to remove themselves as the last owner' do
       # After admin_membership is removed, owner is the sole owner.
-      # Policy blocks self-removal with 403 (actor == subject).
+      # Policy blocks self-removal with 403.
       # The model-level guard for this invariant is covered in organization_membership_spec.rb.
       admin_membership.destroy
 

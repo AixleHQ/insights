@@ -57,5 +57,55 @@ RSpec.describe ScheduledExportMailer, type: :mailer do
         expect(mail.attachments.first.filename).to match(/\.json\z/)
       end
     end
+
+    context "HTML part" do
+      let(:html) { mail.html_part.body.decoded }
+
+      it "is a single well-formed HTML document (no nested layout)" do
+        expect(html).to include("<!DOCTYPE")
+        expect(html).to include("<html")
+        expect(html).to include("<body")
+      end
+
+      it "includes the Aixle Insights brand name" do
+        expect(html).to include("Aixle Insights")
+      end
+
+      it "includes the report type in the heading" do
+        expect(html).to include("Cost by tool")
+      end
+
+      it "includes the organization name" do
+        expect(html).to include("Acme Corp")
+      end
+
+      it "includes format, frequency, and generated-at metadata" do
+        expect(html).to include("CSV")
+        expect(html).to include("Daily")
+        expect(html).to match(/\d{4}-\d{2}-\d{2}/)
+      end
+
+      it "has the branded card structure" do
+        expect(html).to include('class="card"')
+        expect(html).to include('class="logo-text"')
+        expect(html).to include('class="footer"')
+      end
+    end
+
+    context "text part" do
+      let(:text) { mail.text_part.body.decoded }
+
+      it "includes plain text report summary" do
+        expect(text).to include("Scheduled Report: Cost by tool")
+        expect(text).to include("Acme Corp")
+        expect(text).to include("CSV")
+        expect(text).to include("Daily")
+        expect(text).to match(/\d{4}-\d{2}-\d{2}/)
+      end
+
+      it "includes the automated report disclaimer" do
+        expect(text).to include("automated report from Aixle Insights")
+      end
+    end
   end
 end

@@ -3,6 +3,7 @@ class ApplicationController < ActionController::API
 
   before_action :authenticate_user!
   before_action :set_current_organization
+  before_action :set_active_storage_url_options
 
   attr_reader :current_user, :current_organization
 
@@ -33,6 +34,11 @@ class ApplicationController < ActionController::API
 
     unless @current_organization
       render json: { error: "Organization not found or access denied" }, status: :forbidden
+      return
+    end
+
+    unless @current_organization.is_active?
+      render json: { error: "Organization inactive or access denied" }, status: :forbidden
     end
   end
 
@@ -65,7 +71,39 @@ class ApplicationController < ActionController::API
 
   private
 
+  def set_active_storage_url_options
+    ActiveStorage::Current.url_options = active_storage_url_options
+  end
+
+  def active_storage_url_options
+    if ENV["APP_URL"].present?
+      uri = URI.parse(ENV["APP_URL"])
+      options = { protocol: uri.scheme, host: uri.host }
+      options[:port] = uri.port if uri.port && !default_port?(uri.scheme, uri.port)
+      return options
+    end
+
+    # Local docker dev fallback: Rails sees internal service host (api:3000).
+    if Rails.env.development? && request.host == "api"
+      return { protocol: "http", host: "localhost", port: 3000 }
+    end
+
+    { host: request.base_url }
+  rescue URI::InvalidURIError
+    { host: request.base_url }
+  end
+
+  def default_port?(protocol, port)
+    (protocol == "http" && port == 80) || (protocol == "https" && port == 443)
+  end
+
   def render_unauthorized(message = "Unauthorized")
     render json: { error: "Unauthorized", message: message }, status: :unauthorized
+  end
+
+  def reject_inactive_organization!(org)
+    return if org.nil? || org.is_active?
+
+    render json: { error: "Organization inactive or access denied" }, status: :forbidden
   end
 end

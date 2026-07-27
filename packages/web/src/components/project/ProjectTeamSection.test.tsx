@@ -42,9 +42,11 @@ describe("ProjectTeamSection", () => {
     expect(screen.getByText("Leaderboard")).toBeInTheDocument();
   });
 
-  it("shows top contributors by spend subtitle", () => {
+  it("labels the leaderboard as all-time and project-scoped", () => {
     render(<ProjectTeamSection members={mockMembers} />);
-    expect(screen.getByText("Top contributors by spend")).toBeInTheDocument();
+    expect(
+      screen.getByText("All-time top contributors by spend in this project")
+    ).toBeInTheDocument();
   });
 
   it("renders member names sorted by cost descending", () => {

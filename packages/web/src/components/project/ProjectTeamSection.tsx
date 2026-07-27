@@ -52,7 +52,7 @@ export function ProjectTeamSection({
             <Trophy className="size-4 text-muted-foreground" />
             <CardTitle className="text-base">Leaderboard</CardTitle>
           </div>
-          <CardDescription>Top contributors by spend</CardDescription>
+          <CardDescription>All-time top contributors by spend in this project</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
@@ -72,7 +72,7 @@ export function ProjectTeamSection({
           <Trophy className="size-4 text-muted-foreground" />
           <CardTitle className="text-base">Leaderboard</CardTitle>
         </div>
-        <CardDescription>Top contributors by spend</CardDescription>
+        <CardDescription>All-time top contributors by spend in this project</CardDescription>
       </CardHeader>
       <CardContent>
         {ranked.length === 0 ? (

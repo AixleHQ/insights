@@ -35,6 +35,7 @@ import {
   useUpdateProjectMember,
   useOrganizationMembers,
   type ProjectMember,
+  type MemberStatsRange,
 } from "@/hooks/useApi";
 import { formatCount, formatCost, formatTokens } from "@/lib/formatters";
 import {
@@ -45,6 +46,7 @@ import {
 import { ApiError } from "@/lib/api";
 import { AppRoutes } from "@/lib/routes";
 import type { OrganizationMember } from "@/lib/types";
+import { RANGE_OPTIONS, RANGE_SUBTITLE } from "@/lib/memberStatsRange";
 
 const ROLES = ["member", "owner", "viewer"];
 
@@ -69,9 +71,10 @@ export function ProjectMembersTab({
   const [addError, setAddError] = useState<string | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
   const [roleError, setRoleError] = useState<string | null>(null);
+  const [range, setRange] = useState<MemberStatsRange>("30d");
 
   const { data: members = [] } = useProjectMembers(projectId);
-  const { data: stats } = useProjectMemberStats(projectId, 30, isProjectOwner);
+  const { data: stats } = useProjectMemberStats(projectId, range, isProjectOwner);
   const { data: orgMembers = [] } = useOrganizationMembers(orgId, {
     enabled: canManageMembers,
   });
@@ -335,6 +338,26 @@ export function ProjectMembersTab({
           {roleError}
         </p>
       )}
+      {/* Usage-stats time-range selector — the columns below (Tokens, Events, Cost, Last Active)
+          are scoped to this project and to the selected window; the roster above is all-time. */}
+      <div className="flex items-center justify-between gap-3">
+        <p className="type-caption text-muted-foreground">
+          Usage stats: {RANGE_SUBTITLE[range]} &middot; this project
+        </p>
+        <div className="flex gap-1">
+          {RANGE_OPTIONS.map((opt) => (
+            <Button
+              key={opt.value}
+              variant={range === opt.value ? "default" : "ghost"}
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => setRange(opt.value)}
+            >
+              {opt.label}
+            </Button>
+          ))}
+        </div>
+      </div>
 
       <Table>
         <TableHeader>
