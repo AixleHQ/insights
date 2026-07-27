@@ -85,6 +85,9 @@ Rails.application.routes.draw do
         # Scheduled report exports
         resources :scheduled_exports, only: %i[index create update destroy]
 
+        # On-demand export records (history + async generation)
+        resources :export_records, only: %i[index create]
+
         # Organization audit logs (export + unified must precede the resource to avoid capture by :index)
         get "audit_logs/unified/export", to: "unified_audit_logs#export"
         get "audit_logs/unified",        to: "unified_audit_logs#index"

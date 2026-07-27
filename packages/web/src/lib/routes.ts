@@ -24,6 +24,7 @@ export const AppRoutes = {
   dashboard: "/",
   notifications: "/notifications",
   alerts: "/alerts",
+  exports: "/exports",
   // Events
   events: {
     root: "/events",

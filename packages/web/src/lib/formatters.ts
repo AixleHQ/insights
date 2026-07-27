@@ -59,6 +59,13 @@ export function truncateModelName(name: string): string {
   return name.length > 30 ? `${name.slice(0, 30)}…` : name;
 }
 
+export function formatFileSize(bytes: number | null | undefined): string {
+  if (bytes == null) return "—";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 const US_DATETIME_DISPLAY: Intl.DateTimeFormatOptions = {
   dateStyle: "medium",
   timeStyle: "short",

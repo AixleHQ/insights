@@ -6327,6 +6327,79 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationError'
 
+  /api/v1/organizations/{organization_id}/export_records:
+    get:
+      summary: List export records
+      description: Returns all export records for the organization, newest first. Requires owner role.
+      tags:
+        - Export Records
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+      responses:
+        '200':
+          description: Export records list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ExportRecord'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      summary: Create an on-demand export
+      description: |
+        Creates a new export record and enqueues generation asynchronously.
+        Returns 202 Accepted immediately. Poll the index endpoint until status is `ready` or `failed`.
+        Requires owner role.
+      tags:
+        - Export Records
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+        - $ref: '#/components/parameters/X-Organization-ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - report_type
+              properties:
+                report_type:
+                  type: string
+                  enum: [cost_by_user, cost_by_project, cost_by_tool, token_by_user, token_by_tool]
+                format:
+                  type: string
+                  enum: [csv, json]
+                  default: csv
+      responses:
+        '202':
+          description: Export creation accepted — generation queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ExportRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
   /api/v1/organizations/{organization_id}/scheduled_exports:
     get:
       summary: List scheduled exports
@@ -8383,6 +8456,62 @@ components:
           description: Present when recipientType is 'user'.
         enabled:
           type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ExportRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        reportType:
+          type: string
+          enum: [cost_by_user, cost_by_project, cost_by_tool, token_by_user, token_by_tool]
+        format:
+          type: string
+          enum: [csv, json]
+        frequency:
+          type: string
+          nullable: true
+          enum: [daily, weekly, monthly]
+          description: Non-null when triggered by a scheduled export; null for on-demand.
+        status:
+          type: string
+          enum: [pending, generating, ready, failed]
+        rowCount:
+          type: integer
+          nullable: true
+        fileSizeBytes:
+          type: integer
+          nullable: true
+        createdBy:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+              nullable: true
+            email:
+              type: string
+        downloadUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: Presigned download URL. Present only when status is ready and not expired.
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
         createdAt:
           type: string
           format: date-time

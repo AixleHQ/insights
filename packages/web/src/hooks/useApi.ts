@@ -57,6 +57,11 @@ import type {
   MyToolAccountMetadata,
   McpIngestExchangeData,
   DashboardPeriod,
+  ExportRecord,
+  ScheduledExport,
+  ExportReportType,
+  ExportFormat,
+  ExportFrequency,
 } from "@/lib/types";
 import type { IntegrationProvider } from "@/lib/providers";
 
@@ -2595,6 +2600,123 @@ export function useUpdateOrgProviderSetting(orgId: string) {
     onSettled: () => {
       queryClient.invalidateQueries({
         queryKey: ["organizations", orgId, "organization_provider_settings"],
+      });
+    },
+  });
+}
+
+// ── Export Records ──────────────────────────────────────────────────────────
+
+export function useExportRecords(orgId: string, page = 1) {
+  return useQuery({
+    queryKey: ["organizations", orgId, "export_records", page],
+    queryFn: async () => {
+      const params = new URLSearchParams({ page: String(page) });
+      return api.get<PaginatedResponse<ExportRecord>>(
+        `/organizations/${orgId}/export_records?${params}`
+      );
+    },
+    enabled: !!orgId,
+    placeholderData: (prev) => prev,
+    // Poll every 3 seconds while any record is pending or generating
+    refetchInterval: (query) => {
+      const data = query.state.data as PaginatedResponse<ExportRecord> | undefined;
+      if (!data?.data.length) return false;
+      return data.data.some((r) => r.status === "pending" || r.status === "generating") ? 3_000 : false;
+    },
+  });
+}
+
+export function useCreateExportRecord(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { report_type: ExportReportType; format?: ExportFormat }) =>
+      api.post<{ data: ExportRecord }>(
+        `/organizations/${orgId}/export_records`,
+        { export_record: data }
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["organizations", orgId, "export_records"],
+      });
+    },
+  });
+}
+
+// ── Scheduled Exports ───────────────────────────────────────────────────────
+
+export function useScheduledExports(orgId: string, page = 1) {
+  return useQuery({
+    queryKey: ["organizations", orgId, "scheduled_exports", page],
+    queryFn: async () => {
+      const params = new URLSearchParams({ page: String(page) });
+      return api.get<PaginatedResponse<ScheduledExport>>(
+        `/organizations/${orgId}/scheduled_exports?${params}`
+      );
+    },
+    enabled: !!orgId,
+    placeholderData: (prev) => prev,
+  });
+}
+
+export function useCreateScheduledExport(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      report_type: ExportReportType;
+      format?: ExportFormat;
+      frequency: ExportFrequency;
+      day_of_week?: number | null;
+      day_of_month?: number | null;
+      group_by?: string | null;
+      recipients: string[];
+    }) =>
+      api.post<{ data: ScheduledExport }>(
+        `/organizations/${orgId}/scheduled_exports`,
+        { scheduled_export: data }
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["organizations", orgId, "scheduled_exports"],
+      });
+    },
+  });
+}
+
+export function useUpdateScheduledExport(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...data
+    }: {
+      id: string;
+      active?: boolean;
+      recipients?: string[];
+      frequency?: ExportFrequency;
+      day_of_week?: number | null;
+      day_of_month?: number | null;
+    }) =>
+      api.patch<{ data: ScheduledExport }>(
+        `/organizations/${orgId}/scheduled_exports/${id}`,
+        { scheduled_export: data }
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["organizations", orgId, "scheduled_exports"],
+      });
+    },
+  });
+}
+
+export function useDeleteScheduledExport(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api.delete(`/organizations/${orgId}/scheduled_exports/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["organizations", orgId, "scheduled_exports"],
       });
     },
   });
