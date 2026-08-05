@@ -48,7 +48,7 @@ You can also set `DB90_ORGANIZATION_ID=<uuid>` in your shell environment, or pin
 | `aixle-insights run --once` | Perform one multi-tool sync, exit. Useful for cron / manual flushes. |
 | `aixle-insights run --once --full` | Backfill: ignore Cursor watermarks and commit-hash dedupe. |
 | `aixle-insights init` | Keycloak device login + persist credentials + merge `~/.claude.json` entry. |
-| `aixle-insights init --host <url>` | Use a DB90 API origin for token exchange. Remote hosts must use HTTPS; `http://localhost` and loopback addresses are allowed for local development. |
+| `aixle-insights init --host <url>` | Use a Aixle Insights API origin for token exchange. Remote hosts must use HTTPS; `http://localhost` and loopback addresses are allowed for local development. |
 | `aixle-insights init --insecure --host http://...` | Allow a remote plaintext HTTP host for a trusted non-production test endpoint. Prints a warning because tokens and telemetry can be exposed. |
 | `aixle-insights init --hooks --tool-name cursor` | Also install the Cursor-side hook forwarder (opt-in; requires Cursor restart). |
 | `aixle-insights uninstall-hooks` | Remove the hook forwarder + restore `~/.cursor/hooks.json` backup. |
@@ -129,8 +129,8 @@ aixle-insights verify-hooks  # JSON: hooks installed + queue depth
 
 | Symptom | Most likely cause | Fix |
 |---|---|---|
-| `Error: DB90 API host <name> uses remote plaintext HTTP.` | You passed `--host http://<remote>` without `--insecure`. | Use `https://...`, or add `--insecure` if you know the endpoint is trusted and non-production. |
-| `Auth failed: fetch failed` during `init` | The `--keycloak-url` host doesn't resolve (NXDOMAIN), is behind a VPN, or the TLS cert is bad. | Verify with `curl -sS https://<host>/realms/<realm>/.well-known/openid-configuration`. For DB90 staging, the canonical Keycloak URL is embedded in the SPA — `curl https://<APP_HOST> \| grep keycloakUrl` extracts the current value. |
+| `Error: Aixle Insights API host <name> uses remote plaintext HTTP.` | You passed `--host http://<remote>` without `--insecure`. | Use `https://...`, or add `--insecure` if you know the endpoint is trusted and non-production. |
+| `Auth failed: fetch failed` during `init` | The `--keycloak-url` host doesn't resolve (NXDOMAIN), is behind a VPN, or the TLS cert is bad. | Verify with `curl -sS https://<host>/realms/<realm>/.well-known/openid-configuration`. For Aixle Insights staging, the canonical Keycloak URL is embedded in the SPA — `curl https://<APP_HOST> \| grep keycloakUrl` extracts the current value. |
 | `Failed to post event: HTTP 401 Unauthorized` repeated for every turn | Your saved ingest token has been rotated, revoked, or invalidated by a server redeploy. The ingest token is distinct from the Keycloak access token that `health` reports as `authenticated: true`. | Reset the keychain entry and re-run `init`: `security delete-generic-password -s "aixle-insights" -a "aixle-insights-ingest-credential"` then `rm -f ~/.aixle-insights/credentials.json` then `aixle-insights init --host ... --keycloak-url ...`. State files are **not** deleted, so already-sent sessions stay deduped. |
 | `health` shows `authenticated: true` but `last_result` is `sent: 0, failed: N` cycle after cycle | Same as the 401 row above. `authenticated` only proves the OIDC token was acquired, not that the ingest token still validates server-side. | Re-init as above. |
 | `last_result` reports `sent: N` but the Events UI shows nothing | The Temporal worker is not running. The ingest endpoint returns HTTP 202 (queued) regardless of worker state. | `make worker` (or check `docker ps` for `db90-worker`). See [LOCAL-DEV.md](./LOCAL-DEV.md) §1. |

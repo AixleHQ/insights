@@ -5,7 +5,7 @@ describe("evaluateTransportSecurity", () => {
   it("allows remote HTTPS without a warning", () => {
     const result = evaluateTransportSecurity("https://api.example.com", {
       allowInsecureHttp: false,
-      label: "DB90 API host",
+      label: "Aixle Insights API host",
     });
 
     expect(result.ok).toBe(true);
@@ -20,7 +20,7 @@ describe("evaluateTransportSecurity", () => {
   ])("allows local HTTP without a warning: %s", (host) => {
     const result = evaluateTransportSecurity(host, {
       allowInsecureHttp: false,
-      label: "DB90 API host",
+      label: "Aixle Insights API host",
     });
 
     expect(result.ok).toBe(true);
@@ -30,7 +30,7 @@ describe("evaluateTransportSecurity", () => {
   it("rejects remote HTTP without the insecure opt-in", () => {
     const result = evaluateTransportSecurity("http://api.example.com", {
       allowInsecureHttp: false,
-      label: "DB90 API host",
+      label: "Aixle Insights API host",
     });
 
     expect(result.ok).toBe(false);
@@ -44,7 +44,7 @@ describe("evaluateTransportSecurity", () => {
   it("allows remote HTTP with an explicit warning when insecure is enabled", () => {
     const result = evaluateTransportSecurity("http://api.example.com", {
       allowInsecureHttp: true,
-      label: "DB90 API host",
+      label: "Aixle Insights API host",
     });
 
     expect(result.ok).toBe(true);
@@ -57,11 +57,11 @@ describe("evaluateTransportSecurity", () => {
   it("rejects malformed URLs", () => {
     const result = evaluateTransportSecurity("not a url", {
       allowInsecureHttp: false,
-      label: "DB90 API host",
+      label: "Aixle Insights API host",
     });
 
     expect(result.ok).toBe(false);
-    expect(result.error).toContain("DB90 API host");
+    expect(result.error).toContain("Aixle Insights API host");
     expect(result.error).toContain("valid URL");
   });
 });

@@ -446,7 +446,7 @@ RSpec.describe ToolEvents::Upsert do
     let(:organization) { create(:organization) }
     let(:user)         { create(:user) }
 
-    # Mirrors the staging event 9e67dae7 pattern (Grace Hopper, 2026-07-01):
+    # Mirrors the staging event 9e67dae7 pattern (2026-07-01):
     # a stale CLI sends tokens_in = base + cache_read + cache_write while the
     # metadata carries the correct base_input_tokens + cache breakdown.
     let(:inflated_attributes) do

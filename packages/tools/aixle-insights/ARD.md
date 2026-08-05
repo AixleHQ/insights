@@ -7,7 +7,7 @@ Architecture Reference Document for the `@aixle/insights` npm package.
 `@aixle/insights` is a local-first telemetry connector that:
 
 - collects AI coding-assistant activity from Claude Code and Cursor,
-- normalizes events into DB90 ingest payloads,
+- normalizes events into Aixle Insights ingest payloads,
 - and exposes operational controls through an MCP stdio server.
 
 The package is designed so a teammate can run a single `init` flow and then rely on background sync, instead of custom cron jobs, shell scripts, or manual exports.
@@ -26,14 +26,14 @@ The package is designed so a teammate can run a single `init` flow and then rely
   - Cursor SQLite stores (`state.vscdb`, legacy `cursor.db`)
   - Cursor agent transcript files
   - Optional Cursor hook queue (`hooks-queue.ndjson`)
-- Credential lifecycle via Keycloak Device Flow and DB90 MCP token exchange.
+- Credential lifecycle via Keycloak Device Flow and Aixle Insights MCP token exchange.
 - Local state management (checkpoints, lock, retry/backoff, diagnostics).
 
 ### Out of scope
 
-- DB90 backend processing/storage internals after `POST /api/v1/ingest/events`.
+- Aixle Insights backend processing/storage internals after `POST /api/v1/ingest/events`.
 - UI/reporting concerns.
-- Server-side auth policies (handled by DB90 API + Keycloak).
+- Server-side auth policies (handled by Aixle Insights API + Keycloak).
 
 ## 3) High-Level Architecture
 
@@ -69,7 +69,7 @@ The package is designed so a teammate can run a single `init` flow and then rely
 1. `init` performs Keycloak device authorization and exchanges for ingest token(s).
 2. Credentials are saved in keychain when available, otherwise in `~/.aixle-insights/credentials.json` (mode 0600 on POSIX).
 3. `run` starts MCP server and background sync.
-4. Sync reads local sources, maps payloads, and posts to DB90 ingest API.
+4. Sync reads local sources, maps payloads, and posts to Aixle Insights ingest API.
 5. Checkpoints/watermarks/state are persisted per credential (`state-<hostname>-<token-hash>.json`) to avoid duplicate sends.
 6. Diagnostics are surfaced through `health`/`db90_status` and `mcp.log`.
 

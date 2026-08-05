@@ -1,6 +1,6 @@
 ---
 name: component-builder
-description: Executor that builds Figma-driven shadcn/Radix UI components for DB90 — reads Figma context, diffs current code, writes the component.
+description: Executor that builds Figma-driven shadcn/Radix UI components for Aixle Insights — reads Figma context, diffs current code, writes the component.
 tools: Read, Write, Edit, Bash, Glob, Grep
 model: sonnet
 ---
@@ -41,7 +41,7 @@ Do not proceed past a tripwire without reviewer confirmation.
 5. **Write the component** — follow shadcn/Radix patterns, use `cva` for variants, use only design tokens from `index.css`, no raw hex, no arbitrary Tailwind values.
 6. **Check tripwires again** — at completion, before declaring done.
 
-## DB90 design conventions
+## Aixle Insights design conventions
 
 - **Design tokens only.** Use CSS variables from `packages/web/src/index.css` (e.g. `bg-background`, `text-foreground`, `border-border`). Never raw hex. Never `text-[#1a2b3c]`.
 - **Dark mode parity.** Every variant must render correctly in both `light` and `dark` Tailwind themes.

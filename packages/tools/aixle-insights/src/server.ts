@@ -148,7 +148,7 @@ export function createDb90McpServer(): McpServer {
     "db90_sync_now",
     {
       description:
-        "Runs one DB90 ingest sync cycle for enabled tools immediately (matches background cadence). " +
+        "Runs one Aixle Insights ingest sync cycle for enabled tools immediately (matches background cadence). " +
           "Optional `tools` subset filter: omit to sync every tool credential you have authenticated (Claude transcripts + Cursor telemetry).",
       inputSchema: SYNC_NOW_INPUT_SCHEMA,
     },

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 echo "=========================================="
-echo "DB90 Development Setup"
+echo "Aixle Insights Development Setup"
 echo "=========================================="
 echo ""
 

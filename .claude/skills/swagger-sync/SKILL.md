@@ -5,7 +5,7 @@ description: Reminds to update packages/api/swagger/v1/swagger.yaml in the same 
 
 # swagger-sync
 
-You are about to edit a Rails controller or route. The DB90 project rule (see CLAUDE.md) requires that **Swagger stay in lockstep with the implementation at all times**.
+You are about to edit a Rails controller or route. The Aixle Insights project rule (see CLAUDE.md) requires that **Swagger stay in lockstep with the implementation at all times**.
 
 ## Hard rule
 

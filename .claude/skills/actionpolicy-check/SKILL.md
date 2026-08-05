@@ -1,11 +1,11 @@
 ---
 name: actionpolicy-check
-description: Ensures authorize! is called at the start of each Rails controller action (DB90 uses ActionPolicy, not Pundit/CanCan).
+description: Ensures authorize! is called at the start of each Rails controller action (Aixle Insights uses ActionPolicy, not Pundit/CanCan).
 ---
 
 # actionpolicy-check
 
-DB90 uses **ActionPolicy** for authorization. Every controller action must call `authorize!` at the top.
+Aixle Insights uses **ActionPolicy** for authorization. Every controller action must call `authorize!` at the top.
 
 ## Rule
 

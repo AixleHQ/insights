@@ -1,11 +1,87 @@
-# DB90
+# Aixle Insights
+
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Ruby](https://img.shields.io/badge/Ruby-3.4-CC342D?logo=ruby&logoColor=white)](.tool-versions)
+[![Rails](https://img.shields.io/badge/Rails-8.1-CC0000?logo=rubyonrails&logoColor=white)](packages/api)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](packages/web)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](packages/web)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 AI tool analytics platform for tracking and managing coding assistant usage across organizations. Monitors tools like ChatGPT, Claude, GitHub Copilot, and others — capturing token consumption, costs, and usage patterns with built-in risk scanning and data retention policies.
 
+## Quickstart
+
+```bash
+git clone https://github.com/dualboot-partners/aixle-insights.git
+cd aixle-insights
+make setup          # build, start services, create + migrate + seed DB
+make api & make web # Rails on :3000, Vite on :5173
+```
+
+Then open [localhost:5173](http://localhost:5173) and sign in via Keycloak. Full
+step-by-step setup is in [Getting Started](#getting-started).
+
+## Table of Contents
+
+- [Features](#features)
+- [Architecture](#architecture)
+- [Prerequisites](#prerequisites)
+- [Getting Started](#getting-started)
+- [Auth](#auth)
+- [Integrations](#integrations)
+- [Makefile Reference](#makefile-reference)
+- [Testing](#testing)
+- [Ports](#ports)
+- [Contributing](#contributing)
+- [Security](#security)
+- [License](#license)
+
+## Features
+
+- **Multi-tool telemetry** — track usage across ChatGPT, Claude, GitHub Copilot, Cursor, and more from one place.
+- **Cost & token analytics** — per-user, per-team, and per-organization breakdowns of tokens and spend over time.
+- **Risk scanning** — a versioned sanitization pipeline flags and redacts sensitive content before it is persisted.
+- **Data retention policies** — configurable retention backed by TimescaleDB hypertables and automated policies.
+- **Broad integrations** — GitHub, GitLab, Bitbucket, Jira, Linear, and direct AI-provider keys (Anthropic, OpenAI, OpenRouter, Gemini).
+- **Enterprise auth** — Keycloak (OIDC) with optional Google social login.
+- **Durable workflows** — Temporal.io orchestrates ingestion and sanitization with retries and state.
+
 ## Architecture
 
+```mermaid
+flowchart LR
+    subgraph Client
+        Web["React 19 + Vite<br/>(web)"]
+    end
+    subgraph API["Rails 8.1 API"]
+        REST["REST / OpenAPI"]
+        Pol["Action Policy"]
+    end
+    subgraph Async
+        Sidekiq["Sidekiq"]
+        Temporal["Temporal.io<br/>ingest + sanitize"]
+    end
+    subgraph Data
+        PG[("PostgreSQL 17<br/>+ TimescaleDB")]
+        Redis[("Redis")]
+        MinIO[("MinIO / S3")]
+    end
+    KC["Keycloak (OIDC)"]
+
+    Web -->|OIDC| KC
+    Web -->|JWT| REST
+    REST --> Pol
+    REST --> PG
+    REST --> Redis
+    REST --> Sidekiq
+    REST --> Temporal
+    Temporal --> PG
+    Sidekiq --> Redis
+    REST --> MinIO
 ```
-db90-rails/
+
+```
+aixle-insights/
 ├── packages/
 │   ├── api/          # Rails 8.1 API (port 3000)
 │   └── web/          # React + Vite frontend (port 5173)
@@ -47,6 +123,8 @@ This launches all Docker services:
 | Temporal | `localhost:7233` |
 | Temporal UI | [localhost:8088](http://localhost:8088) |
 | MinIO | [localhost:9000](http://localhost:9000) (console: [9001](http://localhost:9001)) |
+
+> **Note:** The default credentials in `docker-compose.yml` (Postgres `postgres`, MinIO `minioadmin`, Keycloak `admin`) are for **local development only**. Never reuse them in staging or production — override every secret via environment variables before deploying.
 
 ### 2. Install dependencies
 
@@ -124,13 +202,16 @@ Google OAuth goes through Keycloak as an identity broker — Google never redire
    ```
 5. Restart the containers: `docker compose up -d`
 
-## Integration Auth
+## Integrations
 
 Each integration uses either an OAuth app (code hosting / project management) or a plain API key (AI providers). Credentials are passed to the Rails API via environment variables — add them to your `.env` file and `docker-compose.yml` under the `api` service's `environment:` block, then restart the container.
 
 ```bash
 docker compose up -d api
 ```
+
+<details>
+<summary><b>Integration setup — GitHub, GitLab, Bitbucket, Jira, Linear, Anthropic, OpenAI, OpenRouter, Gemini</b></summary>
 
 ---
 
@@ -269,7 +350,12 @@ No OAuth app needed — generate an API key from [openrouter.ai/settings/keys](h
 
 No OAuth app needed — generate an API key from [Google AI Studio](https://aistudio.google.com/app/apikey). The key is entered directly in the Connect sheet in the UI and validated against `https://generativelanguage.googleapis.com/v1beta/models` before being saved.
 
+</details>
+
 ## Makefile Reference
+
+<details>
+<summary><b>All <code>make</code> commands</b></summary>
 
 ```
 make help                          Show all commands
@@ -309,68 +395,12 @@ Code Generation:
 Setup & Cleanup:
   make setup                       Full setup (build, up, db-create, migrate, seed)
   make clean                       Remove build artifacts
-
-Remote (ECS operations):
-  make remote-build                Build remote container
-  make remote-shell                Shell into remote container
-  make toolbox-shell               Shell into toolbox container
-
-Staging — Exec:
-  make staging-exec-api            Exec into staging API container
-  make staging-exec-web            Exec into staging web container
-  make staging-exec-sidekiq        Exec into staging Sidekiq container
-  make staging-exec-keycloak       Exec into staging Keycloak container
-  make staging-exec-temporal       Exec into staging Temporal container
-
-Staging — Logs:
-  make staging-logs-api            View staging API logs
-  make staging-logs-web            View staging web logs
-  make staging-logs-keycloak       View staging Keycloak logs
-  make staging-logs-temporal       View staging Temporal logs
-  make staging-logs-sidekiq        View staging Sidekiq logs
-  make watch-staging-logs-api      Follow staging API logs
-  make watch-staging-logs-web      Follow staging web logs
-  make watch-staging-logs-keycloak Follow staging Keycloak logs
-  make watch-staging-logs-temporal Follow staging Temporal logs
-  make watch-staging-logs-sidekiq  Follow staging Sidekiq logs
-
-Staging — Build & Deploy:
-  make staging-build               Build & push all staging images
-  make staging-build-api           Build & push staging API image
-  make staging-build-keycloak      Build & push staging Keycloak image
-  make staging-deploy              Deploy all staging services
-  make staging-deploy-api          Deploy staging API
-  make staging-deploy-web          Deploy staging web
-  make staging-deploy-sidekiq      Deploy staging Sidekiq
-  make staging-deploy-keycloak     Deploy staging Keycloak
-  make staging-deploy-temporal-worker  Deploy staging Temporal worker
-
-Production — Exec:
-  make prod-exec-api               Exec into prod API container
-  make prod-exec-web               Exec into prod web container
-  make prod-exec-keycloak          Exec into prod Keycloak container
-
-Production — Logs:
-  make prod-logs-api               View prod API logs
-  make prod-logs-web               View prod web logs
-  make prod-logs-keycloak          View prod Keycloak logs
-  make prod-logs-temporal          View prod Temporal logs
-  make prod-logs-sidekiq           View prod Sidekiq logs
-  make watch-prod-logs-api         Follow prod API logs
-  make watch-prod-logs-web         Follow prod web logs
-  make watch-prod-logs-keycloak    Follow prod Keycloak logs
-  make watch-prod-logs-temporal    Follow prod Temporal logs
-  make watch-prod-logs-sidekiq     Follow prod Sidekiq logs
-
-Production — Build & Deploy:
-  make prod-build                  Build & push all prod images
-  make prod-deploy                 Deploy all prod services
-  make prod-deploy-api             Deploy prod API
-  make prod-deploy-web             Deploy prod web
-  make prod-deploy-sidekiq         Deploy prod Sidekiq
-  make prod-deploy-keycloak        Deploy prod Keycloak
-  make prod-deploy-temporal-worker Deploy prod Temporal worker
 ```
+
+Deployment targets (`make staging-*` / `make prod-*`) exist for the maintainers'
+hosted environments and are intentionally omitted here.
+
+</details>
 
 ## Testing
 
@@ -393,3 +423,21 @@ cd packages/web && npx playwright test # E2E (starts servers automatically)
 | 8088 | Temporal UI |
 | 9000 | MinIO API |
 | 9001 | MinIO Console |
+
+## Contributing
+
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for setup,
+conventions, and the PR process. By participating you agree to abide by our
+[Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Security
+
+To report a security vulnerability, please follow the process in
+[SECURITY.md](SECURITY.md) — do not open a public issue.
+
+## License
+
+Licensed under the [Apache License 2.0](LICENSE).
+
+Third-party licensing considerations (Redis, TimescaleDB TSL features, Sidekiq)
+are disclosed in [NOTICES.md](NOTICES.md).

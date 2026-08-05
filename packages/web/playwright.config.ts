@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Playwright configuration for DB90 e2e tests.
+ * Playwright configuration for Aixle Insights e2e tests.
  *
  * These tests verify that the seeded development data is correctly
  * linked to users after they log in via Keycloak/Google OAuth.

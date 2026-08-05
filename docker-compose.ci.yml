@@ -21,4 +21,4 @@ services:
       POSTGRES_HOST_AUTH_METHOD: trust
 
   redis:
-    image: ghcr.io/dualboot-partners/db90-rails/redis:7
+    image: ghcr.io/dualboot-partners/db90-rails/redis:7.2

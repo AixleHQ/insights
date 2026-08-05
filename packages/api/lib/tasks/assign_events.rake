@@ -24,7 +24,7 @@ namespace :seed do
     org = user.organizations.first
     unless org
       puts "User has no organizations. Creating membership..."
-      org = Organization.find_by(slug: "dualboot-partners")
+      org = Organization.find_by(slug: "acme-corp")
       if org
         OrganizationMembership.create!(user: user, organization: org, role: "member")
         puts "Added user to organization: #{org.name}"

@@ -4,7 +4,7 @@ module Activities
   class GreetingActivity < Temporalio::Activity::Definition
     def execute(name)
       Temporalio::Activity::Context.current.heartbeat("Processing greeting for #{name}")
-      "Hello, #{name}! Welcome to DB90."
+      "Hello, #{name}! Welcome to Aixle Insights."
     end
   end
 end

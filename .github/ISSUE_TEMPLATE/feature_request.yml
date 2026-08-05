@@ -1,0 +1,37 @@
+name: Feature request
+description: Suggest an idea or enhancement for Aixle Insights
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What problem does this solve? What are you trying to do?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the solution you'd like.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any alternative solutions or features you've considered.
+    validations:
+      required: false
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - API (Rails)
+        - Web (React)
+        - "@aixle/insights (CLI/MCP)"
+        - Infrastructure / Docker
+        - Other / not sure
+    validations:
+      required: true

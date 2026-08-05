@@ -62,8 +62,8 @@ describe("Claude MCP payload contract (AIX-192)", () => {
 
   describe("data-completeness — when input has the field, payload MUST carry it", () => {
     it("project_id is set when a projectId is resolved upstream", () => {
-      const payload = mapTranscriptTurn(makeTurn(), { projectId: "proj-uuid-DB90" });
-      expect(payload.project_id).toBe("proj-uuid-DB90");
+      const payload = mapTranscriptTurn(makeTurn(), { projectId: "proj-uuid-Aixle Insights" });
+      expect(payload.project_id).toBe("proj-uuid-Aixle Insights");
     });
 
     it("model is set on the payload when the turn carries a model", () => {
@@ -187,7 +187,7 @@ describe("Claude MCP payload contract (AIX-192)", () => {
   });
 
   describe("regression scenarios from the 2026-06-07 staging investigation", () => {
-    it("a turn from a developer working in their repo posts with tool_name=claude_code, model, tokens, cost, project_id — the full DB90 row contract", () => {
+    it("a turn from a developer working in their repo posts with tool_name=claude_code, model, tokens, cost, project_id — the full Aixle Insights row contract", () => {
       const payload = mapTranscriptTurn(
         makeTurn({
           model: "claude-sonnet-4-6",

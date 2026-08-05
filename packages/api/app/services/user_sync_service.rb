@@ -12,8 +12,8 @@ class UserSyncService
 
   # Email domains that should be auto-assigned to organizations
   DOMAIN_ORG_MAPPING = {
-    "example.com" => "dualboot-partners",
-    "partner.example.com" => "fueled"
+    "example.com" => "acme-corp",
+    "partner.example.com" => "partner-corp"
   }.freeze
 
   class << self

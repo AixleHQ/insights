@@ -4,7 +4,7 @@
 >
 > Scope: official + undocumented surfaces. Ingestion plumbing, prompt-text capture, and Rails-side schema work are **out of scope** — those live in AIX-236.
 >
-> Authored 2026-05-21 for AIX-234. Cross-reference: `plans/available-data-cursor-claude-AIX-136/research/claude-research-notes.md` is the audit trail.
+> Authored 2026-05-21 for AIX-234.
 
 ---
 
@@ -648,7 +648,7 @@ erDiagram
 
 ### 2.13 OpenTelemetry export — a complete alternate ingestion channel
 
-This is the highest-leverage finding from the research (query #6). Enabling `CLAUDE_CODE_ENABLE_TELEMETRY=1` causes Claude Code to export structured metrics + events via OTLP, exposing strictly more data than the JSONL transcript carries — without DB90 needing to read user filesystems at all.
+This is the highest-leverage finding from the research (query #6). Enabling `CLAUDE_CODE_ENABLE_TELEMETRY=1` causes Claude Code to export structured metrics + events via OTLP, exposing strictly more data than the JSONL transcript carries — without Aixle Insights needing to read user filesystems at all.
 
 **Source.** `CLAUDE_CODE_ENABLE_TELEMETRY=1` + `OTEL_METRICS_EXPORTER`/`OTEL_LOGS_EXPORTER` + endpoint config. Defaults to OTLP/gRPC at `http://localhost:4317`.
 

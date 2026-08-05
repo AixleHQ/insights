@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// reset-local-env.mjs — reset Santiago/any-dev's local @aixle/insights environment
+// reset-local-env.mjs — reset any dev's local @aixle/insights environment
 // to a known-good state after editing the package or after a confused config drift.
 //
 // What it does, in order:
@@ -356,7 +356,7 @@ function main() {
     log("info", `Open a NEW Claude Code / Cursor session in this workspace to use the rebuilt MCP.`);
   } else {
     log("err", `Attribution resolved but project_id is null (source=${source}).`);
-    log("info", `Most likely: this directory's git remote isn't registered as a DB90 project. Check the dashboard's /projects.`);
+    log("info", `Most likely: this directory's git remote isn't registered as a Aixle Insights project. Check the dashboard's /projects.`);
     process.exit(1);
   }
 }

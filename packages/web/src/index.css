@@ -124,7 +124,7 @@
   --sidebar-border: oklch(0.3 0 0);
   --sidebar-ring: oklch(0.55 0 0);
 
-  /* DB90 semantic data colors — risk tokens unchanged */
+  /* Aixle Insights semantic data colors — risk tokens unchanged */
   --risk-critical: oklch(0.6 0.25 25);
   --risk-high: oklch(0.7 0.2 45);
   --risk-medium: oklch(0.75 0.15 85);
@@ -181,7 +181,7 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.7 0 0);
 
-  /* DB90 semantic data colors — risk tokens unchanged */
+  /* Aixle Insights semantic data colors — risk tokens unchanged */
   --risk-critical: oklch(0.65 0.25 25);
   --risk-high: oklch(0.75 0.2 45);
   --risk-medium: oklch(0.8 0.15 85);

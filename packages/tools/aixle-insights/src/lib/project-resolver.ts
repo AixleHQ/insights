@@ -83,7 +83,7 @@ export function getGitRemoteForPath(repoPath: string, verbose: boolean): string 
 /**
  * `git remote get-url origin` returns the literal host from the URL, which may
  * be an SSH host alias from the user's ~/.ssh/config (e.g. `git@github-work:...`
- * where `github-work` maps to `github.com`). DB90 stores the real host, so the
+ * where `github-work` maps to `github.com`). Aixle Insights stores the real host, so the
  * server-side normalized URLs never match. Resolve the alias to its real
  * hostname via `ssh -G` before lookup so the remote is canonical at the source.
  * Non-SSH remotes and unresolvable hosts are returned unchanged.
@@ -175,7 +175,7 @@ export interface CommitAttributionPayload {
 }
 
 /**
- * For recent-commit events, prefer DB90 project lookup from Cursor's `metadata.repo_name`
+ * For recent-commit events, prefer Aixle Insights project lookup from Cursor's `metadata.repo_name`
  * unless the user set `--project-id` or config `project_id` (explicit attribution).
  * Daily stats / legacy rows keep batch (CWD) attribution only.
  */

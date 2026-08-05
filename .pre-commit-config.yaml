@@ -1,0 +1,33 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: ["--allow-multiple-documents"]
+      - id: check-json
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+
+  - repo: local
+    hooks:
+      - id: rubocop
+        name: RuboCop
+        entry: bash -c 'cd packages/api && bundle exec rubocop --parallel --force-exclusion "$@"' --
+        language: system
+        types: [ruby]
+        pass_filenames: true
+
+      - id: eslint
+        name: ESLint
+        entry: bash -c 'cd packages/web && npx eslint --fix "$@"' --
+        language: system
+        files: ^packages/web/.*\.(ts|tsx|js|jsx)$
+        pass_filenames: true

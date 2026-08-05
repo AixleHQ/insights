@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to DB90 are documented in this file.
+All notable changes to Aixle Insights are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -153,7 +153,7 @@ index + a batched token backfill on the `tool_events` hypertable).
 - Thread the dashboard project filter through per-tab tool-insights stats and
   scope them by `project_id` (`AIX-524`).
 - Hide Library/Feedback nav stubs and remove Terms/Privacy links (`AIX-510`).
-- Move export jobs to a dedicated `exports` queue and drop DB90 branding from
+- Move export jobs to a dedicated `exports` queue and drop Aixle Insights branding from
   export emails and filenames (`AIX-401`).
 - Bump Keycloak to 26.6.4 for jdbc-ping clustering (`AIX-527`).
 - Restrict data contribution to Owners and Members (`AIX-503`).
@@ -223,7 +223,7 @@ Aixle Insights rebrand, and timezone/Jira-sync/invitation fixes.
 - Auto-enqueue provider sync after the first OAuth connect (`AIX-451`).
 
 ### Changed
-- Rebrand admin panel and remaining API references from DB90 to Aixle Insights
+- Rebrand admin panel and remaining API references from Aixle Insights to Aixle Insights
   (`AIX-495`).
 - Relabel tool charts to remove the AI-only implication (`AIX-444`).
 - Rename `client_time_zone` to `client_zone` (`AIX-447`).
@@ -276,7 +276,7 @@ staging AWS account.
   harden A01-3 existence leaks in project/org controllers (`AIX-368`).
 
 ### Changed
-- Legal pages brand copy: DB90 → Aixle Insights (`AIX-320`).
+- Legal pages brand copy: Aixle Insights → Aixle Insights (`AIX-320`).
 - CI/CD and remote deploy Makefile: unified `aixle-db90` project name and deploy
   role for staging and production (new staging AWS account).
 
@@ -289,7 +289,7 @@ continues to land on `develop` and ships in subsequent `1.0.0-alpha.*` / `-rc.*`
 tags cut from the same `release/1.0.0` branch.
 
 ### Added
-- Initial DB90 platform release cut from `develop` for production infrastructure validation.
+- Initial Aixle Insights platform release cut from `develop` for production infrastructure validation.
 
 [1.0.0-alpha.9]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.9
 [1.0.0-alpha.8]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.8

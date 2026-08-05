@@ -16,7 +16,7 @@ Step-by-step guide for running **`@aixle/insights`** against the **db90-rails** 
 
 ---
 
-## 1. Start the DB90 stack
+## 1. Start the Aixle Insights stack
 
 From the repo root:
 
@@ -285,8 +285,8 @@ UI: http://localhost:5173 → Events
 If Events still show zero-token `claude_code` rows with `local-command-*` or `<command-name>` in `prompt_text`, remove historical noise (API container):
 
 ```bash
-docker exec db90-api bundle exec rails 'db90:cleanup_claude_noise_events[dualboot-partners,dry_run]'
-docker exec db90-api bundle exec rails 'db90:cleanup_claude_noise_events[dualboot-partners]'
+docker exec db90-api bundle exec rails 'db90:cleanup_claude_noise_events[acme-corp,dry_run]'
+docker exec db90-api bundle exec rails 'db90:cleanup_claude_noise_events[acme-corp]'
 ```
 
 New ingest via MCP skips these turns automatically; the rake only cleans DB rows written before the filter shipped.
@@ -333,7 +333,7 @@ node aixle-insights/dist/cli.js health
 # hooks_queue_depth: 0  (queue was drained)
 ```
 
-5. Open DB90 Events UI → filter by `ingest_source: cursor_hook` → event should show the actual model name.
+5. Open Aixle Insights Events UI → filter by `ingest_source: cursor_hook` → event should show the actual model name.
 
 To uninstall:
 

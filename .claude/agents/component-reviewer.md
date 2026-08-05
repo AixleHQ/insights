@@ -1,6 +1,6 @@
 ---
 name: component-reviewer
-description: Reviews UI components for DB90 design-system conventions — design tokens, dark mode parity, a11y primitives.
+description: Reviews UI components for Aixle Insights design-system conventions — design tokens, dark mode parity, a11y primitives.
 tools: Read, Grep, Glob, Bash
 model: sonnet
 ---

@@ -76,9 +76,9 @@ KNOWN_DEV_USERS = [
     org_role: 'owner'
   },
   {
-    email: 'linu.valds@example.com',
+    email: 'line.valds@example.com',
     name: 'Line Valds',
-    keycloak_sub: 'linu.valds@example.com',
+    keycloak_sub: 'line.valds@example.com',
     global_admin: true,
     org_role: 'owner'
   }
@@ -89,7 +89,7 @@ KNOWN_DEV_USERS = [
 # and the organization has working defaults — independent of heavy simulation data.
 org = nil
 unless Rails.env.production?
-  org = Organization.find_or_create_by!(slug: 'dualboot-partners') do |o|
+  org = Organization.find_or_create_by!(slug: 'acme-corp') do |o|
     o.name = 'Acme Corp'
   end
   puts "Organization: #{org.name}"
@@ -300,7 +300,7 @@ if heavy_seed_enabled?
   ) do |c|
     c.access_token = 'ghp_simulated_token_for_development_only'
     c.is_active = true
-    c.config = { organization: 'dualboot-partners' }
+    c.config = { organization: 'acme-corp' }
   end
 
   # Create repositories for projects
@@ -312,8 +312,8 @@ if heavy_seed_enabled?
     ) do |r|
       repo_name = project.slug
       r.name = repo_name
-      r.full_name = "dualboot-partners/#{repo_name}"
-      r.url = "https://github.com/dualboot-partners/#{repo_name}"
+      r.full_name = "acme-corp/#{repo_name}"
+      r.url = "https://github.com/acme-corp/#{repo_name}"
       r.default_branch = 'main'
     end
   end

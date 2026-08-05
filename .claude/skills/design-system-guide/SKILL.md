@@ -5,7 +5,7 @@ description: Enforces design tokens, dark mode parity, Radix composition, and a1
 
 # design-system-guide
 
-You are editing a shadcn/ui component. DB90 enforces strict design-system conventions because we're in an active Figma → code migration and drift compounds fast.
+You are editing a shadcn/ui component. Aixle Insights enforces strict design-system conventions because we're in an active Figma → code migration and drift compounds fast.
 
 ## Hard rules
 

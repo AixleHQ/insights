@@ -185,7 +185,7 @@ RSpec.describe Activities::ClassificationActivity, type: :unit do
       )
     end
 
-    it "benign Russian text scores low (live false-positive case)" do
+    it "benign natural-language text scores low (live false-positive case)" do
       result = classify("Help me resolve the conflict")
       expect(result["risk_level"]).to eq("low")
       expect(result["detections"]).to be_empty

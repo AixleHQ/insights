@@ -1,4 +1,4 @@
-/* DB90 Keycloak Login Theme - Exact Match to App */
+/* Aixle Insights Keycloak Login Theme - Exact Match to App */
 /* Colors from packages/web/src/index.css dark theme */
 
 :root {
@@ -516,7 +516,7 @@ a:hover {
   text-decoration: underline;
 }
 
-/* Hide default Keycloak elements only on the custom DB90 login screen. */
+/* Hide default Keycloak elements only on the custom Aixle Insights login screen. */
 body.db90-custom-login .login-pf-page .card-pf,
 body.db90-custom-login .login-pf-page #kc-header,
 body.db90-custom-login .login-pf-page #kc-header-wrapper,

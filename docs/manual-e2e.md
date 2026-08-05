@@ -1,11 +1,11 @@
 # Manual end-to-end checklist — @db90/telemetry-mcp + Claude Code
 
-Use this checklist on a **clean machine** (or a fresh user account) that has Claude Code installed and **no prior DB90 MCP setup**.
+Use this checklist on a **clean machine** (or a fresh user account) that has Claude Code installed and **no prior Aixle Insights MCP setup**.
 
 ## Preconditions
 
 - Node.js 20+ and network access for `npx` and Keycloak.
-- DB90 API and Keycloak reachable (local docker-compose or shared dev URLs).
+- Aixle Insights API and Keycloak reachable (local docker-compose or shared dev URLs).
 - Claude Code installed and able to start.
 
 ## Steps
@@ -29,8 +29,8 @@ Use this checklist on a **clean machine** (or a fresh user account) that has Cla
 6. **Run a real session**
    - Use Claude Code normally so transcripts exist and the MCP server can sync.
 
-7. **Verify DB90 dashboard**
-   - Within **five minutes**, confirm the session / usage appears in the DB90 dashboard for the expected organization.
+7. **Verify Aixle Insights dashboard**
+   - Within **five minutes**, confirm the session / usage appears in the Aixle Insights dashboard for the expected organization.
 
 ## Observed results (fill during run)
 

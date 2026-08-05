@@ -1,10 +1,10 @@
-# AGENTS.md — Claude tooling guide for DB90
+# AGENTS.md — Claude tooling guide for Aixle Insights
 
 Welcome! This doc explains the Claude tooling you have access to in this project: commands you can type, agents the model can spawn, skills that auto-load when you're editing certain files, and hooks that run automation for you.
 
 > Use Grep, Glob, and Read to explore the codebase. For directed searches use those tools directly. For broader exploration use the Explore subagent.
 
-**Who this is for:** every engineer on DB90, whether day-one or day-1000. The tooling teaches itself — if you forget how something works, just ask.
+**Who this is for:** every engineer on Aixle Insights, whether day-one or day-1000. The tooling teaches itself — if you forget how something works, just ask.
 
 **Quick start:** run `/onboard` in Claude Code for a guided 10-minute walkthrough, or `/help-tooling` anytime to see a live catalog of what's available.
 
@@ -269,7 +269,7 @@ cp .claude/settings.local.json.example .claude/settings.local.json
 ### Figma MCP setup (for UI work)
 
 1. Open Figma Desktop.
-2. Open the DB90 design system file (ask lead for link).
+2. Open the Aixle Insights design system file (ask lead for link).
 3. In Claude Code, the Figma MCP is auto-detected when Desktop is running. Verify with: "list Figma libraries".
 
 ### Browser automation setup (first time)

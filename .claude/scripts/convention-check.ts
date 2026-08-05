@@ -1,7 +1,7 @@
 /**
  * convention-check.ts — Git convention checker
  *
- * Checks that the current branch and its commits follow DB90 conventions:
+ * Checks that the current branch and its commits follow Aixle Insights conventions:
  *   Branch : feature/AIX-XX-short-description  (or hotfix/...)
  *   Commits: [AIX-XX] Short imperative description
  *
@@ -72,7 +72,7 @@ function main(): void {
   const overall = branchOk && allOk;
   process.stdout.write(
     overall
-      ? `${BOLD_GREEN}  PASS${X}${DIM_GREEN} — branch and commits follow DB90 conventions${X}\n\n`
+      ? `${BOLD_GREEN}  PASS${X}${DIM_GREEN} — branch and commits follow Aixle Insights conventions${X}\n\n`
       : `${BOLD_WHITE}  WARN${X}${DIM_WHITE} — fix the items above before pushing${X}\n\n`
   );
 }

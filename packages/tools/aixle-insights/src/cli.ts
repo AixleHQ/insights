@@ -60,7 +60,7 @@ const GLOBAL_FLAGS = new Set(["--help", "-h", "--once", "--full"]);
 const INIT_VALUE_FLAGS = new Set(["--host", "--keycloak-url", "--tool-name", "--organization-id"]);
 const INIT_BOOLEAN_FLAGS = new Set(["--force", "--hooks", "--insecure"]);
 
-/** Matches DB90 Rails `McpController` UUID check for `X-Organization-ID` (RFC 4122 variant). */
+/** Matches Aixle Insights Rails `McpController` UUID check for `X-Organization-ID` (RFC 4122 variant). */
 export const DB90_ORGANIZATION_UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -215,9 +215,9 @@ Usage:
 
 Commands:
   run              Start the MCP stdio server (default — used by Claude Code).
-  init             Keycloak device login once, then persist DB90 ingest credentials (keychain or file).
+  init             Keycloak device login once, then persist Aixle Insights ingest credentials (keychain or file).
   health           Multi-line diagnostic (credentials, sync, log path, state files).
-  uninstall-hooks  Remove DB90 from ~/.cursor/hooks.json and restore backup (if any).
+  uninstall-hooks  Remove Aixle Insights from ~/.cursor/hooks.json and restore backup (if any).
   verify-hooks     Print hooks install status and queue depth as JSON.
 
 Options:
@@ -226,7 +226,7 @@ Options:
   --help, -h  Show this help message.
 
 init options:
-  --host <url>             DB90 API base URL (default: env DB90_API_URL or http://localhost:3000)
+  --host <url>             Aixle Insights API base URL (default: env DB90_API_URL or http://localhost:3000)
   --keycloak-url <issuer>  Keycloak realm issuer (default: env KEYCLOAK_ISSUER / DB90_KEYCLOAK_ISSUER)
   --tool-name <name>       Optional: mint only \`claude_code\`, only \`cursor\`, or omit to mint BOTH.
   --organization-id <uuid> Optional: scope MCP token exchange to this org (overrides env DB90_ORGANIZATION_ID).
@@ -276,7 +276,7 @@ export async function runInit(cliArgs: Args, deps?: Partial<InitDeps>): Promise<
   const db90Host = (cliArgs.host ?? defaultDb90Host()).replace(/\/$/, "");
   const transportSecurity = evaluateTransportSecurity(db90Host, {
     allowInsecureHttp: cliArgs.insecure === true,
-    label: "DB90 API host",
+    label: "Aixle Insights API host",
   });
   if (!transportSecurity.ok) {
     runtime.error(`Error: ${transportSecurity.error}`);
@@ -309,7 +309,7 @@ export async function runInit(cliArgs: Args, deps?: Partial<InitDeps>): Promise<
   const exchangeOrganizationId = fromFlag || fromEnv;
   if (exchangeOrganizationId && !isValidDb90OrganizationUuid(exchangeOrganizationId)) {
     runtime.error(
-      "Error: --organization-id / DB90_ORGANIZATION_ID must be a valid UUID (RFC 4122, version 1–5, variant per DB90 API)."
+      "Error: --organization-id / DB90_ORGANIZATION_ID must be a valid UUID (RFC 4122, version 1–5, variant per Aixle Insights API)."
     );
     return 1;
   }
@@ -489,7 +489,7 @@ async function main(): Promise<void> {
       if (restored) {
         console.log(backupPath ? `Hooks uninstalled; hooks.json restored from ${backupPath}.` : "Hooks uninstalled; hooks.json removed.");
       } else {
-        console.log("No DB90 hooks entry found in ~/.cursor/hooks.json — nothing to uninstall.");
+        console.log("No Aixle Insights hooks entry found in ~/.cursor/hooks.json — nothing to uninstall.");
       }
       return;
     }

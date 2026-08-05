@@ -1,4 +1,4 @@
-# DB90 Claude Tooling — Agents, Skills, Commands & Hooks
+# Aixle Insights Claude Tooling — Agents, Skills, Commands & Hooks
 
 This file is the authoritative reference for all Claude Code automation in this repo. There are four primitive types:
 
@@ -17,7 +17,7 @@ Run `/help-tooling` at any time for a live, filesystem-sourced catalog.
 
 | Name | Type | Activates when | Purpose |
 |------|------|----------------|---------|
-| `backend-reviewer` | Agent | Any `.rb` diff detected | Reviews Ruby/Rails changes for DB90 conventions — serializers, authorization, architecture, migrations, testing |
+| `backend-reviewer` | Agent | Any `.rb` diff detected | Reviews Ruby/Rails changes for Aixle Insights conventions — serializers, authorization, architecture, migrations, testing |
 | `component-builder` | Agent | Spawned by `/migrate-component` only | Writes Figma-driven shadcn/Radix UI components; stops at hard-coded tripwires to call component-reviewer |
 | `component-reviewer` | Agent | After component-builder tripwires fire; after build; on `components/ui/` diffs | Soft-gate review: design tokens, dark mode, a11y, TypeScript — reports findings, never modifies code |
 | `swagger-auditor` | Agent | Controller or `routes.rb` file changes | Hard-gate PASS/FAIL: verifies `swagger.yaml` matches every controller/route change in the same commit |
@@ -36,7 +36,7 @@ Run `/help-tooling` at any time for a live, filesystem-sourced catalog.
 | `/postgresql-optimization` | Command | `/postgresql-optimization` | Query optimization reference: EXPLAIN ANALYZE, index strategies, window functions, full-text search, monitoring |
 | `/manage-worktrees` | Command | `/manage-worktrees <action>` | Create, navigate, and clean up git worktrees for parallel ticket development |
 | `/refactor-plan` | Command | `/refactor-plan` | Safe refactoring: dead code detection, rename planning, impact radius, dependency analysis |
-| `/onboard` | Command | `/onboard` | Guided 10-minute walkthrough of DB90 Claude tooling — 4 exercises for new engineers |
+| `/onboard` | Command | `/onboard` | Guided 10-minute walkthrough of Aixle Insights Claude tooling — 4 exercises for new engineers |
 | `/tanstack-query-best-practices` | Command | `/tanstack-query-best-practices` | 32 TanStack Query v5 rules: query keys, caching, mutations, error handling, prefetching, performance |
 | `/discover-skills` | Command | `/discover-skills` | Scans project stack, queries skill registry, evaluates and installs relevant skills |
 | `/help-tooling` | Command | `/help-tooling [filter]` | Live filesystem-sourced catalog of all tooling with when-to-use guidance |
@@ -264,7 +264,7 @@ CLI reference for 40+ Playwright browser automation commands (navigation, intera
 **Deliverable:** Inline code examples — no files written.
 
 **`/playwright-best-practices`**  
-50+ Playwright testing patterns organized by activity (E2E, component, API, auth, mobile, CI/CD). Includes DB90-specific auth setup and test command references.  
+50+ Playwright testing patterns organized by activity (E2E, component, API, auth, mobile, CI/CD). Includes Aixle Insights-specific auth setup and test command references.  
 **Deliverable:** Inline reference — no files written.
 
 ---

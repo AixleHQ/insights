@@ -173,7 +173,7 @@ jobs:
             console.error('Unauthorized lifecycle script(s) in package.json:');
             for (const o of offenders) console.error('  ' + o);
             console.error('Allowed: ' + [...allowedLifecycle].join(', '));
-            console.error('If a new lifecycle script is genuinely required, update plans/npm-org-setup-aixle/tasks/03-package-and-workflow-hardening.md and this guard together.');
+            console.error('If a new lifecycle script is genuinely required, update this guard and packages/tools/RELEASING.md together.');
             process.exit(1);
           }
           EOF

@@ -61,21 +61,21 @@ export async function exchangeIngestToken(params: {
   try {
     json = JSON.parse(text) as unknown;
   } catch {
-    throw new Error(`DB90 exchange: invalid JSON (HTTP ${res.status}): ${text.slice(0, 200)}`);
+    throw new Error(`Aixle Insights exchange: invalid JSON (HTTP ${res.status}): ${text.slice(0, 200)}`);
   }
   if (!res.ok) {
-    throw new Error(`DB90 exchange failed (HTTP ${res.status}): ${text.slice(0, 500)}`);
+    throw new Error(`Aixle Insights exchange failed (HTTP ${res.status}): ${text.slice(0, 500)}`);
   }
   const root = json as Record<string, unknown>;
   const data = root["data"];
   if (typeof data !== "object" || data === null) {
-    throw new Error("DB90 exchange: missing data object");
+    throw new Error("Aixle Insights exchange: missing data object");
   }
   const d = data as Record<string, unknown>;
   const ingestHost = d["ingestHost"];
   const organizationId = d["organizationId"];
   if (typeof ingestHost !== "string" || typeof organizationId !== "string") {
-    throw new Error("DB90 exchange: missing ingestHost or organizationId in data");
+    throw new Error("Aixle Insights exchange: missing ingestHost or organizationId in data");
   }
 
   const ingestTokenRaw = d["ingestToken"];
@@ -105,7 +105,7 @@ export async function exchangeIngestToken(params: {
 
   if (Object.keys(accounts).length === 0) {
     if (!ingestToken) {
-      throw new Error("DB90 exchange: no ingestToken / accounts returned in data");
+      throw new Error("Aixle Insights exchange: no ingestToken / accounts returned in data");
     }
     const fallbackTool = requestedTools.length === 1 ? requestedTools[0] : d["toolName"];
     const tid = fallbackTool === "cursor" ? "cursor" : "claude_code";
@@ -114,7 +114,7 @@ export async function exchangeIngestToken(params: {
 
   const missingTools = requestedTools.filter((tool) => !accounts[tool]?.ingestToken);
   if (missingTools.length > 0) {
-    throw new Error(`DB90 exchange: missing requested account(s): ${missingTools.join(", ")}`);
+    throw new Error(`Aixle Insights exchange: missing requested account(s): ${missingTools.join(", ")}`);
   }
 
   return { ingestHost, organizationId, ingestToken, accounts };

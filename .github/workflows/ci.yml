@@ -1,62 +1,12 @@
-name: DB90 CI/CD Pipeline
+name: Aixle Insights CI
 
-on: [push]
-
-env:
-  PROJECT: aixle-db90
-  APPLICATION: app
-  USE_IMAGE_TAG_ENV_PREFIX: true
-  CI_COMMIT_BRANCH: ${{ github.ref_name }}
-  CI_COMMIT_SHA: ${{ github.sha }}
+on: [push, pull_request]
 
 permissions:
-  id-token: write
   contents: read
   packages: read
 
 jobs:
-  build:
-    name: Build & Push Images
-    runs-on: self-hosted
-    container: ghcr.io/artempartos/ecs_toolbox:latest
-    env:
-      ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
-      PROJECT: aixle-db90
-    strategy:
-      matrix:
-        image:
-          - api
-          - web
-          - temporal-worker
-          - keycloak
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Build and push ${{ matrix.image }}
-        run: |
-          ecs_helper build_and_push \
-            --image=${{ matrix.image }} \
-            --file=./Dockerfile.${{ matrix.image }}
-
-      # Container steps run as root; host-native jobs need a writable default workspace.
-      - name: Fix workspace permissions
-        if: always()
-        run: chown -R 1000:1000 "$GITHUB_WORKSPACE"
-
   # --- API checks (build from source with CI target) ---
 
   api_test:
@@ -116,28 +66,23 @@ jobs:
 
   aixle_insights_check:
     name: "@aixle/insights (build + test)"
-    runs-on: self-hosted
-    env:
-      # Fresh path per run — container jobs leave root-owned files in the default workspace.
-      REPO_DIR: ws-${{ github.run_id }}-insights
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          path: ${{ env.REPO_DIR }}
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
           cache: 'npm'
-          cache-dependency-path: ${{ env.REPO_DIR }}/packages/tools/package-lock.json
+          cache-dependency-path: packages/tools/package-lock.json
       - name: Install workspace
         run: npm ci
-        working-directory: ${{ env.REPO_DIR }}/packages/tools
+        working-directory: packages/tools
       - name: Build
         run: npm run build --workspace=@aixle/insights
-        working-directory: ${{ env.REPO_DIR }}/packages/tools
+        working-directory: packages/tools
       - name: Test
         run: npm test --workspace=@aixle/insights
-        working-directory: ${{ env.REPO_DIR }}/packages/tools
+        working-directory: packages/tools
 
   aixle_insights_windows_install:
     name: "@aixle/insights (Windows install smoke — better-sqlite3)"
@@ -161,80 +106,3 @@ jobs:
       - name: Build aixle-insights native dependency
         run: npm run build --workspace=@aixle/insights
         working-directory: packages/tools
-
-  # --- Deploy pipeline (staging and main only) ---
-
-  migrate:
-    name: Run DB Migrations
-    runs-on: self-hosted
-    container: ghcr.io/artempartos/ecs_toolbox:latest
-    needs: [build, api_test, api_lint, api_security, web_test, web_lint, web_typecheck, aixle_insights_check, aixle_insights_windows_install]
-    if: github.ref_name == 'staging' || github.ref_name == 'main'
-    env:
-      ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
-      PROJECT: aixle-db90
-      APPLICATION: api
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Run db:migrate
-        run: |
-          ecs_helper run_command --command "bundle exec rails db:migrate" --name 'db-migrate'
-
-  deploy:
-    name: Deploy Services
-    runs-on: self-hosted
-    container: ghcr.io/artempartos/ecs_toolbox:latest
-    needs: [migrate]
-    if: github.ref_name == 'staging' || github.ref_name == 'main'
-    env:
-      ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
-      PROJECT: aixle-db90
-    strategy:
-      matrix:
-        service:
-          - api
-          - web
-          - sidekiq
-          - temporal-worker
-          - keycloak
-      max-parallel: 5
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Deploy ${{ matrix.service }}
-        run: APPLICATION=${{ matrix.service }} ecs_helper deploy --timeout 3600
-
-  post_deploy:
-    name: Post Deploy (Rollbar)
-    runs-on: self-hosted
-    container: ghcr.io/artempartos/ecs_toolbox:latest
-    if: github.ref_name == 'staging' || github.ref_name == 'main'
-    env:
-      ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
-      PROJECT: aixle-db90
-      APPLICATION: api
-    needs: [deploy]
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION }}
-      - name: Notify Rollbar of deploy
-        run: |
-          COMMIT_SHA="${{ github.sha }}"
-          ACTOR="${{ github.actor }}"
-          ACTOR_ID="${{ github.actor_id }}"
-          DEPLOY_USER="${ACTOR} ${ACTOR_ID}+${ACTOR}@users.noreply.github.com"
-          ecs_helper run_command \
-            --command "bash -c 'export DEPLOY_REVISION=${COMMIT_SHA} && export DEPLOY_USER=\"${DEPLOY_USER}\" && bundle exec rake rollbar:deploy'" \
-            --name 'rollbar-deploy'

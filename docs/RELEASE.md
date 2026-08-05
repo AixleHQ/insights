@@ -1,6 +1,6 @@
 # Release & Hotfix Runbook
 
-This is the human runbook for shipping a production release of the DB90 / Aixle Insights app (Rails API + web on ECS) with GitFlow. Follow it top to bottom and you'll be fine. If you'd rather have the agent drive the whole thing, there's a `release` skill at `.cursor/skills/release/SKILL.md` that does the same steps — just keep the two in sync when you change one.
+This is the human runbook for shipping a production release of the Aixle Insights / Aixle Insights app (Rails API + web on ECS) with GitFlow. Follow it top to bottom and you'll be fine. If you'd rather have the agent drive the whole thing, there's a `release` skill at `.cursor/skills/release/SKILL.md` that does the same steps — just keep the two in sync when you change one.
 
 ## TL;DR — golden rules
 
@@ -155,7 +155,7 @@ git checkout main && git pull --ff-only origin main
 git merge --no-ff release/1.0.0 -m "chore(release): [AIX-169] Release <version> to production"
 git diff --name-only --diff-filter=U        # must be empty (no conflicts)
 git diff release/1.0.0 --stat               # must be empty (main == release content)
-git tag -a v<version> -m "DB90 <version>"$'\n\n'"<one-line summary>"
+git tag -a v<version> -m "Aixle Insights <version>"$'\n\n'"<one-line summary>"
 git rev-list -1 v<version>; git rev-parse HEAD   # tag commit must equal HEAD
 ```
 

@@ -36,10 +36,6 @@
           },
           {
             "type": "command",
-            "command": "node --experimental-strip-types --no-warnings ${CLAUDE_PROJECT_DIR}/.claude/hooks/on-plan-task-edit.ts"
-          },
-          {
-            "type": "command",
             "command": "node --experimental-strip-types --no-warnings ${CLAUDE_PROJECT_DIR}/.claude/hooks/on-aixle-insights-edit.ts"
           },
           {

@@ -1,0 +1,44 @@
+# gitleaks configuration for Aixle Insights.
+#
+# Extends the default gitleaks ruleset and allowlists known non-secrets:
+# test fixtures, factory dummies, and a few code false-positives where the
+# scanner matched ordinary code (time comparisons, doc examples).
+#
+# All suppressed findings were verified as non-secret dummy values, scanned
+# across full history (many live in old commits / old package paths that no
+# longer exist in the working tree). Real credentials are NOT allowlisted.
+
+title = "Aixle Insights gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Test fixtures, dummy values, and verified code false-positives"
+
+# Paths that only ever contain test fixtures / dummy secrets.
+paths = [
+  # RSpec suites, factories, and request specs use fake tokens/webhooks.
+  '''packages/api/spec/.*''',
+  # TypeScript unit tests across current and legacy package paths.
+  '''packages/tools/.*/src/test/.*''',
+  '''packages/db90-claude/src/test/.*''',
+  # Sanitization verification scripts embed sample "secrets" to prove redaction.
+  '''packages/tools/.*/scripts/verify-.*sanitization.*\.ts''',
+  # Internal tooling doc shows an example Figma file key.
+  '''\.claude/commands/implement-design\.md''',
+]
+
+# Non-secret string patterns matched against the offending line.
+regexTarget = "line"
+regexes = [
+  # Placeholder / fixture identifiers.
+  '''fake_key''',
+  '''(?i)ingesttoken''',
+  # Time-comparison code the "generic-api-key" rule mis-flags, e.g.
+  # `token_expires_at > <expr>` / `token_issued_at > <expr>`.
+  '''token_(expires|issued)_at\s*>''',
+  # Historical hardcoded placeholder in EventDetailPage.tsx (removed in tree):
+  # `secret = 'sk-1234567890abcdef...'  # TODO: remove hardcoded key`
+  '''secret\s*=\s*'sk-1234567890abcdef''',
+]

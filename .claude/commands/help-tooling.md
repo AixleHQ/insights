@@ -19,7 +19,7 @@ Produce a friendly, up-to-date catalog of the Claude tooling available in this r
 5. Present the catalog in this shape:
 
 ```
-# Claude Tooling — DB90
+# Claude Tooling — Aixle Insights
 
 ## Commands (you invoke with /name)
 | Command | When to use |

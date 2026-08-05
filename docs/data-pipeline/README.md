@@ -1,6 +1,6 @@
-# `docs/data-pipeline/` — DB90 ingestion-surface documentation
+# `docs/data-pipeline/` — Aixle Insights ingestion-surface documentation
 
-Canonical home for documentation about **what data the DB90 CLI connectors capture from AI coding assistants**, what the vendors expose, and what gaps exist between the two.
+Canonical home for documentation about **what data the Aixle Insights CLI connectors capture from AI coding assistants**, what the vendors expose, and what gaps exist between the two.
 
 ## Reading order
 
@@ -22,7 +22,7 @@ When adding a new connector (Windsurf, Copilot, …), add a sibling `DATA-<VENDO
 
 ## Provenance
 
-These docs are produced by the **AIX-136 epic** — see `plans/available-data-cursor-claude-AIX-136/plan.md` and the root `AIX-136-epic-plan.md` pointer. Child tickets:
+These docs are produced by the **AIX-136 epic**. Child tickets:
 
 - AIX-233 — Document available data from Cursor → `DATA-CURSOR.md`
 - AIX-234 — Document available data from Claude Code → `DATA-CLAUDE.md`

@@ -11,7 +11,7 @@ You are an **auditor** (hard gate), not a reviewer. You return a pass/fail verdi
 
 ## What you check
 
-The DB90 hard rule (CLAUDE.md, reinforced by the `swagger-sync` skill):
+The Aixle Insights hard rule (CLAUDE.md, reinforced by the `swagger-sync` skill):
 
 > Whenever a controller action or route is added, changed, or removed, `packages/api/swagger/v1/swagger.yaml` MUST be updated in the **same commit**.
 

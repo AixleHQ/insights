@@ -1,6 +1,6 @@
 # Cursor ingest verification — `db90-cursor` vs `docs/data-pipeline`
 
-> **Audience:** engineers validating Cursor → DB90 ingest before extending extractors or dashboards.  
+> **Audience:** engineers validating Cursor → Aixle Insights ingest before extending extractors or dashboards.  
 > **Sources:** `packages/tools/db90-cursor/` (`sync.ts`, `cursor-reader.ts`, `mapper.ts`), `docs/data-pipeline/DATA-CURSOR.md`, `docs/data-pipeline/DATA-CURRENT.md`.  
 > **Validated at:** repo HEAD (May 2026). When code and docs disagree, **code wins** — update this file after fixes.
 
@@ -64,11 +64,11 @@ See `packages/tools/db90-cursor/src/mapper.ts` (`Db90Payload`, `Db90PayloadMetad
 
 Sized for Jira/Linear; each has a clear pass/fail.
 
-### P0 — Prove what reaches DB90
+### P0 — Prove what reaches Aixle Insights
 
 | ID | Subtask | Steps | Pass criteria |
 |----|---------|-------|---------------|
-| **CUR-V01** | **Wire recent-commit into sync (CLI + MCP)** | ✅ Shipped — `sync.ts` + MCP `runCursorSlice` + `lastRecentCommitAt` / `CURSOR_RECENT_COMMIT_WATERMARK_KEY`. | After a local commit in Cursor, `db90-cursor --dry-run --verbose` shows one payload with `event_type: "commit"`, `metadata.source: "recent_commit"`, `commit_hash`, `ai_percentage`. Event appears in DB90 ingest / `tool_events`. |
+| **CUR-V01** | **Wire recent-commit into sync (CLI + MCP)** | ✅ Shipped — `sync.ts` + MCP `runCursorSlice` + `lastRecentCommitAt` / `CURSOR_RECENT_COMMIT_WATERMARK_KEY`. | After a local commit in Cursor, `db90-cursor --dry-run --verbose` shows one payload with `event_type: "commit"`, `metadata.source: "recent_commit"`, `commit_hash`, `ai_percentage`. Event appears in Aixle Insights ingest / `tool_events`. |
 | **CUR-V02** | **End-to-end dry-run matrix** | ✅ Shipped — `payload-contract.ts` validates §3.5; dry-run prints matrix; `npm run verify:dry-run-matrix` writes local samples to `fixtures/cursor-dry-run-matrix.json` (gitignored). | Payload set matches `DATA-CURSOR.md` §3.5 field table; no unexpected keys; `cost_model: "estimated_line_count"` on all line-based paths. |
 | **CUR-V03** | **Sync integration test for Path B** | ✅ Shipped in CUR-V01 — `src/test/sync.test.ts`. | Temp `state.vscdb` with `recentCommit` → `syncOnce` → POST mock asserts commit payload. |
 
@@ -76,7 +76,7 @@ Sized for Jira/Linear; each has a clear pass/fail.
 
 | ID | Subtask | Steps | Pass criteria |
 |----|---------|-------|---------------|
-| **CUR-V04** | **Project attribution vs Cursor `repoName`** | ✅ Shipped — `enrichCommitProjectAttribution` (`@db90/sdk`): for `event_type: commit`, lookup `GET /projects/lookup` using `metadata.repo_name` → `https://github.com/{slug}` + SSH candidate; skips when `--project-id` or config `project_id` set. | Wrong-CWD sync still attributes commit to repo in `recentCommit`; daily stats stay CWD-based. GitLab-only slugs need full remote in DB90 project settings (GitHub slug assumed). |
+| **CUR-V04** | **Project attribution vs Cursor `repoName`** | ✅ Shipped — `enrichCommitProjectAttribution` (`@db90/sdk`): for `event_type: commit`, lookup `GET /projects/lookup` using `metadata.repo_name` → `https://github.com/{slug}` + SSH candidate; skips when `--project-id` or config `project_id` set. | Wrong-CWD sync still attributes commit to repo in `recentCommit`; daily stats stay CWD-based. GitLab-only slugs need full remote in Aixle Insights project settings (GitHub slug assumed). |
 | **CUR-V05** | **`workspace` metadata semantics** | ✅ Shipped — keep `metadata.workspace` as SQLite path (stable); add `workspace_scope` (`global` \| `workspace`) and optional `workspace_folder` from `workspace.json` when resolvable. | Global daily stats: `workspace_scope: global`, no folder. Workspace DB: scope `workspace` + folder when `workspace.json` exists. Legacy uses hash dir as `workspace`. |
 | **CUR-V06** | **Daily-stats dedupe audit** | ✅ Shipped — `dedupeDailyStatsEntries` in `cursor-reader.ts` (and MCP parity): per calendar date, prefer `globalStorage/state.vscdb`; collapse identical workspace copies. | On Ana's Mac (May 2026): 19 keys only in global, 0 workspace overlaps — 22 sent events = 19 days × (tab and/or composer payloads) + 1 commit, not double DB reads. Dedupe guards installs that mirror the same date into workspace DBs. |
 | **CUR-V07** | **Legacy `cursor.db` presence check** | ✅ Tooling — `npm run audit:local-stores` in `db90-cursor` (`store-audit.ts`). Run on macOS laptops; see [CUR-V07 results](#cur-v07-results) below. | Record % with zero `cursor.db` vs active `state.vscdb`; sets expectation for Path C value. |

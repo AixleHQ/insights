@@ -1,10 +1,10 @@
 ---
-description: Guided 10-minute walkthrough of the DB90 Claude tooling for new engineers
+description: Guided 10-minute walkthrough of the Aixle Insights Claude tooling for new engineers
 ---
 
 ## Your task
 
-Walk a new engineer through DB90's Claude tooling with four small, concrete exercises. Keep it conversational and friendly. Stop at each checkpoint and ask them to run the thing themselves before moving on.
+Walk a new engineer through Aixle Insights's Claude tooling with four small, concrete exercises. Keep it conversational and friendly. Stop at each checkpoint and ask them to run the thing themselves before moving on.
 
 ### Exercise 1 — Discovery
 

@@ -1,8 +1,7 @@
 # DATA-CURSOR.md — Cursor vendor surface map
 
 > **Audience:** db90 engineers extending the ingest path beyond the current `chat` + `completion` coverage. Companion to [`TOKENS.md`](TOKENS.md) (the May-2026 baseline) and [`DATA-CURRENT.md`](DATA-CURRENT.md) (the validated "what we capture today" view, produced by AIX-235).
-> **Source ticket:** [AIX-233](AIX-233).
-> **Research trail:** [`plans/available-data-cursor-claude-AIX-136/research/cursor-research-notes.md`](../../plans/available-data-cursor-claude-AIX-136/research/cursor-research-notes.md) — 13 WebSearch queries + 3 official-docs WebFetches, dated 2026-05-21.
+> **Source ticket:** AIX-233.
 >
 > This document maps **what Cursor exposes about AI-assisted activity**, across every surface we identified, so the gap-analysis triage in AIX-235 can compare it against what the db90 CLI actually ingests.
 >
@@ -72,7 +71,7 @@ flowchart LR
   Cloud --> AnalyticsAPI
   Cloud --> AdminAPI
 
-  subgraph DB90 [db90-cursor CLI]
+  subgraph Aixle Insights [db90-cursor CLI]
     direction TB
     Reader[cursor-reader.ts]
     Mapper[mapper.ts]
@@ -82,7 +81,7 @@ flowchart LR
   StateGlobal --> Reader
   StateWS --> Reader
   Reader --> Mapper --> Sync
-  Sync --> API[(DB90 Rails<br/>tool_events hypertable)]
+  Sync --> API[(Aixle Insights Rails<br/>tool_events hypertable)]
 
   classDef notRead fill:#fee,stroke:#c33,stroke-dasharray: 4 3;
   class AITrack,Hooks,Logs,UsageAPI,AnalyticsAPI,AdminAPI notRead;
@@ -688,7 +687,7 @@ The mapper produces a `Db90Payload` object (`packages/tools/db90-cursor/src/mapp
 
 ## 5. Hidden / undocumented findings
 
-Every entry below is supported by the search trail in [`cursor-research-notes.md`](../../plans/available-data-cursor-claude-AIX-136/research/cursor-research-notes.md).
+Every entry below is supported by the original research trail captured during the AIX-136 epic.
 
 ### 5.1 Separate `~/.cursor/ai-tracking/ai-code-tracking.db` SQLite store
 
@@ -775,4 +774,3 @@ All accessed 2026-05-21 unless noted.
 - `packages/tools/db90-cursor/src/mapper.ts` (esp. the line-cost model lines 86-96, the daily-stats mapper lines 164-222, the recent-commit mapper lines 228-283, the model-keyed fallback lines 204-219, the `event_type` tag at line 259)
 - `packages/tools/db90-cursor/src/sync.ts` (orchestration; per-driver pricing lines 28-29)
 - `docs/data-pipeline/TOKENS.md` — baseline this doc deepens
-- `plans/available-data-cursor-claude-AIX-136/research/cursor-research-notes.md` — audit trail

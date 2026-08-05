@@ -73,7 +73,7 @@ export async function loginAndPersistCredentials(opts: LoginAndPersistOptions): 
 
     const ingestHostSecurity = evaluateTransportSecurity(exchanged.ingestHost, {
       allowInsecureHttp: opts.allowInsecureHttp === true,
-      label: "DB90 ingest host",
+      label: "Aixle Insights ingest host",
     });
     if (!ingestHostSecurity.ok) {
       return { ok: false, error: ingestHostSecurity.error };

@@ -18,7 +18,7 @@ describe("recentCommitEvent", () => {
         source: "recent_commit",
         commit_hash: "1080c8e38aa694380e5e5d14c950123e6e1a2942",
         branch_name: "feature/AIX-235-cursor-review",
-        repo_name: "dualboot-partners/db90-rails",
+        repo_name: "acme-corp/aixle-insights",
         ai_percentage: "100.00",
         commit_message: "[AIX-235] Add hooks",
       },
@@ -27,7 +27,7 @@ describe("recentCommitEvent", () => {
     expect(fields).toEqual({
       commitHash: "1080c8e38aa694380e5e5d14c950123e6e1a2942",
       branchName: "feature/AIX-235-cursor-review",
-      repoName: "dualboot-partners/db90-rails",
+      repoName: "acme-corp/aixle-insights",
       aiPercentage: 100,
       commitMessage: "[AIX-235] Add hooks",
     });

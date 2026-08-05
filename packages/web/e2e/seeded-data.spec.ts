@@ -51,7 +51,7 @@ test.describe("Seeded Data Verification", () => {
 
     // Check that organization name is visible in sidebar or header
     // The seeded org is "Acme Corp"
-    await expect(page.getByText(/dual boot partners/i).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/acme corp/i).first()).toBeVisible({ timeout: 10000 });
   });
 
   test("dashboard shows seeded event data", async ({ page }) => {
@@ -90,7 +90,7 @@ test.describe("Seeded Data Verification", () => {
 
     // The seed creates 101 users (1 owner + 100 engineers)
     // At minimum, we should see the logged-in user
-    await expect(page.getByText(/billy\.boozer@dualbootpartners\.com/i)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/ada\.lovelace@example\.com/i)).toBeVisible({ timeout: 10000 });
   });
 
   test("/team redirects to /members", async ({ page }) => {

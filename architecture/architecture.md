@@ -1,6 +1,6 @@
-# DB90 Application Architecture
+# Aixle Insights Application Architecture
 
-This document provides comprehensive Mermaid diagrams documenting the DB90 developer tools dashboard architecture.
+This document provides comprehensive Mermaid diagrams documenting the Aixle Insights developer tools dashboard architecture.
 
 **Tech Stack:**
 - **Frontend:** Vite + React SPA + shadcn/ui + Tailwind CSS
@@ -1063,20 +1063,20 @@ Organizations can choose how to integrate AI providers:
 │                                                                          │
 │  Option A: OpenRouter Gateway                                           │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │  App → DB90 API → OpenRouter → Claude/GPT/Gemini/Llama/etc.    │   │
+│  │  App → Aixle Insights API → OpenRouter → Claude/GPT/Gemini/Llama/etc.    │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 │                                                                          │
 │  Option B: Direct API Connections                                       │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │  App → DB90 API → Anthropic API → Claude                        │   │
-│  │  App → DB90 API → OpenAI API → GPT                              │   │
-│  │  App → DB90 API → Google API → Gemini                           │   │
+│  │  App → Aixle Insights API → Anthropic API → Claude                        │   │
+│  │  App → Aixle Insights API → OpenAI API → GPT                              │   │
+│  │  App → Aixle Insights API → Google API → Gemini                           │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 │                                                                          │
 │  Option C: Hybrid                                                       │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │  App → DB90 API → OpenRouter → Llama, Mistral (open models)    │   │
-│  │  App → DB90 API → Anthropic API → Claude (direct)               │   │
+│  │  App → Aixle Insights API → OpenRouter → Llama, Mistral (open models)    │   │
+│  │  App → Aixle Insights API → Anthropic API → Claude (direct)               │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -1089,10 +1089,10 @@ OpenRouter serves **two purposes** for the organization:
 - **Single API key** for accessing multiple AI providers (Claude, GPT-4, Gemini, Llama, etc.)
 - **Centralized billing** at the org level
 - **Model routing** based on org configuration
-- **Real-time event creation** when calls are proxied through DB90
+- **Real-time event creation** when calls are proxied through Aixle Insights
 
 #### 2. Usage Analytics Sync (Correlation Engine)
-- **Pull usage data** from OpenRouter's API (including calls made outside DB90 proxy)
+- **Pull usage data** from OpenRouter's API (including calls made outside Aixle Insights proxy)
 - **Correlate with team members** - match API calls to users
 - **Correlate with projects** - attribute usage to active projects
 - **Correlate with repos/commits** - link AI usage to code activity
@@ -1475,7 +1475,7 @@ db90-dash/
 │   └── Gemfile                 # temporalio gem
 │
 ├── keycloak/
-│   ├── realm-export.json       # DB90 realm configuration
+│   ├── realm-export.json       # Aixle Insights realm configuration
 │   └── themes/                 # Custom login themes (optional)
 │
 ├── scripts/                    # Development scripts
@@ -1720,10 +1720,10 @@ Clients:
     Client Type: Public (SPA)
     Valid Redirect URIs:
       - http://localhost:3000/*
-      - https://app.db90.io/*
+      - https://app.db.io/*
     Web Origins:
       - http://localhost:3000
-      - https://app.db90.io
+      - https://app.db.io
     PKCE: Required (S256)
 
 Identity Providers:
@@ -1740,16 +1740,16 @@ Identity Providers:
     First Login Flow: first broker login
 
   # Phase 2: Add when ready for sister company
-  # google-fueled:
-  #   Alias: google-fueled
-  #   Display Name: "Sign in with Google (Fueled)"
+  # google-partner:
+  #   Alias: google-partner
+  #   Display Name: "Sign in with Google (Partner)"
   #   Hosted Domain: partner.example.com
   #   ...same config as above...
 
 Authentication Flows:
   Browser:
     - Identity Provider Redirector (google-dbp) - ALTERNATIVE
-    # Add google-fueled when Phase 2
+    # Add google-partner when Phase 2
   
   First Broker Login:
     - Create User If Unique - ALTERNATIVE
@@ -1842,9 +1842,9 @@ class UserSyncService
     # Map domains to default organizations
     org = case domain
           when 'example.com'
-            Organization.find_by(slug: 'dual-boot-partners')
+            Organization.find_by(slug: 'acme-corp')
           when 'partner.example.com'
-            Organization.find_by(slug: 'fueled')
+            Organization.find_by(slug: 'partner-corp')
           end
     
     if org
@@ -2684,7 +2684,7 @@ OpenRouter Usage API → OpenRouterSyncJob → Correlation Engine → ToolEvent
 ```
 
 **Sync Features:**
-- Fetches all usage data (including calls made outside DB90 proxy)
+- Fetches all usage data (including calls made outside Aixle Insights proxy)
 - Correlates API calls with team members by metadata/time
 - Links usage to projects based on active project context
 - Associates with repos/commits based on file paths in prompts
@@ -2747,7 +2747,7 @@ TelemetryController → ActionCable.broadcast → EventsChannel → useEventStre
 
 ## 6. Implementation Phases
 
-This section outlines the implementation phases for building the DB90 application. Each phase will be broken down into detailed task files in the `docs/phases/` directory.
+This section outlines the implementation phases for building the Aixle Insights application. Each phase will be broken down into detailed task files in the `docs/phases/` directory.
 
 ### Phase Overview
 
@@ -2774,7 +2774,7 @@ flowchart LR
 - [ ] MinIO instance with `raw-events` bucket
 - [ ] Temporal cluster (server + UI)
 - [ ] Temporal worker scaffold
-- [ ] Keycloak instance with DB90 realm
+- [ ] Keycloak instance with Aixle Insights realm
 - [ ] Google Cloud OAuth credentials (for Keycloak IDP)
 - [ ] Rails API scaffold with basic health endpoint
 - [ ] Vite + React project scaffold (with shadcn/ui initialized)

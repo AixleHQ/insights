@@ -1,6 +1,6 @@
-# DB90 — Web Frontend
+# Aixle Insights — Web Frontend
 
-React 19 + TypeScript + Vite frontend for the DB90 AI analytics platform.
+React 19 + TypeScript + Vite frontend for the Aixle Insights AI analytics platform.
 
 ## Development
 

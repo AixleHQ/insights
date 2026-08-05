@@ -10,7 +10,7 @@ describe("RecentCommitDetail", () => {
           commitHash: "1080c8e38aa694380e5e5d14c950123e6e1a2942",
           branchName: "feature/AIX-235-cursor-review",
           aiPercentage: 100,
-          repoName: "dualboot-partners/db90-rails",
+          repoName: "acme-corp/aixle-insights",
         }}
       />
     );
@@ -20,6 +20,6 @@ describe("RecentCommitDetail", () => {
     expect(screen.getByText("1080c8e")).toBeInTheDocument();
     expect(screen.getByText("feature/AIX-235-cursor-review")).toBeInTheDocument();
     expect(screen.getByText("100%")).toBeInTheDocument();
-    expect(screen.getByText("dualboot-partners/db90-rails")).toBeInTheDocument();
+    expect(screen.getByText("acme-corp/aixle-insights")).toBeInTheDocument();
   });
 });
