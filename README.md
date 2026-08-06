@@ -54,8 +54,13 @@ flowchart LR
     subgraph Client
         Web["React 19 + Vite<br/>(web)"]
     end
+    subgraph Dev["Developer machine"]
+        IDE["IDE / CLI<br/>(Cursor, Claude Code, OpenCode)"]
+        Agent["@aixle/insights<br/>(npm CLI + MCP)"]
+    end
     subgraph API["Rails 8.1 API"]
         REST["REST / OpenAPI"]
+        Ingest["Ingest<br/>(POST /ingest/events)"]
         Pol["Action Policy"]
     end
     subgraph Async
@@ -71,6 +76,9 @@ flowchart LR
 
     Web -->|OIDC| KC
     Web -->|JWT| REST
+    IDE -->|local activity| Agent
+    Agent -->|Bearer ingest token| Ingest
+    Ingest --> Temporal
     REST --> Pol
     REST --> PG
     REST --> Redis
