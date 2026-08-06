@@ -15,40 +15,45 @@ npm run dev
 
 ## Browser Automation & UI Review
 
-The browser MCP is pre-configured in `.mcp.json` at the repo root. Claude Code picks it up automatically — no `claude mcp add` needed.
+The browser MCP is pre-configured in `.mcp.json` at the repo root (`browsermcp` →
+`npx @browsermcp/mcp@latest`). Claude Code / Cursor pick it up automatically — no
+`claude mcp add` needed.
 
 ### One-time setup per machine: install the Chrome extension
 
-Install **Playwright MCP Bridge** from the Chrome Web Store. Search for `Playwright MCP Bridge` by Microsoft.
+Install **Browser MCP** from the [Chrome Web Store](https://chromewebstore.google.com/detail/browser-mcp-automate-your/bjfgambnhccakkhmkepdoekmckoijdlc)
+(search for `Browser MCP`).
 
 Once installed:
-- Claude Code connects to your **already-running Chrome** (with your existing Keycloak sessions).
-- No new blank browser window opens.
-- No port to configure — it uses a stdio connection via `npx @playwright/mcp`.
+- The agent connects to your **already-running Chrome** (with your existing Keycloak sessions).
+- No new blank browser window opens — it drives your real browser profile locally.
+- Nothing leaves your machine; the extension talks to the local MCP server over a WebSocket.
 
 ### How it works
 
 ```
-Chrome (you're logged in) + Playwright MCP Bridge extension
-        ↕ (extension bridges the connection)
-npx @playwright/mcp@latest --extension --browser chrome
+Chrome (you're logged in) + Browser MCP extension
+        ↕ (extension bridges the connection over a local WebSocket)
+npx @browsermcp/mcp@latest
         ↕ (stdio MCP protocol)
-Claude Code
+Claude Code / Cursor
 ```
 
-Claude can then navigate, click, screenshot, and inspect the real app at `http://localhost:5173` as a logged-in user.
+Click the Browser MCP icon in the Chrome toolbar to (re)connect the tab you want the
+agent to drive. The agent can then navigate, click, screenshot, and inspect the real
+app at `http://localhost:5173` as a logged-in user.
 
 ### Verify the connection
 
-In Claude Code, ask: *"Take a screenshot of http://localhost:5173"* — if Chrome opens to that URL and Claude returns a screenshot, the extension is connected.
+Ask the agent: *"Take a screenshot of http://localhost:5173"* — if it returns a
+screenshot of your logged-in app, the extension is connected.
 
 ### Tool reference
 
-| Tool | When Claude uses it | Setup |
+| Tool | When the agent uses it | Setup |
 |---|---|---|
-| **Playwright MCP** (`@playwright/mcp --extension`) | All browser automation — screenshots, navigation, interaction | Install Chrome extension (above) |
-| **`playwright-cli` skill** | Reference for browser automation commands inside Claude sessions | None — always available |
-| **`ui-visual-reviewer` agent** | Visual regression after component changes | None — uses Playwright MCP above |
+| **Browser MCP** (`@browsermcp/mcp`) | All browser automation — screenshots, navigation, interaction | Install Chrome extension (above) |
+| **`ui-visual-reviewer` agent** | Visual regression after component changes | None — uses Browser MCP above |
 
 ---
 

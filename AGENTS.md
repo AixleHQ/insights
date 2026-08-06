@@ -232,10 +232,10 @@ For any UI-related work, use this combo:
 |---|---|---|
 | **Figma Desktop MCP** | Build time — source of truth | Full API: code connect, variables, screenshots |
 | **Claude_Preview** | Build time — inline render check | Fast feedback loop |
-| **Playwright MCP** (`@playwright/mcp --extension`) | Review — screenshots, interaction, auth-required pages | Connects to running Chrome, preserves Keycloak sessions |
+| **Browser MCP** (`@browsermcp/mcp`) | Review — screenshots, interaction, auth-required pages | Connects to running Chrome, preserves Keycloak sessions |
 | **Figma Web MCP** | Fallback only | Desktop unavailable |
 
-Playwright MCP connects to the developer's already-running Chrome via the Playwright MCP Bridge extension. It does not open a blank browser window. See `packages/web/README.md` for setup.
+Browser MCP connects to the developer's already-running Chrome via the Browser MCP extension. It does not open a blank browser window. See `packages/web/README.md` for setup.
 
 ---
 
@@ -274,13 +274,13 @@ cp .claude/settings.local.json.example .claude/settings.local.json
 
 ### Browser automation setup (first time)
 
-Install the **Playwright MCP Bridge** Chrome extension (search `Playwright MCP Bridge` by Microsoft on the Chrome Web Store) — that's all. The MCP server is already configured in `.mcp.json`.
+Install the **Browser MCP** Chrome extension (search `Browser MCP` on the Chrome Web Store) — that's all. The MCP server is already configured in `.mcp.json` (`browsermcp` → `npx @browsermcp/mcp@latest`).
 
-Claude Code connects to your already-running Chrome (with existing Keycloak sessions) via `npx @playwright/mcp@latest --extension`. No blank browser window, no port to configure.
+The agent connects to your already-running Chrome (with existing Keycloak sessions) via `npx @browsermcp/mcp@latest`. No blank browser window; click the Browser MCP toolbar icon to connect the tab.
 
 See **`packages/web/README.md → Browser Automation & UI Review`** for full details.
 
-`ui-visual-reviewer` will use Playwright MCP to verify visual accuracy and feature behavior when invoked. Baseline snapshot storage and historical diff artifacts are out of scope for now — the reviewer verifies current state only.
+`ui-visual-reviewer` will use Browser MCP to verify visual accuracy and feature behavior when invoked. Baseline snapshot storage and historical diff artifacts are out of scope for now — the reviewer verifies current state only.
 
 ### Worktree setup (for parallel tickets)
 
@@ -392,7 +392,7 @@ feature/AIX-XX-short-description
 - Hook scripts live in-repo at `.claude/hooks/*.ts` — Node.js, cross-platform (Windows, macOS, Linux), no shell dependency. Invoked via `node --experimental-strip-types` (Node.js 22+ required, already pinned in `.tool-versions`).
 - Per-machine overrides belong in `.claude/settings.local.json` (gitignored).
 
-After `git pull`, every contributor gets commands + agents + skills + hooks with zero setup. Browser automation needs one one-time step: install the Playwright MCP Bridge Chrome extension (see `packages/web/README.md`).
+After `git pull`, every contributor gets commands + agents + skills + hooks with zero setup. Browser automation needs one one-time step: install the Browser MCP Chrome extension (see `packages/web/README.md`).
 
 ---
 

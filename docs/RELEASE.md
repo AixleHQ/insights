@@ -106,7 +106,7 @@ git rev-list --count main..release/1.0.0          # commit count going to prod
 git push origin release/1.0.0                     # full CI, no deploy — free pre-flight
 ```
 
-If a merge conflicts, prefer the `develop` side for shared infra files (`Makefile`, `scripts/ensure-base-images.sh` have historically been more evolved on `develop`); double-check any non-obvious resolution.
+If a merge conflicts, prefer the `develop` side for shared infra files (e.g. the `Makefile` has historically been more evolved on `develop`); double-check any non-obvious resolution.
 
 ### Step 3 — Pre-flight: migrations + ENV
 
