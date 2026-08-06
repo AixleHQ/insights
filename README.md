@@ -397,6 +397,7 @@ Code Quality:
   make lint                        Run all linters
   make lint-api                    Rubocop
   make lint-web                    ESLint
+  make check                       Run linters + tests (pre-push)
 
 Code Generation:
   make generate-types              Generate TypeScript types from OpenAPI

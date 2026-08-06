@@ -1,6 +1,6 @@
 # Release & Hotfix Runbook
 
-This is the human runbook for shipping a production release of the Aixle Insights / Aixle Insights app (Rails API + web on ECS) with GitFlow. Follow it top to bottom and you'll be fine. If you'd rather have the agent drive the whole thing, there's a `release` skill at `.cursor/skills/release/SKILL.md` that does the same steps — just keep the two in sync when you change one.
+This is the human runbook for shipping a production release of the Aixle Insights app (Rails API + web on ECS) with GitFlow. Follow it top to bottom and you'll be fine.
 
 ## TL;DR — golden rules
 
