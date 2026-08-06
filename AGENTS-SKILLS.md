@@ -63,11 +63,11 @@ Agents are autonomous subagents spawned by the model (via Claude Code's Task too
 - **Serializers:** Alba only. Flags `ActiveModel::Serializer`, `Blueprinter::Base`, JBuilder.
 - **Authorization:** ActionPolicy only. `authorize!` must appear at the top of every controller action. Flags Pundit and CanCan.
 - **Layered architecture:** Business logic must be in the right layer:
-  - `app/domain/` — DDD entities, value objects, core business logic independent of Rails
   - `app/services/` — multi-step operations that span models or require coordination
   - `app/query_builders/` — complex ActiveRecord queries (keep controllers and models query-free)
-  - `app/repositories/` — data access abstraction for domain objects
+  - `app/serializers/` — Alba serializers
   - `app/policies/` — ActionPolicy policies only, all inheriting from `ApplicationPolicy`
+  - `app/forms/`, `app/state_machines/`, `app/middleware/`, `app/dashboards/` — form objects, state machines, Rack middleware, Administrate dashboards
 - **Background jobs:** Sidekiq for standard async. Temporal.io for long-running, multi-step, or durable workflows.
 - **Migrations:** Must be reversible. Never drop a column in the same migration that removes it from the model (two-step deploy).
 - **Testing:** RSpec + FactoryBot + Faker + Shoulda Matchers. Integration/request specs must use a real database — no mocked DB.

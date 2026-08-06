@@ -362,25 +362,30 @@ For direct Ruby commands (`bundle exec`, `rails runner`, `rspec`), run from `pac
 **Branch naming.** Branch from `develop` (never `staging` or `main`):
 
 ```
-feature/AIX-XX-short-description
+<prefix>/AIX-XX-short-description
 ```
 
+- `<prefix>` — `feature/` for new functionality, `bugfix/` for bug fixes (also `hotfix/`, `chore/`)
 - `AIX-XX` — Linear ticket ID
 - `short-description` — kebab-case, 2–4 words
-- Examples: `feature/AIX-61-user-auth`, `feature/AIX-72-slack-alerts`
+- Examples: `feature/AIX-61-user-auth`, `bugfix/AIX-319-google-sign-in`
 
-**Commit messages.**
+**Commit messages.** Conventional Commits are mandatory:
 
 ```
-[AIX-XX] Short imperative description
+<type>(<scope>): [AIX-XX] short imperative description
 ```
 
-- Always prefix with the ticket ID in brackets
+- `<type>` — one of `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `perf`, `ci`
+- `<scope>` — optional but encouraged (e.g. `api`, `web`, `aixle-insights`)
+- `[AIX-XX]` — Linear ticket ID, required in the subject (not the footer)
 - Imperative mood: "Add", "Fix", "Update", "Remove" — not "Added"
 - Subject line under 72 characters
 - Examples:
-  - `[AIX-58] Add connector health display`
-  - `[AIX-61] Fix N+1 query in usage report`
+  - `feat(api): [AIX-184] Add project route guard and token refresh`
+  - `fix(aixle-insights): [AIX-338] Pass resolved path to sqlite open helper`
+
+See [CLAUDE.md](CLAUDE.md#git--worktree-integrity) for the authoritative rule.
 
 **Flow.** Feature branches merge to `develop` via PR. `staging` deploys to staging (auto via CI). `main` deploys to production. CI runs: RSpec, RuboCop, Brakeman, Vitest, ESLint, TypeScript typecheck.
 

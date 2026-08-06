@@ -92,7 +92,7 @@ aixle-insights/
 
 | Layer | Stack |
 |-------|-------|
-| Frontend | React 19, Vite 7, TypeScript, Tailwind CSS 4, shadcn/ui, TanStack Query |
+| Frontend | React 19, Vite 8, TypeScript, Tailwind CSS 4, shadcn/ui, TanStack Query |
 | Backend | Rails 8.1 (API-only), Alba serializers, Action Policy |
 | Database | PostgreSQL 17 + TimescaleDB (time-series hypertables) |
 | Auth | Keycloak (OIDC) with optional Google social login |
@@ -167,14 +167,23 @@ In separate terminals:
 ```bash
 make api      # Rails at http://localhost:3000
 make web      # Vite at http://localhost:5173
-make worker   # Temporal worker (optional)
+make worker   # View Temporal worker logs (optional)
 ```
 
 Open [localhost:5173](http://localhost:5173) and log in via Keycloak.
 
 ### Automated setup
 
-Alternatively, `make setup` (or `./scripts/setup.sh`) runs steps 2–4 in one shot.
+Two entry points, depending on how you run the app:
+
+- **`make setup`** — Docker-based. Runs `build → up → db-create → db-migrate → db-seed`
+  (also enables the git hooks). Dependencies live inside the containers.
+- **`./scripts/setup.sh`** — host-native. Checks prerequisites, installs Ruby/Node
+  dependencies on the host (`bundle install` / `npm install`), starts Docker services,
+  waits for PostgreSQL, then creates/migrates/seeds the database.
+
+Use `make setup` for the containerized workflow; use `scripts/setup.sh` if you run the
+API/web processes directly on your machine.
 
 ## Auth
 
@@ -370,7 +379,7 @@ Docker:
 
 Development:
   make console                     Rails console inside API container
-  make worker                      Start Temporal worker
+  make worker                      View Temporal worker logs
   make sidekiq                     View Sidekiq status
 
 Database:

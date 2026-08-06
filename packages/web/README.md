@@ -76,22 +76,68 @@ make test-web     # Vitest
 
 ## Formatting Utilities
 
-All numeric display must go through `src/lib/formatters.ts`. Never use inline `toFixed()`, `toLocaleString()`, or `Intl.NumberFormat` in components or pages.
+All numeric, currency, and date display must go through `src/lib/formatters.ts`. Never use inline `toFixed()`, `toLocaleString()`, or `Intl.NumberFormat` in components or pages.
+
+**Numbers & currency**
 
 | Helper | Input | Output |
 |---|---|---|
 | `formatCost(n)` | any USD amount | `$0.00` · `$0.0012` (micro) · `$1,234.56` (normal) |
 | `formatTokens(n)` | token count | `842` · `125.0K` · `1.2M` |
+| `formatCount(n)` | integer count | `1,234` (en-US grouped) |
+| `formatPercentage(n)` | fraction | `0.123` → `12.3%`; nullish → `—` |
+| `formatPercent(n, decimals=1)` | already-computed percent | `12.3` → `12.3%` |
+| `formatAiPercentage(n)` | AI-contribution percent | `60` → `60%`; `66.67` → `66.67%` |
+| `formatPerMillion(n)` | per-million USD rate | `$3.00`; nullish → `—` |
+| `formatFileSize(bytes)` | byte count | `B` / `KB` / `MB`; nullish → `—` |
+
+**Dates & time**
+
+| Helper | Input | Output |
+|---|---|---|
+| `formatDateTime(iso)` | ISO timestamp | medium date + short time (en-US); invalid → `—` |
+| `formatEventDate(iso)` | ISO timestamp | calendar date in UTC (e.g. `Jun 22, 2026`) for day-granularity events |
+| `formatLongUsDate(date)` | `Date` | `June 22, 2026`; invalid → `—` |
+| `periodLabel(period)` | `DashboardPeriod` | `All time` / `June 2026` |
+
+**Strings & labels**
+
+| Helper | Purpose |
+|---|---|
+| `truncateModelName(name)` | truncates long model names to 30 chars + `…` |
+| `getEventActorLabel(event)` | display label for an event's actor (user email or attribution) |
+| `isDayGranularityEvent(toolName)` | whether an event shows a calendar date vs. relative time |
+| `EventAttribution` / `EventAttributionType` | attribution constants + type |
 
 ```ts
-import { formatCost, formatTokens } from "@/lib/formatters";
+import { formatCost, formatTokens, formatPercentage } from "@/lib/formatters";
 
-formatCost(0)          // "$0.00"
-formatCost(0.00123)    // "$0.0012"
-formatCost(1234.56)    // "$1,234.56"
-formatTokens(842)      // "842"
-formatTokens(125000)   // "125.0K"
-formatTokens(1200000)  // "1.2M"
+formatCost(0)            // "$0.00"
+formatCost(0.00123)      // "$0.0012"
+formatCost(1234.56)      // "$1,234.56"
+formatTokens(842)        // "842"
+formatTokens(125000)     // "125.0K"
+formatPercentage(0.123)  // "12.3%"
 ```
 
-If a new numeric type needs display (percentages, durations, event counts), add a named export to `formatters.ts` — do not inline it at the call site.
+Need a new display type? First check the table above — a helper may already exist
+(`formatPercentage`, `formatCount`, `formatDateTime`, …). If not, add a named export to
+`formatters.ts` — never inline it at the call site.
+
+## Environment
+
+Copy `.env.example` to `.env.development` (or `.env`) and fill in the values.
+
+| Variable | Purpose |
+|---|---|
+| `VITE_API_URL` | API base path. `/api/v1` in dev (via the Vite proxy); full URL in production |
+| `VITE_INGEST_BASE_URL` | Direct API base used in shell-hook snippets (bypasses the Vite proxy) |
+| `VITE_ADMIN_URL` | Admin panel URL used to redirect back after stopping impersonation |
+| `VITE_KEYCLOAK_URL` | Keycloak base URL (e.g. `http://localhost:8080`) |
+| `VITE_KEYCLOAK_REALM` | Keycloak realm |
+| `VITE_KEYCLOAK_CLIENT_ID` | Keycloak SPA client ID |
+| `E2E_TEST_EMAIL` | **Required for `npm run test:e2e*`** — login used by Playwright E2E specs |
+| `E2E_TEST_PASSWORD` | **Required for `npm run test:e2e*`** — password for the E2E login |
+
+The `E2E_TEST_*` variables are only needed when running the Playwright end-to-end
+tests; the app and unit tests run without them.

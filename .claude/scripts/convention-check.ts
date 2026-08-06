@@ -2,8 +2,10 @@
  * convention-check.ts — Git convention checker
  *
  * Checks that the current branch and its commits follow Aixle Insights conventions:
- *   Branch : feature/AIX-XX-short-description  (or hotfix/...)
- *   Commits: [AIX-XX] Short imperative description
+ *   Branch : <prefix>/AIX-XX-short-description  (feature|bugfix|hotfix|chore)
+ *   Commits: <type>(<scope>): [AIX-XX] short imperative description
+ *            (Conventional Commits; scope optional; type ∈ feat|fix|refactor|
+ *             test|docs|chore|perf|ci)
  *
  * Output: human-readable pass/fail printed to stdout.
  * Exit 0 always — findings are advisory, reported by /review-commit.
@@ -19,8 +21,8 @@ const BOLD_WHITE = "\x1b[1;37m";
 const DIM_WHITE  = "\x1b[2;37m";
 const X          = "\x1b[0m";
 
-const BRANCH_RE  = /^(feature|hotfix|chore|fix)\/AIX-\d+-[\w-]+$/;
-const COMMIT_RE  = /^\[AIX-\d+\] .+/;
+const BRANCH_RE  = /^(feature|bugfix|hotfix|chore)\/AIX-\d+-[\w-]+$/;
+const COMMIT_RE  = /^(feat|fix|refactor|test|docs|chore|perf|ci)(\([\w,-]+\))?: \[AIX-\d+\] .+/;
 
 function git(args: string[]): string {
   const r = spawnSync("git", args, { encoding: "utf8" });
@@ -47,7 +49,7 @@ function main(): void {
     branchOk,
     branchOk
       ? `${branch}`
-      : `"${branch}" — expected feature/AIX-XX-short-description`
+      : `"${branch}" — expected <prefix>/AIX-XX-short-description (feature|bugfix|hotfix|chore)`
   );
 
   // Commit messages
@@ -63,7 +65,7 @@ function main(): void {
     check(
       "Commit message",
       ok,
-      ok ? msg : `"${msg}" — expected [AIX-XX] Imperative description`
+      ok ? msg : `"${msg}" — expected <type>(<scope>): [AIX-XX] Imperative description`
     );
   }
 

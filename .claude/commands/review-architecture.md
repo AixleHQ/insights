@@ -72,11 +72,11 @@ When evaluating solutions, follow this hierarchy:
 
 1. **First Choice — Standard Rails Patterns**: ActiveRecord, concerns, callbacks, counter caches, strong parameters, Scenic database views
 2. **Second Choice — Existing Codebase Patterns**:
-   - Domain-Driven Design in `app/domain/`
    - Service objects in `app/services/`
    - Query builders in `app/query_builders/`
-   - Repository patterns in `app/repositories/`
-3. **Third Choice — New Patterns**: Only when Rails and existing patterns don't suffice. Prefer DDD (entities, value objects, aggregates). Consider CQRS or event sourcing only for audit-critical workflows. Always justify why simpler approaches won't work.
+   - Alba serializers in `app/serializers/`
+   - Form objects, state machines, and Rack middleware in `app/forms/`, `app/state_machines/`, `app/middleware/`
+3. **Third Choice — New Patterns**: Only when Rails and existing patterns don't suffice. Always justify why simpler approaches won't work.
 
 ### Backend Checklist
 

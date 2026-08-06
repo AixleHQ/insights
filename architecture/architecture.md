@@ -1275,11 +1275,11 @@ flowchart TB
 
     subgraph Docker["Docker Compose Environment"]
         subgraph Frontend["Frontend Container"]
-            Vite["Vite + React SPA<br/>Port 3000"]
+            Vite["Vite + React SPA<br/>Port 5173"]
         end
 
         subgraph Backend["Rails Container"]
-            Rails["Ruby on Rails API<br/>Port 3001"]
+            Rails["Ruby on Rails API<br/>Port 3000"]
             ActionCable["ActionCable<br/>WebSocket/SSE"]
         end
 
@@ -1370,7 +1370,7 @@ flowchart TB
 
 ### Monorepo Structure
 
-This project is managed as a **simplified monorepo** with two main packages (Rails API + React SPA) plus supporting infrastructure. Unlike JavaScript-heavy monorepos, we don't need npm workspaces or Turborepo since there's minimal shared code between Ruby and TypeScript.
+This project is managed as a monorepo with three packages (Rails API, React SPA, and the `@aixle/insights` CLI/MCP tool) plus supporting infrastructure.
 
 **Why Monorepo:**
 - Atomic commits across frontend + backend + Temporal
@@ -1381,14 +1381,14 @@ This project is managed as a **simplified monorepo** with two main packages (Rai
 **Tooling:**
 - **Makefile** - Unified commands across Ruby/JS boundary
 - **Docker Compose** - Local development environment
-- **No npm workspaces** - Only one JS package, not needed
+- **npm workspaces** - `packages/tools/` is a workspace root (`@aixle/insights`); `packages/web/` has its own `package.json`
 
 ### Package Structure
 
 ```
-db90-dash/
+aixle-insights/
 ├── packages/
-│   ├── web/                    # Vite + React SPA (port 3000)
+│   ├── web/                    # Vite + React SPA (dev server on port 5173)
 │   │   ├── src/
 │   │   │   ├── components/
 │   │   │   │   ├── ui/         # shadcn/ui components (Button, Card, Dialog, etc.)
@@ -1405,7 +1405,7 @@ db90-dash/
 │   │   ├── package.json
 │   │   └── vite.config.ts
 │   │
-│   └── api/                    # Ruby on Rails API (port 3001)
+│   └── api/                    # Ruby on Rails API (port 3000)
 │       ├── app/
 │       │   ├── controllers/
 │       │   │   ├── api/v1/     # Versioned API controllers
@@ -1517,7 +1517,7 @@ restart:
 
 # ============ Individual Services ============
 api:
-	cd packages/api && bin/rails server -p 3001
+	cd packages/api && bin/rails server -p 3000
 
 web:
 	cd packages/web && npm run dev
@@ -1626,8 +1626,8 @@ The following packages from the old Express/Prisma architecture are **no longer 
 
 | Service | Image | Port | Purpose |
 |---------|-------|------|---------|
-| **web** | Custom (Vite build) | 3000 | React SPA frontend |
-| **api** | Custom (Rails) | 3001 | REST API server |
+| **web** | Custom (Vite build) | 5173 | React SPA frontend (dev server) |
+| **api** | Custom (Rails) | 3000 | REST API server |
 | **sidekiq** | Same as api | - | Background job processor |
 | **temporal** | temporalio/auto-setup | 7233 | Workflow orchestration server |
 | **temporal-ui** | temporalio/ui | 8088 | Temporal web UI |
@@ -1719,10 +1719,10 @@ Clients:
   db90-web:
     Client Type: Public (SPA)
     Valid Redirect URIs:
-      - http://localhost:3000/*
+      - http://localhost:5173/*
       - https://app.db.io/*
     Web Origins:
-      - http://localhost:3000
+      - http://localhost:5173
       - https://app.db.io
     PKCE: Required (S256)
 

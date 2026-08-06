@@ -1,6 +1,6 @@
-# MCP telemetry server (@db90/telemetry-mcp)
+# MCP telemetry server (@aixle/insights)
 
-End-user package: **`@db90/telemetry-mcp`** in `packages/tools/db90-telemetry-mcp/`. It runs as a **stdio MCP server** inside Claude Code (and can run standalone via `db90-mcp run`). It reads local Claude Code transcripts and Cursor IDE telemetry, normalizes payloads, and posts tool-usage events to the db90-rails ingest API using credentials obtained through **Keycloak/OIDC device login** (or manual token files for advanced setups).
+End-user package: **`@aixle/insights`** in `packages/tools/aixle-insights/`. It runs as a **stdio MCP server** inside Claude Code (and can run standalone via `aixle-insights run`). It reads local Claude Code transcripts and Cursor IDE telemetry, normalizes payloads, and posts tool-usage events to the Aixle Insights ingest API using credentials obtained through **Keycloak/OIDC device login** (or manual token files for advanced setups).
 
 ## System flow
 
@@ -8,7 +8,7 @@ The diagram below mirrors the MCP package’s ingest path after readers produce 
 
 ```mermaid
 flowchart LR
-  Editor[Claude Code / Cursor] -->|MCP stdio| MCP[@db90/telemetry-mcp]
+  Editor[Claude Code / Cursor] -->|MCP stdio| MCP[@aixle/insights]
   MCP --> Readers[Claude JSONL reader / Cursor SQLite reader]
   Readers -->|POST /api/v1/ingest/events| Ingest[Api::V1::IngestController#create]
   Ingest --> Raw[RawEventStore / MinIO]

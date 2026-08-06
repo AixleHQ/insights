@@ -27,11 +27,15 @@ Aixle Insights is an AI tool analytics platform tracking coding-assistant usage 
 
 The Rails app uses a layered architecture beyond standard MVC:
 
-- `app/domain/` — DDD: entities, value objects, aggregates. Core business logic independent of Rails.
 - `app/services/` — Service objects for multi-step operations that don't belong in a single model or controller.
 - `app/query_builders/` — Complex ActiveRecord queries. Keep controllers and models free of query logic.
-- `app/repositories/` — Data access abstraction, particularly for domain objects.
+- `app/serializers/` — Alba serializers.
 - `app/policies/` — ActionPolicy authorization policies.
+- `app/forms/` — Form objects for multi-model or validation-heavy input.
+- `app/state_machines/` — State machine definitions.
+- `app/middleware/` — Custom Rack middleware.
+- `app/dashboards/` — Administrate dashboard definitions.
+- `app/jobs/` — Sidekiq background jobs.
 
 Decision hierarchy: standard Rails patterns first → existing codebase patterns → new patterns (justify explicitly).
 
@@ -46,7 +50,8 @@ Decision hierarchy: standard Rails patterns first → existing codebase patterns
   - All numeric display must go through `packages/web/src/lib/formatters.ts`. Never use inline `toFixed()`, `toLocaleString()`, or `Intl.NumberFormat` in components or pages.
   - `formatCost(n)` — money/USD. `$0.00` for zero; `$0.0012` (4 dp) for micro-costs < $0.01; `$1,234.56` (2 dp, US locale) otherwise.
   - `formatTokens(n)` — token counts. Exact integer for < 1 000; `125.0K` thousands; `1.2M` millions.
-  - New numeric type? Add a named export to `formatters.ts` — never inline at the call site.
+  - Many more helpers already exist (`formatCount`, `formatPercentage`, `formatPercent`, `formatDateTime`, `formatEventDate`, `formatFileSize`, …) — see the full table in `packages/web/README.md`. Check there before adding a new one.
+  - New display type not covered? Add a named export to `formatters.ts` — never inline at the call site.
 
 ## Database
 
