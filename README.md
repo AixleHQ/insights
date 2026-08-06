@@ -29,6 +29,7 @@ step-by-step setup is in [Getting Started](#getting-started).
 - [Getting Started](#getting-started)
 - [Auth](#auth)
 - [Integrations](#integrations)
+- [Telemetry Collection](#telemetry-collection)
 - [Makefile Reference](#makefile-reference)
 - [Testing](#testing)
 - [Ports](#ports)
@@ -84,7 +85,8 @@ flowchart LR
 aixle-insights/
 ├── packages/
 │   ├── api/          # Rails 8.1 API (port 3000)
-│   └── web/          # React + Vite frontend (port 5173)
+│   ├── web/          # React + Vite frontend (port 5173)
+│   └── tools/        # @aixle/insights — npm CLI + MCP telemetry collector
 ├── temporal/         # Temporal.io workflow workers
 ├── keycloak/         # Realm config & custom themes
 └── docker-compose.yml
@@ -360,6 +362,27 @@ No OAuth app needed — generate an API key from [openrouter.ai/settings/keys](h
 No OAuth app needed — generate an API key from [Google AI Studio](https://aistudio.google.com/app/apikey). The key is entered directly in the Connect sheet in the UI and validated against `https://generativelanguage.googleapis.com/v1beta/models` before being saved.
 
 </details>
+
+## Telemetry Collection
+
+Per-user IDE telemetry (Cursor, Claude Code, OpenCode) is **not** pushed by the
+editors directly. It is collected by [`@aixle/insights`](packages/tools/aixle-insights)
+— an npm package (CLI + MCP server) each developer installs locally. It reads the
+tool's own local activity (Claude Code JSONL transcripts, Cursor's SQLite store)
+and forwards batched events to the API's public ingest endpoint
+(`POST /api/v1/ingest/events`, authenticated with a per-user Bearer ingest token).
+
+```bash
+npx -y @aixle/insights init \
+  --host http://localhost:3000 \
+  --keycloak-url http://localhost:8080/realms/db90
+```
+
+`init` runs a Keycloak device login, stores credentials locally, and registers the
+MCP server in `~/.claude.json`. From then on it syncs automatically (~every 5 min,
+plus a flush on connect). See the
+[package README](packages/tools/aixle-insights/README.md) and
+[LOCAL-DEV guide](packages/tools/aixle-insights/LOCAL-DEV.md) for details.
 
 ## Makefile Reference
 
