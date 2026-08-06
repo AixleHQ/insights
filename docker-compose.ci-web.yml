@@ -1,6 +1,0 @@
-services:
-  web:
-    build:
-      context: .
-      dockerfile: Dockerfile.web
-      target: ci

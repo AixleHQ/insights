@@ -4,63 +4,139 @@ on: [push, pull_request]
 
 permissions:
   contents: read
-  packages: read
 
 jobs:
-  # --- API checks (build from source with CI target) ---
+  # --- API checks (Ruby, native runner + service containers) ---
 
   api_test:
     name: API Tests (RSpec)
-    uses: ./.github/workflows/code-check.yml
-    secrets: inherit
-    with:
-      check_command: bash -c "bundle exec rails db:drop db:create db:schema:load && bundle exec rspec"
-      container_name: api
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: timescale/timescaledb:2.17.2-pg17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7.2
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      RAILS_ENV: test
+      DATABASE_HOST: localhost
+      DATABASE_PORT: 5432
+      DATABASE_USERNAME: postgres
+      DATABASE_PASSWORD: postgres
+      REDIS_URL: redis://localhost:6379/1
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install system libraries (pg client)
+        run: sudo apt-get update -qq && sudo apt-get install --no-install-recommends -y libpq-dev postgresql-client
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.4.8
+          bundler-cache: true
+          working-directory: packages/api
+      - name: Prepare database
+        working-directory: packages/api
+        run: bundle exec rails db:drop db:create db:schema:load
+      - name: RSpec
+        working-directory: packages/api
+        run: bundle exec rspec
 
   api_lint:
     name: API Lint (Rubocop)
-    uses: ./.github/workflows/code-check.yml
-    secrets: inherit
-    with:
-      check_command: bundle exec rubocop --parallel
-      container_name: api
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.4.8
+          bundler-cache: true
+          working-directory: packages/api
+      - name: Rubocop
+        working-directory: packages/api
+        run: bundle exec rubocop --parallel
 
   api_security:
     name: API Security (Brakeman)
-    uses: ./.github/workflows/code-check.yml
-    secrets: inherit
-    with:
-      check_command: bundle exec brakeman --no-pager
-      container_name: api
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.4.8
+          bundler-cache: true
+          working-directory: packages/api
+      - name: Brakeman
+        working-directory: packages/api
+        run: bundle exec brakeman --no-pager
 
-  # --- Web checks ---
+  # --- Web checks (Node, native runner) ---
 
   web_test:
     name: Web Tests (Vitest)
-    uses: ./.github/workflows/code-check.yml
-    secrets: inherit
-    with:
-      check_command: npm run test:run
-      container_name: web
-      docker_compose_file: docker-compose.ci-web.yml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.13.0
+          cache: npm
+          cache-dependency-path: packages/web/package-lock.json
+      - name: Install
+        working-directory: packages/web
+        run: npm ci
+      - name: Vitest
+        working-directory: packages/web
+        run: npm run test:run
 
   web_lint:
     name: Web Lint (ESLint)
-    uses: ./.github/workflows/code-check.yml
-    secrets: inherit
-    with:
-      check_command: npm run lint
-      container_name: web
-      docker_compose_file: docker-compose.ci-web.yml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.13.0
+          cache: npm
+          cache-dependency-path: packages/web/package-lock.json
+      - name: Install
+        working-directory: packages/web
+        run: npm ci
+      - name: ESLint
+        working-directory: packages/web
+        run: npm run lint
 
   web_typecheck:
     name: Web Typecheck (TypeScript)
-    uses: ./.github/workflows/code-check.yml
-    secrets: inherit
-    with:
-      check_command: npx tsc --noEmit
-      container_name: web
-      docker_compose_file: docker-compose.ci-web.yml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.13.0
+          cache: npm
+          cache-dependency-path: packages/web/package-lock.json
+      - name: Install
+        working-directory: packages/web
+        run: npm ci
+      - name: tsc --noEmit
+        working-directory: packages/web
+        run: npx tsc --noEmit
 
   # --- @aixle/insights (packages/tools/aixle-insights/) ---
 

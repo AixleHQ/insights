@@ -22,7 +22,7 @@ To keep the stack unambiguously permissive, the Redis image is pinned to a 7.2
 line rather than a floating major tag:
 
 - `docker-compose.yml` → `redis:7.2-alpine`
-- `docker-compose.ci.yml` → `.../redis:7.2`
+- `.github/workflows/ci.yml` → `redis:7.2` (CI service container)
 
 If you re-pin to 7.4+, be aware you are opting into RSALv2/SSPLv1 terms. A
 drop-in BSD-licensed alternative is [Valkey](https://valkey.io/).
