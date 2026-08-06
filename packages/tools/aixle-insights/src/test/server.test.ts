@@ -8,12 +8,12 @@ describe("MCP server (in-process)", () => {
 
   async function callTool(name: string, args: Record<string, unknown> = {}): Promise<unknown> {
     vi.resetModules();
-    const { createDb90McpServer } = await import("../server.js");
+    const { createAixleInsightsMcpServer } = await import("../server.js");
     const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
     const { InMemoryTransport } = await import("@modelcontextprotocol/sdk/inMemory.js");
 
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-    const server = createDb90McpServer();
+    const server = createAixleInsightsMcpServer();
     const client = new Client({ name: "db90-mcp-test-client", version: "0.0.0" });
 
     await server.connect(serverTransport);
@@ -42,28 +42,41 @@ describe("MCP server (in-process)", () => {
     vi.restoreAllMocks();
   });
 
-  it("listTools includes db90_authenticate, db90_status, and db90_sync_now", async () => {
+  it("listTools includes the aixle_insights_* names and deprecated db90_* aliases", async () => {
     vi.resetModules();
-    const { createDb90McpServer } = await import("../server.js");
+    const { createAixleInsightsMcpServer } = await import("../server.js");
     const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
     const { InMemoryTransport } = await import("@modelcontextprotocol/sdk/inMemory.js");
 
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-    const server = createDb90McpServer();
+    const server = createAixleInsightsMcpServer();
     const client = new Client({ name: "db90-mcp-test-client", version: "0.0.0" });
 
     await server.connect(serverTransport);
     await client.connect(clientTransport);
 
     const tools = await client.listTools();
-    expect(tools.tools.map((t) => t.name).sort()).toEqual(["db90_authenticate", "db90_status", "db90_sync_now"].sort());
+    expect(tools.tools.map((t) => t.name).sort()).toEqual(
+      [
+        "aixle_insights_authenticate",
+        "aixle_insights_status",
+        "aixle_insights_sync_now",
+        "db90_authenticate",
+        "db90_status",
+        "db90_sync_now",
+      ].sort()
+    );
+    for (const legacyName of ["db90_authenticate", "db90_status", "db90_sync_now"]) {
+      const tool = tools.tools.find((t) => t.name === legacyName);
+      expect(tool?.description).toContain("Deprecated");
+    }
 
     await client.close();
     await server.close();
   });
 
-  it("db90_status tolerates missing credentials and returns JSON", async () => {
-    const parsed = await callTool("db90_status");
+  it("aixle_insights_status tolerates missing credentials and returns JSON", async () => {
+    const parsed = await callTool("aixle_insights_status");
     expect(parsed).toMatchObject({
       authenticated: false,
       configured: false,
@@ -79,7 +92,7 @@ describe("MCP server (in-process)", () => {
     ).toBe(true);
   });
 
-  it("db90_status reports configured when credentials.json is valid", async () => {
+  it("db90_status (deprecated alias) returns the same payload as aixle_insights_status", async () => {
     writeFileSync(
       join(home, "credentials.json"),
       JSON.stringify({ token: "db90_test", host: "http://localhost:3000" }),
@@ -87,6 +100,21 @@ describe("MCP server (in-process)", () => {
     );
 
     const parsed = await callTool("db90_status");
+    expect(parsed).toMatchObject({
+      authenticated: true,
+      configured: true,
+      host: "http://localhost:3000",
+    });
+  });
+
+  it("aixle_insights_status reports configured when credentials.json is valid", async () => {
+    writeFileSync(
+      join(home, "credentials.json"),
+      JSON.stringify({ token: "db90_test", host: "http://localhost:3000" }),
+      "utf-8"
+    );
+
+    const parsed = await callTool("aixle_insights_status");
     expect(parsed).toMatchObject({
       authenticated: true,
       configured: true,
@@ -102,10 +130,10 @@ describe("MCP server (in-process)", () => {
     ).toBe(true);
   });
 
-  it("db90_status tolerates malformed credentials", async () => {
+  it("aixle_insights_status tolerates malformed credentials", async () => {
     writeFileSync(join(home, "credentials.json"), "{ nope", "utf-8");
 
-    const parsed = await callTool("db90_status");
+    const parsed = await callTool("aixle_insights_status");
     expect(parsed).toMatchObject({
       authenticated: false,
       configured: false,
@@ -115,7 +143,7 @@ describe("MCP server (in-process)", () => {
     });
   });
 
-  it("db90_status tolerates malformed state", async () => {
+  it("aixle_insights_status tolerates malformed state", async () => {
     const creds = { token: "db90_test", host: "http://localhost:3000" };
     writeFileSync(join(home, "credentials.json"), JSON.stringify(creds), "utf-8");
 
@@ -123,7 +151,7 @@ describe("MCP server (in-process)", () => {
     const { stateKey } = await import("../state.js");
     writeFileSync(join(home, `${stateKey(creds.host, creds.token)}.json`), "{ nope", "utf-8");
 
-    const parsed = await callTool("db90_status");
+    const parsed = await callTool("aixle_insights_status");
     expect(parsed).toMatchObject({
       authenticated: true,
       configured: true,
@@ -132,7 +160,7 @@ describe("MCP server (in-process)", () => {
     });
   });
 
-  it("db90_authenticate returns device instructions without polling", async () => {
+  it("aixle_insights_authenticate returns device instructions without polling", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -147,7 +175,7 @@ describe("MCP server (in-process)", () => {
       )
     );
 
-    const parsed = await callTool("db90_authenticate", {
+    const parsed = await callTool("aixle_insights_authenticate", {
       keycloakUrl: "http://localhost:8080/realms/db90",
     });
 
@@ -162,7 +190,7 @@ describe("MCP server (in-process)", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
-  it("db90_sync_now reports ok false when another sync holds the lock", async () => {
+  it("aixle_insights_sync_now reports ok false when another sync holds the lock", async () => {
     writeFileSync(
       join(home, "credentials.json"),
       JSON.stringify({ token: "db90_test", host: "http://localhost:3000" }),
@@ -170,7 +198,7 @@ describe("MCP server (in-process)", () => {
     );
 
     vi.resetModules();
-    const { createDb90McpServer } = await import("../server.js");
+    const { createAixleInsightsMcpServer } = await import("../server.js");
     const { acquireSyncLock } = await import("../lock.js");
     const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
     const { InMemoryTransport } = await import("@modelcontextprotocol/sdk/inMemory.js");
@@ -179,13 +207,13 @@ describe("MCP server (in-process)", () => {
     expect(heldLock.acquired).toBe(true);
 
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-    const server = createDb90McpServer();
+    const server = createAixleInsightsMcpServer();
     const client = new Client({ name: "db90-mcp-test-client", version: "0.0.0" });
 
     await server.connect(serverTransport);
     await client.connect(clientTransport);
 
-    const result = await client.callTool({ name: "db90_sync_now", arguments: {} });
+    const result = await client.callTool({ name: "aixle_insights_sync_now", arguments: {} });
     const first = result.content[0];
     if (first?.type !== "text") throw new Error("expected text content");
     const parsed = JSON.parse(first.text) as { ok: boolean; result?: { locked?: boolean } };
@@ -199,14 +227,14 @@ describe("MCP server (in-process)", () => {
     await server.close();
   });
 
-  it("db90_sync_now rejects a requested tool that has no configured credential", async () => {
+  it("aixle_insights_sync_now rejects a requested tool that has no configured credential", async () => {
     writeFileSync(
       join(home, "credentials.json"),
       JSON.stringify({ token: "db90_test", host: "http://localhost:3000" }),
       "utf-8"
     );
 
-    const parsed = await callTool("db90_sync_now", { tools: ["cursor"] });
+    const parsed = await callTool("aixle_insights_sync_now", { tools: ["cursor"] });
     expect(parsed).toMatchObject({
       ok: false,
       result: {
@@ -217,8 +245,8 @@ describe("MCP server (in-process)", () => {
     expect(parsed).toHaveProperty("result.errors");
   });
 
-  it("db90_sync_now logs missing credentials to mcp.log", async () => {
-    const parsed = await callTool("db90_sync_now");
+  it("aixle_insights_sync_now logs missing credentials to mcp.log", async () => {
+    const parsed = await callTool("aixle_insights_sync_now");
     expect(parsed).toMatchObject({ ok: false, error: "missing_credentials" });
     expect(readFileSync(join(home, "mcp.log"), "utf-8")).toContain("credential_validation_failed");
   });
@@ -226,7 +254,7 @@ describe("MCP server (in-process)", () => {
   // Project resolver wiring (AIX-245).
   //
   // The cache test below keeps a single server instance alive across multiple
-  // db90_sync_now calls, which is why it does not reuse the `callTool` helper
+  // aixle_insights_sync_now calls, which is why it does not reuse the `callTool` helper
   // (which resets modules each call and would defeat the module-level cache).
   describe("project_id resolver wiring", () => {
     async function setupServerWithMocks(
@@ -249,19 +277,19 @@ describe("MCP server (in-process)", () => {
         return { ...actual, syncTelemetryTools: syncMock };
       });
 
-      const { createDb90McpServer } = await import("../server.js");
+      const { createAixleInsightsMcpServer } = await import("../server.js");
       const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
       const { InMemoryTransport } = await import("@modelcontextprotocol/sdk/inMemory.js");
 
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-      const server = createDb90McpServer();
+      const server = createAixleInsightsMcpServer();
       const client = new Client({ name: "db90-mcp-test-client", version: "0.0.0" });
       await server.connect(serverTransport);
       await client.connect(clientTransport);
       return { server, client };
     }
 
-    it("resolves project_id once across multiple db90_sync_now calls (cache hit)", async () => {
+    it("resolves project_id once across multiple aixle_insights_sync_now calls (cache hit)", async () => {
       const resolveMock = vi.fn().mockResolvedValue({
         projectId: "proj-uuid-cached",
         source: "auto-detect",
@@ -270,9 +298,9 @@ describe("MCP server (in-process)", () => {
 
       const { server, client } = await setupServerWithMocks(resolveMock, syncMock);
       try {
-        await client.callTool({ name: "db90_sync_now", arguments: {} });
-        await client.callTool({ name: "db90_sync_now", arguments: {} });
-        await client.callTool({ name: "db90_sync_now", arguments: {} });
+        await client.callTool({ name: "aixle_insights_sync_now", arguments: {} });
+        await client.callTool({ name: "aixle_insights_sync_now", arguments: {} });
+        await client.callTool({ name: "aixle_insights_sync_now", arguments: {} });
 
         expect(resolveMock).toHaveBeenCalledTimes(1);
         expect(syncMock).toHaveBeenCalledTimes(3);
@@ -293,8 +321,8 @@ describe("MCP server (in-process)", () => {
 
       const { server, client } = await setupServerWithMocks(resolveMock, syncMock);
       try {
-        await client.callTool({ name: "db90_sync_now", arguments: {} });
-        await client.callTool({ name: "db90_sync_now", arguments: {} });
+        await client.callTool({ name: "aixle_insights_sync_now", arguments: {} });
+        await client.callTool({ name: "aixle_insights_sync_now", arguments: {} });
 
         expect(resolveMock).toHaveBeenCalledTimes(2);
         expect(syncMock.mock.calls[0][0].projectId).toBeNull();
@@ -314,8 +342,8 @@ describe("MCP server (in-process)", () => {
 
       const { server, client } = await setupServerWithMocks(resolveMock, syncMock);
       try {
-        await client.callTool({ name: "db90_sync_now", arguments: {} });
-        await client.callTool({ name: "db90_sync_now", arguments: {} });
+        await client.callTool({ name: "aixle_insights_sync_now", arguments: {} });
+        await client.callTool({ name: "aixle_insights_sync_now", arguments: {} });
 
         expect(resolveMock).toHaveBeenCalledTimes(1);
         for (const call of syncMock.mock.calls) {

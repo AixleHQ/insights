@@ -9,6 +9,7 @@ interface Props {
   orgId: string;
   userId: string;
   period: string;
+  projectId?: string;
 }
 
 const CALLOUT_ICONS: Record<PromptInsightsCallout["type"], LucideIcon> = {
@@ -23,8 +24,8 @@ const DIMENSIONS = [
   { key: "specificity" as const, label: "Specificity" },
 ];
 
-export function PromptInsightsSection({ orgId, userId, period }: Props) {
-  const { data, isLoading, isError, refetch } = usePromptInsights(orgId, userId, period);
+export function PromptInsightsSection({ orgId, userId, period, projectId }: Props) {
+  const { data, isLoading, isError, refetch } = usePromptInsights(orgId, userId, period, projectId);
 
   return (
     <Card>

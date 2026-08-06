@@ -145,16 +145,16 @@ describe("EventDrawer time and unmatched author display", () => {
 
 describe("EventDrawer graceful empty prompt (AIX-511)", () => {
   it("commit event shows only Metadata tab, no Sanitized prompt tab", () => {
-    renderDrawer({ eventType: "commit", sanitizedContent: null, metadata: {} });
+    renderDrawer({ eventType: "commit", metadata: {} });
     expect(screen.queryByRole("tab", { name: /sanitized/i })).not.toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /metadata/i })).toBeInTheDocument();
     expect(screen.queryByText("No content available")).not.toBeInTheDocument();
   });
 
   it("chat event with no text shows placeholder, not blank block", () => {
-    renderDrawer({ eventType: "chat", sanitizedContent: null });
-    expect(screen.getByRole("tab", { name: /sanitized/i })).toBeInTheDocument();
-    expect(screen.getByText(/prompt capture is not enabled/i)).toBeInTheDocument();
+    renderDrawer({ eventType: "chat", eventText: null });
+    expect(screen.getByRole("tab", { name: /prompt/i })).toBeInTheDocument();
+    expect(screen.getByText("Prompt capture not enabled")).toBeInTheDocument();
     expect(screen.queryByText("No content available")).not.toBeInTheDocument();
   });
 });

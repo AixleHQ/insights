@@ -121,6 +121,11 @@ RSpec.describe ToolEventCsvExporter do
       expect(result).to include("Model: gpt-4o")
     end
 
+    it "builds a summary line for search filter" do
+      result = described_class.filter_summary_lines_for_export({ "search" => "github" })
+      expect(result).to include("Search: github")
+    end
+
     it "includes all present filter lines" do
       result = described_class.filter_summary_lines_for_export({
         "tool_name"  => "cursor",

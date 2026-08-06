@@ -20,8 +20,6 @@ module Activities
 
       metadata = extract_metadata(raw_payload)
 
-      # Path 1: cursor / unscannable — no prompt body, but metadata (e.g. commit_message) may
-      # still carry secrets; scan metadata text only (CUR-V16).
       if metadata['scannable'] == false
         metadata_content = extract_text_from_hash(metadata).byteslice(0, 100_000) || ''
         scan_result = scan_content(metadata_content, policy)
@@ -36,30 +34,40 @@ module Activities
         }
       end
 
-      # Path 2: pre-scanned by connector (db90-claude) — use result directly.
-      # requires_sanitization is always false: the connector has already processed
-      # its own content and the raw text is not available server-side to sanitize.
-      if metadata['scannable'] == true && metadata['risk_level']
-        raw_level  = metadata['risk_level']
-        risk_level = VALID_RISK_LEVELS.include?(raw_level) ? raw_level : 'low'
-        categories = Array(metadata['risk_categories'])
-        return {
-          'detections' => categories.map do |c|
-            { 'category' => c, 'pattern' => 'pre_scanned',
-              'count' => 1, 'action' => 'none' }
-          end,
-          'risk_score' => metadata['risk_score'].to_i,
-          'risk_level' => risk_level,
-          'requires_sanitization' => false,
-          'detection_summary' => if categories.empty?
-                                   'No sensitive data detected'
-                                 else
-                                   "Pre-classified: #{categories.join(', ')}"
-                                 end
+      if metadata["scannable"] == true && metadata["risk_level"]
+        raw_level  = metadata["risk_level"]
+        risk_level = VALID_RISK_LEVELS.include?(raw_level) ? raw_level : "low"
+        categories = Array(metadata["risk_categories"])
+        result = {
+          "detections"            => categories.map { |c|
+                                       { "category" => c, "pattern" => "pre_scanned",
+                                         "count" => 1, "action" => "none" } },
+          "risk_score"            => metadata["risk_score"].to_i,
+          "risk_level"            => risk_level,
+          "requires_sanitization" => false,
+          "detection_summary"     => categories.empty? ? "No sensitive data detected" :
+                                       "Pre-classified: #{categories.join(', ')}"
         }
+
+        prompt_text    = metadata["prompt_text"].to_s
+        assistant_text = metadata["assistant_text"].to_s
+        text_to_scan   = [prompt_text, assistant_text].reject(&:empty?).join("\n")
+
+        if text_to_scan.length > 0
+          Temporalio::Activity::Context.current.heartbeat("Scanning prompt/assistant text")
+          text_scan = scan_content(text_to_scan.byteslice(0, 100_000), policy)
+          if text_scan["detections"].any?
+            result["requires_sanitization"] = true
+            result["detections"]            = result["detections"] + text_scan["detections"]
+            result["risk_score"]            = [result["risk_score"], text_scan["risk_score"]].max
+            result["risk_level"] = higher_risk_level(result["risk_level"], text_scan["risk_level"])
+            result["detection_summary"]     = summarize_detections(result["detections"])
+          end
+        end
+
+        return result
       end
 
-      # Path 3: standard server-side scan (web events, anything without scannable flag)
       content = extract_text_content(raw_payload).byteslice(0, 100_000) || ''
       scan_content(content, policy)
     end
@@ -170,6 +178,11 @@ module Activities
       else
         'low'
       end
+    end
+
+    def higher_risk_level(level_a, level_b)
+      order = { "none" => 0, "low" => 1, "medium" => 2, "high" => 3, "critical" => 4 }
+      (order[level_a] || 0) >= (order[level_b] || 0) ? level_a : level_b
     end
 
     def summarize_detections(detections)

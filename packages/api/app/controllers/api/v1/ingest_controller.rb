@@ -155,15 +155,15 @@ module Api
           error_class: e.class.name,
           message: e.message
         )
-        Rails.error.report(e, context: { component: "ingest", stage: "temporal_start", organization_id: org.id }, handled: true)
+        Rollbar.error(e, component: "ingest", stage: "temporal_start", organization_id: org.id)
         fallback_direct_insert(event_params, org)
       end
 
       # The direct-insert fallback bypasses the sanitization workflow (classification +
       # PII scrubbing). This is acceptable as a recovery path but MUST be observable so
       # ops can detect prolonged degraded ingest. Every fallback emits a structured
-      # WARN log with a stable event key (`ingest_fallback_taken`) plus a Rails.error
-      # report so the configured error tracker (Sentry, etc.) shows usage volume.
+      # WARN log with a stable event key (`ingest_fallback_taken`) plus a Rollbar
+      # warning so the on-call team can see fallback volume and trends.
       def log_fallback!(reason:, organization_id:, **extra)
         Rails.logger.warn(
           structured_log_line(
@@ -172,6 +172,12 @@ module Api
             organization_id: organization_id,
             **extra
           )
+        )
+        Rollbar.warning(
+          "Ingest fallback taken",
+          reason: reason,
+          organization_id: organization_id,
+          **extra
         )
       end
 

@@ -67,6 +67,53 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe '#all_owned_projects' do
+    let(:user) { create(:user) }
+
+    it 'includes personal projects owned via owner_id' do
+      personal = create(:project, :personal, owner: user)
+
+      expect(user.all_owned_projects).to include(personal)
+    end
+
+    it 'includes org projects where the user has the owner role' do
+      org = create(:organization)
+      create(:organization_membership, user: user, organization: org)
+      org_project = create(:project, organization: org)
+      create(:project_membership, :owner, user: user, project: org_project)
+
+      expect(user.all_owned_projects).to include(org_project)
+    end
+
+    it 'excludes org projects where the user is a member or viewer' do
+      org = create(:organization)
+      create(:organization_membership, user: user, organization: org)
+      member_project = create(:project, organization: org)
+      viewer_project = create(:project, organization: org)
+      create(:project_membership, user: user, project: member_project, role: 'member')
+      create(:project_membership, :viewer, user: user, project: viewer_project)
+
+      expect(user.all_owned_projects).not_to include(member_project, viewer_project)
+    end
+
+    it 'returns no duplicates' do
+      personal = create(:project, :personal, owner: user)
+      org = create(:organization)
+      create(:organization_membership, user: user, organization: org)
+      org_project = create(:project, organization: org)
+      create(:project_membership, :owner, user: user, project: org_project)
+
+      result = user.all_owned_projects.to_a
+      expect(result).to contain_exactly(personal, org_project)
+    end
+
+    it 'returns none for an unpersisted user' do
+      create(:project, organization: create(:organization))
+
+      expect(User.new.all_owned_projects).to be_empty
+    end
+  end
+
   describe '#display_name' do
     it 'returns name if present' do
       user = build(:user, name: 'John Doe', email: 'john@example.com')

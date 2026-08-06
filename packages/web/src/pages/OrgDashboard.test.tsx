@@ -1,13 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@/test/utils";
+import { render, screen, waitFor, within } from "@/test/utils";
 import userEvent from "@testing-library/user-event";
 import { OrgDashboard } from "./OrgDashboard";
+
+let mockSearchParams = new URLSearchParams();
+const mockSetSearchParams = vi.fn();
 
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual("react-router-dom");
   return {
     ...actual,
-    useSearchParams: () => [new URLSearchParams(), vi.fn()],
+    useSearchParams: () => [mockSearchParams, mockSetSearchParams],
   };
 });
 
@@ -42,20 +45,26 @@ vi.mock("@/hooks/useApi", () => ({
   useEvent: () => ({ data: undefined, isLoading: false }),
 }));
 
-vi.mock("@/components/dashboard", () => ({
-  MetricCard: () => null,
-  MetricGrid: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
-  CostTrendChart: () => null,
-  ActivityFeed: (props: { viewAllTo?: string }) => (
-    <a data-testid="activity-view-all" href={props.viewAllTo}>
-      View all
-    </a>
-  ),
-  TopToolsChart: () => null,
-  ToolInsightsSection: () => null,
-  WeeklyToolUsageChart: () => null,
-  RiskAlertsTable: () => null,
-}));
+vi.mock("@/components/dashboard", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/components/dashboard")>();
+  return {
+    // Keep the real filter controls — the deep-link tests drive their comboboxes.
+    ProjectFilterDropdown: actual.ProjectFilterDropdown,
+    MemberPeriodSelect: actual.MemberPeriodSelect,
+    MetricCard: () => null,
+    MetricGrid: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+    CostTrendChart: () => null,
+    ActivityFeed: (props: { viewAllTo?: string }) => (
+      <a data-testid="activity-view-all" href={props.viewAllTo}>
+        View all
+      </a>
+    ),
+    TopToolsChart: () => null,
+    ToolInsightsSection: () => null,
+    WeeklyToolUsageChart: () => null,
+    RiskAlertsTable: () => null,
+  };
+});
 
 vi.mock("@/components/events", () => ({
   EventDrawer: () => null,
@@ -76,6 +85,7 @@ function setupDefaultMocks() {
 describe("OrgDashboard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSearchParams = new URLSearchParams();
     setupDefaultMocks();
     mockCurrentOrg = { id: "org-1", name: "Org One", slug: "org-one" };
   });
@@ -103,9 +113,71 @@ describe("OrgDashboard", () => {
 const lastEventsProjectId = () => mockUseEvents.mock.calls.at(-1)?.[1]?.project_id;
 const lastStatsProjectId = () => mockUseOverviewStats.mock.calls.at(-1)?.[1]; // useOverviewStats(orgId, projectId, period)
 
+describe("OrgDashboard — filter chrome parity Team ↔ Personal (AIX-607)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSearchParams = new URLSearchParams();
+    mockCurrentOrg = { id: "org-1", name: "Org One", slug: "org-one" };
+    setupDefaultMocks();
+    mockUseProjects.mockReturnValue({ data: [{ id: "proj-1", name: "Aixle Insights" }] });
+  });
+
+  it("labels the Team project dropdown All Projects", async () => {
+    const user = userEvent.setup();
+    render(<OrgDashboard />);
+
+    const [projectFilterTrigger] = screen.getAllByRole("combobox");
+    expect(projectFilterTrigger).toHaveTextContent("All Projects");
+
+    await user.click(projectFilterTrigger);
+    expect(screen.getByRole("option", { name: "All Projects" })).toBeInTheDocument();
+  });
+
+  it("labels the Personal project dropdown All Projects with matching control order", async () => {
+    mockSearchParams = new URLSearchParams("tab=personal");
+    const user = userEvent.setup();
+    render(<OrgDashboard />);
+
+    const comboboxes = screen.getAllByRole("combobox");
+    expect(comboboxes).toHaveLength(2);
+
+    const [projectFilterTrigger, periodTrigger] = comboboxes;
+    expect(projectFilterTrigger).toHaveTextContent("All Projects");
+    expect(periodTrigger).toHaveTextContent("30 days");
+
+    await user.click(projectFilterTrigger);
+    expect(screen.getByRole("option", { name: "All Projects" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "No Project" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Aixle Insights" })).toBeInTheDocument();
+  });
+
+  it("keeps project → period → tabs in the same header row on both tabs", () => {
+    const { rerender } = render(<OrgDashboard />);
+
+    const teamHeader = screen.getByRole("heading", { name: "Dashboard" }).closest("div")!.parentElement!;
+    const teamComboboxes = within(teamHeader).getAllByRole("combobox");
+    expect(teamComboboxes).toHaveLength(2);
+    expect(within(teamHeader).getByRole("tablist")).toBeInTheDocument();
+    expect(within(teamHeader).getByRole("tab", { name: "Team" })).toBeInTheDocument();
+    expect(within(teamHeader).getByRole("tab", { name: "Personal" })).toBeInTheDocument();
+
+    mockSearchParams = new URLSearchParams("tab=personal");
+    rerender(<OrgDashboard />);
+
+    const personalHeader = screen.getByRole("heading", { name: "Dashboard" }).closest("div")!.parentElement!;
+    const personalComboboxes = within(personalHeader).getAllByRole("combobox");
+    expect(personalComboboxes).toHaveLength(2);
+    expect(within(personalHeader).getByRole("tablist")).toBeInTheDocument();
+    // Project trigger still precedes period (same DOM order as Team).
+    expect(personalComboboxes[0]).toHaveTextContent("All Projects");
+    expect(personalComboboxes[1]).toHaveTextContent(/days/);
+  });
+});
+
 describe("OrgDashboard — Recent Activity filter (AIX-523)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSearchParams = new URLSearchParams();
     mockCurrentOrg = { id: "org-1", name: "Org One", slug: "org-one" };
     mockUseActiveUsers.mockReturnValue({ data: undefined });
     mockUseDailyStats.mockReturnValue({ data: undefined, isLoading: false, isError: false, refetch: vi.fn() });
@@ -143,6 +215,7 @@ describe("OrgDashboard — Recent Activity filter (AIX-523)", () => {
 describe("OrgDashboard — Recent Activity 'View all' deep-link (AIX-565)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSearchParams = new URLSearchParams();
     mockCurrentOrg = { id: "org-1", name: "Org One", slug: "org-one" };
     setupDefaultMocks();
     mockUseProjects.mockReturnValue({ data: [{ id: "proj-1", name: "Aixle Insights" }] });

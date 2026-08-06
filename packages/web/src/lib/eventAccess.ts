@@ -1,9 +1,12 @@
 /**
- * Returns true only for org owners.
- * Gates prompt content, sanitized/raw tabs, metadata, and security findings.
+ * Returns true for org owners and platform global admins.
+ * Gates prompt content and related sensitive event details.
  */
-export function canViewEventPrompt(role: string | null | undefined): boolean {
-  return role === "owner";
+export function canViewEventPrompt(
+  role: string | null | undefined,
+  isGlobalAdmin = false
+): boolean {
+  return role === "owner" || isGlobalAdmin;
 }
 
 /** Returns true only for org owners. Controls User column in EventsTable. */

@@ -6,7 +6,7 @@ RSpec.describe ToolEventFilterable, type: :model do
   let(:host) do
     Class.new do
       include ToolEventFilterable
-      public :apply_tool_event_time_filter, :apply_tool_event_risk_level_filter
+      public :apply_tool_event_time_filter, :apply_tool_event_risk_level_filter, :apply_tool_event_filters
     end.new
   end
   let(:org)  { create(:organization) }
@@ -69,6 +69,57 @@ RSpec.describe ToolEventFilterable, type: :model do
         scope = host.apply_tool_event_time_filter(org.tool_events, {})
         expect(scope).to include(event_midnight_utc, event_noon_utc)
       end
+    end
+  end
+
+  describe "#apply_tool_event_filters — search param" do
+    # Regression for AIX-589: tool_name is a PostgreSQL enum; ILIKE requires ::text cast.
+    # Search was previously client-side (current page only); it is now server-side.
+    let(:project) { create(:project, name: "My Git Project", organization: org) }
+    let!(:copilot_event)  { create(:tool_event, organization: org, tool_name: "github_copilot") }
+    let!(:claude_event)   { create(:tool_event, organization: org, tool_name: "claude_code") }
+    let!(:project_event)  { create(:tool_event, organization: org, tool_name: "claude_code", project: project) }
+
+    it "matches tool_name substring case-insensitively (enum cast to text)" do
+      scope = host.apply_tool_event_filters(org.tool_events, { "search" => "github" })
+      expect(scope).to include(copilot_event)
+      expect(scope).not_to include(claude_event)
+    end
+
+    it "matches partial tool_name (e.g. 'git' matches 'github_copilot')" do
+      scope = host.apply_tool_event_filters(org.tool_events, { "search" => "git" })
+      expect(scope).to include(copilot_event)
+      expect(scope).not_to include(claude_event)
+    end
+
+    it "matches project name substring" do
+      scope = host.apply_tool_event_filters(org.tool_events, { "search" => "My Git" })
+      expect(scope).to include(project_event)
+      expect(scope).not_to include(copilot_event)
+    end
+
+    it "is case-insensitive" do
+      scope = host.apply_tool_event_filters(org.tool_events, { "search" => "GITHUB" })
+      expect(scope).to include(copilot_event)
+    end
+
+    it "returns all events when search is blank" do
+      scope = host.apply_tool_event_filters(org.tool_events, { "search" => "" })
+      expect(scope).to include(copilot_event, claude_event, project_event)
+    end
+
+    it "returns no results when search matches nothing" do
+      scope = host.apply_tool_event_filters(org.tool_events, { "search" => "zzznomatch" })
+      expect(scope).to be_empty
+    end
+
+    it "composes with other filters without an ActiveRecord::Relation OR error" do
+      scope = host.apply_tool_event_filters(
+        org.tool_events,
+        { "search" => "git", "event_type" => "chat" }
+      )
+      # The .or() in the search branch must survive an AND-ed filter appended after it.
+      expect { scope.to_a }.not_to raise_error
     end
   end
 

@@ -25,6 +25,15 @@ RSpec.describe 'Admin Authentication', type: :request do
       expect(response).to have_http_status(:ok)
     end
 
+    it 'sets Cache-Control: no-store on admin HTML responses (AIX-589)' do
+      allow_any_instance_of(Admin::ApplicationController).to receive(:current_admin_user).and_return(global_admin)
+
+      get admin_root_path
+
+      expect(response).to have_http_status(:ok)
+      expect(response.headers['Cache-Control']).to include('no-store')
+    end
+
     it 'denies access to unauthenticated users' do
       allow_any_instance_of(Admin::ApplicationController).to receive(:current_admin_user).and_return(nil)
 
@@ -160,6 +169,21 @@ RSpec.describe 'Admin Authentication', type: :request do
       location = response.location
       expect(location).to include(Keycloak.configuration.end_session_url)
       expect(location).not_to include('id_token_hint')
+
+      get admin_users_path
+      expect(response).to redirect_to(login_path(redirect: admin_login_path))
+    end
+
+    it 'clears the admin session without Keycloak redirect when Accept is JSON (main-app logout)' do
+      allow_any_instance_of(Admin::KeycloakAuthService).to receive(:authenticate)
+        .and_return(Admin::KeycloakAuthService::Result.new(success?: true, user: admin_user, id_token: 'the.id.token'))
+      get '/admin/callback', params: { code: 'irrelevant' }
+      expect(response).to redirect_to('/admin')
+
+      delete '/admin/logout', headers: { 'Accept' => 'application/json' }
+
+      expect(response).to have_http_status(:no_content)
+      expect(response.location).to be_blank
 
       get admin_users_path
       expect(response).to redirect_to(login_path(redirect: admin_login_path))

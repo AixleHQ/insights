@@ -2,7 +2,6 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Clock, User, Folder, DollarSign, FileText, Shield, Cpu } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,11 +13,13 @@ import { EventTypeBadge } from "@/components/ui/event-type-badge";
 import { cn, humanizeToolName } from "@/lib/utils";
 import { AppRoutes } from "@/lib/routes";
 import { formatCost, formatTokens, isDayGranularityEvent, formatEventDate, formatDateTime } from "@/lib/formatters";
+import { useCurrentUser } from "@/hooks/useApi";
 import { canViewEventPrompt } from "@/lib/eventAccess";
 import { parseRecentCommitFields } from "@/lib/recentCommitEvent";
 import { isDerivativeEvent } from "@/lib/event-types";
 import { RecentCommitDetail } from "./RecentCommitDetail";
 import { ContentPanel } from "./ContentPanel";
+import { MetadataTable } from "./MetadataTable";
 
 export interface EventDetailData {
   id: string;
@@ -28,9 +29,9 @@ export interface EventDetailData {
   risk_level?: "critical" | "high" | "medium" | "low" | "none";
   cost_usd?: number;
   token_count?: number;
+  input_tokens?: number;
+  output_tokens?: number;
   created_at: string;
-  sanitized_at?: string;
-  classified_at?: string;
   user?: {
     id: string;
     email: string;
@@ -40,15 +41,14 @@ export interface EventDetailData {
     id: string;
     name: string;
   };
-  raw_content?: string;
-  sanitized_content?: string;
   metadata?: Record<string, unknown> | null;
-  findings?: Array<{
-    type: string;
-    severity: string;
-    description: string;
-    location?: string;
-  }>;
+  // Owner-only captured prompt text. undefined => viewer is not an owner (gated);
+  // null => owner but no captured text (capture off / no row).
+  event_text?: {
+    user_text: string | null;
+    assistant_text: string | null;
+    sanitized_at: string | null;
+  } | null;
 }
 
 interface EventDetailProps {
@@ -83,7 +83,11 @@ function DetailRow({
 
 export function EventDetail({ event, isLoading, className }: EventDetailProps) {
   const { currentRole } = useOrg();
-  const isOwner = canViewEventPrompt(currentRole);
+  const { data: me } = useCurrentUser();
+  const isOwner = canViewEventPrompt(
+    currentRole,
+    Boolean(me?.globalAdmin ?? me?.super_admin)
+  );
 
   if (isLoading) {
     return (
@@ -201,11 +205,24 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
             />
             <DetailRow
               icon={FileText}
-              label="Tokens"
+              label="Tokens In"
               value={
-                event.token_count !== undefined ? (
-                  <span className="text-sm">
-                    {formatTokens(event.token_count)}
+                event.input_tokens !== undefined ? (
+                  <span className="font-mono-display">
+                    {formatTokens(event.input_tokens)}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">-</span>
+                )
+              }
+            />
+            <DetailRow
+              icon={FileText}
+              label="Tokens Out"
+              value={
+                event.output_tokens !== undefined ? (
+                  <span className="font-mono-display">
+                    {formatTokens(event.output_tokens)}
                   </span>
                 ) : (
                   <span className="text-muted-foreground">-</span>
@@ -267,99 +284,37 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
                 </TabsContent>
               </Tabs>
             ) : (
-              <Tabs defaultValue="sanitized">
+              <Tabs defaultValue="prompt">
                 <TabsList>
-                  <TabsTrigger value="sanitized">Sanitized</TabsTrigger>
-                  <TabsTrigger value="raw">Raw</TabsTrigger>
+                  <TabsTrigger value="prompt">Prompt</TabsTrigger>
                   <TabsTrigger value="metadata">Metadata</TabsTrigger>
                 </TabsList>
-                <TabsContent value="sanitized" className="mt-4">
-                  <ContentPanel
-                    title="Sanitized Content"
-                    content={event.sanitized_content}
-                    emptyMessage={emptyPromptMessage}
-                  />
-                </TabsContent>
-                <TabsContent value="raw" className="mt-4">
-                  <ContentPanel
-                    title="Raw Content"
-                    content={event.raw_content}
-                    emptyMessage={emptyPromptMessage}
-                  />
+                <TabsContent value="prompt" className="mt-4 space-y-4">
+                  {event.event_text ? (
+                    <>
+                      <ContentPanel
+                        title="User"
+                        content={event.event_text.user_text}
+                        emptyMessage="No user text captured"
+                      />
+                      <ContentPanel
+                        title="Assistant"
+                        content={event.event_text.assistant_text}
+                        emptyMessage="No assistant text captured"
+                      />
+                    </>
+                  ) : (
+                    <ContentPanel title="Prompt" emptyMessage="Prompt capture not enabled" />
+                  )}
                 </TabsContent>
                 <TabsContent value="metadata" className="mt-4">
-                  <ContentPanel
-                    title="Event Metadata"
-                    content={
-                      event.metadata
-                        ? JSON.stringify(event.metadata, null, 2)
-                        : undefined
-                    }
-                  />
+                  <MetadataTable metadata={event.metadata} />
                 </TabsContent>
               </Tabs>
             )}
           </CardContent>
         </Card>
       </div>
-
-      {isOwner && event.findings && event.findings.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="type-body-lg">Security Findings</CardTitle>
-            <CardDescription>
-              Issues detected during content analysis
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {event.findings.map((finding, index) => (
-                <div
-                  key={index}
-                  className={cn(
-                    "rounded-lg border p-3",
-                    finding.severity === "critical" &&
-                      "border-risk-critical/30 bg-risk-critical/10",
-                    finding.severity === "high" &&
-                      "border-risk-high/30 bg-risk-high/10",
-                    finding.severity === "medium" &&
-                      "border-risk-medium/30 bg-risk-medium/10",
-                    finding.severity === "low" &&
-                      "border-risk-low/30 bg-risk-low/10"
-                  )}
-                >
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      variant="outline"
-                      className="font-mono-display text-[10px] uppercase"
-                    >
-                      {finding.type}
-                    </Badge>
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "font-mono-display text-[10px] uppercase",
-                        finding.severity === "critical" && "text-risk-critical",
-                        finding.severity === "high" && "text-risk-high",
-                        finding.severity === "medium" && "text-risk-medium",
-                        finding.severity === "low" && "text-risk-low"
-                      )}
-                    >
-                      {finding.severity}
-                    </Badge>
-                  </div>
-                  <p className="mt-2 text-sm">{finding.description}</p>
-                  {finding.location && (
-                    <p className="mt-1 font-mono-display type-caption text-muted-foreground">
-                      Location: {finding.location}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

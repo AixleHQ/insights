@@ -44,16 +44,12 @@ const mockApiEvent = {
   createdAt: "2026-06-10T14:30:00Z",
   user: { id: "u-1", email: "dev@example.com", name: "Dev User" },
   project: { id: "proj-1", name: "My Project" },
-  sanitizedContent: "Tell me about this codebase",
   metadata: { foo: "bar" },
-  securityFindings: [
-    {
-      type: "pii",
-      severity: "critical",
-      description: "Email address detected",
-      location: { start: 0, end: 20 },
-    },
-  ],
+  eventText: {
+    userText: "Tell me about this codebase",
+    assistantText: "Sure…",
+    sanitizedAt: "2026-06-10T14:31:00Z",
+  },
 };
 
 function renderPage(path = "/events/evt-1") {
@@ -105,22 +101,21 @@ describe("EventDetailPage", () => {
       expect(data.tool_name).toBe("claude_code");
     });
 
-    it("maps sanitizedContent → sanitized_content", () => {
+    it("maps eventText (camelCase) → event_text (snake_case)", () => {
       renderPage();
       const data = JSON.parse(screen.getByTestId("event-data").textContent!);
-      expect(data.sanitized_content).toBe("Tell me about this codebase");
+      expect(data.event_text).toMatchObject({
+        user_text: "Tell me about this codebase",
+        assistant_text: "Sure…",
+        sanitized_at: "2026-06-10T14:31:00Z",
+      });
     });
 
-    it("maps securityFindings to findings with location string", () => {
+    it("maps inputTokens → input_tokens and outputTokens → output_tokens", () => {
       renderPage();
       const data = JSON.parse(screen.getByTestId("event-data").textContent!);
-      expect(data.findings).toHaveLength(1);
-      expect(data.findings[0]).toMatchObject({
-        type: "pii",
-        severity: "critical",
-        description: "Email address detected",
-        location: "Characters 0-20",
-      });
+      expect(data.input_tokens).toBe(800);
+      expect(data.output_tokens).toBe(700);
     });
 
     it("uses tokensTotal when present", () => {
@@ -139,14 +134,24 @@ describe("EventDetailPage", () => {
       expect(data.token_count).toBe(1500); // 800 + 700
     });
 
-    it("omits findings when securityFindings is absent", () => {
+    it("keeps event_text null when owner has no captured text (key present, value null)", () => {
       mockUseEvent.mockReturnValue({
-        data: { ...mockApiEvent, securityFindings: undefined },
+        data: { ...mockApiEvent, eventText: null },
         isLoading: false,
       });
       renderPage();
       const data = JSON.parse(screen.getByTestId("event-data").textContent!);
-      expect(data.findings).toBeUndefined();
+      expect(data).toHaveProperty("event_text", null);
+    });
+
+    it("omits event_text when the API leaves it undefined (non-owner)", () => {
+      mockUseEvent.mockReturnValue({
+        data: { ...mockApiEvent, eventText: undefined },
+        isLoading: false,
+      });
+      renderPage();
+      const data = JSON.parse(screen.getByTestId("event-data").textContent!);
+      expect(data.event_text).toBeUndefined();
     });
   });
 });

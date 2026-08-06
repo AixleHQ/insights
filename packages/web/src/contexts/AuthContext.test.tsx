@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, act } from "@testing-library/react";
 import { ErrorResponse } from "oidc-client-ts";
 import { AuthProvider, useAuth } from "./AuthContext";
+import { LOGOUT_BROADCAST_KEY } from "../lib/auth";
 
 // Capture the UserManager event handlers AuthProvider registers, so tests can fire the
 // silent-renew-error event directly and observe the resulting auth state. Hoisted so the
@@ -9,15 +10,24 @@ import { AuthProvider, useAuth } from "./AuthContext";
 const { handlers, mockManager, authedUser } = vi.hoisted(() => {
   const handlers: Record<string, (arg?: unknown) => void> = {};
   const mockManager = {
+    settings: {
+      authority: "http://localhost:8080/realms/db90",
+      client_id: "db90-web",
+    },
+    removeUser: vi.fn(async () => {
+      handlers.userUnloaded?.();
+    }),
     events: {
       addUserLoaded: (cb: (u: unknown) => void) => (handlers.userLoaded = cb),
       addUserUnloaded: (cb: () => void) => (handlers.userUnloaded = cb),
       addAccessTokenExpired: (cb: () => void) => (handlers.accessTokenExpired = cb),
       addSilentRenewError: (cb: (e: unknown) => void) => (handlers.silentRenewError = cb),
+      addUserSignedOut: (cb: () => void) => (handlers.userSignedOut = cb),
       removeUserLoaded: () => {},
       removeUserUnloaded: () => {},
       removeAccessTokenExpired: () => {},
       removeSilentRenewError: () => {},
+      removeUserSignedOut: () => {},
     },
   };
   const authedUser = {
@@ -81,5 +91,58 @@ describe("AuthContext — silent renew error handling", () => {
     // Give any (unwanted) state update a chance to flush, then assert it stayed true.
     await Promise.resolve();
     expect(screen.getByTestId("auth").textContent).toBe("true");
+  });
+});
+
+describe("AuthContext — cross-tab logout", () => {
+  beforeEach(() => {
+    for (const k of Object.keys(handlers)) delete handlers[k];
+    vi.mocked(mockManager.removeUser).mockClear();
+  });
+
+  it("clears auth when the logout broadcast key is written in another tab", async () => {
+    await renderAuthed();
+
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent("storage", {
+          key: LOGOUT_BROADCAST_KEY,
+          newValue: String(1700000000000),
+          oldValue: null,
+        })
+      );
+    });
+
+    await waitFor(() => expect(mockManager.removeUser).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByTestId("auth").textContent).toBe("false"));
+  });
+
+  it("ignores storage events for unrelated keys", async () => {
+    await renderAuthed();
+
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent("storage", {
+          key: "unrelated-key",
+          newValue: null,
+          oldValue: "x",
+        })
+      );
+    });
+
+    await Promise.resolve();
+    expect(mockManager.removeUser).not.toHaveBeenCalled();
+    expect(screen.getByTestId("auth").textContent).toBe("true");
+  });
+
+  it("clears auth on userSignedOut (OP session ended)", async () => {
+    await renderAuthed();
+
+    act(() => {
+      handlers.userSignedOut?.();
+    });
+
+    await waitFor(() => expect(mockManager.removeUser).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByTestId("auth").textContent).toBe("false"));
   });
 });

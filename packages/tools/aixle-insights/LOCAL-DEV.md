@@ -164,15 +164,17 @@ In `~/.claude.json` → `mcpServers["aixle-insights"]`:
 
 1. **Fully quit** Claude Code (`/exit` in one session is not enough).
 2. Reopen Claude Code in the `db90-rails` repo.
-3. In chat: **`/mcp`** → server must be named **`db90`** (not “telemetry-mcp”) and show **connected**.
+3. In chat: **`/mcp`** → server must be named **`aixle-insights`** (not “telemetry-mcp” or “db90”) and show **connected**.
 
 Available MCP tools:
 
 | Tool | Purpose |
 |------|---------|
-| `db90_status` | Credentials, last sync, errors |
-| `db90_sync_now` | Immediate manual sync |
-| `db90_authenticate` | Device-flow re-login |
+| `aixle_insights_status` | Credentials, last sync, errors |
+| `aixle_insights_sync_now` | Immediate manual sync |
+| `aixle_insights_authenticate` | Device-flow re-login |
+
+The legacy `db90_status` / `db90_sync_now` / `db90_authenticate` names are kept as deprecated aliases for one release (AIX-569) and will be removed once callers migrate.
 
 Automatic sync: ~**5 minutes** + one flush on connect.
 
@@ -285,8 +287,8 @@ UI: http://localhost:5173 → Events
 If Events still show zero-token `claude_code` rows with `local-command-*` or `<command-name>` in `prompt_text`, remove historical noise (API container):
 
 ```bash
-docker exec db90-api bundle exec rails 'db90:cleanup_claude_noise_events[acme-corp,dry_run]'
-docker exec db90-api bundle exec rails 'db90:cleanup_claude_noise_events[acme-corp]'
+docker exec db90-api bundle exec rails 'db90:cleanup_claude_noise_events[dualboot-partners,dry_run]'
+docker exec db90-api bundle exec rails 'db90:cleanup_claude_noise_events[dualboot-partners]'
 ```
 
 New ingest via MCP skips these turns automatically; the rake only cleans DB rows written before the filter shipped.

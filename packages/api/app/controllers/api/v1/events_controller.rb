@@ -26,7 +26,11 @@ module Api
       # GET /api/v1/organizations/:organization_id/events/:id
       def show
         authorize! @event
-        render_resource(@event, ToolEventDetailSerializer, serializer_params: { candidate_users: candidate_users_for(@event) })
+        # Owner-only field gate: members keep access to their own events but never
+        # receive captured prompt text. Computed once, passed to the serializer.
+        show_event_text = allowed_to?(:show?, @event, with: EventTextPolicy)
+        render_resource(@event, ToolEventDetailSerializer,
+                        serializer_params: { show_event_text: show_event_text, candidate_users: candidate_users_for(@event) })
       end
 
       # GET /api/v1/organizations/:organization_id/events/summary
@@ -200,7 +204,7 @@ module Api
       # Per-event authorization is still enforced via ToolEventPolicy in each action.
       def set_event
         @event = current_organization.tool_events
-                                     .includes(:user, :project, :audit_logs)
+                                     .includes(:user, :project, :audit_logs, :event_text)
                                      .find(params[:id])
       end
 
@@ -233,7 +237,7 @@ module Api
       def export_filter_params
         params.permit(:tool_name, :user_id, :project_id,
                       :model, :start_date, :end_date, :risk_level,
-                      :sort_by, :direction, :tz,
+                      :sort_by, :direction, :tz, :search,
                       :event_type, event_type: [])
       end
     end

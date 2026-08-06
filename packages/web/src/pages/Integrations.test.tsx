@@ -2,9 +2,11 @@ import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Integrations } from "./Integrations";
 import { useConnectors, useToolAccounts } from "../hooks/useApi";
+import { SHOW_INTEGRATION_CATALOG } from "@/lib/featureFlags";
+import { AppRoutes } from "@/lib/routes";
 
 const mockHasRole = vi.fn(() => true);
 
@@ -274,16 +276,47 @@ describe("Integrations", () => {
   });
 
   describe("Manage Catalog button", () => {
-    it("is visible for org owners", () => {
+    it("is hidden while catalog enforcement is not shipped (SHOW_INTEGRATION_CATALOG=false)", () => {
       mockHasRole.mockReturnValue(true);
       renderAt("/integrations/connected");
-      expect(screen.getByRole("button", { name: /manage catalog/i })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /manage catalog/i })).not.toBeInTheDocument();
     });
 
-    it("is not rendered for non-owners (org members)", () => {
+    it("stays hidden for non-owners", () => {
       mockHasRole.mockReturnValue(false);
       renderAt("/integrations/connected");
       expect(screen.queryByRole("button", { name: /manage catalog/i })).not.toBeInTheDocument();
     });
+  });
+
+  // Mirrors the manage-route element in App.tsx. When SHOW_INTEGRATION_CATALOG
+  // is off, a direct visit to /integrations/manage must redirect to
+  // /integrations/connected (AIX-602 acceptance criterion).
+  describe("Manage Catalog route guard", () => {
+    it.skipIf(SHOW_INTEGRATION_CATALOG)(
+      "redirects /integrations/manage to connected while the flag is off",
+      () => {
+        render(
+          <MemoryRouter initialEntries={[AppRoutes.integrations.manage]}>
+            <Routes>
+              <Route
+                path={AppRoutes.integrations.manage}
+                element={
+                  SHOW_INTEGRATION_CATALOG ? (
+                    <div>manage catalog page</div>
+                  ) : (
+                    <Navigate to={AppRoutes.integrations.connected} replace />
+                  )
+                }
+              />
+              <Route path="/integrations/:status" element={<Integrations />} />
+            </Routes>
+          </MemoryRouter>,
+        );
+
+        expect(screen.getByRole("tab", { name: /connected/i })).toHaveAttribute("aria-selected", "true");
+        expect(screen.queryByText("manage catalog page")).not.toBeInTheDocument();
+      },
+    );
   });
 });

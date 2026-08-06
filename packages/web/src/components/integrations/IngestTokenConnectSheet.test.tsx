@@ -158,44 +158,26 @@ describe("IngestTokenConnectSheet", () => {
       return user;
     }
 
-    it("defaults MCP (recommended) tab with npx telemetry-mcp init for cursor", async () => {
+    it("renders init command with --host and --keycloak-url for cursor (no tabs, standalone CLI removed)", async () => {
       await goToSetupStep(cursorProvider);
-      const mcpTab = screen.getByRole("tab", { name: /MCP \(recommended\)/i });
-      expect(mcpTab).toHaveAttribute("aria-selected", "true");
+      expect(screen.queryByRole("tab")).not.toBeInTheDocument();
       expect(screen.getByLabelText(/Recommended MCP install command/i)).toHaveTextContent(
-        /npx -y @aixle\/insights init --host http:\/\/localhost:3000/,
+        /npx -y @aixle\/insights init --host http:\/\/localhost:3000 --keycloak-url http:\/\/localhost:8080\/realms\/db90/,
       );
     });
 
-    it("shows standalone Cursor CLI after selecting Standalone CLI tab", async () => {
-      const user = userEvent.setup();
-      await goToSetupStep(cursorProvider);
-      await user.click(screen.getByRole("tab", { name: /Standalone CLI/i }));
-      expect(
-        screen.getByText(
-          /npx -y @aixle\/insights --token db90_abc123testtoken --host http:\/\/localhost:3000/,
-        ),
-      ).toBeInTheDocument();
-    });
-
-    it("defaults MCP (recommended) tab with npx telemetry-mcp init for claude-code", async () => {
+    it("defaults MCP (recommended) tab with npx insights init for claude-code", async () => {
       await goToSetupStep(claudeCodeProvider);
       const mcpTab = screen.getByRole("tab", { name: /MCP \(recommended\)/i });
       expect(mcpTab).toHaveAttribute("aria-selected", "true");
       expect(screen.getByLabelText(/Recommended MCP install command/i)).toHaveTextContent(
-        /npx -y @aixle\/insights init --host http:\/\/localhost:3000/,
+        /npx -y @aixle\/insights init --host http:\/\/localhost:3000 --keycloak-url http:\/\/localhost:8080\/realms\/db90/,
       );
     });
 
-    it("shows standalone Claude CLI after selecting Standalone CLI tab", async () => {
-      const user = userEvent.setup();
+    it("does not offer a Standalone CLI tab for claude-code", async () => {
       await goToSetupStep(claudeCodeProvider);
-      await user.click(screen.getByRole("tab", { name: /Standalone CLI/i }));
-      expect(
-        screen.getByText(
-          /npx -y @aixle\/insights --token db90_abc123testtoken --host http:\/\/localhost:3000/,
-        ),
-      ).toBeInTheDocument();
+      expect(screen.queryByRole("tab", { name: /Standalone CLI/i })).not.toBeInTheDocument();
     });
 
     it("shows ~/.claude/settings.json hook snippet on Advanced hooks tab", async () => {

@@ -333,18 +333,34 @@ export function EventDrawer({
                       </TabsContent>
                     </Tabs>
                   ) : (
-                    <Tabs defaultValue="sanitized">
+                    <Tabs defaultValue="prompt">
                       <TabsList className="w-full justify-start">
-                        <TabsTrigger value="sanitized">Sanitized</TabsTrigger>
+                        <TabsTrigger value="prompt">Prompt</TabsTrigger>
                         <TabsTrigger value="metadata">Metadata</TabsTrigger>
                       </TabsList>
-                      <TabsContent value="sanitized" className="mt-4">
-                        <ContentPanel
-                          title="Sanitized Content"
-                          content={event.sanitizedContent || undefined}
-                          emptyMessage={emptyPromptMessage}
-                          preClassName="max-h-64"
-                        />
+                      <TabsContent value="prompt" className="mt-4 space-y-4">
+                        {event.eventText ? (
+                          <>
+                            <ContentPanel
+                              title="User"
+                              content={event.eventText.userText}
+                              emptyMessage="No user text captured"
+                              preClassName="max-h-64"
+                            />
+                            <ContentPanel
+                              title="Assistant"
+                              content={event.eventText.assistantText}
+                              emptyMessage="No assistant text captured"
+                              preClassName="max-h-64"
+                            />
+                          </>
+                        ) : (
+                          <ContentPanel
+                            title="Prompt"
+                            emptyMessage="Prompt capture not enabled"
+                            preClassName="max-h-64"
+                          />
+                        )}
                       </TabsContent>
                       <TabsContent value="metadata" className="mt-4">
                         <ContentPanel

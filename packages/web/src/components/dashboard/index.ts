@@ -17,3 +17,6 @@ export { WeeklyToolUsageChart } from "./WeeklyToolUsageChart";
 export { RiskAlertsTable } from "./RiskAlertsTable";
 export { PromptInsightsSection } from "./PromptInsightsSection";
 export { RangeSegmentedControl, type RangeOption } from "./RangeSegmentedControl";
+export { ProjectFilterDropdown } from "./ProjectFilterDropdown";
+export { MemberPeriodSelect } from "./MemberPeriodSelect";
+export { MEMBER_PERIODS, MEMBER_PERIOD_LABELS, type MemberPeriod } from "./memberPeriods";

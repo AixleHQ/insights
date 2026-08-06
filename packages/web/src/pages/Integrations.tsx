@@ -34,6 +34,7 @@ import { OrgSlackConnectSheet } from "@/components/integrations/OrgSlackConnectS
 import { OpenrouterWebhookSheet } from "@/components/integrations/OpenrouterWebhookSheet";
 import { availableProviders, categoryLabels } from "@/lib/providers";
 import { AppRoutes } from "@/lib/routes";
+import { SHOW_INTEGRATION_CATALOG } from "@/lib/featureFlags";
 
 const AI_PROVIDERS = new Set(["anthropic", "openai", "openrouter", "gemini"]);
 const SLACK_PROVIDERS = new Set(["slack"]);
@@ -241,7 +242,7 @@ export function Integrations() {
             more
           </p>
         </div>
-        {isOwner && (
+        {isOwner && SHOW_INTEGRATION_CATALOG && (
           <Button variant="outline" size="sm" onClick={() => navigate(AppRoutes.integrations.manage)}>
             Manage Catalog
           </Button>

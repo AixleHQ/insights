@@ -7,7 +7,12 @@ describe("eventAccess", () => {
       expect(canViewEventPrompt("owner")).toBe(true);
     });
 
-    it("denies members, viewers, and admins-by-name", () => {
+    it("allows global admins even without owner role", () => {
+      expect(canViewEventPrompt("member", true)).toBe(true);
+      expect(canViewEventPrompt(null, true)).toBe(true);
+    });
+
+    it("denies members, viewers, and admins-by-name without global flag", () => {
       expect(canViewEventPrompt("member")).toBe(false);
       expect(canViewEventPrompt("viewer")).toBe(false);
       expect(canViewEventPrompt("admin")).toBe(false);

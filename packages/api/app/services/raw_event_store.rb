@@ -92,8 +92,8 @@ class RawEventStore
     end
 
     def ensure_bucket_exists!
-      client.head_bucket(bucket: bucket_name)
-    rescue Aws::S3::Errors::NotFound
+      client.list_objects_v2(bucket: bucket_name, max_keys: 0)
+    rescue Aws::S3::Errors::NoSuchBucket
       client.create_bucket(bucket: bucket_name)
       configure_lifecycle_policy!
     end

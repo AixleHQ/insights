@@ -1,100 +1,15 @@
 # Aixle Insights
 
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Ruby](https://img.shields.io/badge/Ruby-3.4-CC342D?logo=ruby&logoColor=white)](.tool-versions)
-[![Rails](https://img.shields.io/badge/Rails-8.1-CC0000?logo=rubyonrails&logoColor=white)](packages/api)
-[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](packages/web)
-[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](packages/web)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
-
 AI tool analytics platform for tracking and managing coding assistant usage across organizations. Monitors tools like ChatGPT, Claude, GitHub Copilot, and others — capturing token consumption, costs, and usage patterns with built-in risk scanning and data retention policies.
-
-## Quickstart
-
-```bash
-git clone https://github.com/dualboot-partners/aixle-insights.git
-cd aixle-insights
-make setup          # build, start services, create + migrate + seed DB
-make api & make web # Rails on :3000, Vite on :5173
-```
-
-Then open [localhost:5173](http://localhost:5173) and sign in via Keycloak. Full
-step-by-step setup is in [Getting Started](#getting-started).
-
-## Table of Contents
-
-- [Features](#features)
-- [Architecture](#architecture)
-- [Prerequisites](#prerequisites)
-- [Getting Started](#getting-started)
-- [Auth](#auth)
-- [Integrations](#integrations)
-- [Telemetry Collection](#telemetry-collection)
-- [Makefile Reference](#makefile-reference)
-- [Testing](#testing)
-- [Ports](#ports)
-- [Contributing](#contributing)
-- [Security](#security)
-- [License](#license)
-
-## Features
-
-- **Multi-tool telemetry** — track usage across ChatGPT, Claude, GitHub Copilot, Cursor, and more from one place.
-- **Cost & token analytics** — per-user, per-team, and per-organization breakdowns of tokens and spend over time.
-- **Risk scanning** — a versioned sanitization pipeline flags and redacts sensitive content before it is persisted.
-- **Data retention policies** — configurable retention backed by TimescaleDB hypertables and automated policies.
-- **Broad integrations** — GitHub, GitLab, Bitbucket, Jira, Linear, and direct AI-provider keys (Anthropic, OpenAI, OpenRouter, Gemini).
-- **Enterprise auth** — Keycloak (OIDC) with optional Google social login.
-- **Durable workflows** — Temporal.io orchestrates ingestion and sanitization with retries and state.
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    subgraph Client
-        Web["React 19 + Vite<br/>(web)"]
-    end
-    subgraph Dev["Developer machine"]
-        IDE["IDE / CLI<br/>(Cursor, Claude Code, OpenCode)"]
-        Agent["@aixle/insights<br/>(npm CLI + MCP)"]
-    end
-    subgraph API["Rails 8.1 API"]
-        REST["REST / OpenAPI"]
-        Ingest["Ingest<br/>(POST /ingest/events)"]
-        Pol["Action Policy"]
-    end
-    subgraph Async
-        Sidekiq["Sidekiq"]
-        Temporal["Temporal.io<br/>ingest + sanitize"]
-    end
-    subgraph Data
-        PG[("PostgreSQL 17<br/>+ TimescaleDB")]
-        Redis[("Redis")]
-        MinIO[("MinIO / S3")]
-    end
-    KC["Keycloak (OIDC)"]
-
-    Web -->|OIDC| KC
-    Web -->|JWT| REST
-    IDE -->|local activity| Agent
-    Agent -->|Bearer ingest token| Ingest
-    Ingest --> Temporal
-    REST --> Pol
-    REST --> PG
-    REST --> Redis
-    REST --> Sidekiq
-    REST --> Temporal
-    Temporal --> PG
-    Sidekiq --> Redis
-    REST --> MinIO
 ```
-
-```
-aixle-insights/
+db90-rails/
 ├── packages/
 │   ├── api/          # Rails 8.1 API (port 3000)
 │   ├── web/          # React + Vite frontend (port 5173)
-│   └── tools/        # @aixle/insights — npm CLI + MCP telemetry collector
+│   └── tools/        # @aixle/insights — published CLI + stdio MCP server
 ├── temporal/         # Temporal.io workflow workers
 ├── keycloak/         # Realm config & custom themes
 └── docker-compose.yml
@@ -102,12 +17,28 @@ aixle-insights/
 
 | Layer | Stack |
 |-------|-------|
-| Frontend | React 19, Vite 8, TypeScript, Tailwind CSS 4, shadcn/ui, TanStack Query |
+| Frontend | React 19, Vite 7, TypeScript, Tailwind CSS 4, shadcn/ui, TanStack Query |
 | Backend | Rails 8.1 (API-only), Alba serializers, Action Policy |
 | Database | PostgreSQL 17 + TimescaleDB (time-series hypertables) |
 | Auth | Keycloak (OIDC) with optional Google social login |
 | Workflows | Temporal.io (Ruby SDK) for ingestion/sanitization pipelines |
 | Storage | MinIO (S3-compatible), Redis |
+
+## `@aixle/insights` — two release channels
+
+The telemetry CLI / MCP server is published to npm on **two channels**. Production is the
+default; the staging channel exists so QA can test unreleased work without it reaching anyone
+else. A plain `npm install` never resolves to a staging build.
+
+```bash
+npm i -g @aixle/insights            # production — everyone
+npm i -g @aixle/insights@staging    # staging (QA only)
+npm view @aixle/insights dist-tags  # which version each channel points at
+```
+
+Full install, host configuration, and "which one do I have?" guidance:
+[`packages/tools/aixle-insights/README.md`](packages/tools/aixle-insights/README.md#choosing-a-version).
+Maintainers cutting a release: [`packages/tools/RELEASING.md`](packages/tools/RELEASING.md).
 
 ## Prerequisites
 
@@ -133,8 +64,6 @@ This launches all Docker services:
 | Temporal | `localhost:7233` |
 | Temporal UI | [localhost:8088](http://localhost:8088) |
 | MinIO | [localhost:9000](http://localhost:9000) (console: [9001](http://localhost:9001)) |
-
-> **Note:** The default credentials in `docker-compose.yml` (Postgres `postgres`, MinIO `minioadmin`, Keycloak `admin`) are for **local development only**. Never reuse them in staging or production — override every secret via environment variables before deploying.
 
 ### 2. Install dependencies
 
@@ -177,23 +106,14 @@ In separate terminals:
 ```bash
 make api      # Rails at http://localhost:3000
 make web      # Vite at http://localhost:5173
-make worker   # View Temporal worker logs (optional)
+make worker   # Temporal worker (optional)
 ```
 
 Open [localhost:5173](http://localhost:5173) and log in via Keycloak.
 
 ### Automated setup
 
-Two entry points, depending on how you run the app:
-
-- **`make setup`** — Docker-based. Runs `build → up → db-create → db-migrate → db-seed`
-  (also enables the git hooks). Dependencies live inside the containers.
-- **`./scripts/setup.sh`** — host-native. Checks prerequisites, installs Ruby/Node
-  dependencies on the host (`bundle install` / `npm install`), starts Docker services,
-  waits for PostgreSQL, then creates/migrates/seeds the database.
-
-Use `make setup` for the containerized workflow; use `scripts/setup.sh` if you run the
-API/web processes directly on your machine.
+Alternatively, `make setup` (or `./scripts/setup.sh`) runs steps 2–4 in one shot.
 
 ## Auth
 
@@ -221,16 +141,13 @@ Google OAuth goes through Keycloak as an identity broker — Google never redire
    ```
 5. Restart the containers: `docker compose up -d`
 
-## Integrations
+## Integration Auth
 
 Each integration uses either an OAuth app (code hosting / project management) or a plain API key (AI providers). Credentials are passed to the Rails API via environment variables — add them to your `.env` file and `docker-compose.yml` under the `api` service's `environment:` block, then restart the container.
 
 ```bash
 docker compose up -d api
 ```
-
-<details>
-<summary><b>Integration setup — GitHub, GitLab, Bitbucket, Jira, Linear, Anthropic, OpenAI, OpenRouter, Gemini</b></summary>
 
 ---
 
@@ -369,33 +286,7 @@ No OAuth app needed — generate an API key from [openrouter.ai/settings/keys](h
 
 No OAuth app needed — generate an API key from [Google AI Studio](https://aistudio.google.com/app/apikey). The key is entered directly in the Connect sheet in the UI and validated against `https://generativelanguage.googleapis.com/v1beta/models` before being saved.
 
-</details>
-
-## Telemetry Collection
-
-Per-user IDE telemetry (Cursor, Claude Code, OpenCode) is **not** pushed by the
-editors directly. It is collected by [`@aixle/insights`](packages/tools/aixle-insights)
-— an npm package (CLI + MCP server) each developer installs locally. It reads the
-tool's own local activity (Claude Code JSONL transcripts, Cursor's SQLite store)
-and forwards batched events to the API's public ingest endpoint
-(`POST /api/v1/ingest/events`, authenticated with a per-user Bearer ingest token).
-
-```bash
-npx -y @aixle/insights init \
-  --host http://localhost:3000 \
-  --keycloak-url http://localhost:8080/realms/db90
-```
-
-`init` runs a Keycloak device login, stores credentials locally, and registers the
-MCP server in `~/.claude.json`. From then on it syncs automatically (~every 5 min,
-plus a flush on connect). See the
-[package README](packages/tools/aixle-insights/README.md) and
-[LOCAL-DEV guide](packages/tools/aixle-insights/LOCAL-DEV.md) for details.
-
 ## Makefile Reference
-
-<details>
-<summary><b>All <code>make</code> commands</b></summary>
 
 ```
 make help                          Show all commands
@@ -410,7 +301,7 @@ Docker:
 
 Development:
   make console                     Rails console inside API container
-  make worker                      View Temporal worker logs
+  make worker                      Start Temporal worker
   make sidekiq                     View Sidekiq status
 
 Database:
@@ -428,7 +319,6 @@ Code Quality:
   make lint                        Run all linters
   make lint-api                    Rubocop
   make lint-web                    ESLint
-  make check                       Run linters + tests (pre-push)
 
 Code Generation:
   make generate-types              Generate TypeScript types from OpenAPI
@@ -436,12 +326,68 @@ Code Generation:
 Setup & Cleanup:
   make setup                       Full setup (build, up, db-create, migrate, seed)
   make clean                       Remove build artifacts
+
+Remote (ECS operations):
+  make remote-build                Build remote container
+  make remote-shell                Shell into remote container
+  make toolbox-shell               Shell into toolbox container
+
+Staging — Exec:
+  make staging-exec-api            Exec into staging API container
+  make staging-exec-web            Exec into staging web container
+  make staging-exec-sidekiq        Exec into staging Sidekiq container
+  make staging-exec-keycloak       Exec into staging Keycloak container
+  make staging-exec-temporal       Exec into staging Temporal container
+
+Staging — Logs:
+  make staging-logs-api            View staging API logs
+  make staging-logs-web            View staging web logs
+  make staging-logs-keycloak       View staging Keycloak logs
+  make staging-logs-temporal       View staging Temporal logs
+  make staging-logs-sidekiq        View staging Sidekiq logs
+  make watch-staging-logs-api      Follow staging API logs
+  make watch-staging-logs-web      Follow staging web logs
+  make watch-staging-logs-keycloak Follow staging Keycloak logs
+  make watch-staging-logs-temporal Follow staging Temporal logs
+  make watch-staging-logs-sidekiq  Follow staging Sidekiq logs
+
+Staging — Build & Deploy:
+  make staging-build               Build & push all staging images
+  make staging-build-api           Build & push staging API image
+  make staging-build-keycloak      Build & push staging Keycloak image
+  make staging-deploy              Deploy all staging services
+  make staging-deploy-api          Deploy staging API
+  make staging-deploy-web          Deploy staging web
+  make staging-deploy-sidekiq      Deploy staging Sidekiq
+  make staging-deploy-keycloak     Deploy staging Keycloak
+  make staging-deploy-temporal-worker  Deploy staging Temporal worker
+
+Production — Exec:
+  make prod-exec-api               Exec into prod API container
+  make prod-exec-web               Exec into prod web container
+  make prod-exec-keycloak          Exec into prod Keycloak container
+
+Production — Logs:
+  make prod-logs-api               View prod API logs
+  make prod-logs-web               View prod web logs
+  make prod-logs-keycloak          View prod Keycloak logs
+  make prod-logs-temporal          View prod Temporal logs
+  make prod-logs-sidekiq           View prod Sidekiq logs
+  make watch-prod-logs-api         Follow prod API logs
+  make watch-prod-logs-web         Follow prod web logs
+  make watch-prod-logs-keycloak    Follow prod Keycloak logs
+  make watch-prod-logs-temporal    Follow prod Temporal logs
+  make watch-prod-logs-sidekiq     Follow prod Sidekiq logs
+
+Production — Build & Deploy:
+  make prod-build                  Build & push all prod images
+  make prod-deploy                 Deploy all prod services
+  make prod-deploy-api             Deploy prod API
+  make prod-deploy-web             Deploy prod web
+  make prod-deploy-sidekiq         Deploy prod Sidekiq
+  make prod-deploy-keycloak        Deploy prod Keycloak
+  make prod-deploy-temporal-worker Deploy prod Temporal worker
 ```
-
-Deployment targets (`make staging-*` / `make prod-*`) exist for the maintainers'
-hosted environments and are intentionally omitted here.
-
-</details>
 
 ## Testing
 
@@ -464,31 +410,3 @@ cd packages/web && npx playwright test # E2E (starts servers automatically)
 | 8088 | Temporal UI |
 | 9000 | MinIO API |
 | 9001 | MinIO Console |
-
-## Contributing
-
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for setup,
-conventions, and the PR process. By participating you agree to abide by our
-[Code of Conduct](CODE_OF_CONDUCT.md).
-
-## Security
-
-To report a security vulnerability, please follow the process in
-[SECURITY.md](SECURITY.md) — do not open a public issue.
-
-## License
-
-Copyright 2026 Dualboot Partners, LLC
-
-Licensed under the [Apache License 2.0](LICENSE).
-
-Third-party licensing considerations (Redis, TimescaleDB TSL features, Sidekiq)
-are disclosed in [NOTICES.md](NOTICES.md).
-
-"Aixle" and "Aixle Insights" are trademarks of Dualboot Partners, LLC. The
-Apache License does not grant permission to use these marks.
-
-The hosted service is governed by its own
-[Terms of Service](docs/legal/TERMS_OF_SERVICE.md) and
-[Privacy Policy](docs/legal/PRIVACY_POLICY.md); neither limits any right granted
-to you under the Apache License with respect to this source code.

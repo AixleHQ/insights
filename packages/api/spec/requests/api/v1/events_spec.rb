@@ -636,6 +636,51 @@ RSpec.describe 'Api::V1::Events', type: :request do
 
       expect_not_found
     end
+
+    context 'eventText (owner-only prompt text, AIX-264)' do
+      let!(:event_text) do
+        create(:event_text,
+               tool_event_id: tool_event.id,
+               occurred_at: tool_event.occurred_at,
+               user_text: 'reverse a linked list',
+               assistant_text: 'here is how')
+      end
+
+      it 'returns eventText for an owner' do
+        membership.update!(role: 'owner')
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/events/#{tool_event.id}",
+                          user: user,
+                          organization: organization
+
+        expect_success
+        expect(json_data).to have_key(:eventText)
+        expect(json_data[:eventText][:userText]).to eq('reverse a linked list')
+        expect(json_data[:eventText][:assistantText]).to eq('here is how')
+      end
+
+      it 'omits eventText for a member viewing their own event' do
+        authenticated_get "/api/v1/organizations/#{organization.id}/events/#{tool_event.id}",
+                          user: user,
+                          organization: organization
+
+        expect_success
+        expect(json_data).not_to have_key(:eventText)
+      end
+
+      it 'returns eventText as null for an owner when no captured text exists' do
+        membership.update!(role: 'owner')
+        other_event = create(:tool_event, organization: organization, user: user, tool_name: 'cursor')
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/events/#{other_event.id}",
+                          user: user,
+                          organization: organization
+
+        expect_success
+        expect(json_data).to have_key(:eventText)
+        expect(json_data[:eventText]).to be_nil
+      end
+    end
   end
 
   describe 'GET /api/v1/organizations/:organization_id/events/summary' do

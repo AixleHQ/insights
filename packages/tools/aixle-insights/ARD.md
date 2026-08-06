@@ -18,9 +18,10 @@ The package is designed so a teammate can run a single `init` flow and then rely
 
 - CLI workflows (`init`, `run`, `run --once`, `health`, hooks install/uninstall/verify).
 - MCP tools:
-  - `db90_status`
-  - `db90_sync_now`
-  - `db90_authenticate`
+  - `aixle_insights_status`
+  - `aixle_insights_sync_now`
+  - `aixle_insights_authenticate`
+  - Deprecated aliases (removed in a later release, AIX-569): `db90_status`, `db90_sync_now`, `db90_authenticate`
 - Multi-source ingestion:
   - Claude transcript JSONL files
   - Cursor SQLite stores (`state.vscdb`, legacy `cursor.db`)
@@ -44,7 +45,7 @@ The package is designed so a teammate can run a single `init` flow and then rely
    - Executes one-shot flows (`init`, `health`, `run --once`) or starts MCP server (`run`).
 
 2. **MCP layer** (`src/server.ts`)
-   - Registers `db90_*` tools on stdio transport.
+   - Registers `aixle_insights_*` tools on stdio transport (plus deprecated `db90_*` aliases, AIX-569).
    - Runs startup sync and periodic background sync loop.
 
 3. **Sync orchestration** (`src/sync.ts`)
@@ -71,7 +72,7 @@ The package is designed so a teammate can run a single `init` flow and then rely
 3. `run` starts MCP server and background sync.
 4. Sync reads local sources, maps payloads, and posts to Aixle Insights ingest API.
 5. Checkpoints/watermarks/state are persisted per credential (`state-<hostname>-<token-hash>.json`) to avoid duplicate sends.
-6. Diagnostics are surfaced through `health`/`db90_status` and `mcp.log`.
+6. Diagnostics are surfaced through `health`/`aixle_insights_status` and `mcp.log`.
 
 ## 4) Core Decisions
 
@@ -155,7 +156,7 @@ Reference runbook: `packages/tools/RELEASING.md`.
   - optional queue: `hooks-queue.ndjson`
 - Health surfaces:
   - CLI: `aixle-insights health`
-  - MCP: `db90_status`
+  - MCP: `aixle_insights_status`
 
 ## 8) Known Trade-offs and Current Direction
 

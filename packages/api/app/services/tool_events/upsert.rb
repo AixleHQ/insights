@@ -23,13 +23,15 @@ module ToolEvents
     ].freeze
 
     # Server-stamped metadata — stripped from incoming payloads so clients
-    # cannot forge it: renormalization provenance (AIX-260) and PR
+    # cannot forge it: renormalization provenance (AIX-260), PR
     # correlation results (AIX-261; a forged pr_url is a malicious link
-    # rendered in the UI). jira_ticket is deliberately NOT reserved — clients
-    # may supply it directly.
+    # rendered in the UI), and prompt text (AIX-263; event_texts is the
+    # sole home for prompt text, with separate retention). jira_ticket is
+    # deliberately NOT reserved — clients may supply it directly.
     RESERVED_METADATA_KEYS = %w[
       renormalized_from renormalized_by
       pr_number pr_url pr_state pr_lookup_status
+      prompt_text assistant_text
     ].freeze
 
     # Events tagged with these cost_model values store non-real-token metrics in

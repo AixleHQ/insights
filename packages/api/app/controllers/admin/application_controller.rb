@@ -9,6 +9,7 @@ module Admin
 
     protect_from_forgery with: :exception
 
+    before_action :prevent_admin_page_caching
     before_action :authenticate_admin!
     before_action :log_admin_action, only: [ :create, :update, :destroy ]
 
@@ -43,6 +44,12 @@ module Admin
     end
 
     private
+
+    # Avoid bfcache / intermediary caches serving an authenticated admin page after
+    # cross-surface logout cleared the session cookie (Back button).
+    def prevent_admin_page_caching
+      response.headers["Cache-Control"] = "no-store"
+    end
 
     def authenticate_admin!
       unless current_admin_user&.global_admin?

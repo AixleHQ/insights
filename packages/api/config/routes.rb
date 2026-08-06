@@ -25,6 +25,7 @@ Rails.application.routes.draw do
       post "audit_logs", action: :create_audit_log
       post "alerts", action: :create_alert
       post "broadcasts", action: :create_broadcast
+      post "event_texts", action: :create_event_text
       get "organizations/:id/sanitization_policy", action: :sanitization_policy
     end
 

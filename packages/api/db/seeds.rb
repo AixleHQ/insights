@@ -13,30 +13,57 @@ def heavy_seed_enabled?
   ENV["RUN_HEAVY_SEED"].present?
 end
 
-# Create a default sanitization policy
+# SCHEMA INCOMPATIBILITY NOTE (AIX-363):
+# This DB policy is served by InternalController#sanitization_policy as:
+#   { data: { version, name, classification_rules, sanitization_rules } }
+# but GetPolicyActivity falls back to DEFAULT_POLICY unless INTERNAL_API_KEY is set,
+# AND SanitizationActivity iterates policy["rules"] (DEFAULT_POLICY shape) — not the
+# classification_rules/sanitization_rules shape stored here. As long as INTERNAL_API_KEY
+# is unset the DB policy is never consumed, so there is no live bug. However, if
+# INTERNAL_API_KEY is ever configured, SanitizationActivity will receive the
+# classification_rules/sanitization_rules shape and will silently skip all patterns
+# (no "rules" key). A future story must either fix InternalController to re-map the DB
+# policy to the DEFAULT_POLICY shape, or migrate the DB records to use the rules schema.
+# Until then, keep this seed in sync with DEFAULT_POLICY patterns so the stored data
+# remains the source of truth — even if its schema transformation is not yet wired up.
+# Version 2 — bumped alongside DEFAULT_POLICY (AIX-363).
 if SanitizationPolicy.count == 0
   puts "Creating default sanitization policy..."
   SanitizationPolicy.create!(
-    version: 1,
+    version: 2,
     name: 'Default Policy',
     classification_rules: {
       patterns: [
         { name: 'api_key', regex: '(?i)(api[_-]?key|apikey)["\']?\s*[:=]\s*["\']?[a-zA-Z0-9_-]{20,}' },
-        { name: 'aws_secret', regex: '(?i)aws[_-]?secret[_-]?access[_-]?key["\']?\s*[:=]\s*["\']?[A-Za-z0-9/+=]{40}' },
+        { name: 'anthropic_key', regex: 'sk-ant-[A-Za-z0-9_-]{20,}' },
+        { name: 'openai_key', regex: 'sk-(proj-)?[A-Za-z0-9_-]{20,}' },
+        { name: 'aws_key', regex: 'AKIA[0-9A-Z]{16}' },
+        { name: 'aws_secret', regex: '(?<![A-Za-z0-9\/+=])[A-Za-z0-9\/+=]{40}(?![A-Za-z0-9\/+=])' },
+        { name: 'github_token', regex: 'gh[pousr]_[A-Za-z0-9_]{20,}' },
+        { name: 'slack_token', regex: 'xox[baprs]-[A-Za-z0-9-]{10,}' },
+        { name: 'jwt', regex: 'eyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*' },
         { name: 'private_key', regex: '-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----' },
         { name: 'email', regex: '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' },
-        { name: 'phone', regex: '\b\d{3}[-.]?\d{3}[-.]?\d{4}\b' },
+        { name: 'phone', regex: '\+\d{1,3}[-.\s]?\d{2,4}[-.\s]?\d{2,4}[-.\s]?\d{2,6}\b' \
+                                 '|\(\d{3}\)[-.\s]?\d{3}[-.]?\d{4}\b' \
+                                 '|\b\d{3}[-.]?\d{3}[-.]?\d{4}\b' },
         { name: 'ssn', regex: '\b\d{3}-\d{2}-\d{4}\b' }
       ]
     },
     sanitization_rules: {
       actions: [
-        { pattern: 'api_key', action: 'redact', replacement: '[REDACTED_API_KEY]' },
-        { pattern: 'aws_secret', action: 'redact', replacement: '[REDACTED_AWS_SECRET]' },
-        { pattern: 'private_key', action: 'redact', replacement: '[REDACTED_PRIVATE_KEY]' },
+        { pattern: 'api_key', action: 'redact', replacement: '[REDACTED]' },
+        { pattern: 'anthropic_key', action: 'redact', replacement: '[REDACTED]' },
+        { pattern: 'openai_key', action: 'redact', replacement: '[REDACTED]' },
+        { pattern: 'aws_key', action: 'redact', replacement: '[REDACTED]' },
+        { pattern: 'aws_secret', action: 'redact', replacement: '[REDACTED]' },
+        { pattern: 'github_token', action: 'redact', replacement: '[REDACTED]' },
+        { pattern: 'slack_token', action: 'redact', replacement: '[REDACTED]' },
+        { pattern: 'jwt', action: 'redact', replacement: '[REDACTED]' },
+        { pattern: 'private_key', action: 'redact', replacement: '[REDACTED]' },
         { pattern: 'email', action: 'mask', mask_char: '*', visible_chars: 3 },
-        { pattern: 'phone', action: 'redact', replacement: '[REDACTED_PHONE]' },
-        { pattern: 'ssn', action: 'redact', replacement: '[REDACTED_SSN]' }
+        { pattern: 'phone', action: 'redact', replacement: '[REDACTED]' },
+        { pattern: 'ssn', action: 'redact', replacement: '[REDACTED]' }
       ]
     },
     is_active: true,
@@ -76,9 +103,9 @@ KNOWN_DEV_USERS = [
     org_role: 'owner'
   },
   {
-    email: 'line.valds@example.com',
+    email: 'linu.valds@example.com',
     name: 'Line Valds',
-    keycloak_sub: 'line.valds@example.com',
+    keycloak_sub: 'linu.valds@example.com',
     global_admin: true,
     org_role: 'owner'
   }
@@ -89,7 +116,7 @@ KNOWN_DEV_USERS = [
 # and the organization has working defaults — independent of heavy simulation data.
 org = nil
 unless Rails.env.production?
-  org = Organization.find_or_create_by!(slug: 'acme-corp') do |o|
+  org = Organization.find_or_create_by!(slug: 'dualboot-partners') do |o|
     o.name = 'Acme Corp'
   end
   puts "Organization: #{org.name}"
@@ -300,7 +327,7 @@ if heavy_seed_enabled?
   ) do |c|
     c.access_token = 'ghp_simulated_token_for_development_only'
     c.is_active = true
-    c.config = { organization: 'acme-corp' }
+    c.config = { organization: 'dualboot-partners' }
   end
 
   # Create repositories for projects
@@ -312,8 +339,8 @@ if heavy_seed_enabled?
     ) do |r|
       repo_name = project.slug
       r.name = repo_name
-      r.full_name = "acme-corp/#{repo_name}"
-      r.url = "https://github.com/acme-corp/#{repo_name}"
+      r.full_name = "dualboot-partners/#{repo_name}"
+      r.url = "https://github.com/dualboot-partners/#{repo_name}"
       r.default_branch = 'main'
     end
   end

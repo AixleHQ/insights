@@ -15,6 +15,12 @@ const keycloakConfig = {
   clientId: config.keycloakClientId,
 };
 
+// Cross-tab logout signal. oidc-client-ts defaults its userStore to sessionStorage,
+// which is per-tab, so removing the OIDC user key never dispatches a `storage` event
+// to sibling tabs. We instead write this dedicated localStorage key on logout;
+// localStorage writes DO fire `storage` in other tabs, which then clear their session.
+export const LOGOUT_BROADCAST_KEY = "db90.logout";
+
 // OIDC User Manager settings
 const settings: UserManagerSettings = {
   authority: `${keycloakConfig.url}/realms/${keycloakConfig.realm}`,
@@ -119,10 +125,39 @@ export async function loginCallback(): Promise<User> {
   return signinRedirectCallbackInFlight;
 }
 
+const ADMIN_SESSION_CLEAR_TIMEOUT_MS = 3000;
+
+/**
+ * Clear the Administrate httponly admin cookie (same-origin /admin/logout) before
+ * ending the Keycloak SSO session. Without this, logging out of the main app leaves
+ * /admin usable until the 1-day signed cookie expires (cross-surface logout gap).
+ * Timed out / failed clears must not block Keycloak signoutRedirect.
+ */
+async function clearAdminSession(): Promise<void> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), ADMIN_SESSION_CLEAR_TIMEOUT_MS);
+  try {
+    await fetch("/admin/logout", {
+      method: "DELETE",
+      headers: { Accept: "application/json" },
+      credentials: "include",
+      signal: controller.signal,
+    });
+  } catch {
+    // Best-effort — Keycloak signout still proceeds.
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
 export async function logout(): Promise<void> {
   // Clear the stored org so the default_org_id preference wins on the next login
   // instead of the last-used org from this session (AIX-318).
   localStorage.removeItem(ORG_STORAGE_KEY);
+  // Signal sibling tabs to drop their session (see LOGOUT_BROADCAST_KEY). Writing a
+  // fresh value each time guarantees a `storage` event even on back-to-back logouts.
+  localStorage.setItem(LOGOUT_BROADCAST_KEY, String(Date.now()));
+  await clearAdminSession();
   const manager = getUserManager();
   await manager.signoutRedirect();
 }

@@ -14,7 +14,7 @@ class UserDashboard < Administrate::BaseDashboard
     organizations: Field::HasMany,
     project_memberships: Field::HasMany,
     projects: Field::HasMany,
-    owned_projects: Field::HasMany.with_options(class_name: "Project"),
+    all_owned_projects: Field::HasMany.with_options(class_name: "Project"),
     user_settings: Field::HasMany,
     created_at: Field::DateTime,
     updated_at: Field::DateTime
@@ -36,7 +36,7 @@ class UserDashboard < Administrate::BaseDashboard
     avatar_url
     global_admin
     organizations
-    owned_projects
+    all_owned_projects
     created_at
     updated_at
   ].freeze

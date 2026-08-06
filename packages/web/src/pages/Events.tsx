@@ -4,6 +4,7 @@ import { CheckSquare, Download, Loader2, RefreshCw } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useOrg } from "@/contexts/OrgContext";
 import { useEvents, useExportEvents, useProjects, useCurrentUser, useEventsSummary, useOrganizationMembers, queryKeys } from "@/hooks/useApi";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useEventsPageUpdates } from "@/hooks/useWebSocket";
 import { Button } from "@/components/ui/button";
 import {
@@ -99,6 +100,20 @@ export function Events() {
       .map((slug) => ({ value: slug, label: humanizeToolName(slug) }));
   }, [eventsSummary]);
 
+  const debouncedSearch = useDebouncedValue(filters.search ?? "", 350);
+
+  // The User filter is admin/owner-only. Strip userId/userName reactively so a
+  // hand-crafted ?user_id= deep-link can't surface the filter (chip or API param)
+  // for a plain member. Derived, not init-only: isOwnerOrPlatformAdmin flips
+  // false→true once useCurrentUser resolves for a non-owner platform admin.
+  const effectiveFilters = useMemo<EventFiltersState>(
+    () =>
+      isOwnerOrPlatformAdmin
+        ? filters
+        : { ...filters, userId: undefined, userName: undefined },
+    [filters, isOwnerOrPlatformAdmin],
+  );
+
   const apiParams = useMemo(() => ({
     page,
     per_page: pageSize,
@@ -106,13 +121,14 @@ export function Events() {
     risk_level: filters.riskLevels,
     event_type: filters.eventTypes,
     project_id: filters.projectIds,
-    user_id: filters.userId,
+    user_id: effectiveFilters.userId,
     start_date: filters.dateFrom,
     end_date: filters.dateTo,
     sort_by: SORT_FIELD_API_MAP[sortField],
     direction: sortDirection,
     tz: clientTimezone,
-  }), [page, pageSize, filters.tools, filters.riskLevels, filters.eventTypes, filters.projectIds, filters.userId, filters.dateFrom, filters.dateTo, sortField, sortDirection]);
+    search: debouncedSearch || undefined,
+  }), [page, pageSize, filters.tools, filters.riskLevels, filters.eventTypes, filters.projectIds, effectiveFilters.userId, filters.dateFrom, filters.dateTo, sortField, sortDirection, debouncedSearch]);
 
   const { data: eventsResponse, isLoading, isFetching, isError, refetch } = useEvents(
     currentOrg?.id || "",
@@ -148,25 +164,6 @@ export function Events() {
     setPage(1);
   };
 
-  // Client-side: text search only. Risk/tool/type/project filters (including the
-  // not_none sentinel from Risk Alerts drill-down) are server-side — do not
-  // re-filter risk levels here; staging previously compared against "not_none"
-  // literally and hid every row.
-  const filteredAndSortedEvents = useMemo(() => {
-    let result = [...events];
-
-    if (filters.search) {
-      const search = filters.search.toLowerCase();
-      result = result.filter(
-        (e) =>
-          (e.tool_name || "").toLowerCase().includes(search) ||
-          (e.project?.name || "").toLowerCase().includes(search)
-      );
-    }
-
-    return result;
-  }, [events, filters.search]);
-
   const handleExport = async () => {
     setExportQueued(false);
     setExportError(false);
@@ -182,10 +179,11 @@ export function Events() {
         start_date: filters.dateFrom,
         end_date: filters.dateTo,
         project_id: filters.projectIds,
-        user_id: filters.userId,
+        user_id: effectiveFilters.userId,
         sort_by: SORT_FIELD_API_MAP[sortField],
         direction: sortDirection,
         tz: clientTimezone,
+        search: filters.search || undefined,
         filename,
       });
 
@@ -209,22 +207,21 @@ export function Events() {
 
   const handleNavigate = useCallback((direction: "prev" | "next") => {
     if (!selectedEventId) return;
-    const currentIndex = filteredAndSortedEvents.findIndex((e) => e.id === selectedEventId);
+    const currentIndex = events.findIndex((e) => e.id === selectedEventId);
     if (currentIndex === -1) return;
 
     const newIndex = direction === "prev" ? currentIndex - 1 : currentIndex + 1;
-    if (newIndex >= 0 && newIndex < filteredAndSortedEvents.length) {
-      setSelectedEventId(filteredAndSortedEvents[newIndex].id);
+    if (newIndex >= 0 && newIndex < events.length) {
+      setSelectedEventId(events[newIndex].id);
     }
-  }, [selectedEventId, filteredAndSortedEvents]);
+  }, [selectedEventId, events]);
 
   const selectedEventIndex = selectedEventId
-    ? filteredAndSortedEvents.findIndex((e) => e.id === selectedEventId)
+    ? events.findIndex((e) => e.id === selectedEventId)
     : -1;
 
   const totalPages = eventsResponse?.meta?.total_pages || 1;
   const totalCount = eventsResponse?.meta?.total_count || 0;
-  const hasClientSideFilters = !!filters.search;
 
   const handleTabChange = useCallback((value: string) => {
     const nextTab = value as EventsTab;
@@ -266,7 +263,7 @@ export function Events() {
       )}
 
       <EventFilters
-        filters={filters}
+        filters={effectiveFilters}
         onFiltersChange={(newFilters) => {
           setFilters(newFilters);
           setPage(1);
@@ -320,14 +317,14 @@ export function Events() {
         onOpenChange={setDrawerOpen}
         onNavigate={activeTab === "all" ? handleNavigate : undefined}
         hasPrev={activeTab === "all" && selectedEventIndex > 0}
-        hasNext={activeTab === "all" && selectedEventIndex < filteredAndSortedEvents.length - 1}
+        hasNext={activeTab === "all" && selectedEventIndex < events.length - 1}
         onAssign={activeTab === "not_assigned" && assignEventFn ? assignEventFn : undefined}
       />
 
       {activeTab === "all" && (
         <>
           <EventsTable
-            events={filteredAndSortedEvents}
+            events={events}
             isLoading={isLoading}
             isError={isError}
             onRetry={() => refetch()}
@@ -353,9 +350,7 @@ export function Events() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
               <p>
-                {hasClientSideFilters
-                  ? `Showing ${filteredAndSortedEvents.length} filtered events`
-                  : `Showing ${filteredAndSortedEvents.length} of ${totalCount} events`}
+                {`Showing ${events.length} of ${totalCount} events`}
               </p>
               <Select
                 value={String(pageSize)}

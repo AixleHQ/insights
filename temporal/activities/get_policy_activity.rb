@@ -14,7 +14,9 @@ module Activities
           "action" => "redact",
           "patterns" => {
             "email" => '\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
-            "phone" => '\b\d{3}[-.]?\d{3}[-.]?\d{4}\b',
+            "phone" => '\+\d{1,3}[-.\s]?\d{2,4}[-.\s]?\d{2,4}[-.\s]?\d{2,6}\b' \
+                       '|\(\d{3}\)[-.\s]?\d{3}[-.]?\d{4}\b' \
+                       '|\b\d{3}[-.]?\d{3}[-.]?\d{4}\b',
             "ssn" => '\b\d{3}-\d{2}-\d{4}\b',
             "credit_card" => '\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b'
           }
@@ -25,10 +27,9 @@ module Activities
           "patterns" => {
             "aws_access_key"  => 'AKIA[0-9A-Z]{16}',
             "aws_session_key" => 'ASIA[0-9A-Z]{16}',
-            "github_token"    => 'gh[pousr]_[A-Za-z0-9_]{36,}',
-            # Word-bounded; (?!ant-) so Anthropic keys do not also match openai_key.
+            "github_token"    => 'gh[pousr]_[A-Za-z0-9_]{20,}',
             "openai_key"      => '\bsk-(?!ant-)[A-Za-z0-9_\-]{20,}\b',
-            "anthropic_key"   => '\bsk-ant-[A-Za-z0-9_\-]{93,}\b',
+            "anthropic_key"   => '\bsk-ant-[A-Za-z0-9_\-]{20,}\b',
             "slack_token"     => 'xox[baprs]-[0-9A-Za-z\-]{10,}',
             "stripe_key"      => '(?:sk|rk)_live_[0-9a-zA-Z]{24,}',
             "google_api_key"  => 'AIza[0-9A-Za-z_\-]{35}',
@@ -49,7 +50,13 @@ module Activities
         "medium" => 1,
         "high" => 3,
         "critical" => 5
-      }
+      },
+      # Structural metadata fields that must never be redacted — they are opaque
+      # identifiers, not user-controlled content, and downstream jobs depend on them.
+      "excluded_keys" => %w[
+        commit_hash branch_name workspace workspace_folder
+        repo_name jira_ticket cursor_session_id
+      ]
     }.freeze
 
     def execute(params)

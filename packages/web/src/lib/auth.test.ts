@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ErrorResponse } from "oidc-client-ts";
 
 // Mock the UserManager so auth.ts's lazy getUserManager() returns a controllable stub
@@ -71,25 +71,6 @@ describe("isDeadSessionError", () => {
   });
 });
 
-describe("logout", () => {
-  beforeEach(() => {
-    mockManager.signoutRedirect.mockReset().mockResolvedValue(undefined);
-    localStorage.clear();
-  });
-
-  it("clears stored org from localStorage before redirecting (AIX-318)", async () => {
-    localStorage.setItem(ORG_STORAGE_KEY, "org-123");
-    await logout();
-    expect(localStorage.getItem(ORG_STORAGE_KEY)).toBeNull();
-    expect(mockManager.signoutRedirect).toHaveBeenCalledOnce();
-  });
-
-  it("still calls signoutRedirect even when no org was stored", async () => {
-    await logout();
-    expect(mockManager.signoutRedirect).toHaveBeenCalledOnce();
-  });
-});
-
 describe("getAccessToken", () => {
   beforeEach(() => {
     mockManager.getUser.mockReset();
@@ -122,5 +103,94 @@ describe("getAccessToken", () => {
 
     await expect(getAccessToken()).resolves.toBe("good-token");
     expect(mockManager.signinSilent).not.toHaveBeenCalled();
+  });
+});
+
+describe("logout", () => {
+  const memoryStore: Record<string, string> = {};
+  const localStorageMock = {
+    getItem: vi.fn((key: string) => memoryStore[key] ?? null),
+    setItem: vi.fn((key: string, value: string) => {
+      memoryStore[key] = value;
+    }),
+    removeItem: vi.fn((key: string) => {
+      delete memoryStore[key];
+    }),
+    clear: vi.fn(() => {
+      for (const key of Object.keys(memoryStore)) delete memoryStore[key];
+    }),
+  };
+
+  beforeEach(() => {
+    for (const key of Object.keys(memoryStore)) delete memoryStore[key];
+    mockManager.signoutRedirect.mockReset().mockResolvedValue(undefined);
+    vi.stubGlobal("localStorage", localStorageMock);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
+    );
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("clears stored org from localStorage before redirecting (AIX-318)", async () => {
+    memoryStore[ORG_STORAGE_KEY] = "org-123";
+    await logout();
+    expect(memoryStore[ORG_STORAGE_KEY]).toBeUndefined();
+    expect(localStorageMock.removeItem).toHaveBeenCalledWith(ORG_STORAGE_KEY);
+    expect(mockManager.signoutRedirect).toHaveBeenCalledOnce();
+  });
+
+  it("still calls signoutRedirect even when no org was stored", async () => {
+    await logout();
+    expect(mockManager.signoutRedirect).toHaveBeenCalledOnce();
+  });
+
+  it("clears the Administrate session before Keycloak signoutRedirect", async () => {
+    await logout();
+
+    expect(fetch).toHaveBeenCalledWith(
+      "/admin/logout",
+      expect.objectContaining({
+        method: "DELETE",
+        credentials: "include",
+        headers: { Accept: "application/json" },
+        signal: expect.any(AbortSignal),
+      })
+    );
+    expect(mockManager.signoutRedirect).toHaveBeenCalled();
+  });
+
+  it("still signs out of Keycloak if admin session clear fails", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+
+    await logout();
+
+    expect(mockManager.signoutRedirect).toHaveBeenCalled();
+  });
+
+  it("still signs out of Keycloak if admin session clear hangs past timeout", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        (_input: RequestInfo | URL, init?: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => {
+              reject(new DOMException("Aborted", "AbortError"));
+            });
+          })
+      )
+    );
+
+    const logoutPromise = logout();
+    await vi.advanceTimersByTimeAsync(3000);
+    await logoutPromise;
+
+    expect(mockManager.signoutRedirect).toHaveBeenCalled();
+    vi.useRealTimers();
   });
 });

@@ -11,6 +11,18 @@ module ToolEventFilterable
     if (tools = normalize_string_array(fp["tool_name"])).any?
       scope = scope.where(tool_name: tools)
     end
+    if (raw_search = fp["search"].to_s.strip).present?
+      # Substring search over tool_name + project name. Rather than an unindexed
+      # leading-wildcard ILIKE on the enum cast (and a per-row LEFT JOIN projects)
+      # across the tool_events history, resolve matches to indexed IN predicates:
+      #   - tool_name is a fixed enum, so match its known values in Ruby.
+      #   - project names resolve via a subquery on the small projects table,
+      #     feeding project_id IN (...) — hits idx_tool_events_project_occurred.
+      matching_tools = ToolEvent::TOOL_NAMES.select { |name| name.include?(raw_search.downcase) }
+      like_term = "%#{ActiveRecord::Base.sanitize_sql_like(raw_search)}%"
+      project_ids = Project.where("name ILIKE ?", like_term).select(:id)
+      scope = scope.where(tool_name: matching_tools).or(scope.where(project_id: project_ids))
+    end
     if (types = normalize_string_array(fp["event_type"])).any?
       scope = scope.where(event_type: types)
     end

@@ -46,6 +46,7 @@ import {
 import { NotFound } from "./pages/NotFound";
 import { Exports } from "./pages/Exports";
 import { AppRoutes } from "./lib/routes";
+import { SHOW_INTEGRATION_CATALOG } from "./lib/featureFlags";
 
 function TeamIdRedirect() {
   const { id } = useParams<{ id: string }>();
@@ -148,9 +149,13 @@ function App() {
                   <Route
                     path={AppRoutes.integrations.manage}
                     element={
-                      <ProtectedRoute requireRoles={["owner"]}>
-                        <IntegrationsManage />
-                      </ProtectedRoute>
+                      SHOW_INTEGRATION_CATALOG ? (
+                        <ProtectedRoute requireRoles={["owner"]}>
+                          <IntegrationsManage />
+                        </ProtectedRoute>
+                      ) : (
+                        <Navigate to={AppRoutes.integrations.connected} replace />
+                      )
                     }
                   />
                   <Route path="/integrations/:status" element={<Integrations />} />

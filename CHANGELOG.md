@@ -5,6 +5,47 @@ All notable changes to Aixle Insights are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-08-05
+
+First stable release. Promotes the `1.0.0-alpha.*` series to a final `1.0.0`
+and ships the remaining `develop` batch on top of `1.0.0-alpha.9`: prompt
+capture (opt-in, off by default), a hardened sanitizer, server-side event
+search, cross-tab logout, dashboard filter parity, CLI/MCP rebrand to Aixle
+Insights, and the `@aixle/insights` npm distribution channels. No new database
+migrations run on deploy — `event_texts` and the orphaned-membership cleanup
+already shipped with `1.0.0-alpha.9`.
+
+### Added
+- Prompt capture pipeline: `event_texts` hypertable, capture service, and a
+  Temporal `PersistPromptActivity`, gated behind the opt-in
+  `AIXLE_INSIGHTS_PROMPT_CAPTURE` flag (off by default) (`AIX-263`,
+  `AIX-264`).
+- EventDetail prompt-text display with a metadata table and `event_text`
+  authorization policy (`AIX-264`).
+- Server-side event search with an indexed `ToolEventFilterable` scope
+  (`AIX-589`).
+- `@aixle/insights` npm distribution: version-channel dist-tag routing,
+  fail-closed on bad versions/channels, and the 0.2.0 release (`AIX-614`,
+  `AIX-157`).
+
+### Changed
+- Rebrand the CLI/MCP surface off the `db90` prefix to Aixle Insights: helper
+  renames, onboarding copy sync, and MCP tool names (`AIX-588`,
+  `AIX-569`).
+- Unify dashboard filter chrome across Team and Personal tabs and reset the
+  standalone project filter on org change (`AIX-607`).
+- Show role-owned projects in the admin user detail (`AIX-592`).
+- Hide Manage Catalog behind a feature flag until enforcement ships
+  (`AIX-602`).
+- Gate the Events User filter deep-link behind admin/owner (`AIX-609`).
+
+### Fixed
+- Harden the sanitizer: exempt structural IDs by key rather than UUID shape,
+  cut secrets-pattern false positives, widen phone PII matching, and refresh
+  detection_summary on text-scan escalation (`AIX-363`, `AIX-263`).
+- Clear the admin session on main-app logout and fix cross-tab logout
+  (`AIX-589`).
+
 ## [1.0.0-alpha.9] - 2026-07-27
 
 Ninth alpha release. A large batch from `develop`: user avatars and data
@@ -291,6 +332,7 @@ tags cut from the same `release/1.0.0` branch.
 ### Added
 - Initial Aixle Insights platform release cut from `develop` for production infrastructure validation.
 
+[1.0.0]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0
 [1.0.0-alpha.9]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.9
 [1.0.0-alpha.8]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.8
 [1.0.0-alpha.7]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.7

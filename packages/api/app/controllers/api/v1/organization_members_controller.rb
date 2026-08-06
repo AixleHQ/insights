@@ -378,8 +378,8 @@ module Api
         # Single aggregate query covering both windows using PostgreSQL FILTER.
         # Uses >= / < boundary so the windows are non-overlapping (fixes the
         # original double-counting bug on the boundary day).
-        base = current_organization.tool_events
-          .where(user_id: @membership.user_id, occurred_at: prev_start..Time.current)
+        base = member_events_base
+          .where(occurred_at: prev_start..Time.current)
 
         agg = base.select(Arel.sql(<<~SQL.squish)).take
           COUNT(*) FILTER (WHERE occurred_at >= #{quoted}) AS curr_events,
@@ -437,8 +437,8 @@ module Api
         days = period_days(params[:period])
 
         current_start = (client_zone.now - days.days).beginning_of_day
-        events = current_organization.tool_events
-          .where(user_id: @membership.user_id, occurred_at: current_start..Time.current)
+        events = member_events_base
+          .where(occurred_at: current_start..Time.current)
 
         # Aggregate with no GROUP BY always returns one row (COUNT(*) = 0 when empty) — agg is never nil.
         agg = events.select(Arel.sql(<<~SQL.squish)).take
@@ -508,8 +508,8 @@ module Api
       def member_heatmap
         authorize! @membership
 
-        data = current_organization.tool_events
-          .where(user_id: @membership.user_id, occurred_at: 1.year.ago..Time.current)
+        data = member_events_base
+          .where(occurred_at: 1.year.ago..Time.current)
           .group(date_sql)
           .select("#{date_sql} as date, COUNT(*) as count")
           .order("date ASC")
@@ -535,6 +535,23 @@ module Api
         when "7d"  then 7
         when "90d" then 90
         else 30
+        end
+      end
+
+      # Returns the member's ToolEvent relation, optionally scoped to a project.
+      # project_id is validated through the org to prevent cross-org data access.
+      # Mirrors StatsController#scoped_events_base: "none" filters unattributed events.
+      def member_events_base
+        scope = current_organization.tool_events.where(user_id: @membership.user_id)
+        project_id = Array.wrap(params[:project_id]).first.to_s.strip.presence
+
+        case project_id
+        when "none"
+          scope.where(project_id: nil)
+        when nil
+          scope
+        else
+          scope.where(project_id: current_organization.projects.find(project_id).id)
         end
       end
 

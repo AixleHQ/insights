@@ -31,6 +31,15 @@ export const SYNC_NOW_INPUT_SCHEMA = z
   })
   .strict();
 
+const AUTHENTICATE_INPUT_SCHEMA = z.object({
+  keycloakUrl: z.string().optional(),
+  clientId: z.string().optional(),
+});
+
+/** AIX-569: `db90_*` names are deprecated aliases kept for one release for existing callers. */
+const DEPRECATED_ALIAS_NOTE =
+  "(Deprecated — use `{name}` instead; kept temporarily for backward compatibility, see AIX-569.) ";
+
 function jsonContent(value: unknown) {
   return {
     content: [
@@ -99,8 +108,8 @@ async function getProjectResolutionForSync(
   return result;
 }
 
-/** Structured status for `db90_status` — tolerates missing/malformed credentials and state. */
-export async function buildDb90StatusPayload(): Promise<Record<string, unknown>> {
+/** Structured status for `aixle_insights_status` — tolerates missing/malformed credentials and state. */
+export async function buildAixleInsightsStatusPayload(): Promise<Record<string, unknown>> {
   const snapshot = await buildHealthSnapshot();
   return healthSnapshotToStatusPayload(snapshot);
 }
@@ -108,7 +117,7 @@ export async function buildDb90StatusPayload(): Promise<Record<string, unknown>>
 async function executeSync(parsed: { tools?: TelemetryToolId[] }): Promise<unknown> {
   const creds = await loadCredentials();
   if (!creds || !credentialsHaveAnyToken(creds)) {
-    mcpLog.warn("credential_validation_failed", { source: "db90_sync_now", reason: "missing_credentials" }, false);
+    mcpLog.warn("credential_validation_failed", { source: "aixle_insights_sync_now", reason: "missing_credentials" }, false);
     return { ok: false, error: "missing_credentials" };
   }
   migrateAllLegacyState(creds);
@@ -128,100 +137,116 @@ async function executeSync(parsed: { tools?: TelemetryToolId[] }): Promise<unkno
   return { ok: syncResultOk(result), result };
 }
 
+async function statusHandler() {
+  return jsonContent(await buildAixleInsightsStatusPayload());
+}
+
+async function syncNowHandler(input: unknown) {
+  try {
+    const parsed = SYNC_NOW_INPUT_SCHEMA.parse(input ?? {});
+    return jsonContent(await executeSync(parsed));
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return jsonContent({
+        ok: false,
+        error: "validation_error",
+        details: err.flatten(),
+      });
+    }
+    return jsonContent({
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+async function authenticateHandler(args: z.infer<typeof AUTHENTICATE_INPUT_SCHEMA>) {
+  try {
+    const kc = (args.keycloakUrl?.trim() || defaultKeycloakIssuer()).trim();
+    if (!kc) {
+      return jsonContent({
+        ok: false,
+        error: "keycloakUrl or KEYCLOAK_ISSUER / DB90_KEYCLOAK_ISSUER is required",
+      });
+    }
+    const clientId = args.clientId?.trim() || defaultKeycloakClientId();
+    const device = await startDeviceAuthorization({
+      issuer: kc,
+      clientId,
+    });
+    return jsonContent({
+      ok: true,
+      verificationUri: device.verification_uri,
+      verificationUriComplete: device.verification_uri_complete ?? null,
+      userCode: device.user_code,
+      expiresIn: device.expires_in,
+      interval: device.interval ?? 5,
+      issuer: kc,
+      clientId,
+      message: `Visit ${device.verification_uri} and enter code ${device.user_code}`,
+    });
+  } catch (err) {
+    return jsonContent({
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
 /** In-process MCP server instance (stdio not attached). */
-export function createDb90McpServer(): McpServer {
+export function createAixleInsightsMcpServer(): McpServer {
   const server = new McpServer(
     { name: SERVER_NAME, version: SERVER_VERSION },
     { capabilities: { tools: {} } }
   );
 
+  const statusDescription =
+    "Returns Aixle Insights MCP connectivity and last sync metadata from disk (credentials + state). No arguments.";
+  server.registerTool("aixle_insights_status", { description: statusDescription }, statusHandler);
   server.registerTool(
     "db90_status",
-    {
-      description:
-        "Returns Aixle Insights MCP connectivity and last sync metadata from disk (credentials + state). No arguments.",
-    },
-    async () => jsonContent(await buildDb90StatusPayload())
+    { description: DEPRECATED_ALIAS_NOTE.replace("{name}", "aixle_insights_status") + statusDescription },
+    statusHandler
   );
 
+  const syncNowDescription =
+    "Runs one Aixle Insights ingest sync cycle for enabled tools immediately (matches background cadence). " +
+      "Optional `tools` subset filter: omit to sync every tool credential you have authenticated (Claude transcripts + Cursor telemetry).";
+  server.registerTool(
+    "aixle_insights_sync_now",
+    { description: syncNowDescription, inputSchema: SYNC_NOW_INPUT_SCHEMA },
+    syncNowHandler
+  );
   server.registerTool(
     "db90_sync_now",
     {
-      description:
-        "Runs one Aixle Insights ingest sync cycle for enabled tools immediately (matches background cadence). " +
-          "Optional `tools` subset filter: omit to sync every tool credential you have authenticated (Claude transcripts + Cursor telemetry).",
+      description: DEPRECATED_ALIAS_NOTE.replace("{name}", "aixle_insights_sync_now") + syncNowDescription,
       inputSchema: SYNC_NOW_INPUT_SCHEMA,
     },
-    async (input: unknown) => {
-      try {
-        const parsed = SYNC_NOW_INPUT_SCHEMA.parse(input ?? {});
-        return jsonContent(await executeSync(parsed));
-      } catch (err) {
-        if (err instanceof z.ZodError) {
-          return jsonContent({
-            ok: false,
-            error: "validation_error",
-            details: err.flatten(),
-          });
-        }
-        return jsonContent({
-          ok: false,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-    }
+    syncNowHandler
   );
 
+  const authenticateDescription =
+    "Starts Keycloak device login and returns the visit URL/code for the user. Use aixle-insights init for the full terminal flow that saves credentials.";
+  server.registerTool(
+    "aixle_insights_authenticate",
+    { description: authenticateDescription, inputSchema: AUTHENTICATE_INPUT_SCHEMA },
+    authenticateHandler
+  );
   server.registerTool(
     "db90_authenticate",
     {
-      description:
-        "Starts Keycloak device login and returns the visit URL/code for the user. Use aixle-insights init for the full terminal flow that saves credentials.",
-      inputSchema: z.object({
-        keycloakUrl: z.string().optional(),
-        clientId: z.string().optional(),
-      }),
+      description: DEPRECATED_ALIAS_NOTE.replace("{name}", "aixle_insights_authenticate") + authenticateDescription,
+      inputSchema: AUTHENTICATE_INPUT_SCHEMA,
     },
-    async (input) => {
-      try {
-        const args = input;
-        const kc = (args.keycloakUrl?.trim() || defaultKeycloakIssuer()).trim();
-        if (!kc) {
-          return jsonContent({
-            ok: false,
-            error: "keycloakUrl or KEYCLOAK_ISSUER / DB90_KEYCLOAK_ISSUER is required",
-          });
-        }
-        const clientId = args.clientId?.trim() || defaultKeycloakClientId();
-        const device = await startDeviceAuthorization({
-          issuer: kc,
-          clientId,
-        });
-        return jsonContent({
-          ok: true,
-          verificationUri: device.verification_uri,
-          verificationUriComplete: device.verification_uri_complete ?? null,
-          userCode: device.user_code,
-          expiresIn: device.expires_in,
-          interval: device.interval ?? 5,
-          issuer: kc,
-          clientId,
-          message: `Visit ${device.verification_uri} and enter code ${device.user_code}`,
-        });
-      } catch (err) {
-        return jsonContent({
-          ok: false,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-    }
+    authenticateHandler
   );
 
   return server;
 }
 
 export async function startServer(): Promise<void> {
-  const server = createDb90McpServer();
+  const server = createAixleInsightsMcpServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);
 

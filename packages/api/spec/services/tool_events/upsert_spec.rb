@@ -446,7 +446,7 @@ RSpec.describe ToolEvents::Upsert do
     let(:organization) { create(:organization) }
     let(:user)         { create(:user) }
 
-    # Mirrors the staging event 9e67dae7 pattern (2026-07-01):
+    # Mirrors the staging event 9e67dae7 pattern (Grace Hopper, 2026-07-01):
     # a stale CLI sends tokens_in = base + cache_read + cache_write while the
     # metadata carries the correct base_input_tokens + cache breakdown.
     let(:inflated_attributes) do
@@ -1119,6 +1119,42 @@ RSpec.describe ToolEvents::Upsert do
       )
       event = described_class.call(attrs)[:tool_event]
       expect(event.reload.metadata.keys).not_to include("pr_number", "pr_url")
+    end
+  end
+
+  describe "prompt_text / assistant_text metadata stripping (AIX-263)" do
+    let(:organization) { create(:organization) }
+    let(:user)         { create(:user) }
+
+    let(:base_attributes) do
+      {
+        organization_id: organization.id,
+        user_id: user.id,
+        tool_name: "claude_code",
+        event_type: "chat",
+        occurred_at: Time.current,
+        metadata: {
+          "session_id" => nil,
+          "prompt_text" => "How do I reverse a string?",
+          "assistant_text" => "Use .reverse",
+          "other_key" => "should remain"
+        }
+      }
+    end
+
+    it "strips prompt_text from tool_events.metadata" do
+      result = described_class.call(base_attributes)
+      expect(result[:tool_event].metadata).not_to have_key("prompt_text")
+    end
+
+    it "strips assistant_text from tool_events.metadata" do
+      result = described_class.call(base_attributes)
+      expect(result[:tool_event].metadata).not_to have_key("assistant_text")
+    end
+
+    it "preserves unrelated metadata keys" do
+      result = described_class.call(base_attributes)
+      expect(result[:tool_event].metadata["other_key"]).to eq("should remain")
     end
   end
 end

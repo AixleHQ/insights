@@ -1,7 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@/test/utils";
+import { render, screen, waitFor } from "@/test/utils";
 import userEvent from "@testing-library/user-event";
+import { ApiError } from "@/lib/api";
 import { MemberProfileView } from "./MemberProfile";
+
+const mockNavigate = vi.fn();
+
+vi.mock("react-router-dom", async () => {
+  const actual = await vi.importActual("react-router-dom");
+  return { ...actual, useNavigate: () => mockNavigate };
+});
 
 vi.mock("@/contexts/OrgContext", () => ({
   useOrg: () => ({
@@ -69,7 +77,7 @@ const mockProject = {
 };
 
 function setupDefaultMocks() {
-  mockUseMember.mockReturnValue({ data: mockMember, isLoading: false });
+  mockUseMember.mockReturnValue({ data: mockMember, isLoading: false, isError: false, error: null });
   mockUseMemberStats.mockReturnValue({ data: mockStats });
   mockUseMemberHeatmap.mockReturnValue({ data: [] });
   mockUseMemberEvents.mockReturnValue({ data: emptyEventsResponse, isLoading: false });
@@ -82,6 +90,45 @@ describe("MemberProfileView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setupDefaultMocks();
+  });
+
+  describe("org-switch 404 redirect (AIX-589)", () => {
+    it("redirects to members list when useMember returns 404", async () => {
+      mockUseMember.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        isError: true,
+        error: new ApiError("Not found", 404, null),
+      });
+      render(<MemberProfileView memberId="stale-mem" />);
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith("/members", { replace: true });
+      });
+    });
+
+    it("does not redirect on non-404 errors", async () => {
+      mockUseMember.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        isError: true,
+        error: new ApiError("Forbidden", 403, null),
+      });
+      render(<MemberProfileView memberId="mem-1" />);
+      await Promise.resolve();
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
+
+    it("does not redirect on 404 when embedded", async () => {
+      mockUseMember.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        isError: true,
+        error: new ApiError("Not found", 404, null),
+      });
+      render(<MemberProfileView memberId="stale-mem" embedded />);
+      await Promise.resolve();
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
   });
 
   describe("without projectId", () => {

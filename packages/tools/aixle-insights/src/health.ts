@@ -174,7 +174,7 @@ export async function buildHealthSnapshot(): Promise<HealthSnapshot> {
   }
 }
 
-/** MCP `db90_status` JSON — single source shared with CLI health. */
+/** MCP `aixle_insights_status` JSON — single source shared with CLI health. */
 export function healthSnapshotToStatusPayload(snapshot: HealthSnapshot): Record<string, unknown> {
   const proc = snapshot.process;
   const pers = snapshot.persisted;

@@ -79,7 +79,7 @@ describe("InvitationAccept", () => {
     expect(refreshOrganizations).toHaveBeenCalledWith("org-1");
 
     expect(screen.getByText(/you're connected/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/npx -y @aixle\/insights --token <YOUR_INGEST_TOKEN> --host/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/npx -y @aixle\/insights init --host .* --keycloak-url .*\/realms\//).length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText(/redirecting you to your profile/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /continue to dashboard/i })).toBeInTheDocument();
   });

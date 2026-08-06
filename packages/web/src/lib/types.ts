@@ -279,10 +279,16 @@ export interface ToolEvent {
   correlationConfidence?: number | null;
   suggestedUser?: { id: string; email: string; name: string | null; avatarUrl?: string | null } | null;
   // Detail-only fields (returned by the show endpoint, not the list endpoint)
-  sanitizedContent?: string | null;
   metadata?: Record<string, unknown> | null;
   durationMs?: number | null;
   auditLog?: AuditLog | null;
+  // Owner-only captured prompt text. Key is omitted entirely for non-owners;
+  // null when no captured text exists (capture off / not yet captured).
+  eventText?: {
+    userText: string | null;
+    assistantText: string | null;
+    sanitizedAt: string | null;
+  } | null;
 }
 
 export interface SecurityFinding {

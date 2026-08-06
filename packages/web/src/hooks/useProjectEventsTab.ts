@@ -6,6 +6,7 @@ import {
   useExportEvents,
   useCurrentUser,
 } from "@/hooks/useApi";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useEventsPageUpdates } from "@/hooks/useWebSocket";
 import { showEventsUserColumn, type SortField, type SortDirection, riskLevelOrder } from "@/lib/eventAccess";
 import { humanizeToolName, toEventRow } from "@/lib/utils";
@@ -39,7 +40,6 @@ export interface ProjectEventsTab {
   totalCount: number;
   selectedIndex: number;
   showUserCol: boolean;
-  hasClientSideFilters: boolean;
   handleFiltersChange: (f: EventFiltersState) => void;
   handleSort: (field: SortField) => void;
   handleNavigate: (direction: "prev" | "next") => void;
@@ -73,6 +73,8 @@ export function useProjectEventsTab({
   const [exportQueued, setExportQueued] = useState(false);
   const [exportError, setExportError] = useState(false);
 
+  const debouncedSearch = useDebouncedValue(filters.search ?? "", 350);
+
   const eventsParams = useMemo(
     () => ({
       page,
@@ -84,8 +86,9 @@ export function useProjectEventsTab({
       start_date: filters.dateFrom,
       end_date: filters.dateTo,
       tz: clientTimezone,
+      search: debouncedSearch || undefined,
     }),
-    [projectId, page, pageSize, filters.tools, filters.riskLevels, filters.eventTypes, filters.dateFrom, filters.dateTo]
+    [projectId, page, pageSize, filters.tools, filters.riskLevels, filters.eventTypes, filters.dateFrom, filters.dateTo, debouncedSearch]
   );
 
   const { data: eventsResponse, isLoading } = useEvents(orgId, eventsParams);
@@ -116,17 +119,7 @@ export function useProjectEventsTab({
   );
 
   const filteredAndSortedEvents = useMemo(() => {
-    let result = [...tabEvents];
-
-    // Client-side: text search only (tool/risk/type are server-side via eventsParams)
-    if (filters.search) {
-      const s = filters.search.toLowerCase();
-      result = result.filter(
-        (e) =>
-          (e.tool_name || "").toLowerCase().includes(s) ||
-          (e.project?.name || "").toLowerCase().includes(s)
-      );
-    }
+    const result = [...tabEvents];
 
     result.sort((a, b) => {
       let comparison = 0;
@@ -152,11 +145,10 @@ export function useProjectEventsTab({
     });
 
     return result;
-  }, [tabEvents, filters.search, sort, sortDir]);
+  }, [tabEvents, sort, sortDir]);
 
   const totalPages = eventsResponse?.meta?.total_pages || 1;
   const totalCount = eventsResponse?.meta?.total_count || 0;
-  const hasClientSideFilters = !!filters.search;
   const selectedIndex = selectedId
     ? filteredAndSortedEvents.findIndex((e) => e.id === selectedId)
     : -1;
@@ -205,6 +197,7 @@ export function useProjectEventsTab({
         end_date: filters.dateTo,
         project_id: projectId,
         tz: clientTimezone,
+        search: filters.search || undefined,
         filename: `aixle-insights-events-${startStr}-${endStr}.csv`,
       });
       if (result?.queued) setExportQueued(true);
@@ -233,7 +226,6 @@ export function useProjectEventsTab({
     toolFilterOptions,
     totalPages,
     totalCount,
-    hasClientSideFilters,
     selectedIndex,
     showUserCol,
     handleFiltersChange,

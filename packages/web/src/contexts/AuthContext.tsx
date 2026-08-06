@@ -17,6 +17,7 @@ import {
   silentRenew,
   isDeadSessionError,
   directLogin as authDirectLogin,
+  LOGOUT_BROADCAST_KEY,
   type User,
   type UserProfile,
 } from "../lib/auth";
@@ -125,10 +126,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     };
 
+    const handleUserSignedOut = () => {
+      // Keycloak session ended (check-session iframe / OP logout). Clear local user so
+      // this tab matches — covers same-browser logout even when storage events are missed.
+      console.log("[AuthContext] userSignedOut event, initDone:", initDoneRef.current);
+      if (!initDoneRef.current) return;
+      void manager.removeUser();
+    };
+
     manager.events.addUserLoaded(handleUserLoaded);
     manager.events.addUserUnloaded(handleUserUnloaded);
     manager.events.addAccessTokenExpired(handleAccessTokenExpired);
     manager.events.addSilentRenewError(handleSilentRenewError);
+    manager.events.addUserSignedOut(handleUserSignedOut);
+
+    // Detect logout in another tab. The OIDC user is stored in sessionStorage (per-tab),
+    // so its removal never reaches sibling tabs; logout() instead writes LOGOUT_BROADCAST_KEY
+    // to localStorage, whose write DOES fire `storage` here. Clear this tab's session to match.
+    const handleStorageChange = (e: StorageEvent) => {
+      if (!initDoneRef.current) return;
+      if (e.key === LOGOUT_BROADCAST_KEY && e.newValue !== null) {
+        // removeUser clears in-memory UserManager state and raises userUnloaded → setState.
+        void manager.removeUser();
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
 
     const initAuth = async () => {
       try {
@@ -190,6 +212,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       manager.events.removeUserUnloaded(handleUserUnloaded);
       manager.events.removeAccessTokenExpired(handleAccessTokenExpired);
       manager.events.removeSilentRenewError(handleSilentRenewError);
+      manager.events.removeUserSignedOut(handleUserSignedOut);
+      window.removeEventListener("storage", handleStorageChange);
     };
   }, []);
 

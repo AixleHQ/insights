@@ -6,6 +6,79 @@ stdio **MCP server** for AI coding-assistant telemetry. Ingests Claude Code JSON
 
 For implementation architecture, design decisions, and package direction, see [`ARD.md`](./ARD.md).
 
+## Choosing a version
+
+Two channels are published. Pick one deliberately — they are **not** interchangeable.
+
+| | Production | Staging (QA) |
+|---|---|---|
+| Install | `npm i -g @aixle/insights` | `npm i -g @aixle/insights@staging` |
+| Version looks like | `0.2.0` | `0.2.1-staging` |
+| Points at | the production API | the staging API |
+| Who should use it | **everyone** | QA validating unreleased work |
+| Stability | released, supported | may change or break without notice |
+
+### Production — use this unless told otherwise
+
+```bash
+# One-shot via npx (recommended — always pulls the current release):
+npx -y @aixle/insights init \
+  --host https://insights.example.com \
+  --keycloak-url https://YOUR-KEYCLOAK/realms/YOUR_REALM
+
+# Or global install:
+npm i -g @aixle/insights
+aixle-insights --version    # e.g. 0.2.0  (no suffix)
+```
+
+### Staging — QA only
+
+Staging builds carry a `-staging` suffix and live on the `staging` dist-tag. You must ask for
+them explicitly; a plain `npm install` will never give you one.
+
+```bash
+# One-shot via npx:
+npx -y @aixle/insights@staging init \
+  --host https://staging.insights.example.com \
+  --keycloak-url https://YOUR-STAGING-KEYCLOAK/realms/YOUR_REALM
+
+# Or global install:
+npm i -g @aixle/insights@staging
+aixle-insights --version    # e.g. 0.2.1-staging  (note the suffix)
+```
+
+Point a staging build at the **staging** API host. Sending staging telemetry to production
+pollutes production analytics.
+
+### Which one do I have?
+
+```bash
+aixle-insights --version                 # a -staging suffix means a QA build
+npm view @aixle/insights dist-tags       # what each channel currently resolves to
+```
+
+Expected output — `latest` and `staging` move independently:
+
+```
+{ latest: '0.2.0', staging: '0.2.1-staging' }
+```
+
+### Switching back to production
+
+```bash
+npm i -g @aixle/insights@latest
+```
+
+Then re-run `init` against the production host, since credentials and the MCP entry are
+per-host.
+
+> **Why `npm install` never surprises you with a staging build:** `-staging` versions are semver
+> prereleases, and no ordinary version range resolves to a prerelease. `*`, `^0.2.0`, `~0.2.0`
+> and `>=0.1.0` all select `0.2.0` even when `0.2.1-staging` exists. Staging builds are
+> reachable only by exact version or the `staging` dist-tag.
+
+Maintainers: see [`../RELEASING.md`](../RELEASING.md) for how each channel is cut.
+
 ## Install
 
 ```bash
@@ -25,7 +98,7 @@ After `init` succeeds:
 
 1. **Restart Claude Code** — it discovers the new MCP server on the next launch.
 2. Open Claude Code; confirm `/mcp` lists **aixle-insights**.
-3. During a Claude session invoke the **`db90_status`** MCP tool (or `aixle-insights health` from the shell) to see connectivity + last sync metadata.
+3. During a Claude session invoke the **`aixle_insights_status`** MCP tool (or `aixle-insights health` from the shell) to see connectivity + last sync metadata.
 
 ## Multi-org
 
@@ -123,7 +196,7 @@ aixle-insights health        # connectivity + last sync metadata
 aixle-insights verify-hooks  # JSON: hooks installed + queue depth
 ```
 
-`mcp.log` (rotates at 5 MiB to `mcp.log.1`) under the app home directory captures operational events. Inside Claude Code, the **`db90_status`** MCP tool returns the same diagnostic structure as `aixle-insights health`.
+`mcp.log` (rotates at 5 MiB to `mcp.log.1`) under the app home directory captures operational events. Inside Claude Code, the **`aixle_insights_status`** MCP tool returns the same diagnostic structure as `aixle-insights health`.
 
 ## Troubleshooting
 
@@ -184,4 +257,4 @@ npm rebuild better-sqlite3
 
 ## License
 
-MIT.
+Apache-2.0.

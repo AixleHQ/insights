@@ -1481,6 +1481,14 @@ paths:
           schema:
             type: string
             enum: [7d, 30d, 90d]
+        - name: project_id
+          in: query
+          required: false
+          description: >
+            UUID of a specific project, or "none" to filter for events with no project assigned.
+            Omit or leave blank for all projects (member-wide total).
+          schema:
+            type: string
       responses:
         '200':
           description: Dashboard stats for the period
@@ -1551,6 +1559,14 @@ paths:
           schema:
             type: string
             enum: [7d, 30d, 90d]
+        - name: project_id
+          in: query
+          required: false
+          description: >
+            UUID of a specific project, or "none" to filter for events with no project assigned.
+            Omit or leave blank for all projects (member-wide total).
+          schema:
+            type: string
       responses:
         '200':
           description: Prompt insights for the period
@@ -1615,6 +1631,14 @@ paths:
           schema:
             type: string
         - $ref: '#/components/parameters/tz'
+        - name: project_id
+          in: query
+          required: false
+          description: >
+            UUID of a specific project, or "none" to filter for events with no project assigned.
+            Omit or leave blank for all projects (member-wide total).
+          schema:
+            type: string
       responses:
         '200':
           description: Daily event counts for heatmap
@@ -4967,6 +4991,11 @@ paths:
           in: query
           schema:
             type: string
+        - name: search
+          in: query
+          description: Case-insensitive substring search across tool name and project name.
+          schema:
+            type: string
         - name: sort_by
           in: query
           description: |
@@ -5137,6 +5166,11 @@ paths:
             format: float
             minimum: 0
             maximum: 1
+        - name: search
+          in: query
+          description: Case-insensitive substring search across tool name and project name.
+          schema:
+            type: string
       responses:
         '200':
           description: Paginated list of unattributed events
@@ -5356,6 +5390,11 @@ paths:
             format: uuid
         - name: model
           in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          description: Case-insensitive substring search across tool name and project name.
           schema:
             type: string
         - name: sort_by
@@ -8373,6 +8412,24 @@ components:
             auditLog:
               nullable: true
               $ref: '#/components/schemas/AuditLog'
+            eventText:
+              type: object
+              nullable: true
+              description: >-
+                Sanitized captured prompt/assistant text. Owner-only: present only when
+                the requester is an organization owner (or global admin). The field is
+                omitted entirely for members; null when no captured text exists.
+              properties:
+                userText:
+                  type: string
+                  nullable: true
+                assistantText:
+                  type: string
+                  nullable: true
+                sanitizedAt:
+                  type: string
+                  format: date-time
+                  nullable: true
 
     AuditLog:
       type: object

@@ -2,10 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Copy, Loader2, RefreshCw } from "lucide-react";
 import { useOrg } from "@/contexts/OrgContext";
 import { useMyToolAccounts, useMcpIngestExchange } from "@/hooks/useApi";
-import {
-  buildDb90ClaudeIngestExampleCommand,
-  buildDb90CursorIngestExampleCommand,
-} from "@/lib/db90-cli";
+import { buildAixleInsightsInitCommand } from "@/lib/aixle-cli";
 import { formatDateTime } from "@/lib/formatters";
 import type { McpIngestExchangeData } from "@/lib/types";
 import { ToolAccounts } from "./ToolAccounts";
@@ -59,8 +56,7 @@ export function SettingsToolsSection() {
     return [...ingestRows].sort((a, b) => a.displayName.localeCompare(b.displayName));
   }, [ingestRows]);
 
-  const claudeExampleCommand = useMemo(() => buildDb90ClaudeIngestExampleCommand(), []);
-  const cursorExampleCommand = useMemo(() => buildDb90CursorIngestExampleCommand(), []);
+  const initCommand = useMemo(() => buildAixleInsightsInitCommand(), []);
 
   async function handleCopy(text: string, flashKey: string) {
     try {
@@ -142,44 +138,22 @@ export function SettingsToolsSection() {
           ) : sortedRows.length === 0 ? (
             <div className="space-y-4 rounded-lg border border-dashed bg-muted/30 p-6">
               <p className="text-sm text-muted-foreground">
-                No ingest-linked tools yet. Create an ingest token from Integrations, or run a
-                standalone CLI after replacing{" "}
-                <code className="rounded bg-muted px-1 py-0.5 text-xs">&lt;YOUR_INGEST_TOKEN&gt;</code>{" "}
-                with your token. Prefer{" "}
-                <code className="rounded bg-muted px-1 py-0.5 text-xs">npx -y @aixle/insights init</code>{" "}
-                when you want MCP setup without pasting a token.
+                No ingest-linked tools yet. Run this on the machine where you use Claude Code or
+                Cursor — a one-time Keycloak device login connects both, no ingest token needed.
               </p>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground">Claude Code (standalone CLI)</p>
-                  <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs whitespace-pre-wrap break-all">
-                    {claudeExampleCommand}
-                  </pre>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void handleCopy(claudeExampleCommand, "empty-cmd-claude")}
-                  >
-                    <Copy className="mr-2 size-4" />
-                    {copyFlash === "empty-cmd-claude" ? "Copied" : "Copy command"}
-                  </Button>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground">Cursor (standalone CLI)</p>
-                  <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs whitespace-pre-wrap break-all">
-                    {cursorExampleCommand}
-                  </pre>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void handleCopy(cursorExampleCommand, "empty-cmd-cursor")}
-                  >
-                    <Copy className="mr-2 size-4" />
-                    {copyFlash === "empty-cmd-cursor" ? "Copied" : "Copy command"}
-                  </Button>
-                </div>
+              <div className="space-y-2">
+                <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs whitespace-pre-wrap break-all">
+                  {initCommand}
+                </pre>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void handleCopy(initCommand, "empty-cmd-init")}
+                >
+                  <Copy className="mr-2 size-4" />
+                  {copyFlash === "empty-cmd-init" ? "Copied" : "Copy command"}
+                </Button>
               </div>
             </div>
           ) : (

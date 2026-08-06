@@ -1,4 +1,5 @@
 require "temporalio/workflow"
+require_relative "../activities/persist_prompt_activity"
 
 module Workflows
   class IngestionSanitizationWorkflow < Temporalio::Workflow::Definition
@@ -110,6 +111,29 @@ module Workflows
           max_attempts: 5
         )
       )
+
+      # Step 5b: Persist sanitized prompt text (capture path only, non-blocking on failure)
+      # Use canonical occurred_at from the persisted tool_event to keep idempotency across replay paths.
+      @current_state = "persisting_prompt"
+      begin
+        Temporalio::Workflow.execute_activity(
+          Activities::PersistPromptActivity,
+          {
+            "tool_event_id" => persistence_result["tool_event_id"],
+            "occurred_at"   => persistence_result["occurred_at"],
+            "sanitization"  => @sanitization_result,
+            "policy"        => policy
+          },
+          start_to_close_timeout: 15,
+          retry_policy: Temporalio::RetryPolicy.new(
+            initial_interval: 1.0,
+            backoff_coefficient: 2.0,
+            max_attempts: 3
+          )
+        )
+      rescue StandardError
+        # Prompt capture must never fail the already-persisted event path.
+      end
 
       # Step 6: Broadcast to ActionCable (non-blocking)
       @current_state = "broadcasting"

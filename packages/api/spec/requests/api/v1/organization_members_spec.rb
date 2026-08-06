@@ -625,6 +625,56 @@ RSpec.describe 'Api::V1::OrganizationMembers', type: :request do
       expect(json_response[:total_events]).to eq(0)
     end
 
+    it 'scopes stats to a project when project_id is given' do
+      project = create(:project, organization: organization)
+      create(:tool_event,
+             organization: organization,
+             user: member,
+             project: project,
+             tool_name: 'claude_code',
+             occurred_at: 5.days.ago)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/dashboard_stats",
+                        user: owner,
+                        organization: organization,
+                        params: { project_id: project.id }
+
+      expect_success
+      # Only the project-scoped event falls in the default 30d window.
+      expect(json_response[:total_events]).to eq(1)
+    end
+
+    it 'scopes stats to unattributed events when project_id=none' do
+      project = create(:project, organization: organization)
+      create(:tool_event,
+             organization: organization,
+             user: member,
+             project: project,
+             tool_name: 'claude_code',
+             occurred_at: 5.days.ago)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/dashboard_stats",
+                        user: owner,
+                        organization: organization,
+                        params: { project_id: 'none' }
+
+      expect_success
+      # The two before-block events have no project; the project-scoped one is excluded.
+      expect(json_response[:total_events]).to eq(2)
+    end
+
+    it 'returns 404 for a project_id from another org' do
+      other_org = create(:organization)
+      other_project = create(:project, organization: other_org)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/dashboard_stats",
+                        user: owner,
+                        organization: organization,
+                        params: { project_id: other_project.id }
+
+      expect(response).to have_http_status(:not_found)
+    end
+
     it 'resolves membership by user.id in path' do
       authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member.id}/dashboard_stats",
                         user: owner,
@@ -693,6 +743,57 @@ RSpec.describe 'Api::V1::OrganizationMembers', type: :request do
       # Two events on same day should sum to count 2
       ten_days_ago = json_response.find { |r| r[:count] == 2 }
       expect(ten_days_ago).not_to be_nil
+    end
+
+    it 'scopes the heatmap to a project when project_id is given' do
+      project = create(:project, organization: organization)
+      create(:tool_event,
+             organization: organization,
+             user: member,
+             project: project,
+             tool_name: 'claude_code',
+             occurred_at: 3.days.ago)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/stats/heatmap",
+                        user: owner,
+                        organization: organization,
+                        params: { project_id: project.id }
+
+      expect_success
+      total = json_response.sum { |r| r[:count] }
+      expect(total).to eq(1)
+    end
+
+    it 'scopes the heatmap to unattributed events when project_id is "none"' do
+      project = create(:project, organization: organization)
+      create(:tool_event,
+             organization: organization,
+             user: member,
+             project: project,
+             tool_name: 'claude_code',
+             occurred_at: 3.days.ago)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/stats/heatmap",
+                        user: owner,
+                        organization: organization,
+                        params: { project_id: 'none' }
+
+      expect_success
+      # The three before-block events have no project; the project-scoped one is excluded.
+      total = json_response.sum { |r| r[:count] }
+      expect(total).to eq(3)
+    end
+
+    it 'returns 404 for a project_id from another org' do
+      other_org = create(:organization)
+      other_project = create(:project, organization: other_org)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/stats/heatmap",
+                        user: owner,
+                        organization: organization,
+                        params: { project_id: other_project.id }
+
+      expect(response).to have_http_status(:not_found)
     end
 
     it 'resolves membership by user.id in path' do
@@ -791,6 +892,78 @@ RSpec.describe 'Api::V1::OrganizationMembers', type: :request do
       expect(json_response[:score]).to eq(0)
       expect(json_response[:dimensions]).to eq({ structure: 0, context: 0, specificity: 0 })
       expect(json_response[:callouts]).to eq([])
+    end
+
+    it 'scopes insights to a project when project_id is given' do
+      project = create(:project, organization: organization)
+      create(:tool_event,
+             organization: organization,
+             user: member,
+             project: project,
+             tool_name: 'claude_code',
+             event_type: 'chat',
+             tokens_in: 5000,
+             tokens_out: 100,
+             occurred_at: 5.days.ago)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/prompt_insights",
+                        user: owner,
+                        organization: organization,
+                        params: { project_id: project.id }
+
+      # Unattributed before-block events are excluded; the project event yields insights.
+      expect_success
+      expect(json_response[:callouts].length).to eq(3)
+      expect(json_response[:score]).to be > 0
+    end
+
+    it 'returns empty insights when project_id has no matching events' do
+      project = create(:project, organization: organization)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/prompt_insights",
+                        user: owner,
+                        organization: organization,
+                        params: { project_id: project.id }
+
+      # Before-block events are unattributed, so this project scope is empty.
+      expect_success
+      expect(json_response[:score]).to eq(0)
+      expect(json_response[:callouts]).to eq([])
+    end
+
+    it 'scopes insights to unattributed events when project_id=none' do
+      project = create(:project, organization: organization)
+      create(:tool_event,
+             organization: organization,
+             user: member,
+             project: project,
+             tool_name: 'claude_code',
+             event_type: 'chat',
+             tokens_in: 5000,
+             tokens_out: 100,
+             occurred_at: 5.days.ago)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/prompt_insights",
+                        user: owner,
+                        organization: organization,
+                        params: { project_id: 'none' }
+
+      # The project-scoped event is excluded, so the score reflects only the
+      # three unattributed before-block events (non-empty callouts).
+      expect_success
+      expect(json_response[:callouts].length).to eq(3)
+    end
+
+    it 'returns 404 for a project_id from another org' do
+      other_org = create(:organization)
+      other_project = create(:project, organization: other_org)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/prompt_insights",
+                        user: owner,
+                        organization: organization,
+                        params: { project_id: other_project.id }
+
+      expect(response).to have_http_status(:not_found)
     end
 
     it 'allows member to view their own prompt insights' do

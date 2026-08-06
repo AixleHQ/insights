@@ -96,12 +96,12 @@ export const queryKeys = {
     events: (orgId: string, id: string) => ["organizations", orgId, "members", id, "events"] as const,
     stats: (orgId: string, id: string, range?: string) =>
       ["organizations", orgId, "members", id, "stats", range ?? "30d"] as const,
-    dashboardStats: (orgId: string, userId: string, period: string) =>
-      ["organizations", orgId, "members", userId, "dashboard_stats", period] as const,
-    heatmap: (orgId: string, userId: string) =>
-      ["organizations", orgId, "members", userId, "heatmap", clientTimezone] as const,
-    promptInsights: (orgId: string, userId: string, period: string) =>
-      ["organizations", orgId, "members", userId, "prompt_insights", period] as const,
+    dashboardStats: (orgId: string, userId: string, period: string, projectId?: string) =>
+      ["organizations", orgId, "members", userId, "dashboard_stats", period, projectId ?? "all"] as const,
+    heatmap: (orgId: string, userId: string, projectId?: string) =>
+      ["organizations", orgId, "members", userId, "heatmap", clientTimezone, projectId ?? "all"] as const,
+    promptInsights: (orgId: string, userId: string, period: string, projectId?: string) =>
+      ["organizations", orgId, "members", userId, "prompt_insights", period, projectId ?? "all"] as const,
     removalPreview: (orgId: string, id: string) =>
       ["organizations", orgId, "members", id, "removal_preview"] as const,
   },
@@ -716,12 +716,14 @@ export interface MemberHeatmapEntry {
   count: number;
 }
 
-export function useMemberDashboardStats(orgId: string, userId: string, period = "30d") {
+export function useMemberDashboardStats(orgId: string, userId: string, period = "30d", projectId?: string) {
   return useQuery({
-    queryKey: queryKeys.members.dashboardStats(orgId, userId, period),
+    queryKey: queryKeys.members.dashboardStats(orgId, userId, period, projectId),
     queryFn: async () => {
+      const params = new URLSearchParams({ period });
+      if (projectId) params.set("project_id", projectId);
       const response = await api.get<MemberDashboardStats>(
-        appendTz(`/organizations/${orgId}/members/${userId}/dashboard_stats?period=${period}`)
+        appendTz(`/organizations/${orgId}/members/${userId}/dashboard_stats?${params}`)
       );
       return response;
     },
@@ -730,12 +732,15 @@ export function useMemberDashboardStats(orgId: string, userId: string, period = 
   });
 }
 
-export function useMemberHeatmap(orgId: string, userId: string) {
+export function useMemberHeatmap(orgId: string, userId: string, projectId?: string) {
   return useQuery({
-    queryKey: queryKeys.members.heatmap(orgId, userId),
+    queryKey: queryKeys.members.heatmap(orgId, userId, projectId),
     queryFn: async () => {
+      const params = new URLSearchParams();
+      if (projectId) params.set("project_id", projectId);
+      const qs = params.toString();
       const response = await api.get<MemberHeatmapEntry[]>(
-        appendTz(`/organizations/${orgId}/members/${userId}/stats/heatmap`)
+        appendTz(`/organizations/${orgId}/members/${userId}/stats/heatmap${qs ? `?${qs}` : ""}`)
       );
       return response;
     },
@@ -760,12 +765,14 @@ export interface PromptInsights {
   callouts: PromptInsightsCallout[];
 }
 
-export function usePromptInsights(orgId: string, userId: string, period = "30d") {
+export function usePromptInsights(orgId: string, userId: string, period = "30d", projectId?: string) {
   return useQuery({
-    queryKey: queryKeys.members.promptInsights(orgId, userId, period),
+    queryKey: queryKeys.members.promptInsights(orgId, userId, period, projectId),
     queryFn: async () => {
+      const params = new URLSearchParams({ period });
+      if (projectId) params.set("project_id", projectId);
       const response = await api.get<PromptInsights>(
-        appendTz(`/organizations/${orgId}/members/${userId}/prompt_insights?period=${period}`)
+        appendTz(`/organizations/${orgId}/members/${userId}/prompt_insights?${params}`)
       );
       return response;
     },
@@ -1708,6 +1715,7 @@ export interface EventsParams {
   project_id?: string | string[];
   sort_by?: EventSortBy;
   direction?: EventSortDirection;
+  search?: string;
 }
 
 /** Serializes query values; arrays become comma-separated. */

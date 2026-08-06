@@ -12,6 +12,9 @@ import {
   ToolInsightsSection,
   WeeklyToolUsageChart,
   RiskAlertsTable,
+  ProjectFilterDropdown,
+  MemberPeriodSelect,
+  type MemberPeriod,
   type DailyCostData,
   type ActivityEvent,
   type ToolUsageData,
@@ -37,38 +40,6 @@ import { AppRoutes } from "@/lib/routes";
 // Active Members intentionally uses a fixed rolling window, not the month filter,
 // so the number stays stable while users explore historical months.
 const ACTIVE_USERS_WINDOW_DAYS = 7;
-
-function ProjectFilterDropdown({
-  orgId,
-  value,
-  onChange,
-}: {
-  orgId: string;
-  value: string | undefined;
-  onChange: (v: string | undefined) => void;
-}) {
-  const { data: projects } = useProjects(orgId);
-
-  return (
-    <Select
-      value={value ?? "all"}
-      onValueChange={(v) => onChange(v === "all" ? undefined : v)}
-    >
-      <SelectTrigger className="w-48">
-        <SelectValue placeholder="All Activity" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="all">All Activity</SelectItem>
-        <SelectItem value="none">No Project</SelectItem>
-        {projects?.map((p) => (
-          <SelectItem key={p.id} value={p.id}>
-            {p.name}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
 
 function PeriodSelector({
   value,
@@ -115,6 +86,10 @@ export function OrgDashboard() {
     type: "month",
     value: currentMonth(),
   });
+  // Personal tab keeps its own scope (rolling-day windows) but its filter bar is
+  // rendered from this shared header so the chrome matches the Team tab (AIX-607).
+  const [personalPeriod, setPersonalPeriod] = useState<MemberPeriod>("30d");
+  const [personalProjectId, setPersonalProjectId] = useState<string | undefined>();
 
   const orgId = currentOrg?.id || "";
   const isAllTime = selectedPeriod.type === "all_time";
@@ -131,6 +106,7 @@ export function OrgDashboard() {
   if (orgId !== prevOrgId) {
     setPrevOrgId(orgId);
     setSelectedProjectId(undefined);
+    setPersonalProjectId(undefined);
   }
 
   const { data: projects } = useProjects(orgId);
@@ -245,7 +221,7 @@ export function OrgDashboard() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {activeTab === "team" && (
+          {activeTab === "team" ? (
             <>
               <ProjectFilterDropdown
                 orgId={orgId}
@@ -253,6 +229,15 @@ export function OrgDashboard() {
                 onChange={setSelectedProjectId}
               />
               <PeriodSelector value={selectedPeriod} onChange={setSelectedPeriod} />
+            </>
+          ) : (
+            <>
+              <ProjectFilterDropdown
+                orgId={orgId}
+                value={personalProjectId}
+                onChange={setPersonalProjectId}
+              />
+              <MemberPeriodSelect value={personalPeriod} onChange={setPersonalPeriod} />
             </>
           )}
           <TabNav
@@ -268,7 +253,7 @@ export function OrgDashboard() {
       </div>
 
       {activeTab === "personal" ? (
-        <MemberDashboard hideHeader />
+        <MemberDashboard hideHeader period={personalPeriod} projectId={personalProjectId} />
       ) : selectedProjectId &&
         !isLoadingStats &&
         !stats?.total_events ? (

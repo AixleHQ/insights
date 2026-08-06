@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   Mail,
@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useOrg } from "@/contexts/OrgContext";
 import { useMember, useMemberEvents, useMemberHeatmap, useMemberStats, useProject, useEvents, type MemberStatsRange } from "@/hooks/useApi";
+import { ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -147,6 +148,7 @@ export interface MemberProfileViewProps {
 
 export function MemberProfileView({ memberId, embedded = false, projectId }: MemberProfileViewProps) {
   const { currentOrg } = useOrg();
+  const navigate = useNavigate();
 
   // Time-range for headline stats, breakdowns, and the activity heatmap.
   const [range, setRange] = useState<MemberStatsRange>("30d");
@@ -175,7 +177,27 @@ export function MemberProfileView({ memberId, embedded = false, projectId }: Mem
     setDrawerOpen(true);
   }, []);
 
-  const { data: member, isLoading: memberLoading } = useMember(currentOrg?.id || "", memberId);
+  const {
+    data: member,
+    isLoading: memberLoading,
+    isError: memberError,
+    error: memberQueryError,
+  } = useMember(currentOrg?.id || "", memberId);
+
+  // Org switch can leave a stale member id that 404s in the new org — send the user
+  // to the members list. Keep other errors (network / 403 / 5xx) on the page.
+  // Skip when embedded (e.g. User Settings) so a transient 404 doesn't yank navigation.
+  useEffect(() => {
+    if (
+      !embedded &&
+      !memberLoading &&
+      memberError &&
+      memberQueryError instanceof ApiError &&
+      memberQueryError.status === 404
+    ) {
+      navigate(AppRoutes.members.root, { replace: true });
+    }
+  }, [embedded, memberLoading, memberError, memberQueryError, navigate]);
   const { data: statsData } = useMemberStats(currentOrg?.id || "", memberId, range);
   const { data: heatmapData } = useMemberHeatmap(currentOrg?.id || "", memberId);
   const { data: eventsResponse, isLoading: eventsLoading } = useMemberEvents(

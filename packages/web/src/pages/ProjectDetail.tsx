@@ -589,9 +589,7 @@ export function ProjectDetail() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
               <p>
-                {eventsTab.hasClientSideFilters
-                  ? `Showing ${eventsTab.filteredAndSortedEvents.length} filtered events`
-                  : `Showing ${eventsTab.filteredAndSortedEvents.length} of ${eventsTab.totalCount} events`}
+                {`Showing ${eventsTab.filteredAndSortedEvents.length} of ${eventsTab.totalCount} events`}
               </p>
               <Select
                 value={String(eventsTab.pageSize)}

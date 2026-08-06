@@ -119,6 +119,26 @@ RSpec.describe Activities::ClassificationActivity, type: :unit do
       expect(result["detections"]).to eq([])
       expect(result["detection_summary"]).to eq("No sensitive data detected")
     end
+
+    it "refreshes detection_summary when server-side text scan finds secrets the client missed" do
+      params = {
+        "raw_payload" => JSON.generate({
+          "metadata" => {
+            "scannable"       => true,
+            "risk_level"      => "low",
+            "risk_categories" => [],
+            "risk_score"      => 0,
+            "prompt_text"     => "here is my api_key = abcdefghijklmnopqrstuvwxyz123456"
+          }
+        }),
+        "policy" => default_policy
+      }
+
+      result = activity.execute(params)
+
+      expect(result["requires_sanitization"]).to be true
+      expect(result["detection_summary"]).to eq("1 secrets detection(s)")
+    end
   end
 
   describe "Path 3: standard server-side scan (web events)" do
@@ -185,7 +205,7 @@ RSpec.describe Activities::ClassificationActivity, type: :unit do
       )
     end
 
-    it "benign natural-language text scores low (live false-positive case)" do
+    it "benign Russian text scores low (live false-positive case)" do
       result = classify("Help me resolve the conflict")
       expect(result["risk_level"]).to eq("low")
       expect(result["detections"]).to be_empty

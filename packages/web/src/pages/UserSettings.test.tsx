@@ -302,7 +302,7 @@ describe("UserSettings", () => {
 
       expect(screen.getByText(/ingest tokens/i)).toBeInTheDocument();
       expect(screen.getByText(/no ingest-linked tools yet/i)).toBeInTheDocument();
-      expect(screen.getAllByText(/npx -y @aixle\/insights --token <YOUR_INGEST_TOKEN> --host/).length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText(/npx -y @aixle\/insights init --host .* --keycloak-url .*\/realms\//).length).toBeGreaterThanOrEqual(1);
       expect(screen.getByRole("tab", { name: /available/i })).toBeInTheDocument();
     });
 

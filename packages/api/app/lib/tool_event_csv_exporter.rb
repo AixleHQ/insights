@@ -17,7 +17,7 @@ module ToolEventCsvExporter
   GLOBAL_ADMIN_HEADERS = (ORG_ADMIN_HEADERS + %w[model session_id]).freeze
 
   SUMMARY_PARAM_KEYS = %w[
-    tool_name event_type user_id project_id model start_date end_date risk_level
+    tool_name event_type user_id project_id model start_date end_date risk_level search
   ].freeze
 
   # Builds rows for the CSV preamble: title "Applied filters", then one row per active filter.
@@ -34,6 +34,7 @@ module ToolEventCsvExporter
     lines << "From: #{fp['start_date']}"                      if fp["start_date"].present?
     lines << "To: #{fp['end_date']}"                          if fp["end_date"].present?
     lines << "Risk level: #{fp['risk_level']}"                if fp["risk_level"].present?
+    lines << "Search: #{fp['search']}"                        if fp["search"].present?
 
     if fp["user_id"].present?
       email = User.find_by(id: fp["user_id"])&.email

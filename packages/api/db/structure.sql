@@ -26,7 +26,7 @@ COMMENT ON EXTENSION timescaledb IS 'Enables scalable inserts and complex querie
 -- Name: timeseries; Type: SCHEMA; Schema: -; Owner: -
 --
 
-CREATE SCHEMA IF NOT EXISTS timeseries;
+CREATE SCHEMA timeseries;
 
 --
 -- Name: pgcrypto; Type: EXTENSION; Schema: -; Owner: -
@@ -210,10 +210,10 @@ CREATE TABLE _timescaledb_internal._compressed_hypertable_2 (
 );
 
 --
--- Name: _compressed_hypertable_4; Type: TABLE; Schema: _timescaledb_internal; Owner: -
+-- Name: _compressed_hypertable_8; Type: TABLE; Schema: _timescaledb_internal; Owner: -
 --
 
-CREATE TABLE _timescaledb_internal._compressed_hypertable_4 (
+CREATE TABLE _timescaledb_internal._compressed_hypertable_8 (
 );
 
 --
@@ -276,7 +276,6 @@ CREATE VIEW _timescaledb_internal._direct_view_4 AS
     sum(cost_usd) AS total_cost
    FROM timeseries.tool_events
   GROUP BY (public.time_bucket('1 day'::interval, occurred_at)), organization_id, user_id, project_id, tool_name, event_type;
-
 --
 -- Name: _materialized_hypertable_3; Type: TABLE; Schema: _timescaledb_internal; Owner: -
 --
@@ -294,7 +293,6 @@ CREATE TABLE _timescaledb_internal._materialized_hypertable_3 (
     total_tokens bigint,
     total_cost numeric
 );
-
 --
 -- Name: _materialized_hypertable_4; Type: TABLE; Schema: _timescaledb_internal; Owner: -
 --
@@ -312,7 +310,6 @@ CREATE TABLE _timescaledb_internal._materialized_hypertable_4 (
     total_tokens bigint,
     total_cost numeric
 );
-
 --
 -- Name: _partial_view_3; Type: VIEW; Schema: _timescaledb_internal; Owner: -
 --
@@ -350,7 +347,6 @@ CREATE VIEW _timescaledb_internal._partial_view_4 AS
     sum(cost_usd) AS total_cost
    FROM timeseries.tool_events
   GROUP BY (public.time_bucket('1 day'::interval, occurred_at)), organization_id, user_id, project_id, tool_name, event_type;
-
 --
 -- Name: active_storage_attachments; Type: TABLE; Schema: public; Owner: -
 --
@@ -570,7 +566,7 @@ CREATE TABLE public.connector_health_snapshots (
     snapshotted_at timestamp(6) without time zone NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT connector_health_snapshots_status_check CHECK (((status)::text = ANY (ARRAY[('success'::character varying)::text, ('failure'::character varying)::text])))
+    CONSTRAINT connector_health_snapshots_status_check CHECK (((status)::text = ANY ((ARRAY['success'::character varying, 'failure'::character varying])::text[])))
 );
 
 --
@@ -1186,7 +1182,6 @@ CREATE VIEW timeseries.hourly_token_usage AS
     total_tokens,
     total_cost
    FROM _timescaledb_internal._materialized_hypertable_3;
-
 --
 -- Name: active_storage_attachments id; Type: DEFAULT; Schema: public; Owner: -
 --
@@ -1222,7 +1217,6 @@ ALTER TABLE ONLY public.connector_event_dedup ALTER COLUMN id SET DEFAULT nextva
 --
 
 ALTER TABLE ONLY public.retention_purge_logs ALTER COLUMN id SET DEFAULT nextval('public.retention_purge_logs_id_seq'::regclass);
-
 --
 -- Name: active_storage_attachments active_storage_attachments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
@@ -1509,7 +1503,6 @@ ALTER TABLE ONLY timeseries.event_texts
 
 ALTER TABLE ONLY timeseries.tool_events
     ADD CONSTRAINT tool_events_pkey PRIMARY KEY (id, occurred_at);
-
 --
 -- Name: _materialized_hypertable_3_bucket_idx; Type: INDEX; Schema: _timescaledb_internal; Owner: -
 --
@@ -1581,7 +1574,6 @@ CREATE INDEX _materialized_hypertable_4_tool_name_bucket_idx ON _timescaledb_int
 --
 
 CREATE INDEX _materialized_hypertable_4_user_id_bucket_idx ON _timescaledb_internal._materialized_hypertable_4 USING btree (user_id, bucket DESC);
-
 --
 -- Name: idx_connector_event_dedup_event_id; Type: INDEX; Schema: public; Owner: -
 --
@@ -2391,7 +2383,6 @@ CREATE INDEX tool_events_occurred_at_idx ON timeseries.tool_events USING btree (
 --
 
 CREATE TRIGGER retention_purge_logs_append_only BEFORE DELETE OR UPDATE ON public.retention_purge_logs FOR EACH ROW EXECUTE FUNCTION public.prevent_retention_purge_log_mutation();
-
 --
 -- Name: project_memberships fk_project_memberships_created_by_id; Type: FK CONSTRAINT; Schema: public; Owner: -
 --

@@ -8,35 +8,58 @@ import {
   TopToolsChart,
   ActivityHeatmap,
   PromptInsightsSection,
+  ProjectFilterDropdown,
+  MemberPeriodSelect,
+  MEMBER_PERIOD_LABELS,
+  type MemberPeriod,
   type ToolUsageData,
 } from "@/components/dashboard";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatCardSkeleton } from "@/components/ui/skeletons";
 import { humanizeToolName } from "@/lib/utils";
 import { formatTokens, formatPercent, formatCount } from "@/lib/formatters";
 import { SHOW_PROMPT_INSIGHTS_SECTION_IN_PERSONAL_DASHBOARD } from "@/lib/featureFlags";
 
-const PERIODS = ["7d", "30d", "90d"] as const;
-type Period = (typeof PERIODS)[number];
-
-const PERIOD_LABELS: Record<Period, string> = {
-  "7d": "7 days",
-  "30d": "30 days",
-  "90d": "90 days",
-};
-
-export function MemberDashboard({ hideHeader = false }: { hideHeader?: boolean }) {
+export function MemberDashboard({
+  hideHeader = false,
+  period: periodProp,
+  projectId,
+}: {
+  hideHeader?: boolean;
+  period?: MemberPeriod;
+  projectId?: string;
+}) {
   const { currentOrg } = useOrg();
   const { data: currentUser, isLoading: isLoadingUser } = useCurrentUser();
 
   const orgId = currentOrg?.id ?? "";
   const userId = currentUser?.id ?? "";
 
-  const [period, setPeriod] = useState<Period>("30d");
+  // Controlled by OrgDashboard's header when embedded; self-managed standalone.
+  const [internalPeriod, setInternalPeriod] = useState<MemberPeriod>("30d");
+  const period = periodProp ?? internalPeriod;
+  const [internalProjectId, setInternalProjectId] = useState<string | undefined>();
 
-  const { data: stats, isLoading: isLoadingStats } = useMemberDashboardStats(orgId, userId, period);
-  const { data: heatmapData } = useMemberHeatmap(orgId, userId);
+  // Reset the standalone project filter when the org changes — a project UUID from
+  // the previous org would otherwise be sent under the new org and 404. Embedded mode
+  // is handled by the parent (OrgDashboard), which owns the scope there.
+  const [prevOrgId, setPrevOrgId] = useState(orgId);
+  if (orgId !== prevOrgId) {
+    setPrevOrgId(orgId);
+    if (!hideHeader) setInternalProjectId(undefined);
+  }
+
+  // When hideHeader, parent owns project scope (even when the value is undefined =
+  // "All Projects"). Standalone mode manages its own project filter state.
+  const resolvedProjectId = hideHeader ? projectId : internalProjectId;
+
+  const { data: stats, isLoading: isLoadingStats } = useMemberDashboardStats(
+    orgId,
+    userId,
+    period,
+    resolvedProjectId,
+  );
+  const { data: heatmapData } = useMemberHeatmap(orgId, userId, resolvedProjectId);
 
   if (!currentUser && isLoadingUser) {
     return <Skeleton className="h-96 w-full" />;
@@ -54,32 +77,27 @@ export function MemberDashboard({ hideHeader = false }: { hideHeader?: boolean }
 
   const totalTokens = (stats?.total_tokens_in ?? 0) + (stats?.total_tokens_out ?? 0);
 
-  const periodButtons = (
-    <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
-      <TabsList>
-        {PERIODS.map((p) => (
-          <TabsTrigger key={p} value={p}>
-            {PERIOD_LABELS[p]}
-          </TabsTrigger>
-        ))}
-      </TabsList>
-    </Tabs>
-  );
-
   return (
     <div className="space-y-6">
-      {!hideHeader ? (
-        <div className="flex items-start justify-between">
+      {/* When embedded (hideHeader), OrgDashboard's header owns the filter bar so
+          the project/period controls sit in the same place as the Team tab. */}
+      {!hideHeader && (
+        <div className="flex items-center justify-between">
           <div>
             <h1 className="type-h2">My Dashboard</h1>
             <p className="text-sm text-muted-foreground">
               Your personal AI tool usage for {currentOrg?.name || "your organization"}
             </p>
           </div>
-          {periodButtons}
+          <div className="flex items-center gap-3">
+            <ProjectFilterDropdown
+              orgId={orgId}
+              value={internalProjectId}
+              onChange={setInternalProjectId}
+            />
+            <MemberPeriodSelect value={period} onChange={setInternalPeriod} />
+          </div>
         </div>
-      ) : (
-        <div className="flex justify-end">{periodButtons}</div>
       )}
 
       <MetricGrid className="lg:grid-cols-4 xl:grid-cols-4">
@@ -109,7 +127,7 @@ export function MemberDashboard({ hideHeader = false }: { hideHeader?: boolean }
                   ? formatPercent(Math.abs(stats.events_change_percent))
                   : undefined
               }
-              description={`Last ${PERIOD_LABELS[period]}`}
+              description={`Last ${MEMBER_PERIOD_LABELS[period]}`}
             />
             <MetricCard
               title="Total Cost"
@@ -128,7 +146,7 @@ export function MemberDashboard({ hideHeader = false }: { hideHeader?: boolean }
                   ? formatPercent(Math.abs(stats.cost_change_percent))
                   : undefined
               }
-              description={`Last ${PERIOD_LABELS[period]}`}
+              description={`Last ${MEMBER_PERIOD_LABELS[period]}`}
             />
             <MetricCard
               title="Total Tokens"
@@ -165,7 +183,7 @@ export function MemberDashboard({ hideHeader = false }: { hideHeader?: boolean }
 
       {SHOW_PROMPT_INSIGHTS_SECTION_IN_PERSONAL_DASHBOARD ? (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <PromptInsightsSection orgId={orgId} userId={userId} period={period} />
+          <PromptInsightsSection orgId={orgId} userId={userId} period={period} projectId={resolvedProjectId} />
           <TopToolsChart data={toolUsage} isLoading={isLoadingStats} />
         </div>
       ) : (

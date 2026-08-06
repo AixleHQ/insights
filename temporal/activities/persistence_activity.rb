@@ -34,6 +34,7 @@ module Activities
 
       {
         "tool_event_id" => tool_event["id"],
+        "occurred_at" => tool_event["occurred_at"],
         "audit_log_id" => audit_log["id"],
         "persisted_at" => Time.now.utc.iso8601
       }

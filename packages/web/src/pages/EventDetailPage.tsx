@@ -23,6 +23,8 @@ export function EventDetailPage() {
       model: apiEvent.model,
       risk_level: apiEvent.riskLevel,
       cost_usd: apiEvent.costUsd,
+      input_tokens: apiEvent.inputTokens ?? undefined,
+      output_tokens: apiEvent.outputTokens ?? undefined,
       token_count:
         apiEvent.tokensTotal ??
         (apiEvent.inputTokens || 0) + (apiEvent.outputTokens || 0),
@@ -40,16 +42,20 @@ export function EventDetailPage() {
             name: apiEvent.project.name,
           }
         : undefined,
-      sanitized_content: apiEvent.sanitizedContent || undefined,
+      // eventText is owner-only (key absent for members) and may be null when no
+      // captured text exists. Preserve the distinction: undefined => non-owner gate,
+      // null => owner but capture off / no row.
+      event_text:
+        apiEvent.eventText === undefined
+          ? undefined
+          : apiEvent.eventText
+            ? {
+                user_text: apiEvent.eventText.userText,
+                assistant_text: apiEvent.eventText.assistantText,
+                sanitized_at: apiEvent.eventText.sanitizedAt,
+              }
+            : null,
       metadata: apiEvent.metadata,
-      findings: apiEvent.securityFindings?.map((f) => ({
-        type: f.type,
-        severity: f.severity,
-        description: f.description,
-        location: f.location
-          ? `Characters ${f.location.start}-${f.location.end}`
-          : undefined,
-      })),
     };
   }, [apiEvent]);
 

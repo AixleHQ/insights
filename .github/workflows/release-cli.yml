@@ -27,7 +27,7 @@ env:
 jobs:
   resolve:
     name: Resolve target package + version
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     outputs:
       package: ${{ steps.target.outputs.package }}
       working_directory: ${{ steps.target.outputs.working_directory }}
@@ -41,9 +41,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "$REF" == refs/tags/cli-mcp-v* ]]; then
-            echo "package=mcp" >> "$GITHUB_OUTPUT"
-            echo "working_directory=packages/tools/aixle-insights" >> "$GITHUB_OUTPUT"
-            echo "tag_version=${REF#refs/tags/cli-mcp-v}" >> "$GITHUB_OUTPUT"
+            RESOLVED_VERSION="${REF#refs/tags/cli-mcp-v}"
           elif [[ -n "$INPUT_PACKAGE" ]]; then
             # workflow_dispatch: require an explicit version input so the
             # package.json-version check below always runs. An empty version
@@ -56,18 +54,30 @@ jobs:
               echo "Only 'mcp' is a valid workflow_dispatch package (got $INPUT_PACKAGE)." >&2
               exit 1
             fi
-            echo "package=mcp" >> "$GITHUB_OUTPUT"
-            echo "working_directory=packages/tools/aixle-insights" >> "$GITHUB_OUTPUT"
-            echo "tag_version=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
+            RESOLVED_VERSION="$INPUT_VERSION"
           else
             echo "Could not resolve target package from ref=$REF / input=$INPUT_PACKAGE" >&2
             exit 1
           fi
 
+          # Fail closed on a malformed version before anything downstream sees it.
+          # The package.json-match guard only proves the two agree — it does not
+          # prove either is valid semver, and `npm pack` happily accepts a version
+          # like "foo", so a typo'd tag (cli-mcp-vfoo) would otherwise reach the
+          # publish step and, having no `-`, be routed to the production channel.
+          if [[ ! "$RESOLVED_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Version '$RESOLVED_VERSION' is not valid semver (expected X.Y.Z or X.Y.Z-<identifier>)." >&2
+            exit 1
+          fi
+
+          echo "package=mcp" >> "$GITHUB_OUTPUT"
+          echo "working_directory=packages/tools/aixle-insights" >> "$GITHUB_OUTPUT"
+          echo "tag_version=$RESOLVED_VERSION" >> "$GITHUB_OUTPUT"
+
   publish:
     name: Publish ${{ needs.resolve.outputs.package }} to npm
     needs: resolve
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     environment: npm-publish
     steps:
       - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0  # v6.0.3
@@ -79,8 +89,17 @@ jobs:
           cache-dependency-path: packages/tools/package-lock.json
           registry-url: 'https://registry.npmjs.org'
 
+      # Pinned to the 11.x major, NOT @latest. Trusted Publishing needs >= 11.5.1,
+      # but npm 12.0.0 (2026-07-08) started blocking package install scripts unless
+      # they are covered by its new `allowScripts` config — including during an
+      # explicit `npm rebuild`. That silently broke the better-sqlite3 compile step
+      # below: it printed "rebuilt dependencies successfully" while compiling
+      # nothing, and the failure only surfaced later as a missing .node binding in
+      # the test step. Every other pin in this workflow is exact (actions are
+      # SHA-pinned), so an unpinned npm was the one place a major could land
+      # unannounced. Revisit deliberately when adopting npm 12's allowScripts model.
       - name: Upgrade npm to OIDC-capable version (>= 11.5.1 required for Trusted Publishing)
-        run: npm install -g npm@latest
+        run: npm install -g 'npm@^11.5.1'
 
       - name: Verify version matches package.json
         env:
@@ -173,7 +192,7 @@ jobs:
             console.error('Unauthorized lifecycle script(s) in package.json:');
             for (const o of offenders) console.error('  ' + o);
             console.error('Allowed: ' + [...allowedLifecycle].join(', '));
-            console.error('If a new lifecycle script is genuinely required, update this guard and packages/tools/RELEASING.md together.');
+            console.error('If a new lifecycle script is genuinely required, update the packaging guard configuration accordingly.');
             process.exit(1);
           }
           EOF
@@ -224,6 +243,25 @@ jobs:
         run: npm rebuild better-sqlite3
         working-directory: packages/tools
 
+      # `npm rebuild` exits 0 and prints "rebuilt dependencies successfully" even
+      # when it compiled nothing — npm 12 blocked the install script and only
+      # emitted a warning. Assert the artifact exists so the failure is attributed
+      # here instead of surfacing as a confusing "Could not locate the bindings
+      # file" several steps later, and so a future npm change cannot silently
+      # reintroduce it.
+      - name: Verify the native binding was actually produced
+        working-directory: packages/tools
+        run: |
+          set -euo pipefail
+          if ! find node_modules/better-sqlite3 -name 'better_sqlite3.node' -print -quit | grep -q .; then
+            echo "better-sqlite3 native binding was not compiled." >&2
+            echo "npm rebuild reported success but produced no .node artifact — most likely its" >&2
+            echo "install script was blocked (npm >= 12 'allowScripts'). Check the rebuild step log" >&2
+            echo "for 'install scripts blocked' warnings, and the pinned npm version above." >&2
+            exit 1
+          fi
+          echo "Found: $(find node_modules/better-sqlite3 -name 'better_sqlite3.node' -print -quit)"
+
       - name: Build
         run: npm run build
         working-directory: ${{ needs.resolve.outputs.working_directory }}
@@ -257,6 +295,41 @@ jobs:
           // is obsolete — there is no separate SDK package to stage.
           EOF
 
+      # npm assigns the 'latest' dist-tag to ANY publish that omits --tag, including
+      # prerelease versions. Without this step a staging build (e.g. 0.2.1-staging)
+      # would be handed to every `npm install @aixle/insights` user. Derive the tag from
+      # the version so it can never be forgotten or passed wrongly by hand:
+      #   0.2.0          -> latest    (stable)
+      #   0.2.1-staging  -> staging   (QA channel)
+      #
+      # The model is exactly two channels, so the prerelease identifier is matched
+      # exactly rather than prefix-split. Prefix-splitting silently accepted a typo
+      # ('0.2.1-stagin.g' -> 'stagin') or an unexpected shape as a brand-new
+      # dist-tag that no runbook documents. Anything that is not exactly 'staging'
+      # is a mistake in this model, so fail closed and make a human decide —
+      # extending to a third channel must be a deliberate change here AND in
+      # RELEASING.md, not an accident of tag spelling.
+      - name: Resolve npm dist-tag (staging prerelease -> staging, stable -> latest)
+        id: disttag
+        env:
+          TAG_VERSION: ${{ needs.resolve.outputs.tag_version }}
+        run: |
+          set -euo pipefail
+          if [[ "$TAG_VERSION" == *-* ]]; then
+            pre="${TAG_VERSION#*-}"
+            if [[ "$pre" != "staging" ]]; then
+              echo "Unrecognized prerelease identifier '$pre' in version '$TAG_VERSION'." >&2
+              echo "This package publishes exactly two channels: X.Y.Z -> latest, X.Y.Z-staging -> staging." >&2
+              echo "See packages/tools/RELEASING.md → Release channels. Refusing to publish to an undocumented dist-tag." >&2
+              exit 1
+            fi
+            npm_tag="staging"
+          else
+            npm_tag="latest"
+          fi
+          echo "npm_tag=$npm_tag" >> "$GITHUB_OUTPUT"
+          echo "Publishing $TAG_VERSION under dist-tag '$npm_tag'"
+
       - name: Publish to npm (OIDC Trusted Publishing — no stored token)
         working-directory: ${{ needs.resolve.outputs.working_directory }}
-        run: npm publish
+        run: npm publish --tag "${{ steps.disttag.outputs.npm_tag }}"

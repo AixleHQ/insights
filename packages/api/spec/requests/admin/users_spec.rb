@@ -28,6 +28,34 @@ RSpec.describe 'Admin Users', type: :request do
       expect(response).to have_http_status(:ok)
       expect(response.body).to include(user.email)
     end
+
+    it 'lists org projects where the user has the owner role' do
+      organization = create(:organization)
+      create(:organization_membership, user: user, organization: organization)
+      project = create(:project, organization: organization)
+      create(:project_membership, :owner, user: user, project: project)
+
+      get admin_user_path(user)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include(project.name)
+    end
+
+    it 'renders without a broken "View all" link when the user owns more than four projects' do
+      organization = create(:organization)
+      create(:organization_membership, user: user, organization: organization)
+      5.times do
+        project = create(:project, organization: organization)
+        create(:project_membership, :owner, user: user, project: project)
+      end
+
+      get admin_user_path(user)
+
+      expect(response).to have_http_status(:ok)
+      # all_owned_projects has no top-level admin route, so the guard must
+      # suppress the "View all" link rather than emit an unroutable path.
+      expect(response.body).not_to include('/admin/all_owned_projects')
+    end
   end
 
   describe 'PATCH /admin/users/:id' do

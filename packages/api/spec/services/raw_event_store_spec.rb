@@ -233,17 +233,17 @@ RSpec.describe RawEventStore do
   describe '.ensure_bucket_exists!' do
     context 'when bucket exists' do
       it 'does nothing' do
-        allow(s3_client).to receive(:head_bucket)
+        allow(s3_client).to receive(:list_objects_v2).and_return(double(contents: []))
 
         described_class.ensure_bucket_exists!
 
-        expect(s3_client).to have_received(:head_bucket).with(bucket: 'raw-events')
+        expect(s3_client).to have_received(:list_objects_v2).with(bucket: 'raw-events', max_keys: 0)
       end
     end
 
     context 'when bucket does not exist' do
       it 'creates bucket with lifecycle policy' do
-        allow(s3_client).to receive(:head_bucket).and_raise(Aws::S3::Errors::NotFound.new(nil, 'Not found'))
+        allow(s3_client).to receive(:list_objects_v2).and_raise(Aws::S3::Errors::NoSuchBucket.new(nil, 'No such bucket'))
         allow(s3_client).to receive(:create_bucket)
         allow(s3_client).to receive(:put_bucket_lifecycle_configuration)
 

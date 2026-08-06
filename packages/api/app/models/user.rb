@@ -30,6 +30,13 @@ class User < ApplicationRecord
   scope :global_admins, -> { where(global_admin: true) }
   scope :active_in_organization, ->(org) { joins(:organization_memberships).where(organization_memberships: { organization_id: org.id }) }
 
+  def all_owned_projects
+    return Project.none unless persisted?
+
+    owner_membership_project_ids = project_memberships.owners.select(:project_id)
+    Project.where(owner_id: id).or(Project.where(id: owner_membership_project_ids))
+  end
+
   def display_name
     name.presence || email.split("@").first
   end

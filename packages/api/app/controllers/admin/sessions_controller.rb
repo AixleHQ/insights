@@ -40,22 +40,32 @@ module Admin
     end
 
     # DELETE /admin/logout
+    #
+    # HTML: clear local admin auth, then RP-initiated Keycloak logout (admin UI logout button).
+    # JSON: clear local admin auth only — used by the main-app SPA logout so a cross-surface
+    # logout immediately invalidates the Administrate httponly cookie. The SPA then ends the
+    # Keycloak SSO session via oidc-client-ts signoutRedirect.
     def destroy
       id_token = session[:admin_id_token]
+      clear_admin_auth!
 
-      # Clear local auth vectors first: signed session cookie and the JWT fallback.
-      cookies.delete(:admin_user_id, path: "/")
-      cookies.delete(:admin_token, path: "/")
-      reset_session
-
-      # Terminate the Keycloak SSO session too — otherwise the next /admin visit
-      # silently re-authenticates via the still-active Keycloak session.
-      post_logout_redirect = "#{external_origin}/admin/login?notice=Logged+out+successfully"
-      redirect_to auth_service.logout_url(post_logout_redirect, id_token_hint: id_token),
-                  allow_other_host: true
+      respond_to do |format|
+        format.json { head :no_content }
+        format.all do
+          post_logout_redirect = "#{external_origin}/admin/login?notice=Logged+out+successfully"
+          redirect_to auth_service.logout_url(post_logout_redirect, id_token_hint: id_token),
+                      allow_other_host: true
+        end
+      end
     end
 
     private
+
+    def clear_admin_auth!
+      cookies.delete(:admin_user_id, path: "/")
+      cookies.delete(:admin_token, path: "/")
+      reset_session
+    end
 
     def auth_service
       @auth_service ||= Admin::KeycloakAuthService.new

@@ -5,9 +5,16 @@ import { MemoryRouter } from "react-router-dom";
 import { EventDetail, type EventDetailData } from "./EventDetail";
 
 const mockCurrentRole = vi.fn<() => string | null>(() => "owner");
+const mockUseCurrentUser = vi.fn(() => ({
+  data: { globalAdmin: false, super_admin: false },
+}));
 
 vi.mock("@/contexts/OrgContext", () => ({
   useOrg: () => ({ currentRole: mockCurrentRole() }),
+}));
+
+vi.mock("@/hooks/useApi", () => ({
+  useCurrentUser: () => mockUseCurrentUser(),
 }));
 
 vi.mock("@/components/ui/risk-badge", () => ({
@@ -32,25 +39,17 @@ const mockEvent: EventDetailData = {
   risk_level: "high",
   cost_usd: 0.0042,
   token_count: 1500,
+  input_tokens: 800,
+  output_tokens: 700,
   created_at: "2026-06-10T14:30:00Z",
   user: { id: "u-1", email: "dev@example.com", name: "Dev User" },
   project: { id: "proj-1", name: "My Project" },
-  sanitized_content: "Tell me about this codebase",
-  raw_content: undefined, // not mapped by EventDetailPage
-  metadata: { foo: "bar" },
-  findings: [
-    {
-      type: "pii",
-      severity: "critical",
-      description: "Email address detected",
-      location: "Characters 0-20",
-    },
-    {
-      type: "secret",
-      severity: "high",
-      description: "API key pattern found",
-    },
-  ],
+  metadata: { foo: "bar", count: 3 },
+  event_text: {
+    user_text: "Tell me about this codebase",
+    assistant_text: "Sure, this is a Rails API…",
+    sanitized_at: "2026-06-10T14:31:00Z",
+  },
 };
 
 function renderDetail(event: EventDetailData | null, isLoading = false) {
@@ -64,6 +63,9 @@ function renderDetail(event: EventDetailData | null, isLoading = false) {
 describe("EventDetail", () => {
   beforeEach(() => {
     mockCurrentRole.mockReturnValue("owner");
+    mockUseCurrentUser.mockReturnValue({
+      data: { globalAdmin: false, super_admin: false },
+    });
   });
 
   describe("loading state", () => {
@@ -111,9 +113,18 @@ describe("EventDetail", () => {
       expect(screen.getByText(/\$0\.004/)).toBeInTheDocument();
     });
 
-    it("renders tokens using formatTokens (K suffix for 1500)", () => {
+    it("renders tokens in / tokens out using formatTokens", () => {
       renderDetail(mockEvent);
-      expect(screen.getByText(/1\.5K/)).toBeInTheDocument();
+      expect(screen.getByText("Tokens In")).toBeInTheDocument();
+      expect(screen.getByText("Tokens Out")).toBeInTheDocument();
+      expect(screen.getByText("800")).toBeInTheDocument();
+      expect(screen.getByText("700")).toBeInTheDocument();
+    });
+
+    it("renders dash for tokens when in/out are absent", () => {
+      renderDetail({ ...mockEvent, input_tokens: undefined, output_tokens: undefined });
+      expect(screen.getByText("Tokens In")).toBeInTheDocument();
+      expect(screen.getAllByText("-").length).toBeGreaterThan(0);
     });
 
     it("renders model name when present and not 'unknown'", () => {
@@ -149,50 +160,60 @@ describe("EventDetail", () => {
   });
 
   describe("owner: content tabs", () => {
-    it("renders Sanitized / Raw / Metadata tabs", () => {
+    it("renders Prompt / Metadata tabs (no Raw)", () => {
       renderDetail(mockEvent);
-      expect(screen.getByRole("tab", { name: /sanitized/i })).toBeInTheDocument();
-      expect(screen.getByRole("tab", { name: /raw/i })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /prompt/i })).toBeInTheDocument();
       expect(screen.getByRole("tab", { name: /metadata/i })).toBeInTheDocument();
+      expect(screen.queryByRole("tab", { name: /raw/i })).not.toBeInTheDocument();
     });
 
-    it("sanitized tab shows content", () => {
+    it("prompt tab shows user and assistant text", () => {
       renderDetail(mockEvent);
       expect(screen.getByText("Tell me about this codebase")).toBeInTheDocument();
+      expect(screen.getByText("Sure, this is a Rails API…")).toBeInTheDocument();
     });
 
-    it("raw tab shows prompt placeholder (field not mapped from API)", async () => {
-      const user = userEvent.setup();
-      renderDetail(mockEvent);
-      await user.click(screen.getByRole("tab", { name: /raw/i }));
-      expect(
-        screen.getByText(/prompt capture is not enabled/i)
-      ).toBeInTheDocument();
+    it("shows 'Prompt capture not enabled' placeholder when eventText is null", () => {
+      renderDetail({ ...mockEvent, event_text: null });
+      expect(screen.getByText("Prompt capture not enabled")).toBeInTheDocument();
+      expect(screen.queryByText("Tell me about this codebase")).not.toBeInTheDocument();
     });
 
-    it("metadata tab shows JSON stringified output", async () => {
+    it("renders metadata as a key/value table, not JSON.stringify", async () => {
       const user = userEvent.setup();
       renderDetail(mockEvent);
       await user.click(screen.getByRole("tab", { name: /metadata/i }));
-      expect(screen.getByText(/"foo"/)).toBeInTheDocument();
+      expect(screen.getByText("foo")).toBeInTheDocument();
+      expect(screen.getByText("bar")).toBeInTheDocument();
+      expect(screen.getByText("count")).toBeInTheDocument();
+      // The raw JSON blob form must be gone.
+      expect(screen.queryByText(/"foo":/)).not.toBeInTheDocument();
+    });
+
+    it("shows 'No metadata available' when metadata is empty", async () => {
+      const user = userEvent.setup();
+      renderDetail({ ...mockEvent, metadata: {} });
+      await user.click(screen.getByRole("tab", { name: /metadata/i }));
+      expect(screen.getByText("No metadata available")).toBeInTheDocument();
     });
   });
 
-  describe("owner: security findings", () => {
-    it("renders finding cards with severity tokens", () => {
-      renderDetail(mockEvent);
-      expect(screen.getByText("Email address detected")).toBeInTheDocument();
-      expect(screen.getByText("API key pattern found")).toBeInTheDocument();
-    });
-
-    it("renders location when present", () => {
-      renderDetail(mockEvent);
-      expect(screen.getByText(/Characters 0-20/)).toBeInTheDocument();
-    });
-
-    it("omits findings section when there are no findings", () => {
-      renderDetail({ ...mockEvent, findings: [] });
-      expect(screen.queryByText("Security Findings")).not.toBeInTheDocument();
+  describe("XSS safety", () => {
+    it("renders HTML/script in prompt text as literal text, not live DOM", () => {
+      const payload = '<script>alert("xss")</script><img onerror="x" />';
+      const { container } = renderDetail({
+        ...mockEvent,
+        event_text: {
+          user_text: payload,
+          assistant_text: null,
+          sanitized_at: null,
+        },
+      });
+      // Literal text is present…
+      expect(screen.getByText(payload)).toBeInTheDocument();
+      // …and no live <script>/<img> element was injected.
+      expect(container.querySelector("script")).toBeNull();
+      expect(container.querySelector("img")).toBeNull();
     });
   });
 
@@ -203,14 +224,24 @@ describe("EventDetail", () => {
       mockCurrentRole.mockReturnValue("member");
       renderDetail(mockEvent);
       expect(screen.getByText(gateMessage)).toBeInTheDocument();
-      expect(screen.queryByRole("tab", { name: /sanitized/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("tab", { name: /prompt/i })).not.toBeInTheDocument();
     });
 
-    it("admin sees gate, not tabs (AIX-115 alignment)", () => {
+    it("admin sees gate, not tabs (owner-only alignment)", () => {
       mockCurrentRole.mockReturnValue("admin");
       renderDetail(mockEvent);
       expect(screen.getByText(gateMessage)).toBeInTheDocument();
-      expect(screen.queryByRole("tab", { name: /sanitized/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("tab", { name: /prompt/i })).not.toBeInTheDocument();
+    });
+
+    it("global admin sees prompt tabs even with member role", () => {
+      mockCurrentRole.mockReturnValue("member");
+      mockUseCurrentUser.mockReturnValue({
+        data: { globalAdmin: true, super_admin: false },
+      });
+      renderDetail(mockEvent);
+      expect(screen.getByRole("tab", { name: /prompt/i })).toBeInTheDocument();
+      expect(screen.queryByText(gateMessage)).not.toBeInTheDocument();
     });
 
     it("viewer sees gate", () => {
@@ -225,10 +256,10 @@ describe("EventDetail", () => {
       expect(screen.getByText(gateMessage)).toBeInTheDocument();
     });
 
-    it("non-owner does not see security findings", () => {
+    it("non-owner does not see prompt text", () => {
       mockCurrentRole.mockReturnValue("member");
       renderDetail(mockEvent);
-      expect(screen.queryByText("Security Findings")).not.toBeInTheDocument();
+      expect(screen.queryByText("Tell me about this codebase")).not.toBeInTheDocument();
     });
   });
 
@@ -252,7 +283,6 @@ describe("EventDetail", () => {
       renderDetail({
         ...mockEvent,
         event_type: "commit",
-        sanitized_content: undefined,
         metadata: { source: "recent_commit", commit_hash: "abc1234" },
       });
       expect(screen.getByTestId("recent-commit-detail")).toBeInTheDocument();
@@ -266,7 +296,6 @@ describe("EventDetail", () => {
       renderDetail({
         ...mockEvent,
         event_type: "edit",
-        sanitized_content: undefined,
         metadata: null,
       });
       expect(screen.queryByRole("tab", { name: /sanitized/i })).not.toBeInTheDocument();
@@ -277,10 +306,10 @@ describe("EventDetail", () => {
       renderDetail({
         ...mockEvent,
         event_type: "chat",
-        sanitized_content: undefined,
+        event_text: null,
       });
-      expect(screen.getByRole("tab", { name: /sanitized/i })).toBeInTheDocument();
-      expect(screen.getByText(/prompt capture is not enabled/i)).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /prompt/i })).toBeInTheDocument();
+      expect(screen.getByText("Prompt capture not enabled")).toBeInTheDocument();
       expect(screen.queryByText("No content available")).not.toBeInTheDocument();
     });
   });

@@ -118,6 +118,36 @@ describe("Events page User filter gating", () => {
   });
 });
 
+describe("Events page User filter deep-link gating (AIX-609)", () => {
+  const deepLink = "/events?user_id=user-1&user_name=Jane%20Doe";
+
+  it("strips a ?user_id= deep-link for a plain member (no chip, no user_id sent)", () => {
+    mockHasRole.mockReturnValue(false);
+    mockCurrentUser.mockReturnValue({ data: { globalAdmin: false, super_admin: false }, isLoading: false });
+    renderPage(deepLink);
+
+    expect(screen.queryByText("Jane Doe")).not.toBeInTheDocument();
+    expect(lastApiParams().user_id).toBeUndefined();
+  });
+
+  it("keeps the ?user_id= deep-link for an org owner (chip shown, user_id sent)", () => {
+    mockHasRole.mockReturnValue(true);
+    renderPage(deepLink);
+
+    expect(screen.getByText("Jane Doe")).toBeInTheDocument();
+    expect(lastApiParams().user_id).toBe("user-1");
+  });
+
+  it("keeps the ?user_id= deep-link for a platform admin (non-owner)", () => {
+    mockHasRole.mockReturnValue(false);
+    mockCurrentUser.mockReturnValue({ data: { globalAdmin: true }, isLoading: false });
+    renderPage(deepLink);
+
+    expect(screen.getByText("Jane Doe")).toBeInTheDocument();
+    expect(lastApiParams().user_id).toBe("user-1");
+  });
+});
+
 describe("Events — URL filter hydration (AIX-565)", () => {
   it("hydrates projectIds and date range from a dashboard 'View all' deep-link", () => {
     renderPage("/events?project_id=proj-1&date_from=2026-07-01&date_to=2026-07-31");
@@ -141,5 +171,38 @@ describe("Events — URL filter hydration (AIX-565)", () => {
     expect(params.project_id).toBeUndefined();
     expect(params.start_date).toBeUndefined();
     expect(params.end_date).toBeUndefined();
+  });
+});
+
+describe("Events — server-side search (AIX-589)", () => {
+  it("passes debounced search text to useEvents (not client-side only)", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.type(screen.getByPlaceholderText("Search events..."), "github");
+
+    // Debounce is 350ms — wait until the list query picks up the value.
+    await vi.waitFor(
+      () => {
+        expect(lastApiParams().search).toBe("github");
+      },
+      { timeout: 2000 }
+    );
+  });
+
+  it("includes search in export params (immediate typed value)", async () => {
+    const exportEvents = vi.fn().mockResolvedValue({});
+    mockExportEvents.mockReturnValue({ exportEvents, isExporting: false });
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.type(screen.getByPlaceholderText("Search events..."), "claude");
+    await user.click(screen.getByRole("button", { name: /^export$/i }));
+
+    await vi.waitFor(() => {
+      expect(exportEvents).toHaveBeenCalledWith(
+        expect.objectContaining({ search: "claude" })
+      );
+    });
   });
 });

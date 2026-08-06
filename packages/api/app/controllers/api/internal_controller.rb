@@ -9,7 +9,12 @@ module Api
     # POST /api/internal/tool_events
     def create_tool_event
       result = ToolEvents::Upsert.call(tool_event_params.to_h.symbolize_keys)
-      render json: { data: { id: result[:tool_event].id } }, status: :created
+      render json: {
+        data: {
+          id: result[:tool_event].id,
+          occurred_at: result[:tool_event].occurred_at
+        }
+      }, status: :created
     rescue ActiveRecord::RecordInvalid => e
       render json: { error: "Validation failed", errors: e.record.errors.to_hash }, status: :unprocessable_content
     end
@@ -40,6 +45,30 @@ module Api
       deliver_project_slack_alerts(alert_data)
 
       render json: { data: { id: SecureRandom.uuid, status: "sent" } }, status: :created
+    end
+
+    # POST /api/internal/event_texts
+    def create_event_text
+      result = EventTexts::Persist.call(
+        tool_event_id: event_text_params[:tool_event_id],
+        occurred_at: event_text_params[:occurred_at],
+        user_text: event_text_params[:user_text],
+        assistant_text: event_text_params[:assistant_text],
+        sanitizer_version: event_text_params[:sanitizer_version]
+      )
+
+      if result[:captured]
+        render json: {
+          data: {
+            tool_event_id: result[:event_text]&.tool_event_id,
+            occurred_at: result[:event_text]&.occurred_at
+          }
+        }, status: :created
+      else
+        render json: { captured: false }, status: :ok
+      end
+    rescue ActiveRecord::RecordInvalid => e
+      render json: { error: "Validation failed", errors: e.record.errors.to_hash }, status: :unprocessable_content
     end
 
     # POST /api/internal/broadcasts
@@ -118,6 +147,12 @@ module Api
         :raw_event_key, :risk_level, :temporal_workflow_id,
         :confidence_score,
         classification_labels: [], sanitization_actions: [], metadata: {}
+      )
+    end
+
+    def event_text_params
+      params.require(:event_text).permit(
+        :tool_event_id, :occurred_at, :user_text, :assistant_text, :sanitizer_version
       )
     end
 

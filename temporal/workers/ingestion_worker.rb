@@ -33,6 +33,7 @@ worker = Temporalio::Worker.new(
     Activities::ClassificationActivity.new,
     Activities::SanitizationActivity.new,
     Activities::PersistenceActivity.new,
+    Activities::PersistPromptActivity.new,
     Activities::AlertActivity.new,
     Activities::BroadcastActivity.new
   ]

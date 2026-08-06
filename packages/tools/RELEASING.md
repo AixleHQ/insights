@@ -14,15 +14,61 @@ Runbook for cutting a public npm release of **`@aixle/insights`**. The package l
 
 ## Tag → release mapping
 
-| Tag pattern | Published package | Working directory |
-|-------------|-------------------|-------------------|
-| `cli-mcp-vX.Y.Z` | `@aixle/insights` | `packages/tools/aixle-insights` |
+| Tag pattern | Published package | Working directory | dist-tag |
+|-------------|-------------------|-------------------|----------|
+| `cli-mcp-vX.Y.Z` | `@aixle/insights` | `packages/tools/aixle-insights` | `latest` |
+| `cli-mcp-vX.Y.Z-staging` | `@aixle/insights` | `packages/tools/aixle-insights` | `staging` |
 
 > Tag prefix is kept as `cli-mcp-v*` for continuity with the existing CI lane. A future PR may rename the taxonomy to `aixle-insights-v*`.
+
+## Release channels
+
+Two channels share one pipeline. **The npm dist-tag is derived in CI from the version string — never pass `--tag` by hand.**
+
+| Channel | Version | dist-tag | Cut from | Installed by |
+|---------|---------|----------|----------|--------------|
+| Production | `X.Y.Z` | `latest` | `develop` | everyone — `npm i @aixle/insights` |
+| Staging / QA | `X.Y.Z-staging` | `staging` | `staging` | QA — `npm i @aixle/insights@staging` |
+
+`latest` moves **only** on a plain `X.Y.Z`. A version whose prerelease identifier is exactly `staging` publishes to the `staging` channel, so a staging build can never be handed to production users.
+
+**There is no third channel.** The identifier is matched exactly, and CI **fails the publish** for anything else — `0.2.1-rc.1`, `0.2.1-staging.1`, a typo'd `0.2.1-stagin.g`, all of it. This is deliberate: silently minting a dist-tag from whatever was typed would create a channel no runbook documents and nobody knows how to retire. Adding a channel must be a deliberate edit to *both* `release-cli.yml` and this file.
+
+The version itself is also validated as semver in the `resolve` job. `npm pack` accepts a nonsense version like `foo`, and the package.json-match guard only proves the tag and manifest agree — not that either is valid — so a typo'd tag such as `cli-mcp-vfoo` would otherwise have no `-`, and be routed to the **production** channel.
+
+**Staging versions bump the patch, not a counter**: `0.2.1-staging`, then `0.2.2-staging`, then `0.2.3-staging`. They interleave correctly with stable releases:
+
+```
+0.2.0 < 0.2.1-staging < 0.2.1 < 0.2.2-staging < 0.2.2
+```
+
+Because there is no counter, a bad staging build cannot be re-cut under the same number — npm versions are immutable, so roll forward to the next patch. Do not expect the stable patch sequence to stay contiguous.
+
+Prerelease versions are invisible to ordinary installs: no normal semver range (`*`, `^0.2.0`, `~0.2.0`, `>=0.1.0`) ever resolves to one. They are reachable only by exact version or the `staging` dist-tag.
+
+### Retiring the staging channel
+
+Never `npm unpublish` (see [If something goes wrong](#if-something-goes-wrong)). Instead:
+
+```bash
+npm dist-tag rm @aixle/insights staging          # channel stops resolving — one command
+```
+
+Deprecation must be done **per version**. A single semver range cannot select them all, because a prerelease only satisfies a range when some comparator shares its exact `major.minor.patch` tuple — `0.2.2-staging` does *not* match `>=0.2.1-staging <0.3.0`:
+
+```bash
+for v in 0.2.1-staging 0.2.2-staging; do
+  npm deprecate "@aixle/insights@$v" "Staging prerelease — use the current stable release"
+done
+```
+
+The versions stay in the registry regardless: npm's unpublish policy after 72 hours requires no dependents, fewer than 300 weekly downloads, *and* a single maintainer.
 
 ## Release flow (happy path)
 
 For a release of `@aixle/insights@X.Y.Z`:
+
+> **Staging releases** follow the identical flow with two substitutions: read `staging` wherever this section says `develop`, and use a `X.Y.Z-staging` version. Everything else — guards, gate, verification — is the same, and CI routes the publish to the `staging` dist-tag automatically.
 
 1. **Branch and bump.** From `develop`, branch and edit `packages/tools/aixle-insights/package.json`:
    ```bash
@@ -64,11 +110,22 @@ For a release of `@aixle/insights@X.Y.Z`:
    - Runs `npm audit signatures` over the installed dep tree (verifies registry-signed integrity).
    - Builds, tests.
    - `npm pack --dry-run --json` against an allowlist: `dist/**`, `README.md`, `LICENSE`, `package.json`.
-   - `npm publish` via OIDC Trusted Publishing — short-lived token minted by GitHub OIDC; no secret read. Provenance attestation is automatic.
+   - Validates that the resolved version is semver at all (in `resolve`, before any publish step runs).
+   - Derives the npm dist-tag from the version: no `-` → `latest`; prerelease identifier exactly `staging` → `staging`. Any other identifier **fails the job** rather than inventing a dist-tag. The chosen tag is echoed in the step log.
+   - `npm publish --tag <derived>` via OIDC Trusted Publishing — short-lived token minted by GitHub OIDC; no secret read. Provenance attestation is automatic.
 7. **Smoke-test the published artifact** from an empty directory (outside the monorepo):
    ```bash
    npm view @aixle/insights version            # confirms registry has the new version
    npx -y @aixle/insights@X.Y.Z --help
+
+   # Confirm the dist-tag landed on the intended channel. For a staging release the
+   # decisive check is that `latest` did NOT move:
+   npm view @aixle/insights dist-tags
+   # Stable release  -> latest = X.Y.Z
+   # Staging release -> latest unchanged, staging = X.Y.Z-staging
+   #
+   # If `latest` ever moves onto a staging build, repoint it immediately:
+   #   npm dist-tag add @aixle/insights@<last-stable> latest
 
    # Verify registry signature (provenance is deferred until repo is public):
    npm audit signatures @aixle/insights@X.Y.Z
@@ -78,7 +135,7 @@ For a release of `@aixle/insights@X.Y.Z`:
    1. `npx -y @aixle/insights@X.Y.Z init --host … --keycloak-url … --organization-id <uuid>`
    2. Complete Keycloak device authorization in the browser.
    3. Open `~/.claude.json` → confirm `mcpServers.aixle-insights` references `npx -y @aixle/insights run`.
-   4. Restart Claude Code. Invoke the `db90_status` MCP tool inside a session, or run `aixle-insights health` from the shell.
+   4. Restart Claude Code. Invoke the `aixle_insights_status` MCP tool inside a session, or run `aixle-insights health` from the shell.
    5. Trigger `aixle-insights run --once` and check the API's `/events` for the resulting payload.
 
    **Time budget:** the scripted steps above should finish in ≤ 5 minutes on typical broadband, excluding SSO credential hunting.
@@ -105,7 +162,7 @@ Record the Actions run URL, outcome, `npm view` output, smoke-test result, elaps
 
 - **"Verify version matches package.json"** — tag (`cli-mcp-v…`) or `version` input mismatch; bump in a new commit and re-tag.
 - **Obsolete-scope guard** — a legacy `@db90/telemetry-mcp` / `db90-mcp` / `db90-telemetry-mcp` / `@<scope>` literal slipped into the package. Find and replace, then re-tag.
-- **Unauthorized lifecycle script guard** — only `prepublishOnly` is allowed. If a new lifecycle script is genuinely required, update the guard and this runbook together.
+- **Unauthorized lifecycle script guard** — only `prepublishOnly` is allowed. If a new lifecycle script is genuinely required, update the guard configuration accordingly.
 - **`publishConfig.provenance` guard** — `package.json` must keep `"publishConfig": { "access": "public", "provenance": false }` while the source repo is private. Flipping to `true` requires the source repo to be public first; npm returns HTTP 422 ("Unsupported GitHub Actions source repository visibility: private") otherwise.
 - **`npm audit signatures` failure** — a dep was unpublished + republished with a different signing identity, or registry signature drift. Investigate the failing dep on `npmjs.com` before disabling the check.
 - **Pack allowlist leaks** — fix `files` field / `.npmignore`; ensure stray artifacts are not staged.
@@ -123,5 +180,5 @@ Before marking a release ticket done:
 1. Tag pushed (`cli-mcp-v…`).
 2. GitHub Actions URL + green conclusion.
 3. `npm view @aixle/insights version` output matches the tag.
-4. Clean-profile `npx -y @aixle/insights init` narrative (issuer used, Claude config snippet, `db90_status` / health excerpt).
+4. Clean-profile `npx -y @aixle/insights init` narrative (issuer used, Claude config snippet, `aixle_insights_status` / health excerpt).
 5. Approximate elapsed time (≤ 5 min guideline).

@@ -40,4 +40,21 @@ class ToolEventDetailSerializer < BaseSerializer
     latest = event.audit_logs.order(created_at: :desc).first
     AuditLogSerializer.new(latest).serialize if latest
   end
+
+  # Owner-only captured prompt/assistant text. The controller computes the gate via
+  # EventTextPolicy and passes params[:show_event_text]; non-owners never receive the
+  # field. nil when no event_texts row exists (capture off / not yet captured).
+  # Ships camelCased as eventText: { userText, assistantText, sanitizedAt }.
+  attribute :event_text, if: proc { params[:show_event_text] } do |event|
+    text = event.event_text
+    next nil unless text
+
+    # transform_keys :lower_camel does not recurse into hashes returned from a block,
+    # so emit camelCase keys directly (mirrors the user/project attribute blocks).
+    {
+      userText: text.user_text,
+      assistantText: text.assistant_text,
+      sanitizedAt: text.sanitized_at&.iso8601
+    }
+  end
 end

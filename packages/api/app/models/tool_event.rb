@@ -18,6 +18,12 @@ class ToolEvent < ApplicationRecord
   belongs_to :repository, optional: true
   has_many :audit_logs, dependent: :nullify
 
+  # NOTE: single-record (show) use only. event_texts lives in the timeseries schema
+  # with a composite PK (tool_event_id, occurred_at); we look up by tool_event_id
+  # (index-backed) for the detail endpoint. If ever added to a list endpoint, preload
+  # with events.includes(:event_text) to avoid N+1.
+  has_one :event_text, foreign_key: :tool_event_id, primary_key: :id
+
   validates :tool_name, presence: true, inclusion: { in: TOOL_NAMES }
   validates :event_type, presence: true, inclusion: { in: EVENT_TYPES }
   validates :occurred_at, presence: true

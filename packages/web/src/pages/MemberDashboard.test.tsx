@@ -24,6 +24,9 @@ vi.mock("@/components/dashboard", () => ({
   TopToolsChart: () => <div data-testid="top-tools-chart" />,
   ActivityHeatmap: () => null,
   PromptInsightsSection: () => <div data-testid="prompt-insights-section">Prompt Insights</div>,
+  ProjectFilterDropdown: () => <div data-testid="project-filter-dropdown" />,
+  MemberPeriodSelect: () => <div data-testid="member-period-select" />,
+  MEMBER_PERIOD_LABELS: { "7d": "7 days", "30d": "30 days", "90d": "90 days" },
 }));
 
 function setupDefaultMocks() {
@@ -46,5 +49,17 @@ describe("MemberDashboard", () => {
   it("still renders TopToolsChart so it can fill the row", () => {
     render(<MemberDashboard />);
     expect(screen.getByTestId("top-tools-chart")).toBeInTheDocument();
+  });
+
+  it("shows project and period filters in the standalone header (AIX-607)", () => {
+    render(<MemberDashboard />);
+    expect(screen.getByTestId("project-filter-dropdown")).toBeInTheDocument();
+    expect(screen.getByTestId("member-period-select")).toBeInTheDocument();
+  });
+
+  it("hides filter chrome when embedded via hideHeader", () => {
+    render(<MemberDashboard hideHeader period="30d" projectId={undefined} />);
+    expect(screen.queryByTestId("project-filter-dropdown")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("member-period-select")).not.toBeInTheDocument();
   });
 });
