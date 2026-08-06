@@ -1,0 +1,75 @@
+version: 2
+
+updates:
+  # --- Ruby (Bundler) ---
+  - package-ecosystem: bundler
+    directory: /packages/api
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+    groups:
+      api-minor-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: bundler
+    directory: /temporal
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+    groups:
+      temporal-minor-patch:
+        update-types:
+          - minor
+          - patch
+
+  # --- JavaScript / TypeScript (npm) ---
+  # packages/tools is the npm workspace root for @aixle/insights.
+  - package-ecosystem: npm
+    directory: /packages/tools
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+    groups:
+      tools-minor-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: npm
+    directory: /packages/web
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+    groups:
+      web-minor-patch:
+        update-types:
+          - minor
+          - patch
+
+  # --- GitHub Actions ---
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci(deps)"
+    groups:
+      actions-minor-patch:
+        update-types:
+          - minor
+          - patch
