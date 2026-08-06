@@ -6,12 +6,11 @@ name: CLA
 # rather than in a third-party service or a second repo, and is written with the
 # built-in GITHUB_TOKEN (no PAT needed).
 #
-# ADVISORY MODE: the check currently runs with `continue-on-error: true` because the
-# binding iCLA/cCLA text in CLA.md is still pending legal sign-off (see the draft notice
-# there). It comments and records intent but does not block merges. To make it a hard
-# gate: (1) publish the final CLA text and drop the draft notice in CLA.md, (2) remove
-# the `continue-on-error` line below, (3) add "CLA" to the branch protection required
-# checks (needs the repo to be public or on a paid plan).
+# BLOCKING: the binding iCLA/cCLA text is published in CLA.md, so the check no longer
+# runs in advisory mode — a pull request whose committers have not signed fails here.
+# The remaining step is outside this file: add "CLA" to the branch protection required
+# checks (needs the repo to be public or on a paid plan), so the failure also prevents
+# the merge button.
 #
 # One-time setup, required before the first run — the action does not bootstrap its own
 # storage (a missing signatures file surfaces as a hard failure, not an empty store):
@@ -51,8 +50,6 @@ jobs:
     if: github.event_name == 'pull_request_target' || github.event.issue.pull_request
     steps:
       - name: Check CLA signature
-        # ADVISORY MODE — see the header. Remove this line to make the CLA blocking.
-        continue-on-error: true
         # Pinned to a commit SHA: this is a third-party action running in a
         # `pull_request_target` workflow with write permissions, so a mutable tag would
         # be a supply-chain risk. Upstream is archived/read-only, so the pin is permanent

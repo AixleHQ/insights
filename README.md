@@ -437,7 +437,17 @@ To report a security vulnerability, please follow the process in
 
 ## License
 
+Copyright 2026 Dualboot Partners, LLC
+
 Licensed under the [Apache License 2.0](LICENSE).
 
 Third-party licensing considerations (Redis, TimescaleDB TSL features, Sidekiq)
 are disclosed in [NOTICES.md](NOTICES.md).
+
+"Aixle" and "Aixle Insights" are trademarks of Dualboot Partners, LLC. The
+Apache License does not grant permission to use these marks.
+
+The hosted service is governed by its own
+[Terms of Service](docs/legal/TERMS_OF_SERVICE.md) and
+[Privacy Policy](docs/legal/PRIVACY_POLICY.md); neither limits any right granted
+to you under the Apache License with respect to this source code.

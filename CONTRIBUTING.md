@@ -104,10 +104,22 @@ The sign-off email must match the commit author's email.
 
 Contributions to Aixle Insights also require a signed **Contributor License
 Agreement (CLA)** (this is separate from, and in addition to, the DCO sign-off).
-On your first pull request, the CLA Assistant bot will prompt you to sign — a
-one-time action per contributor. If you contribute on behalf of your employer, a
-**Corporate CLA** may apply instead. See [CLA.md](CLA.md) for details and the
-agreement text.
+Before your first contribution can be merged, you must sign it; the CLA Assistant
+bot comments on your first pull request with the one-time signing step, and the
+signature covers all your future contributions.
+
+The CLA grants the maintainers the rights needed to distribute, sublicense, and —
+if ever necessary — relicense the project, which a DCO sign-off alone does not
+provide. You keep full ownership of your contributions either way.
+
+- Contributing on your own behalf → the [Individual CLA](CLA.md#individual-cla)
+- Contributing on behalf of an employer or other organization → your organization
+  executes the [Corporate CLA](CLA.md#corporate-cla); see its § 7 for how the two
+  interact, and note that its Schedule A is an administrative convenience, not a
+  condition of the license grant
+
+> The DCO certifies the **origin** of your contribution; the CLA grants the
+> project the **rights** to it. Both are required.
 
 ## License
 
