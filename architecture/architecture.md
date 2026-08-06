@@ -1180,13 +1180,19 @@ These are **required** for team members and scoped per-organization (a user may 
 
 ### Telemetry Sources (User-Level, Real-Time Push)
 
-These emit events directly from the user's IDE/CLI:
+Rather than each IDE pushing to the API directly, telemetry is collected by the
+**`@aixle/insights`** npm package (a CLI + MCP server the developer installs
+locally). It reads each tool's local activity — Claude Code transcripts, Cursor's
+SQLite store, OpenCode logs — and forwards batched events to the API via
+`POST /api/v1/ingest/events` (Bearer ingest token, no JWT). It runs as an MCP
+server inside Claude Code (auto-sync ~5 min + flush on connect) and via an opt-in
+Cursor hook forwarder for per-turn model attribution.
 
-| Source | Events | Auth |
-|--------|--------|------|
-| **Cursor** | `session_start`, `session_end`, `completion`, tokens | API token per user |
-| **Claude Code** | `conversation_*`, `message`, `tool_use`, `loop_*`, tokens | API token per user |
-| **OpenCode** | `conversation_*`, `message`, `tool_use`, tokens | API token per user |
+| Source | Events | Collected by | Auth |
+|--------|--------|--------------|------|
+| **Cursor** | `session_start`, `session_end`, `completion`, tokens | `@aixle/insights` (SQLite reader + hooks) | Bearer ingest token per user |
+| **Claude Code** | `conversation_*`, `message`, `tool_use`, `loop_*`, tokens | `@aixle/insights` (transcript reader / MCP) | Bearer ingest token per user |
+| **OpenCode** | `conversation_*`, `message`, `tool_use`, tokens | `@aixle/insights` (log reader) | Bearer ingest token per user |
 
 ### Connection Flow Diagram
 
@@ -1234,19 +1240,22 @@ flowchart TB
         UserLinear --> UserAccounts
     end
 
-    subgraph Telemetry["Telemetry (Real-Time Push)"]
+    subgraph Telemetry["Telemetry (collected by @aixle/insights)"]
         IDE["Developer IDE/CLI"]
-        
-        IDE -->|"emits events"| Cursor["Cursor"]
-        IDE -->|"emits events"| ClaudeCode["Claude Code"]
-        IDE -->|"emits events"| OpenCode["OpenCode"]
+        Agent["@aixle/insights<br/>(npm CLI + MCP server)"]
+
+        IDE -->|"local activity"| Cursor["Cursor<br/>(SQLite store)"]
+        IDE -->|"local activity"| ClaudeCode["Claude Code<br/>(transcripts)"]
+        IDE -->|"local activity"| OpenCode["OpenCode<br/>(logs)"]
+
+        Cursor -->|"reads"| Agent
+        ClaudeCode -->|"reads"| Agent
+        OpenCode -->|"reads"| Agent
     end
 
     OrgConnectors -->|"syncs repos, issues"| DB[(Database)]
     UserAccounts -->|"enables attribution"| DB
-    Cursor -->|"POST /telemetry"| DB
-    ClaudeCode -->|"POST /telemetry"| DB
-    OpenCode -->|"POST /telemetry"| DB
+    Agent -->|"POST /api/v1/ingest/events<br/>(Bearer ingest token)"| DB
 ```
 
 ### Attribution Flow
@@ -1870,7 +1879,12 @@ Temporal provides durable workflow orchestration for complex, long-running, or c
 
 ```mermaid
 flowchart TB
+    subgraph Clients["External Clients"]
+        Agent["@aixle/insights<br/>(npm CLI + MCP server)"]
+    end
+
     subgraph Capture["1. Ingestion/Capture Layer"]
+        Ingest["Ingest Controller<br/>(POST /api/v1/ingest/events)"]
         Telemetry["Telemetry Controller"]
         Webhooks["Webhook Controller"]
         AIProxy["AI Proxy Controller"]
@@ -1909,6 +1923,8 @@ flowchart TB
     end
 
     %% Ingestion flows
+    Agent -->|"batched IDE events"| Ingest
+    Ingest -->|"raw event"| TemporalServer
     Telemetry -->|"raw event"| TemporalServer
     Webhooks -->|"raw event"| TemporalServer
     AIProxy -->|"raw event"| TemporalServer
@@ -2199,7 +2215,7 @@ All routes are prefixed with `/api/v1` and follow Rails RESTful conventions.
 flowchart LR
     subgraph Public["Public Routes"]
         Health["GET /health"]
-        TelemetryIngest["POST /telemetry/*"]
+        IngestEvents["POST /ingest/events<br/>(Bearer ingest token)"]
     end
 
     subgraph AuthRequired["Auth Required (JWT)"]
@@ -2276,12 +2292,8 @@ flowchart LR
     end
 
     subgraph Telemetry["Telemetry (Token Auth)"]
-        TelemetryCursor["POST /telemetry/cursor"]
-        TelemetryCursorBatch["POST /telemetry/cursor/batch"]
-        TelemetryClaudeCode["POST /telemetry/claude-code"]
-        TelemetryClaudeCodeBatch["POST /telemetry/claude-code/batch"]
-        TelemetryOpenCode["POST /telemetry/opencode"]
-        TelemetryOpenCodeBatch["POST /telemetry/opencode/batch"]
+        TelemetryIngestRoute["POST /telemetry/ingest"]
+        TelemetryBatch["POST /telemetry/batch"]
     end
 
     subgraph AIGateway["AI Gateway (OpenRouter Proxy)"]
@@ -2313,7 +2325,8 @@ flowchart LR
 | **Tool Accounts** | 5 | Required | User tool account linking (list, create, delete, oauth_url, oauth_callback) |
 | **AI Gateway** | 3 | Required | OpenRouter proxy for AI completions |
 | **Admin** | 3 | Admin | User management |
-| **Telemetry** | 6 | Token | IDE telemetry (Cursor, Claude Code, OpenCode) |
+| **Ingest** | 1 | Bearer token | Public event ingest from `@aixle/insights` (`POST /ingest/events`) |
+| **Telemetry** | 2 | Token | Telemetry ingest + batch (`POST /telemetry/ingest`, `/telemetry/batch`) |
 | **Webhooks** | 5 | Signature | Incoming webhooks from external tools |
 
 ### Rails Routes Configuration
@@ -2407,17 +2420,15 @@ Rails.application.routes.draw do
         post 'chat'         # Chat completions
         get 'models'        # List available models for current org
       end
-    end
-  end
 
-  # Telemetry (token auth - user's personal API token)
-  namespace :telemetry do
-    post 'cursor'
-    post 'cursor/batch'
-    post 'claude-code'
-    post 'claude-code/batch'
-    post 'opencode'
-    post 'opencode/batch'
+      # Telemetry ingestion (token auth - user's personal ingest token)
+      post 'telemetry/ingest', to: 'telemetry#ingest'
+      post 'telemetry/batch',  to: 'telemetry#batch'
+
+      # Public ingest endpoint — Bearer token auth, no JWT/org context.
+      # This is what the @aixle/insights CLI/MCP posts batched IDE events to.
+      post 'ingest/events', to: 'ingest#create'
+    end
   end
 
   # Webhooks (signature verification)
@@ -2456,10 +2467,15 @@ flowchart TB
         Gemini["Gemini API"]
     end
 
-    subgraph IDETelemetry["IDE Telemetry (User Push)"]
+    subgraph IDETelemetry["IDE Telemetry (collected by @aixle/insights)"]
         CursorIDE["Cursor"]
         ClaudeCode["Claude Code"]
         OpenCode["OpenCode"]
+        InsightsAgent["@aixle/insights<br/>(npm CLI + MCP server)"]
+
+        CursorIDE -->|"reads SQLite"| InsightsAgent
+        ClaudeCode -->|"reads transcripts / MCP"| InsightsAgent
+        OpenCode -->|"reads logs"| InsightsAgent
     end
 
     subgraph Ingestion["1. Ingestion/Capture Layer"]
@@ -2471,6 +2487,7 @@ flowchart TB
             LinearSyncJob["LinearSyncJob"]
             AIUsageSyncJob["AIUsageSyncJob"]
         end
+        IngestController["IngestController<br/>(POST /api/v1/ingest/events)"]
         TelemetryController["TelemetryController"]
         WebhookController["WebhookController"]
         AIProxyController["AIProxyController"]
@@ -2547,12 +2564,12 @@ flowchart TB
     OpenAI -->|"usage API"| AIUsageSyncJob
     Gemini -->|"usage API"| AIUsageSyncJob
 
-    %% Telemetry → Temporal
-    CursorIDE -->|"POST /telemetry"| TelemetryController
-    ClaudeCode -->|"POST /telemetry"| TelemetryController
-    OpenCode -->|"POST /telemetry"| TelemetryController
+    %% Telemetry: @aixle/insights → Ingest → Temporal
+    InsightsAgent -->|"POST /api/v1/ingest/events<br/>(Bearer ingest token)"| IngestController
 
     %% ALL ingestion routes through Temporal for sanitization
+    IngestController -->|"raw event"| RawStore
+    IngestController -->|"start workflow"| TemporalServer
     WebhookController -->|"raw event"| RawStore
     WebhookController -->|"start workflow"| TemporalServer
     TelemetryController -->|"raw event"| RawStore
@@ -2630,9 +2647,9 @@ flowchart TB
 | **Anthropic** | Org | `api_call`, `completion`, tokens, cost | Real-time proxy + Hourly sync | ✅ Temporal |
 | **OpenAI** | Org | `api_call`, `completion`, tokens, cost | Real-time proxy + Hourly sync | ✅ Temporal |
 | **Gemini** | Org | `api_call`, `completion`, tokens, cost | Real-time proxy + Hourly sync | ✅ Temporal |
-| **Cursor** | User | `session_*`, `completion`, tokens | Real-time POST | ✅ Temporal |
-| **Claude Code** | User | `conversation_*`, `message`, `tool_use`, `loop_*` | Real-time POST | ✅ Temporal |
-| **OpenCode** | User | `conversation_*`, `message`, `tool_use` | Real-time POST | ✅ Temporal |
+| **Cursor** | User | `session_*`, `completion`, tokens | `@aixle/insights` → `POST /ingest/events` | ✅ Temporal |
+| **Claude Code** | User | `conversation_*`, `message`, `tool_use`, `loop_*` | `@aixle/insights` → `POST /ingest/events` | ✅ Temporal |
+| **OpenCode** | User | `conversation_*`, `message`, `tool_use` | `@aixle/insights` → `POST /ingest/events` | ✅ Temporal |
 
 ### Ingestion → Persistence Data Lifecycle
 
