@@ -26,4 +26,4 @@ This roadmap reflects where Aixle Insights has been and where it's headed. Items
 
 ## What's next
 
-Near-term roadmap items will be published here once confirmed. Watch the [GitHub Issues](https://github.com/AixleHQ/insights/issues) for in-progress work.
+We're actively developing Aixle Insights. Planned work includes deeper connector coverage, improved cost attribution, and self-hosted deployment guides. Watch [GitHub Issues](https://github.com/AixleHQ/insights/issues) and [Releases](https://github.com/AixleHQ/insights/releases) for specifics as they land.

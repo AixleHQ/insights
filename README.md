@@ -58,6 +58,10 @@ Aixle Insights is open source under the [Apache 2.0 License](LICENSE). Contribut
 
 External PRs require a DCO sign-off (`git commit -s`). See [CLA.md](CLA.md) for status.
 
+## Security
+
+Please do not report security vulnerabilities through public GitHub issues. Use [GitHub's private vulnerability reporting](https://github.com/AixleHQ/insights/security/advisories/new) instead. See [SECURITY.md](SECURITY.md) for details.
+
 ## License
 
 Apache License 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
