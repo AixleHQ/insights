@@ -5,10 +5,9 @@ hero:
   name: Aixle Insights
   text: AI tool analytics for engineering teams
   tagline: Track usage, cost, and risk across Claude, ChatGPT, Copilot, and 10+ other tools.
-  # image block intentionally omitted until a real screenshot exists:
-  # image:
-  #   src: /dashboard.gif
-  #   alt: Aixle Insights dashboard
+  image:
+    src: /insights/dashboard.png
+    alt: Aixle Insights dashboard
   actions:
     - theme: brand
       text: Quickstart →

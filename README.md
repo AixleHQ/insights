@@ -7,9 +7,7 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/AixleHQ/insights?style=social)](https://github.com/AixleHQ/insights)
 
-<!-- TODO: add a dashboard screenshot or GIF here before the public OSS launch.
-     Capture: main dashboard with events list + cost chart, using seeded data (make db-seed).
-     Tool: LICEcap or Kap for GIF; save to website/public/dashboard.gif and update this line. -->
+![Aixle Insights dashboard](website/public/dashboard.png)
 
 ## What it does
 
