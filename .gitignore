@@ -51,6 +51,11 @@ log/
 /packages/web/node_modules
 /packages/web/dist
 
+# VitePress docs site
+website/node_modules/
+website/.vitepress/dist/
+website/.vitepress/cache/
+
 # Temporal
 /temporal/vendor/bundle
 
