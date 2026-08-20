@@ -1,0 +1,51 @@
+# Code owners for Aixle Insights
+#
+# Each line maps a path pattern to the GitHub users or teams requested for review
+# when matching files change. Later matches take precedence.
+# Docs: https://docs.github.com/articles/about-code-owners
+#
+# The @AixleHQ/maintainers team must exist in the AixleHQ organization and hold
+# write access on this repository — GitHub silently ignores rules naming a team
+# it cannot resolve. Keep this list in sync with the maintainer roles described
+# in GOVERNANCE.md.
+
+# Default owners for everything in the repo
+*                                   @AixleHQ/maintainers
+
+# Backend (Rails API)
+/packages/api/                      @AixleHQ/maintainers
+/packages/api/app/policies/         @AixleHQ/maintainers
+/packages/api/app/services/         @AixleHQ/maintainers
+/packages/api/db/                   @AixleHQ/maintainers
+/packages/api/swagger/              @AixleHQ/maintainers
+
+# Frontend (React / Vite)
+/packages/web/                      @AixleHQ/maintainers
+
+# CLI & MCP connectors (published to npm)
+/packages/tools/                    @AixleHQ/maintainers
+
+# Workflows & infra
+/temporal/                          @AixleHQ/maintainers
+/keycloak/                          @AixleHQ/maintainers
+/docker/                            @AixleHQ/maintainers
+/.github/                           @AixleHQ/maintainers
+
+# Docs and project meta
+/README.md                          @AixleHQ/maintainers
+/architecture/                      @AixleHQ/maintainers
+/docs/                              @AixleHQ/maintainers
+/CONTRIBUTING.md                    @AixleHQ/maintainers
+/GOVERNANCE.md                      @AixleHQ/maintainers
+
+# Legal, licensing, and community health
+/LICENSE                            @AixleHQ/maintainers
+/NOTICE                             @AixleHQ/maintainers
+/NOTICES.md                         @AixleHQ/maintainers
+/THIRD-PARTY-LICENSES.md            @AixleHQ/maintainers
+/CLA.md                             @AixleHQ/maintainers
+/CLA-CORPORATE.md                   @AixleHQ/maintainers
+/DCO                                @AixleHQ/maintainers
+/TRADEMARK.md                       @AixleHQ/maintainers
+/CODE_OF_CONDUCT.md                 @AixleHQ/maintainers
+/SECURITY.md                        @AixleHQ/maintainers

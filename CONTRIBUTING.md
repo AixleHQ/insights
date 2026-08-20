@@ -70,7 +70,10 @@ Example: `feat(api): add connector health display`.
 3. Fill out the PR template — describe the change and how you verified it.
 4. CI runs RSpec, RuboCop, Brakeman, Vitest, ESLint, and TypeScript typecheck, plus the DCO and CLA checks.
 
-We review PRs on a best-effort basis. Thanks for helping improve Aixle Insights!
+Every PR needs at least one maintainer approval; substantial changes need two and
+should start as an issue. See [GOVERNANCE.md](GOVERNANCE.md) for who the
+maintainers are and how decisions get made. We review PRs on a best-effort
+basis. Thanks for helping improve Aixle Insights!
 
 ## Reporting security issues
 
@@ -79,9 +82,11 @@ Please do **not** open public issues for security vulnerabilities. See [SECURITY
 ## Developer Certificate of Origin (DCO)
 
 Every commit must carry a `Signed-off-by:` trailer certifying you have the right
-to submit the code under the project's license (see
+to submit the code under the project's license. The full text you are certifying
+against is in [`DCO`](DCO) at the root of this repository (Developer Certificate
+of Origin 1.1, also published at
 [developercertificate.org](https://developercertificate.org/)). Our DCO check
-verifies this on every pull request.
+verifies the trailer on every pull request.
 
 `make setup` (or `make hooks`) points git at `.githooks/`, which appends the
 sign-off automatically — so a plain `git commit` behaves like `git commit -s`.
@@ -112,11 +117,14 @@ The CLA grants the maintainers the rights needed to distribute, sublicense, and 
 if ever necessary — relicense the project, which a DCO sign-off alone does not
 provide. You keep full ownership of your contributions either way.
 
-- Contributing on your own behalf → the [Individual CLA](CLA.md#individual-cla)
+- Contributing on your own behalf → the [Individual CLA](CLA.md), signed
+  electronically through the bot
 - Contributing on behalf of an employer or other organization → your organization
-  executes the [Corporate CLA](CLA.md#corporate-cla); see its § 7 for how the two
+  executes the [Corporate CLA](CLA-CORPORATE.md); see its § 7 for how the two
   interact, and note that its Schedule A is an administrative convenience, not a
   condition of the license grant
+
+Questions about contribution rights: `legal.insights@aixle.com`.
 
 > The DCO certifies the **origin** of your contribution; the CLA grants the
 > project the **rights** to it. Both are required.
@@ -126,3 +134,9 @@ provide. You keep full ownership of your contributions either way.
 By contributing, you agree that your contributions will be licensed under the
 [Apache License 2.0](LICENSE), subject to the terms of the signed
 [CLA](CLA.md).
+
+If your change adds or updates a dependency, refresh
+[THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md) in the same PR, and flag
+anything that is not a plain permissive license so it can be assessed. Use of the
+project's name and logo is governed by [TRADEMARK.md](TRADEMARK.md), which the
+Apache License does not cover.
