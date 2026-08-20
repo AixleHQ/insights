@@ -469,7 +469,12 @@ cd packages/web && npx playwright test # E2E (starts servers automatically)
 
 Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for setup,
 conventions, and the PR process. By participating you agree to abide by our
-[Code of Conduct](CODE_OF_CONDUCT.md).
+[Code of Conduct](CODE_OF_CONDUCT.md). [GOVERNANCE.md](GOVERNANCE.md) explains
+who maintains the project, how decisions are made, and how releases are cut.
+
+Every commit needs a [DCO](DCO) sign-off, and a first contribution needs a signed
+[Individual CLA](CLA.md) — or, if you contribute on behalf of an employer, a
+[Corporate CLA](CLA-CORPORATE.md) executed by your organization.
 
 ## Security
 
@@ -482,11 +487,14 @@ Copyright 2026 Dualboot Partners, LLC
 
 Licensed under the [Apache License 2.0](LICENSE).
 
-Third-party licensing considerations (Redis, TimescaleDB TSL features, Sidekiq)
-are disclosed in [NOTICES.md](NOTICES.md).
+Third-party dependencies and their licenses are inventoried in
+[THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md); the components whose
+licensing affects how you may run or redistribute the stack (Redis, TimescaleDB
+TSL features, Sidekiq) are analysed in [NOTICES.md](NOTICES.md).
 
 "Aixle" and "Aixle Insights" are trademarks of Dualboot Partners, LLC. The
-Apache License does not grant permission to use these marks.
+Apache License does not grant permission to use these marks — see
+[TRADEMARK.md](TRADEMARK.md) for what is allowed without asking.
 
 The hosted service is governed by its own
 [Terms of Service](docs/legal/TERMS_OF_SERVICE.md) and

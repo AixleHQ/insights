@@ -10,9 +10,13 @@ releases are not guaranteed to receive backported fixes.
 **Please do not report security vulnerabilities through public GitHub issues,
 pull requests, or discussions.**
 
-Instead, report them privately using GitHub's
-[private vulnerability reporting](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability)
-("Report a vulnerability" under the repository's **Security** tab).
+Instead, report them privately through either channel:
+
+1. GitHub's
+   [private vulnerability reporting](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability)
+   ("Report a vulnerability" under the repository's **Security** tab) — preferred,
+   since it keeps the report, the fix, and the advisory in one place.
+2. Email — `security.insights@aixle.com`.
 
 When reporting, please include:
 

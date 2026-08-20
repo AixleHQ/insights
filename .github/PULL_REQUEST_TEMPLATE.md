@@ -18,6 +18,9 @@
 
 - [ ] `make lint` passes
 - [ ] `make test` passes
+- [ ] Every commit is signed off (`git commit -s`) per the [DCO](../DCO)
+- [ ] I have signed the [CLA](../CLA.md), or my organization has executed the
+      [Corporate CLA](../CLA-CORPORATE.md)
 - [ ] Swagger (`packages/api/swagger/v1/swagger.yaml`) updated if controllers/routes changed
 - [ ] Docs updated if behavior or architecture changed
 

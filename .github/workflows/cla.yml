@@ -6,8 +6,9 @@ name: CLA
 # rather than in a third-party service or a second repo, and is written with the
 # built-in GITHUB_TOKEN (no PAT needed).
 #
-# BLOCKING: the binding iCLA/cCLA text is published in CLA.md, so the check no longer
-# runs in advisory mode — a pull request whose committers have not signed fails here.
+# BLOCKING: the binding iCLA text is published in CLA.md (the cCLA lives in
+# CLA-CORPORATE.md and is executed offline), so the check no longer runs in advisory
+# mode — a pull request whose committers have not signed fails here.
 # The remaining step is outside this file: add "CLA" to the branch protection required
 # checks (needs the repo to be public or on a paid plan), so the failure also prevents
 # the merge button.
