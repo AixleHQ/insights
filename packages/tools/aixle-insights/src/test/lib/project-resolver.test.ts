@@ -438,7 +438,7 @@ describe("lookupProjectByRemote", () => {
 
     await lookupProjectByRemote("git@github.com:org/repo.git", "https://app.insights.example.com/", token, false);
     const calledUrl = mockFetch.mock.calls[0][0] as string;
-    expect(calledUrl).toMatch(/^https:\/\/app\.db90\.io\/api\//);
+    expect(calledUrl).toMatch(/^https:\/\/app\.insights\.example\.com\/api\//);
     expect(calledUrl).not.toContain("//api");
   });
 });
